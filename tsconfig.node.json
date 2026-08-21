@@ -9,8 +9,8 @@
     "skipLibCheck": true,
     "types": ["node", "electron"],
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@renderer/*": ["src/renderer/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@renderer/*": ["./src/renderer/*"]
     }
   },
   "include": [

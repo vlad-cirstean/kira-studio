@@ -14,7 +14,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "bun run typecheck:node && bun run typecheck:web",
-    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:node": "tsgo --noEmit -p tsconfig.node.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "test:ui": "electron-vite build && playwright test"
   },
@@ -23,12 +23,13 @@
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "26.2.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
     "@vscode/codicons": "0.0.46-24",
     "electron": "43.4.1",
     "electron-vite": "5.0.0",
     "tailwindcss": "4.3.3",
-    "typescript": "7.0.2",
+    "typescript": "5.9.3",
     "vite": "7.3.6",
     "vue": "3.5.41",
     "vue-tsc": "3.3.11"

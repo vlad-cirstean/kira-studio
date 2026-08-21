@@ -5,13 +5,16 @@
 
 ## Implementation addenda (recorded by Sonnet during Step 1)
 
-- **D8/D9 superseded.** At install time (2026-08-21), `typescript@7.0.2` is a published **stable**
-  release and `vue-tsc@3.3.11` declares `peerDependencies: { typescript: '>=5.0.0' }`, accepting
-  it. This is the exact convergence §3 anticipated ("converge on one toolchain once `vue-tsc` runs
-  on TS7"), so it is done now rather than deferred: `@typescript/native-preview`/`tsgo` are **not**
-  installed. Both `typecheck:node` and `typecheck:web` run against the same `typescript@7.0.2` —
-  `tsc --noEmit` and `vue-tsc --noEmit` respectively. The two-tsconfig split (D8) is otherwise
-  unchanged (still two configs, still no `-b` build-mode).
+- **D8/D9 confirmed as originally written — convergence attempted and reverted.**
+  `typescript@7.0.2` is now a published stable release, and `vue-tsc@3.3.11` nominally accepts it
+  (`peerDependencies: { typescript: '>=5.0.0' }`), so the toolchain was briefly unified on it. It
+  does not actually work: `vue-tsc` shells out to `require.resolve('typescript/lib/tsc')`, a path
+  TS7 no longer exports (`ERR_PACKAGE_PATH_NOT_EXPORTED`), so `vue-tsc` on TS7 fails at runtime
+  despite the permissive peer range. **Reverted to D8/D9 exactly as planned**: `tsconfig.node.json`
+  is checked with `tsgo` (from `@typescript/native-preview@7.0.0-dev.20260707.2`, since no stable
+  release of the package itself exists yet — see D9), `tsconfig.web.json` is checked with
+  `vue-tsc@3.3.11` against `typescript@5.9.3`. §3's convergence note still does not hold; revisit
+  once a `vue-tsc` release drops the `lib/tsc` require.
 - **Dependency versions bumped to actual current releases**, not the plan's placeholder ranges
   (which were written without a live registry check): `electron@43.4.1`, `electron-vite@5.0.0`,
   `vite@7.3.6` (pinned below `electron-vite@5`'s supported peer ceiling — `vite@8.x` is out, is
