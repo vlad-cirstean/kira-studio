@@ -1,8 +1,9 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, MessageChannelMain } from 'electron';
+import { app, BrowserWindow, Menu, MessageChannelMain } from 'electron';
 import { startEngine } from './engine-host';
 import { registerIpc } from './ipc';
 import { log } from './log';
+import { buildMenu } from './menu';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
@@ -12,6 +13,7 @@ app.setName('Kira Studio');
 if (process.env.KIRA_HOME) {
   app.setPath('userData', join(kiraHome(), 'electron'));
 }
+Menu.setApplicationMenu(buildMenu());
 
 async function main(): Promise<void> {
   await app.whenReady();

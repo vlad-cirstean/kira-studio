@@ -12,4 +12,7 @@ export const control = {
   layoutSet: (patch: LayoutPatch): Promise<Layout> => kira.layoutSet(patch),
   engineStatus: (): Promise<EngineStatus> => kira.engineStatus(),
   onEngineState: (cb: (status: EngineStatus) => void): (() => void) => kira.onEngineState(cb),
+  onOpenSettings: (cb: () => void): (() => void) => kira.onOpenSettings(cb),
+  onToggleProjectPanel: (cb: () => void): (() => void) => kira.onToggleProjectPanel(cb),
+  onToggleOperationsPanel: (cb: () => void): (() => void) => kira.onToggleOperationsPanel(cb),
 };

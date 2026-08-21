@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import Codicon from '../theme/Codicon.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { engineState } from './state/engine';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from './state/layout';
-
-const settingsOpen = ref(false);
+import { settingsOpen } from './state/settings';
 </script>
 
 <template>

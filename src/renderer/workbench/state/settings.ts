@@ -1,8 +1,9 @@
 import { defaultSettings, type Settings, type SettingsPatch } from '@shared/settings';
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { control } from '../../bridge/control';
 
 export const settingsState = reactive<Settings>(structuredClone(defaultSettings));
+export const settingsOpen = ref(false);
 
 export function applyAppearance(): void {
   const root = document.documentElement.style;

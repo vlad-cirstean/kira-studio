@@ -16,6 +16,21 @@ const kiraApi: KiraApi = {
     ipcRenderer.on(IPC.engineState, listener);
     return () => ipcRenderer.off(IPC.engineState, listener);
   },
+  onOpenSettings: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.openSettings, listener);
+    return () => ipcRenderer.off(IPC.openSettings, listener);
+  },
+  onToggleProjectPanel: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.toggleProjectPanel, listener);
+    return () => ipcRenderer.off(IPC.toggleProjectPanel, listener);
+  },
+  onToggleOperationsPanel: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.toggleOperationsPanel, listener);
+    return () => ipcRenderer.off(IPC.toggleOperationsPanel, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('kira', kiraApi);

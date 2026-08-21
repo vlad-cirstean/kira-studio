@@ -10,6 +10,9 @@ export const IPC = {
   engineStatus: 'kira:engine:status',
   port: 'kira:port',
   engineState: 'kira:engine:state',
+  openSettings: 'kira:open-settings',
+  toggleProjectPanel: 'kira:menu:toggle-project-panel',
+  toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
 } as const;
 
 export interface AppInfo {
@@ -33,4 +36,7 @@ export interface KiraApi {
   layoutSet(patch: LayoutPatch): Promise<Layout>;
   engineStatus(): Promise<EngineStatus>;
   onEngineState(cb: (status: EngineStatus) => void): () => void;
+  onOpenSettings(cb: () => void): () => void;
+  onToggleProjectPanel(cb: () => void): () => void;
+  onToggleOperationsPanel(cb: () => void): () => void;
 }
