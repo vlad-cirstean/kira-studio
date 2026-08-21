@@ -3,5 +3,5 @@ import EmptyState from './EmptyState.vue';
 </script>
 
 <template>
-  <EmptyState icon="tools" label="No connection selected" />
+  <EmptyState icon="tools" label="No connection selected" compact />
 </template>
