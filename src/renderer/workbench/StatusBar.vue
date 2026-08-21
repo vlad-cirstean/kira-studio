@@ -9,29 +9,6 @@ import { settingsOpen } from './state/settings';
 <template>
   <div class="status-bar" :style="{ height: 'var(--kira-statusbar-h)' }">
     <div class="side">
-      <button
-        type="button"
-        class="toggle-button"
-        :class="{ active: layoutState.panel.project.visible }"
-        data-testid="toggle-project-panel"
-        @click="toggleProjectPanel"
-      >
-        <Codicon name="layout-sidebar-left" :size="14" />
-        Project
-      </button>
-      <button
-        type="button"
-        class="toggle-button"
-        :class="{ active: layoutState.panel.operations.visible }"
-        data-testid="toggle-operations-panel"
-        @click="toggleOperationsPanel"
-      >
-        <Codicon name="layout-panel" :size="14" />
-        Operations
-      </button>
-    </div>
-
-    <div class="side">
       <span
         class="engine-indicator"
         data-testid="engine-status"
@@ -45,6 +22,32 @@ import { settingsOpen } from './state/settings';
         />
         engine {{ engineState.status }}
       </span>
+      <button
+        type="button"
+        class="toggle-button"
+        data-testid="toggle-project-panel"
+        aria-label="Toggle Project Panel"
+        :aria-pressed="layoutState.panel.project.visible"
+        @click="toggleProjectPanel"
+      >
+        <Codicon
+          :name="layoutState.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
+          :size="14"
+        />
+      </button>
+      <button
+        type="button"
+        class="toggle-button"
+        data-testid="toggle-operations-panel"
+        aria-label="Toggle Operations Panel"
+        :aria-pressed="layoutState.panel.operations.visible"
+        @click="toggleOperationsPanel"
+      >
+        <Codicon
+          :name="layoutState.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
+          :size="14"
+        />
+      </button>
       <button
         type="button"
         class="toggle-button"
@@ -66,7 +69,7 @@ import { settingsOpen } from './state/settings';
 .status-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0 8px;
   font-size: 11px;
   color: var(--kira-fg-muted);
@@ -87,8 +90,8 @@ import { settingsOpen } from './state/settings';
 .toggle-button {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px;
+  justify-content: center;
+  width: 18px;
   height: 18px;
   border-radius: var(--kira-radius);
   color: var(--kira-fg-muted);
@@ -99,10 +102,6 @@ import { settingsOpen } from './state/settings';
 
 .toggle-button:hover {
   background: var(--kira-hover);
-}
-
-.toggle-button.active {
-  background: var(--kira-select);
   color: var(--kira-fg);
 }
 </style>
