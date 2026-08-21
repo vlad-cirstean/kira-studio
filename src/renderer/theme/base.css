@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "@vscode/codicons/dist/codicon.css";
+@import "./tokens.css";
+
+/* Maps the token set into Tailwind v4's CSS-first config, so utilities like
+   `bg-chrome` / `text-muted` exist alongside the raw custom properties. */
+@theme {
+  --color-bg: var(--kira-bg);
+  --color-elevated: var(--kira-bg-elevated);
+  --color-chrome: var(--kira-bg-chrome);
+  --color-input: var(--kira-bg-input);
+  --color-fg: var(--kira-fg);
+  --color-muted: var(--kira-fg-muted);
+  --color-disabled: var(--kira-fg-disabled);
+  --color-border: var(--kira-border);
+  --color-border-strong: var(--kira-border-strong);
+  --color-focus: var(--kira-focus);
+  --color-accent: var(--kira-accent);
+  --color-accent-fg: var(--kira-accent-fg);
+  --color-select: var(--kira-select);
+  --color-hover: var(--kira-hover);
+  --color-badge: var(--kira-badge);
+  --color-error: var(--kira-error);
+  --color-warn: var(--kira-warn);
+  --color-ok: var(--kira-ok);
+  --color-info: var(--kira-info);
+
+  --color-conn-red: var(--kira-conn-red);
+  --color-conn-orange: var(--kira-conn-orange);
+  --color-conn-amber: var(--kira-conn-amber);
+  --color-conn-olive: var(--kira-conn-olive);
+  --color-conn-green: var(--kira-conn-green);
+  --color-conn-teal: var(--kira-conn-teal);
+  --color-conn-cyan: var(--kira-conn-cyan);
+  --color-conn-blue: var(--kira-conn-blue);
+  --color-conn-indigo: var(--kira-conn-indigo);
+  --color-conn-violet: var(--kira-conn-violet);
+  --color-conn-magenta: var(--kira-conn-magenta);
+  --color-conn-grey: var(--kira-conn-grey);
+
+  --radius-kira: var(--kira-radius);
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-font-size);
+  color: var(--kira-fg);
+  background: var(--kira-bg-chrome);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.cm-editor {
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kira-scrollbar);
+  border-radius: var(--kira-radius);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

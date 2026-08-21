@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import Codicon from './theme/Codicon.vue';
 import { engineState, initEngineState } from './workbench/state/engine';
 
 onMounted(() => {
@@ -8,19 +9,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Temporary placeholder for Step 3 verification; replaced by WorkbenchShell in Step 6. -->
+  <!-- Temporary placeholder for Step 3/5 verification; replaced by WorkbenchShell in Step 6. -->
   <div
-    style="
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ccc;
-      background: #1f1f1f;
-      font-family: 'SF Mono', Menlo, monospace;
-    "
+    class="bg-chrome text-fg flex h-full items-center justify-center gap-1.5"
     data-testid="status-bar"
   >
+    <Codicon
+      :name="engineState.status === 'ok' ? 'pass-filled' : 'error'"
+      :style="{ color: engineState.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
+    />
     engine {{ engineState.status }}<span v-if="engineState.lastPingMs !== null">
       · {{ engineState.lastPingMs }} ms</span
     >
