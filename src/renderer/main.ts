@@ -1,5 +1,12 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import './theme/base.css';
+import { hydrateLayout } from './workbench/state/layout';
+import { hydrateSettings } from './workbench/state/settings';
 
-createApp(App).mount('#app');
+async function bootstrap(): Promise<void> {
+  await Promise.all([hydrateLayout(), hydrateSettings()]);
+  createApp(App).mount('#app');
+}
+
+void bootstrap();
