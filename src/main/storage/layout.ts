@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   defaultLayout,
   type Layout,
@@ -6,9 +7,10 @@ import {
   layoutSchema,
 } from '../../shared/layout';
 import type { Db } from './db';
+import { uiLayout } from './schema';
 
-function read(db: Db): Map<string, unknown> {
-  const rows = db.all('SELECT key, value FROM ui_layout') as { key: string; value: string }[];
+async function read(db: Db): Promise<Map<string, unknown>> {
+  const rows = await db.select().from(uiLayout);
   return new Map(rows.map((r) => [r.key, JSON.parse(r.value) as unknown]));
 }
 
@@ -16,8 +18,8 @@ function pick(stored: Map<string, unknown>, key: string, fallback: unknown): unk
   return stored.has(key) ? stored.get(key) : fallback;
 }
 
-export function getAllLayout(db: Db): Layout {
-  const stored = read(db);
+export async function getAllLayout(db: Db): Promise<Layout> {
+  const stored = await read(db);
   const candidate = {
     panel: {
       project: {
@@ -53,9 +55,9 @@ function flatten(layout: Layout): [string, unknown][] {
   ];
 }
 
-export function setLayout(db: Db, patch: LayoutPatch): Layout {
+export async function setLayout(db: Db, patch: LayoutPatch): Promise<Layout> {
   const validPatch = layoutPatchSchema.parse(patch);
-  const current = getAllLayout(db);
+  const current = await getAllLayout(db);
   const merged: Layout = {
     panel: {
       project: { ...current.panel.project, ...validPatch.panel?.project },
@@ -65,13 +67,15 @@ export function setLayout(db: Db, patch: LayoutPatch): Layout {
     window: { ...current.window, ...validPatch.window },
   };
 
-  db.transaction(() => {
+  await db.transaction(async (tx) => {
     for (const [key, value] of flatten(merged)) {
-      db.run(
-        'INSERT INTO ui_layout (key, value) VALUES (?, ?) ' +
-          'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        [key, JSON.stringify(value)],
-      );
+      await tx
+        .insert(uiLayout)
+        .values({ key, value: JSON.stringify(value) })
+        .onConflictDoUpdate({
+          target: uiLayout.key,
+          set: { value: sql`excluded.value` },
+        });
     }
   });
 

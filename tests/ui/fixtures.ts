@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron, test as base, type ElectronApplication, type Page } from '@playwright/test';
 
-const mainEntry = resolve(__dirname, '../../out/main/index.js');
+const mainEntry = resolve(__dirname, '../../out-test/main/index.js');
 
 export interface KiraApp {
   app: ElectronApplication;

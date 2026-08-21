@@ -16,25 +16,33 @@
     "typecheck": "bun run typecheck:node && bun run typecheck:web",
     "typecheck:node": "tsgo --noEmit -p tsconfig.node.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
-    "test:ui": "electron-vite build && playwright test"
+    "test:ui": "EVITE_OUT_DIR=out-test electron-vite build && playwright test",
+    "test:db": "bun test tests/db",
+    "db:generate": "drizzle-kit generate"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "26.2.0",
+    "@types/pg": "8.23.1",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
     "@vscode/codicons": "0.0.46-24",
+    "bun-types": "1.4.0",
+    "drizzle-kit": "0.31.10",
     "electron": "43.4.1",
     "electron-vite": "5.0.0",
     "tailwindcss": "4.3.3",
+    "testcontainers": "12.1.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vue": "3.5.41",
     "vue-tsc": "3.3.11"
   },
   "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0",
     "zod": "4.4.3"
   }
 }

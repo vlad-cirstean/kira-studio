@@ -1,32 +1,29 @@
-import { log } from '../log';
-import type { Db } from './db';
-import { migrations } from './migrations';
+import { resolve } from 'node:path';
+import { migrate as drizzleMigrate } from 'drizzle-orm/sqlite-proxy/migrator';
+import type { Db, RawDb } from './db';
 
-export function migrate(db: Db): void {
-  db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
-  const row = db.get('SELECT version FROM schema_version LIMIT 1') as
-    | { version: number }
-    | undefined;
-  if (!row) {
-    db.run('INSERT INTO schema_version (version) VALUES (0)');
-  }
-  let current = row?.version ?? 0;
-
-  const maxVersion = migrations[migrations.length - 1]?.version ?? 0;
-  if (current > maxVersion) {
-    throw new Error(
-      `Database schema_version (${current}) is newer than this build knows about ` +
-        `(${maxVersion}) — refusing to run against a downgraded app.`,
-    );
-  }
-
-  for (const m of migrations) {
-    if (m.version <= current) continue;
-    db.transaction(() => {
-      db.exec(m.sql);
-      db.run('UPDATE schema_version SET version = ?', [m.version]);
-    });
-    log('info', 'migrate', `applied ${m.name} (version ${m.version})`);
-    current = m.version;
-  }
+// Applies drizzle-kit migrations (generated from schema.ts via `bun run db:generate`) using
+// drizzle's migrator, which tracks applied migrations by hash in `__drizzle_migrations`. The
+// migrator hands back a flat list of SQL statements; we run them in one transaction through the
+// raw node:sqlite handle (drizzle has no multi-statement `exec`, but the proxy callback can only
+// run prepared single statements, so the raw handle is still the right tool for DDL here).
+//
+// P1 does not package, so the migrations folder is resolved from the process working directory
+// (dev and the Playwright harness both run from the project root). A packaged app must ship the
+// `drizzle/` folder and resolve it from `app.getAppPath()` instead.
+export async function migrate(db: Db, raw: RawDb): Promise<void> {
+  await drizzleMigrate(
+    db,
+    async (queries) => {
+      raw.exec('BEGIN');
+      try {
+        for (const query of queries) raw.exec(query);
+        raw.exec('COMMIT');
+      } catch (err) {
+        raw.exec('ROLLBACK');
+        throw err;
+      }
+    },
+    { migrationsFolder: resolve(process.cwd(), 'drizzle') },
+  );
 }

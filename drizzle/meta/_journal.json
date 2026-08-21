@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787342284387,
+      "tag": "0000_gorgeous_calypso",
+      "breakpoints": true
+    }
+  ]
+}

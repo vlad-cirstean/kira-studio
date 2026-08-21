@@ -6,7 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!out", "!dist", "!test-results", "!playwright-report", "!node_modules"]
+    "includes": [
+      "**",
+      "!out",
+      "!out-test",
+      "!dist",
+      "!test-results",
+      "!playwright-report",
+      "!node_modules",
+      "!drizzle"
+    ]
   },
   "formatter": {
     "enabled": true,

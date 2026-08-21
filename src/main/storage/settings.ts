@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   defaultSettings,
   type Settings,
@@ -6,11 +7,12 @@ import {
   settingsSchema,
 } from '../../shared/settings';
 import type { Db } from './db';
+import { settings } from './schema';
 
 const PREFIX = 'appearance.';
 
-export function getAllSettings(db: Db): Settings {
-  const rows = db.all('SELECT key, value FROM settings') as { key: string; value: string }[];
+export async function getAllSettings(db: Db): Promise<Settings> {
+  const rows = await db.select().from(settings);
   const stored = new Map(rows.map((r) => [r.key, JSON.parse(r.value) as unknown]));
   const candidate = {
     appearance: {
@@ -23,18 +25,20 @@ export function getAllSettings(db: Db): Settings {
   return settingsSchema.parse(candidate);
 }
 
-export function setSettings(db: Db, patch: SettingsPatch): Settings {
+export async function setSettings(db: Db, patch: SettingsPatch): Promise<Settings> {
   const validPatch = settingsPatchSchema.parse(patch);
-  const current = getAllSettings(db);
+  const current = await getAllSettings(db);
   const merged: Settings = { appearance: { ...current.appearance, ...validPatch.appearance } };
 
-  db.transaction(() => {
+  await db.transaction(async (tx) => {
     for (const [suffix, value] of Object.entries(merged.appearance)) {
-      db.run(
-        'INSERT INTO settings (key, value) VALUES (?, ?) ' +
-          'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        [`${PREFIX}${suffix}`, JSON.stringify(value)],
-      );
+      await tx
+        .insert(settings)
+        .values({ key: `${PREFIX}${suffix}`, value: JSON.stringify(value) })
+        .onConflictDoUpdate({
+          target: settings.key,
+          set: { value: sql`excluded.value` },
+        });
     }
   });
 
