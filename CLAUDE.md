@@ -16,8 +16,7 @@
   Subagents are fine for genuinely independent, parallelizable, or throwaway research (e.g.
   "how does the `pg` driver handle cancellation?") — not for writing the phase's code.
 - No per-phase PRs. One feature branch for all of v1.
-- Run `/compact` after each finished logical unit or step, before starting the next one, so
-  context stays small and the next step begins clean, instead of spawning a subagent to avoid
-  context growth.
+- Autocompact is configured, so context management is handled automatically — do not stop
+  implementation to manually `/compact` between steps.
 
 Full spec: `docs/SPEC.md`.
