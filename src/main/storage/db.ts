@@ -8,7 +8,10 @@ export interface Db {
   exec(sql: string): void;
   get(sql: string, params?: SqlParam[]): Record<string, unknown> | undefined;
   all(sql: string, params?: SqlParam[]): Record<string, unknown>[];
-  run(sql: string, params?: SqlParam[]): { changes: number | bigint; lastInsertRowid: number | bigint };
+  run(
+    sql: string,
+    params?: SqlParam[],
+  ): { changes: number | bigint; lastInsertRowid: number | bigint };
   transaction<T>(fn: () => T): T;
   close(): void;
 }

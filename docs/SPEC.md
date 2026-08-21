@@ -8,7 +8,7 @@ A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScri
 
 ## 1. Scope
 
-**In scope (v1):** MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS. macOS only. Dark mode only.
+**In scope (v1):** MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, S3. macOS only. Dark mode only.
 Read paths complete. Write paths: **add row, delete row, and cell editing** — all staged as pending
 changes with an exact-command preview. **DDL is read-only** but modelled for editing.
 
@@ -19,6 +19,10 @@ every mutation path.
 **Explicitly deferred:** credential encryption, MySQL, SQLite-as-target, light mode, Windows/Linux,
 DDL editing, unit tests, code signing/notarization, auto-update. Deferred to v2: **SSH tunnel**.
 Out for v1: export to CSV/JSON, connection folders/groups, split editor groups, multiple windows.
+
+**Deferred to the end of the v1 plan:** **pre-connect scripts** — an optional per-connection shell
+command (e.g. a port-forward) run before connecting; if the process exits while the connection is
+in use, the connection is marked disconnected. See phase **P12** in §10.
 
 ---
 
@@ -76,6 +80,7 @@ See §7.
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | DDL tab, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
+| Validation | Zod | runtime validation at every trust boundary: IPC control-channel payloads, stored settings/layout/connection rows read back from SQLite, connection-dialog input |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
 | Storage | SQLite at `~/.kira-studio/kira.sqlite` | `node:sqlite` if it holds up, else `better-sqlite3` — implementation detail behind the storage module |
 | Packaging | electron-builder | unsigned local builds; signing/notarization after v1 |
@@ -84,7 +89,7 @@ See §7.
 
 Driver libraries — the best-maintained option per engine: `pg`, `mariadb`, `mongodb`, `ioredis`,
 `@confluentinc/kafka-javascript` (native, heavier, but actively maintained where `kafkajs` has
-stalled), `@aws-sdk/client-sqs`.
+stalled), `@aws-sdk/client-sqs`, `@aws-sdk/client-s3`.
 
 App identity: organisation **kirathecat**, bundle ID `com.kirathecat.kira-studio`. No auto-update.
 
@@ -171,6 +176,7 @@ type OpCtx = { opId: string; signal: AbortSignal; onProgress?: (p: Progress) => 
 | Redis | db index → key namespaces (split on `:`) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
 | Kafka | cluster → topics, consumer groups | stream | offset window per partition | end-offset − begin-offset | stop consumer, `AbortSignal` |
 | SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | `AbortSignal` on the SDK call |
+| S3 | account → buckets → prefixes/objects (lazy, `/`-delimited) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
 
 **SQS read policy.** Reads are **never automatic**. The stream view has an explicit **Poll** button
 with a visible warning that `ReceiveMessage` makes messages invisible to real consumers for the
@@ -205,7 +211,13 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 tabs(id, connection_id, path, kind, state_json, order, active)  -- session restore, §8.4
 ```
 
-Migrations are forward-only numbered SQL files applied on startup.
+Migrations are forward-only numbered SQL files applied on startup. Every row read back out of
+`settings`, `ui_layout` and `connections` is parsed through a Zod schema before use, so a hand-edited
+or stale-shape row fails loudly instead of propagating `undefined`s into the UI.
+
+S3 connections reuse the existing `connections` columns: `host`/`port`/`database` are unused, the AWS
+**named profile** goes in `username`, bucket/region/prefix defaults live in `options_json`, and static
+keys (accepted only in URI mode, per the SQS policy in §5.1) go in `uri`.
 
 ---
 
@@ -485,6 +497,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P9 Redis** | Adapter + key/value view | Second non-tabular shape |
 | **P10 Kafka + SQS** | Adapters + stream view | Most divergent semantics; benefits from everything above |
 | **P11 Hardening** | Memory/perf pass against §2 budgets, cache tuning, cold-start time, unsigned packaging | Measure once the surface is complete |
+| **P12 Pre-connect scripts** | Per-connection optional shell command (e.g. port-forward) run before connect; connection marked disconnected if the process exits while in use; config UI in the connection dialog | Cuts across every adapter, so it comes last — nothing else depends on it |
 
 ---
 
@@ -494,7 +507,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 src/
   main/          window, menus, storage (SQLite), settings, op-log persistence, IPC
   engine/        utilityProcess host: adapter registry, cache tiers, op scheduler, cancellation
-    adapters/    postgres/ mariadb/ mongo/ redis/ kafka/ sqs/   (one dir each)
+    adapters/    postgres/ mariadb/ mongo/ redis/ kafka/ sqs/ s3/   (one dir each)
   renderer/      Vue app
     workbench/   shell, panels, status bar, settings dialog, context-menu service
     project/     tree, connection dialog, filters, search
@@ -515,6 +528,6 @@ docs/
   `docs/plans/`, then Sonnet executes it.
 - Docs and comments: minimal and explanatory — say what is happening and why, never restate the code.
 - **One feature branch for all of v1.** No per-phase PRs — there is nothing to review against.
-- **Run `/compact` after each finished logical unit or step**, before starting the next one, so the
-  context stays small and the next step begins clean.
+- Autocompact is configured, so context management is handled automatically — do not stop
+  implementation to manually `/compact` between steps.
 - Biome default rules, no exceptions files without a reason recorded.

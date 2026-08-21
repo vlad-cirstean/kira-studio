@@ -30,6 +30,28 @@
   `linter.rules.recommended` → `linter.rules.preset`, folder ignores in `files.includes` written
   without a trailing `/**`, which is deprecated since Biome 2.2.0).
 
+## Implementation addenda (recorded by Sonnet during Steps 3-4)
+
+- **`biome.json` gets a `**/*.vue` override** disabling `correctness.noUnusedImports` /
+  `noUnusedVariables`. Biome lints a Vue SFC's `<script>` block in isolation and cannot see
+  template-only references, so every import used only in `<template>` (e.g. a reactive state
+  object) reads as unused. This will recur throughout Step 6 — do not chase it file-by-file.
+- **Bug found and fixed: `schema_version` was created twice.** `migrate.ts`'s bootstrap already does
+  `CREATE TABLE IF NOT EXISTS schema_version` + seed; `0001_init.sql` also had a
+  `CREATE TABLE schema_version (...)` (without `IF NOT EXISTS`), so applying it collided with the
+  table the runner had just created and start-up crashed. Fixed by deleting that block from
+  `0001_init.sql` and leaving an explanatory comment — migrations must never touch
+  `schema_version`, only `migrate.ts` owns it (this was already the plan's intent in Step 4c, just
+  misread on first pass).
+- **Zod added as the validation library** (SPEC.md §3, added after P0 Steps 3-4 were already
+  committed). Applies going forward from Step 5 onward, and was retrofitted into the already-built
+  Step 3-4 surfaces: `settings.ts`/`layout.ts` parse each row read back from SQLite through a Zod
+  schema before merging over defaults (a hand-edited or stale-shape row now fails loudly instead of
+  silently propagating `undefined` into the UI), and the `ipc.ts` `kira:settings:set` /
+  `kira:layout:set` handlers validate the incoming patch shape before it reaches storage.
+- **Ground rule "`/compact` after each numbered step" (§0) is stale.** Autocompact is now configured
+  (see `CLAUDE.md`/SPEC.md §12); do not stop between steps to compact manually.
+
 ## 0. Ground rules for this phase
 
 - Build **only** what P0 lists. Anything that needs a database driver, a tree, or a data view is P1+. See §9 (Out of scope) at the end — read it before starting, and re-read it if you feel tempted to "just add".

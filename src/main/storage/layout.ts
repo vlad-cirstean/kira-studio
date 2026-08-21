@@ -2,7 +2,8 @@ import {
   defaultLayout,
   type Layout,
   type LayoutPatch,
-  type WindowBounds,
+  layoutPatchSchema,
+  layoutSchema,
 } from '../../shared/layout';
 import type { Db } from './db';
 
@@ -11,13 +12,13 @@ function read(db: Db): Map<string, unknown> {
   return new Map(rows.map((r) => [r.key, JSON.parse(r.value) as unknown]));
 }
 
-function pick<T>(stored: Map<string, unknown>, key: string, fallback: T): T {
-  return stored.has(key) ? (stored.get(key) as T) : fallback;
+function pick(stored: Map<string, unknown>, key: string, fallback: unknown): unknown {
+  return stored.has(key) ? stored.get(key) : fallback;
 }
 
 export function getAllLayout(db: Db): Layout {
   const stored = read(db);
-  return {
+  const candidate = {
     panel: {
       project: {
         visible: pick(stored, 'panel.project.visible', defaultLayout.panel.project.visible),
@@ -33,9 +34,11 @@ export function getAllLayout(db: Db): Layout {
       },
     },
     window: {
-      bounds: pick<WindowBounds | null>(stored, 'window.bounds', defaultLayout.window.bounds),
+      bounds: pick(stored, 'window.bounds', defaultLayout.window.bounds),
     },
   };
+  // A hand-edited or stale-shape row must fail loudly here, not propagate `undefined`s into the UI.
+  return layoutSchema.parse(candidate);
 }
 
 function flatten(layout: Layout): [string, unknown][] {
@@ -51,14 +54,15 @@ function flatten(layout: Layout): [string, unknown][] {
 }
 
 export function setLayout(db: Db, patch: LayoutPatch): Layout {
+  const validPatch = layoutPatchSchema.parse(patch);
   const current = getAllLayout(db);
   const merged: Layout = {
     panel: {
-      project: { ...current.panel.project, ...patch.panel?.project },
-      operations: { ...current.panel.operations, ...patch.panel?.operations },
-      cellEditor: { ...current.panel.cellEditor, ...patch.panel?.cellEditor },
+      project: { ...current.panel.project, ...validPatch.panel?.project },
+      operations: { ...current.panel.operations, ...validPatch.panel?.operations },
+      cellEditor: { ...current.panel.cellEditor, ...validPatch.panel?.cellEditor },
     },
-    window: { ...current.window, ...patch.window },
+    window: { ...current.window, ...validPatch.window },
   };
 
   db.transaction(() => {

@@ -1,29 +1,44 @@
-export interface WindowBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import { z } from 'zod';
 
-export interface Layout {
-  panel: {
-    project: { visible: boolean; width: number };
-    operations: { visible: boolean; height: number };
-    cellEditor: { visible: boolean; height: number };
-  };
-  window: {
-    bounds: WindowBounds | null;
-  };
-}
+export const windowBoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+export type WindowBounds = z.infer<typeof windowBoundsSchema>;
 
-export interface LayoutPatch {
-  panel?: {
-    project?: Partial<Layout['panel']['project']>;
-    operations?: Partial<Layout['panel']['operations']>;
-    cellEditor?: Partial<Layout['panel']['cellEditor']>;
-  };
-  window?: Partial<Layout['window']>;
-}
+const panelProjectSchema = z.object({ visible: z.boolean(), width: z.number() });
+const panelOperationsSchema = z.object({ visible: z.boolean(), height: z.number() });
+const panelCellEditorSchema = z.object({ visible: z.boolean(), height: z.number() });
+
+export const layoutSchema = z.object({
+  panel: z.object({
+    project: panelProjectSchema,
+    operations: panelOperationsSchema,
+    cellEditor: panelCellEditorSchema,
+  }),
+  window: z.object({
+    bounds: windowBoundsSchema.nullable(),
+  }),
+});
+export type Layout = z.infer<typeof layoutSchema>;
+
+export const layoutPatchSchema = z.object({
+  panel: z
+    .object({
+      project: panelProjectSchema.partial().optional(),
+      operations: panelOperationsSchema.partial().optional(),
+      cellEditor: panelCellEditorSchema.partial().optional(),
+    })
+    .optional(),
+  window: z
+    .object({
+      bounds: windowBoundsSchema.nullable().optional(),
+    })
+    .optional(),
+});
+export type LayoutPatch = z.infer<typeof layoutPatchSchema>;
 
 export const defaultLayout: Layout = {
   panel: {
