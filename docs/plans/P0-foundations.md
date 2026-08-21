@@ -3,6 +3,30 @@
 > Plan for SPEC.md §10 phase **P0**. Authored by Opus, executed by Sonnet.
 > Deliverable: *Bun + Biome + TS7 + electron-vite; three-process skeleton with MessagePort; SQLite storage + migrations; dark theme tokens + codicons; workbench shell (panels, status bar toggles, settings dialog with fonts); Playwright harness that launches and screenshots the app.*
 
+## Implementation addenda (recorded by Sonnet during Step 1)
+
+- **D8/D9 superseded.** At install time (2026-08-21), `typescript@7.0.2` is a published **stable**
+  release and `vue-tsc@3.3.11` declares `peerDependencies: { typescript: '>=5.0.0' }`, accepting
+  it. This is the exact convergence §3 anticipated ("converge on one toolchain once `vue-tsc` runs
+  on TS7"), so it is done now rather than deferred: `@typescript/native-preview`/`tsgo` are **not**
+  installed. Both `typecheck:node` and `typecheck:web` run against the same `typescript@7.0.2` —
+  `tsc --noEmit` and `vue-tsc --noEmit` respectively. The two-tsconfig split (D8) is otherwise
+  unchanged (still two configs, still no `-b` build-mode).
+- **Dependency versions bumped to actual current releases**, not the plan's placeholder ranges
+  (which were written without a live registry check): `electron@43.4.1`, `electron-vite@5.0.0`,
+  `vite@7.3.6` (pinned below `electron-vite@5`'s supported peer ceiling — `vite@8.x` is out, is
+  newer than what `electron-vite@5.0.0` supports), `vue@3.5.41`, `vue-tsc@3.3.11`,
+  `@vitejs/plugin-vue@6.0.8`, `tailwindcss`/`@tailwindcss/vite@4.3.3`, `@playwright/test@1.62.1`,
+  `@biomejs/biome@2.5.9`, `@vscode/codicons@0.0.46-24`, `@types/node@26.2.0`.
+- **`esbuild` added to `trustedDependencies`** alongside `electron` — Bun blocks its postinstall
+  otherwise (`bun pm untrusted` flagged it). Electron's own postinstall also did not run until its
+  binary was fetched manually once (`node node_modules/electron/install.js`) because it wasn't yet
+  trusted at the time of the first `bun install`; a clean install with `trustedDependencies` already
+  set should not need that manual step.
+- **`biome.json` migrated to the 2.5.9 schema** via `biome migrate --write` (schema version bump,
+  `linter.rules.recommended` → `linter.rules.preset`, folder ignores in `files.includes` written
+  without a trailing `/**`, which is deprecated since Biome 2.2.0).
+
 ## 0. Ground rules for this phase
 
 - Build **only** what P0 lists. Anything that needs a database driver, a tree, or a data view is P1+. See §9 (Out of scope) at the end — read it before starting, and re-read it if you feel tempted to "just add".
