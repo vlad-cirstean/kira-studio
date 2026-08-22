@@ -136,12 +136,14 @@ class PostgresAdapter implements Adapter {
     const exec = this.execFor(client, ctx);
 
     const info = await catalog.getRelationInfo(exec, schemaSegment.name, objectSegment.name);
-    const [rawColumns, indexes, foreignKeys, referencedBy] = await Promise.all([
-      catalog.listColumns(exec, schemaSegment.name, objectSegment.name),
-      catalog.listIndexes(exec, info.oid),
-      catalog.listForeignKeys(exec, info.oid, databaseSegment.name),
-      catalog.listReferencedBy(exec, info.oid, databaseSegment.name),
-    ]);
+    // Sequential, not Promise.all: `exec` routes every one of these through the same single
+    // pg.Client (D14 — one Client per connection/database, never a Pool), and node-postgres has
+    // deprecated firing concurrent queries at one Client (it silently queued them until now, but
+    // that queuing is going away in pg@9).
+    const rawColumns = await catalog.listColumns(exec, schemaSegment.name, objectSegment.name);
+    const indexes = await catalog.listIndexes(exec, info.oid);
+    const foreignKeys = await catalog.listForeignKeys(exec, info.oid, databaseSegment.name);
+    const referencedBy = await catalog.listReferencedBy(exec, info.oid, databaseSegment.name);
     const primaryKey = catalog.primaryKeyFromIndexes(indexes);
     const pkColumns = new Set(primaryKey ?? []);
     const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
@@ -192,10 +194,9 @@ class PostgresAdapter implements Adapter {
     table: string,
   ): Promise<TreeNode[]> {
     const oid = await catalog.getRelationOid(exec, schema, table);
-    const [columns, indexes] = await Promise.all([
-      catalog.listColumns(exec, schema, table),
-      catalog.listIndexes(exec, oid),
-    ]);
+    // Sequential — see the comment in describe() above.
+    const columns = await catalog.listColumns(exec, schema, table);
+    const indexes = await catalog.listIndexes(exec, oid);
     const pkColumns = new Set(catalog.primaryKeyFromIndexes(indexes) ?? []);
     return columns.map((col) => ({
       kind: 'column' as const,

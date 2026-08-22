@@ -20,6 +20,7 @@
     "src/shared/**/*.ts",
     "electron.vite.config.ts",
     "playwright.config.ts",
-    "tests/**/*.ts"
+    "tests/ui/**/*.ts",
+    "tests/db/support/**/*.ts"
   ]
 }

@@ -11,7 +11,10 @@ interface PgDriverError {
   message?: string;
 }
 
-function mapPgError(err: unknown): AdapterError {
+// Exported so client.ts can map a raw pg connection-time failure (client.connect() itself,
+// before any query has run) the same way a query failure is mapped — an auth failure at
+// connect time is just as much an E_AUTH as one hit mid-query.
+export function mapPgError(err: unknown): AdapterError {
   const driverCode = (err as PgDriverError | undefined)?.code;
   const message = err instanceof Error ? err.message : String(err);
   if (driverCode === '28P01' || driverCode === '28000') {
