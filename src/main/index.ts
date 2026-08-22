@@ -1,12 +1,16 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, Menu, MessageChannelMain } from 'electron';
+import { IPC } from '../shared/protocol/ipc';
+import { createConnectionsService } from './connections';
 import { startEngine } from './engine-host';
-import { registerIpc } from './ipc';
+import { registerIpc } from './ipc/registry';
 import { log } from './log';
 import { buildMenu } from './menu';
+import { wireOplog } from './oplog';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
+import { createTreeService } from './tree-service';
 import { createWindow } from './window';
 
 app.setName('Kira Studio');
@@ -14,6 +18,12 @@ if (process.env.KIRA_HOME) {
   app.setPath('userData', join(kiraHome(), 'electron'));
 }
 Menu.setApplicationMenu(buildMenu());
+
+function broadcast(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(channel, payload);
+  }
+}
 
 async function main(): Promise<void> {
   await app.whenReady();
@@ -23,7 +33,20 @@ async function main(): Promise<void> {
   migrate(db);
 
   const engineHost = startEngine();
-  registerIpc(db, engineHost);
+  const connections = createConnectionsService(db, engineHost);
+  const tree = createTreeService(db, engineHost, connections);
+
+  connections.onStateChange((state) => broadcast(IPC.connectionState, state));
+  connections.onMetadataInvalidated((connectionId) =>
+    broadcast(IPC.connectionMetadataInvalidated, connectionId),
+  );
+  // On engine exit: engine-host.ts already rejects every pending call; this synthesises
+  // per-connection error states so the tree/status bar reflect it too (no auto-respawn).
+  engineHost.on('engine:down', () => connections.markAllErrored('engine process exited'));
+
+  wireOplog(engineHost, db, (record) => broadcast(IPC.opUpdate, record));
+
+  registerIpc({ db, engineHost, connections, tree });
 
   let generation = 0;
   const attachPort = (win: BrowserWindow): void => {

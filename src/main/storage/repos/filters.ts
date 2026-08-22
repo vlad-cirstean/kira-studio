@@ -1,25 +1,12 @@
 import { z } from 'zod';
+import {
+  type ConnectionFilter,
+  type ConnectionFilterInput,
+  filterActionSchema,
+  filterNodeKindSchema,
+} from '../../../shared/domain/connection-filter';
 import { log } from '../../log';
 import type { Db } from '../db';
-
-const filterNodeKindSchema = z.enum(['database', 'schema', 'table']);
-const filterActionSchema = z.enum(['hide', 'show']);
-
-export interface ConnectionFilter {
-  id: string;
-  connectionId: string;
-  nodeKind: 'database' | 'schema' | 'table';
-  pattern: string;
-  isRegex: boolean;
-  action: 'hide' | 'show';
-}
-
-export interface ConnectionFilterInput {
-  nodeKind: 'database' | 'schema' | 'table';
-  pattern: string;
-  isRegex: boolean;
-  action: 'hide' | 'show';
-}
 
 const filterRowSchema = z
   .object({

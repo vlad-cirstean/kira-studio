@@ -1,3 +1,7 @@
+import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../domain/connection';
+import type { ConnectionFilter, ConnectionFilterInput } from '../domain/connection-filter';
+import type { OpRecord } from '../domain/ops';
+import type { ObjectMeta, TreeNode } from '../domain/tree';
 import type { Layout, LayoutPatch } from '../layout';
 import type { Settings, SettingsPatch } from '../settings';
 
@@ -13,6 +17,29 @@ export const IPC = {
   openSettings: 'kira:open-settings',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
+
+  connectionsList: 'kira:connections:list',
+  connectionsCreate: 'kira:connections:create',
+  connectionsUpdate: 'kira:connections:update',
+  connectionsDuplicate: 'kira:connections:duplicate',
+  connectionsDelete: 'kira:connections:delete',
+  connectionsReorder: 'kira:connections:reorder',
+  connectionsReveal: 'kira:connections:reveal',
+  connectionsTest: 'kira:connections:test',
+  connectionsConnect: 'kira:connections:connect',
+  connectionsDisconnect: 'kira:connections:disconnect',
+  connectionsStates: 'kira:connections:states',
+  treeChildren: 'kira:tree:children',
+  treeDescribe: 'kira:tree:describe',
+  treeInvalidate: 'kira:tree:invalidate',
+  filtersList: 'kira:filters:list',
+  filtersReplace: 'kira:filters:replace',
+  opsRecent: 'kira:ops:recent',
+  opsCancel: 'kira:ops:cancel',
+
+  connectionState: 'kira:connection:state',
+  connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
+  opUpdate: 'kira:op:update',
 } as const;
 
 export interface AppInfo {
@@ -28,6 +55,22 @@ export interface EngineStatus {
   pid: number | null;
 }
 
+export interface ConnectionTestResult {
+  ok: boolean;
+  serverVersion?: string;
+  error?: string;
+}
+
+export interface TreeChildrenResult {
+  nodes: TreeNode[];
+  source: 'cache' | 'server';
+}
+
+export interface TreeDescribeResult {
+  meta: ObjectMeta;
+  source: 'cache' | 'server';
+}
+
 export interface KiraApi {
   appInfo(): Promise<AppInfo>;
   settingsGetAll(): Promise<Settings>;
@@ -39,4 +82,40 @@ export interface KiraApi {
   onOpenSettings(cb: () => void): () => void;
   onToggleProjectPanel(cb: () => void): () => void;
   onToggleOperationsPanel(cb: () => void): () => void;
+
+  connectionsList(): Promise<ConnectionSummary[]>;
+  connectionsCreate(input: ConnectionInput): Promise<ConnectionSummary>;
+  connectionsUpdate(args: { id: string; input: ConnectionInput }): Promise<ConnectionSummary>;
+  connectionsDuplicate(args: { id: string }): Promise<ConnectionSummary>;
+  connectionsDelete(args: { id: string }): Promise<void>;
+  connectionsReorder(args: { ids: string[] }): Promise<ConnectionSummary[]>;
+  connectionsReveal(args: { id: string }): Promise<{ password: string | null }>;
+  connectionsTest(args: { input: ConnectionInput }): Promise<ConnectionTestResult>;
+  connectionsConnect(args: { id: string }): Promise<ConnectionState>;
+  connectionsDisconnect(args: { id: string }): Promise<ConnectionState>;
+  connectionsStates(): Promise<ConnectionState[]>;
+  onConnectionState(cb: (state: ConnectionState) => void): () => void;
+  onConnectionMetadataInvalidated(cb: (connectionId: string) => void): () => void;
+
+  treeChildren(args: {
+    connectionId: string;
+    path: string;
+    refresh?: boolean;
+  }): Promise<TreeChildrenResult>;
+  treeDescribe(args: {
+    connectionId: string;
+    path: string;
+    refresh?: boolean;
+  }): Promise<TreeDescribeResult>;
+  treeInvalidate(args: { connectionId: string; path?: string }): Promise<void>;
+
+  filtersList(args: { connectionId: string }): Promise<ConnectionFilter[]>;
+  filtersReplace(args: {
+    connectionId: string;
+    filters: ConnectionFilterInput[];
+  }): Promise<ConnectionFilter[]>;
+
+  opsRecent(args: { limit: number }): Promise<OpRecord[]>;
+  opsCancel(args: { opId: string }): Promise<void>;
+  onOpUpdate(cb: (record: OpRecord) => void): () => void;
 }

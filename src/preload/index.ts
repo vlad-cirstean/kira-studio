@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ConnectionInput, ConnectionState } from '../shared/domain/connection';
+import type { ConnectionFilter, ConnectionFilterInput } from '../shared/domain/connection-filter';
+import type { OpRecord } from '../shared/domain/ops';
 import type { LayoutPatch } from '../shared/layout';
-import type { EngineStatus, KiraApi } from '../shared/protocol/ipc';
+import type {
+  EngineStatus,
+  KiraApi,
+  TreeChildrenResult,
+  TreeDescribeResult,
+} from '../shared/protocol/ipc';
 import { IPC } from '../shared/protocol/ipc';
 import type { SettingsPatch } from '../shared/settings';
 
@@ -30,6 +38,54 @@ const kiraApi: KiraApi = {
     const listener = (): void => cb();
     ipcRenderer.on(IPC.toggleOperationsPanel, listener);
     return () => ipcRenderer.off(IPC.toggleOperationsPanel, listener);
+  },
+
+  connectionsList: () => ipcRenderer.invoke(IPC.connectionsList),
+  connectionsCreate: (input: ConnectionInput) => ipcRenderer.invoke(IPC.connectionsCreate, input),
+  connectionsUpdate: (args: { id: string; input: ConnectionInput }) =>
+    ipcRenderer.invoke(IPC.connectionsUpdate, args),
+  connectionsDuplicate: (args: { id: string }) =>
+    ipcRenderer.invoke(IPC.connectionsDuplicate, args),
+  connectionsDelete: (args: { id: string }) => ipcRenderer.invoke(IPC.connectionsDelete, args),
+  connectionsReorder: (args: { ids: string[] }) => ipcRenderer.invoke(IPC.connectionsReorder, args),
+  connectionsReveal: (args: { id: string }) => ipcRenderer.invoke(IPC.connectionsReveal, args),
+  connectionsTest: (args: { input: ConnectionInput }) =>
+    ipcRenderer.invoke(IPC.connectionsTest, args),
+  connectionsConnect: (args: { id: string }) => ipcRenderer.invoke(IPC.connectionsConnect, args),
+  connectionsDisconnect: (args: { id: string }) =>
+    ipcRenderer.invoke(IPC.connectionsDisconnect, args),
+  connectionsStates: () => ipcRenderer.invoke(IPC.connectionsStates),
+  onConnectionState: (cb: (state: ConnectionState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: ConnectionState): void => cb(state);
+    ipcRenderer.on(IPC.connectionState, listener);
+    return () => ipcRenderer.off(IPC.connectionState, listener);
+  },
+  onConnectionMetadataInvalidated: (cb: (connectionId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, connectionId: string): void =>
+      cb(connectionId);
+    ipcRenderer.on(IPC.connectionMetadataInvalidated, listener);
+    return () => ipcRenderer.off(IPC.connectionMetadataInvalidated, listener);
+  },
+
+  treeChildren: (args: { connectionId: string; path: string; refresh?: boolean }) =>
+    ipcRenderer.invoke(IPC.treeChildren, args) as Promise<TreeChildrenResult>,
+  treeDescribe: (args: { connectionId: string; path: string; refresh?: boolean }) =>
+    ipcRenderer.invoke(IPC.treeDescribe, args) as Promise<TreeDescribeResult>,
+  treeInvalidate: (args: { connectionId: string; path?: string }) =>
+    ipcRenderer.invoke(IPC.treeInvalidate, args),
+
+  filtersList: (args: { connectionId: string }) =>
+    ipcRenderer.invoke(IPC.filtersList, args) as Promise<ConnectionFilter[]>,
+  filtersReplace: (args: { connectionId: string; filters: ConnectionFilterInput[] }) =>
+    ipcRenderer.invoke(IPC.filtersReplace, args) as Promise<ConnectionFilter[]>,
+
+  opsRecent: (args: { limit: number }) =>
+    ipcRenderer.invoke(IPC.opsRecent, args) as Promise<OpRecord[]>,
+  opsCancel: (args: { opId: string }) => ipcRenderer.invoke(IPC.opsCancel, args),
+  onOpUpdate: (cb: (record: OpRecord) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, record: OpRecord): void => cb(record);
+    ipcRenderer.on(IPC.opUpdate, listener);
+    return () => ipcRenderer.off(IPC.opUpdate, listener);
   },
 };
 
