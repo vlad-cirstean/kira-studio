@@ -14,8 +14,10 @@ const FIELD_COUNT = 5;
  *  can contain arbitrary bytes, so nothing after it can be corrupted by a stray delimiter. */
 export const STASH_FORMAT = "%H%x1f%P%x1f%gd%x1f%at%x1f%s";
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 export function stashListArgs(): string[] {
-  return ["--no-optional-locks", "stash", "list", "-z", `--format=${STASH_FORMAT}`];
+  return ["stash", "list", "-z", `--format=${STASH_FORMAT}`];
 }
 
 const decoder = new TextDecoder("utf-8", { fatal: false });

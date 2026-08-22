@@ -1,0 +1,116 @@
+/**
+ * A controllable `ProcessRunner` double for unit tests that need to assert exact argv/env
+ * without spawning anything, and need precise control over when a "process" produces output
+ * or exits — the read-pool-bound and write-queue-serialization tests need exactly that
+ * timing control, which a real spawned process cannot offer deterministically. Not exported
+ * from index.ts: this is test scaffolding, not product surface.
+ */
+import type { ProcessExit, ProcessRunner, SpawnedProcess, SpawnRequest } from "@kira-version/core";
+
+export class FakeProcess implements SpawnedProcess {
+  readonly stdout: AsyncIterable<Uint8Array>;
+  readonly stderr: Promise<Uint8Array>;
+  readonly exit: Promise<ProcessExit>;
+  readonly writes: Uint8Array[] = [];
+  killedWith: NodeJS.Signals[] = [];
+
+  #stdoutChunks: Uint8Array[] = [];
+  #stdoutEnded = false;
+  #stdoutWaiters: Array<() => void> = [];
+  #resolveStderr!: (bytes: Uint8Array) => void;
+  #resolveExit!: (exit: ProcessExit) => void;
+  #rejectExit!: (err: unknown) => void;
+  #settled = false;
+
+  get settled(): boolean {
+    return this.#settled;
+  }
+
+  constructor() {
+    this.stderr = new Promise((resolve) => {
+      this.#resolveStderr = resolve;
+    });
+    this.exit = new Promise((resolve, reject) => {
+      this.#resolveExit = resolve;
+      this.#rejectExit = reject;
+    });
+    this.stdout = this.#iterateStdout();
+  }
+
+  async *#iterateStdout(): AsyncGenerator<Uint8Array> {
+    let index = 0;
+    for (;;) {
+      if (index < this.#stdoutChunks.length) {
+        yield this.#stdoutChunks[index] as Uint8Array;
+        index++;
+        continue;
+      }
+      if (this.#stdoutEnded) return;
+      await new Promise<void>((resolve) => this.#stdoutWaiters.push(resolve));
+    }
+  }
+
+  emitStdout(chunk: Uint8Array): void {
+    this.#stdoutChunks.push(chunk);
+    this.#drainWaiters();
+  }
+
+  endStdout(): void {
+    this.#stdoutEnded = true;
+    this.#drainWaiters();
+  }
+
+  #drainWaiters(): void {
+    const waiters = this.#stdoutWaiters;
+    this.#stdoutWaiters = [];
+    for (const waiter of waiters) waiter();
+  }
+
+  finish(code: number, stderrText = ""): void {
+    if (this.#settled) return;
+    this.#settled = true;
+    this.endStdout();
+    this.#resolveStderr(new TextEncoder().encode(stderrText));
+    this.#resolveExit({ code, signal: null });
+  }
+
+  failSpawn(err: unknown): void {
+    if (this.#settled) return;
+    this.#settled = true;
+    this.endStdout();
+    this.#resolveStderr(new Uint8Array());
+    this.#rejectExit(err);
+  }
+
+  write(chunk: Uint8Array): Promise<void> {
+    this.writes.push(chunk);
+    return Promise.resolve();
+  }
+
+  kill(signal: NodeJS.Signals = "SIGTERM"): void {
+    this.killedWith.push(signal);
+    if (!this.#settled) {
+      this.#settled = true;
+      this.endStdout();
+      this.#resolveStderr(new Uint8Array());
+      this.#resolveExit({ code: null, signal });
+    }
+  }
+}
+
+export class FakeProcessRunner implements ProcessRunner {
+  readonly calls: Array<{ executable: string; request: SpawnRequest }> = [];
+  readonly processes: FakeProcess[] = [];
+
+  spawn(executable: string, request: SpawnRequest): SpawnedProcess {
+    this.calls.push({ executable, request });
+    const proc = new FakeProcess();
+    this.processes.push(proc);
+    // Mirrors NodeProcessRunner's contract: a ProcessRunner honors request.signal itself.
+    if (request.signal) {
+      if (request.signal.aborted) proc.kill("SIGTERM");
+      else request.signal.addEventListener("abort", () => proc.kill("SIGTERM"), { once: true });
+    }
+    return proc;
+  }
+}

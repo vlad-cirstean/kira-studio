@@ -19,15 +19,10 @@ export const REFS_FORMAT =
   "%(refname)%1f%(objectname)%1f%(objecttype)%1f%(upstream)%1f%(upstream:track)%1f" +
   "%(committerdate:unix)%1f%(HEAD)%1f%(*objectname)";
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 export function refsArgs(): string[] {
-  return [
-    "--no-optional-locks",
-    "for-each-ref",
-    `--format=${REFS_FORMAT}`,
-    "refs/heads",
-    "refs/remotes",
-    "refs/tags",
-  ];
+  return ["for-each-ref", `--format=${REFS_FORMAT}`, "refs/heads", "refs/remotes", "refs/tags"];
 }
 
 const decoder = new TextDecoder("utf-8", { fatal: false });

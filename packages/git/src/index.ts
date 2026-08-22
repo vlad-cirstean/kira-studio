@@ -13,6 +13,17 @@ export {
   parseGitVersion,
   resolveRepoIdentity,
 } from "./discovery.ts";
+export type {
+  CatFileSession,
+  Disposable,
+  GitDriver,
+  GitRead,
+  GitWriteResult,
+  OpenGitDriverOptions,
+  ReadOptions,
+  WriteOptions,
+} from "./driver.ts";
+export { buildGitArgv, buildGitEnv, openGitDriver } from "./driver.ts";
 export type { GitErrorKind } from "./errors.ts";
 export { GitCancelled, GitError, GitSpawnFailed, classifyGitError } from "./errors.ts";
 export { NodeProcessRunner, ProcessSpawnError } from "./nodeProcessRunner.ts";

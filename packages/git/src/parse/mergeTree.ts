@@ -12,16 +12,10 @@
 import type { MergePrediction } from "@kira-version/core";
 import { assert } from "@kira-version/core";
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 export function mergeTreeArgs(base: string, other: string): string[] {
-  return [
-    "--no-optional-locks",
-    "merge-tree",
-    "--write-tree",
-    "--messages",
-    "--name-only",
-    base,
-    other,
-  ];
+  return ["merge-tree", "--write-tree", "--messages", "--name-only", base, other];
 }
 
 /** Groups lines into blank-line-separated blocks, dropping the separators themselves. */

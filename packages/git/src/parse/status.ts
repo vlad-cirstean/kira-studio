@@ -17,15 +17,10 @@ import type {
 } from "@kira-version/core";
 import { assert } from "@kira-version/core";
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 export function statusArgs(opts: { ignored?: boolean } = {}): string[] {
-  const args = [
-    "--no-optional-locks",
-    "status",
-    "--porcelain=v2",
-    "--branch",
-    "--untracked-files=normal",
-    "-z",
-  ];
+  const args = ["status", "--porcelain=v2", "--branch", "--untracked-files=normal", "-z"];
   if (opts.ignored) args.push("--ignored");
   return args;
 }

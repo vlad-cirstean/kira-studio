@@ -22,15 +22,10 @@ export interface LogArgsOptions {
   readonly maxCount: number;
 }
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 export function logArgs(opts: LogArgsOptions): string[] {
-  const args = [
-    "--no-optional-locks",
-    "log",
-    "--decorate=full",
-    "--topo-order",
-    "-z",
-    `--format=${LOG_FORMAT}`,
-  ];
+  const args = ["log", "--decorate=full", "--topo-order", "-z", `--format=${LOG_FORMAT}`];
   if (opts.scope === "all") args.push("--all", "--glob=refs/stash");
   args.push(`--max-count=${opts.maxCount}`);
   return args;
@@ -38,15 +33,7 @@ export function logArgs(opts: LogArgsOptions): string[] {
 
 /** Same format, for a single commit (`git show -s`) — reused rather than duplicated. */
 export function showMetadataArgs(sha: string): string[] {
-  return [
-    "--no-optional-locks",
-    "show",
-    "-s",
-    "--decorate=full",
-    "-z",
-    `--format=${LOG_FORMAT}`,
-    sha,
-  ];
+  return ["show", "-s", "--decorate=full", "-z", `--format=${LOG_FORMAT}`, sha];
 }
 
 const decoder = new TextDecoder("utf-8", { fatal: false });

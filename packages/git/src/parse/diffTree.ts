@@ -13,8 +13,10 @@
 import type { FileChangeKind } from "@kira-version/core";
 import { assert } from "@kira-version/core";
 
+// `--no-optional-locks` is not included here: driver.ts (W7) adds it structurally to every
+// read, so a caller of this args builder does not need to remember it too.
 function diffTreeArgs(mode: string[], from: string | undefined, to: string): string[] {
-  const base = ["--no-optional-locks", "diff-tree", "-r", "--no-commit-id", ...mode, "-z"];
+  const base = ["diff-tree", "-r", "--no-commit-id", ...mode, "-z"];
   return from === undefined ? [...base, "--root", to] : [...base, from, to];
 }
 
