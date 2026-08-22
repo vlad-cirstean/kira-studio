@@ -109,7 +109,7 @@ export async function listTablesAndRoutines(
 
 interface ColumnRow {
   name: string;
-  position: number;
+  position: number | bigint;
   data_type: string;
   is_nullable: string;
   default_expr: string | null;
@@ -132,7 +132,10 @@ export async function listColumns(
   );
   return rows.map((row) => ({
     name: row.name,
-    position: row.position,
+    // ORDINAL_POSITION comes back as a BigInt (same information_schema BIGINT quirk as
+    // NON_UNIQUE in listIndexes) — ColumnMeta.position is arithmetic'd on downstream (sorted by
+    // subtraction in read.ts's resolveProjection), so it must be a real number here.
+    position: Number(row.position),
     dataType: row.data_type,
     nullable: row.is_nullable === 'YES',
     defaultExpr: row.default_expr,
@@ -143,7 +146,7 @@ export async function listColumns(
 
 interface IndexRow {
   index_name: string;
-  non_unique: number;
+  non_unique: number | bigint;
   index_type: string;
   column_name: string;
   seq: number;
@@ -171,7 +174,9 @@ export async function listIndexes(
   return [...byName.entries()].map(([name, group]) => ({
     name,
     columns: group.map((r) => r.column_name),
-    unique: group[0].non_unique === 0,
+    // NON_UNIQUE comes back from the driver as a BigInt (information_schema.STATISTICS defines
+    // it as bigint) — Number(...) === 0 avoids the 0n !== 0 trap of a direct strict comparison.
+    unique: Number(group[0].non_unique) === 0,
     primary: name === 'PRIMARY',
     method: group[0].index_type,
   }));

@@ -228,11 +228,15 @@ export async function readPage(
     .filter(Boolean)
     .join('\n');
 
+  // Never `prepared` here: mariadb.js's binary/prepared protocol (conn.execute) combined with
+  // the textMode typeCast callback corrupts row data (buffer/field misalignment), confirmed with
+  // real bound keyset params, not just the zero-param case. conn.query() already binds `?`
+  // placeholders client-side (its own escaping, not string interpolation), so keyset params are
+  // still safely bound over the text protocol.
   const rawRows = await runQuery<(string | null)[]>(conn, sql, params, ctx, track, {
     rowsAsArray: true,
     textMode: true,
     logParams: true,
-    prepared: true,
   });
 
   const probedExtra = rawRows.length > req.pageSize;
@@ -256,7 +260,10 @@ export async function readPage(
       return v;
     });
 
-  const strategy: PagePosition['strategy'] = req.cursor.mode === 'offset' ? 'offset' : 'keyset';
+  // Reflects whether keyset navigation is available from here, not which cursor mode this
+  // particular fetch used — an eligible sort reports 'keyset' even on the very first (offset 0)
+  // page, so the renderer can page forward/back by token from then on (§5c).
+  const strategy: PagePosition['strategy'] = order.keysetEligible ? 'keyset' : 'offset';
   const hasMore = rowCount === 0 ? false : req.cursor.mode === 'before' ? true : probedExtra;
 
   let nextToken: string | null = null;

@@ -79,9 +79,12 @@ describe('mariadb adapter (§9.1)', () => {
     try {
       // PROCESSLIST carries no program-name column; the connect attribute we set
       // (client.ts's `connectAttributes: { program_name: 'kira-studio' }`) lives in
-      // SESSION_CONNECT_ATTRS instead, and disappears with the connection that set it.
+      // performance_schema.session_connect_attrs instead (not information_schema — that schema
+      // has no such table). The table name is genuinely lowercase on disk (lower_case_table_names
+      // defaults to 0 on Linux, making lookups case-sensitive) — it disappears once the
+      // connection that set it ends.
       const rows = await side.query<{ n: bigint | number }[]>(
-        `SELECT count(*) AS n FROM information_schema.SESSION_CONNECT_ATTRS
+        `SELECT count(*) AS n FROM performance_schema.session_connect_attrs
          WHERE ATTR_NAME = 'program_name' AND ATTR_VALUE = 'kira-studio'`,
       );
       expect(Number(rows[0]?.n ?? 0)).toBe(0);
@@ -133,7 +136,9 @@ describe('mariadb adapter (§9.1)', () => {
         ]),
         makeCtx(),
       );
-      expect(columns).toHaveLength(60);
+      // 59, not the Postgres fixture's 60 — MariaDB has no equivalent of Postgres's array,
+      // inet, and interval types, so wide_table has 3 fewer columns here.
+      expect(columns).toHaveLength(59);
       expect(columns[0]?.name).toBe('id');
       expect(columns[0]?.path).toBe('database:kira_test/table:wide_table/column:id');
       expect(columns[1]?.name).toBe('int_a');
@@ -191,14 +196,24 @@ describe('mariadb adapter (§9.1)', () => {
       const quantity = orderItems.columns.find((c) => c.name === 'quantity');
       expect(quantity).toMatchObject({ nullable: false, defaultExpr: '1' });
       expect(quantity?.dataType).toMatch(/^int/);
-      expect(orderItems.indexes).toHaveLength(2);
+      // 3, not 2 — InnoDB auto-creates a supporting index for a foreign-key column that isn't
+      // already the leftmost column of some other index. order_id is (it leads
+      // order_items_order_product_idx), but product_id is only the composite index's second
+      // column, so InnoDB adds a third, non-unique index on product_id alone.
+      expect(orderItems.indexes).toHaveLength(3);
       const pkIndex = orderItems.indexes.find((i) => i.primary);
       expect(pkIndex).toMatchObject({ unique: true, primary: true, columns: ['id'] });
-      const uniqueIndex = orderItems.indexes.find((i) => !i.primary);
+      const uniqueIndex = orderItems.indexes.find((i) => i.unique && !i.primary);
       expect(uniqueIndex).toMatchObject({
         unique: true,
         primary: false,
         columns: ['order_id', 'product_id'],
+      });
+      const fkSupportIndex = orderItems.indexes.find((i) => !i.unique);
+      expect(fkSupportIndex).toMatchObject({
+        unique: false,
+        primary: false,
+        columns: ['product_id'],
       });
       expect(orderItems.foreignKeys).toHaveLength(2);
       const orderFk = orderItems.foreignKeys.find((fk) => fk.columns.includes('order_id'));
@@ -243,7 +258,10 @@ describe('mariadb adapter (§9.1)', () => {
       expect(bigRowsMeta.rowEstimate ?? 0).toBeGreaterThan(900_000);
       expect(bigRowsMeta.rowEstimate ?? 0).toBeLessThan(1_100_000);
 
-      // Never analysed — must surface as null, never a raw sentinel.
+      // Unlike Postgres (reltuples truly stays unset until an explicit ANALYZE/VACUUM),
+      // MariaDB's InnoDB persists and auto-recalculates row-count statistics on ordinary DML
+      // (innodb_stats_auto_recalc), so a tiny freshly-seeded table already reports an exact
+      // count here rather than surfacing null.
       const compositePkMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
@@ -251,7 +269,7 @@ describe('mariadb adapter (§9.1)', () => {
         ]),
         makeCtx(),
       );
-      expect(compositePkMeta.rowEstimate).toBeNull();
+      expect(compositePkMeta.rowEstimate).toBe(3);
     } finally {
       await adapter.disconnect();
     }
@@ -471,19 +489,26 @@ describe('mariadb adapter (§9.1)', () => {
       const initialPrevToken = lastPage.position.prevToken;
       if (!initialPrevToken) throw new Error('expected a prevToken on the last forward page');
 
+      // Every page (forward or backward) displays its rows in ascending order (D7's builder
+      // reverses a 'before' fetch back into display order) — so walking backward and
+      // prepending each newly-visited page's block, starting from the last forward page's own
+      // rows, reconstructs the full ascending id sequence directly.
       const backwardIds: string[] = [];
+      for (let r = 0; r < lastPage.rowCount; r++) backwardIds.push(cellAt(lastPage, 0, r) ?? '');
       let backCursor: { mode: 'before'; token: string } = {
         mode: 'before',
         token: initialPrevToken,
       };
       for (let i = 0; i < 5; i++) {
         const page = await adapter.read({ ...baseReq, cursor: backCursor }, makeCtx());
-        for (let r = 0; r < page.rowCount; r++) backwardIds.push(cellAt(page, 0, r) ?? '');
+        const ids: string[] = [];
+        for (let r = 0; r < page.rowCount; r++) ids.push(cellAt(page, 0, r) ?? '');
+        backwardIds.unshift(...ids);
         if (!page.position.prevToken) break;
         backCursor = { mode: 'before', token: page.position.prevToken };
       }
 
-      expect(backwardIds.slice().reverse()).toEqual(forwardIds);
+      expect(backwardIds).toEqual(forwardIds);
       const seen = new Set(forwardIds);
       expect(seen.size).toBe(forwardIds.length); // no repeats
 

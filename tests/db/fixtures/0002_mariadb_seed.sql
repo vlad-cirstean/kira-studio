@@ -101,7 +101,8 @@ CREATE TABLE nulls_and_unicode (
   label     TEXT,
   note      TEXT,
   big_text  LONGTEXT,
-  big_blob  BLOB
+  -- Plain BLOB caps out at 64 KB — too small for the 256 KB oversized value below.
+  big_blob  MEDIUMBLOB
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- Every nullable column NULL.
@@ -137,7 +138,10 @@ INSERT INTO nested_json (id, data) VALUES (
           'level4', JSON_OBJECT(
             'level5', JSON_OBJECT(
               'value', 'deep',
-              'items', CAST((SELECT CONCAT('[', GROUP_CONCAT(seq), ']') FROM seq_1_to_200) AS JSON)
+              -- MariaDB has no CAST(... AS JSON) (JSON isn't a cast target type — it's a LONGTEXT
+              -- alias); JSON_ARRAYAGG is a genuine JSON-producing aggregate, so JSON_OBJECT embeds
+              -- its result as an array rather than quoting it as a string.
+              'items', (SELECT JSON_ARRAYAGG(seq) FROM seq_1_to_200)
             )
           )
         )
@@ -264,10 +268,11 @@ CREATE FUNCTION full_name(first_name VARCHAR(255), last_name VARCHAR(255)) RETUR
   DETERMINISTIC
   RETURN CONCAT(first_name, ' ', last_name);
 
-CREATE PROCEDURE noop_procedure()
-BEGIN
-  SELECT 1;
-END;
+-- A single-statement body (no BEGIN...END) is deliberate: `importFile`'s client-side statement
+-- splitter (mariadb.js) has no DELIMITER support and naively splits on every top-level ';', so a
+-- compound BEGIN...END body's internal ';' breaks it into two bogus statements. This fixture only
+-- needs a procedure to exist for the NodeKind coverage, not a compound body.
+CREATE PROCEDURE noop_procedure() SELECT 1;
 
 -- -------------------------------------------------------------------------------------------
 -- Identifier-quoting edge cases — a backtick inside a table name, and a name with a space.
