@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { settingsState } from '../../state/settings';
 import { patchTabState, tabsState } from '../../state/tabs';
-import { settingsState } from '../../workbench/state/settings';
 import { alignmentFor, columnOffsets, initialWidths, visibleColumnRange } from './columns';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import { searchState } from './search';

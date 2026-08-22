@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { RowDensity } from '@shared/settings';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { data } from '../bridge/data';
+import { cacheStatsState } from '../state/cacheStats';
+import { patchSettings, settingsState } from '../state/settings';
 import Codicon from '../theme/Codicon.vue';
-import { patchSettings, settingsState } from './state/settings';
+
+const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -61,6 +65,45 @@ function onFontSizeChange(e: Event): void {
 
 function setRowDensity(density: RowDensity): void {
   void patchSettings({ appearance: { rowDensity: density } });
+}
+
+function onDefaultPageSizeChange(e: Event): void {
+  const value = Number((e.target as HTMLSelectElement).value);
+  const pageSize = PAGE_SIZES.find((size) => size === value);
+  if (!pageSize) return;
+  void patchSettings({ data: { defaultPageSize: pageSize } });
+}
+
+function onPrefetchChange(e: Event): void {
+  void patchSettings({ data: { prefetch: (e.target as HTMLInputElement).checked } });
+}
+
+function onCountOnOpenChange(e: Event): void {
+  void patchSettings({ data: { countOnOpen: (e.target as HTMLInputElement).checked } });
+}
+
+function onCacheBudgetChange(e: Event): void {
+  const value = Number((e.target as HTMLInputElement).value);
+  if (!Number.isFinite(value) || value < 8 || value > 1024) return;
+  void patchSettings({ cache: { l2BudgetMb: value } });
+}
+
+const hitRateLabel = computed(() => {
+  const stats = cacheStatsState.stats;
+  if (!stats) return '—';
+  const total = stats.l2Hits + stats.l2Misses;
+  if (total === 0) return '—';
+  return `${Math.round((stats.l2Hits / total) * 100)}% (${stats.l2Hits}/${total})`;
+});
+
+const cacheSizeLabel = computed(() => {
+  const stats = cacheStatsState.stats;
+  if (!stats) return '—';
+  return `${(stats.l2Bytes / (1024 * 1024)).toFixed(1)} / ${(stats.l2BudgetBytes / (1024 * 1024)).toFixed(0)} MB`;
+});
+
+async function onClearCaches(): Promise<void> {
+  await data.clearCaches();
 }
 </script>
 
@@ -135,30 +178,62 @@ function setRowDensity(density: RowDensity): void {
           <template v-else-if="activeSection === 'Data'">
             <label class="field">
               <span>Default page size</span>
-              <input type="number" value="100" disabled />
+              <select
+                data-testid="settings-default-page-size"
+                :value="settingsState.data.defaultPageSize"
+                @change="onDefaultPageSizeChange"
+              >
+                <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
+              </select>
             </label>
             <label class="field checkbox">
-              <input type="checkbox" checked disabled />
+              <input
+                type="checkbox"
+                data-testid="settings-prefetch"
+                :checked="settingsState.data.prefetch"
+                @change="onPrefetchChange"
+              />
               <span>Prefetch next page</span>
             </label>
             <label class="field checkbox">
-              <input type="checkbox" disabled />
+              <input
+                type="checkbox"
+                data-testid="settings-count-on-open"
+                :checked="settingsState.data.countOnOpen"
+                @change="onCountOnOpenChange"
+              />
               <span>Count rows on tab open</span>
             </label>
-            <p class="muted-note">Available once data views land.</p>
           </template>
 
           <template v-else-if="activeSection === 'Cache'">
             <label class="field">
-              <span>Result page cache budget</span>
-              <input type="text" value="64 MB" disabled />
+              <span>Result page cache budget (MB)</span>
+              <input
+                type="number"
+                min="8"
+                max="1024"
+                data-testid="settings-cache-budget"
+                :value="settingsState.cache.l2BudgetMb"
+                @change="onCacheBudgetChange"
+              />
+            </label>
+            <label class="field">
+              <span>Current usage</span>
+              <input type="text" :value="cacheSizeLabel" disabled />
             </label>
             <label class="field">
               <span>Hit rate</span>
-              <input type="text" value="—" disabled />
+              <input type="text" :value="hitRateLabel" disabled />
             </label>
-            <button type="button" disabled>Clear caches</button>
-            <p class="muted-note">Available once data views land.</p>
+            <button
+              type="button"
+              class="action-button"
+              data-testid="settings-clear-caches"
+              @click="onClearCaches"
+            >
+              Clear caches
+            </button>
           </template>
 
           <template v-else>
@@ -262,7 +337,8 @@ function setRowDensity(density: RowDensity): void {
 }
 
 .field input[type='text'],
-.field input[type='number'] {
+.field input[type='number'],
+.field select {
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
@@ -293,6 +369,20 @@ function setRowDensity(density: RowDensity): void {
 .muted-note {
   color: var(--kira-fg-disabled);
   font-size: 11px;
+}
+
+.action-button {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  cursor: pointer;
+}
+
+.action-button:hover {
+  background: var(--kira-hover);
 }
 
 .dialog-footer {

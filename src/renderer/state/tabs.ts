@@ -2,7 +2,7 @@ import { type DataTabState, defaultDataTabState, type TabRecord } from '@shared/
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { drop as dropPage } from '../views/grid/page';
-import { settingsState } from '../workbench/state/settings';
+import { settingsState } from './settings';
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
 // operations panel, none of which may reach into each other — hence renderer/state/, not

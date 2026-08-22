@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { settingsState } from '../state/settings';
 import { openDataTab } from '../state/tabs';
 import { openContextMenu } from '../workbench/state/contextMenu';
-import { settingsState } from '../workbench/state/settings';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import DataGrid from './DataGrid.vue';
 import SearchToolbar from './SearchToolbar.vue';
-import { load, runtime } from './state';
+import { cancelPrefetch, load, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
@@ -38,6 +38,12 @@ onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
+});
+
+// This component is remounted per tab switch (see the note above) — its unmount is the natural
+// place to cancel whatever prefetch was pending for the tab being switched away from.
+onUnmounted(() => {
+  cancelPrefetch(props.tab.id);
 });
 
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
