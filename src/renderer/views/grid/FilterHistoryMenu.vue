@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FilterHistoryEntry, SavedQuery, SortSpec } from '@shared/domain/queries';
-import { onMounted, ref } from 'vue';
+import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { findDataTab } from '../../state/tabs';
 
@@ -13,6 +13,34 @@ function tab() {
 
 const saved = ref<SavedQuery[]>([]);
 const history = ref<FilterHistoryEntry[]>([]);
+
+// Electron's renderer does not implement window.prompt() (only alert/confirm are backed by a
+// native dialog) — calling it throws rather than showing anything. This is the in-app substitute,
+// shared by saveCurrent() and rename() below.
+const textPrompt = ref<{
+  title: string;
+  value: string;
+  resolve: (v: string | null) => void;
+} | null>(null);
+const promptInput = ref<HTMLInputElement | null>(null);
+function promptText(title: string, initial: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    textPrompt.value = { title, value: initial, resolve };
+    void nextTick(() => promptInput.value?.focus());
+  });
+}
+function submitPrompt(): void {
+  if (!textPrompt.value) return;
+  const { value, resolve } = textPrompt.value;
+  textPrompt.value = null;
+  resolve(value);
+}
+function cancelPrompt(): void {
+  if (!textPrompt.value) return;
+  const { resolve } = textPrompt.value;
+  textPrompt.value = null;
+  resolve(null);
+}
 
 async function reload(): Promise<void> {
   const t = tab();
@@ -55,7 +83,7 @@ async function togglePin(entry: SavedQuery): Promise<void> {
   await reload();
 }
 async function rename(entry: SavedQuery): Promise<void> {
-  const name = window.prompt('Rename saved filter', entry.name);
+  const name = await promptText('Rename saved filter', entry.name);
   if (!name || name.trim() === '') return;
   await control.queriesUpdate(entry.id, { name: name.trim() });
   await reload();
@@ -68,7 +96,7 @@ async function remove(entry: SavedQuery): Promise<void> {
 async function saveCurrent(): Promise<void> {
   const t = tab();
   if (!t?.connectionId) return;
-  const name = window.prompt('Name this filter');
+  const name = await promptText('Name this filter', '');
   if (!name || name.trim() === '') return;
   await control.queriesSave({
     connectionId: t.connectionId,
@@ -124,6 +152,26 @@ async function saveCurrent(): Promise<void> {
       <button type="button" class="save-current" data-testid="save-current-filter" @click="saveCurrent">
         Save current filter…
       </button>
+    </div>
+
+    <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
+      <div class="prompt-box">
+        <div class="prompt-title">{{ textPrompt.title }}</div>
+        <input
+          ref="promptInput"
+          v-model="textPrompt.value"
+          type="text"
+          data-testid="text-prompt-input"
+          @keydown.enter="submitPrompt"
+          @keydown.escape="cancelPrompt"
+        />
+        <div class="prompt-actions">
+          <button type="button" data-testid="text-prompt-cancel" @click="cancelPrompt">
+            Cancel
+          </button>
+          <button type="button" data-testid="text-prompt-ok" @click="submitPrompt">OK</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -221,5 +269,63 @@ async function saveCurrent(): Promise<void> {
 
 .save-current:hover {
   background: var(--kira-hover);
+}
+
+.prompt-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.prompt-box {
+  width: 280px;
+  background: var(--kira-bg-elevated);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-title {
+  font-size: 12px;
+  color: var(--kira-fg-muted);
+}
+
+.prompt-box input {
+  background: var(--kira-bg-input);
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.prompt-actions button {
+  padding: 3px 10px;
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.prompt-actions button:last-child {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
 }
 </style>
