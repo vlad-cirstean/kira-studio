@@ -13,7 +13,7 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
-import { activeTab, findDataTab, openDataTab } from '../state/tabs';
+import { activeTab, findDataTab, openDataTab, openDdlTab } from '../state/tabs';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
 import {
@@ -228,6 +228,20 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
         openDataTab(row.connectionId, row.path, { newTab: true });
       },
     },
+    // D5: offered only when the connection's caps say so — never a permanently disabled row.
+    ...(connectionsState.states[row.connectionId]?.caps?.ddl === true
+      ? [
+          {
+            type: 'item' as const,
+            id: 'open-ddl',
+            label: 'Open DDL',
+            icon: 'file-code',
+            run: () => {
+              openDdlTab(row.connectionId, row.path);
+            },
+          },
+        ]
+      : []),
     {
       type: 'item',
       id: 'refresh',
