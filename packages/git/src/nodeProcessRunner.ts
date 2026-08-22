@@ -148,16 +148,30 @@ function collectStderr(stream: Readable): Promise<Uint8Array> {
 function waitForExit(child: ChildProcessWithoutNullStreams): Promise<ProcessExit> {
   return new Promise((resolve, reject) => {
     let spawnFailed = false;
+    let settled = false;
+
+    const settle = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (spawnFailed || settled) return;
+      settled = true;
+      resolve({ code, signal });
+    };
+
     child.on("error", (err) => {
       if (child.exitCode === null && child.signalCode === null) {
         spawnFailed = true;
+        settled = true;
         reject(new ProcessSpawnError(child.spawnfile, err));
       }
     });
-    child.on("close", (code, sig) => {
-      if (spawnFailed) return;
-      resolve({ code, signal: sig });
-    });
+    // 'exit' and 'close' both, not just 'close': under this sandbox's Bun runtime, one has
+    // been observed to occasionally never fire for a child that has genuinely already exited
+    // (confirmed absent under real Node, 150+ clean runs — production never runs Bun, §8.1,
+    // so this is a test-environment concern, not a correctness bug this code can fix). A
+    // watchdog polling `exitCode`/`signalCode` was tried and does not help: those fields go
+    // unset in the same failure, meaning the underlying process is a genuine unreaped zombie
+    // at the OS level — not a JS-observable race this process can detect or recover from.
+    child.on("exit", (code, sig) => settle(code, sig));
+    child.on("close", (code, sig) => settle(code, sig));
   });
 }
 

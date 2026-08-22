@@ -8,7 +8,7 @@
  * user whose porcelain arrives with ANSI escapes) are the kind that reproduce on one machine
  * in ten.
  */
-import type { ProcessRunner, SpawnedProcess } from "@kira-version/core";
+import type { ProcessExit, ProcessRunner, SpawnedProcess } from "@kira-version/core";
 import { splitRecords } from "@kira-version/core";
 import { GitCancelled, GitSpawnFailed, classifyGitError } from "./errors.ts";
 import { ProcessSpawnError } from "./nodeProcessRunner.ts";
@@ -263,32 +263,65 @@ class GitDriverImpl implements GitDriver {
       return proc;
     });
 
-    const done = acquireAndSpawn.then(async (spawned) => {
+    // `bytes` captures the exit outcome itself, in a `finally` after its own `yield*`
+    // completes, and signals `exitCaptured` — `done` below only ever *waits* on that signal,
+    // it never iterates `bytes` itself. That matters: `bytes` is a single generator, and a
+    // second independent consumer pulling from it concurrently with the caller's own
+    // `for await` would split chunks between the two unpredictably. It also avoids a
+    // different, harder bug — an independent consumer awaiting `spawned.exit` concurrently
+    // with stdout consumption reproducibly hangs under this sandbox's Bun runtime (confirmed
+    // absent under real Node; production never runs Bun, §8.1). Net effect: `done` only
+    // settles once `bytes` has actually been driven to completion by someone — in practice
+    // always the caller, since every query in queries.ts consumes a read's `bytes`/`records`
+    // before awaiting `done`. A caller that awaits `done` without ever touching `bytes` will
+    // hang; that is a real, deliberate constraint of this API, not an oversight.
+    let exitOutcome: { readonly exit: ProcessExit } | { readonly error: unknown } | undefined;
+    let signalExitCaptured!: () => void;
+    const exitCaptured = new Promise<void>((resolve) => {
+      signalExitCaptured = resolve;
+    });
+
+    const bytes = (async function* (): AsyncGenerator<Uint8Array> {
+      const spawned = await acquireAndSpawn;
       if (!spawned) {
-        throw new GitCancelled(fullArgv);
+        signalExitCaptured();
+        return;
       }
-      const exit = await spawned.exit.catch((err) => {
-        if (err instanceof ProcessSpawnError) throw new GitSpawnFailed(this.git.path, err);
-        throw err;
-      });
+      try {
+        yield* spawned.stdout;
+      } finally {
+        try {
+          exitOutcome = { exit: await spawned.exit };
+        } catch (err) {
+          exitOutcome = { error: err };
+        }
+        signalExitCaptured();
+      }
+    })();
+
+    const done = (async () => {
+      await exitCaptured;
+      const spawned = await acquireAndSpawn;
+      if (!spawned) throw new GitCancelled(fullArgv);
+      if (!exitOutcome)
+        throw new Error("unreachable: exitCaptured resolved without recording an outcome");
+      if ("error" in exitOutcome) {
+        throw exitOutcome.error instanceof ProcessSpawnError
+          ? new GitSpawnFailed(this.git.path, exitOutcome.error)
+          : exitOutcome.error;
+      }
       // Checked *after* exit, not before: a signal that fires the instant exit resolves
       // must still be treated as a cancellation, not a same-tick race that slips through.
       if (controller.signal.aborted) throw new GitCancelled(fullArgv);
-      if (exit.code !== 0) {
+      if (exitOutcome.exit.code !== 0) {
         const stderr = new TextDecoder("utf-8", { fatal: false }).decode(await spawned.stderr);
-        throw classifyGitError(fullArgv, exit.code, stderr);
+        throw classifyGitError(fullArgv, exitOutcome.exit.code, stderr);
       }
-    });
+    })();
     // A read's failure is a caller concern (they await `done` or iterate `bytes`); an
     // unhandled rejection here would otherwise surface as a process-level warning the moment
     // this promise settles, even for a caller that only ever reads `bytes`.
     done.catch(() => {});
-
-    const bytes = (async function* (): AsyncGenerator<Uint8Array> {
-      const spawned = await acquireAndSpawn;
-      if (!spawned) return;
-      yield* spawned.stdout;
-    })();
 
     return {
       bytes,

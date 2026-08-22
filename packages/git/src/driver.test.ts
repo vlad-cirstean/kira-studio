@@ -5,6 +5,15 @@ import { FakeProcessRunner, fakeResolvedGit, flushUntil } from "./testFakes.ts";
 
 const noopCatFile: CatFileSession = { dispose: () => {} };
 
+/** `read.done` only settles once `read.bytes` has been driven to completion (driver.ts's
+ *  `read()` doc comment) — every test that checks `done` must drain `bytes` first, exactly as
+ *  every real caller in queries.ts does. */
+async function drain(bytes: AsyncIterable<Uint8Array>): Promise<void> {
+  for await (const _chunk of bytes) {
+    // discard
+  }
+}
+
 describe("openGitDriver — argv and env", () => {
   test("read() prepends the config overrides, --no-pager, and --no-optional-locks", async () => {
     const runner = new FakeProcessRunner();
@@ -17,6 +26,7 @@ describe("openGitDriver — argv and env", () => {
     const proc = runner.processes.at(-1);
     expect(proc).toBeDefined();
     proc?.finish(0);
+    await drain(read.bytes);
     await read.done;
 
     const call = runner.calls.at(-1);
@@ -100,16 +110,20 @@ describe("openGitDriver — read pool bound", () => {
 
     // Finishing one frees a pool slot for the next queued read.
     runner.processes[0]?.finish(0);
+    if (reads[0]) await drain(reads[0].bytes);
     await reads[0]?.done;
     await flushUntil(() => runner.processes.length >= 3);
     expect(runner.processes.length).toBe(3);
 
     runner.processes[1]?.finish(0);
     runner.processes[2]?.finish(0);
+    if (reads[1]) await drain(reads[1].bytes);
+    if (reads[2]) await drain(reads[2].bytes);
     await Promise.all([reads[1]?.done, reads[2]?.done]);
     await flushUntil(() => runner.processes.length >= 4);
     expect(runner.processes.length).toBe(4);
     runner.processes[3]?.finish(0);
+    if (reads[3]) await drain(reads[3].bytes);
     await reads[3]?.done;
   });
 });
@@ -186,6 +200,7 @@ describe("openGitDriver — read cancellation", () => {
     expect(proc).toBeDefined();
 
     read.cancel();
+    await drain(read.bytes);
     await expect(read.done).rejects.toBeInstanceOf(GitCancelled);
     expect(proc?.killedWith).toContain("SIGTERM");
   });
@@ -200,6 +215,7 @@ describe("openGitDriver — read cancellation", () => {
     await Promise.resolve();
     runner.processes.at(-1)?.finish(128, "fatal: invalid reference: badsha\n");
 
+    await drain(read.bytes);
     await expect(read.done).rejects.toBeInstanceOf(GitError);
   });
 });
