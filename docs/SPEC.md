@@ -1421,7 +1421,7 @@ deliberately deferred rather than left undecided.**
 | D5 | Theme | **Ride VS Code's injected theme.** It pushes the full workbench palette as `--vscode-*` CSS variables plus theme-kind body classes into every webview and keeps them live across theme switches. Electron wears the same variable names, generated from VS Code's own theme JSON. Details in 3.4, aesthetic rules in 6.1. |
 | D6 | Supported hosts | **Local desktop VS Code, plus the standalone Electron build.** Remote contexts (SSH, WSL, Codespaces, dev containers) and browser VS Code are out of scope and untested (2.1.1). |
 | D7 | `engines.vscode` floor | **Roughly six months behind current stable — but raised without hesitation whenever a newer API genuinely earns it.** Reach is not worth working around a missing API. The concrete number is set at P0 from the then-current release and revisited at P11. |
-| D8 | v1 branch | **All v1 work lands on `feature/kickoff`.** Agents start from its tip and add on top for as long as phases remain unfinished; never rebased or force-pushed. See `AGENTS.md`. |
+| D8 | v1 branch | **All v1 work lands on `feature/kickoff`.** Agents start from its tip and add on top for as long as phases remain unfinished; never rebased or force-pushed. A phase may be implemented on its own phase-scoped working branch rather than directly on `feature/kickoff`; once the phase is done, that branch's commits are replayed onto `feature/kickoff`, which stays the one history every later phase starts from regardless of which branch the implementation work happened on. See `AGENTS.md`. |
 
 ### 11.2 Product scope
 
