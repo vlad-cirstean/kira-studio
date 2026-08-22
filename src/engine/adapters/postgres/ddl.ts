@@ -42,6 +42,11 @@ interface IndexDdlRow {
   name: string;
 }
 
+interface SerialSequenceRow {
+  col: string;
+  seq: string | null;
+}
+
 interface CommentStmtRow {
   stmt: string;
 }
@@ -133,11 +138,30 @@ export async function buildDdl(
        ORDER BY i.relname`,
       [oid],
     );
+    // pg_get_serial_sequence resolves the sequence a column's `nextval(...)` default targets by
+    // parsing the default expression itself — it returns NULL for identity columns (no default
+    // to parse) and for columns with no serial-style default. The referenced sequence must exist
+    // before CREATE TABLE runs, since the column's default resolves its `::regclass` cast eagerly.
+    const serialSequences = (
+      await exec<SerialSequenceRow>(
+        `SELECT format('%I', a.attname) AS col, pg_get_serial_sequence($2::text, a.attname) AS seq
+         FROM pg_attribute a
+         WHERE a.attrelid = $1::oid AND a.attnum > 0 AND NOT a.attisdropped
+         ORDER BY a.attnum`,
+        [oid, shape.qname],
+      )
+    ).filter((r): r is { col: string; seq: string } => r.seq !== null);
 
     const partitionBy = shape.partition_by ? ` PARTITION BY ${shape.partition_by}` : '';
+    for (const { seq } of serialSequences) {
+      statements.push(`CREATE SEQUENCE ${seq}`);
+    }
     statements.push(
       `CREATE TABLE ${shape.qname} (\n${columns.map(columnLine).join(',\n')}\n)${partitionBy}`,
     );
+    for (const { seq, col } of serialSequences) {
+      statements.push(`ALTER SEQUENCE ${seq} OWNED BY ${shape.qname}.${col}`);
+    }
     for (const c of constraints) {
       statements.push(`ALTER TABLE ${shape.qname} ADD CONSTRAINT ${c.name} ${c.def}`);
     }
