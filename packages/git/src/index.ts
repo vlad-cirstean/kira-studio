@@ -13,6 +13,8 @@ export {
   parseGitVersion,
   resolveRepoIdentity,
 } from "./discovery.ts";
+export type { GitErrorKind } from "./errors.ts";
+export { GitCancelled, GitError, GitSpawnFailed, classifyGitError } from "./errors.ts";
 export { NodeProcessRunner, ProcessSpawnError } from "./nodeProcessRunner.ts";
 export type { NameStatusEntry, NumstatEntry } from "./parse/diffTree.ts";
 export {
