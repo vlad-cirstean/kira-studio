@@ -279,6 +279,7 @@ test('tabs — independent state, context menu, colours, session restore', async
   const titles = await allTabs.evaluateAll((els) => els.map((el) => el.textContent?.trim()));
 
   const { window: restored } = await relaunch();
+
   const restoredTabs = restored.locator('[data-testid="tab"]');
   await expect(restoredTabs).toHaveCount(3, { timeout: 10_000 });
   const restoredTitles = await restoredTabs.evaluateAll((els) =>

@@ -40,6 +40,11 @@ function saveDebounced(): void {
   }, 1000);
 }
 
+// A pending debounced save is otherwise lost outright if the window closes before its timer
+// fires (e.g. a pager/filter/sort change right before quit) — flush it while the renderer can
+// still send the IPC call.
+window.addEventListener('beforeunload', saveNow);
+
 export async function hydrateTabs(): Promise<void> {
   const tabs = await control.tabsList();
   tabsState.tabs = tabs;
