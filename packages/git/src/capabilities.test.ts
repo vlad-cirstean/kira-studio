@@ -1,7 +1,7 @@
+import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
 import { CapabilitiesCache, capabilitiesForVersion } from "./capabilities.ts";
 import type { GitVersion } from "./discovery.ts";
 import { type CatFileSession, openGitDriver } from "./driver.ts";

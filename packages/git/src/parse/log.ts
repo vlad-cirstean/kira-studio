@@ -17,6 +17,19 @@ const FIELD_COUNT = 10;
  *  message can only corrupt the subject, never a field before it. */
 export const LOG_FORMAT = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%D%x1f%s";
 
+/**
+ * The rev set §4.4's history walk covers: every ref (`--all`, which as of git 2.43 already
+ * includes `refs/stash` — confirmed empirically, V3 below) plus the explicit `--glob` as a
+ * belt-and-braces guard against an older or differently-behaving git, versus just `HEAD` for
+ * the narrow current-branch-only view (D10's toggle; git defaults to `HEAD` when no revision
+ * is given, so "head" scope needs no extra argv at all). One builder shared by `logArgs`,
+ * `git/logSession.ts`'s spawn (P2 W11), and `countCommits` — a remaining-count computed over a
+ * *different* rev set than the walk itself would make "127,400 remaining" a lie.
+ */
+export function revSetArgs(scope: "all" | "head"): string[] {
+  return scope === "all" ? ["--all", "--glob=refs/stash"] : [];
+}
+
 export interface LogArgsOptions {
   readonly scope: "all" | "head";
   readonly maxCount: number;
@@ -26,9 +39,22 @@ export interface LogArgsOptions {
 // read, so a caller of this args builder does not need to remember it too.
 export function logArgs(opts: LogArgsOptions): string[] {
   const args = ["log", "--decorate=full", "--topo-order", "-z", `--format=${LOG_FORMAT}`];
-  if (opts.scope === "all") args.push("--all", "--glob=refs/stash");
+  args.push(...revSetArgs(opts.scope));
   args.push(`--max-count=${opts.maxCount}`);
   return args;
+}
+
+/** The unpaged walk `logSession.ts` (W11) spawns: same format and rev set as `logArgs`, minus
+ *  `--max-count` — the pause is the page limit, not a git-side one. */
+export function logSessionArgs(scope: "all" | "head"): string[] {
+  const args = ["log", "--decorate=full", "--topo-order", "-z", `--format=${LOG_FORMAT}`];
+  args.push(...revSetArgs(scope));
+  return args;
+}
+
+/** The `--skip` fallback (§5.1.1) after a reclaimed session: same walk, resumed by count. */
+export function logSessionSkipArgs(scope: "all" | "head", skip: number): string[] {
+  return [...logSessionArgs(scope), `--skip=${skip}`];
 }
 
 /** Same format, for a single commit (`git show -s`) — reused rather than duplicated. */

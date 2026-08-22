@@ -11,7 +11,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { RepoIdentity } from "@kira-version/core";
-import { type GitVersion, compareVersions } from "./discovery.ts";
+import { compareVersions, type GitVersion } from "./discovery.ts";
 import type { GitDriver, GitRead } from "./driver.ts";
 
 export interface GitCapabilities {

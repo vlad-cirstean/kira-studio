@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
 import { parseMergeTreeOutput } from "./mergeTree.ts";
 
 const FIXTURES = join(import.meta.dir, "../../../../tests/fixtures/porcelain/mergeTree");

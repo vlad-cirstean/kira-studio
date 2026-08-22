@@ -11,8 +11,8 @@
  */
 import type { ProcessRunner, SpawnedProcess } from "@kira-version/core";
 import type { ResolvedGit } from "./discovery.ts";
-import { buildGitArgv, buildGitEnv } from "./driver.ts";
 import type { CatFileSession, Disposable } from "./driver.ts";
+import { buildGitArgv, buildGitEnv } from "./driver.ts";
 
 export type CatFileResult =
   | {

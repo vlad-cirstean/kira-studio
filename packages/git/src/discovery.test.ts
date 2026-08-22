@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-  MINIMUM_GIT_VERSION,
   compareVersions,
+  MINIMUM_GIT_VERSION,
   meetsMinimumVersion,
   parseGitVersion,
 } from "./discovery.ts";

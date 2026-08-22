@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { GitCancelled, GitError, GitSpawnFailed, classifyGitError } from "./errors.ts";
+import { classifyGitError, GitCancelled, GitError, GitSpawnFailed } from "./errors.ts";
 
 /**
  * Every stderr string below is a real, captured message (see errors.ts's header comment) —

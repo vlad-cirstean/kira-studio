@@ -19,6 +19,8 @@ import type {
   StatusResult,
 } from "@kira-version/core";
 import { splitLimitedFields } from "@kira-version/core";
+import type { GitDriver, GitRead } from "./driver.ts";
+import { GitError } from "./errors.ts";
 import type { NameStatusEntry, NumstatEntry } from "./parse/diffTree.ts";
 import {
   nameStatusArgs,
@@ -26,13 +28,11 @@ import {
   parseNameStatusRecords,
   parseNumstatRecords,
 } from "./parse/diffTree.ts";
-import { logArgs, parseLogRecord, showMetadataArgs } from "./parse/log.ts";
+import { logArgs, parseLogRecord, revSetArgs, showMetadataArgs } from "./parse/log.ts";
 import { mergeTreeArgs, parseMergeTreeOutput } from "./parse/mergeTree.ts";
-import { REFS_RECORD_DELIMITER, parseRefRecord, refsArgs } from "./parse/refs.ts";
+import { parseRefRecord, REFS_RECORD_DELIMITER, refsArgs } from "./parse/refs.ts";
 import { parseStashRecord, stashListArgs } from "./parse/stash.ts";
 import { parseStatus, statusArgs } from "./parse/status.ts";
-import type { GitDriver, GitRead } from "./driver.ts";
-import { GitError } from "./errors.ts";
 
 const decoder = new TextDecoder("utf-8", { fatal: false });
 
@@ -124,7 +124,9 @@ export async function stashList(driver: GitDriver): Promise<StashEntry[]> {
 }
 
 export async function countCommits(driver: GitDriver, scope: "all" | "head"): Promise<number> {
-  const argv = scope === "all" ? ["rev-list", "--count", "--all"] : ["rev-list", "--count", "HEAD"];
+  // `rev-list`, unlike `log`, requires an explicit revision — "head" scope names HEAD directly
+  // rather than relying on git's argument-less default the way `logArgs`'s "head" scope does.
+  const argv = ["rev-list", "--count", ...(scope === "all" ? revSetArgs("all") : ["HEAD"])];
   const bytes = await collectOneShot(driver.read(argv));
   return Number(decoder.decode(bytes).trim());
 }

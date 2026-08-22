@@ -10,9 +10,9 @@
  */
 import type { ProcessExit, ProcessRunner, SpawnedProcess } from "@kira-version/core";
 import { splitRecords } from "@kira-version/core";
-import { GitCancelled, GitSpawnFailed, classifyGitError } from "./errors.ts";
-import { ProcessSpawnError } from "./nodeProcessRunner.ts";
 import type { ResolvedGit } from "./discovery.ts";
+import { classifyGitError, GitCancelled, GitSpawnFailed } from "./errors.ts";
+import { ProcessSpawnError } from "./nodeProcessRunner.ts";
 
 // ---------------------------------------------------------------------------------------
 // Env and flags — the structural part of §4.3's discipline.

@@ -6,7 +6,7 @@
  * from index.ts: this is test scaffolding, not product surface.
  */
 import type { ProcessExit, ProcessRunner, SpawnedProcess, SpawnRequest } from "@kira-version/core";
-import { type ResolvedGit, locateGit } from "./discovery.ts";
+import { locateGit, type ResolvedGit } from "./discovery.ts";
 
 export class FakeProcess implements SpawnedProcess {
   readonly stdout: AsyncIterable<Uint8Array>;
