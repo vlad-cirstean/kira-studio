@@ -136,11 +136,19 @@ export async function fakeResolvedGit(version = "2.45.0"): Promise<ResolvedGit> 
   return resolution.git;
 }
 
-/** Ticks the microtask queue until `predicate` holds (or gives up after `maxTicks`) — robust
- *  against exactly how many promise hops a driver's internals happen to take, which is an
- *  implementation detail tests should not hard-code against. */
+/**
+ * Ticks the microtask queue until `predicate` holds — robust against exactly how many promise
+ * hops a driver's internals happen to take, which is an implementation detail tests should
+ * not hard-code against. Throws if `predicate` never becomes true within `maxTicks`, rather
+ * than silently returning — a wrong assumption about what a test is waiting for should fail
+ * fast and close to the mistake, not surface as an unrelated assertion or a full test timeout.
+ */
 export async function flushUntil(predicate: () => boolean, maxTicks = 50): Promise<void> {
-  for (let i = 0; i < maxTicks && !predicate(); i++) {
+  for (let i = 0; i < maxTicks; i++) {
+    if (predicate()) return;
     await Promise.resolve();
+  }
+  if (!predicate()) {
+    throw new Error(`flushUntil: predicate still false after ${maxTicks} microtask ticks`);
   }
 }

@@ -1,5 +1,7 @@
 export type { GitCapabilities, RepoCapabilities } from "./capabilities.ts";
 export { CapabilitiesCache, capabilitiesForVersion } from "./capabilities.ts";
+export type { CatFileResult, CatFileSessionOptions } from "./catFile.ts";
+export { openCatFileSession } from "./catFile.ts";
 export type {
   GitResolution,
   GitVersion,
