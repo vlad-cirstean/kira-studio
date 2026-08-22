@@ -52,25 +52,56 @@ function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
 }
 
+// Scrolling the tree closes any open context menu (a window-level capture-phase 'scroll'
+// listener backs that, correctly, so a menu never floats over content that's moved out from
+// under it) — and a programmatic scrollTop write dispatches its 'scroll' event asynchronously,
+// on a timer the browser controls. A blind `waitForTimeout` after the write is a guess at that
+// timing; under load it guesses wrong and the event fires later, right after a click that opened
+// a fresh menu, closing it before the next assertion sees it. So this waits for the 'scroll'
+// event itself (falling back to a short timeout for a write that doesn't actually move
+// scrollTop, which fires no event at all) before ever proceeding — the row is only found or
+// clicked once no scroll event from this helper's own writes can still be in flight.
+async function scrollAndSettle(container: Locator, mode: 'reset' | 'advance'): Promise<void> {
+  await container.evaluate(
+    (el, m) =>
+      new Promise<void>((resolve) => {
+        const before = el.scrollTop;
+        const target = m === 'reset' ? 0 : before + Math.max(200, el.clientHeight);
+        if (target === before) {
+          resolve();
+          return;
+        }
+        const onScroll = () => {
+          el.removeEventListener('scroll', onScroll);
+          resolve();
+        };
+        el.addEventListener('scroll', onScroll);
+        el.scrollTop = target;
+        // Fallback in case the browser coalesces/suppresses the event unexpectedly.
+        setTimeout(() => {
+          el.removeEventListener('scroll', onScroll);
+          resolve();
+        }, 300);
+      }),
+    mode,
+  );
+}
+
 // The project tree is virtualized (VirtualList.vue) — a row not currently scrolled into view
 // simply is not in the DOM. Scroll the container down in pages until the target row appears
 // (or the bottom is reached) instead of asserting on a DOM query that may just be off-screen.
 async function findRow(page: Page, path: string): Promise<Locator> {
   const container = treeContainer(page);
   const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
+  if ((await target.count()) > 0) return target;
+  await scrollAndSettle(container, 'reset');
   for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
+    if ((await target.count()) > 0) break;
     const atBottom = await container.evaluate(
       (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
     );
     if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
+    await scrollAndSettle(container, 'advance');
   }
   return target;
 }
@@ -87,8 +118,16 @@ async function getOps(page: Page): Promise<OpRecordLike[]> {
   return page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));
 }
 
+// A right-click on a row that Playwright still considers not-quite-in-view triggers its own
+// internal scroll-into-view as part of the click's actionability check — a scroll whose 'scroll'
+// event (caught, correctly, by the same window-level listener) can otherwise land asynchronously
+// right after the click opens a fresh menu, closing it before the next assertion sees it.
+// Scrolling the row fully into view ourselves first, and waiting out any resulting event, means
+// the click that follows has nothing left to scroll.
 async function openRowMenu(page: Page, path: string): Promise<void> {
   const row = await findRow(page, path);
+  await row.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
   await row.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
 }
@@ -235,15 +274,11 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
 
   // app is still expanded from the earlier expansion step — sequence:invoice_number_seq is
   // already one of its rendered children.
-  const sequenceRow = await findRow(page, SEQUENCE_PATH);
-  await sequenceRow.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await openRowMenu(page, SEQUENCE_PATH);
   expect(await menuItemIds(page)).toEqual(['copy-name', 'copy-qualified-name']);
   await page.keyboard.press('Escape');
 
-  const idColumnRow = await findRow(page, WIDE_TABLE_ID_COLUMN_PATH);
-  await idColumnRow.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await openRowMenu(page, WIDE_TABLE_ID_COLUMN_PATH);
   expect(await menuItemIds(page)).toEqual(['copy-name', 'add-to-projection', 'sort-by']);
   await page.keyboard.press('Escape');
 
