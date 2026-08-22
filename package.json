@@ -18,7 +18,7 @@
     "check:tokens": "bun run scripts/check-tokens.ts",
     "test": "bun test packages tests/fixtures tests/integration tests/unit",
     "test:e2e": "playwright test",
-    "test:perf": "bun run tests/perf/run.ts && bun run tests/perf/parserThroughput.ts",
+    "test:perf": "bun run tests/perf/run.ts && bun run tests/perf/parserThroughput.ts && bun run tests/perf/historyPipeline.ts",
     "dev:harness": "bun run --filter '@kira-version/harness' dev"
   },
   "devDependencies": {

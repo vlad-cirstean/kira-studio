@@ -1,0 +1,11 @@
+{
+  "firstPageMs": 129.60602799999924,
+  "sessionMs": 125.04835000000003,
+  "layoutMs": 4.557677999999214,
+  "loadMoreMsWorst": 154.23143299999992,
+  "fullWalkMs": 2745.4276709999995,
+  "storeBytes": 10485882,
+  "layoutBytes": 3612452,
+  "heapUsedMB": 26.384828567504883,
+  "firstPageMsNoGraph": 514.7222069999989
+}
