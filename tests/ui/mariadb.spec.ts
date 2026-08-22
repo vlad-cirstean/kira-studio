@@ -151,7 +151,18 @@ test('mariadb — connect, tree, data tab, count, filter, cancel', async ({
   await (await findRow(page, BIG_ROWS_PATH)).dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await page.click('[data-testid="page-size-10000"]');
-  await page.click('[data-testid="pager-next"]');
+  await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).not.toBe('');
+  // MariaDB's optimizer short-circuits `OR` per row — an `(SELECT SLEEP(2)) IS NULL OR id > 0`
+  // filter (the Postgres approach, where an uncorrelated subquery is always hoisted into a
+  // one-shot InitPlan) never even calls SLEEP() here, since `id > 0` alone already decides every
+  // row. Gating the slow branch on a single, rare row (`id != 1`, false for exactly one row)
+  // means SLEEP() is only reached — and only needs to run — once, giving this filtered read a
+  // flat, deterministic ~2s cost overall. Applying the filter itself is what starts the slow
+  // read here — not a follow-up pager click — so there's no risk of the D-prefetch background
+  // fetch (§8) having already warmed the next page and turning a pager click into an instant
+  // cache hit instead.
+  await page.fill('[data-testid="filter-where-input"]', 'id != 1 OR (SELECT SLEEP(2)) IS NOT NULL');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
   await page.click('[data-testid="toolbar-stop"]');
   await expect
     .poll(
