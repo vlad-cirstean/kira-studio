@@ -1,5 +1,7 @@
+import { and, count, eq } from 'drizzle-orm';
 import { log } from '../../log';
-import type { Db } from '../db';
+import type { KiraDb } from '../db';
+import { metadataCache } from '../schema/metadata-cache';
 
 export type MetaKind = 'children' | 'describe';
 
@@ -13,18 +15,19 @@ interface CachedPayload {
 
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 
-interface CacheRow {
-  payload_json: string;
-}
-
-function readPayload(db: Db, connectionId: string, path: string): CachedPayload | null {
-  const row = db.get(
-    'SELECT payload_json FROM metadata_cache WHERE connection_id = ? AND path = ?',
-    [connectionId, path],
-  ) as CacheRow | undefined;
+async function readPayload(
+  db: KiraDb,
+  connectionId: string,
+  path: string,
+): Promise<CachedPayload | null> {
+  const rows = await db
+    .select({ payloadJson: metadataCache.payloadJson })
+    .from(metadataCache)
+    .where(and(eq(metadataCache.connectionId, connectionId), eq(metadataCache.path, path)));
+  const row = rows[0];
   if (!row) return null;
   try {
-    return JSON.parse(row.payload_json) as CachedPayload;
+    return JSON.parse(row.payloadJson) as CachedPayload;
   } catch {
     return null;
   }
@@ -32,25 +35,36 @@ function readPayload(db: Db, connectionId: string, path: string): CachedPayload 
 
 // JSON.parse'd, NOT validated here — callers parse through the domain Zod schema and drop the
 // row (dropCached) on a shape mismatch, treating it as a miss rather than surfacing an error.
-export function getCached(
-  db: Db,
+export async function getCached(
+  db: KiraDb,
   connectionId: string,
   path: string,
   kind: MetaKind,
-): unknown | null {
-  const payload = readPayload(db, connectionId, path);
+): Promise<unknown | null> {
+  const payload = await readPayload(db, connectionId, path);
   return payload?.[kind] ?? null;
 }
 
-export function putCached(
-  db: Db,
+export async function putCached(
+  db: KiraDb,
   connectionId: string,
   path: string,
   kind: MetaKind,
   payload: unknown,
-): void {
-  db.transaction(() => {
-    const existing = readPayload(db, connectionId, path) ?? {};
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ payloadJson: metadataCache.payloadJson })
+      .from(metadataCache)
+      .where(and(eq(metadataCache.connectionId, connectionId), eq(metadataCache.path, path)));
+    let existing: CachedPayload = {};
+    if (rows[0]) {
+      try {
+        existing = JSON.parse(rows[0].payloadJson) as CachedPayload;
+      } catch {
+        existing = {};
+      }
+    }
     const merged: CachedPayload = { ...existing, [kind]: payload };
     const json = JSON.stringify(merged);
     if (Buffer.byteLength(json, 'utf8') > MAX_PAYLOAD_BYTES) {
@@ -62,28 +76,31 @@ export function putCached(
       return;
     }
     const fetchedAt = new Date().toISOString();
-    db.run(
-      `INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
-       VALUES (?, ?, ?, ?, ?, NULL)
-       ON CONFLICT(connection_id, path) DO UPDATE SET
-         kind = excluded.kind, payload_json = excluded.payload_json, fetched_at = excluded.fetched_at`,
-      [connectionId, path, kind, json, fetchedAt],
-    );
+    await tx
+      .insert(metadataCache)
+      .values({ connectionId, path, kind, payloadJson: json, fetchedAt, etag: null })
+      .onConflictDoUpdate({
+        target: [metadataCache.connectionId, metadataCache.path],
+        set: { kind, payloadJson: json, fetchedAt },
+      });
   });
 }
 
 // `path` omitted = drop every cached row for the whole connection.
-export function dropCached(db: Db, connectionId: string, path?: string): void {
+export async function dropCached(db: KiraDb, connectionId: string, path?: string): Promise<void> {
   if (path === undefined) {
-    db.run('DELETE FROM metadata_cache WHERE connection_id = ?', [connectionId]);
+    await db.delete(metadataCache).where(eq(metadataCache.connectionId, connectionId));
   } else {
-    db.run('DELETE FROM metadata_cache WHERE connection_id = ? AND path = ?', [connectionId, path]);
+    await db
+      .delete(metadataCache)
+      .where(and(eq(metadataCache.connectionId, connectionId), eq(metadataCache.path, path)));
   }
 }
 
-export function countCached(db: Db, connectionId: string): number {
-  const row = db.get('SELECT COUNT(*) AS n FROM metadata_cache WHERE connection_id = ?', [
-    connectionId,
-  ]) as { n: number } | undefined;
-  return row?.n ?? 0;
+export async function countCached(db: KiraDb, connectionId: string): Promise<number> {
+  const rows = await db
+    .select({ n: count() })
+    .from(metadataCache)
+    .where(eq(metadataCache.connectionId, connectionId));
+  return rows[0]?.n ?? 0;
 }

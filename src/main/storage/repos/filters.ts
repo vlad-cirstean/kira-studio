@@ -1,3 +1,4 @@
+import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   type ConnectionFilter,
@@ -6,34 +7,37 @@ import {
   filterNodeKindSchema,
 } from '../../../shared/domain/connection-filter';
 import { log } from '../../log';
-import type { Db } from '../db';
+import type { KiraDb } from '../db';
+import { connectionFilters } from '../schema/connection-filters';
 
 const filterRowSchema = z
   .object({
     id: z.string(),
-    connection_id: z.string(),
-    node_kind: filterNodeKindSchema,
+    connectionId: z.string(),
+    nodeKind: filterNodeKindSchema,
     pattern: z.string(),
-    is_regex: z.union([z.literal(0), z.literal(1)]),
+    isRegex: z.boolean(),
     action: filterActionSchema,
   })
   .transform(
     (row): ConnectionFilter => ({
       id: row.id,
-      connectionId: row.connection_id,
-      nodeKind: row.node_kind,
+      connectionId: row.connectionId,
+      nodeKind: row.nodeKind,
       pattern: row.pattern,
-      isRegex: row.is_regex === 1,
+      isRegex: row.isRegex,
       action: row.action,
     }),
   );
 
-export function listFilters(db: Db, connectionId: string): ConnectionFilter[] {
-  const rows = db.all(
-    'SELECT id, connection_id, node_kind, pattern, is_regex, action FROM connection_filters ' +
-      'WHERE connection_id = ? ORDER BY rowid',
-    [connectionId],
-  );
+export async function listFilters(db: KiraDb, connectionId: string): Promise<ConnectionFilter[]> {
+  const rows = await db
+    .select()
+    .from(connectionFilters)
+    .where(eq(connectionFilters.connectionId, connectionId))
+    // Matches the pre-Drizzle `ORDER BY rowid`: insertion order, since replaceFilters() always
+    // does a full delete-then-insert of the whole set in `inputs` order.
+    .orderBy(sql`rowid`);
   const out: ConnectionFilter[] = [];
   for (const row of rows) {
     const parsed = filterRowSchema.safeParse(row);
@@ -48,26 +52,22 @@ export function listFilters(db: Db, connectionId: string): ConnectionFilter[] {
 
 // Delete-all + insert, one transaction: the dialog edits a whole list and saves it, and the
 // set is small enough that a per-row diff would add complexity for no benefit.
-export function replaceFilters(
-  db: Db,
+export async function replaceFilters(
+  db: KiraDb,
   connectionId: string,
   inputs: ConnectionFilterInput[],
-): ConnectionFilter[] {
-  db.transaction(() => {
-    db.run('DELETE FROM connection_filters WHERE connection_id = ?', [connectionId]);
+): Promise<ConnectionFilter[]> {
+  await db.transaction(async (tx) => {
+    await tx.delete(connectionFilters).where(eq(connectionFilters.connectionId, connectionId));
     for (const input of inputs) {
-      db.run(
-        'INSERT INTO connection_filters (id, connection_id, node_kind, pattern, is_regex, action) ' +
-          'VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          crypto.randomUUID(),
-          connectionId,
-          input.nodeKind,
-          input.pattern,
-          input.isRegex ? 1 : 0,
-          input.action,
-        ],
-      );
+      await tx.insert(connectionFilters).values({
+        id: crypto.randomUUID(),
+        connectionId,
+        nodeKind: input.nodeKind,
+        pattern: input.pattern,
+        isRegex: input.isRegex,
+        action: input.action,
+      });
     }
   });
   return listFilters(db, connectionId);

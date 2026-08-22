@@ -29,8 +29,8 @@ async function main(): Promise<void> {
   await app.whenReady();
 
   ensureLayout();
-  const db = await openDb();
-  migrate(db);
+  const { db, raw, close } = await openDb();
+  migrate(raw);
 
   const engineHost = startEngine();
   const connections = createConnectionsService(db, engineHost);
@@ -58,11 +58,11 @@ async function main(): Promise<void> {
     });
   };
 
-  attachPort(createWindow(db));
+  attachPort(await createWindow(db));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      attachPort(createWindow(db));
+      void createWindow(db).then(attachPort);
     }
   });
 
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
 
   app.on('before-quit', () => {
     engineHost.stop();
-    db.close();
+    close();
   });
 }
 

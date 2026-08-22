@@ -7,7 +7,7 @@ import { injectUriPassword, stripUriPassword } from '../shared/domain/uri';
 import { ENGINE_OP, type ResolvedConnectionConfig } from '../shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
-import type { Db } from './storage/db';
+import type { KiraDb } from './storage/db';
 import {
   type ConnectionFields,
   deleteConnection,
@@ -27,12 +27,12 @@ export interface ConnectionTestResult {
 }
 
 export interface ConnectionsService {
-  list(): ConnectionSummary[];
+  list(): Promise<ConnectionSummary[]>;
   create(input: ConnectionInput): Promise<ConnectionSummary>;
   update(id: string, input: ConnectionInput): Promise<ConnectionSummary>;
   duplicate(id: string): Promise<ConnectionSummary>;
   remove(id: string): Promise<void>;
-  reorder(ids: string[]): ConnectionSummary[];
+  reorder(ids: string[]): Promise<ConnectionSummary[]>;
   reveal(id: string): Promise<{ password: string | null }>;
   test(input: ConnectionInput): Promise<ConnectionTestResult>;
   connect(id: string): Promise<ConnectionState>;
@@ -56,7 +56,7 @@ function extractFields(summary: ConnectionSummary): ConnectionFields {
   return fields;
 }
 
-export function createConnectionsService(db: Db, engineHost: EngineHost): ConnectionsService {
+export function createConnectionsService(db: KiraDb, engineHost: EngineHost): ConnectionsService {
   const secrets = createSecretStore(db);
   const states = new Map<string, ConnectionState>();
   const stateHandlers = new Set<(state: ConnectionState) => void>();
@@ -85,7 +85,7 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
 
   // Private — never returned over IPC (D9).
   async function resolve(id: string): Promise<ResolvedConnectionConfig> {
-    const summary = getConnection(db, id);
+    const summary = await getConnection(db, id);
     if (!summary) throw new Error(`connection ${id} not found`);
     const password = await secrets.get(id);
     return {
@@ -123,7 +123,7 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
         password = stripped.password;
       }
       const id = crypto.randomUUID();
-      const created = insertConnection(db, {
+      const created = await insertConnection(db, {
         id,
         fields: { ...input, uri },
         createdAt: new Date().toISOString(),
@@ -154,12 +154,12 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
     },
 
     async duplicate(id) {
-      const existing = getConnection(db, id);
+      const existing = await getConnection(db, id);
       if (!existing) throw new Error(`connection ${id} not found`);
       const password = await secrets.get(id);
       const newId = crypto.randomUUID();
       const fields = extractFields(existing);
-      const created = insertConnection(db, {
+      const created = await insertConnection(db, {
         id: newId,
         fields: { ...fields, name: `${fields.name} copy` },
         createdAt: new Date().toISOString(),
@@ -173,7 +173,7 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
       if (current.status === 'connected' || current.status === 'connecting') {
         await engineHost.call(ENGINE_OP.disconnect, { connectionId: id }).catch(() => {});
       }
-      deleteConnection(db, id); // cascades filters, metadata cache, saved queries
+      await deleteConnection(db, id); // cascades filters, metadata cache, saved queries
       await secrets.delete(id);
       states.delete(id);
     },
@@ -196,7 +196,7 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
     },
 
     async connect(id) {
-      const summary = getConnection(db, id);
+      const summary = await getConnection(db, id);
       if (!summary) throw new Error(`connection ${id} not found`);
       emitState({
         connectionId: id,
@@ -223,7 +223,7 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
         // D11: the whole connection's metadata is refreshed on every reconnect. A blunt
         // delete alone would blank the tree, so the renderer re-fetches only the paths it
         // currently has expanded once it sees the invalidation push.
-        dropCached(db, id);
+        await dropCached(db, id);
         emitInvalidated(id);
         return state;
       } catch (err) {

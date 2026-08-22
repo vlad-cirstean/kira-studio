@@ -1,7 +1,7 @@
 import type { OpKind, OpRecord } from '../shared/domain/ops';
 import { ENGINE_EVENT, opEndEventSchema, opStartEventSchema } from '../shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
-import type { Db } from './storage/db';
+import type { KiraDb } from './storage/db';
 import { appendOp, finishOp, pruneOps } from './storage/repos/ops';
 
 interface InFlightOp {
@@ -16,14 +16,14 @@ interface InFlightOp {
 // touches Drizzle/op_log directly (that's repos/ops.ts's job).
 export function wireOplog(
   engineHost: EngineHost,
-  db: Db,
+  db: KiraDb,
   broadcast: (record: OpRecord) => void,
 ): void {
-  pruneOps(db);
+  void pruneOps(db);
 
   const inFlight = new Map<string, InFlightOp>();
 
-  engineHost.on(ENGINE_EVENT.opStart, (payload) => {
+  engineHost.on(ENGINE_EVENT.opStart, async (payload) => {
     const parsed = opStartEventSchema.safeParse(payload);
     if (!parsed.success) return;
     const evt = parsed.data;
@@ -34,7 +34,7 @@ export function wireOplog(
       startedAt: evt.startedAt,
     };
     inFlight.set(evt.opId, record);
-    appendOp(db, {
+    await appendOp(db, {
       id: evt.opId,
       connectionId: record.connectionId,
       tabId: record.tabId,
@@ -55,11 +55,11 @@ export function wireOplog(
     });
   });
 
-  engineHost.on(ENGINE_EVENT.opEnd, (payload) => {
+  engineHost.on(ENGINE_EVENT.opEnd, async (payload) => {
     const parsed = opEndEventSchema.safeParse(payload);
     if (!parsed.success) return;
     const evt = parsed.data;
-    finishOp(db, evt.opId, {
+    await finishOp(db, evt.opId, {
       status: evt.status,
       durationMs: evt.durationMs,
       rows: evt.rows,

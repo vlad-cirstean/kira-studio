@@ -1,8 +1,8 @@
 import { log } from '../log';
-import type { Db } from './db';
+import type { RawDb } from './db';
 import { migrations } from './migrations';
 
-export function migrate(db: Db): void {
+export function migrate(db: RawDb): void {
   db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
   const row = db.get('SELECT version FROM schema_version LIMIT 1') as
     | { version: number }

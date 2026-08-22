@@ -9,7 +9,7 @@ import {
 import { ENGINE_OP } from '../shared/protocol/engine-ops';
 import type { ConnectionsService } from './connections';
 import type { EngineHost } from './engine-host';
-import type { Db } from './storage/db';
+import type { KiraDb } from './storage/db';
 import { getConnection } from './storage/repos/connections';
 import { dropCached, getCached, putCached } from './storage/repos/metadata-cache';
 
@@ -33,7 +33,7 @@ export interface TreeService {
   /** Drops L1 for one node (path given) or the whole connection (path omitted). No push of its
    * own — the caller already knows what it asked to invalidate. The D11 reconnect push is
    * `connections.onMetadataInvalidated`, a separate concern owned by connections.ts. */
-  invalidate(connectionId: string, path?: string): void;
+  invalidate(connectionId: string, path?: string): Promise<void>;
 }
 
 const treeNodeArraySchema = z.array(treeNodeSchema);
@@ -41,14 +41,14 @@ const treeNodeArraySchema = z.array(treeNodeSchema);
 // L1 cache-aside for children()/describe() (D10). `path` is always the encoded string form —
 // it is exactly what's persisted in metadata_cache.path, so no re-encoding happens on this side.
 export function createTreeService(
-  db: Db,
+  db: KiraDb,
   engineHost: EngineHost,
   connections: ConnectionsService,
 ): TreeService {
-  function requireConnected(connectionId: string): void {
+  async function requireConnected(connectionId: string): Promise<void> {
     const state = connections.stateOf(connectionId);
     if (state.status !== 'connected') {
-      const summary = getConnection(db, connectionId);
+      const summary = await getConnection(db, connectionId);
       throw new DisconnectedError(`${summary?.name ?? connectionId} is not connected`);
     }
   }
@@ -56,44 +56,44 @@ export function createTreeService(
   return {
     async children(connectionId, path, refresh) {
       if (!refresh) {
-        const cached = getCached(db, connectionId, path, 'children');
+        const cached = await getCached(db, connectionId, path, 'children');
         if (cached !== null) {
           const parsed = treeNodeArraySchema.safeParse(cached);
           if (parsed.success) return { nodes: parsed.data, source: 'cache' };
-          dropCached(db, connectionId, path);
+          await dropCached(db, connectionId, path);
         }
       }
-      requireConnected(connectionId);
+      await requireConnected(connectionId);
       const nodePath = decodePath(connectionId, path);
       const result = await engineHost.call<{ nodes: TreeNode[] }>(ENGINE_OP.children, {
         connectionId,
         path: nodePath,
       });
-      putCached(db, connectionId, path, 'children', result.nodes);
+      await putCached(db, connectionId, path, 'children', result.nodes);
       return { nodes: result.nodes, source: 'server' };
     },
 
     async describe(connectionId, path, refresh) {
       if (!refresh) {
-        const cached = getCached(db, connectionId, path, 'describe');
+        const cached = await getCached(db, connectionId, path, 'describe');
         if (cached !== null) {
           const parsed = objectMetaSchema.safeParse(cached);
           if (parsed.success) return { meta: parsed.data, source: 'cache' };
-          dropCached(db, connectionId, path);
+          await dropCached(db, connectionId, path);
         }
       }
-      requireConnected(connectionId);
+      await requireConnected(connectionId);
       const nodePath = decodePath(connectionId, path);
       const result = await engineHost.call<{ meta: ObjectMeta }>(ENGINE_OP.describe, {
         connectionId,
         path: nodePath,
       });
-      putCached(db, connectionId, path, 'describe', result.meta);
+      await putCached(db, connectionId, path, 'describe', result.meta);
       return { meta: result.meta, source: 'server' };
     },
 
     invalidate(connectionId, path) {
-      dropCached(db, connectionId, path);
+      return dropCached(db, connectionId, path);
     },
   };
 }

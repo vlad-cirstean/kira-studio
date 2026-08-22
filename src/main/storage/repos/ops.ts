@@ -1,6 +1,8 @@
+import { desc, eq, lt, notInArray } from 'drizzle-orm';
 import { type OpRecord, opRecordSchema } from '../../../shared/domain/ops';
 import { log } from '../../log';
-import type { Db } from '../db';
+import type { KiraDb } from '../db';
+import { opLog } from '../schema/ops';
 
 const RETENTION_DAYS = 30;
 const HARD_CAP_ROWS = 20_000;
@@ -13,12 +15,19 @@ export interface AppendOpInput {
   startedAt: string;
 }
 
-export function appendOp(db: Db, input: AppendOpInput): void {
-  db.run(
-    `INSERT INTO op_log (id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error)
-     VALUES (?, ?, ?, ?, NULL, ?, 'running', NULL, NULL, NULL)`,
-    [input.id, input.connectionId, input.tabId, input.startedAt, input.kind],
-  );
+export async function appendOp(db: KiraDb, input: AppendOpInput): Promise<void> {
+  await db.insert(opLog).values({
+    id: input.id,
+    connectionId: input.connectionId,
+    tabId: input.tabId,
+    startedAt: input.startedAt,
+    durationMs: null,
+    kind: input.kind,
+    status: 'running',
+    rows: null,
+    command: null,
+    error: null,
+  });
 }
 
 export interface FinishOpPatch {
@@ -29,23 +38,29 @@ export interface FinishOpPatch {
   error: string | null;
 }
 
-export function finishOp(db: Db, id: string, patch: FinishOpPatch): void {
-  db.run(
-    'UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ? WHERE id = ?',
-    [patch.status, patch.durationMs, patch.rows, patch.command, patch.error, id],
-  );
+export async function finishOp(db: KiraDb, id: string, patch: FinishOpPatch): Promise<void> {
+  await db
+    .update(opLog)
+    .set({
+      status: patch.status,
+      durationMs: patch.durationMs,
+      rows: patch.rows,
+      command: patch.command,
+      error: patch.error,
+    })
+    .where(eq(opLog.id, id));
 }
 
-export function recentOps(db: Db, limit: number): OpRecord[] {
-  const rows = db.all('SELECT * FROM op_log ORDER BY started_at DESC LIMIT ?', [limit]);
+export async function recentOps(db: KiraDb, limit: number): Promise<OpRecord[]> {
+  const rows = await db.select().from(opLog).orderBy(desc(opLog.startedAt)).limit(limit);
   const out: OpRecord[] = [];
   for (const row of rows) {
     const candidate = {
       id: row.id,
-      connectionId: row.connection_id,
-      tabId: row.tab_id,
-      startedAt: row.started_at,
-      durationMs: row.duration_ms,
+      connectionId: row.connectionId,
+      tabId: row.tabId,
+      startedAt: row.startedAt,
+      durationMs: row.durationMs,
       kind: row.kind,
       status: row.status,
       rows: row.rows,
@@ -62,13 +77,17 @@ export function recentOps(db: Db, limit: number): OpRecord[] {
   return out;
 }
 
-export function pruneOps(db: Db): void {
+export async function pruneOps(db: KiraDb): Promise<void> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  db.run('DELETE FROM op_log WHERE started_at < ?', [cutoff]);
-  db.run(
-    `DELETE FROM op_log WHERE id NOT IN (
-       SELECT id FROM op_log ORDER BY started_at DESC LIMIT ?
-     )`,
-    [HARD_CAP_ROWS],
-  );
+  await db.delete(opLog).where(lt(opLog.startedAt, cutoff));
+
+  const keep = await db
+    .select({ id: opLog.id })
+    .from(opLog)
+    .orderBy(desc(opLog.startedAt))
+    .limit(HARD_CAP_ROWS);
+  const keepIds = keep.map((r) => r.id);
+  if (keepIds.length > 0) {
+    await db.delete(opLog).where(notInArray(opLog.id, keepIds));
+  }
 }

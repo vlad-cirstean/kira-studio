@@ -1,12 +1,12 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
-import type { Db } from './storage/db';
+import type { KiraDb } from './storage/db';
 import { getAllLayout, setLayout } from './storage/repos/layout';
 
 const BOUNDS_DEBOUNCE_MS = 300;
 
-export function createWindow(db: Db): BrowserWindow {
-  const layout = getAllLayout(db);
+export async function createWindow(db: KiraDb): Promise<BrowserWindow> {
+  const layout = await getAllLayout(db);
   const bounds = layout.window.bounds;
 
   const win = new BrowserWindow({
@@ -30,7 +30,7 @@ export function createWindow(db: Db): BrowserWindow {
   const persistBounds = (): void => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      setLayout(db, { window: { bounds: win.getBounds() } });
+      void setLayout(db, { window: { bounds: win.getBounds() } });
     }, BOUNDS_DEBOUNCE_MS);
   };
   win.on('resize', persistBounds);

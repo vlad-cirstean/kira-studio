@@ -1,3 +1,4 @@
+import { asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   type ConnectionInput,
@@ -7,16 +8,31 @@ import {
   connectionModeSchema,
 } from '../../../shared/domain/connection';
 import { log } from '../../log';
-import type { Db } from '../db';
+import type { KiraDb } from '../db';
+import { connections } from '../schema/connections';
 
 // The fields the repo layer accepts on write. `password` is deliberately excluded from this
 // type — these functions never select, insert, or update that column; the caller (Step 6a's
 // connections.ts orchestration) pairs every call here with a `SecretStore` call.
 export type ConnectionFields = Omit<ConnectionInput, 'password'>;
 
-const SELECT_COLUMNS =
-  'id, name, kind, color, mode, read_only, host, port, database, username, uri, ' +
-  'options_json, created_at, updated_at, sort_order';
+const SELECT_COLUMNS = {
+  id: connections.id,
+  name: connections.name,
+  kind: connections.kind,
+  color: connections.color,
+  mode: connections.mode,
+  readOnly: connections.readOnly,
+  host: connections.host,
+  port: connections.port,
+  database: connections.database,
+  username: connections.username,
+  uri: connections.uri,
+  optionsJson: connections.optionsJson,
+  createdAt: connections.createdAt,
+  updatedAt: connections.updatedAt,
+  sortOrder: connections.sortOrder,
+};
 
 const connectionRowSchema = z
   .object({
@@ -25,16 +41,16 @@ const connectionRowSchema = z
     kind: connectionKindSchema,
     color: connectionColorSchema,
     mode: connectionModeSchema,
-    read_only: z.union([z.literal(0), z.literal(1)]),
+    readOnly: z.boolean(),
     host: z.string().nullable(),
     port: z.number().nullable(),
     database: z.string().nullable(),
     username: z.string().nullable(),
     uri: z.string().nullable(),
-    options_json: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
-    sort_order: z.number(),
+    optionsJson: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    sortOrder: z.number(),
   })
   .transform(
     (row): ConnectionSummary => ({
@@ -43,16 +59,16 @@ const connectionRowSchema = z
       kind: row.kind,
       color: row.color,
       mode: row.mode,
-      readOnly: row.read_only === 1,
+      readOnly: row.readOnly,
       host: row.host,
       port: row.port,
       database: row.database,
       username: row.username,
       uri: row.uri,
-      options: row.options_json ? (JSON.parse(row.options_json) as Record<string, unknown>) : {},
-      sortOrder: row.sort_order,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      options: row.optionsJson ? (JSON.parse(row.optionsJson) as Record<string, unknown>) : {},
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     }),
   );
 
@@ -71,8 +87,11 @@ function parseRow(row: Record<string, unknown>): ConnectionSummary | null {
   return result.data;
 }
 
-export function listConnections(db: Db): ConnectionSummary[] {
-  const rows = db.all(`SELECT ${SELECT_COLUMNS} FROM connections ORDER BY sort_order, name`);
+export async function listConnections(db: KiraDb): Promise<ConnectionSummary[]> {
+  const rows = await db
+    .select(SELECT_COLUMNS)
+    .from(connections)
+    .orderBy(asc(connections.sortOrder), asc(connections.name));
   const out: ConnectionSummary[] = [];
   for (const row of rows) {
     const parsed = parseRow(row);
@@ -81,16 +100,17 @@ export function listConnections(db: Db): ConnectionSummary[] {
   return out;
 }
 
-export function getConnection(db: Db, id: string): ConnectionSummary | null {
-  const row = db.get(`SELECT ${SELECT_COLUMNS} FROM connections WHERE id = ?`, [id]);
+export async function getConnection(db: KiraDb, id: string): Promise<ConnectionSummary | null> {
+  const rows = await db.select(SELECT_COLUMNS).from(connections).where(eq(connections.id, id));
+  const row = rows[0];
   return row ? parseRow(row) : null;
 }
 
-function nextSortOrder(db: Db): number {
-  const row = db.get('SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM connections') as
-    | { maxOrder: number }
-    | undefined;
-  return (row?.maxOrder ?? -1) + 1;
+async function nextSortOrder(db: KiraDb): Promise<number> {
+  const rows = await db
+    .select({ maxOrder: sql<number>`COALESCE(MAX(${connections.sortOrder}), -1)` })
+    .from(connections);
+  return (rows[0]?.maxOrder ?? -1) + 1;
 }
 
 export interface NewConnectionRow {
@@ -99,77 +119,70 @@ export interface NewConnectionRow {
   createdAt: string;
 }
 
-export function insertConnection(db: Db, row: NewConnectionRow): ConnectionSummary {
-  const sortOrder = nextSortOrder(db);
-  db.run(
-    `INSERT INTO connections
-       (id, name, kind, color, mode, read_only, host, port, database, username, uri,
-        options_json, created_at, updated_at, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      row.id,
-      row.fields.name,
-      row.fields.kind,
-      row.fields.color,
-      row.fields.mode,
-      row.fields.readOnly ? 1 : 0,
-      row.fields.host,
-      row.fields.port,
-      row.fields.database,
-      row.fields.username,
-      row.fields.uri,
-      JSON.stringify(row.fields.options),
-      row.createdAt,
-      row.createdAt,
-      sortOrder,
-    ],
-  );
-  const created = getConnection(db, row.id);
+export async function insertConnection(
+  db: KiraDb,
+  row: NewConnectionRow,
+): Promise<ConnectionSummary> {
+  const sortOrder = await nextSortOrder(db);
+  await db.insert(connections).values({
+    id: row.id,
+    name: row.fields.name,
+    kind: row.fields.kind,
+    color: row.fields.color,
+    mode: row.fields.mode,
+    readOnly: row.fields.readOnly,
+    host: row.fields.host,
+    port: row.fields.port,
+    database: row.fields.database,
+    username: row.fields.username,
+    uri: row.fields.uri,
+    optionsJson: JSON.stringify(row.fields.options),
+    createdAt: row.createdAt,
+    updatedAt: row.createdAt,
+    sortOrder,
+  });
+  const created = await getConnection(db, row.id);
   if (!created) throw new Error(`insertConnection: row ${row.id} not readable after insert`);
   return created;
 }
 
-export function updateConnection(
-  db: Db,
+export async function updateConnection(
+  db: KiraDb,
   id: string,
   fields: ConnectionFields,
   updatedAt: string,
-): ConnectionSummary {
-  db.run(
-    `UPDATE connections
-        SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
-            database = ?, username = ?, uri = ?, options_json = ?, updated_at = ?
-      WHERE id = ?`,
-    [
-      fields.name,
-      fields.kind,
-      fields.color,
-      fields.mode,
-      fields.readOnly ? 1 : 0,
-      fields.host,
-      fields.port,
-      fields.database,
-      fields.username,
-      fields.uri,
-      JSON.stringify(fields.options),
+): Promise<ConnectionSummary> {
+  await db
+    .update(connections)
+    .set({
+      name: fields.name,
+      kind: fields.kind,
+      color: fields.color,
+      mode: fields.mode,
+      readOnly: fields.readOnly,
+      host: fields.host,
+      port: fields.port,
+      database: fields.database,
+      username: fields.username,
+      uri: fields.uri,
+      optionsJson: JSON.stringify(fields.options),
       updatedAt,
-      id,
-    ],
-  );
-  const updated = getConnection(db, id);
+    })
+    .where(eq(connections.id, id));
+  const updated = await getConnection(db, id);
   if (!updated) throw new Error(`updateConnection: row ${id} not found`);
   return updated;
 }
 
-export function deleteConnection(db: Db, id: string): void {
-  db.run('DELETE FROM connections WHERE id = ?', [id]);
+export async function deleteConnection(db: KiraDb, id: string): Promise<void> {
+  await db.delete(connections).where(eq(connections.id, id));
 }
 
-export function reorderConnections(db: Db, ids: string[]): ConnectionSummary[] {
-  db.transaction(() => {
-    ids.forEach((id, index) => {
-      db.run('UPDATE connections SET sort_order = ? WHERE id = ?', [index, id]);
-    });
+export async function reorderConnections(db: KiraDb, ids: string[]): Promise<ConnectionSummary[]> {
+  await db.transaction(async (tx) => {
+    for (const [index, id] of ids.entries()) {
+      await tx.update(connections).set({ sortOrder: index }).where(eq(connections.id, id));
+    }
   });
   return listConnections(db);
 }

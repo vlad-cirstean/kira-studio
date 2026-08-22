@@ -23,6 +23,6 @@ export function registerTreeHandlers(deps: IpcDeps): void {
   });
   handle(IPC.treeInvalidate, (_event, payload) => {
     const { connectionId, path } = invalidateArgsSchema.parse(payload);
-    tree.invalidate(connectionId, path);
+    return tree.invalidate(connectionId, path);
   });
 }
