@@ -46,7 +46,15 @@ function onSelect(row: TreeRowVm): void {
   selectRow(row.key);
 }
 
+// The twisty always expands/collapses, regardless of kind — a table's columns must stay
+// reachable in the tree (tree.spec.ts's own WIDE_TABLE_PATH scenario). Only double-click
+// (onOpen) is kind-aware: it opens data for a table/view/matview instead of expanding it.
 function onToggle(row: TreeRowVm): void {
+  if (row.expanded) collapse(row.connectionId, row.path);
+  else void expand(row.connectionId, row.path);
+}
+
+function onOpen(row: TreeRowVm): void {
   if (OPENABLE_KINDS.has(row.kind)) {
     openDataTab(row.connectionId, row.path);
     return;
@@ -79,6 +87,7 @@ function onBackgroundContextMenu(event: MouseEvent): void {
             :selected="treeState.selected === item.key"
             @select="onSelect"
             @toggle="onToggle"
+            @open="onOpen"
             @contextmenu="onContextMenu"
           />
         </template>

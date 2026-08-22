@@ -8,6 +8,7 @@ const props = defineProps<{ row: TreeRowVm; selected: boolean }>();
 const emit = defineEmits<{
   select: [row: TreeRowVm];
   toggle: [row: TreeRowVm];
+  open: [row: TreeRowVm];
   contextmenu: [row: TreeRowVm, event: MouseEvent];
 }>();
 
@@ -34,7 +35,7 @@ function onClick(): void {
 }
 
 function onDblClick(): void {
-  if (props.row.hasChildren) emit('toggle', props.row);
+  if (props.row.hasChildren) emit('open', props.row);
 }
 
 function onTwistyClick(e: MouseEvent): void {
