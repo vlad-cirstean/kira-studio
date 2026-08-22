@@ -163,12 +163,14 @@ kira-version-vscode/
 │   ├── git/                        the only package that knows git exists
 │   │   └── src/
 │   │       ├── driver.ts           spawn discipline, env hygiene, write queue, cancellation (§4.3)
+│   │       ├── nodeProcessRunner.ts the one real ProcessRunner (Node child_process) (§4.3)
 │   │       ├── discovery.ts        locate git, probe version, enforce the 2.38 floor (§4.2)
 │   │       ├── capabilities.ts     per-repo facts: commit-graph, sparse, linked worktree
 │   │       ├── catFile.ts          persistent `cat-file --batch` process
 │   │       ├── logSession.ts       long-lived paged `git log` process (§5.1.1)
 │   │       ├── watcher.ts          .git + worktree watching → refsChanged / worktreeChanged
 │   │       ├── errors.ts           exit code + stderr → typed error union
+│   │       ├── queries.ts          §4.4 read surface: argv + parser bound to typed queries
 │   │       ├── parse/              log.ts refs.ts status.ts diffTree.ts stash.ts mergeTree.ts
 │   │       └── ops/                fetch.ts pull.ts push.ts stash.ts branch.ts tag.ts
 │   │                               checkout.ts reset.ts revert.ts cherryPick.ts conflict.ts
@@ -232,6 +234,8 @@ kira-version-vscode/
 └── tests/
     ├── fixtures/
     │   ├── generateRepo.ts         builds real repos: topologies, sizes, conflicts
+    │   ├── fakeGit.ts              stand-in git binary for discovery.ts: version, hang, garbage output
+    │   ├── recordPorcelain.ts      regenerates tests/fixtures/porcelain/ from real git, as raw bytes
     │   └── porcelain/              recorded git output for parser unit tests
     ├── e2e/                        Playwright against apps/harness
     ├── integration/                real git + real hosts (electron, vscode)
