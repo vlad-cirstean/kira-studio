@@ -282,6 +282,10 @@ Panel sizes and visibility persist. Theme is a single dark token set derived fro
 Modern** — both its colors *and* the recently reworked chrome layout: rounded/floating panels, thin
 borders, the detached look rather than the older flat-edge one.
 
+A visual mockup of this chrome (rounded-pill tabs, floating sidebar/editor/panel surfaces, the
+4/6/8px corner-radius system) lives in `docs/design/vscode-modern-ui/`, grounded in VS Code's actual
+`workbench.experimental.modernUI` CSS rather than approximated from memory.
+
 ### 8.2 Settings dialog
 
 Modal, sectioned. v1 sections:
