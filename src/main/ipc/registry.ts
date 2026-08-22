@@ -5,7 +5,9 @@ import { registerEngineHandlers } from './engine';
 import { registerFiltersHandlers } from './filters';
 import { registerLayoutHandlers } from './layout';
 import { registerOpsHandlers } from './ops';
+import { registerQueriesHandlers } from './queries';
 import { registerSettingsHandlers } from './settings';
+import { registerTabsHandlers } from './tabs';
 import { registerTreeHandlers } from './tree';
 
 export type { IpcDeps } from './deps';
@@ -19,4 +21,6 @@ export function registerIpc(deps: IpcDeps): void {
   registerTreeHandlers(deps);
   registerFiltersHandlers(deps);
   registerOpsHandlers(deps);
+  registerTabsHandlers(deps);
+  registerQueriesHandlers(deps);
 }

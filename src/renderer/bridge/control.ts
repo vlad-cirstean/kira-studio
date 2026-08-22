@@ -5,6 +5,8 @@ import type {
 } from '@shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
 import type { OpRecord } from '@shared/domain/ops';
+import type { FilterBody, FilterHistoryEntry, SavedQuery, SortSpec } from '@shared/domain/queries';
+import type { TabRecord } from '@shared/domain/tabs';
 import type { Layout, LayoutPatch } from '@shared/layout';
 import type {
   AppInfo,
@@ -83,4 +85,32 @@ export const control = {
   opsRecent: (limit: number): Promise<OpRecord[]> => kira.opsRecent({ limit }),
   opsCancel: (opId: string): Promise<void> => kira.opsCancel({ opId }),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => kira.onOpUpdate(cb),
+
+  tabsList: (): Promise<TabRecord[]> => kira.tabsList(),
+  tabsSave: (tabs: TabRecord[]): Promise<void> => kira.tabsSave(plain({ tabs })),
+
+  queriesList: (connectionId: string, path: string): Promise<SavedQuery[]> =>
+    kira.queriesList({ connectionId, path }),
+  queriesSave: (args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: FilterBody;
+    pinned: boolean;
+  }): Promise<SavedQuery> => kira.queriesSave(plain(args)),
+  queriesUpdate: (id: string, patch: { name?: string; pinned?: boolean }): Promise<SavedQuery> =>
+    kira.queriesUpdate(plain({ id, ...patch })),
+  queriesDelete: (id: string): Promise<void> => kira.queriesDelete({ id }),
+  queriesTouch: (id: string): Promise<void> => kira.queriesTouch({ id }),
+  queriesHistoryList: (
+    connectionId: string,
+    path: string,
+    limit: number,
+  ): Promise<FilterHistoryEntry[]> => kira.queriesHistoryList({ connectionId, path, limit }),
+  queriesHistoryRecord: (
+    connectionId: string,
+    path: string,
+    where: string | null,
+    orderBy: SortSpec | null,
+  ): Promise<void> => kira.queriesHistoryRecord(plain({ connectionId, path, where, orderBy })),
 };
