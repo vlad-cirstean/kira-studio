@@ -240,7 +240,8 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
     timeout: 10_000,
   });
   const opsAfterProjection = await getOps(page, connectionId);
-  const lastRead = ofKind(opsAfterProjection, 'read').at(-1);
+  // getOps() is newest-first (recentOps() orders by startedAt desc) — the just-issued read is [0].
+  const lastRead = ofKind(opsAfterProjection, 'read')[0];
   expect(lastRead?.command).toContain('"id"');
   expect(lastRead?.command).not.toContain('"hash"');
 
@@ -294,9 +295,9 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="filter-history-button"]');
   await expect(page.locator('[data-testid="filter-history"]')).toBeVisible();
   await expect(page.locator('[data-testid="history-entry"]').first()).toContainText('id <= 5');
-  page.once('dialog', (d) => d.accept('Small ids'));
   await page.click('[data-testid="save-current-filter"]');
-  await page.waitForTimeout(200);
+  await page.fill('[data-testid="text-prompt-input"]', 'Small ids');
+  await page.click('[data-testid="text-prompt-ok"]');
   await expect(page.locator('[data-testid="saved-entry"]').first()).toContainText('Small ids');
   await page.click('[data-testid="filter-history-backdrop"]');
   await page.fill('[data-testid="filter-where-input"]', '');
@@ -328,7 +329,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="pager-next"]');
   await page.click('[data-testid="toolbar-stop"]');
   await expect
-    .poll(async () => ofKind(await getOps(page, connectionId), 'read').at(-1)?.status, {
+    .poll(async () => ofKind(await getOps(page, connectionId), 'read')[0]?.status, {
       timeout: 10_000,
     })
     .toBe('cancelled');
