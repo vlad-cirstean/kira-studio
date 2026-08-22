@@ -5,6 +5,7 @@ import { patchTabState, tabsState } from '../../state/tabs';
 import { settingsState } from '../../workbench/state/settings';
 import { alignmentFor, columnOffsets, initialWidths, visibleColumnRange } from './columns';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
+import { searchState } from './search';
 import { runtime, setSort } from './state';
 
 const props = defineProps<{ tabId: string }>();
@@ -220,6 +221,26 @@ function isSelected(row: number, displayCol: number): boolean {
   return false;
 }
 
+// Rebuilt only when the search result changes (a completed scan or prev/next), not per cell —
+// matches are keyed by the page's own column index, not display position.
+const matchIndex = computed(() => {
+  const entry = searchState[props.tabId];
+  if (!entry) return null;
+  const set = new Set<string>();
+  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
+  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
+});
+
+function isSearchMatch(row: number, displayCol: number): boolean {
+  const pageCol = displayIndexToPageIndex.value[displayCol];
+  return matchIndex.value?.set.has(`${row}:${pageCol}`) ?? false;
+}
+function isCurrentSearchMatch(row: number, displayCol: number): boolean {
+  const pageCol = displayIndexToPageIndex.value[displayCol];
+  const current = matchIndex.value?.current;
+  return !!current && current.row === row && current.col === pageCol;
+}
+
 // ctrl/cmd-click a disjoint cell is folded into a plain cell selection — multi-cell disjoint
 // selection has no consumer until P6's copy/paste, so a second selected-cell set is not built here.
 function onCellClick(row: number, displayCol: number, e: MouseEvent): void {
@@ -389,7 +410,12 @@ defineExpose({ scrollCellIntoView });
           :data-row="r"
           :data-column="columnOrder[c]"
           :data-null="cellAt(r, c).isNull"
-          :class="{ 'align-right': alignFor(c) === 'right', selected: isSelected(r, c) }"
+          :class="{
+            'align-right': alignFor(c) === 'right',
+            selected: isSelected(r, c),
+            'search-match': isSearchMatch(r, c),
+            'search-match-current': isCurrentSearchMatch(r, c),
+          }"
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
         >
@@ -531,6 +557,15 @@ defineExpose({ scrollCellIntoView });
   background: var(--kira-select);
   outline: 1px solid var(--kira-accent);
   outline-offset: -1px;
+}
+
+.grid-cell.search-match {
+  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+}
+
+.grid-cell.search-match-current {
+  background: var(--kira-warn);
+  color: var(--kira-bg);
 }
 
 .cell-null {

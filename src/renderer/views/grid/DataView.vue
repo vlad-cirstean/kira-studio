@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import DataGrid from './DataGrid.vue';
+import SearchToolbar from './SearchToolbar.vue';
 import { load, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
@@ -38,6 +39,16 @@ onMounted(() => {
     void load(props.tab.id);
   }
 });
+
+const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
+
+function onGoToMatch(row: number, col: number): void {
+  dataGridRef.value?.scrollCellIntoView(row, col);
+}
+function onCloseSearch(): void {
+  const runtimeEntry = runtime[props.tab.id];
+  if (runtimeEntry) runtimeEntry.searchOpen = false;
+}
 </script>
 
 <template>
@@ -58,7 +69,13 @@ onMounted(() => {
         {{ rt.error.message }}
       </div>
       <div class="grid-area">
-        <DataGrid :tab-id="tab.id" />
+        <DataGrid ref="dataGridRef" :tab-id="tab.id" />
+        <SearchToolbar
+          v-if="rt?.searchOpen"
+          :tab-id="tab.id"
+          @go-to-match="onGoToMatch"
+          @close="onCloseSearch"
+        />
       </div>
     </template>
   </div>
