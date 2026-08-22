@@ -7,7 +7,7 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { settingsState } from '../../state/settings';
-import { patchTabState, tabsState } from '../../state/tabs';
+import { findDataTab, patchDataTabState } from '../../state/tabs';
 import {
   alignmentFor,
   columnOffsets,
@@ -28,7 +28,7 @@ const OVERSCAN_ROWS = 8;
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function tab() {
-  return tabsState.tabs.find((t) => t.id === props.tabId) ?? null;
+  return findDataTab(props.tabId);
 }
 
 const page = computed(() => {
@@ -135,7 +135,7 @@ let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
 watch([scrollTop, scrollLeft], () => {
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
   scrollSaveTimer = setTimeout(() => {
-    patchTabState(props.tabId, { scrollTop: scrollTop.value, scrollLeft: scrollLeft.value });
+    patchDataTabState(props.tabId, { scrollTop: scrollTop.value, scrollLeft: scrollLeft.value });
   }, 300);
 });
 
@@ -182,7 +182,7 @@ function onResizeMove(e: PointerEvent): void {
   const width = Math.max(40, resizing.startWidth + (e.clientX - resizing.startX));
   const t = tab();
   if (t)
-    patchTabState(props.tabId, {
+    patchDataTabState(props.tabId, {
       columnWidths: { ...t.state.columnWidths, [resizing.name]: width },
     });
 }
@@ -207,7 +207,7 @@ function onHeaderDrop(e: DragEvent, name: string): void {
   if (from < 0 || to < 0) return;
   order.splice(from, 1);
   order.splice(to, 0, source);
-  patchTabState(props.tabId, { columnOrder: order });
+  patchDataTabState(props.tabId, { columnOrder: order });
 }
 
 function rt() {

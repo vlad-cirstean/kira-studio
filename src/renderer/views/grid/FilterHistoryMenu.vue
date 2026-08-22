@@ -2,13 +2,13 @@
 import type { FilterHistoryEntry, SavedQuery, SortSpec } from '@shared/domain/queries';
 import { onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import { tabsState } from '../../state/tabs';
+import { findDataTab } from '../../state/tabs';
 
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ apply: [where: string | null, orderBy: SortSpec | null]; close: [] }>();
 
 function tab() {
-  return tabsState.tabs.find((t) => t.id === props.tabId) ?? null;
+  return findDataTab(props.tabId);
 }
 
 const saved = ref<SavedQuery[]>([]);

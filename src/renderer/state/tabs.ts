@@ -1,4 +1,11 @@
-import { type DataTabState, defaultDataTabState, type TabRecord } from '@shared/domain/tabs';
+import {
+  asDataTab,
+  type DataTabRecord,
+  type DataTabState,
+  defaultDataTabState,
+  defaultDdlTabState,
+  type TabRecord,
+} from '@shared/domain/tabs';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { drop as dropPage } from '../views/grid/page';
@@ -83,21 +90,62 @@ export function openDataTab(
   return id;
 }
 
+// Opens a 'ddl' tab, reusing an existing one for the same (connectionId, path) — mirrors
+// openDataTab's identity rule (§8.4), minus the `newTab` escape hatch: D14 gives DDL no
+// "open in new tab" affordance.
+export function openDdlTab(connectionId: string, path: string): string {
+  const existing = tabsState.tabs.find(
+    (t) => t.kind === 'ddl' && t.connectionId === connectionId && t.path === path,
+  );
+  if (existing) {
+    activateTab(existing.id);
+    return existing.id;
+  }
+
+  const id = crypto.randomUUID();
+  const record: TabRecord = {
+    id,
+    connectionId,
+    path,
+    kind: 'ddl',
+    state: defaultDdlTabState(),
+    order: tabsState.tabs.length,
+    active: true,
+  };
+  deactivateAll();
+  tabsState.tabs.push(record);
+  tabsState.activeId = id;
+  tabsState.hydrated.add(id);
+  saveNow();
+  return id;
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
   if (!source) return id;
 
   const newId = crypto.randomUUID();
-  const record: TabRecord = {
-    id: newId,
-    connectionId: source.connectionId,
-    path: source.path,
-    kind: source.kind,
-    state: defaultDataTabState(source.state.pageSize),
-    order: tabsState.tabs.length,
-    active: true,
-  };
+  const record: TabRecord =
+    source.kind === 'data'
+      ? {
+          id: newId,
+          connectionId: source.connectionId,
+          path: source.path,
+          kind: 'data',
+          state: defaultDataTabState(source.state.pageSize),
+          order: tabsState.tabs.length,
+          active: true,
+        }
+      : {
+          id: newId,
+          connectionId: source.connectionId,
+          path: source.path,
+          kind: 'ddl',
+          state: defaultDdlTabState(),
+          order: tabsState.tabs.length,
+          active: true,
+        };
   deactivateAll();
   tabsState.tabs.push(record);
   tabsState.activeId = newId;
@@ -176,9 +224,9 @@ export function activateTab(id: string): void {
   saveNow();
 }
 
-export function patchTabState(id: string, patch: Partial<DataTabState>): void {
+export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {
   const target = tabsState.tabs.find((t) => t.id === id);
-  if (!target) return;
+  if (target?.kind !== 'data') return;
   Object.assign(target.state, patch);
   saveDebounced();
 }
@@ -201,3 +249,9 @@ export function isHydrated(id: string): boolean {
 export const activeTab = computed<TabRecord | null>(
   () => tabsState.tabs.find((t) => t.id === tabsState.activeId) ?? null,
 );
+
+export function findDataTab(id: string): DataTabRecord | null {
+  return asDataTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));

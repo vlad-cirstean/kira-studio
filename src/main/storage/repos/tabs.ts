@@ -33,8 +33,8 @@ export async function listTabs(db: KiraDb): Promise<TabRecord[]> {
       );
       continue;
     }
-    // Only 'data' is renderable in P2 (D18) — a row of any other kind is dropped, logged, and
-    // not re-saved, the same "corrupt row is a miss" discipline as the metadata cache.
+    // Only RENDERABLE_TAB_KINDS is renderable (D18) — a row of any other kind is dropped, logged,
+    // and not re-saved, the same "corrupt row is a miss" discipline as the metadata cache.
     if (!RENDERABLE_TAB_KINDS.includes(parsed.data.kind)) {
       log(
         'warn',

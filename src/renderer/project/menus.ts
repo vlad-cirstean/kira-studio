@@ -13,7 +13,7 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
-import { activeTab, openDataTab, tabsState } from '../state/tabs';
+import { activeTab, findDataTab, openDataTab } from '../state/tabs';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
 import {
@@ -346,7 +346,7 @@ function columnMenu(row: TreeRowVm): MenuItem[] {
       icon: 'list-selection',
       run: () => {
         const tabId = targetTabFor(row);
-        const tab = tabsState.tabs.find((t) => t.id === tabId);
+        const tab = findDataTab(tabId);
         const current = tab?.state.projection ?? null;
         if (current?.includes(row.name)) return;
         void setProjection(tabId, current ? [...current, row.name] : [row.name]);

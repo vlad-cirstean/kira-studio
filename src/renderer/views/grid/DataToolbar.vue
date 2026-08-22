@@ -2,7 +2,7 @@
 import type { DataTabState } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { connectionsState } from '../../state/connections';
-import { activeTab } from '../../state/tabs';
+import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
 import {
@@ -26,7 +26,7 @@ const PAGE_SIZE_LABEL: Record<DataTabState['pageSize'], string> = {
   10000: '10k',
 };
 
-const tab = computed(() => activeTab.value);
+const tab = computed(() => activeDataTab.value);
 const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
 
 const caps = computed(() => {

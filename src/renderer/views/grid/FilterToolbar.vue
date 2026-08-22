@@ -2,12 +2,12 @@
 import type { SortSpec } from '@shared/domain/queries';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { activeTab } from '../../state/tabs';
+import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import FilterHistoryMenu from './FilterHistoryMenu.vue';
 import { setFilter, setSort } from './state';
 
-const tab = computed(() => activeTab.value);
+const tab = computed(() => activeDataTab.value);
 
 function sortToText(sort: SortSpec | null): string {
   if (!sort) return '';

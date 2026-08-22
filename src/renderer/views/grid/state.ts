@@ -6,7 +6,7 @@ import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { settingsState } from '../../state/settings';
-import { patchTabState, tabsState, unmarkHydrated } from '../../state/tabs';
+import { findDataTab, patchDataTabState, tabsState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './page';
 
 export type Selection =
@@ -56,12 +56,8 @@ function ensureRuntime(tabId: string): DataViewRuntime {
   return rt;
 }
 
-function findTab(tabId: string) {
-  return tabsState.tabs.find((t) => t.id === tabId) ?? null;
-}
-
 async function loadMeta(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   try {
@@ -89,7 +85,7 @@ export function cancelPrefetch(tabId: string): void {
 }
 
 async function runPrefetch(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   const rt = runtime[tabId];
   if (!tab?.connectionId || !rt?.hasMore) return;
 
@@ -125,7 +121,7 @@ function schedulePrefetch(tabId: string): void {
   cancelPrefetch(tabId);
   if (!settingsState.data.prefetch) return;
   if (tabId !== tabsState.activeId) return;
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   const rt = runtime[tabId];
   if (!tab?.connectionId || !rt?.hasMore) return;
 
@@ -140,7 +136,7 @@ function schedulePrefetch(tabId: string): void {
 }
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   // Evaluated before ensureRuntime() creates the entry — true only for this tab's very first
   // load, which is when countOnOpen (§ settings) should trigger a background Σ.
@@ -203,14 +199,14 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
 }
 
 export async function reload(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
   await load(tabId, { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize });
 }
 
 export async function runCount(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   try {
@@ -233,53 +229,53 @@ export function stop(tabId: string): void {
 }
 
 export async function goFirst(tabId: string): Promise<void> {
-  patchTabState(tabId, { pageIndex: 0 });
+  patchDataTabState(tabId, { pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
 
 // D7's cursor choice: prefer the token when one is available, falling back to offset — the
 // pager position (`pageIndex`) always advances by one regardless of which strategy served it.
 export async function goNext(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   const nextIndex = tab.state.pageIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
     : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-  patchTabState(tabId, { pageIndex: nextIndex });
+  patchDataTabState(tabId, { pageIndex: nextIndex });
   await load(tabId, cursor);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   const prevIndex = Math.max(0, tab.state.pageIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
     : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
-  patchTabState(tabId, { pageIndex: prevIndex });
+  patchDataTabState(tabId, { pageIndex: prevIndex });
   await load(tabId, cursor);
 }
 
 // Requires a count and is offset (pageCount-1)*pageSize (§8c) — the toolbar disables ⏭ until
 // Σ has run.
 export async function goLast(tabId: string): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   const rt = runtime[tabId];
   if (!tab || !rt?.count) return;
   const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
   const lastIndex = pageCount - 1;
-  patchTabState(tabId, { pageIndex: lastIndex });
+  patchDataTabState(tabId, { pageIndex: lastIndex });
   await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize });
 }
 
 export async function goToPage(tabId: string, n: number): Promise<void> {
-  const tab = findTab(tabId);
+  const tab = findDataTab(tabId);
   if (!tab) return;
   const index = Math.max(0, n);
-  patchTabState(tabId, { pageIndex: index });
+  patchDataTabState(tabId, { pageIndex: index });
   await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize });
 }
 
@@ -296,24 +292,24 @@ export async function setPageSize(
   pageSize: DataTabState['pageSize'],
 ): Promise<void> {
   resetTokens(tabId);
-  patchTabState(tabId, { pageSize, pageIndex: 0 });
+  patchDataTabState(tabId, { pageSize, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
 
 export async function setProjection(tabId: string, projection: string[] | null): Promise<void> {
   resetTokens(tabId);
-  patchTabState(tabId, { projection, pageIndex: 0 });
+  patchDataTabState(tabId, { projection, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
 
 export async function setFilter(tabId: string, filter: string | null): Promise<void> {
   resetTokens(tabId);
-  patchTabState(tabId, { filter, pageIndex: 0 });
+  patchDataTabState(tabId, { filter, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
 
 export async function setSort(tabId: string, sort: SortSpec | null): Promise<void> {
   resetTokens(tabId);
-  patchTabState(tabId, { sort, pageIndex: 0 });
+  patchDataTabState(tabId, { sort, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
