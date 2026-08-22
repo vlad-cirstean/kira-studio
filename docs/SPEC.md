@@ -80,6 +80,22 @@ no claim, run no CI for them, and will not treat a remote-only bug as a v1 defec
 manifest declares this honestly (`extensionKind: ["workspace"]`, no `browser` entry point) so
 VS Code does not offer the extension where it cannot function.
 
+### 2.1.2 Supported operating systems
+
+**macOS only for v1.** Windows and Linux are not supported, not tested, and not claimed.
+
+This is a scope decision, not an architectural one, so the code leaves the seam open without
+building anything for it: anything platform-conditional goes behind a named strategy selected
+on `process.platform`, with the unimplemented platforms present as explicit cases that fail
+with "platform not supported yet" rather than as missing branches that silently misbehave.
+Today that is exactly two places - Git binary discovery (§4.2) and Electron packaging (P11).
+Adding a platform later should be implementing those cases and running the suites there, not
+untangling assumptions.
+
+Concretely this means: no Windows path handling, no `\r\n` line-ending special cases beyond
+what git's own `core.autocrlf` does for us, no per-platform CI, and no Windows code-signing
+identity to acquire (§11 D26).
+
 ### 2.2 Electron
 
 `packages/host-electron` provides a `BrowserWindow` loading the identical UI bundle, a main
@@ -109,10 +125,6 @@ kira-version-vscode/
 ├── tsconfig.base.json              TS7-clean options, shared by every package
 ├── tsconfig.json                   solution file referencing all packages
 ├── playwright.config.ts            projects: harness (fast), electron, vscode
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                  check + unit + harness e2e, every push
-│       └── integration.yml         real-git + electron + vscode matrix, PR and nightly
 ├── docs/
 │   ├── SPEC.md                     this document
 │   └── plans/                      Opus-authored phase plans, P0.md … P11.md
@@ -221,13 +233,13 @@ kira-version-vscode/
     │   └── porcelain/              recorded git output for parser unit tests
     ├── e2e/                        Playwright against apps/harness
     ├── integration/                real git + real hosts (electron, vscode)
-    └── perf/                       time + heap budgets (§5.1), CI-enforced
+    └── perf/                       time + heap budgets (§5.1), run locally (D28)
 ```
 
 Unit tests are colocated (`foo.ts` / `foo.test.ts`, run by `bun test`); only the suites that
 need a harness or a real repository live under `tests/`.
 
-**Dependency rule, enforced in CI** by Biome's `noRestrictedImports` plus a bundle check:
+**Dependency rule, enforced by `bun run check`** via Biome's `noRestrictedImports` plus a bundle check:
 `core` and `ipc` depend on nothing; `git` depends on `core` + `ipc`; `ui` depends on `core` +
 `ipc`; hosts depend on everything; **nothing depends on a host**. The string `vscode` appears
 as an import specifier in exactly one package, and `bun:`/`Bun` in none (§8.1).
@@ -407,10 +419,13 @@ Resolution order:
 1. `kiraVersion.git.path` (our setting), if set.
 2. VS Code's `git.path` setting, when running in VS Code — reuse the user's existing config.
 3. `PATH` lookup.
-4. Platform fallbacks: Windows `%ProgramFiles%\Git\cmd\git.exe`, `%LocalAppData%\Programs\Git\cmd\git.exe`;
-   macOS — probe `/usr/local/bin`, `/opt/homebrew/bin`, then `/usr/bin/git` (which is the
-   Command Line Tools shim: **running it when CLT is not installed pops a system install
-   dialog**, so probe with `xcode-select -p` first and never spawn the shim blind).
+4. Platform fallbacks, behind a `PlatformGitLocator` strategy selected by `process.platform`.
+   **Only the macOS strategy is implemented** (D27): probe `/opt/homebrew/bin`,
+   `/usr/local/bin`, then `/usr/bin/git` — the last being the Command Line Tools shim, where
+   **running it when CLT is not installed pops a system install dialog**, so probe with
+   `xcode-select -p` first and never spawn the shim blind. The Windows and Linux strategies
+   exist as named, unimplemented cases that throw a clear "platform not supported yet" error;
+   adding one later is a single file, not a refactor.
 
 **Minimum version: Git 2.38 — a hard requirement, not a soft floor.** `git merge-tree
 --write-tree` (2.38, Oct 2022) is what makes the checkout and stash-pop conflict predictions
@@ -545,8 +560,10 @@ Measured on a 100k-commit repository, mid-range laptop, warm OS cache:
 | Idle memory, first page | ≤ 80 MB renderer |
 | Idle memory, full 100k loaded | ≤ 250 MB renderer |
 
-These are CI-checked with a synthetic repository generator; a regression beyond 20% fails
-the build. The 100k row is the ceiling test — reached by scripted "load more" presses — not
+These are checked by the perf harness against a synthetic repository generator; a regression
+beyond 20% fails `bun run test:perf`. It is run locally, on demand and before closing a phase
+(D28) - there is no CI to run it for us, which makes running it a habit rather than a
+safety net. The 100k row is the ceiling test — reached by scripted "load more" presses — not
 the default experience.
 
 ### 5.1.1 Paging: an explicit "Load more", not infinite scroll
@@ -642,9 +659,9 @@ Rules:
 - **Caches are bounded and evictable**: diff text LRU (cap by bytes, not entries), rendered
   canvas tiles, and the per-repo commit set, which is dropped when the repo is deselected and
   when the window has been hidden past a threshold.
-- Memory is a **CI-checked budget**, not an aspiration: the perf harness (P0) measures
-  renderer heap after loading the 100k synthetic repo and fails the build on a >20%
-  regression, alongside the timing budgets in §5.1.
+- Memory is a **measured budget**, not an aspiration: the perf harness (P0) measures renderer
+  heap after loading the 100k synthetic repo and fails on a >20% regression, alongside the
+  timing budgets in §5.1.
 
 ---
 
@@ -1152,7 +1169,7 @@ rather than abandoning Biome. Biome also enforces our architectural boundaries v
 TypeScript 7.0 (the Go-native compiler, "Project Corsa") went stable in July 2026 with 8–12×
 faster checks. Nothing about it conflicts with VS Code or Electron: **nothing is compiled by
 `tsc` at all.** Transformation is done by esbuild/Vite/`bun build`; TypeScript runs
-`noEmit` as a pure type checker. So the choice affects CI wall-clock and editor feedback
+`noEmit` as a pure type checker. So the choice affects check wall-clock and editor feedback
 latency, and nothing about the shipped artifact. That also means it is reversible at any time,
 which is why it does not deserve to become a risk.
 
@@ -1185,9 +1202,9 @@ There are two ways out, and they differ in cost:
   `enum` where a union or `as const` works, `verbatimModuleSyntax`, `isolatedModules`, explicit
   `import type`. This is what actually determines whether the eventual switch is a one-line
   change or a migration, and it costs nothing because it is also just good modern TypeScript.
-- **CI runs a single checker**, TS 5.x, until `vue-tsc` ships TS 7 support.
+- **`bun run check` runs a single checker**, TS 5.x, until `vue-tsc` ships TS 7 support.
 - **tsgo is installed and available as an optional fast local check** over the pure-`.ts`
-  packages (`bun run check:fast`). Sub-second feedback in the inner loop, zero CI dependency,
+  packages (`bun run check:fast`). Sub-second feedback in the inner loop, no effect on `check`,
   and it keeps us honest about TS 7 semantics continuously rather than discovering divergence
   at switch time.
 - **Flip when the ecosystem does.** TS 7.1 is expected around October 2026, which lands inside
@@ -1219,8 +1236,8 @@ Two suites:
    can also drive the VS Code Electron binary (launch the downloaded build with the extension
    installed, then work through the webview frame); `@vscode/test-electron` remains available
    for extension-host-level tests that need the VS Code API rather than the UI. Slower tier,
-   runs on PRs and nightly across Linux/macOS/Windows and across a matrix of Git versions
-   (oldest supported, current) to keep the capability gating in §4.2 honest.
+   Run on demand, on macOS only (D27), against the Git the developer has installed. The
+   OS and Git-version matrix this tier is shaped for arrives with the second platform.
 
 Layer beneath both: `bun test` unit tests over `core` (layout, search, pre-flight planners)
 and `git` (porcelain parsers, against recorded fixtures).
@@ -1300,6 +1317,8 @@ Deferred to v2, listed so the v1 architecture does not preclude them:
   carried now.
 - **Telemetry of any kind.** Nothing is collected, so there is no opt-out to design.
 - **Multi-level operation history.** Undo is one level (7.12).
+- **Windows and Linux support** (2.1.2). macOS only, with the seam left open.
+- **Continuous integration.** No pipeline, no workflows, no hosted runners (D28).
 - Commit creation, staging/unstaging (this is a history tool, not a replacement for VS Code's
   SCM view — v1 reads the working tree, it does not edit it, except via the documented
   operations here).
@@ -1319,7 +1338,7 @@ Phases are sequential; each ends at a checkpoint.
 
 | # | Phase | Deliverable | Exit criteria |
 |---|---|---|---|
-| **P0** | Foundation | Monorepo per the normative tree in 3.1, Bun workspaces, Biome, **single TS 5.x checker with TS7-clean compiler options plus `tsgo` as an optional `check:fast`** (8.3), Vite, CI, `packages/ipc` contract skeleton, `apps/harness` with mock bridge, Playwright wired to it, fixture-repo generator, perf-budget harness (time **and** heap). | `bun install && bun run check && bun run test` green in CI; harness renders a placeholder UI; one Playwright test passes; `vue-tsc`/TS-7 state re-confirmed and versions pinned. |
+| **P0** | Foundation | Monorepo per the normative tree in 3.1, Bun workspaces, Biome, **single TS 5.x checker with TS7-clean compiler options plus `tsgo` as an optional `check:fast`** (8.3), Vite, `packages/ipc` contract skeleton, `apps/harness` with mock bridge, Playwright wired to it, fixture-repo generator, perf-budget harness (time **and** heap). | `bun install && bun run check && bun run test` green locally on macOS; harness renders a placeholder UI; one Playwright test passes; `vue-tsc`/TS-7 state re-confirmed and versions pinned. |
 | **P1** | Git driver | `GitDriver`: discovery, version probe with the **2.38 hard-floor block state**, repo capability probe, spawn discipline (§4.3), streaming NUL parser, cancellation, write queue, `cat-file --batch`, typed error classification. | Unit tests over recorded porcelain fixtures; integration tests against generated repos; sub-2.38 Git produces the block state, never a half-working app. |
 | **P2** | History pipeline | Streaming `git log` walk with **paused long-lived-process paging (5.1.1)** and remaining-count query, ref query, status query, lane layout in a worker, packed transferable buffers, column-wise typed-array store with string interning (5.5). | First page within budget; repeated Load more to 100k within time **and heap** budget; layout unit tests over hand-built topologies incl. octopus merges. |
 | **P3** | Host bridge | RPC transport for both hosts, VS Code panel webview view registered and reachable, Electron shell booting the same bundle, state persistence/rehydration, **the shared settings schema driving both hosts (D25)**, theme token layer, `readTokens` canvas bridge, and Electron palette generation from VS Code theme JSON (3.4). | Panel opens in VS Code and shows live data; Electron app shows the same; hide/reveal rehydrates without re-running git; switching VS Code theme restyles the panel live, canvas included, with no reload. |
@@ -1330,7 +1349,7 @@ Phases are sequential; each ends at a checkpoint.
 | **P8** | Stash | Stash create (incl. `-u`, message, pathspec), list, show, apply/pop/drop/branch, stashes rendered in the graph, and the pop-prediction engine via `merge-tree` (§7.6) wired into checkout resolution. | Prediction verified against actually-executed pops across clean and conflicting cases; a dropped stash is recoverable through the undo slot. |
 | **P9** | Reset | Soft/mixed/hard with per-mode consequence copy, pre-flight counts, typed confirmation for hard-with-dirty, reflog-backed undo completing the undo slot (7.12). | Integration tests assert repository state per mode; undo restores; guarded during in-progress operations. |
 | **P10** | Search | Input with case/whole-word/regex toggles, commit/refs(branches+tags)/both scope, hybrid client-side + git-backed matching, next/prev navigation, live regex validation, abort-on-supersede. | Semantics table fully covered by tests (each toggle × scope); ≤120 ms budget met; malformed regex never throws. |
-| **P11** | Ship | Electron packaging (`electron-builder`), `.vsix` packaging without `vscode:prepublish`, `extensionKind`/no-browser manifest declarations (2.1.1), **`engines.vscode` floor confirmed (D7)**, **SCM title button and status bar item (6.5)**, marketplace + OpenVSX metadata, cross-platform CI matrix (OS x recent Git versions), docs, settings surface, telemetry-free release checklist. | Installable `.vsix` and signed desktop builds; full Playwright matrix green on Linux/macOS/Windows. |
+| **P11** | Ship | Electron packaging (`electron-builder`), `.vsix` packaging without `vscode:prepublish`, `extensionKind`/no-browser manifest declarations (2.1.1), **`engines.vscode` floor confirmed (D7)**, **SCM title button and status bar item (6.5)**, marketplace + OpenVSX metadata, docs, settings surface, telemetry-free release checklist. | Installable `.vsix` and a signed, notarized macOS build; full Playwright suite green on macOS. |
 
 ---
 
@@ -1385,7 +1404,9 @@ deliberately deferred rather than left undecided.**
 | D23 | Telemetry | **None at all.** Nothing collected, so there is no opt-out to design and no privacy policy to write. Easier to never start than to remove later. |
 | D24 | Localization | **English only, and no l10n infrastructure** — no bundle, no string-id indirection, no scaffolding carried for a future that may not come. If it is ever wanted, it is a mechanical change made then. |
 | D25 | Settings | **One schema in `core`**, generating `contributes.configuration` for VS Code at build time and driving the Electron settings UI from the same source. Defined at P3, before ~15 settings accrete in two places. |
-| D26 | Licensing and distribution | **MIT; published to both the VS Code Marketplace and OpenVSX.** Signed Electron builds need an Apple Developer account for notarization and a Windows code-signing certificate — real cost and a real identity, which must be decided **before** P11 rather than at it. |
+| D26 | Licensing and distribution | **MIT; published to both the VS Code Marketplace and OpenVSX.** The signed Electron build needs an Apple Developer account for notarization — real cost and a real identity, to be decided **before** P11 rather than at it. No Windows certificate is needed while D27 holds. |
+| D27 | Operating systems | **macOS only for v1.** Windows and Linux are not supported or tested. Platform-conditional code sits behind named strategies with the other platforms as explicit unimplemented cases, so adding one later is implementation rather than untangling (2.1.2). |
+| D28 | Continuous integration | **None for now.** No workflows, no hosted runners. `bun run check`, `bun test`, `test:e2e` and `test:perf` are run locally on macOS, and running them before closing a phase is part of the phase's exit criteria rather than something a pipeline enforces. The scripts are written to be CI-callable so adding a pipeline later is configuration, not rework. |
 
 ---
 

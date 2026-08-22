@@ -1,1 +1,4 @@
-Opus-authored phase plans live here, one per phase (P0–P11). See AGENTS.md.
+Phase plans for `docs/SPEC.md` §10, one per phase (P0–P11).
+
+A phase is planned here before it is implemented; see `AGENTS.md`. Each plan closes with a
+Findings section recorded during implementation — later phases read it as inherited context.
