@@ -58,7 +58,7 @@ function onContextMenu(e: MouseEvent): void {
     :data-status="row.kind === 'connection' ? row.status : undefined"
     @click="onClick"
     @dblclick="onDblClick"
-    @contextmenu.prevent="onContextMenu"
+    @contextmenu.prevent.stop="onContextMenu"
   >
     <div v-if="row.depth === 0" class="color-rail" :style="{ background: `var(--kira-conn-${row.color})` }" />
 

@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import { connectionsState } from './state/connections';
+import ContextMenu from './workbench/ContextMenu.vue';
 import { initEngineState } from './workbench/state/engine';
 import { toggleOperationsPanel, toggleProjectPanel } from './workbench/state/layout';
 import { settingsOpen } from './workbench/state/settings';
@@ -29,4 +30,5 @@ onUnmounted(() => {
 <template>
   <WorkbenchShell />
   <ConnectionDialog v-if="connectionsState.dialog.open" />
+  <ContextMenu />
 </template>

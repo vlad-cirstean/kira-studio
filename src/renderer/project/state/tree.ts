@@ -115,6 +115,16 @@ export async function refreshExpanded(connectionId: string): Promise<void> {
   }
 }
 
+export function collapseAll(): void {
+  treeState.expanded.clear();
+}
+
+export async function refreshAllConnections(): Promise<void> {
+  for (const conn of connectionsState.records) {
+    await refreshExpanded(conn.id);
+  }
+}
+
 let unsubscribeInvalidated: (() => void) | null = null;
 
 export function initTreeSync(): void {

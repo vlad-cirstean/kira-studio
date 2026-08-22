@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { openContextMenu } from '../workbench/state/contextMenu';
 import { settingsState } from '../workbench/state/settings';
 import VirtualList from '../workbench/VirtualList.vue';
+import { emptyBackgroundMenu, menuForRow } from './menus';
 import {
   collapse,
   expand,
@@ -28,14 +30,20 @@ function onToggle(row: TreeRowVm): void {
   else void expand(row.connectionId, row.path);
 }
 
-// Right-click menu wiring lands in Step 9 (context menu service) — the row already emits the
-// event so that step only needs to build the handler, not touch the tree again.
-function onContextMenu(_row: TreeRowVm, _event: MouseEvent): void {}
+function onContextMenu(row: TreeRowVm, event: MouseEvent): void {
+  openContextMenu(event, menuForRow(row));
+}
+
+function onBackgroundContextMenu(event: MouseEvent): void {
+  // TreeRow.vue stops propagation on its own contextmenu handler, so only a right-click on
+  // the empty area below/around the rows (the virtual list's spacer divs) ever reaches here.
+  openContextMenu(event, emptyBackgroundMenu());
+}
 </script>
 
 <template>
   <div class="project-tree">
-    <div class="tree-body">
+    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
       <VirtualList :items="visibleRows" :row-height="rowHeight">
         <template #default="{ item }">
           <TreeRow
