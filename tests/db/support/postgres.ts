@@ -89,6 +89,10 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
     config,
     uri,
     async stop() {
+      // Playwright's workers:1 config runs every UI spec file sequentially in the same worker
+      // process, sharing this module's state — without resetting `memoized`, a later spec file's
+      // startPostgres() would return this now-dead container instead of starting a fresh one.
+      memoized = null;
       await container.stop();
     },
   };

@@ -41,6 +41,10 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
       MARIADB_PASSWORD: PASSWORD,
     })
     .withExposedPorts(MARIADB_PORT)
+    // performance_schema is off by default on MariaDB (unlike MySQL) — scenario 1 needs
+    // performance_schema.SESSION_CONNECT_ATTRS to assert that a disconnected session's connect
+    // attributes are gone.
+    .withCommand(['--performance-schema=ON'])
     // The image ships healthcheck.sh; this is more reliable than a log match. (If a future pinned
     // tag drops the script, the fix is Wait.forLogMessage(/ready for connections/, 2) — MariaDB's
     // entrypoint starts the server twice for the same reason Postgres's does, and waiting for only
@@ -72,7 +76,17 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     file: SEED_SQL_PATH,
   });
 
-  const rootConn = await createConnection({ host, port, user: 'root', password: ROOT_PASSWORD });
+  // `database` is required here even though every statement below qualifies its table names —
+  // the SEQUENCE-engine `seq_1_to_N` pseudo-table used for the big_rows bulk insert is always
+  // unqualified and resolves against whatever database the connection has selected, so a
+  // connection with none throws ER_NO_DB_ERROR.
+  const rootConn = await createConnection({
+    host,
+    port,
+    user: 'root',
+    password: ROOT_PASSWORD,
+    database: DATABASE,
+  });
   try {
     // A second database, mirroring the Postgres fixture's `analytics` schema — MariaDB has no
     // schema level, so a second *database* is the equivalent (§6d).
@@ -128,6 +142,10 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     config,
     uri,
     async stop() {
+      // Playwright's workers:1 config runs every UI spec file sequentially in the same worker
+      // process, sharing this module's state — without resetting `memoized`, a later spec file's
+      // startMariadb() would return this now-dead container instead of starting a fresh one.
+      memoized = null;
       await container.stop();
     },
   };
