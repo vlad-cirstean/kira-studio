@@ -6,6 +6,7 @@
  * from index.ts: this is test scaffolding, not product surface.
  */
 import type { ProcessExit, ProcessRunner, SpawnedProcess, SpawnRequest } from "@kira-version/core";
+import { type ResolvedGit, locateGit } from "./discovery.ts";
 
 export class FakeProcess implements SpawnedProcess {
   readonly stdout: AsyncIterable<Uint8Array>;
@@ -112,5 +113,34 @@ export class FakeProcessRunner implements ProcessRunner {
       else request.signal.addEventListener("abort", () => proc.kill("SIGTERM"), { once: true });
     }
     return proc;
+  }
+}
+
+/**
+ * Resolves a real `ResolvedGit` through the legitimate path (discovery.ts's opaque
+ * constructor), against a fake version probe, rather than poking a hole in its opacity. Uses
+ * its own throwaway runner — a `ResolvedGit` carries no reference to the runner that produced
+ * it, and reusing a caller's own runner here would pollute its `processes`/`calls` with the
+ * version probe's spawn, off by one from whatever that caller wants to assert on.
+ */
+export async function fakeResolvedGit(version = "2.45.0"): Promise<ResolvedGit> {
+  const probeRunner = new FakeProcessRunner();
+  const resultPromise = locateGit({ runner: probeRunner, configuredCandidates: ["/fake/git"] });
+  await Promise.resolve();
+  const proc = probeRunner.processes.at(-1);
+  if (!proc) throw new Error("expected the version probe to have spawned");
+  proc.emitStdout(new TextEncoder().encode(`git version ${version}\n`));
+  proc.finish(0);
+  const resolution = await resultPromise;
+  if (resolution.kind !== "ok") throw new Error(`unexpected resolution: ${resolution.kind}`);
+  return resolution.git;
+}
+
+/** Ticks the microtask queue until `predicate` holds (or gives up after `maxTicks`) — robust
+ *  against exactly how many promise hops a driver's internals happen to take, which is an
+ *  implementation detail tests should not hard-code against. */
+export async function flushUntil(predicate: () => boolean, maxTicks = 50): Promise<void> {
+  for (let i = 0; i < maxTicks && !predicate(); i++) {
+    await Promise.resolve();
   }
 }

@@ -1,3 +1,5 @@
+export type { GitCapabilities, RepoCapabilities } from "./capabilities.ts";
+export { CapabilitiesCache, capabilitiesForVersion } from "./capabilities.ts";
 export type {
   GitResolution,
   GitVersion,
