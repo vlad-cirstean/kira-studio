@@ -1,5 +1,6 @@
 import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
+import type { SavedQuery } from '@shared/domain/queries';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -37,10 +38,21 @@ export const treeState = reactive({
   selected: null as string | null,
   /** Set by revealPath(); ProjectTree.vue watches it to scroll the row into view (Step 7b). */
   pendingScrollKey: null as string | null,
+  /** Populated on demand for the tree's "Saved filters ▸" submenu (Step 13). */
+  savedQueries: {} as Record<string, SavedQuery[]>,
 });
 
 export function selectRow(key: string): void {
   treeState.selected = key;
+}
+
+// Fetched right before opening a relation's context menu (never memoised — a saved filter can
+// be added/renamed/deleted between two right-clicks, and this is a fast local IPC round-trip).
+export async function loadSavedQueries(connectionId: string, path: string): Promise<void> {
+  treeState.savedQueries[rowKey(connectionId, path)] = await control.queriesList(
+    connectionId,
+    path,
+  );
 }
 
 export const filtersDialogState = reactive({
@@ -58,7 +70,7 @@ export function closeFiltersDialog(): void {
   filtersDialogState.connectionId = null;
 }
 
-function rowKey(connectionId: string, path: string): string {
+export function rowKey(connectionId: string, path: string): string {
   return `${connectionId}|${path}`;
 }
 

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
+import { tabTitle } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
+import { activateTab, tabsState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
 import EmptyState from './EmptyState.vue';
 
@@ -51,6 +54,38 @@ function formatDuration(ms: number | null): string {
 
 async function onCancel(record: OpRecord): Promise<void> {
   await control.opsCancel(record.id);
+}
+
+function tabTitleFor(record: OpRecord): string {
+  const tab = record.tabId ? tabsState.tabs.find((t) => t.id === record.tabId) : undefined;
+  return tab ? tabTitle(tab) : '—';
+}
+
+// §8.11: "Clicking a row reveals the tab that issued it" — a no-op when the tab has since
+// been closed, never an error.
+function revealTab(record: OpRecord): void {
+  if (record.tabId && tabsState.tabs.some((t) => t.id === record.tabId)) {
+    activateTab(record.tabId);
+  }
+}
+
+function onRowClick(record: OpRecord): void {
+  toggleExpanded(record);
+  revealTab(record);
+}
+
+function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
+  const hasTab = record.tabId !== null && tabsState.tabs.some((t) => t.id === record.tabId);
+  const items: MenuItem[] = [
+    {
+      type: 'item',
+      id: 'reveal-tab',
+      label: 'Reveal originating tab',
+      disabled: !hasTab,
+      run: () => revealTab(record),
+    },
+  ];
+  openContextMenu(event, items);
 }
 </script>
 
@@ -100,7 +135,8 @@ async function onCancel(record: OpRecord): Promise<void> {
               :class="{ error: item.record.status === 'error' }"
               data-testid="op-row"
               :data-status="item.record.status"
-              @click="toggleExpanded(item.record)"
+              @click="onRowClick(item.record)"
+              @contextmenu.prevent="onRowContextMenu(item.record, $event)"
             >
               <span class="mono">{{ formatTime(item.record.startedAt) }}</span>
               <span class="connection-cell">
@@ -111,7 +147,7 @@ async function onCancel(record: OpRecord): Promise<void> {
                 />
                 <span class="truncate">{{ connectionFor(item.record)?.name ?? '—' }}</span>
               </span>
-              <span>—</span>
+              <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(item.record) }}</span>
               <span>{{ item.record.kind }}</span>
               <span class="status-cell">
                 <Codicon v-if="item.record.status === 'running'" name="loading" class="spin" :size="12" />

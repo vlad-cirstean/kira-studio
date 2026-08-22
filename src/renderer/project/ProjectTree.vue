@@ -9,6 +9,7 @@ import {
   collapse,
   expand,
   initTreeSync,
+  loadSavedQueries,
   searchIncomplete,
   selectRow,
   type TreeRowVm,
@@ -54,7 +55,10 @@ function onToggle(row: TreeRowVm): void {
   else void expand(row.connectionId, row.path);
 }
 
-function onContextMenu(row: TreeRowVm, event: MouseEvent): void {
+async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
+  // The "Saved filters ▸" submenu (Step 13) is built synchronously by menuForRow() from
+  // treeState.savedQueries, so it must already be populated by the time the menu opens.
+  if (OPENABLE_KINDS.has(row.kind)) await loadSavedQueries(row.connectionId, row.path);
   openContextMenu(event, menuForRow(row));
 }
 

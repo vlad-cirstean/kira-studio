@@ -1,6 +1,7 @@
 import { connectionColorSchema } from '@shared/domain/connection';
-import { decodePath } from '@shared/domain/tree';
+import { decodePath, pathParent } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
+import { control } from '../bridge/control';
 import {
   connectConnection,
   connectionsState,
@@ -12,13 +13,17 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
+import { activeTab, openDataTab, tabsState } from '../state/tabs';
+import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
 import {
   collapseAll,
   openFiltersDialog,
   refresh,
   refreshAllConnections,
+  rowKey,
   type TreeRowVm,
+  treeState,
 } from './state/tree';
 
 function copyText(text: string): void {
@@ -202,8 +207,27 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
+// §8.10's own ordering: Open data / Open data in new tab come first, before Refresh.
 function relationMenu(row: TreeRowVm): MenuItem[] {
   return [
+    {
+      type: 'item',
+      id: 'open-data',
+      label: 'Open data',
+      icon: 'table',
+      run: () => {
+        openDataTab(row.connectionId, row.path);
+      },
+    },
+    {
+      type: 'item',
+      id: 'open-data-new-tab',
+      label: 'Open data in new tab',
+      icon: 'table',
+      run: () => {
+        openDataTab(row.connectionId, row.path, { newTab: true });
+      },
+    },
     {
       type: 'item',
       id: 'refresh',
@@ -225,7 +249,55 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       icon: 'copy',
       run: () => copyText(qualifiedNameFor(row)),
     },
+    {
+      type: 'item',
+      id: 'count-rows',
+      label: 'Count rows',
+      icon: 'symbol-numeric',
+      // Opens (or reuses) the table's data tab and runs Σ on it — never a bare count with
+      // nowhere to show the answer.
+      run: () => {
+        const tabId = openDataTab(row.connectionId, row.path);
+        void runCount(tabId);
+      },
+    },
+    {
+      type: 'submenu',
+      id: 'saved-filters',
+      label: 'Saved filters',
+      icon: 'bookmark',
+      items: savedFiltersSubmenu(row),
+    },
   ];
+}
+
+// Reads from the on-demand cache state/tree.ts populates just before the menu opens
+// (ProjectTree.vue's onContextMenu) — building this synchronously is what keeps menuForRow()
+// itself synchronous.
+function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
+  const saved = treeState.savedQueries[rowKey(row.connectionId, row.path)] ?? [];
+  if (saved.length === 0) {
+    return [
+      {
+        type: 'item',
+        id: 'saved-filters-empty',
+        label: 'No saved filters',
+        disabled: true,
+        run: () => {},
+      },
+    ];
+  }
+  return saved.map((entry) => ({
+    type: 'item' as const,
+    id: `saved-filter-${entry.id}`,
+    label: entry.name,
+    run: async () => {
+      const tabId = openDataTab(row.connectionId, row.path);
+      await setFilter(tabId, entry.body.where);
+      await setSort(tabId, entry.body.orderBy);
+      await control.queriesTouch(entry.id);
+    },
+  }));
 }
 
 function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
@@ -247,6 +319,17 @@ function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
+// The active tab if it already targets this column's table, otherwise open (or reuse) that
+// table's data tab first — never silently no-op, and never act on an unrelated tab.
+function targetTabFor(row: TreeRowVm): string {
+  const tablePath = pathParent(row.path) ?? '';
+  const active = activeTab.value;
+  if (active && active.connectionId === row.connectionId && active.path === tablePath) {
+    return active.id;
+  }
+  return openDataTab(row.connectionId, tablePath);
+}
+
 function columnMenu(row: TreeRowVm): MenuItem[] {
   return [
     {
@@ -255,6 +338,32 @@ function columnMenu(row: TreeRowVm): MenuItem[] {
       label: 'Copy name',
       icon: 'copy',
       run: () => copyText(row.name),
+    },
+    {
+      type: 'item',
+      id: 'add-to-projection',
+      label: 'Add to projection',
+      icon: 'list-selection',
+      run: () => {
+        const tabId = targetTabFor(row);
+        const tab = tabsState.tabs.find((t) => t.id === tabId);
+        const current = tab?.state.projection ?? null;
+        if (current?.includes(row.name)) return;
+        void setProjection(tabId, current ? [...current, row.name] : [row.name]);
+      },
+    },
+    {
+      type: 'item',
+      id: 'sort-by',
+      label: 'Sort by',
+      icon: 'sort-precedence',
+      run: () => {
+        const tabId = targetTabFor(row);
+        void setSort(tabId, {
+          kind: 'structured',
+          terms: [{ column: row.name, direction: 'asc' }],
+        });
+      },
     },
   ];
 }
