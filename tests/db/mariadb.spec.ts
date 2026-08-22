@@ -286,6 +286,9 @@ describe('mariadb adapter (§9.1)', () => {
           describe() {
             throw new Error('not used by this test');
           },
+          ddl() {
+            throw new Error('not used by this test');
+          },
           read() {
             throw new Error('not used by this test');
           },

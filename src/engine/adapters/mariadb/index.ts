@@ -1,4 +1,5 @@
 import { type Connection, createConnection } from 'mariadb';
+import type { SourceText } from '../../../shared/domain/ddl';
 import {
   encodePath,
   type NodePath,
@@ -20,6 +21,7 @@ import { mariadbCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
+import { buildDdl } from './ddl';
 import { type RunningQuery, runQuery } from './query';
 import { countRows, readPage } from './read';
 
@@ -166,6 +168,39 @@ class MariaDbAdapter implements Adapter {
       rowEstimate,
       comment: info?.comment ? info.comment : null,
     };
+  }
+
+  async ddl(path: NodePath, ctx: OpCtx): Promise<SourceText> {
+    const segments = path.segments;
+    const [databaseSegment, objectSegment] = segments;
+    if (
+      segments.length !== 2 ||
+      !databaseSegment ||
+      databaseSegment.kind !== 'database' ||
+      !objectSegment
+    ) {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `ddl requires a database/table path, got depth ${segments.length}`,
+      );
+    }
+    if (
+      objectSegment.kind === 'sequence' ||
+      objectSegment.kind === 'function' ||
+      objectSegment.kind === 'column'
+    ) {
+      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+    }
+    if (objectSegment.kind !== 'table' && objectSegment.kind !== 'view') {
+      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+    }
+
+    const conn = await this.requireConnection(databaseSegment.name);
+    const exec = this.execFor(conn, ctx);
+    return buildDdl(exec, segments, databaseSegment.name, {
+      kind: objectSegment.kind,
+      name: objectSegment.name,
+    });
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
