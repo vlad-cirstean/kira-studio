@@ -3,6 +3,7 @@ import { ENGINE_EVENT, ENGINE_OP, engineOpPayloadSchema } from '../shared/protoc
 import type { Adapter, AdapterDeps } from './adapters/adapter';
 import { AdapterError, toWireError } from './adapters/errors';
 import { createAdapter } from './adapters/registry';
+import { cache } from './cache';
 import { cancelOp, runOp, wireScheduler } from './scheduler/ops';
 
 const adapters = new Map<string, Adapter>();
@@ -107,6 +108,13 @@ async function handleCancel(payload: unknown) {
   return { cancelled };
 }
 
+// Not a database operation — runs outside runOp and never reaches the op log (Step 3).
+async function handleConfigureCache(payload: unknown) {
+  const { l2BudgetBytes } = engineOpPayloadSchema[ENGINE_OP.configureCache].parse(payload);
+  cache.configure(l2BudgetBytes);
+  return {};
+}
+
 type OpHandler = (payload: unknown) => Promise<unknown>;
 
 const handlers: Record<string, OpHandler> = {
@@ -116,6 +124,7 @@ const handlers: Record<string, OpHandler> = {
   [ENGINE_OP.describe]: handleDescribe,
   [ENGINE_OP.test]: handleTest,
   [ENGINE_OP.cancel]: handleCancel,
+  [ENGINE_OP.configureCache]: handleConfigureCache,
 };
 
 export async function handleFrame(request: PortRequest): Promise<PortResponse> {

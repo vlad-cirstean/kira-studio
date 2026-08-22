@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, Menu, MessageChannelMain } from 'electron';
 import { IPC } from '../shared/protocol/ipc';
 import { createConnectionsService } from './connections';
+import { pushEngineConfig } from './engine-config';
 import { startEngine } from './engine-host';
 import { registerIpc } from './ipc/registry';
 import { log } from './log';
@@ -35,6 +36,7 @@ async function main(): Promise<void> {
   const engineHost = startEngine();
   const connections = createConnectionsService(db, engineHost);
   const tree = createTreeService(db, engineHost, connections);
+  void pushEngineConfig(engineHost, db);
 
   connections.onStateChange((state) => broadcast(IPC.connectionState, state));
   connections.onMetadataInvalidated((connectionId) =>
