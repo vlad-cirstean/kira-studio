@@ -594,4 +594,9 @@ docs/
   `feature/kickoff` is that branch: everything specified in this document is v1, and agents
   working from this spec build directly on top of `feature/kickoff` rather than branching off
   `main`.
+- **A phase's last step is to land its commits on `feature/kickoff`.** A phase is developed on
+  its own branch (started as an exact copy of `feature/kickoff`'s tip), so once the phase's
+  final step (its lint/typecheck/definition-of-done pass) is green, replay/push that branch's
+  commits onto `feature/kickoff` — a fast-forward, since the phase branch never diverges from
+  it. The next phase then starts its own branch from the new `feature/kickoff` tip.
 - Biome default rules, no exceptions files without a reason recorded.
