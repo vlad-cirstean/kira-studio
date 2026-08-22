@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { activeTab } from '../../state/tabs';
+import DdlToolbar from '../../views/ddl/DdlToolbar.vue';
 import DataToolbar from '../../views/grid/DataToolbar.vue';
 import FilterToolbar from '../../views/grid/FilterToolbar.vue';
 import EmptyState from './EmptyState.vue';
@@ -25,9 +26,16 @@ const tintStyle = computed(() =>
 </script>
 
 <template>
-  <div v-if="activeTab && activeTab.kind === 'data'" class="toolbar-band" :style="tintStyle">
-    <DataToolbar />
-    <FilterToolbar />
+  <div
+    v-if="activeTab && (activeTab.kind === 'data' || activeTab.kind === 'ddl')"
+    class="toolbar-band"
+    :style="tintStyle"
+  >
+    <template v-if="activeTab.kind === 'data'">
+      <DataToolbar />
+      <FilterToolbar />
+    </template>
+    <DdlToolbar v-else :tab-id="activeTab.id" />
   </div>
   <EmptyState v-else icon="tools" label="No connection selected" />
 </template>

@@ -23,6 +23,7 @@ function colorFor(tab: TabRecord): string | undefined {
 }
 
 function iconFor(tab: TabRecord): string {
+  if (tab.kind === 'ddl') return 'file-code';
   const tail = pathTail(tab.path);
   const KIND_ICON: Record<string, string> = {
     table: 'table',
@@ -107,6 +108,7 @@ const tabs = computed(() => tabsState.tabs);
       :class="{ active: tab.active }"
       data-testid="tab"
       :data-tab-id="tab.id"
+      :data-tab-kind="tab.kind"
       :data-active="tab.active"
       :data-color="colorFor(tab)"
       :style="{ '--tab-color': `var(--kira-conn-${colorFor(tab)})` }"
