@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import EmptyState from './EmptyState.vue';
+import CellEditorView from '../../views/celleditor/CellEditorView.vue';
 </script>
 
 <template>
-  <EmptyState icon="edit" label="No cell selected" />
+  <CellEditorView />
 </template>
