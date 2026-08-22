@@ -104,6 +104,10 @@ async function scrollColumnIntoView(page: Page, column: string): Promise<void> {
   await grid.evaluate((el) => {
     el.scrollLeft = 0;
   });
+  // Setting scrollLeft programmatically dispatches the 'scroll' event asynchronously — without
+  // this wait, the loop's first check below races ahead of Vue's re-render and wrongly concludes
+  // the reset didn't bring the target into view, so it scrolls right and never returns to 0.
+  await page.waitForTimeout(50);
   for (let i = 0; i < 80; i++) {
     if ((await target.count()) > 0) return;
     const atEnd = await grid.evaluate((el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
@@ -205,8 +209,6 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(
     page.locator('[data-testid="grid-header-cell"][data-column="sample"]'),
   ).toBeVisible();
-  const opsBaseline = (await getOps(page, connectionId)).length;
-
   const panel = page.locator('[data-testid="cell-editor-panel"]');
 
   // --- scenario 1: populate --------------------------------------------------------------
@@ -336,9 +338,17 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await selectCell(page, jsonRow, 'sample');
   await expect(panel).toHaveAttribute('data-format', 'text'); // sticks across tabs, same (conn, path, column)
 
-  // A different column on the same row is unaffected by the override.
+  // A different column on the same row is unaffected by the override: its format still tracks
+  // its own auto-detection rather than the 'sample' column's override. Asserting format equals
+  // detected (rather than merely "not text") is load-bearing — 'kind' holds a plain word like
+  // "json" that itself auto-detects as 'text', so a leaked override would be indistinguishable
+  // from correct behavior under a bare `not.toHaveAttribute('data-format', 'text')` check.
   await selectCell(page, jsonRow, 'kind');
-  await expect(panel).not.toHaveAttribute('data-format', 'text');
+  const [kindFormat, kindDetected] = await Promise.all([
+    panel.getAttribute('data-format'),
+    panel.getAttribute('data-detected'),
+  ]);
+  expect(kindFormat).toBe(kindDetected);
 
   await selectCell(page, jsonRow, 'sample');
   await page.selectOption('[data-testid="cell-editor-format"]', 'auto');
@@ -356,9 +366,16 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await selectCell(page, 1, 'label');
   await expect(page.locator('[data-testid="cell-editor-badge-empty"]')).toBeVisible();
 
+  await scrollColumnIntoView(page, 'big_text');
   await selectCell(page, 3, 'big_text');
   await expect(page.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('64 KB');
+
+  // Captured here, not at the very top: scenarios 1-7 legitimately open several new tables
+  // (nested_json, wide_table, nulls_and_unicode), each a genuine read — the zero-ops invariant
+  // below is about the cell editor's OWN interactions (selection, beautify, override), exercised
+  // from here on with no further table opens on this connection.
+  const opsBaseline = (await getOps(page, connectionId)).length;
 
   // --- scenario 8: selection semantics -----------------------------------------------------
   // Switch back to the original formats tab explicitly (by id) rather than dblclick, since two
@@ -381,12 +398,12 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
-  // The header's column-select trigger is a full-cell overlay behind the sort click target
-  // (DataGrid.vue's `.header-select-zone`) — targeted directly and forced, since a plain click
-  // on the header cell's visible area is the sort control, not the column-select one.
+  // The header's column-select trigger is a narrow strip at the header cell's left edge
+  // (DataGrid.vue's `.header-select-zone`) — distinct from the sort target (the label/chevron,
+  // covering the rest of the cell).
   await page
     .locator('[data-testid="grid-header-cell"][data-column="kind"] .header-select-zone')
-    .click({ force: true });
+    .click();
   await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
 
   // --- scenario 9: read-only ---------------------------------------------------------------

@@ -63,6 +63,14 @@ const offsets = computed(() => columnOffsets(columnOrder.value, widths.value));
 const totalWidth = computed(() => offsets.value[offsets.value.length - 1] ?? 0);
 const totalHeight = computed(() => (page.value?.rowCount ?? 0) * rowHeight.value);
 
+// The gutter shows the row's position in the whole result set, not just this page's fetched
+// window (`r` is a local index into the current page's rows) — so it must add back the rows
+// skipped by earlier pages.
+const rowNumberBase = computed(() => {
+  const t = tab();
+  return t ? t.state.pageIndex * t.state.pageSize : 0;
+});
+
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const scrollLeft = ref(0);
@@ -457,7 +465,7 @@ defineExpose({ scrollCellIntoView });
           :style="{ width: `${GUTTER_WIDTH}px` }"
           @click="onGutterClick(r)"
         >
-          {{ r + 1 }}
+          {{ rowNumberBase + r + 1 }}
         </div>
         <div
           v-for="c in visibleColumnIndices"
@@ -548,10 +556,17 @@ defineExpose({ scrollCellIntoView });
   flex-shrink: 0;
 }
 
+/* A narrow strip at the header cell's left edge, not the sort target (the label/chevron) nor
+   the resize handle (the right edge) — click it to select the whole column, mirroring the row
+   gutter's click-to-select-row. Kept out of the label's flow so it can never swallow the sort
+   click that covers the rest of the cell. */
 .header-select-zone {
   position: absolute;
-  inset: 0;
-  z-index: -1;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: pointer;
 }
 
 .resize-handle {

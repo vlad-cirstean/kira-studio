@@ -48,12 +48,16 @@ function defaultRuntime(): DataViewRuntime {
 }
 
 function ensureRuntime(tabId: string): DataViewRuntime {
-  let rt = runtime[tabId];
-  if (!rt) {
-    rt = defaultRuntime();
-    runtime[tabId] = rt;
+  if (!runtime[tabId]) {
+    // `runtime` is reactive() — Vue only wraps a nested plain object in its own reactive proxy
+    // when it's read back out through the parent proxy. Returning the just-created local object
+    // directly (instead of reading runtime[tabId] again) would hand load() an unwrapped
+    // reference: every mutation this same load() makes afterward (status, hasMore, tokens, ...)
+    // would bypass the proxy's `set` trap entirely, so no dependent render (e.g. the pager-next
+    // button's `disabled` binding) would ever be notified.
+    runtime[tabId] = defaultRuntime();
   }
-  return rt;
+  return runtime[tabId];
 }
 
 async function loadMeta(tabId: string): Promise<void> {
