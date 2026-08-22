@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import type { SourceText } from '../../../shared/domain/ddl';
 import {
   encodePath,
   type NodePath,
@@ -20,6 +21,7 @@ import { postgresCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildClientConfig, ClientSet } from './client';
+import { buildDdl } from './ddl';
 import { type RunningQuery, runQuery } from './query';
 import { countRows, readPage } from './read';
 
@@ -170,6 +172,45 @@ class PostgresAdapter implements Adapter {
       rowEstimate: info.rowEstimate,
       comment: info.comment,
     };
+  }
+
+  async ddl(path: NodePath, ctx: OpCtx): Promise<SourceText> {
+    const segments = path.segments;
+    const [databaseSegment, schemaSegment, objectSegment] = segments;
+    if (
+      segments.length !== 3 ||
+      !databaseSegment ||
+      databaseSegment.kind !== 'database' ||
+      !schemaSegment ||
+      schemaSegment.kind !== 'schema' ||
+      !objectSegment
+    ) {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `ddl requires a database/schema/table path, got depth ${segments.length}`,
+      );
+    }
+    if (
+      objectSegment.kind === 'sequence' ||
+      objectSegment.kind === 'function' ||
+      objectSegment.kind === 'column'
+    ) {
+      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+    }
+    if (
+      objectSegment.kind !== 'table' &&
+      objectSegment.kind !== 'view' &&
+      objectSegment.kind !== 'matview'
+    ) {
+      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+    }
+
+    const client = await this.requireClient(databaseSegment.name);
+    const exec = this.execFor(client, ctx);
+    return buildDdl(exec, segments, schemaSegment.name, {
+      kind: objectSegment.kind,
+      name: objectSegment.name,
+    });
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

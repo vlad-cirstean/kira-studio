@@ -1,5 +1,6 @@
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/domain/connection';
+import type { SourceText } from '../../shared/domain/ddl';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
 import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
 import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
@@ -78,6 +79,9 @@ export interface Adapter {
   /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
 
+  /** The object's definition as executable statements. Gated by caps.ddl; L1-cached by main. */
+  ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>;
+
   /**
    * Forward a cancel for an in-flight op to the server (D5).
    * Returns false when the op was unknown or the server refused; never throws for
@@ -105,7 +109,6 @@ export type AdapterFactory = (deps: AdapterDeps) => Adapter;
  *
  * | Phase | Added to `Adapter`                                                              | Gated by         |
  * |-------|----------------------------------------------------------------------------------|------------------|
- * | P4    | `ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>`                              | `caps.ddl`       |
  * | P5    | `preview(plan: MutationPlan): string[]` — synchronous, never executes              | `caps.writable`  |
  * | P5    | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>`                   | `caps.writable`  |
  * | P5.5  | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>`                         | `caps.sql`       |
