@@ -1,0 +1,49 @@
+/* VS Code Dark Modern derived tokens (SPEC.md §8.1). */
+:root {
+  --kira-bg: #1f1f1f; /* editor.background */
+  --kira-bg-elevated: #202020; /* editorWidget.background */
+  --kira-bg-chrome: #181818; /* sideBar / statusBar / titleBar / panel */
+  --kira-bg-input: #313131; /* input + dropdown */
+  --kira-fg: #cccccc;
+  --kira-fg-muted: #9d9d9d;
+  --kira-fg-disabled: #6e6e6e;
+  --kira-border: #2b2b2b; /* contrastBorder / panel.border */
+  --kira-border-strong: #313131; /* widget.border */
+  --kira-focus: #0078d4;
+  --kira-accent: #0078d4; /* button.background */
+  --kira-accent-fg: #ffffff;
+  --kira-select: #04395e; /* list.activeSelectionBackground */
+  --kira-hover: #2a2d2e; /* list.hoverBackground */
+  --kira-badge: #616161;
+  --kira-scrollbar: #79797966;
+  --kira-error: #f14c4c;
+  --kira-warn: #cca700;
+  --kira-ok: #23d18b;
+  --kira-info: #3794ff;
+
+  /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders. */
+  --kira-radius: 6px;
+  --kira-gap: 4px;
+  --kira-border-width: 1px;
+  --kira-statusbar-h: 22px;
+  --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
+
+  /* Appearance tokens: defaults here, overwritten at runtime from `settings` (Step 6). */
+  --kira-font-family: "SF Mono", Menlo, monospace;
+  --kira-font-size: 12px;
+  --kira-row-height: 28px; /* comfortable; compact = 22px */
+
+  /* §8.12 connection color palette. */
+  --kira-conn-red: #c75450;
+  --kira-conn-orange: #cc7832;
+  --kira-conn-amber: #bfa23a;
+  --kira-conn-olive: #91a93e;
+  --kira-conn-green: #499c54;
+  --kira-conn-teal: #2aa198;
+  --kira-conn-cyan: #3592c4;
+  --kira-conn-blue: #4b7bec;
+  --kira-conn-indigo: #6c71c4;
+  --kira-conn-violet: #9876aa;
+  --kira-conn-magenta: #c066b0;
+  --kira-conn-grey: #6e7681;
+}
