@@ -1,22 +1,21 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { NodePath } from '@shared/domain/tree';
-import { Client } from 'pg';
+import { createConnection } from 'mariadb';
 import type { Adapter, AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
-import { AdapterError } from '../../src/engine/adapters/errors';
-import { postgresCaps } from '../../src/engine/adapters/postgres/caps';
-import { type RunningQuery, runQuery } from '../../src/engine/adapters/postgres/query';
+import { mariadbCaps } from '../../src/engine/adapters/mariadb/caps';
+import { type RunningQuery, runQuery } from '../../src/engine/adapters/mariadb/query';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { cancelOp, runOp, wireScheduler } from '../../src/engine/scheduler/ops';
 import { isNull, isTruncated, type TabularPage } from '../../src/shared/protocol/page';
 import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
-import { type PgFixture, startPostgres } from './support/postgres';
+import { type MariaFixture, startMariadb } from './support/mariadb';
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 const BIG_ROWS = 1_000_000;
 
 const deps: AdapterDeps = {
   log(level, message) {
-    if (level === 'error') console.error(`[postgres adapter] ${message}`);
+    if (level === 'error') console.error(`[mariadb adapter] ${message}`);
   },
 };
 
@@ -29,7 +28,7 @@ function makeCtx(): OpCtx {
 }
 
 function path(segments: NodePath['segments']): NodePath {
-  return { connectionId: 'test-postgres', segments };
+  return { connectionId: 'test-mariadb', segments };
 }
 
 const decoder = new TextDecoder();
@@ -52,39 +51,47 @@ async function waitUntil(
   }
 }
 
-let fixture: PgFixture;
+let fixture: MariaFixture;
 
 beforeAll(async () => {
   if (!(await isDockerAvailable())) throw new Error(DOCKER_UNAVAILABLE_MESSAGE);
-  fixture = await startPostgres();
+  fixture = await startMariadb();
 }, CONTAINER_START_TIMEOUT_MS);
 
 afterAll(async () => {
   await fixture?.stop();
 });
 
-describe('postgres adapter (§9.1)', () => {
+describe('mariadb adapter (§9.1)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
-    expect(info.serverVersion).toMatch(/^PostgreSQL 17/);
+    expect(info.serverVersion).toMatch(/^MariaDB 11\./);
 
     await adapter.disconnect();
 
-    const side = new Client({ connectionString: fixture.uri });
-    await side.connect();
+    const side = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+    });
     try {
-      const result = await side.query<{ n: string }>(
-        `SELECT count(*)::text AS n FROM pg_stat_activity WHERE application_name = 'kira-studio'`,
+      // PROCESSLIST carries no program-name column; the connect attribute we set
+      // (client.ts's `connectAttributes: { program_name: 'kira-studio' }`) lives in
+      // SESSION_CONNECT_ATTRS instead, and disappears with the connection that set it.
+      const rows = await side.query<{ n: bigint | number }[]>(
+        `SELECT count(*) AS n FROM information_schema.SESSION_CONNECT_ATTRS
+         WHERE ATTR_NAME = 'program_name' AND ATTR_VALUE = 'kira-studio'`,
       );
-      expect(result.rows[0]?.n).toBe('0');
+      expect(Number(rows[0]?.n ?? 0)).toBe(0);
     } finally {
       await side.end();
     }
   });
 
   test('2. auth failure', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     const badConfig = { ...fixture.config, password: 'definitely-wrong' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_AUTH',
@@ -92,47 +99,43 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('3. tree enumeration', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const roots = await adapter.children(path([]), makeCtx());
       const rootNames = roots.map((n) => n.name).sort();
-      expect(rootNames).toEqual(['kira_test', 'postgres']);
+      expect(rootNames).toEqual(['kira_analytics', 'kira_test']);
+      expect(rootNames).not.toContain('mysql');
+      expect(rootNames).not.toContain('information_schema');
+      expect(rootNames).not.toContain('performance_schema');
+      expect(rootNames).not.toContain('sys');
 
-      const schemas = await adapter.children(
+      const dbChildren = await adapter.children(
         path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
-      const schemaNames = schemas.map((n) => n.name).sort();
-      expect(schemaNames).toEqual(['analytics', 'app']);
-      expect(schemaNames).not.toContain('pg_catalog');
-      expect(schemaNames).not.toContain('information_schema');
-
-      const appChildren = await adapter.children(
-        path([
-          { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
-        ]),
-        makeCtx(),
-      );
-      const byKind = (kind: string) =>
-        appChildren.filter((n) => n.kind === kind).map((n) => n.name);
+      const byKind = (kind: string) => dbChildren.filter((n) => n.kind === kind).map((n) => n.name);
       expect(byKind('table')).toContain('wide_table');
       expect(byKind('view')).toEqual(['order_summary']);
-      expect(byKind('matview')).toEqual(['customer_totals']);
+      expect(byKind('matview')).toEqual([]);
       expect(byKind('sequence')).toContain('invoice_number_seq');
       expect(byKind('function').sort()).toEqual(['full_name', 'noop_procedure']);
+
+      // No schema level — depth 2, not 3. The encoded path is asserted explicitly, because
+      // that is the abstraction claim this adapter exists to test (§6d).
+      const wideTable = dbChildren.find((n) => n.name === 'wide_table');
+      expect(wideTable?.path).toBe('database:kira_test/table:wide_table');
 
       const columns = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'wide_table' },
         ]),
         makeCtx(),
       );
       expect(columns).toHaveLength(60);
       expect(columns[0]?.name).toBe('id');
+      expect(columns[0]?.path).toBe('database:kira_test/table:wide_table/column:id');
       expect(columns[1]?.name).toBe('int_a');
     } finally {
       await adapter.disconnect();
@@ -140,25 +143,21 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('4. quoting', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const appChildren = await adapter.children(
-        path([
-          { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
-        ]),
+      const dbChildren = await adapter.children(
+        path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
-      const names = appChildren.map((n) => n.name);
-      expect(names).toContain('weird"name');
+      const names = dbChildren.map((n) => n.name);
+      expect(names).toContain('weird`name');
       expect(names).toContain('Order Items');
 
       const weirdColumns = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
-          { kind: 'table', name: 'weird"name' },
+          { kind: 'table', name: 'weird`name' },
         ]),
         makeCtx(),
       );
@@ -167,7 +166,6 @@ describe('postgres adapter (§9.1)', () => {
       const spacedColumns = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'Order Items' },
         ]),
         makeCtx(),
@@ -179,20 +177,20 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('5. describe', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const orderItems = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'order_items' },
         ]),
         makeCtx(),
       );
       expect(orderItems.primaryKey).toEqual(['id']);
       const quantity = orderItems.columns.find((c) => c.name === 'quantity');
-      expect(quantity).toMatchObject({ dataType: 'integer', nullable: false, defaultExpr: '1' });
+      expect(quantity).toMatchObject({ nullable: false, defaultExpr: '1' });
+      expect(quantity?.dataType).toMatch(/^int/);
       expect(orderItems.indexes).toHaveLength(2);
       const pkIndex = orderItems.indexes.find((i) => i.primary);
       expect(pkIndex).toMatchObject({ unique: true, primary: true, columns: ['id'] });
@@ -212,7 +210,6 @@ describe('postgres adapter (§9.1)', () => {
       const employees = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'employees' },
         ]),
         makeCtx(),
@@ -225,23 +222,19 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('6. row estimate', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const appChildren = await adapter.children(
-        path([
-          { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
-        ]),
+      const dbChildren = await adapter.children(
+        path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
-      const bigRows = appChildren.find((n) => n.name === 'big_rows');
+      const bigRows = dbChildren.find((n) => n.name === 'big_rows');
       expect(bigRows?.detail).toMatch(/^~[\d,]+ rows$/);
 
       const bigRowsMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'big_rows' },
         ]),
         makeCtx(),
@@ -250,13 +243,10 @@ describe('postgres adapter (§9.1)', () => {
       expect(bigRowsMeta.rowEstimate ?? 0).toBeGreaterThan(900_000);
       expect(bigRowsMeta.rowEstimate ?? 0).toBeLessThan(1_100_000);
 
-      // Never analysed — must surface as null, never the raw -1 Postgres stores.
-      const compositePk = appChildren.find((n) => n.name === 'composite_pk');
-      expect(compositePk?.detail).toBeUndefined();
+      // Never analysed — must surface as null, never a raw sentinel.
       const compositePkMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'table', name: 'composite_pk' },
         ]),
         makeCtx(),
@@ -268,17 +258,26 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('7. cancel, asserted server-side', async () => {
-    const client = new Client({ connectionString: fixture.uri });
-    await client.connect();
-    const side = new Client({ connectionString: fixture.uri });
-    await side.connect();
+    const client = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: fixture.config.username ?? undefined,
+      password: fixture.config.password ?? undefined,
+      database: fixture.config.database ?? undefined,
+    });
+    const side = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+    });
     try {
       let tracked: RunningQuery | undefined;
       wireScheduler({
         emit: () => {},
         getAdapter: (): Adapter => ({
-          kind: 'postgres',
-          caps: postgresCaps,
+          kind: 'mariadb',
+          caps: mariadbCaps,
           connect() {
             throw new Error('not used by this test');
           },
@@ -294,15 +293,16 @@ describe('postgres adapter (§9.1)', () => {
             throw new Error('not used by this test');
           },
           async cancel() {
-            if (!tracked) return false;
-            const cancelClient = new Client({ connectionString: fixture.uri });
-            await cancelClient.connect();
+            if (!tracked || tracked.threadId === null) return false;
+            const cancelClient = await createConnection({
+              host: fixture.config.host ?? undefined,
+              port: fixture.config.port ?? undefined,
+              user: 'root',
+              password: 'kira',
+            });
             try {
-              const result = await cancelClient.query<{ ok: boolean }>(
-                'SELECT pg_cancel_backend($1) AS ok',
-                [tracked.backendPid],
-              );
-              return result.rows[0]?.ok ?? false;
+              await cancelClient.query(`KILL QUERY ${tracked.threadId}`);
+              return true;
             } finally {
               await cancelClient.end();
             }
@@ -313,22 +313,20 @@ describe('postgres adapter (§9.1)', () => {
       let capturedOpId: string | undefined;
       const opPromise = runOp({ connectionId: 'cancel-test', kind: 'children' }, (ctx) => {
         capturedOpId = ctx.opId;
-        return runQuery(client, 'SELECT pg_sleep(30)', [], ctx, (q) => {
+        return runQuery(client, 'SELECT SLEEP(30)', [], ctx, (q) => {
           tracked = q;
         });
       });
-      // opPromise is asserted with `.rejects` further down, but that attaches its handler only
-      // after the waitUntil/cancelOp calls below — several ticks after the cancellation actually
-      // rejects it. Node/Bun flag that gap as an unhandled rejection; this no-op catch marks the
-      // promise handled immediately without affecting the real assertion.
+      // Same discipline as postgres.spec.ts: mark the rejection handled immediately so
+      // Node/Bun does not flag an unhandled rejection during the waitUntil/cancelOp gap below.
       opPromise.catch(() => {});
 
       await waitUntil(async () => {
-        const result = await side.query<{ n: string }>(
-          `SELECT count(*)::text AS n FROM pg_stat_activity
-           WHERE state = 'active' AND query LIKE '%pg_sleep%' AND query NOT LIKE '%pg_stat_activity%'`,
+        const rows = await side.query<{ n: bigint | number }[]>(
+          `SELECT count(*) AS n FROM information_schema.PROCESSLIST
+           WHERE state != 'Killed' AND info LIKE '%SLEEP%' AND info NOT LIKE '%PROCESSLIST%'`,
         );
-        return result.rows[0]?.n !== '0';
+        return Number(rows[0]?.n ?? 0) !== 0;
       });
 
       expect(capturedOpId).toBeDefined();
@@ -340,11 +338,11 @@ describe('postgres adapter (§9.1)', () => {
 
       await waitUntil(
         async () => {
-          const result = await side.query<{ n: string }>(
-            `SELECT count(*)::text AS n FROM pg_stat_activity
-           WHERE state = 'active' AND query LIKE '%pg_sleep%' AND query NOT LIKE '%pg_stat_activity%'`,
+          const rows = await side.query<{ n: bigint | number }[]>(
+            `SELECT count(*) AS n FROM information_schema.PROCESSLIST
+             WHERE state != 'Killed' AND info LIKE '%SLEEP%' AND info NOT LIKE '%PROCESSLIST%'`,
           );
-          return result.rows[0]?.n === '0';
+          return Number(rows[0]?.n ?? 0) === 0;
         },
         { timeoutMs: 2000 },
       );
@@ -355,17 +353,16 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('8. cap honesty', () => {
-    expect(postgresCaps.cancel).toBe(true);
+    expect(mariadbCaps.cancel).toBe(true);
   });
 
   test('9. children of a leaf', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
-          { kind: 'schema', name: 'app' },
           { kind: 'sequence', name: 'invoice_number_seq' },
         ]),
         makeCtx(),
@@ -377,14 +374,13 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('10. read: first page', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await adapter.read(
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'big_rows' },
           ]),
           projection: null,
@@ -397,7 +393,7 @@ describe('postgres adapter (§9.1)', () => {
       );
       expect(page.rowCount).toBe(100);
       expect(page.position.hasMore).toBe(true);
-      expect(page.columns.map((c) => c.name)).toEqual(['id', 'hash']);
+      expect(page.columns.map((c) => c.name)).toEqual(['id', 'payload']);
       expect(page.position.strategy).toBe('keyset');
     } finally {
       await adapter.disconnect();
@@ -405,7 +401,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('11. read: deep page by offset', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -420,7 +416,6 @@ describe('postgres adapter (§9.1)', () => {
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'big_rows' },
           ]),
           projection: null,
@@ -439,12 +434,11 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('12. read: keyset forward and backward', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
         { kind: 'database', name: 'kira_test' },
-        { kind: 'schema', name: 'app' },
         { kind: 'table', name: 'big_rows' },
       ]);
       const baseReq = {
@@ -505,7 +499,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('13. read: no keyset without a tiebreaker', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       // order_summary is a view with no unique key of its own.
@@ -513,7 +507,6 @@ describe('postgres adapter (§9.1)', () => {
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'view', name: 'order_summary' },
           ]),
           projection: null,
@@ -531,7 +524,6 @@ describe('postgres adapter (§9.1)', () => {
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'order_items' },
           ]),
           projection: null,
@@ -555,12 +547,11 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('14. read: projection', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
         { kind: 'database', name: 'kira_test' },
-        { kind: 'schema', name: 'app' },
         { kind: 'table', name: 'order_items' },
       ]);
       const page = await adapter.read(
@@ -597,12 +588,11 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('15. read: filter and sort', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
         { kind: 'database', name: 'kira_test' },
-        { kind: 'schema', name: 'app' },
         { kind: 'table', name: 'order_items' },
       ]);
       const all = await adapter.read(
@@ -629,6 +619,20 @@ describe('postgres adapter (§9.1)', () => {
       );
       expect(filtered.rowCount).toBeLessThan(all.rowCount);
 
+      await expect(
+        adapter.read(
+          {
+            path: target,
+            projection: null,
+            filter: 'this is not valid sql (((',
+            sort: null,
+            pageSize: 10,
+            cursor: { mode: 'offset', offset: 0 },
+          },
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_QUERY' });
+
       try {
         await adapter.read(
           {
@@ -643,8 +647,7 @@ describe('postgres adapter (§9.1)', () => {
         );
         throw new Error('expected the read to reject');
       } catch (err) {
-        expect((err as { code?: string }).code).toBe('E_QUERY');
-        expect((err as Error).message).toContain('syntax error');
+        expect((err as Error).message).toContain('SQL syntax');
       }
     } finally {
       await adapter.disconnect();
@@ -652,14 +655,13 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('16. read: fidelity', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await adapter.read(
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'nulls_and_unicode' },
           ]),
           projection: ['id', 'label', 'note', 'big_text', 'big_blob'],
@@ -686,23 +688,22 @@ describe('postgres adapter (§9.1)', () => {
       expect(cellAt(page, 2, 2)).toContain('עברית');
 
       // Row 3: the 1 MB text cell is truncated at MAX_CELL_BYTES and reported as such; the
-      // bytea column comes back as 0x-prefixed hex, never U+FFFD.
+      // blob column comes back as 0x-prefixed hex, never U+FFFD.
       const bigTextChunk = page.chunks[3];
       expect(isTruncated(bigTextChunk, 3)).toBe(true);
       expect(page.truncatedCells).toBeGreaterThan(0);
       const blobText = cellAt(page, 4, 3);
-      expect(blobText).toMatch(/^\\x[0-9a-f]+$/);
+      expect(blobText).toMatch(/^0x[0-9a-f]+$/);
 
-      // numeric(20,6) comes back as its exact text, not a rounded double — this is the
+      // decimal(20,6) comes back as its exact text, not a rounded double — this is the
       // assertion D3 exists for.
-      const numericPage = await adapter.read(
+      const decimalPage = await adapter.read(
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'wide_table' },
           ]),
-          projection: ['numeric_a'],
+          projection: ['decimal_a'],
           filter: 'id = 1',
           sort: null,
           pageSize: 10,
@@ -710,21 +711,20 @@ describe('postgres adapter (§9.1)', () => {
         },
         makeCtx(),
       );
-      expect(cellAt(numericPage, 0, 0)).toBe('1.500000');
+      expect(cellAt(decimalPage, 0, 0)).toBe('1.500000');
     } finally {
       await adapter.disconnect();
     }
   });
 
   test('17. count', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const bigRowsCount = await adapter.count(
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'big_rows' },
           ]),
           filter: null,
@@ -738,7 +738,6 @@ describe('postgres adapter (§9.1)', () => {
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
-            { kind: 'schema', name: 'app' },
             { kind: 'table', name: 'order_items' },
           ]),
           filter: 'quantity > 1',
@@ -752,24 +751,28 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('18. read cannot write', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
-    const probeClient = new Client({ connectionString: fixture.uri });
-    await probeClient.connect();
+    const probeConn = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+      database: 'kira_test',
+    });
     try {
-      await probeClient.query('CREATE TABLE IF NOT EXISTS app.app_probe (id int PRIMARY KEY)');
-      await probeClient.query('INSERT INTO app.app_probe (id) VALUES (1) ON CONFLICT DO NOTHING');
+      await probeConn.query('CREATE TABLE IF NOT EXISTS app_probe (id INT PRIMARY KEY)');
+      await probeConn.query('INSERT IGNORE INTO app_probe (id) VALUES (1)');
 
       await expect(
         adapter.read(
           {
             path: path([
               { kind: 'database', name: 'kira_test' },
-              { kind: 'schema', name: 'app' },
               { kind: 'table', name: 'order_items' },
             ]),
             projection: null,
-            filter: '1=1; DROP TABLE app.app_probe',
+            filter: '1=1; DROP TABLE app_probe',
             sort: null,
             pageSize: 10,
             cursor: { mode: 'offset', offset: 0 },
@@ -778,26 +781,15 @@ describe('postgres adapter (§9.1)', () => {
         ),
       ).rejects.toMatchObject({ code: 'E_QUERY' });
 
-      const stillThere = await probeClient.query<{ n: string }>(
-        `SELECT count(*)::text AS n FROM information_schema.tables
-         WHERE table_schema = 'app' AND table_name = 'app_probe'`,
+      const stillThere = await probeConn.query<{ n: bigint | number }[]>(
+        `SELECT count(*) AS n FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = 'kira_test' AND TABLE_NAME = 'app_probe'`,
       );
-      expect(stillThere.rows[0]?.n).toBe('1');
+      expect(Number(stillThere[0]?.n ?? 0)).toBe(1);
     } finally {
-      await probeClient.query('DROP TABLE IF EXISTS app.app_probe');
-      await probeClient.end();
+      await probeConn.query('DROP TABLE IF EXISTS app_probe');
+      await probeConn.end();
       await adapter.disconnect();
-    }
-  });
-
-  test('19. unsupported kind', () => {
-    expect(() => createAdapter('mongodb', deps)).toThrow(AdapterError);
-    try {
-      createAdapter('mongodb', deps);
-      throw new Error('expected createAdapter to throw');
-    } catch (err) {
-      expect(err).toBeInstanceOf(AdapterError);
-      expect((err as AdapterError).code).toBe('E_UNSUPPORTED');
     }
   });
 });
