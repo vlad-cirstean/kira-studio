@@ -93,6 +93,28 @@ async function selectCell(page: Page, row: number, column: string): Promise<void
     .click();
 }
 
+// The data grid virtualizes columns the same way the tree virtualizes rows (DataGrid.vue's
+// visibleColumnIndices) — a column not currently scrolled into view simply has no DOM node, so a
+// wide_table column past the first screenful must be scrolled into view before it can be
+// selected or asserted on.
+async function scrollColumnIntoView(page: Page, column: string): Promise<void> {
+  const grid = page.locator('[data-testid="data-grid"]');
+  const target = page.locator(`[data-testid="grid-header-cell"][data-column="${column}"]`);
+  if ((await target.count()) > 0) return;
+  await grid.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  for (let i = 0; i < 80; i++) {
+    if ((await target.count()) > 0) return;
+    const atEnd = await grid.evaluate((el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    if (atEnd) break;
+    await grid.evaluate((el) => {
+      el.scrollLeft += Math.max(200, el.clientWidth);
+    });
+    await page.waitForTimeout(30);
+  }
+}
+
 async function editorText(page: Page): Promise<string> {
   return page.locator('[data-testid="cell-editor-panel"] .cm-content').innerText();
 }
@@ -218,16 +240,20 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   const wideRow = await findRow(page, WIDE_PATH);
   await wideRow.dblclick();
+  await scrollColumnIntoView(page, 'uuid_a');
   await expect(
     page.locator('[data-testid="grid-header-cell"][data-column="uuid_a"]'),
   ).toBeVisible();
   await selectCell(page, 0, 'uuid_a');
   await expect(panel).toHaveAttribute('data-detected', 'uuid');
+  await scrollColumnIntoView(page, 'ts_a');
   await selectCell(page, 0, 'ts_a');
   await expect(panel).toHaveAttribute('data-detected', 'iso8601');
+  await scrollColumnIntoView(page, 'bytea_a');
   await selectCell(page, 0, 'bytea_a');
   await expect(panel).toHaveAttribute('data-detected', 'hex');
   await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('bytes');
+  await scrollColumnIntoView(page, 'int_a');
   await selectCell(page, 0, 'int_a');
   await expect(panel).toHaveAttribute('data-detected', 'text');
 
