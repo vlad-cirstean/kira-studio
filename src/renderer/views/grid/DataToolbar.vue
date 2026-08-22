@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DataTabState } from '@shared/domain/tabs';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
@@ -35,6 +35,19 @@ const caps = computed(() => {
 });
 
 const pageDisplay = computed(() => (tab.value ? tab.value.state.pageIndex + 1 : 1));
+
+// A plain `:value="pageDisplay"` fights the user's typing: any unrelated reactive read this
+// component makes (rt.value's status/count/etc.) forces a re-render, and Vue reasserts the bound
+// value on the DOM input regardless of whether pageDisplay itself changed — wiping out whatever
+// the user has typed but not yet committed. Mirroring it through its own ref, kept in sync with
+// pageDisplay only when the page actually advances, avoids the fight.
+const pageInputValue = ref(String(pageDisplay.value));
+watch(pageDisplay, (v) => {
+  pageInputValue.value = String(v);
+});
+function onPageInput(e: Event): void {
+  pageInputValue.value = (e.target as HTMLInputElement).value;
+}
 const pageCount = computed(() => {
   const count = rt.value?.count;
   const size = tab.value?.state.pageSize;
@@ -112,7 +125,8 @@ const columnsOpen = ref(false);
           min="1"
           class="page-input"
           data-testid="pager-page-input"
-          :value="pageDisplay"
+          :value="pageInputValue"
+          @input="onPageInput"
           @change="onJump"
         />
         <template v-if="pageCount"> of {{ pageCount }}</template>
