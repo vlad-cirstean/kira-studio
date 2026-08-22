@@ -1,6 +1,8 @@
 import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '../domain/connection-filter';
 import type { OpRecord } from '../domain/ops';
+import type { FilterBody, FilterHistoryEntry, SavedQuery, SortSpec } from '../domain/queries';
+import type { TabRecord } from '../domain/tabs';
 import type { ObjectMeta, TreeNode } from '../domain/tree';
 import type { Layout, LayoutPatch } from '../layout';
 import type { Settings, SettingsPatch } from '../settings';
@@ -36,6 +38,17 @@ export const IPC = {
   filtersReplace: 'kira:filters:replace',
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
+
+  tabsList: 'kira:tabs:list',
+  tabsSave: 'kira:tabs:save',
+
+  queriesList: 'kira:queries:list',
+  queriesSave: 'kira:queries:save',
+  queriesUpdate: 'kira:queries:update',
+  queriesDelete: 'kira:queries:delete',
+  queriesTouch: 'kira:queries:touch',
+  queriesHistoryList: 'kira:queries:historyList',
+  queriesHistoryRecord: 'kira:queries:historyRecord',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
@@ -118,4 +131,30 @@ export interface KiraApi {
   opsRecent(args: { limit: number }): Promise<OpRecord[]>;
   opsCancel(args: { opId: string }): Promise<void>;
   onOpUpdate(cb: (record: OpRecord) => void): () => void;
+
+  tabsList(): Promise<TabRecord[]>;
+  tabsSave(args: { tabs: TabRecord[] }): Promise<void>;
+
+  queriesList(args: { connectionId: string; path: string }): Promise<SavedQuery[]>;
+  queriesSave(args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: FilterBody;
+    pinned: boolean;
+  }): Promise<SavedQuery>;
+  queriesUpdate(args: { id: string; name?: string; pinned?: boolean }): Promise<SavedQuery>;
+  queriesDelete(args: { id: string }): Promise<void>;
+  queriesTouch(args: { id: string }): Promise<void>;
+  queriesHistoryList(args: {
+    connectionId: string;
+    path: string;
+    limit: number;
+  }): Promise<FilterHistoryEntry[]>;
+  queriesHistoryRecord(args: {
+    connectionId: string;
+    path: string;
+    where: string | null;
+    orderBy: SortSpec | null;
+  }): Promise<void>;
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ConnectionSummary } from '../domain/connection';
 import { connectionSummarySchema } from '../domain/connection';
+import { opKindSchema } from '../domain/ops';
 import { nodeKindSchema, objectMetaSchema, treeNodeSchema } from '../domain/tree';
 
 export const ENGINE_OP = {
@@ -10,6 +11,8 @@ export const ENGINE_OP = {
   describe: 'adapter:describe',
   test: 'adapter:test',
   cancel: 'adapter:cancel',
+  /** Not a database operation — runs outside runOp and never reaches the op log (Step 3). */
+  configureCache: 'cache:configure',
 } as const;
 
 export const ENGINE_EVENT = {
@@ -42,6 +45,7 @@ export const engineOpPayloadSchema = {
   [ENGINE_OP.describe]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
   [ENGINE_OP.test]: z.object({ config: resolvedConnectionConfigSchema }),
   [ENGINE_OP.cancel]: z.object({ opId: z.string() }),
+  [ENGINE_OP.configureCache]: z.object({ l2BudgetBytes: z.number().int().min(1) }),
 } as const;
 
 export const engineOpResultSchema = {
@@ -58,12 +62,14 @@ export const engineOpResultSchema = {
     error: z.string().optional(),
   }),
   [ENGINE_OP.cancel]: z.object({ cancelled: z.boolean() }),
+  [ENGINE_OP.configureCache]: z.object({}),
 } as const;
 
 export const opStartEventSchema = z.object({
   opId: z.string(),
   connectionId: z.string().nullable(),
-  kind: z.enum(['connect', 'disconnect', 'children', 'describe', 'test']),
+  tabId: z.string().nullable(),
+  kind: opKindSchema,
   startedAt: z.string(),
 });
 export type OpStartEvent = z.infer<typeof opStartEventSchema>;

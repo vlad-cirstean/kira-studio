@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { ConnectionInput, ConnectionState } from '../shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '../shared/domain/connection-filter';
 import type { OpRecord } from '../shared/domain/ops';
+import type {
+  FilterBody,
+  FilterHistoryEntry,
+  SavedQuery,
+  SortSpec,
+} from '../shared/domain/queries';
+import type { TabRecord } from '../shared/domain/tabs';
 import type { LayoutPatch } from '../shared/layout';
 import type {
   EngineStatus,
@@ -87,6 +94,31 @@ const kiraApi: KiraApi = {
     ipcRenderer.on(IPC.opUpdate, listener);
     return () => ipcRenderer.off(IPC.opUpdate, listener);
   },
+
+  tabsList: () => ipcRenderer.invoke(IPC.tabsList) as Promise<TabRecord[]>,
+  tabsSave: (args: { tabs: TabRecord[] }) => ipcRenderer.invoke(IPC.tabsSave, args),
+
+  queriesList: (args: { connectionId: string; path: string }) =>
+    ipcRenderer.invoke(IPC.queriesList, args) as Promise<SavedQuery[]>,
+  queriesSave: (args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: FilterBody;
+    pinned: boolean;
+  }) => ipcRenderer.invoke(IPC.queriesSave, args) as Promise<SavedQuery>,
+  queriesUpdate: (args: { id: string; name?: string; pinned?: boolean }) =>
+    ipcRenderer.invoke(IPC.queriesUpdate, args) as Promise<SavedQuery>,
+  queriesDelete: (args: { id: string }) => ipcRenderer.invoke(IPC.queriesDelete, args),
+  queriesTouch: (args: { id: string }) => ipcRenderer.invoke(IPC.queriesTouch, args),
+  queriesHistoryList: (args: { connectionId: string; path: string; limit: number }) =>
+    ipcRenderer.invoke(IPC.queriesHistoryList, args) as Promise<FilterHistoryEntry[]>,
+  queriesHistoryRecord: (args: {
+    connectionId: string;
+    path: string;
+    where: string | null;
+    orderBy: SortSpec | null;
+  }) => ipcRenderer.invoke(IPC.queriesHistoryRecord, args),
 };
 
 contextBridge.exposeInMainWorld('kira', kiraApi);
