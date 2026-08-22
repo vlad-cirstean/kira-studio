@@ -5,7 +5,12 @@ import { settingsOpen } from '../state/settings';
 import Codicon from '../theme/Codicon.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { engineState } from './state/engine';
-import { layoutState, toggleOperationsPanel, toggleProjectPanel } from './state/layout';
+import {
+  layoutState,
+  toggleCellEditorPanel,
+  toggleOperationsPanel,
+  toggleProjectPanel,
+} from './state/layout';
 
 const cacheTitle = computed(() => {
   const stats = cacheStatsState.stats;
@@ -34,6 +39,16 @@ const cacheSizeLabel = computed(() => {
       >
         <Codicon name="layout-sidebar-left" :size="14" />
         Project
+      </button>
+      <button
+        type="button"
+        class="toggle-button"
+        :class="{ active: layoutState.panel.cellEditor.visible }"
+        data-testid="toggle-cell-editor-panel"
+        @click="toggleCellEditorPanel"
+      >
+        <Codicon name="symbol-string" :size="14" />
+        Cell editor
       </button>
       <button
         type="button"

@@ -127,6 +127,16 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
         <span>Command</span>
       </div>
       <div class="ops-body">
+        <!--
+          The expanded command/error detail rows below are plain text, not CodeMirror, even
+          though CodeMirror now exists (P3, src/renderer/editor/). The blocker isn't the missing
+          dependency — VirtualList is fixed-row-height (P2 §0 note 14: "wrong for the grid...
+          left exactly as it is"), and a log detail with variable-height syntax highlighting
+          needs a variable-height row, which is a real change to a component every panel
+          depends on. P5 is the natural owner: it builds §8.5's *Preview command* panel, the
+          app's first genuine read-only statement-rendering surface, and this op-log detail is
+          the same widget shown somewhere else (D19).
+        -->
         <VirtualList :items="listItems" :row-height="20">
           <template #default="{ item }">
             <div
