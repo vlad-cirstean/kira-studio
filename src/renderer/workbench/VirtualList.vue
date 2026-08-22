@@ -42,6 +42,23 @@ const topSpacer = computed(() => startIndex.value * props.rowHeight);
 const bottomSpacer = computed(
   () => Math.max(0, props.items.length - endIndex.value) * props.rowHeight,
 );
+
+// Scrolls just enough to bring `index` into view — top-aligned if it's above the viewport,
+// bottom-aligned if below, a no-op if already visible. Used by the tab menu's "Reveal in
+// project panel" (Step 7b); adds no behaviour for existing callers.
+function scrollToIndex(index: number): void {
+  const el = containerRef.value;
+  if (!el) return;
+  const rowTop = index * props.rowHeight;
+  const rowBottom = rowTop + props.rowHeight;
+  if (rowTop < el.scrollTop) {
+    el.scrollTop = rowTop;
+  } else if (rowBottom > el.scrollTop + el.clientHeight) {
+    el.scrollTop = rowBottom - el.clientHeight;
+  }
+}
+
+defineExpose({ scrollToIndex });
 </script>
 
 <template>

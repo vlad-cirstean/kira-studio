@@ -34,7 +34,14 @@ export const treeState = reactive({
   errors: {} as Record<string, string>,
   filters: {} as Record<string, ConnectionFilter[]>,
   search: '',
+  selected: null as string | null,
+  /** Set by revealPath(); ProjectTree.vue watches it to scroll the row into view (Step 7b). */
+  pendingScrollKey: null as string | null,
 });
+
+export function selectRow(key: string): void {
+  treeState.selected = key;
+}
 
 export const filtersDialogState = reactive({
   open: false,
@@ -117,6 +124,26 @@ export async function refreshExpanded(connectionId: string): Promise<void> {
 
 export function collapseAll(): void {
   treeState.expanded.clear();
+}
+
+// §8.10's "Reveal in project panel" (Step 7b): expands every ancestor in order — sequentially,
+// the same discipline refreshExpanded already uses — then selects the row and asks the tree
+// view to scroll it into view.
+export async function revealPath(connectionId: string, path: string): Promise<void> {
+  if (!treeState.expanded.has(rowKey(connectionId, ''))) {
+    await expand(connectionId, '');
+  }
+  const segments = path.split('/').filter(Boolean);
+  let ancestor = '';
+  for (let i = 0; i < segments.length - 1; i++) {
+    ancestor = ancestor ? `${ancestor}/${segments[i]}` : segments[i];
+    if (!treeState.expanded.has(rowKey(connectionId, ancestor))) {
+      await expand(connectionId, ancestor);
+    }
+  }
+  const key = rowKey(connectionId, path);
+  treeState.selected = key;
+  treeState.pendingScrollKey = key;
 }
 
 export async function refreshAllConnections(): Promise<void> {

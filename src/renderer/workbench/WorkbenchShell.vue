@@ -144,7 +144,6 @@ const gridStyle = computed(() => ({
 }
 
 .toolbar {
-  height: 32px;
   flex-shrink: 0;
 }
 

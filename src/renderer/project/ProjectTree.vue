@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { openDataTab } from '../state/tabs';
 import { openContextMenu } from '../workbench/state/contextMenu';
 import { settingsState } from '../workbench/state/settings';
 import VirtualList from '../workbench/VirtualList.vue';
@@ -9,23 +10,46 @@ import {
   expand,
   initTreeSync,
   searchIncomplete,
+  selectRow,
   type TreeRowVm,
+  treeState,
   visibleRows,
 } from './state/tree';
 import TreeRow from './TreeRow.vue';
 
-const selectedKey = ref<string | null>(null);
+// Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
+// than toggling the twisty, which the twisty button itself already does.
+const OPENABLE_KINDS = new Set(['table', 'view', 'matview']);
+
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 
 onMounted(() => {
   initTreeSync();
 });
 
+// revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
+// scrolling happens here, one tick later, once visibleRows reflects the newly expanded nodes.
+watch(
+  () => treeState.pendingScrollKey,
+  async (key) => {
+    if (!key) return;
+    treeState.pendingScrollKey = null;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const index = visibleRows.value.findIndex((row) => row.key === key);
+    if (index >= 0) virtualListRef.value?.scrollToIndex(index);
+  },
+);
+
 function onSelect(row: TreeRowVm): void {
-  selectedKey.value = row.key;
+  selectRow(row.key);
 }
 
 function onToggle(row: TreeRowVm): void {
+  if (OPENABLE_KINDS.has(row.kind)) {
+    openDataTab(row.connectionId, row.path);
+    return;
+  }
   if (row.expanded) collapse(row.connectionId, row.path);
   else void expand(row.connectionId, row.path);
 }
@@ -44,11 +68,11 @@ function onBackgroundContextMenu(event: MouseEvent): void {
 <template>
   <div class="project-tree">
     <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
-      <VirtualList :items="visibleRows" :row-height="rowHeight">
+      <VirtualList ref="virtualListRef" :items="visibleRows" :row-height="rowHeight">
         <template #default="{ item }">
           <TreeRow
             :row="item"
-            :selected="selectedKey === item.key"
+            :selected="treeState.selected === item.key"
             @select="onSelect"
             @toggle="onToggle"
             @contextmenu="onContextMenu"
