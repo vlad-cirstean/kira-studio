@@ -9,6 +9,7 @@ import {
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { drop as dropPage } from '../views/grid/page';
+import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { settingsState } from './settings';
 
@@ -175,6 +176,7 @@ export function closeTab(id: string): void {
   tabsState.hydrated.delete(id);
   dropPage(id); // §2.2: closing a tab frees its cached page immediately.
   clearSelectedCellFor(id);
+  clearPending(id);
 
   if (tabsState.tabs.length === 0) {
     tabsState.activeId = null;
@@ -194,6 +196,7 @@ export function closeOthers(id: string): void {
       tabsState.hydrated.delete(t.id);
       dropPage(t.id);
       clearSelectedCellFor(t.id);
+      clearPending(t.id);
     }
   }
   tabsState.tabs = [keep];
@@ -209,6 +212,7 @@ export function closeToTheRight(id: string): void {
     tabsState.hydrated.delete(t.id);
     dropPage(t.id);
     clearSelectedCellFor(t.id);
+    clearPending(t.id);
   }
   tabsState.tabs = tabsState.tabs.slice(0, idx + 1);
   if (!tabsState.tabs.some((t) => t.active)) {
@@ -223,6 +227,7 @@ export function closeAll(): void {
     tabsState.hydrated.delete(t.id);
     dropPage(t.id);
     clearSelectedCellFor(t.id);
+    clearPending(t.id);
   }
   tabsState.tabs = [];
   tabsState.activeId = null;

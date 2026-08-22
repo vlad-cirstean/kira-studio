@@ -262,7 +262,10 @@ class PostgresAdapter implements Adapter {
   async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
     const [databaseSegment] = plan.path.segments;
     if (databaseSegment?.kind !== 'database') {
-      throw new AdapterError('E_NOT_FOUND', `unexpected root path segment kind: ${databaseSegment?.kind}`);
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `unexpected root path segment kind: ${databaseSegment?.kind}`,
+      );
     }
     const client = await this.requireClient(databaseSegment.name);
     return mutate.mutate(

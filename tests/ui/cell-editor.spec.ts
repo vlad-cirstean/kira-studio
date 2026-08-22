@@ -406,10 +406,14 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     .click();
   await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
 
-  // --- scenario 9: read-only ---------------------------------------------------------------
+  // --- scenario 9: the panel itself stays read-only even for an editable cell --------------
+  // `formats` has a primary key and this connection is writable, so P5 makes this cell
+  // genuinely editable (in the grid) — the panel carries no read-only-reason attribute at all,
+  // but its own CodeMirrorHost is still hardcoded read-only (D4: editing happens in the grid,
+  // never in this panel).
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
-  await expect(panel).toHaveAttribute('data-read-only-reason', 'not-editable-yet');
+  await expect(panel).not.toHaveAttribute('data-read-only-reason');
   const beforeType = await editorText(page);
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
   await page.keyboard.type('ZZZZZ');

@@ -6,6 +6,7 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
+import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import {
@@ -17,6 +18,13 @@ import {
   visibleColumnRange,
 } from './columns';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
+import {
+  isPendingDelete,
+  pendingFor,
+  stagedValue,
+  stageEdit,
+  stageInsertValue,
+} from './pendingChanges';
 import { searchState } from './search';
 import { runtime, setSort } from './state';
 
@@ -61,7 +69,24 @@ const widths = computed<Record<string, number>>(() => {
 
 const offsets = computed(() => columnOffsets(columnOrder.value, widths.value));
 const totalWidth = computed(() => offsets.value[offsets.value.length - 1] ?? 0);
-const totalHeight = computed(() => (page.value?.rowCount ?? 0) * rowHeight.value);
+
+const pending = computed(() => pendingFor(props.tabId));
+const insertRows = computed(() => pending.value?.inserts ?? []);
+
+const hasPrimaryKey = computed(() => page.value?.columns.some((c) => c.isPrimaryKey) ?? false);
+const isWritable = computed(() => {
+  const t = tab();
+  if (!t?.connectionId) return false;
+  const record = connectionsState.records.find((r) => r.id === t.connectionId);
+  return !record?.readOnly;
+});
+// Gates whether double-click/Enter starts an inline edit (D2/D14) — the toolbar's add/delete/
+// preview/commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
+const canEditTable = computed(() => isWritable.value && hasPrimaryKey.value);
+
+const totalHeight = computed(
+  () => ((page.value?.rowCount ?? 0) + insertRows.value.length) * rowHeight.value,
+);
 
 // The gutter shows the row's position in the whole result set, not just this page's fetched
 // window (`r` is a local index into the current page's rows) — so it must add back the rows
@@ -276,6 +301,7 @@ watch(
       row: target.row,
       value: view.isNull ? null : view.text,
       truncated: view.truncated,
+      hasPrimaryKey: hasPrimaryKey.value,
     };
     publishSelectedCell(selected);
   },
@@ -304,6 +330,81 @@ function isCurrentSearchMatch(row: number, displayCol: number): boolean {
   const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
   const current = matchIndex.value?.current;
   return !!current && current.row === row && current.col === pageCol;
+}
+
+function isDeleted(row: number): boolean {
+  return isPendingDelete(props.tabId, row);
+}
+
+// Merges a staged edit over the real page value for display — never touches the underlying
+// page/decode cache, which stays the server's own last-read value until commit/discard.
+function displayCell(
+  row: number,
+  displayCol: number,
+): {
+  text: string;
+  isNull: boolean;
+  truncated: boolean;
+  staged: boolean;
+} {
+  const name = columnOrder.value[displayCol];
+  const staged = name ? stagedValue(props.tabId, row, name) : undefined;
+  if (staged !== undefined) {
+    return { text: staged ?? '', isNull: staged === null, truncated: false, staged: true };
+  }
+  const base = cellAt(row, displayCol);
+  return { ...base, staged: false };
+}
+
+// Inline cell editor (D2/D6): a plain <input> overlaid on the cell, opened by double-click or
+// Enter on a selected cell. It stages text verbatim on commit — it can never express SQL NULL
+// (D14's documented scope limit for this phase; retype the whole value, no "set to NULL"
+// affordance yet).
+const editingCell = ref<{ row: number; col: number } | null>(null);
+const editingBuffer = ref('');
+
+function isEditing(row: number, displayCol: number): boolean {
+  return editingCell.value?.row === row && editingCell.value?.col === displayCol;
+}
+
+function startEdit(row: number, displayCol: number): void {
+  if (!canEditTable.value || isDeleted(row)) return;
+  const current = displayCell(row, displayCol);
+  editingCell.value = { row, col: displayCol };
+  editingBuffer.value = current.isNull ? '' : current.text;
+}
+
+function commitEdit(): void {
+  const e = editingCell.value;
+  if (!e) return;
+  const name = columnOrder.value[e.col];
+  editingCell.value = null;
+  if (name) stageEdit(props.tabId, e.row, name, editingBuffer.value);
+}
+
+function cancelEdit(): void {
+  editingCell.value = null;
+}
+
+function onCellDblClick(row: number, displayCol: number): void {
+  startEdit(row, displayCol);
+}
+
+// The input is a descendant of the grid's own keydown-handling container, so without stopping
+// propagation Enter/Escape would also fall through to onKeydown and move the selection.
+function onEditKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitEdit();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelEdit();
+  }
+  e.stopPropagation();
+}
+
+function onInsertInput(e: Event, insertId: string, column: string): void {
+  stageInsertValue(props.tabId, insertId, column, (e.target as HTMLInputElement).value);
 }
 
 // ctrl/cmd-click a disjoint cell is folded into a plain cell selection — multi-cell disjoint
@@ -359,6 +460,11 @@ function onKeydown(e: KeyboardEvent): void {
   const sel = runtimeEntry.selection;
   if (!sel || (sel.kind !== 'cell' && sel.kind !== 'range')) return;
   let { row, col } = sel.kind === 'range' ? { row: sel.row, col: sel.col } : sel;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    startEdit(row, col);
+    return;
+  }
   switch (e.key) {
     case 'ArrowUp':
       row = Math.max(0, row - 1);
@@ -457,6 +563,7 @@ defineExpose({ scrollCellIntoView });
         class="grid-row"
         data-testid="grid-row"
         :data-row="r"
+        :class="{ 'pending-delete': isDeleted(r) }"
         :style="{ top: `${rowHeight + r * rowHeight}px`, height: `${rowHeight}px` }"
       >
         <div
@@ -474,26 +581,69 @@ defineExpose({ scrollCellIntoView });
           data-testid="grid-cell"
           :data-row="r"
           :data-column="columnOrder[c]"
-          :data-null="cellAt(r, c).isNull"
+          :data-null="displayCell(r, c).isNull"
           :class="{
             'align-right': alignFor(c) === 'right',
             selected: isSelected(r, c),
             'search-match': isSearchMatch(r, c),
             'search-match-current': isCurrentSearchMatch(r, c),
+            'pending-edit': displayCell(r, c).staged,
           }"
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
+          @dblclick="onCellDblClick(r, c)"
         >
-          <span v-if="cellAt(r, c).isNull" class="cell-null">NULL</span>
+          <input
+            v-if="isEditing(r, c)"
+            v-model="editingBuffer"
+            class="cell-input"
+            data-testid="grid-cell-input"
+            autofocus
+            @keydown="onEditKeydown"
+            @blur="commitEdit"
+            @click.stop
+          />
+          <template v-else-if="displayCell(r, c).isNull">
+            <span class="cell-null">NULL</span>
+          </template>
           <template v-else>
-            {{ cellAt(r, c).text
+            {{ displayCell(r, c).text
             }}<span
-              v-if="cellAt(r, c).truncated"
+              v-if="displayCell(r, c).truncated"
               class="truncated-marker"
               title="value truncated at 64 KB"
               >…</span
             >
           </template>
+        </div>
+      </div>
+
+      <div
+        v-for="(insert, idx) in insertRows"
+        :key="insert.id"
+        class="grid-row pending-insert"
+        data-testid="grid-row-insert"
+        :data-insert-id="insert.id"
+        :style="{
+          top: `${rowHeight + ((page?.rowCount ?? 0) + idx) * rowHeight}px`,
+          height: `${rowHeight}px`,
+        }"
+        @click="onGutterClick((page?.rowCount ?? 0) + idx)"
+      >
+        <div class="gutter-cell" :style="{ width: `${GUTTER_WIDTH}px` }">+</div>
+        <div
+          v-for="c in visibleColumnIndices"
+          :key="columnOrder[c]"
+          class="grid-cell insert-cell"
+          data-testid="grid-cell-insert"
+          :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
+          @click.stop
+        >
+          <input
+            class="cell-input"
+            :value="insert.values[columnOrder[c]] ?? ''"
+            @input="onInsertInput($event, insert.id, columnOrder[c])"
+          />
         </div>
       </div>
     </div>
@@ -653,6 +803,32 @@ defineExpose({ scrollCellIntoView });
   color: var(--kira-fg-muted);
   margin-left: 2px;
   flex-shrink: 0;
+}
+
+.grid-cell.pending-edit {
+  background: color-mix(in srgb, var(--kira-accent) 18%, transparent);
+}
+
+.grid-row.pending-delete {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.grid-row.pending-insert {
+  background: color-mix(in srgb, var(--kira-accent) 8%, transparent);
+}
+
+.cell-input {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: 1px solid var(--kira-accent);
+  outline-offset: -1px;
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font: inherit;
 }
 
 .no-rows {

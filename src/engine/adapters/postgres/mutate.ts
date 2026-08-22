@@ -4,8 +4,8 @@ import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import * as catalog from './catalog';
-import { quoteIdent } from './read';
 import { type RunningQuery, runCommand, runQuery } from './query';
+import { quoteIdent } from './read';
 
 // Renders one row-op's statement text. preview() (never executes, D6) inlines an escaped SQL
 // literal for each value; mutate() pushes a `$n` placeholder onto `params` instead — the two stay
@@ -93,7 +93,10 @@ function assertColumnsKnown(target: catalog.ReadTarget, columns: string[]): void
 
 // A partial or missing primary key is not a safe row identifier (P5 D1/D2) — enforced here too,
 // not only by the renderer graying out editing for a keyless table.
-function assertKeyIsPrimaryKey(target: catalog.ReadTarget, key: Record<string, string | null>): void {
+function assertKeyIsPrimaryKey(
+  target: catalog.ReadTarget,
+  key: Record<string, string | null>,
+): void {
   if (!target.primaryKey || target.primaryKey.length === 0) {
     throw new AdapterError(
       'E_UNSUPPORTED',
@@ -128,7 +131,8 @@ export async function mutate(
 
   // Fresh in this same op (D7, mirrors resolveProjection's P2 D10 discipline) — never trusts a
   // column name the renderer sent without re-checking it against the catalog right now.
-  const execSelect: catalog.QueryExecutor = (sql, params) => runQuery(client, sql, params, ctx, track);
+  const execSelect: catalog.QueryExecutor = (sql, params) =>
+    runQuery(client, sql, params, ctx, track);
   const target = await catalog.getReadTarget(execSelect, schema, table);
 
   for (const op of plan.ops) {

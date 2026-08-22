@@ -5,6 +5,17 @@ import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
+import PreviewCommandPanel from './PreviewCommandPanel.vue';
+import { getPage } from './page';
+import {
+  addInsertRow,
+  commitPending,
+  discardInsertRow,
+  discardPending,
+  hasPending,
+  pendingFor,
+  toggleDelete,
+} from './pendingChanges';
 import {
   goFirst,
   goLast,
@@ -33,6 +44,20 @@ const caps = computed(() => {
   const connectionId = tab.value?.connectionId;
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
+
+// The 5 mutation buttons (add/delete/preview/commit/discard) are gated on writability alone —
+// never on whether the table has a primary key. A no-PK table still rejects at the per-cell
+// edit level (readOnlyReasonFor) and at the server (assertKeyIsPrimaryKey); gating the toolbar
+// too would just be a second, redundant guard.
+const isWritable = computed(() => {
+  const connectionId = tab.value?.connectionId;
+  const record = connectionId ? connectionsState.records.find((r) => r.id === connectionId) : null;
+  return !!caps.value?.writable && !record?.readOnly;
+});
+
+const tabHasPending = computed(() => (tab.value ? hasPending(tab.value.id) : false));
+
+const previewOpen = ref(false);
 
 const pageDisplay = computed(() => (tab.value ? tab.value.state.pageIndex + 1 : 1));
 
@@ -91,6 +116,58 @@ function onToggleSearch(): void {
 }
 
 const columnsOpen = ref(false);
+
+function onAddRow(): void {
+  const t = tab.value;
+  if (!t) return;
+  const p = getPage(t.id);
+  if (!p) return;
+  addInsertRow(
+    t.id,
+    p.columns.map((c) => c.name),
+  );
+}
+
+// A selected row/cell/range at or beyond the page's real row count addresses an appended
+// pending-insert row (DataGrid.vue's synthetic row indices) — deleting one of those discards it
+// outright rather than staging a delete op that could never resolve to a real primary key.
+function onDeleteRow(): void {
+  const t = tab.value;
+  const r = t ? runtime[t.id] : undefined;
+  const sel = r?.selection;
+  if (!t || !sel) return;
+  const p = getPage(t.id);
+  const rowCount = p?.rowCount ?? 0;
+
+  let rows: number[];
+  if (sel.kind === 'row') rows = sel.rows;
+  else if (sel.kind === 'cell') rows = [sel.row];
+  else if (sel.kind === 'range') {
+    const [r0, r1] = [sel.anchorRow, sel.row].sort((a, b) => a - b);
+    rows = Array.from({ length: r1 - r0 + 1 }, (_, i) => r0 + i);
+  } else return;
+
+  const realRows = rows.filter((row) => row < rowCount);
+  if (realRows.length) toggleDelete(t.id, realRows);
+
+  const inserts = pendingFor(t.id)?.inserts ?? [];
+  for (const row of rows.filter((row) => row >= rowCount)) {
+    const insert = inserts[row - rowCount];
+    if (insert) discardInsertRow(t.id, insert.id);
+  }
+}
+
+async function onCommit(): Promise<void> {
+  const t = tab.value;
+  if (!t?.connectionId) return;
+  await commitPending(t.connectionId, t.path, t.id);
+  await reload(t.id);
+}
+
+function onDiscard(): void {
+  const t = tab.value;
+  if (t) discardPending(t.id);
+}
 </script>
 
 <template>
@@ -193,27 +270,53 @@ const columnsOpen = ref(false);
 
     <button
       type="button"
-      disabled
-      title="Available in a later version"
       data-testid="toolbar-add-row"
+      :disabled="!isWritable"
+      :title="isWritable ? 'Add a row' : 'Connection is read-only'"
+      @click="onAddRow"
     >
       + row
     </button>
     <button
       type="button"
-      disabled
-      title="Available in a later version"
       data-testid="toolbar-delete-row"
+      :disabled="!isWritable"
+      :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
+      @click="onDeleteRow"
     >
       − row
     </button>
+    <div class="preview-anchor">
+      <button
+        type="button"
+        data-testid="toolbar-preview-command"
+        :disabled="!isWritable"
+        :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
+        @click="previewOpen = !previewOpen"
+      >
+        ⌘ preview command
+      </button>
+      <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
+    </div>
     <button
+      v-if="tabHasPending"
       type="button"
-      disabled
-      title="Available in a later version"
-      data-testid="toolbar-preview-command"
+      data-testid="toolbar-commit-changes"
+      :disabled="!isWritable"
+      title="Commit pending changes"
+      @click="onCommit"
     >
-      ⌘ preview command
+      commit
+    </button>
+    <button
+      v-if="tabHasPending"
+      type="button"
+      data-testid="toolbar-discard-changes"
+      :disabled="!isWritable"
+      title="Discard pending changes"
+      @click="onDiscard"
+    >
+      discard
     </button>
 
     <button
@@ -338,7 +441,8 @@ const columnsOpen = ref(false);
   color: var(--kira-warn);
 }
 
-.columns-anchor {
+.columns-anchor,
+.preview-anchor {
   position: relative;
 }
 </style>

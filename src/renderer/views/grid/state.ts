@@ -8,6 +8,7 @@ import { data } from '../../bridge/data';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState, tabsState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './page';
+import { clearPending } from './pendingChanges';
 
 export type Selection =
   | { kind: 'cell'; row: number; col: number }
@@ -147,6 +148,10 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const isFirstLoad = !runtime[tabId];
   const rt = ensureRuntime(tabId);
   cancelPrefetch(tabId);
+  // D3: a pending-change set is scoped to the page it was staged against — paging, filtering,
+  // sorting or refreshing all replace that page, so whatever was staged no longer identifies
+  // anything real and must not silently reappear against different rows.
+  clearPending(tabId);
 
   const effectiveCursor: PageCursor = cursor ?? {
     mode: 'offset',

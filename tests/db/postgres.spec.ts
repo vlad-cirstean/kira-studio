@@ -1082,7 +1082,11 @@ describe('postgres adapter (§9.1)', () => {
         ops: [
           { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'new tenant' } },
           { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
-          { kind: 'update', key: { tenant_id: '1', entity_id: '1' }, changes: { name: "O'Brien Co" } },
+          {
+            kind: 'update',
+            key: { tenant_id: '1', entity_id: '1' },
+            changes: { name: "O'Brien Co" },
+          },
         ],
       };
       const statements = adapter.preview(plan);
@@ -1148,9 +1152,13 @@ describe('postgres adapter (§9.1)', () => {
         },
         makeCtx(),
       );
-      expect(cellAt(rows, rows.columns.findIndex((c) => c.name === 'name'), 0)).toBe(
-        'tenant 1 / entity 1 updated',
-      );
+      expect(
+        cellAt(
+          rows,
+          rows.columns.findIndex((c) => c.name === 'name'),
+          0,
+        ),
+      ).toBe('tenant 1 / entity 1 updated');
     } finally {
       await adapter.disconnect();
     }
@@ -1186,7 +1194,9 @@ describe('postgres adapter (§9.1)', () => {
           },
         ],
       };
-      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({
+        code: 'E_UNSUPPORTED',
+      });
     } finally {
       await adapter.disconnect();
     }
@@ -1238,7 +1248,10 @@ describe('postgres adapter (§9.1)', () => {
       const plan: MutationPlan = {
         path: compositePkPath(),
         ops: [
-          { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'tenant 3 / entity 1' } },
+          {
+            kind: 'insert',
+            values: { tenant_id: '3', entity_id: '1', name: 'tenant 3 / entity 1' },
+          },
           { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
           {
             kind: 'update',
@@ -1299,7 +1312,9 @@ describe('postgres adapter (§9.1)', () => {
         ]),
         ops: [{ kind: 'update', key: { col: 'x' }, changes: { col: 'y' } }],
       };
-      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({
+        code: 'E_UNSUPPORTED',
+      });
     } finally {
       await probeClient.query('DROP TABLE IF EXISTS app.no_pk_probe');
       await probeClient.end();

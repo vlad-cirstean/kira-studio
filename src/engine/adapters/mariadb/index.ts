@@ -250,16 +250,13 @@ class MariaDbAdapter implements Adapter {
   async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
     const [databaseSegment] = plan.path.segments;
     if (databaseSegment?.kind !== 'database') {
-      throw new AdapterError('E_NOT_FOUND', `unexpected root path segment kind: ${databaseSegment?.kind}`);
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `unexpected root path segment kind: ${databaseSegment?.kind}`,
+      );
     }
     const conn = await this.requireConnection(databaseSegment.name);
-    return mutate.mutate(
-      conn,
-      ctx,
-      (q) => this.runningByOp.set(ctx.opId, q),
-      this.readOnly,
-      plan,
-    );
+    return mutate.mutate(conn, ctx, (q) => this.runningByOp.set(ctx.opId, q), this.readOnly, plan);
   }
 
   async cancel(opId: string): Promise<boolean> {

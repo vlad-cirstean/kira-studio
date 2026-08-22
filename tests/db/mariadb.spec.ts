@@ -1022,14 +1022,18 @@ describe('mariadb adapter (§9.1)', () => {
         ops: [
           { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'new tenant' } },
           { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
-          { kind: 'update', key: { tenant_id: '1', entity_id: '1' }, changes: { name: "O'Brien Co" } },
+          {
+            kind: 'update',
+            key: { tenant_id: '1', entity_id: '1' },
+            changes: { name: "O'Brien Co" },
+          },
         ],
       };
       const statements = adapter.preview(plan);
       expect(statements).toEqual([
-        'DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = \'2\' AND `entity_id` = \'1\'',
-        'UPDATE `kira_test`.`composite_pk` SET `name` = \'O\'\'Brien Co\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
-        'INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES (\'3\', \'1\', \'new tenant\')',
+        "DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = '2' AND `entity_id` = '1'",
+        "UPDATE `kira_test`.`composite_pk` SET `name` = 'O''Brien Co' WHERE `tenant_id` = '1' AND `entity_id` = '1'",
+        "INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES ('3', '1', 'new tenant')",
       ]);
 
       const rows = await adapter.read(
@@ -1074,7 +1078,7 @@ describe('mariadb adapter (§9.1)', () => {
       const result = await adapter.mutate(plan, ctx);
       expect(result.affectedRows).toBe(1);
       expect(loggedCommand).toBe(
-        'UPDATE `kira_test`.`composite_pk` SET `name` = \'tenant 1 / entity 1 updated\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
+        "UPDATE `kira_test`.`composite_pk` SET `name` = 'tenant 1 / entity 1 updated' WHERE `tenant_id` = '1' AND `entity_id` = '1'",
       );
 
       const rows = await adapter.read(
@@ -1088,9 +1092,13 @@ describe('mariadb adapter (§9.1)', () => {
         },
         makeCtx(),
       );
-      expect(cellAt(rows, rows.columns.findIndex((c) => c.name === 'name'), 0)).toBe(
-        'tenant 1 / entity 1 updated',
-      );
+      expect(
+        cellAt(
+          rows,
+          rows.columns.findIndex((c) => c.name === 'name'),
+          0,
+        ),
+      ).toBe('tenant 1 / entity 1 updated');
     } finally {
       await adapter.disconnect();
     }
@@ -1126,7 +1134,9 @@ describe('mariadb adapter (§9.1)', () => {
           },
         ],
       };
-      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({
+        code: 'E_UNSUPPORTED',
+      });
     } finally {
       await adapter.disconnect();
     }
@@ -1178,7 +1188,10 @@ describe('mariadb adapter (§9.1)', () => {
       const plan: MutationPlan = {
         path: compositePkPath(),
         ops: [
-          { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'tenant 3 / entity 1' } },
+          {
+            kind: 'insert',
+            values: { tenant_id: '3', entity_id: '1', name: 'tenant 3 / entity 1' },
+          },
           { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
           {
             kind: 'update',
@@ -1191,9 +1204,9 @@ describe('mariadb adapter (§9.1)', () => {
       expect(result.affectedRows).toBe(3);
       expect(loggedCommand).toBe(
         [
-          'DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = \'2\' AND `entity_id` = \'1\'',
-          'UPDATE `kira_test`.`composite_pk` SET `name` = \'tenant 1 / entity 1 final\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
-          'INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES (\'3\', \'1\', \'tenant 3 / entity 1\')',
+          "DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = '2' AND `entity_id` = '1'",
+          "UPDATE `kira_test`.`composite_pk` SET `name` = 'tenant 1 / entity 1 final' WHERE `tenant_id` = '1' AND `entity_id` = '1'",
+          "INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES ('3', '1', 'tenant 3 / entity 1')",
         ].join(';\n'),
       );
 
@@ -1243,7 +1256,9 @@ describe('mariadb adapter (§9.1)', () => {
         ]),
         ops: [{ kind: 'update', key: { col: 'x' }, changes: { col: 'y' } }],
       };
-      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({
+        code: 'E_UNSUPPORTED',
+      });
     } finally {
       await probeConn.query('DROP TABLE IF EXISTS no_pk_probe');
       await probeConn.end();

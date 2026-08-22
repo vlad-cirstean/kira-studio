@@ -1,0 +1,243 @@
+import type { Locator, Page } from '@playwright/test';
+import type { ConnectionColor } from '@shared/domain/connection';
+import { expect, test } from './fixtures';
+import {
+  DOCKER_UNAVAILABLE_MESSAGE,
+  isDockerAvailable,
+  type PgFixture,
+  startPostgres,
+} from './support/pg';
+
+test.describe.configure({ timeout: 300_000 });
+
+let pg: PgFixture | null = null;
+
+test.beforeAll(async () => {
+  test.setTimeout(300_000);
+  if (!(await isDockerAvailable())) {
+    test.skip(true, DOCKER_UNAVAILABLE_MESSAGE);
+    return;
+  }
+  pg = await startPostgres();
+});
+
+test.afterAll(async () => {
+  await pg?.stop();
+});
+
+const DB_PATH = 'database:kira_test';
+const APP_PATH = `${DB_PATH}/schema:app`;
+// composite_pk has a genuine 2-column primary key and no inbound foreign key (tests/db's own
+// fixture-table choice for the same reason, see tests/db/postgres.spec.ts) — a clean target for
+// edit/insert/delete UI scenarios that doesn't trip a FK constraint no scenario here means to test.
+const COMPOSITE_PATH = `${APP_PATH}/table:composite_pk`;
+
+function treeContainer(page: Page): Locator {
+  return page.locator('[data-testid="tree-background"] .virtual-list');
+}
+
+async function findRow(page: Page, path: string): Promise<Locator> {
+  const container = treeContainer(page);
+  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
+  await container.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  for (let i = 0; i < 80; i++) {
+    if ((await target.count()) > 0) return target;
+    const atBottom = await container.evaluate(
+      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
+    );
+    if (atBottom) break;
+    await container.evaluate((el) => {
+      el.scrollTop += Math.max(200, el.clientHeight);
+    });
+    await page.waitForTimeout(30);
+  }
+  return target;
+}
+
+async function expandRow(page: Page, path: string): Promise<Locator> {
+  const row = await findRow(page, path);
+  await expect(row).toBeVisible();
+  await row.locator('.twisty').click();
+  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
+  return row;
+}
+
+async function openRowMenu(page: Page, path: string): Promise<void> {
+  const row = await findRow(page, path);
+  await row.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+}
+
+async function createConnection(
+  page: Page,
+  cfg: {
+    host: string | null;
+    port: number | null;
+    database: string | null;
+    username: string | null;
+    password: string | null;
+  },
+  opts: { name: string; color: ConnectionColor; readOnly: boolean },
+): Promise<string> {
+  return page.evaluate(
+    ({ cfg, opts }) =>
+      window.kira
+        .connectionsCreate({
+          name: opts.name,
+          kind: 'postgres',
+          color: opts.color,
+          mode: 'fields',
+          readOnly: opts.readOnly,
+          host: cfg.host,
+          port: cfg.port,
+          database: cfg.database,
+          username: cfg.username,
+          password: cfg.password,
+          uri: null,
+          options: {},
+        })
+        .then((c) => c.id),
+    { cfg, opts },
+  );
+}
+
+function gridCell(page: Page, row: number, column: string): Locator {
+  return page.locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`);
+}
+
+async function cellText(page: Page, row: number, column: string): Promise<string> {
+  return (await gridCell(page, row, column)).innerText();
+}
+
+async function editCell(page: Page, row: number, column: string, value: string): Promise<void> {
+  await gridCell(page, row, column).dblclick();
+  const input = page.locator('[data-testid="grid-cell-input"]');
+  await expect(input).toBeVisible();
+  await input.fill(value);
+  await input.press('Enter');
+}
+
+test('mutations — edit, add, delete, preview, commit, discard, read-only guard', async ({
+  kira,
+}) => {
+  test.setTimeout(300_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
+
+  const cfg = {
+    host: pg.config.host,
+    port: pg.config.port,
+    database: pg.config.database,
+    username: pg.config.username,
+    password: pg.config.password,
+  };
+  await createConnection(page, cfg, {
+    name: 'Mutations DB',
+    color: 'green',
+    readOnly: false,
+  });
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  const compositeRow = await findRow(page, COMPOSITE_PATH);
+  await compositeRow.dblclick();
+  const grid = page.locator('[data-testid="data-grid"]');
+  await expect(grid).toBeVisible();
+  await expect(page.locator('[data-testid="grid-header-cell"][data-column="name"]')).toBeVisible();
+
+  // --- scenario 1: editing a cell stages it (tinted, not yet sent) ------------------------
+  const originalName = await cellText(page, 0, 'name');
+  await editCell(page, 0, 'name', 'edited via UI');
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'name')).toBe('edited via UI');
+  await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toBeVisible();
+  await expect(page.locator('[data-testid="toolbar-discard-changes"]')).toBeVisible();
+
+  // --- scenario 2: discard reverts every pending change -------------------------------------
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
+  expect(await cellText(page, 0, 'name')).toBe(originalName);
+
+  // --- scenario 3: add row appends an always-editable insert row ---------------------------
+  await page.click('[data-testid="toolbar-add-row"]');
+  const insertRow = page.locator('[data-testid="grid-row-insert"]');
+  await expect(insertRow).toHaveCount(1);
+  const insertId = await insertRow.getAttribute('data-insert-id');
+  expect(insertId).not.toBeNull();
+  const insertInputs = insertRow.locator('[data-testid="grid-cell-insert"] input');
+  await insertInputs.nth(0).fill('9');
+  await insertInputs.nth(1).fill('1');
+  await insertInputs.nth(2).fill('inserted row');
+
+  // --- scenario 4: preview command shows the exact SQL for pending changes -----------------
+  await page.click('[data-testid="toolbar-preview-command"]');
+  const previewPanel = page.locator('[data-testid="preview-command-panel"]');
+  await expect(previewPanel).toBeVisible();
+  await expect(previewPanel.locator('.cm-content')).toBeVisible({ timeout: 10_000 });
+  const previewText = await previewPanel.locator('.cm-content').innerText();
+  expect(previewText).toContain('INSERT INTO');
+  expect(previewText).toContain('composite_pk');
+  await page.click('[data-testid="preview-command-close"]');
+  await expect(previewPanel).toHaveCount(0);
+
+  // Discard the insert before moving to the delete/commit scenarios below, so they start clean.
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(insertRow).toHaveCount(0);
+
+  // --- scenario 5: delete-row marks a row struck-through, non-committed until commit -------
+  await page.locator('[data-testid="grid-gutter-cell"]').nth(1).click();
+  await page.click('[data-testid="toolbar-delete-row"]');
+  const deletedRow = page.locator('[data-testid="grid-row"][data-row="1"]');
+  await expect(deletedRow).toHaveClass(/pending-delete/);
+
+  // --- scenario 6: commit sends the batch and reloads the tab ------------------------------
+  const deletedRowName = await cellText(page, 1, 'name');
+  await editCell(page, 0, 'name', 'committed value');
+  await page.click('[data-testid="toolbar-commit-changes"]');
+  await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
+  await expect(gridCell(page, 0, 'name')).not.toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'name')).toBe('committed value');
+  const remainingNames = await page
+    .locator('[data-testid="grid-cell"][data-column="name"]')
+    .allInnerTexts();
+  expect(remainingNames).not.toContain(deletedRowName);
+
+  // --- scenario 7: a read-only connection disables every mutation button ------------------
+  const firstConnRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await expect(firstConnRow).toHaveCount(1);
+  await firstConnRow.locator('.twisty').click();
+
+  await createConnection(page, cfg, { name: 'Mutations DB (RO)', color: 'red', readOnly: true });
+  const roConnRow = page
+    .locator('[data-testid="tree-row"][data-kind="connection"]')
+    .filter({ hasText: 'Mutations DB (RO)' });
+  await expect(roConnRow).toBeVisible();
+  await roConnRow.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(roConnRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await roConnRow.locator('.twisty').click();
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const roCompositeRow = await findRow(page, COMPOSITE_PATH);
+  await roCompositeRow.dblclick();
+  await expect(page.locator('[data-testid="grid-header-cell"][data-column="name"]')).toBeVisible();
+
+  for (const testId of ['toolbar-add-row', 'toolbar-delete-row', 'toolbar-preview-command']) {
+    await expect(page.locator(`[data-testid="${testId}"]`)).toBeDisabled();
+  }
+});

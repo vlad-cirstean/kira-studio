@@ -51,19 +51,27 @@ const sqlDialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
 });
 
-const readOnlyReason = computed(() =>
-  cell.value ? readOnlyReasonFor(cell.value) : 'not-editable-yet',
-);
-const readOnlyChipText = computed(() =>
-  readOnlyReason.value === 'connection-read-only'
-    ? 'Connection is read-only'
-    : 'Read-only in this version',
-);
-const readOnlyChipTitle = computed(() =>
-  readOnlyReason.value === 'connection-read-only'
-    ? undefined
-    : 'Editing a cell stages a pending change; that arrives in a later version.',
-);
+const readOnlyReason = computed(() => (cell.value ? readOnlyReasonFor(cell.value) : null));
+const readOnlyChipText = computed(() => {
+  switch (readOnlyReason.value) {
+    case 'connection-read-only':
+      return 'Connection is read-only';
+    case 'no-primary-key':
+      return 'No primary key';
+    default:
+      return '';
+  }
+});
+const readOnlyChipTitle = computed(() => {
+  switch (readOnlyReason.value) {
+    case 'connection-read-only':
+      return undefined;
+    case 'no-primary-key':
+      return "This table has no primary key, so a row can't be identified to write.";
+    default:
+      return undefined;
+  }
+});
 
 // The display buffer (D6): what Beautify/Reset act on. Never the stored value itself, which
 // stays reachable through `cell.value.value` for Reset.
@@ -228,7 +236,7 @@ const statusLine = computed(() => {
         <Codicon name="discard" :size="14" />
       </button>
 
-      <span class="read-only-chip" :title="readOnlyChipTitle">
+      <span v-if="readOnlyReason" class="read-only-chip" :title="readOnlyChipTitle">
         <Codicon name="lock" :size="12" />
         {{ readOnlyChipText }}
       </span>

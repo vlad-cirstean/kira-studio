@@ -3,6 +3,7 @@ import type { OpRecord } from '@shared/domain/ops';
 import { tabTitle } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
+import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, tabsState } from '../../state/tabs';
@@ -74,6 +75,11 @@ function onRowClick(record: OpRecord): void {
   revealTab(record);
 }
 
+function sqlDialectFor(record: OpRecord): 'postgres' | 'mariadb' | undefined {
+  const kind = connectionFor(record)?.kind;
+  return kind === 'postgres' || kind === 'mariadb' ? kind : undefined;
+}
+
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   const hasTab = record.tabId !== null && tabsState.tabs.some((t) => t.id === record.tabId);
   const items: MenuItem[] = [
@@ -128,14 +134,11 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </div>
       <div class="ops-body">
         <!--
-          The expanded command/error detail rows below are plain text, not CodeMirror, even
-          though CodeMirror now exists (P3, src/renderer/editor/). The blocker isn't the missing
-          dependency — VirtualList is fixed-row-height (P2 §0 note 14: "wrong for the grid...
-          left exactly as it is"), and a log detail with variable-height syntax highlighting
-          needs a variable-height row, which is a real change to a component every panel
-          depends on. P5 is the natural owner: it builds §8.5's *Preview command* panel, the
-          app's first genuine read-only statement-rendering surface, and this op-log detail is
-          the same widget shown somewhere else (D19).
+          The expanded command/error detail rows embed a CodeMirrorHost (D18/D19) inside
+          VirtualList's fixed 20px row rather than making VirtualList itself variable-height
+          (P2 §0 note 14 leaves it fixed on purpose) — scoped CSS below forces a single
+          non-wrapping line and hides the line-number gutter so it reads like the plain text
+          it replaces, just with SQL syntax highlighting.
         -->
         <VirtualList :items="listItems" :row-height="20">
           <template #default="{ item }">
@@ -179,10 +182,17 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               </span>
               <span v-else class="mono truncate" :title="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
             </div>
-            <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row mono">
-              command: {{ item.record.command }}
+            <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
+              <CodeMirrorHost
+                :doc="`command: ${item.record.command}`"
+                language="sql"
+                :sql-dialect="sqlDialectFor(item.record)"
+                :read-only="true"
+              />
             </div>
-            <div v-else class="ops-detail-row mono error-text">error: {{ item.record.error }}</div>
+            <div v-else class="ops-detail-row ops-detail-cm">
+              <CodeMirrorHost :doc="`error: ${item.record.error}`" language="plain" :read-only="true" />
+            </div>
           </template>
         </VirtualList>
       </div>
@@ -361,5 +371,31 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ops-detail-cm {
+  padding: 0;
+}
+
+.ops-detail-cm :deep(.cm-editor) {
+  height: 20px;
+  font-size: 11px;
+}
+
+.ops-detail-cm :deep(.cm-scroller) {
+  overflow: hidden;
+}
+
+.ops-detail-cm :deep(.cm-content) {
+  white-space: pre;
+  padding: 0;
+}
+
+.ops-detail-cm :deep(.cm-line) {
+  padding: 0 8px;
+}
+
+.ops-detail-cm :deep(.cm-gutters) {
+  display: none;
 }
 </style>

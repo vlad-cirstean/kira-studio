@@ -18,6 +18,9 @@ export interface SelectedCell {
   value: string | null;
   /** The engine cut this value at MAX_CELL_BYTES; the rest was never fetched (D14). */
   truncated: boolean;
+  /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
+   *  page has one is grid-only knowledge and `views/celleditor/` may not import `views/grid/`. */
+  hasPrimaryKey: boolean;
 }
 
 export const cellSelectionState = reactive<{ current: SelectedCell | null }>({ current: null });
