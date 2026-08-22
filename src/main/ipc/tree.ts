@@ -21,6 +21,10 @@ export function registerTreeHandlers(deps: IpcDeps): void {
     const { connectionId, path, refresh } = treeArgsSchema.parse(payload);
     return tree.describe(connectionId, path, refresh ?? false);
   });
+  handle(IPC.treeDdl, (_event, payload) => {
+    const { connectionId, path, refresh } = treeArgsSchema.parse(payload);
+    return tree.ddl(connectionId, path, refresh ?? false);
+  });
   handle(IPC.treeInvalidate, (_event, payload) => {
     const { connectionId, path } = invalidateArgsSchema.parse(payload);
     return tree.invalidate(connectionId, path);

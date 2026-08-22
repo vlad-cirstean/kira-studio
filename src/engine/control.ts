@@ -89,6 +89,17 @@ async function handleDescribe(payload: unknown) {
   return { meta: value };
 }
 
+async function handleDdl(payload: unknown) {
+  const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.ddl].parse(payload);
+  const adapter = requireAdapter(connectionId);
+  const { value } = await runOp({ connectionId, kind: 'ddl' }, async (ctx) => {
+    const ddl = await adapter.ddl(path, ctx);
+    ctx.setRows(ddl.statements.length);
+    return ddl;
+  });
+  return { ddl: value };
+}
+
 async function handleTest(payload: unknown) {
   const { config } = engineOpPayloadSchema[ENGINE_OP.test].parse(payload);
   const adapter = createAdapter(config.kind, deps);
@@ -123,6 +134,7 @@ const handlers: Record<string, OpHandler> = {
   [ENGINE_OP.disconnect]: handleDisconnect,
   [ENGINE_OP.children]: handleChildren,
   [ENGINE_OP.describe]: handleDescribe,
+  [ENGINE_OP.ddl]: handleDdl,
   [ENGINE_OP.test]: handleTest,
   [ENGINE_OP.cancel]: handleCancel,
   [ENGINE_OP.configureCache]: handleConfigureCache,

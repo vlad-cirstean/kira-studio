@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type SourceText, sourceTextSchema } from '../shared/domain/ddl';
 import {
   decodePath,
   type ObjectMeta,
@@ -27,9 +28,15 @@ export interface TreeDescribeResult {
   source: 'cache' | 'server';
 }
 
+export interface TreeDdlResult {
+  ddl: SourceText;
+  source: 'cache' | 'server';
+}
+
 export interface TreeService {
   children(connectionId: string, path: string, refresh: boolean): Promise<TreeChildrenResult>;
   describe(connectionId: string, path: string, refresh: boolean): Promise<TreeDescribeResult>;
+  ddl(connectionId: string, path: string, refresh: boolean): Promise<TreeDdlResult>;
   /** Drops L1 for one node (path given) or the whole connection (path omitted). No push of its
    * own — the caller already knows what it asked to invalidate. The D11 reconnect push is
    * `connections.onMetadataInvalidated`, a separate concern owned by connections.ts. */
@@ -90,6 +97,25 @@ export function createTreeService(
       });
       await putCached(db, connectionId, path, 'describe', result.meta);
       return { meta: result.meta, source: 'server' };
+    },
+
+    async ddl(connectionId, path, refresh) {
+      if (!refresh) {
+        const cached = await getCached(db, connectionId, path, 'ddl');
+        if (cached !== null) {
+          const parsed = sourceTextSchema.safeParse(cached);
+          if (parsed.success) return { ddl: parsed.data, source: 'cache' };
+          await dropCached(db, connectionId, path);
+        }
+      }
+      await requireConnected(connectionId);
+      const nodePath = decodePath(connectionId, path);
+      const result = await engineHost.call<{ ddl: SourceText }>(ENGINE_OP.ddl, {
+        connectionId,
+        path: nodePath,
+      });
+      await putCached(db, connectionId, path, 'ddl', result.ddl);
+      return { ddl: result.ddl, source: 'server' };
     },
 
     invalidate(connectionId, path) {

@@ -13,6 +13,7 @@ import type {
   ConnectionTestResult,
   EngineStatus,
   TreeChildrenResult,
+  TreeDdlResult,
   TreeDescribeResult,
 } from '@shared/protocol/ipc';
 import type { Settings, SettingsPatch } from '@shared/settings';
@@ -72,6 +73,8 @@ export const control = {
     path: string,
     refresh?: boolean,
   ): Promise<TreeDescribeResult> => kira.treeDescribe({ connectionId, path, refresh }),
+  treeDdl: (connectionId: string, path: string, refresh?: boolean): Promise<TreeDdlResult> =>
+    kira.treeDdl({ connectionId, path, refresh }),
   treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
     kira.treeInvalidate({ connectionId, path }),
 
