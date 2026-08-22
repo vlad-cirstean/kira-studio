@@ -1,4 +1,4 @@
-import type { Client, QueryResultRow } from 'pg';
+import type { Client, QueryArrayConfig, QueryConfig, QueryResultRow } from 'pg';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 
@@ -29,17 +29,33 @@ export function mapPgError(err: unknown): AdapterError {
   return new AdapterError('E_QUERY', message, err);
 }
 
+export interface QueryOptions {
+  rowMode?: 'array';
+  /** Identity type parsers — the read path only (D3), never catalog queries. */
+  textMode?: boolean;
+  /** Appends the bound parameter values to the logged command (§5b step 6), read path only. */
+  logParams?: boolean;
+}
+
 // The cancellable query helper (§5c). Exported so tests/db/postgres.spec.ts can drive a
 // `SELECT pg_sleep(30)` directly to assert server-side cancellation without inventing a fake
-// tree level.
+// tree level. `opts` is P2's addition: the read path needs `rowMode: 'array'` and identity type
+// parsers (D3), and this is extended rather than duplicated so cancellation, tracking and error
+// mapping stay in exactly one place — existing (catalog) call sites are unaffected.
 export async function runQuery<R extends QueryResultRow = QueryResultRow>(
   client: Client,
   sql: string,
   params: unknown[],
   ctx: OpCtx,
   track: (q: RunningQuery) => void,
+  opts?: QueryOptions,
 ): Promise<R[]> {
-  ctx.setCommand(sql); // before the statement is issued, not after (Adapter rule 3)
+  // Before the statement is issued, not after (Adapter rule 3). The read path asks for the
+  // bound values appended so the op log shows the real statement (§5b step 6); catalog callers
+  // never pass logParams, so their behaviour is unchanged.
+  ctx.setCommand(
+    opts?.logParams && params.length > 0 ? `${sql} -- params: ${JSON.stringify(params)}` : sql,
+  );
 
   if (ctx.signal.aborted) {
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
@@ -47,6 +63,30 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
 
   const backendPid = (client as unknown as { processID?: number }).processID;
   if (typeof backendPid === 'number') track({ backendPid });
+
+  // pg's `types.getTypeParser` is honoured per-query (verified against pg/lib/result.js: the
+  // Result is constructed with `this.types`, and each column parser comes from
+  // `types.getTypeParser(oid, format)`) — a per-query identity parser is enough, no need for a
+  // second Client constructed with custom `types` (checked 2026-08-22).
+  const types = opts?.textMode ? { getTypeParser: () => (v: string) => v } : undefined;
+
+  const issue = (): Promise<{ rows: unknown[] }> => {
+    if (opts?.rowMode === 'array') {
+      const config: QueryArrayConfig<unknown[]> = {
+        text: sql,
+        values: params,
+        rowMode: 'array',
+        ...(types ? { types } : {}),
+      };
+      return client.query<unknown[]>(config);
+    }
+    const config: QueryConfig<unknown[]> = {
+      text: sql,
+      values: params,
+      ...(types ? { types } : {}),
+    };
+    return client.query<QueryResultRow>(config) as unknown as Promise<{ rows: unknown[] }>;
+  };
 
   // `pg` has no per-query abort. The AbortSignal listener below only stops *us* waiting — it
   // does not stop the server from executing the query. The server-side kill is entirely
@@ -64,13 +104,12 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
 
-    client
-      .query<R>(sql, params)
+    issue()
       .then((result) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
-        resolve(result.rows);
+        resolve(result.rows as R[]);
       })
       .catch((err: unknown) => {
         if (settled) return;

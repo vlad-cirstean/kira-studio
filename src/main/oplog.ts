@@ -29,7 +29,7 @@ export function wireOplog(
     const evt = parsed.data;
     const record: InFlightOp = {
       connectionId: evt.connectionId,
-      tabId: null,
+      tabId: evt.tabId,
       kind: evt.kind,
       startedAt: evt.startedAt,
     };

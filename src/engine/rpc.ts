@@ -1,4 +1,7 @@
 import type { PingPayload, PortRequest, PortResponse } from '../shared/port';
+import { DATA_OP, invalidateRequestWireSchema } from '../shared/protocol/data-ops';
+import { cache } from './cache';
+import { handleCount, handlePrefetch, handleRead } from './data';
 
 type Handler = (payload: unknown) => Promise<unknown>;
 
@@ -7,27 +10,61 @@ const handlers: Record<string, Handler> = {
     const payload: PingPayload = { pong: true, enginePid: process.pid, at: Date.now() };
     return payload;
   },
+  [DATA_OP.read]: async (payload) => {
+    const { response } = await handleRead(payload);
+    return response;
+  },
+  [DATA_OP.count]: handleCount,
+  [DATA_OP.prefetch]: handlePrefetch,
+  [DATA_OP.invalidate]: async (payload) => {
+    const { connectionId, path } = invalidateRequestWireSchema.parse(payload);
+    cache.dropTarget(connectionId, path);
+    return {};
+  },
+  [DATA_OP.cacheStats]: async () => cache.stats(),
+  [DATA_OP.cacheClear]: async () => {
+    cache.clear();
+    return {};
+  },
 };
 
-export async function dispatch(request: PortRequest): Promise<PortResponse> {
+/**
+ * `transfer` is plumbing for a future platform that lets `MessagePortMain.postMessage` transfer
+ * raw bytes — Electron's typings currently only accept `MessagePortMain[]` in that list (checked
+ * 2026-08-22 against `node_modules/electron/electron.d.ts`), so no handler here ever populates
+ * it. A `TabularPage`'s buffers still travel safely via structured clone, which — unlike a
+ * transfer — never detaches the L2-cached original (D4): the fields below always come back
+ * `undefined` today, and that is correct, not a bug.
+ */
+export async function dispatch(
+  request: PortRequest,
+): Promise<{ response: PortResponse; transfer?: unknown[] }> {
   const handler = handlers[request.op];
   if (!handler) {
     return {
-      kind: 'res',
-      id: request.id,
-      ok: false,
-      error: { message: `unknown op: ${request.op}`, code: 'UNKNOWN_OP' },
+      response: {
+        kind: 'res',
+        id: request.id,
+        ok: false,
+        error: { message: `unknown op: ${request.op}`, code: 'E_UNSUPPORTED' },
+      },
     };
   }
   try {
     const payload = await handler(request.payload);
-    return { kind: 'res', id: request.id, ok: true, payload };
+    return { response: { kind: 'res', id: request.id, ok: true, payload } };
   } catch (err) {
+    const code = (err as { code?: unknown } | undefined)?.code;
     return {
-      kind: 'res',
-      id: request.id,
-      ok: false,
-      error: { message: err instanceof Error ? err.message : String(err) },
+      response: {
+        kind: 'res',
+        id: request.id,
+        ok: false,
+        error: {
+          message: err instanceof Error ? err.message : String(err),
+          code: typeof code === 'string' ? code : undefined,
+        },
+      },
     };
   }
 }

@@ -1,6 +1,7 @@
 import type { OpKind } from '../../shared/domain/ops';
 import { ENGINE_EVENT } from '../../shared/protocol/engine-ops';
 import type { Adapter, OpCtx, Progress } from '../adapters/adapter';
+import { AdapterError } from '../adapters/errors';
 
 export interface RunOpCtx extends OpCtx {
   /** children() sets this to the node count, describe() to the column count (§4c). */
@@ -28,10 +29,16 @@ export function wireScheduler(deps: {
 }
 
 export async function runOp<T>(
-  spec: { connectionId: string | null; kind: OpKind },
+  spec: { connectionId: string | null; kind: OpKind; opId?: string; tabId?: string | null },
   fn: (ctx: RunOpCtx) => Promise<T>,
 ): Promise<{ opId: string; value: T }> {
-  const opId = crypto.randomUUID();
+  const opId = spec.opId ?? crypto.randomUUID();
+  // A duplicate id would corrupt the op log's primary key and let the stop button cancel the
+  // wrong query (D2) — reject it before op:start is even emitted.
+  if (running.has(opId)) {
+    throw new AdapterError('E_QUERY', `duplicate operation id: ${opId}`);
+  }
+  const tabId = spec.tabId ?? null;
   const controller = new AbortController();
   running.set(opId, { controller, connectionId: spec.connectionId });
 
@@ -39,6 +46,7 @@ export async function runOp<T>(
   emitEvent(ENGINE_EVENT.opStart, {
     opId,
     connectionId: spec.connectionId,
+    tabId,
     kind: spec.kind,
     startedAt,
   });

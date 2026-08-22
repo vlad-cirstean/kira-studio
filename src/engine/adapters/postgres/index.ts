@@ -6,13 +6,22 @@ import {
   type TreeNode,
 } from '../../../shared/domain/tree';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
-import type { Adapter, AdapterDeps, ConnectInfo, OpCtx } from '../adapter';
+import type { Page } from '../../../shared/protocol/page';
+import type {
+  Adapter,
+  AdapterDeps,
+  ConnectInfo,
+  CountRequest,
+  OpCtx,
+  ReadRequest,
+} from '../adapter';
 import { AdapterError } from '../errors';
 import { postgresCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildClientConfig, ClientSet } from './client';
 import { type RunningQuery, runQuery } from './query';
+import { countRows, readPage } from './read';
 
 class PostgresAdapter implements Adapter {
   readonly kind = 'postgres' as const;
@@ -161,6 +170,48 @@ class PostgresAdapter implements Adapter {
       rowEstimate: info.rowEstimate,
       comment: info.comment,
     };
+  }
+
+  async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
+    const { client, target } = await this.resolveReadTarget(req.path, ctx);
+    return readPage(client, ctx, (q) => this.runningByOp.set(ctx.opId, q), target, {
+      projection: req.projection,
+      filter: req.filter,
+      sort: req.sort,
+      pageSize: req.pageSize,
+      cursor: req.cursor,
+    });
+  }
+
+  async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
+    const { client, target } = await this.resolveReadTarget(req.path, ctx);
+    return countRows(client, ctx, (q) => this.runningByOp.set(ctx.opId, q), target, req.filter);
+  }
+
+  private async resolveReadTarget(
+    path: NodePath,
+    ctx: OpCtx,
+  ): Promise<{ client: Client; target: catalog.ReadTarget }> {
+    const segments = path.segments;
+    const [databaseSegment, schemaSegment, objectSegment] = segments;
+    if (
+      segments.length !== 3 ||
+      databaseSegment?.kind !== 'database' ||
+      schemaSegment?.kind !== 'schema' ||
+      !objectSegment ||
+      (objectSegment.kind !== 'table' &&
+        objectSegment.kind !== 'view' &&
+        objectSegment.kind !== 'matview')
+    ) {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `read requires a database/schema/table path, got: ${encodePath(segments)}`,
+      );
+    }
+    const client = await this.requireClient(databaseSegment.name);
+    const exec = this.execFor(client, ctx);
+    const target = await catalog.getReadTarget(exec, schemaSegment.name, objectSegment.name);
+    return { client, target };
   }
 
   async cancel(opId: string): Promise<boolean> {

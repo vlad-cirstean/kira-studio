@@ -1,7 +1,9 @@
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/domain/connection';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
+import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
 import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
+import type { Page } from '../../shared/protocol/page';
 
 export interface Progress {
   message?: string;
@@ -40,8 +42,29 @@ export interface ConnectInfo {
  *    adapter's promise; getting it wrong shows a twisty that expands to nothing, which is a
  *    bug to fix in the parent's query, not to paper over.
  * 6. An adapter is single-connection. One instance <-> one `connections` row. The registry
- *    in `src/engine/control.ts` owns the `Map<connectionId, Adapter>`.
+ *    in `src/engine/adapters/live.ts` owns the `Map<connectionId, Adapter>`.
+ * 7. `read()` and `count()` obey the same identifier rule as the catalog code, via
+ *    `quoteIdent` (D8). Every identifier they emit came out of a catalog query in the same
+ *    op. A projected column name that is not in that catalog result is `E_NOT_FOUND`, never
+ *    quoted-and-hoped.
+ * 8. A page is built with `createTabularPageBuilder` from `shared/protocol/page.ts`. An
+ *    adapter that hand-rolls the columnar layout will disagree with the renderer's decoder in
+ *    some edge case; there is one codec.
  */
+export interface ReadRequest {
+  path: NodePath;
+  projection: string[] | null;
+  filter: string | null;
+  sort: SortSpec | null;
+  pageSize: number; // already validated <= MAX_PAGE_SIZE at the port boundary
+  cursor: PageCursor;
+}
+
+export interface CountRequest {
+  path: NodePath;
+  filter: string | null;
+}
+
 export interface Adapter {
   readonly kind: ConnectionKind;
   readonly caps: Caps;
@@ -61,6 +84,12 @@ export interface Adapter {
    * "already finished". Adapters with caps.cancel === false return false unconditionally.
    */
   cancel(opId: string): Promise<boolean>;
+
+  /** One page of rows. Shape depends on caps.defaultPageKind; both SQL adapters return TabularPage. */
+  read(req: ReadRequest, ctx: OpCtx): Promise<Page>;
+
+  /** `exact` is false when the adapter can only estimate (caps.exactCount === false). */
+  count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }>;
 }
 
 export interface AdapterDeps {
@@ -70,13 +99,12 @@ export interface AdapterDeps {
 export type AdapterFactory = (deps: AdapterDeps) => Adapter;
 
 /**
- * Adapter roadmap (normative, D3). Each later phase adds exactly these members. Do not add
- * them early; do not change the signatures without amending docs/plans/P1-connections-and-tree.md §4b.
+ * Adapter roadmap (normative, D3). `read`/`count` shipped in P2 (above). Each later phase adds
+ * exactly these members. Do not add them early; do not change the signatures without amending
+ * docs/plans/P1-connections-and-tree.md §4b.
  *
  * | Phase | Added to `Adapter`                                                              | Gated by         |
  * |-------|----------------------------------------------------------------------------------|------------------|
- * | P2    | `read(req: ReadRequest, ctx: OpCtx): Promise<Page>` (discriminated union on `kind`) | always present   |
- * | P2    | `count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }>`  | always present   |
  * | P4    | `ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>`                              | `caps.ddl`       |
  * | P5    | `preview(plan: MutationPlan): string[]` — synchronous, never executes              | `caps.writable`  |
  * | P5    | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>`                   | `caps.writable`  |

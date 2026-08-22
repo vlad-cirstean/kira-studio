@@ -74,6 +74,16 @@ export const countRequestWireSchema = z.object({
   filter: z.string().max(4096).nullable(),
 });
 
+export interface InvalidateRequestWire {
+  connectionId: string;
+  path: string;
+}
+
+export const invalidateRequestWireSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+});
+
 export interface ReadResponse {
   page: Page;
   source: 'cache' | 'server';

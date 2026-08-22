@@ -1,12 +1,11 @@
 import type { PortRequest, PortResponse } from '../shared/port';
 import { ENGINE_EVENT, ENGINE_OP, engineOpPayloadSchema } from '../shared/protocol/engine-ops';
-import type { Adapter, AdapterDeps } from './adapters/adapter';
+import type { AdapterDeps } from './adapters/adapter';
 import { AdapterError, toWireError } from './adapters/errors';
+import { deleteLiveAdapter, getLiveAdapter, setLiveAdapter } from './adapters/live';
 import { createAdapter } from './adapters/registry';
 import { cache } from './cache';
 import { cancelOp, runOp, wireScheduler } from './scheduler/ops';
-
-const adapters = new Map<string, Adapter>();
 
 function emit(topic: string, payload: unknown): void {
   process.parentPort.postMessage({ kind: 'evt', topic, payload });
@@ -14,7 +13,7 @@ function emit(topic: string, payload: unknown): void {
 
 wireScheduler({
   emit,
-  getAdapter: (connectionId) => adapters.get(connectionId),
+  getAdapter: getLiveAdapter,
 });
 
 const deps: AdapterDeps = {
@@ -24,8 +23,8 @@ const deps: AdapterDeps = {
   },
 };
 
-function requireAdapter(connectionId: string): Adapter {
-  const adapter = adapters.get(connectionId);
+function requireAdapter(connectionId: string) {
+  const adapter = getLiveAdapter(connectionId);
   if (!adapter) {
     throw new AdapterError('E_NOT_FOUND', `connection ${connectionId} has no active adapter`);
   }
@@ -36,17 +35,17 @@ async function handleConnect(payload: unknown) {
   const { config } = engineOpPayloadSchema[ENGINE_OP.connect].parse(payload);
 
   // A reconnect is a disconnect + connect, never two live clients for the same connection.
-  const existing = adapters.get(config.id);
+  const existing = getLiveAdapter(config.id);
   if (existing) {
     await existing.disconnect().catch(() => {});
-    adapters.delete(config.id);
+    deleteLiveAdapter(config.id);
   }
 
   const adapter = createAdapter(config.kind, deps);
   const { value } = await runOp({ connectionId: config.id, kind: 'connect' }, (ctx) =>
     adapter.connect(config, ctx),
   );
-  adapters.set(config.id, adapter);
+  setLiveAdapter(config.id, adapter);
   emit(ENGINE_EVENT.connectionState, {
     connectionId: config.id,
     status: 'connected',
@@ -58,10 +57,12 @@ async function handleConnect(payload: unknown) {
 
 async function handleDisconnect(payload: unknown) {
   const { connectionId } = engineOpPayloadSchema[ENGINE_OP.disconnect].parse(payload);
-  const adapter = adapters.get(connectionId);
+  const adapter = getLiveAdapter(connectionId);
   if (adapter) {
     await runOp({ connectionId, kind: 'disconnect' }, () => adapter.disconnect());
-    adapters.delete(connectionId);
+    deleteLiveAdapter(connectionId);
+    // §2.2: disconnecting releases the connection's driver state and all its cached pages.
+    cache.dropConnection(connectionId);
   }
   return {};
 }

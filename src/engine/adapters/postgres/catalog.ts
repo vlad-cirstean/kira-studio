@@ -272,6 +272,37 @@ export function primaryKeyFromIndexes(indexes: IndexMeta[]): string[] | null {
   return indexes.find((idx) => idx.primary)?.columns ?? null;
 }
 
+export interface ReadTarget {
+  oid: string;
+  qualifiedName: { schema: string; relation: string };
+  columns: ColumnMeta[];
+  primaryKey: string[] | null;
+  /** Unique indexes whose columns are all NOT NULL — keyset tiebreaker candidates (D7). */
+  uniqueKeys: string[][];
+}
+
+// The read path needs the relation's columns/PK/unique-index shape in one shot (D10: resolved
+// fresh on every uncached read, in the same op, right before the data statement).
+export async function getReadTarget(
+  exec: QueryExecutor,
+  schema: string,
+  relation: string,
+): Promise<ReadTarget> {
+  const info = await getRelationInfo(exec, schema, relation);
+  // Sequential, not Promise.all — see index.ts's comment: node-postgres has deprecated firing
+  // concurrent queries at one Client.
+  const rawColumns = await listColumns(exec, schema, relation);
+  const indexes = await listIndexes(exec, info.oid);
+  const primaryKey = primaryKeyFromIndexes(indexes);
+  const pkColumns = new Set(primaryKey ?? []);
+  const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
+  const nullableByName = new Map(columns.map((c) => [c.name, c.nullable]));
+  const uniqueKeys = indexes
+    .filter((idx) => idx.unique && idx.columns.every((c) => nullableByName.get(c) === false))
+    .map((idx) => idx.columns);
+  return { oid: info.oid, qualifiedName: { schema, relation }, columns, primaryKey, uniqueKeys };
+}
+
 const CONSTRAINT_ACTION: Record<string, string> = {
   a: 'NO ACTION',
   r: 'RESTRICT',
