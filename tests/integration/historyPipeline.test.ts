@@ -22,6 +22,7 @@ import {
   baseEnv,
   branchy,
   crissCross,
+  largeBranchy,
   linear,
   octopus,
   withStash,
@@ -232,4 +233,23 @@ describe("history pipeline — edge cases", () => {
     expect(chunk.laneCount).toBe(1);
     expect(Array.from(chunk.laneOf)).toEqual([0]);
   });
+});
+
+describe("history pipeline — page-boundary invariant at 100k scale", () => {
+  test("largeBranchy(100_000) at pageSize=5000 matches a single full-repo pass, byte for byte", async () => {
+    const { dir } = largeBranchy(100_000);
+    const onePass = await runPipeline(dir, 1_000_000);
+    const paged = await runPipeline(dir, 5000);
+
+    expect(paged.store.rowCount).toBe(onePass.store.rowCount);
+    expect(paged.store.rowCount).toBe(100_000);
+
+    const onePassLane = onePass.chunks.flatMap((c) => Array.from(c.laneOf));
+    const pagedLane = paged.chunks.flatMap((c) => Array.from(c.laneOf));
+    expect(pagedLane).toEqual(onePassLane);
+
+    expect(Array.from(reassembleEdges(paged.chunks))).toEqual(
+      Array.from(reassembleEdges(onePass.chunks)),
+    );
+  }, 60_000);
 });

@@ -234,16 +234,24 @@ kira-version-vscode/
 └── tests/
     ├── fixtures/
     │   ├── generateRepo.ts         builds real repos: topologies, sizes, conflicts
+    │   ├── topology.ts             in-memory hand-built commit topologies for graph-layout unit tests (P2)
     │   ├── fakeGit.ts              stand-in git binary for discovery.ts: version, hang, garbage output
     │   ├── recordPorcelain.ts      regenerates tests/fixtures/porcelain/ from real git, as raw bytes
     │   └── porcelain/              recorded git output for parser unit tests
+    ├── unit/                       unit tests that cross a package's own tsc rootDir (e.g. a
+    │                               packages/core test consuming tests/fixtures/topology.ts) —
+    │                               colocation is impossible there without violating each
+    │                               package's own tsconfig; mirrors tests/integration/'s pattern
     ├── e2e/                        Playwright against apps/harness
     ├── integration/                real git + real hosts (electron, vscode)
     └── perf/                       time + heap budgets (§5.1), run locally (D28)
 ```
 
-Unit tests are colocated (`foo.ts` / `foo.test.ts`, run by `bun test`); only the suites that
-need a harness or a real repository live under `tests/`.
+Unit tests are colocated (`foo.ts` / `foo.test.ts`, run by `bun test`) **except** where doing so
+would import across a package's own tsc `rootDir` (a `packages/core` test needing
+`tests/fixtures/topology.ts`, say) — those live under `tests/unit/` instead, discovered while
+implementing P2 (a stray `.d.ts` `tsc -b` emitted into `tests/fixtures/` was the tell). Suites
+that need a harness or a real repository still live under `tests/` as before.
 
 **Dependency rule, enforced by `bun run check`** via Biome's `noRestrictedImports` plus a bundle check:
 `core` and `ipc` depend on nothing; `git` depends on `core` + `ipc`; `ui` depends on `core` +
