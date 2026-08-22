@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { capsSchema } from '../caps';
 
 export const connectionKindSchema = z.enum([
   'postgres',
@@ -90,5 +91,8 @@ export const connectionStateSchema = z.object({
   serverVersion: z.string().nullable(),
   error: z.string().nullable(),
   since: z.number(), // epoch ms
+  // Non-null only while connected — the toolbar's projection menu (Step 9) reads this to
+  // decide whether server-side projection actually applies.
+  caps: capsSchema.nullable(),
 });
 export type ConnectionState = z.infer<typeof connectionStateSchema>;

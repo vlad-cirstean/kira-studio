@@ -1,3 +1,4 @@
+import type { Caps } from '../shared/caps';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -79,6 +80,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         serverVersion: null,
         error: null,
         since: Date.now(),
+        caps: null,
       }
     );
   }
@@ -204,10 +206,11 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         serverVersion: null,
         error: null,
         since: Date.now(),
+        caps: null,
       });
       try {
         const cfg = await resolve(id);
-        const result = await engineHost.call<{ serverVersion: string }>(
+        const result = await engineHost.call<{ serverVersion: string; caps: Caps }>(
           ENGINE_OP.connect,
           { config: cfg },
           20_000,
@@ -218,6 +221,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
           serverVersion: result.serverVersion,
           error: null,
           since: Date.now(),
+          caps: result.caps,
         };
         emitState(state);
         // D11: the whole connection's metadata is refreshed on every reconnect. A blunt
@@ -233,6 +237,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
           serverVersion: null,
           error: err instanceof Error ? err.message : String(err),
           since: Date.now(),
+          caps: null,
         };
         emitState(state);
         return state;
@@ -248,6 +253,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         serverVersion: null,
         error: null,
         since: Date.now(),
+        caps: null,
       };
       emitState(state);
       return state;
@@ -268,7 +274,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     markAllErrored(reason) {
       for (const state of states.values()) {
         if (state.status === 'connected' || state.status === 'connecting') {
-          emitState({ ...state, status: 'error', error: reason, since: Date.now() });
+          emitState({ ...state, status: 'error', error: reason, since: Date.now(), caps: null });
         }
       }
     },

@@ -1,4 +1,7 @@
+import { z } from 'zod';
+
 export type PageKind = 'tabular' | 'document' | 'keyvalue' | 'stream';
+export const pageKindSchema = z.enum(['tabular', 'document', 'keyvalue', 'stream']);
 
 export type PaginationStrategy =
   | 'keyset' // ordered by a unique key; LIMIT/OFFSET fallback when there is no key
@@ -7,6 +10,14 @@ export type PaginationStrategy =
   | 'token' // opaque continuation token (S3)
   | 'offsetWindow' // explicit begin/end offsets per partition (Kafka)
   | 'batch'; // receive-a-batch, no addressable position (SQS)
+export const paginationStrategySchema = z.enum([
+  'keyset',
+  'offset',
+  'cursor',
+  'token',
+  'offsetWindow',
+  'batch',
+]);
 
 export interface Caps {
   // ---- shape: what view the UI reaches for, and what a page looks like
@@ -34,6 +45,26 @@ export interface Caps {
   // ---- lifecycle
   cancel: boolean; // can forward a cancel to the server — ADDED (D4, D5)
 }
+
+// Crosses the engine<->main process boundary on connect (P2's ConnectInfo.caps addition) and
+// main<->renderer over kira:connection:state — validated like anything else at a trust boundary.
+export const capsSchema = z.object({
+  tabular: z.boolean(),
+  documents: z.boolean(),
+  keyValue: z.boolean(),
+  stream: z.boolean(),
+  defaultPageKind: pageKindSchema,
+  sql: z.boolean(),
+  ddl: z.boolean(),
+  projection: z.boolean(),
+  serverFilter: z.boolean(),
+  exactCount: z.boolean(),
+  pagination: paginationStrategySchema,
+  foreignKeys: z.boolean(),
+  writable: z.boolean(),
+  transactions: z.boolean(),
+  cancel: z.boolean(),
+});
 
 /**
  * §5.1, filled in — the map every later adapter is written against. Only the postgres row is

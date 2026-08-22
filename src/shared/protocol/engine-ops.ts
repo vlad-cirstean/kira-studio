@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { capsSchema } from '../caps';
 import type { ConnectionSummary } from '../domain/connection';
 import { connectionSummarySchema } from '../domain/connection';
 import { opKindSchema } from '../domain/ops';
@@ -52,6 +53,9 @@ export const engineOpResultSchema = {
   [ENGINE_OP.connect]: z.object({
     serverVersion: z.string(),
     details: z.record(z.string(), z.string()).optional(),
+    // The renderer's projection menu (Step 9) branches on this — known immediately from the
+    // adapter instance, before the connect probe even runs.
+    caps: capsSchema,
   }),
   [ENGINE_OP.disconnect]: z.object({}),
   [ENGINE_OP.children]: z.object({ nodes: z.array(treeNodeSchema) }),

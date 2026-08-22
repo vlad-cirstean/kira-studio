@@ -52,7 +52,7 @@ async function handleConnect(payload: unknown) {
     serverVersion: value.serverVersion,
     error: null,
   });
-  return value;
+  return { ...value, caps: adapter.caps };
 }
 
 async function handleDisconnect(payload: unknown) {
