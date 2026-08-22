@@ -20,6 +20,8 @@ export const IPC = {
   openSettings: 'kira:open-settings',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
+  appFlushBeforeClose: 'kira:app:flush-before-close',
+  appFlushed: 'kira:app:flushed',
 
   connectionsList: 'kira:connections:list',
   connectionsCreate: 'kira:connections:create',
@@ -105,6 +107,10 @@ export interface KiraApi {
   onOpenSettings(cb: () => void): () => void;
   onToggleProjectPanel(cb: () => void): () => void;
   onToggleOperationsPanel(cb: () => void): () => void;
+  // Quit handshake: main holds `before-quit` until every window acks this, so a debounced save
+  // still pending when the user quits is never silently lost.
+  onFlushBeforeClose(cb: () => void): () => void;
+  appFlushed(): void;
 
   connectionsList(): Promise<ConnectionSummary[]>;
   connectionsCreate(input: ConnectionInput): Promise<ConnectionSummary>;

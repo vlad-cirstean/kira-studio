@@ -41,9 +41,17 @@ function saveDebounced(): void {
 }
 
 // A pending debounced save is otherwise lost outright if the window closes before its timer
-// fires (e.g. a pager/filter/sort change right before quit) — flush it while the renderer can
-// still send the IPC call.
-window.addEventListener('beforeunload', saveNow);
+// fires (e.g. a pager/filter/sort change right before quit): main holds `before-quit` until
+// every window acks this, so awaiting tabsSave here before acking is what actually makes the
+// wait worthwhile — `beforeunload` can't do this, since main tears the renderer down without
+// waiting for anything it starts there.
+control.onFlushBeforeClose(() => {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  void control.tabsSave(tabsState.tabs).finally(() => control.appFlushed());
+});
 
 export async function hydrateTabs(): Promise<void> {
   const tabs = await control.tabsList();

@@ -40,6 +40,8 @@ export const control = {
   onOpenSettings: (cb: () => void): (() => void) => kira.onOpenSettings(cb),
   onToggleProjectPanel: (cb: () => void): (() => void) => kira.onToggleProjectPanel(cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => kira.onToggleOperationsPanel(cb),
+  onFlushBeforeClose: (cb: () => void): (() => void) => kira.onFlushBeforeClose(cb),
+  appFlushed: (): void => kira.appFlushed(),
 
   connectionsList: (): Promise<ConnectionSummary[]> => kira.connectionsList(),
   connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>

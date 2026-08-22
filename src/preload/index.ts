@@ -56,6 +56,14 @@ const kiraApi: KiraApi = {
     ipcRenderer.on(IPC.toggleOperationsPanel, listener);
     return () => ipcRenderer.off(IPC.toggleOperationsPanel, listener);
   },
+  onFlushBeforeClose: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.appFlushBeforeClose, listener);
+    return () => ipcRenderer.off(IPC.appFlushBeforeClose, listener);
+  },
+  appFlushed: () => {
+    ipcRenderer.send(IPC.appFlushed);
+  },
 
   connectionsList: () => ipcRenderer.invoke(IPC.connectionsList),
   connectionsCreate: (input: ConnectionInput) => ipcRenderer.invoke(IPC.connectionsCreate, input),
