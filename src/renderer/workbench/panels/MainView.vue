@@ -5,6 +5,6 @@ import EmptyState from './EmptyState.vue';
 </script>
 
 <template>
-  <DataTabView v-if="activeTab && activeTab.kind === 'data'" :tab="activeTab" />
+  <DataTabView v-if="activeTab && activeTab.kind === 'data'" :key="activeTab.id" :tab="activeTab" />
   <EmptyState v-else icon="table" label="No tab open" />
 </template>
