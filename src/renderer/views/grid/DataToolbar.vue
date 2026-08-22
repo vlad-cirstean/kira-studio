@@ -242,7 +242,7 @@ const columnsOpen = ref(false);
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 3px 5px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
 }
 
 .data-toolbar > button:hover:not(:disabled) {
@@ -269,7 +269,7 @@ const columnsOpen = ref(false);
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 3px 4px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   font-size: 10px;
 }
 
@@ -294,7 +294,7 @@ const columnsOpen = ref(false);
   width: 40px;
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   font-size: 11px;
   padding: 1px 4px;
@@ -307,7 +307,7 @@ const columnsOpen = ref(false);
 
 .segmented button {
   padding: 2px 6px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);

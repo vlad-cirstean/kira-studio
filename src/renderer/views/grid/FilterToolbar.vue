@@ -144,7 +144,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 2px 4px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
 }
 
 .history-anchor > button:hover {
@@ -163,7 +163,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 
 .filter-input:focus {
   background: var(--kira-bg-input);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
 }
 
 .filter-input:not(.orderby) {

@@ -169,7 +169,7 @@ onUnmounted(() => {
   width: 160px;
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   padding: 2px 6px;
   font-size: 11px;
@@ -178,7 +178,7 @@ onUnmounted(() => {
 .toggle {
   background: transparent;
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 1px 5px;

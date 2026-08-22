@@ -574,6 +574,10 @@ defineExpose({ scrollCellIntoView });
   background: var(--kira-bg-elevated);
 }
 
+.grid-row:hover .grid-cell:not(.selected) {
+  background: var(--kira-hover);
+}
+
 .gutter-cell {
   position: sticky;
   left: 0;

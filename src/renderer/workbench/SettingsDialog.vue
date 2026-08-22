@@ -110,6 +110,18 @@ async function onClearCaches(): Promise<void> {
 <template>
   <div class="scrim" data-testid="settings-dialog" @click.self="emit('close')">
     <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="dialog-title">
+        <span>Settings</span>
+        <button
+          type="button"
+          class="title-close"
+          aria-label="Close"
+          data-testid="settings-dialog-close"
+          @click="emit('close')"
+        >
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
       <div class="dialog-body">
         <nav class="section-list">
           <button
@@ -276,11 +288,41 @@ async function onClearCaches(): Promise<void> {
   height: 400px;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
+  border-radius: var(--kira-radius-lg);
+  box-shadow: var(--kira-shadow-dialog);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.dialog-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 16px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.title-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.title-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .dialog-body {
@@ -302,7 +344,7 @@ async function onClearCaches(): Promise<void> {
 .section-item {
   text-align: left;
   padding: 4px 8px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   background: transparent;
   border: none;
   color: var(--kira-fg-muted);
@@ -341,7 +383,7 @@ async function onClearCaches(): Promise<void> {
 .field select {
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   padding: 4px 6px;
 }
@@ -354,7 +396,7 @@ async function onClearCaches(): Promise<void> {
 .segmented button {
   flex: 1;
   padding: 4px 8px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
@@ -374,7 +416,7 @@ async function onClearCaches(): Promise<void> {
 .action-button {
   align-self: flex-start;
   padding: 4px 10px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
@@ -397,7 +439,7 @@ async function onClearCaches(): Promise<void> {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg);

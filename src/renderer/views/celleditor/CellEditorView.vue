@@ -289,7 +289,7 @@ const statusLine = computed(() => {
 
 .type-pill {
   padding: 1px 5px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
   font-weight: 400;
@@ -298,8 +298,8 @@ const statusLine = computed(() => {
 }
 
 .badge {
-  padding: 1px 5px;
-  border-radius: var(--kira-radius);
+  padding: 1px 6px;
+  border-radius: var(--kira-radius-pill);
   background: var(--kira-badge);
   color: var(--kira-fg);
   font-size: 10px;
@@ -313,7 +313,7 @@ const statusLine = computed(() => {
 .format-select {
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   padding: 2px 4px;
   font-size: 11px;
@@ -332,7 +332,7 @@ const statusLine = computed(() => {
   height: 22px;
   background: transparent;
   border: none;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg-muted);
   cursor: pointer;
   flex-shrink: 0;
@@ -353,7 +353,7 @@ const statusLine = computed(() => {
   align-items: center;
   gap: 4px;
   padding: 1px 6px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-pill);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
   font-size: 10px;

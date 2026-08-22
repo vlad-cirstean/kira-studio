@@ -38,7 +38,10 @@
   --color-conn-magenta: var(--kira-conn-magenta);
   --color-conn-grey: var(--kira-conn-grey);
 
+  --radius-kira-sm: var(--kira-radius-sm);
   --radius-kira: var(--kira-radius);
+  --radius-kira-lg: var(--kira-radius-lg);
+  --radius-kira-pill: var(--kira-radius-pill);
 }
 
 html,

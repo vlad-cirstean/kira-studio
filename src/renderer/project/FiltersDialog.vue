@@ -87,7 +87,18 @@ async function onSave(): Promise<void> {
 <template>
   <div v-if="filtersDialogState.open" class="scrim" data-testid="filters-dialog" @click.self="closeFiltersDialog">
     <div class="dialog" role="dialog" aria-modal="true">
-      <div class="dialog-title">Filters</div>
+      <div class="dialog-title">
+        <span>Filters</span>
+        <button
+          type="button"
+          class="title-close"
+          aria-label="Close"
+          data-testid="filters-dialog-close"
+          @click="closeFiltersDialog"
+        >
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
       <div class="dialog-body">
         <div v-for="(rule, index) in draft" :key="index" class="rule-row">
           <select v-model="rule.nodeKind">
@@ -139,18 +150,40 @@ async function onSave(): Promise<void> {
   max-height: 70vh;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
+  border-radius: var(--kira-radius-lg);
+  box-shadow: var(--kira-shadow-dialog);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .dialog-title {
-  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 16px;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   font-size: 12px;
   font-weight: 600;
+}
+
+.title-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.title-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .dialog-body {
@@ -174,7 +207,7 @@ async function onSave(): Promise<void> {
 .rule-row input[type='text'] {
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   padding: 3px 5px;
   font-size: 12px;
@@ -235,10 +268,16 @@ async function onSave(): Promise<void> {
 
 .dialog-footer button {
   padding: 4px 10px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   cursor: pointer;
+}
+
+.dialog-footer button:last-child {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
 }
 </style>

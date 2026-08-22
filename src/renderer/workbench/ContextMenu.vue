@@ -143,7 +143,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border-radius: 3px;
+  border-radius: var(--kira-radius-sm);
   cursor: pointer;
   position: relative;
   white-space: nowrap;

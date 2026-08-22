@@ -104,7 +104,7 @@ function onCloseSearch(): void {
 
 .reconnect-panel button {
   padding: 6px 14px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg);

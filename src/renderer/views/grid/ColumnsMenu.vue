@@ -92,7 +92,7 @@ function close(): void {
 .columns-menu-header button {
   background: transparent;
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 2px 6px;

@@ -126,12 +126,13 @@ const cacheSizeLabel = computed(() => {
 }
 
 .toggle-button {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 0 6px;
   height: 18px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg-muted);
   background: transparent;
   border: none;
@@ -140,10 +141,21 @@ const cacheSizeLabel = computed(() => {
 
 .toggle-button:hover {
   background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .toggle-button.active {
-  background: var(--kira-select);
   color: var(--kira-fg);
+}
+
+.toggle-button.active::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--kira-accent);
 }
 </style>

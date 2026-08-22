@@ -155,7 +155,18 @@ const isValid = computed(() =>
 <template>
   <div v-if="draft" class="scrim" data-testid="connection-dialog" @click.self="closeDialog">
     <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="dialog-title">{{ isEdit ? 'Edit Connection' : 'New Connection' }}</div>
+      <div class="dialog-title">
+        <span>{{ isEdit ? 'Edit Connection' : 'New Connection' }}</span>
+        <button
+          type="button"
+          class="title-close"
+          aria-label="Close"
+          data-testid="connection-dialog-close"
+          @click="closeDialog"
+        >
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
       <div class="dialog-body">
         <div class="field-row">
           <label class="field name-field">
@@ -299,6 +310,7 @@ const isValid = computed(() =>
           <button type="button" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
           <button
             type="button"
+            class="primary"
             data-testid="connection-save"
             :disabled="!isValid"
             @click="onSave"
@@ -327,19 +339,41 @@ const isValid = computed(() =>
   max-height: 80vh;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
+  border-radius: var(--kira-radius-lg);
+  box-shadow: var(--kira-shadow-dialog);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .dialog-title {
-  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 16px;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
+}
+
+.title-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.title-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .dialog-body {
@@ -385,7 +419,7 @@ const isValid = computed(() =>
 .field select {
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   padding: 4px 6px;
 }
@@ -420,7 +454,7 @@ const isValid = computed(() =>
 .segmented button {
   flex: 1;
   padding: 4px 8px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
@@ -478,6 +512,11 @@ const isValid = computed(() =>
 }
 
 .test-chip.ok {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--kira-radius-pill);
+  background: #1c3d2c;
   color: var(--kira-ok);
 }
 
@@ -496,7 +535,7 @@ const isValid = computed(() =>
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border-radius: var(--kira-radius);
+  border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
@@ -506,5 +545,17 @@ const isValid = computed(() =>
 .dialog-footer button:disabled {
   color: var(--kira-fg-disabled);
   cursor: not-allowed;
+}
+
+.dialog-footer button.primary {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+
+.dialog-footer button.primary:disabled {
+  background: var(--kira-bg-input);
+  border-color: var(--kira-border);
+  color: var(--kira-fg-disabled);
 }
 </style>

@@ -134,7 +134,9 @@ const tabs = computed(() => tabsState.tabs);
 .tab-strip {
   height: 100%;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -144,10 +146,11 @@ const tabs = computed(() => tabsState.tabs);
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  height: 24px;
   max-width: 220px;
-  padding: 0 8px;
-  border: none;
-  border-top: 3px solid var(--tab-color, transparent);
+  padding: 0 8px 0 6px;
+  border: var(--kira-border-width) solid transparent;
+  border-radius: var(--kira-radius-sm);
   background: transparent;
   color: var(--kira-fg-muted);
   cursor: pointer;
@@ -155,8 +158,9 @@ const tabs = computed(() => tabsState.tabs);
 }
 
 .tab.active {
-  background: var(--kira-bg);
+  background: var(--kira-bg-elevated);
   color: var(--kira-fg);
+  border-color: var(--tab-color, var(--kira-border));
 }
 
 .tab:hover:not(.active) {
@@ -181,7 +185,7 @@ const tabs = computed(() => tabsState.tabs);
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--kira-radius-sm);
   opacity: 0;
 }
 
