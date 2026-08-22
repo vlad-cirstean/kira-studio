@@ -1,5 +1,5 @@
-import type { AppInfo, EngineStatus } from '@shared/ipc';
 import type { Layout, LayoutPatch } from '@shared/layout';
+import type { AppInfo, EngineStatus } from '@shared/protocol/ipc';
 import type { Settings, SettingsPatch } from '@shared/settings';
 
 const kira = window.kira;

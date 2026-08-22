@@ -7,7 +7,7 @@ declare module '*.vue' {
   export default component;
 }
 
-import type { KiraApi } from '@shared/ipc';
+import type { KiraApi } from '@shared/protocol/ipc';
 
 declare global {
   interface Window {

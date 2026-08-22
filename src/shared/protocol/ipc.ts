@@ -1,5 +1,5 @@
-import type { Layout, LayoutPatch } from './layout';
-import type { Settings, SettingsPatch } from './settings';
+import type { Layout, LayoutPatch } from '../layout';
+import type { Settings, SettingsPatch } from '../settings';
 
 export const IPC = {
   appInfo: 'kira:app:info',

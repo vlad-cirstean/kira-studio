@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
-import { IPC } from '../shared/ipc';
+import { IPC } from '../shared/protocol/ipc';
 
 function sendToFocusedWindow(channel: string): void {
   const window = BrowserWindow.getFocusedWindow();

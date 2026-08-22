@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { EngineStatus, KiraApi } from '../shared/ipc';
-import { IPC } from '../shared/ipc';
 import type { LayoutPatch } from '../shared/layout';
+import type { EngineStatus, KiraApi } from '../shared/protocol/ipc';
+import { IPC } from '../shared/protocol/ipc';
 import type { SettingsPatch } from '../shared/settings';
 
 const kiraApi: KiraApi = {

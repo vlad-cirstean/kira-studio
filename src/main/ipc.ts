@@ -1,6 +1,6 @@
 import { app, ipcMain } from 'electron';
-import { IPC } from '../shared/ipc';
 import type { LayoutPatch } from '../shared/layout';
+import { IPC } from '../shared/protocol/ipc';
 import type { SettingsPatch } from '../shared/settings';
 import type { EngineHost } from './engine-host';
 import type { Db } from './storage/db';
