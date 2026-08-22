@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { connectionsState } from '../state/connections';
+import { activeTab } from '../state/tabs';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
@@ -18,6 +20,17 @@ import {
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const cellVisible = computed(() => layoutState.panel.cellEditor.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
+
+// §8.12: the connection colour on the editor area's outer border, matching the mockup's
+// Main.dc vs MainNoColor treatment (no colour assigned -> plain border).
+const editorAreaColor = computed(() => {
+  const tab = activeTab.value;
+  if (!tab?.connectionId) return undefined;
+  return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;
+});
+const editorAreaStyle = computed(() =>
+  editorAreaColor.value ? { borderColor: `var(--kira-conn-${editorAreaColor.value})` } : {},
+);
 
 const gridStyle = computed(() => ({
   '--project-w': projectVisible.value ? `${layoutState.panel.project.width}px` : '0px',
@@ -49,10 +62,10 @@ const gridStyle = computed(() => ({
       @resize="setProjectWidth"
     />
 
-    <div class="main-column" style="grid-area: main">
-      <div class="panel-surface tab-strip" data-testid="tab-strip"><TabStrip /></div>
-      <div class="panel-surface toolbar" data-testid="toolbar"><Toolbar /></div>
-      <div class="panel-surface main-view" data-testid="main-view"><MainView /></div>
+    <div class="editor-area" style="grid-area: main" :style="editorAreaStyle">
+      <div class="tab-strip" data-testid="tab-strip"><TabStrip /></div>
+      <div class="toolbar" data-testid="toolbar"><Toolbar /></div>
+      <div class="main-view" data-testid="main-view"><MainView /></div>
     </div>
 
     <Splitter
@@ -129,22 +142,27 @@ const gridStyle = computed(() => ({
   min-height: 0;
 }
 
-.main-column {
-  grid-area: main;
+.editor-area {
   display: flex;
   flex-direction: column;
-  gap: var(--kira-gap);
   min-width: 0;
   min-height: 0;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg);
+  overflow: hidden;
 }
 
 .tab-strip {
   height: 32px;
   flex-shrink: 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-chrome);
 }
 
 .toolbar {
   flex-shrink: 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .main-view {
