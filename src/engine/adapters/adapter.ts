@@ -1,0 +1,84 @@
+import type { Caps } from '../../shared/caps';
+import type { ConnectionKind } from '../../shared/domain/connection';
+import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
+import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
+
+export interface Progress {
+  message?: string;
+  done?: number;
+  total?: number;
+}
+
+export interface OpCtx {
+  readonly opId: string;
+  readonly signal: AbortSignal;
+  /** The exact statement about to run. Lands in op_log.command and §8.11's command column (D20). */
+  setCommand(text: string): void;
+  onProgress?(p: Progress): void;
+}
+
+export interface ConnectInfo {
+  serverVersion: string;
+  /** Free-form, engine-specific, shown in the connection tooltip. */
+  details?: Record<string, string>;
+}
+
+/**
+ * Rules that hold for every adapter, present and future:
+ *
+ * 1. An adapter imports nothing from `electron`. It is a plain Node module — this is what
+ *    makes `tests/db/` able to import it directly and what would let a connection move to
+ *    its own process later (§4).
+ * 2. Every method that talks to the server takes an `OpCtx` and honours `ctx.signal`. A
+ *    method that ignores the signal is a bug even if the underlying driver "is fast".
+ * 3. `ctx.setCommand()` is called before the statement is issued, not after it returns — an
+ *    op that is cancelled mid-flight must still show what it was running.
+ * 4. Errors are thrown as `AdapterError` (`./errors.ts`) with a code from a closed set and
+ *    the server's own message verbatim in `message`. §8.5 and §8.14 both require unmodified
+ *    server errors; wrapping starts there.
+ * 5. `children()` returns `[]` for a leaf, never throws. `hasChildren` on the parent is the
+ *    adapter's promise; getting it wrong shows a twisty that expands to nothing, which is a
+ *    bug to fix in the parent's query, not to paper over.
+ * 6. An adapter is single-connection. One instance <-> one `connections` row. The registry
+ *    in `src/engine/control.ts` owns the `Map<connectionId, Adapter>`.
+ */
+export interface Adapter {
+  readonly kind: ConnectionKind;
+  readonly caps: Caps;
+
+  connect(cfg: ResolvedConnectionConfig, ctx: OpCtx): Promise<ConnectInfo>;
+  disconnect(): Promise<void>;
+
+  /** One lazy tree level. `path.segments` is empty for the connection root. */
+  children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]>;
+
+  /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
+  describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
+
+  /**
+   * Forward a cancel for an in-flight op to the server (D5).
+   * Returns false when the op was unknown or the server refused; never throws for
+   * "already finished". Adapters with caps.cancel === false return false unconditionally.
+   */
+  cancel(opId: string): Promise<boolean>;
+}
+
+export interface AdapterDeps {
+  log(level: 'info' | 'warn' | 'error', message: string): void;
+}
+
+export type AdapterFactory = (deps: AdapterDeps) => Adapter;
+
+/**
+ * Adapter roadmap (normative, D3). Each later phase adds exactly these members. Do not add
+ * them early; do not change the signatures without amending docs/plans/P1-connections-and-tree.md §4b.
+ *
+ * | Phase | Added to `Adapter`                                                              | Gated by         |
+ * |-------|----------------------------------------------------------------------------------|------------------|
+ * | P2    | `read(req: ReadRequest, ctx: OpCtx): Promise<Page>` (discriminated union on `kind`) | always present   |
+ * | P2    | `count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }>`  | always present   |
+ * | P4    | `ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>`                              | `caps.ddl`       |
+ * | P5    | `preview(plan: MutationPlan): string[]` — synchronous, never executes              | `caps.writable`  |
+ * | P5    | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>`                   | `caps.writable`  |
+ * | P5.5  | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>`                         | `caps.sql`       |
+ */

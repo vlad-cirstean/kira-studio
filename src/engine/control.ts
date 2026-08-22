@@ -1,0 +1,137 @@
+import type { PortRequest, PortResponse } from '../shared/port';
+import { ENGINE_EVENT, ENGINE_OP, engineOpPayloadSchema } from '../shared/protocol/engine-ops';
+import type { Adapter, AdapterDeps } from './adapters/adapter';
+import { AdapterError, toWireError } from './adapters/errors';
+import { createAdapter } from './adapters/registry';
+import { cancelOp, runOp, wireScheduler } from './scheduler/ops';
+
+const adapters = new Map<string, Adapter>();
+
+function emit(topic: string, payload: unknown): void {
+  process.parentPort.postMessage({ kind: 'evt', topic, payload });
+}
+
+wireScheduler({
+  emit,
+  getAdapter: (connectionId) => adapters.get(connectionId),
+});
+
+const deps: AdapterDeps = {
+  log(level, message) {
+    const sink = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+    sink(`[engine] ${message}`);
+  },
+};
+
+function requireAdapter(connectionId: string): Adapter {
+  const adapter = adapters.get(connectionId);
+  if (!adapter) {
+    throw new AdapterError('E_NOT_FOUND', `connection ${connectionId} has no active adapter`);
+  }
+  return adapter;
+}
+
+async function handleConnect(payload: unknown) {
+  const { config } = engineOpPayloadSchema[ENGINE_OP.connect].parse(payload);
+
+  // A reconnect is a disconnect + connect, never two live clients for the same connection.
+  const existing = adapters.get(config.id);
+  if (existing) {
+    await existing.disconnect().catch(() => {});
+    adapters.delete(config.id);
+  }
+
+  const adapter = createAdapter(config.kind, deps);
+  const { value } = await runOp({ connectionId: config.id, kind: 'connect' }, (ctx) =>
+    adapter.connect(config, ctx),
+  );
+  adapters.set(config.id, adapter);
+  emit(ENGINE_EVENT.connectionState, {
+    connectionId: config.id,
+    status: 'connected',
+    serverVersion: value.serverVersion,
+    error: null,
+  });
+  return value;
+}
+
+async function handleDisconnect(payload: unknown) {
+  const { connectionId } = engineOpPayloadSchema[ENGINE_OP.disconnect].parse(payload);
+  const adapter = adapters.get(connectionId);
+  if (adapter) {
+    await runOp({ connectionId, kind: 'disconnect' }, () => adapter.disconnect());
+    adapters.delete(connectionId);
+  }
+  return {};
+}
+
+async function handleChildren(payload: unknown) {
+  const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.children].parse(payload);
+  const adapter = requireAdapter(connectionId);
+  const { value } = await runOp({ connectionId, kind: 'children' }, async (ctx) => {
+    const nodes = await adapter.children(path, ctx);
+    ctx.setRows(nodes.length);
+    return nodes;
+  });
+  return { nodes: value };
+}
+
+async function handleDescribe(payload: unknown) {
+  const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.describe].parse(payload);
+  const adapter = requireAdapter(connectionId);
+  const { value } = await runOp({ connectionId, kind: 'describe' }, async (ctx) => {
+    const meta = await adapter.describe(path, ctx);
+    ctx.setRows(meta.columns.length);
+    return meta;
+  });
+  return { meta: value };
+}
+
+async function handleTest(payload: unknown) {
+  const { config } = engineOpPayloadSchema[ENGINE_OP.test].parse(payload);
+  const adapter = createAdapter(config.kind, deps);
+  try {
+    const { value } = await runOp({ connectionId: null, kind: 'test' }, (ctx) =>
+      adapter.connect(config, ctx),
+    );
+    await adapter.disconnect().catch(() => {});
+    return { ok: true, serverVersion: value.serverVersion };
+  } catch (err) {
+    return { ok: false, error: toWireError(err).message };
+  }
+}
+
+async function handleCancel(payload: unknown) {
+  const { opId } = engineOpPayloadSchema[ENGINE_OP.cancel].parse(payload);
+  const cancelled = await cancelOp(opId);
+  return { cancelled };
+}
+
+type OpHandler = (payload: unknown) => Promise<unknown>;
+
+const handlers: Record<string, OpHandler> = {
+  [ENGINE_OP.connect]: handleConnect,
+  [ENGINE_OP.disconnect]: handleDisconnect,
+  [ENGINE_OP.children]: handleChildren,
+  [ENGINE_OP.describe]: handleDescribe,
+  [ENGINE_OP.test]: handleTest,
+  [ENGINE_OP.cancel]: handleCancel,
+};
+
+export async function handleFrame(request: PortRequest): Promise<PortResponse> {
+  const handler = handlers[request.op];
+  if (!handler) {
+    return {
+      kind: 'res',
+      id: request.id,
+      ok: false,
+      error: { message: `unknown engine op: ${request.op}`, code: 'E_UNSUPPORTED' },
+    };
+  }
+  try {
+    const payload = await handler(request.payload);
+    return { kind: 'res', id: request.id, ok: true, payload };
+  } catch (err) {
+    return { kind: 'res', id: request.id, ok: false, error: toWireError(err) };
+  }
+}
