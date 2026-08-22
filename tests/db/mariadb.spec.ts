@@ -795,4 +795,180 @@ describe('mariadb adapter (§9.1)', () => {
       await adapter.disconnect();
     }
   });
+
+  test('19. ddl', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    let wideTableDdl: Awaited<ReturnType<Adapter['ddl']>>;
+    try {
+      // 1. Passthrough.
+      wideTableDdl = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'table', name: 'wide_table' },
+        ]),
+        makeCtx(),
+      );
+      expect(wideTableDdl.origin).toBe('server');
+      expect(wideTableDdl.statements).toHaveLength(1);
+
+      const sideConn = await createConnection({
+        host: fixture.config.host ?? undefined,
+        port: fixture.config.port ?? undefined,
+        user: 'root',
+        password: 'kira',
+        database: 'kira_test',
+      });
+      try {
+        const [row] = await sideConn.query<{ 'Create Table': string }[]>(
+          'SHOW CREATE TABLE wide_table',
+        );
+        const expected = row['Create Table'].replace(/;\s*$/, '');
+        expect(wideTableDdl.statements[0]).toBe(expected);
+      } finally {
+        await sideConn.end();
+      }
+
+      // 3. View.
+      const orderSummary = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'table', name: 'order_summary' },
+        ]),
+        makeCtx(),
+      );
+      expect(orderSummary.origin).toBe('server');
+      expect(orderSummary.statements[0]).toContain('DEFINER=');
+      expect(orderSummary.notes.some((n) => n.includes('DEFINER'))).toBe(true);
+
+      // 4. Unsupported and not-found.
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'function', name: 'noop_procedure' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'function', name: 'full_name' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+
+      await expect(
+        adapter.ddl(path([{ kind: 'database', name: 'kira_test' }]), makeCtx()),
+      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'table', name: 'does_not_exist' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+    } finally {
+      await adapter.disconnect();
+    }
+
+    // 2. Round trip — root creds are required for the admin database and its own connection,
+    // since the fixture's `kira` user is only ever granted on `kira_test` (D17 as in postgres.spec.ts).
+    const admin = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+    });
+    try {
+      await admin.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+      await admin.query('CREATE DATABASE kira_ddl_roundtrip');
+    } finally {
+      await admin.end();
+    }
+
+    try {
+      const roundTripConn = await createConnection({
+        host: fixture.config.host ?? undefined,
+        port: fixture.config.port ?? undefined,
+        user: 'root',
+        password: 'kira',
+        database: 'kira_ddl_roundtrip',
+      });
+      try {
+        await roundTripConn.query(wideTableDdl.statements[0]);
+      } finally {
+        await roundTripConn.end();
+      }
+
+      const sourceAdapter = createAdapter('mariadb', deps);
+      await sourceAdapter.connect(fixture.config, makeCtx());
+      let original: Awaited<ReturnType<Adapter['describe']>>;
+      try {
+        original = await sourceAdapter.describe(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'table', name: 'wide_table' },
+          ]),
+          makeCtx(),
+        );
+      } finally {
+        await sourceAdapter.disconnect();
+      }
+
+      const copyAdapter = createAdapter('mariadb', deps);
+      await copyAdapter.connect(
+        { ...fixture.config, username: 'root', password: 'kira', database: 'kira_ddl_roundtrip' },
+        makeCtx(),
+      );
+      let copy: Awaited<ReturnType<Adapter['describe']>>;
+      try {
+        copy = await copyAdapter.describe(
+          path([
+            { kind: 'database', name: 'kira_ddl_roundtrip' },
+            { kind: 'table', name: 'wide_table' },
+          ]),
+          makeCtx(),
+        );
+      } finally {
+        await copyAdapter.disconnect();
+      }
+
+      const shape = (m: Awaited<ReturnType<Adapter['describe']>>) => ({
+        columns: m.columns
+          .map((c) => ({
+            name: c.name,
+            dataType: c.dataType,
+            nullable: c.nullable,
+            defaultExpr: c.defaultExpr,
+            isPrimaryKey: c.isPrimaryKey,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        primaryKey: m.primaryKey ? [...m.primaryKey].sort() : null,
+        indexes: m.indexes
+          .map((i) => ({ name: i.name, columns: i.columns, unique: i.unique }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      });
+      expect(shape(copy)).toEqual(shape(original));
+    } finally {
+      const cleanup = await createConnection({
+        host: fixture.config.host ?? undefined,
+        port: fixture.config.port ?? undefined,
+        user: 'root',
+        password: 'kira',
+      });
+      try {
+        await cleanup.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+      } finally {
+        await cleanup.end();
+      }
+    }
+  });
 });

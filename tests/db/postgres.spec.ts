@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { ddlText } from '@shared/domain/ddl';
 import type { NodePath } from '@shared/domain/tree';
 import { Client } from 'pg';
 import type { Adapter, AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
@@ -802,5 +803,249 @@ describe('postgres adapter (§9.1)', () => {
       expect(err).toBeInstanceOf(AdapterError);
       expect((err as AdapterError).code).toBe('E_UNSUPPORTED');
     }
+  });
+
+  test('20. ddl', async () => {
+    const adapter = createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // 1. Shape.
+      const orderItems = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'table', name: 'order_items' },
+        ]),
+        makeCtx(),
+      );
+      expect(orderItems.origin).toBe('composed');
+      expect(orderItems.kind).toBe('table');
+      expect(orderItems.qualifiedName).toBe('app.order_items');
+      expect(orderItems.notes.length).toBeGreaterThan(0);
+      // The serial id column's backing sequence must be created before the table that
+      // references it via an eagerly-resolved `::regclass` cast in its DEFAULT.
+      expect(orderItems.statements[0]).toMatch(/^CREATE SEQUENCE app\.order_items_id_seq$/);
+      const orderItemsCreateTable = orderItems.statements.find((s) => s.startsWith('CREATE TABLE'));
+      expect(orderItemsCreateTable).toMatch(/^CREATE TABLE app\.order_items \(/);
+
+      // 2. Quoting.
+      const weird = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'table', name: 'weird"name' },
+        ]),
+        makeCtx(),
+      );
+      const weirdCreateTable = weird.statements.find((s) => s.startsWith('CREATE TABLE'));
+      expect(weirdCreateTable).toContain('app."weird""name"');
+
+      const orders = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'table', name: 'orders' },
+        ]),
+        makeCtx(),
+      );
+      const ordersCreateTable = orders.statements.find((s) => s.startsWith('CREATE TABLE'));
+      expect(ordersCreateTable).not.toContain('"app"."orders"');
+
+      // 5. View.
+      const orderSummary = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'view', name: 'order_summary' },
+        ]),
+        makeCtx(),
+      );
+      expect(orderSummary.statements).toHaveLength(1);
+      expect(orderSummary.statements[0]).toMatch(/^CREATE VIEW app\.order_summary AS/);
+      expect(orderSummary.statements[0]).toContain('app.orders');
+      expect(orderSummary.statements[0]).toContain('app.order_items');
+      expect(orderSummary.statements[0].trimEnd().endsWith(';')).toBe(false);
+
+      // 6. Matview.
+      const customerTotals = await adapter.ddl(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'matview', name: 'customer_totals' },
+        ]),
+        makeCtx(),
+      );
+      expect(customerTotals.statements[0]).toMatch(
+        /^CREATE MATERIALIZED VIEW app\.customer_totals AS/,
+      );
+      expect(customerTotals.notes.some((n) => n.includes('created without data'))).toBe(true);
+
+      // 7. Unsupported and not-found.
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'sequence', name: 'invoice_number_seq' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'function', name: 'full_name' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+
+      await expect(
+        adapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'table', name: 'does_not_exist' },
+          ]),
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+
+      // 8. ddlText round trip.
+      const doc = ddlText(orderItems);
+      const chunks = doc.split('\n\n');
+      expect(chunks).toHaveLength(orderItems.statements.length);
+      for (const chunk of chunks) {
+        expect(chunk.endsWith(';')).toBe(true);
+        expect(chunk.endsWith(';;')).toBe(false);
+      }
+    } finally {
+      await adapter.disconnect();
+    }
+
+    // 3 & 4. Round trip — executed into a fresh database, described back, and compared against
+    // the original. A second database (not a scratch schema) is what keeps the qualified names
+    // ddl() emitted valid verbatim, with no string rewriting in the test (D17).
+    async function roundTrip(objectName: string): Promise<void> {
+      const sourceAdapter = createAdapter('postgres', deps);
+      await sourceAdapter.connect(fixture.config, makeCtx());
+      let original: Awaited<ReturnType<Adapter['describe']>>;
+      let def: Awaited<ReturnType<Adapter['ddl']>>;
+      try {
+        original = await sourceAdapter.describe(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'table', name: objectName },
+          ]),
+          makeCtx(),
+        );
+        def = await sourceAdapter.ddl(
+          path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'table', name: objectName },
+          ]),
+          makeCtx(),
+        );
+      } finally {
+        await sourceAdapter.disconnect();
+      }
+
+      const admin = new Client({
+        host: fixture.config.host ?? undefined,
+        port: fixture.config.port ?? undefined,
+        user: fixture.config.username ?? undefined,
+        password: fixture.config.password ?? undefined,
+        database: 'postgres',
+      });
+      await admin.connect();
+      try {
+        await admin.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+        await admin.query('CREATE DATABASE kira_ddl_roundtrip');
+      } finally {
+        await admin.end();
+      }
+
+      try {
+        const roundTripClient = new Client({
+          host: fixture.config.host ?? undefined,
+          port: fixture.config.port ?? undefined,
+          user: fixture.config.username ?? undefined,
+          password: fixture.config.password ?? undefined,
+          database: 'kira_ddl_roundtrip',
+        });
+        await roundTripClient.connect();
+        try {
+          await roundTripClient.query('CREATE SCHEMA app');
+          for (const stmt of def.statements) await roundTripClient.query(stmt);
+        } finally {
+          await roundTripClient.end();
+        }
+
+        const copyAdapter = createAdapter('postgres', deps);
+        await copyAdapter.connect({ ...fixture.config, database: 'kira_ddl_roundtrip' }, makeCtx());
+        let copy: Awaited<ReturnType<Adapter['describe']>>;
+        try {
+          copy = await copyAdapter.describe(
+            path([
+              { kind: 'database', name: 'kira_ddl_roundtrip' },
+              { kind: 'schema', name: 'app' },
+              { kind: 'table', name: objectName },
+            ]),
+            makeCtx(),
+          );
+        } finally {
+          await copyAdapter.disconnect();
+        }
+
+        const shape = (m: Awaited<ReturnType<Adapter['describe']>>) => ({
+          columns: m.columns
+            .map((c) => ({
+              name: c.name,
+              dataType: c.dataType,
+              nullable: c.nullable,
+              defaultExpr: c.defaultExpr,
+              isPrimaryKey: c.isPrimaryKey,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+          primaryKey: m.primaryKey ? [...m.primaryKey].sort() : null,
+          indexes: m.indexes
+            .map((i) => ({ name: i.name, columns: i.columns, unique: i.unique }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        });
+        expect(shape(copy)).toEqual(shape(original));
+      } finally {
+        const cleanup = new Client({
+          host: fixture.config.host ?? undefined,
+          port: fixture.config.port ?? undefined,
+          user: fixture.config.username ?? undefined,
+          password: fixture.config.password ?? undefined,
+          database: 'postgres',
+        });
+        await cleanup.connect();
+        try {
+          await cleanup.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+        } finally {
+          await cleanup.end();
+        }
+      }
+    }
+
+    await roundTrip('wide_table');
+    await roundTrip('weird"name');
   });
 });
