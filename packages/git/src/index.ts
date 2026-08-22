@@ -44,3 +44,13 @@ export { mergeTreeArgs, parseMergeTreeOutput } from "./parse/mergeTree.ts";
 export { REFS_FORMAT, REFS_RECORD_DELIMITER, parseRefRecord, refsArgs } from "./parse/refs.ts";
 export { STASH_FORMAT, parseStashRecord, stashListArgs } from "./parse/stash.ts";
 export { parseStatus, statusArgs } from "./parse/status.ts";
+export type { CommitDetailOptions, LogQueryOptions } from "./queries.ts";
+export {
+  commitDetail,
+  countCommits,
+  log,
+  predictMerge,
+  refs,
+  stashList,
+  status,
+} from "./queries.ts";
