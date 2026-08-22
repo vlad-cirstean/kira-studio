@@ -478,19 +478,26 @@ describe('postgres adapter (§9.1)', () => {
       const initialPrevToken = lastPage.position.prevToken;
       if (!initialPrevToken) throw new Error('expected a prevToken on the last forward page');
 
+      // Every page (forward or backward) displays its rows in ascending order (D7's builder
+      // reverses a 'before' fetch back into display order) — so walking backward and
+      // prepending each newly-visited page's block, starting from the last forward page's own
+      // rows, reconstructs the full ascending id sequence directly.
       const backwardIds: string[] = [];
+      for (let r = 0; r < lastPage.rowCount; r++) backwardIds.push(cellAt(lastPage, 0, r) ?? '');
       let backCursor: { mode: 'before'; token: string } = {
         mode: 'before',
         token: initialPrevToken,
       };
       for (let i = 0; i < 5; i++) {
         const page = await adapter.read({ ...baseReq, cursor: backCursor }, makeCtx());
-        for (let r = 0; r < page.rowCount; r++) backwardIds.push(cellAt(page, 0, r) ?? '');
+        const ids: string[] = [];
+        for (let r = 0; r < page.rowCount; r++) ids.push(cellAt(page, 0, r) ?? '');
+        backwardIds.unshift(...ids);
         if (!page.position.prevToken) break;
         backCursor = { mode: 'before', token: page.position.prevToken };
       }
 
-      expect(backwardIds.slice().reverse()).toEqual(forwardIds);
+      expect(backwardIds).toEqual(forwardIds);
       const seen = new Set(forwardIds);
       expect(seen.size).toBe(forwardIds.length); // no repeats
 
@@ -695,7 +702,7 @@ describe('postgres adapter (§9.1)', () => {
       expect(isTruncated(bigTextChunk, 3)).toBe(true);
       expect(page.truncatedCells).toBeGreaterThan(0);
       const blobText = cellAt(page, 4, 3);
-      expect(blobText).toMatch(/^\\x[0-9a-f]+$/);
+      expect(blobText).toMatch(/^0x[0-9a-f]+$/);
 
       // numeric(20,6) comes back as its exact text, not a rounded double — this is the
       // assertion D3 exists for.

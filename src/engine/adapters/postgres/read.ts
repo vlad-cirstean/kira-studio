@@ -278,7 +278,10 @@ export async function readPage(
       return v;
     });
 
-  const strategy: PagePosition['strategy'] = req.cursor.mode === 'offset' ? 'offset' : 'keyset';
+  // Reflects whether keyset navigation is available from here, not which cursor mode this
+  // particular fetch used — an eligible sort reports 'keyset' even on the very first (offset 0)
+  // page, so the renderer can page forward/back by token from then on (§5c).
+  const strategy: PagePosition['strategy'] = order.keysetEligible ? 'keyset' : 'offset';
 
   // hasMore answers "is there a next page forward" regardless of which direction this page was
   // fetched in: a 'before' fetch always has a forward page (we navigated back from it); an
