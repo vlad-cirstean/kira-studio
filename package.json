@@ -16,7 +16,7 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check:tokens": "bun run scripts/check-tokens.ts",
-    "test": "bun test packages tests/fixtures",
+    "test": "bun test packages tests/fixtures tests/integration",
     "test:e2e": "playwright test",
     "test:perf": "bun run tests/perf/run.ts",
     "dev:harness": "bun run --filter '@kira-version/harness' dev"

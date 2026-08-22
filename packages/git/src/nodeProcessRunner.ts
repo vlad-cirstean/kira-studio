@@ -91,15 +91,34 @@ class NodeSpawnedProcess implements SpawnedProcess {
   kill(signal?: NodeJS.Signals): void {
     if (this.#child.exitCode !== null || this.#child.signalCode !== null) return;
     if (signal) {
-      this.#child.kill(signal);
+      killGroup(this.#child, signal);
       return;
     }
-    this.#child.kill("SIGTERM");
+    killGroup(this.#child, "SIGTERM");
     this.#killTimer = setTimeout(() => {
       if (this.#child.exitCode === null && this.#child.signalCode === null) {
-        this.#child.kill("SIGKILL");
+        killGroup(this.#child, "SIGKILL");
       }
     }, SIGKILL_GRACE_MS);
+  }
+}
+
+/**
+ * Signals the whole process group, not just the immediate child. `git` itself never forks a
+ * subprocess that outlives it, but a shell-scripted stand-in (fakeGit.ts, used to test
+ * discovery.ts's timeout handling) does: `#!/bin/sh` running `sleep N` as its last statement
+ * is a *grandchild*, and killing only the shell can leave that grandchild running with the
+ * stdout pipe still open — which then never emits EOF, hanging any reader forever. Spawning
+ * with `detached: true` makes the child its own process-group leader, so `kill(-pid)` reaches
+ * the whole tree.
+ */
+function killGroup(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): void {
+  if (typeof child.pid !== "number") return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    // ESRCH (already dead) or a platform without process groups — fall back to the direct child.
+    child.kill(signal);
   }
 }
 
@@ -149,6 +168,8 @@ export class NodeProcessRunner implements ProcessRunner {
       env: { ...request.env },
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
+      // Own process group, so kill() (killGroup, below) can reach a child's own descendants.
+      detached: true,
     });
 
     const process_ = new NodeSpawnedProcess(child, request.signal);

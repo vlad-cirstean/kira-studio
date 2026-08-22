@@ -15,14 +15,18 @@ export interface FakeGitOptions {
   readonly behaviour?: FakeGitBehaviour;
 }
 
+// Real invocations carry other flags around "version" (discovery.ts always prepends
+// `--no-optional-locks`), so these scripts scan every arg rather than checking only `$1`.
+const HAS_VERSION_ARG = 'for a in "$@"; do if [ "$a" = "version" ]; then VERSION_ARG=1; fi; done';
+
 function scriptFor(version: string, behaviour: FakeGitBehaviour): string {
   switch (behaviour) {
     case "ok":
-      return `#!/bin/sh\nif [ "$1" = "version" ]; then echo "git version ${version}"; exit 0; fi\nexit 1\n`;
+      return `#!/bin/sh\n${HAS_VERSION_ARG}\nif [ "$VERSION_ARG" = "1" ]; then echo "git version ${version}"; exit 0; fi\nexit 1\n`;
     case "exitNonZero":
       return `#!/bin/sh\necho "fatal: fake git refuses everything" >&2\nexit 128\n`;
     case "garbageOutput":
-      return `#!/bin/sh\nif [ "$1" = "version" ]; then echo "not a version string at all"; exit 0; fi\nexit 1\n`;
+      return `#!/bin/sh\n${HAS_VERSION_ARG}\nif [ "$VERSION_ARG" = "1" ]; then echo "not a version string at all"; exit 0; fi\nexit 1\n`;
     case "hang":
       return `#!/bin/sh\nsleep 999999\n`;
   }

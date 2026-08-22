@@ -1,3 +1,18 @@
+export type {
+  GitResolution,
+  GitVersion,
+  LocateGitOptions,
+  RepoIdentityResolution,
+  ResolvedGit,
+} from "./discovery.ts";
+export {
+  MINIMUM_GIT_VERSION,
+  compareVersions,
+  locateGit,
+  meetsMinimumVersion,
+  parseGitVersion,
+  resolveRepoIdentity,
+} from "./discovery.ts";
 export { NodeProcessRunner, ProcessSpawnError } from "./nodeProcessRunner.ts";
 export type { NameStatusEntry, NumstatEntry } from "./parse/diffTree.ts";
 export {
