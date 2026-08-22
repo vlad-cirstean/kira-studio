@@ -4,8 +4,8 @@ import {
   type SettingsPatch,
   settingsPatchSchema,
   settingsSchema,
-} from '../../shared/settings';
-import type { Db } from './db';
+} from '../../../shared/settings';
+import type { Db } from '../db';
 
 const PREFIX = 'appearance.';
 

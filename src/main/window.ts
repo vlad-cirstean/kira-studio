@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
 import type { Db } from './storage/db';
-import { getAllLayout, setLayout } from './storage/layout';
+import { getAllLayout, setLayout } from './storage/repos/layout';
 
 const BOUNDS_DEBOUNCE_MS = 300;
 

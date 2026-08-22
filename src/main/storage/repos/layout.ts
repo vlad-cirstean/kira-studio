@@ -4,8 +4,8 @@ import {
   type LayoutPatch,
   layoutPatchSchema,
   layoutSchema,
-} from '../../shared/layout';
-import type { Db } from './db';
+} from '../../../shared/layout';
+import type { Db } from '../db';
 
 function read(db: Db): Map<string, unknown> {
   const rows = db.all('SELECT key, value FROM ui_layout') as { key: string; value: string }[];

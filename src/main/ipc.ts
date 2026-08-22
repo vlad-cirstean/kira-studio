@@ -4,9 +4,9 @@ import { IPC } from '../shared/protocol/ipc';
 import type { SettingsPatch } from '../shared/settings';
 import type { EngineHost } from './engine-host';
 import type { Db } from './storage/db';
-import { getAllLayout, setLayout } from './storage/layout';
 import { kiraHome } from './storage/paths';
-import { getAllSettings, setSettings } from './storage/settings';
+import { getAllLayout, setLayout } from './storage/repos/layout';
+import { getAllSettings, setSettings } from './storage/repos/settings';
 
 export function registerIpc(db: Db, engineHost: EngineHost): void {
   ipcMain.handle(IPC.appInfo, () => ({

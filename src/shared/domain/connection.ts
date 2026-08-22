@@ -30,40 +30,43 @@ export type ConnectionColor = z.infer<typeof connectionColorSchema>;
 export const connectionModeSchema = z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;
 
-export const connectionInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    kind: connectionKindSchema,
-    color: connectionColorSchema,
-    mode: connectionModeSchema,
-    readOnly: z.boolean(),
-    host: z.string().trim().nullable(),
-    port: z.number().int().min(1).max(65535).nullable(),
-    database: z.string().nullable(),
-    username: z.string().nullable(),
-    password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
-    uri: z.string().nullable(),
-    options: z.record(z.string(), z.unknown()),
-  })
-  .superRefine((input, ctx) => {
-    if (input.mode === 'fields') {
-      if (!input.host) {
-        ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
-      }
-      if (!input.port) {
-        ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
-      }
-    } else {
-      if (!input.uri || input.uri.trim() === '') {
-        ctx.addIssue({ code: 'custom', path: ['uri'], message: 'A connection URI is required.' });
-      }
+// The plain object shape, with no refinement — kept separate so both connectionInputSchema
+// (which adds the fields/uri superRefine below) and connectionSummarySchema (which cannot
+// .omit() from a refined schema) can each build off it independently.
+const connectionFieldsSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  kind: connectionKindSchema,
+  color: connectionColorSchema,
+  mode: connectionModeSchema,
+  readOnly: z.boolean(),
+  host: z.string().trim().nullable(),
+  port: z.number().int().min(1).max(65535).nullable(),
+  database: z.string().nullable(),
+  username: z.string().nullable(),
+  password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
+  uri: z.string().nullable(),
+  options: z.record(z.string(), z.unknown()),
+});
+
+export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
+  if (input.mode === 'fields') {
+    if (!input.host) {
+      ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
     }
-  });
+    if (!input.port) {
+      ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
+    }
+  } else {
+    if (!input.uri || input.uri.trim() === '') {
+      ctx.addIssue({ code: 'custom', path: ['uri'], message: 'A connection URI is required.' });
+    }
+  }
+});
 
 export type ConnectionInput = z.infer<typeof connectionInputSchema>;
 
 // What the renderer gets. Note the absence of `password` — this is D9 enforced by the type.
-export const connectionSummarySchema = connectionInputSchema.omit({ password: true }).extend({
+export const connectionSummarySchema = connectionFieldsSchema.omit({ password: true }).extend({
   id: z.string(),
   sortOrder: z.number(),
   createdAt: z.string(),
