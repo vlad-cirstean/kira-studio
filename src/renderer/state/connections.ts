@@ -26,6 +26,7 @@ export const connectionsState = reactive({
 });
 
 let unsubscribeState: (() => void) | null = null;
+let unsubscribeListChanged: (() => void) | null = null;
 
 export async function hydrateConnections(): Promise<void> {
   const [records, states] = await Promise.all([
@@ -38,6 +39,14 @@ export async function hydrateConnections(): Promise<void> {
   unsubscribeState?.();
   unsubscribeState = control.onConnectionState((state) => {
     connectionsState.states[state.connectionId] = state;
+  });
+
+  // Covers any mutation that didn't go through this store's own wrappers below (saveDialog(),
+  // duplicateConnection(), ...) — e.g. a connection created via a direct IPC call — so the tree
+  // never silently diverges from what main actually persisted.
+  unsubscribeListChanged?.();
+  unsubscribeListChanged = control.onConnectionsChanged((records) => {
+    connectionsState.records = records;
   });
 }
 

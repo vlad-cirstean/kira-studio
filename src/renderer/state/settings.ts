@@ -19,12 +19,23 @@ export function applyAppearance(): void {
   );
 }
 
-export async function hydrateSettings(): Promise<void> {
-  const settings = await control.settingsGetAll();
+let unsubscribeChanged: (() => void) | null = null;
+
+function applySettings(settings: Settings): void {
   Object.assign(settingsState.appearance, settings.appearance);
   Object.assign(settingsState.data, settings.data);
   Object.assign(settingsState.cache, settings.cache);
   applyAppearance();
+}
+
+export async function hydrateSettings(): Promise<void> {
+  applySettings(await control.settingsGetAll());
+
+  // Covers a settings change made through any path other than this module's own patchSettings()
+  // below (e.g. a direct IPC call) — the same gap connections.ts's onConnectionsChanged closes
+  // for the connections list.
+  unsubscribeChanged?.();
+  unsubscribeChanged = control.onSettingsChanged(applySettings);
 }
 
 export async function patchSettings(patch: SettingsPatch): Promise<void> {

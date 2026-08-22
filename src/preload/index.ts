@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ConnectionInput, ConnectionState } from '../shared/domain/connection';
+import type {
+  ConnectionInput,
+  ConnectionState,
+  ConnectionSummary,
+} from '../shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '../shared/domain/connection-filter';
 import type { OpRecord } from '../shared/domain/ops';
 import type {
@@ -18,12 +22,17 @@ import type {
   TreeDescribeResult,
 } from '../shared/protocol/ipc';
 import { IPC } from '../shared/protocol/ipc';
-import type { SettingsPatch } from '../shared/settings';
+import type { Settings, SettingsPatch } from '../shared/settings';
 
 const kiraApi: KiraApi = {
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),
   settingsGetAll: () => ipcRenderer.invoke(IPC.settingsGetAll),
   settingsSet: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.settingsSet, patch),
+  onSettingsChanged: (cb: (settings: Settings) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, settings: Settings): void => cb(settings);
+    ipcRenderer.on(IPC.settingsChanged, listener);
+    return () => ipcRenderer.off(IPC.settingsChanged, listener);
+  },
   layoutGetAll: () => ipcRenderer.invoke(IPC.layoutGetAll),
   layoutSet: (patch: LayoutPatch) => ipcRenderer.invoke(IPC.layoutSet, patch),
   engineStatus: () => ipcRenderer.invoke(IPC.engineStatus),
@@ -73,6 +82,12 @@ const kiraApi: KiraApi = {
       cb(connectionId);
     ipcRenderer.on(IPC.connectionMetadataInvalidated, listener);
     return () => ipcRenderer.off(IPC.connectionMetadataInvalidated, listener);
+  },
+  onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, records: ConnectionSummary[]): void =>
+      cb(records);
+    ipcRenderer.on(IPC.connectionsChanged, listener);
+    return () => ipcRenderer.off(IPC.connectionsChanged, listener);
   },
 
   treeChildren: (args: { connectionId: string; path: string; refresh?: boolean }) =>

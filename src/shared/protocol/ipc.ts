@@ -54,6 +54,8 @@ export const IPC = {
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
+  connectionsChanged: 'kira:connections:changed',
+  settingsChanged: 'kira:settings:changed',
   opUpdate: 'kira:op:update',
 } as const;
 
@@ -95,6 +97,7 @@ export interface KiraApi {
   appInfo(): Promise<AppInfo>;
   settingsGetAll(): Promise<Settings>;
   settingsSet(patch: SettingsPatch): Promise<Settings>;
+  onSettingsChanged(cb: (settings: Settings) => void): () => void;
   layoutGetAll(): Promise<Layout>;
   layoutSet(patch: LayoutPatch): Promise<Layout>;
   engineStatus(): Promise<EngineStatus>;
@@ -116,6 +119,7 @@ export interface KiraApi {
   connectionsStates(): Promise<ConnectionState[]>;
   onConnectionState(cb: (state: ConnectionState) => void): () => void;
   onConnectionMetadataInvalidated(cb: (connectionId: string) => void): () => void;
+  onConnectionsChanged(cb: (records: ConnectionSummary[]) => void): () => void;
 
   treeChildren(args: {
     connectionId: string;

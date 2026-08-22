@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { IPC } from '../../shared/protocol/ipc';
 import type { SettingsPatch } from '../../shared/settings';
 import { pushEngineConfig } from '../engine-config';
@@ -11,6 +11,13 @@ export function registerSettingsHandlers(deps: IpcDeps): void {
     const merged = await setSettings(deps.db, patch);
     if (patch.cache?.l2BudgetMb !== undefined) {
       await pushEngineConfig(deps.engineHost, deps.db);
+    }
+    // Otherwise a settings change made through any path other than the renderer's own
+    // patchSettings() wrapper (e.g. a direct IPC call) silently never reaches the renderer's
+    // local settingsState — it stays on whatever it was hydrated to at boot, the same gap
+    // connections.ts's onListChanged closes for the connections list.
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.settingsChanged, merged);
     }
     return merged;
   });

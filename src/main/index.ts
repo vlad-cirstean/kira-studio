@@ -42,6 +42,7 @@ async function main(): Promise<void> {
   connections.onMetadataInvalidated((connectionId) =>
     broadcast(IPC.connectionMetadataInvalidated, connectionId),
   );
+  connections.onListChanged((records) => broadcast(IPC.connectionsChanged, records));
   // On engine exit: engine-host.ts already rejects every pending call; this synthesises
   // per-connection error states so the tree/status bar reflect it too (no auto-respawn).
   engineHost.on('engine:down', () => connections.markAllErrored('engine process exited'));

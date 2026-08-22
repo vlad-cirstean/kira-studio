@@ -32,6 +32,7 @@ export const control = {
   appInfo: (): Promise<AppInfo> => kira.appInfo(),
   settingsGetAll: (): Promise<Settings> => kira.settingsGetAll(),
   settingsSet: (patch: SettingsPatch): Promise<Settings> => kira.settingsSet(plain(patch)),
+  onSettingsChanged: (cb: (settings: Settings) => void): (() => void) => kira.onSettingsChanged(cb),
   layoutGetAll: (): Promise<Layout> => kira.layoutGetAll(),
   layoutSet: (patch: LayoutPatch): Promise<Layout> => kira.layoutSet(plain(patch)),
   engineStatus: (): Promise<EngineStatus> => kira.engineStatus(),
@@ -62,6 +63,8 @@ export const control = {
     kira.onConnectionState(cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>
     kira.onConnectionMetadataInvalidated(cb),
+  onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void): (() => void) =>
+    kira.onConnectionsChanged(cb),
 
   treeChildren: (
     connectionId: string,

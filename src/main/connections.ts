@@ -42,6 +42,7 @@ export interface ConnectionsService {
   stateOf(id: string): ConnectionState;
   onStateChange(cb: (state: ConnectionState) => void): () => void;
   onMetadataInvalidated(cb: (connectionId: string) => void): () => void;
+  onListChanged(cb: (records: ConnectionSummary[]) => void): () => void;
   /** Called when engine-host reports the engine process exited (D2/D11 gap coverage). */
   markAllErrored(reason: string): void;
 }
@@ -62,6 +63,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
   const states = new Map<string, ConnectionState>();
   const stateHandlers = new Set<(state: ConnectionState) => void>();
   const invalidatedHandlers = new Set<(connectionId: string) => void>();
+  const listChangedHandlers = new Set<(records: ConnectionSummary[]) => void>();
 
   function emitState(state: ConnectionState): void {
     states.set(state.connectionId, state);
@@ -70,6 +72,14 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
 
   function emitInvalidated(connectionId: string): void {
     for (const handler of invalidatedHandlers) handler(connectionId);
+  }
+
+  // Broadcasts the authoritative list after any mutation — the renderer store otherwise only
+  // ever sees a connection created/changed through its own saveDialog()/duplicateConnection()
+  // wrappers, never one created via a direct IPC call (e.g. Playwright driving the app headless).
+  async function emitListChanged(): Promise<void> {
+    const records = await listConnections(db);
+    for (const handler of listChangedHandlers) handler(records);
   }
 
   function stateOf(id: string): ConnectionState {
@@ -131,6 +141,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         createdAt: new Date().toISOString(),
       });
       await secrets.set(id, password);
+      void emitListChanged();
       return created;
     },
 
@@ -152,7 +163,9 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
       if (password !== null) {
         await secrets.set(id, password === '' ? null : password);
       }
-      return updateConnection(db, id, { ...input, uri }, new Date().toISOString());
+      const updated = await updateConnection(db, id, { ...input, uri }, new Date().toISOString());
+      void emitListChanged();
+      return updated;
     },
 
     async duplicate(id) {
@@ -167,6 +180,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         createdAt: new Date().toISOString(),
       });
       await secrets.set(newId, password);
+      void emitListChanged();
       return created;
     },
 
@@ -178,9 +192,14 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
       await deleteConnection(db, id); // cascades filters, metadata cache, saved queries
       await secrets.delete(id);
       states.delete(id);
+      void emitListChanged();
     },
 
-    reorder: (ids) => reorderConnections(db, ids),
+    async reorder(ids) {
+      const reordered = await reorderConnections(db, ids);
+      void emitListChanged();
+      return reordered;
+    },
 
     async reveal(id) {
       const password = await secrets.get(id);
@@ -269,6 +288,10 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     onMetadataInvalidated(cb) {
       invalidatedHandlers.add(cb);
       return () => invalidatedHandlers.delete(cb);
+    },
+    onListChanged(cb) {
+      listChangedHandlers.add(cb);
+      return () => listChangedHandlers.delete(cb);
     },
 
     markAllErrored(reason) {
