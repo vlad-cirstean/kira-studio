@@ -5,6 +5,10 @@
     "outDir": "../dist/tests",
     "rootDir": "."
   },
-  "references": [{ "path": "../packages/core" }, { "path": "../packages/ipc" }],
+  "references": [
+    { "path": "../packages/core" },
+    { "path": "../packages/git" },
+    { "path": "../packages/ipc" }
+  ],
   "include": ["**/*.ts"]
 }

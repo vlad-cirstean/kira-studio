@@ -34,7 +34,8 @@ function dateFor(index: number): string {
   return `${EPOCH_SECONDS + index * STEP_SECONDS} +0000`;
 }
 
-function baseEnv(cwd: string): NodeJS.ProcessEnv {
+/** Exported so `recordPorcelain.ts` and integration tests can shell out with the same hygiene. */
+export function baseEnv(cwd: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
     GIT_CONFIG_GLOBAL: "/dev/null",
