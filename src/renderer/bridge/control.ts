@@ -1,18 +1,86 @@
+import type {
+  ConnectionInput,
+  ConnectionState,
+  ConnectionSummary,
+} from '@shared/domain/connection';
+import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
+import type { OpRecord } from '@shared/domain/ops';
 import type { Layout, LayoutPatch } from '@shared/layout';
-import type { AppInfo, EngineStatus } from '@shared/protocol/ipc';
+import type {
+  AppInfo,
+  ConnectionTestResult,
+  EngineStatus,
+  TreeChildrenResult,
+  TreeDescribeResult,
+} from '@shared/protocol/ipc';
 import type { Settings, SettingsPatch } from '@shared/settings';
 
 const kira = window.kira;
 
+// UI state is built from Vue `reactive()` objects, whose Proxy wrappers Electron's
+// contextBridge cannot structured-clone across the isolated world ("An object could not be
+// cloned"). Every payload built from renderer state is round-tripped through JSON here before
+// crossing into `window.kira` — the one place this is needed, rather than every call site.
+function plain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export const control = {
   appInfo: (): Promise<AppInfo> => kira.appInfo(),
   settingsGetAll: (): Promise<Settings> => kira.settingsGetAll(),
-  settingsSet: (patch: SettingsPatch): Promise<Settings> => kira.settingsSet(patch),
+  settingsSet: (patch: SettingsPatch): Promise<Settings> => kira.settingsSet(plain(patch)),
   layoutGetAll: (): Promise<Layout> => kira.layoutGetAll(),
-  layoutSet: (patch: LayoutPatch): Promise<Layout> => kira.layoutSet(patch),
+  layoutSet: (patch: LayoutPatch): Promise<Layout> => kira.layoutSet(plain(patch)),
   engineStatus: (): Promise<EngineStatus> => kira.engineStatus(),
   onEngineState: (cb: (status: EngineStatus) => void): (() => void) => kira.onEngineState(cb),
   onOpenSettings: (cb: () => void): (() => void) => kira.onOpenSettings(cb),
   onToggleProjectPanel: (cb: () => void): (() => void) => kira.onToggleProjectPanel(cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => kira.onToggleOperationsPanel(cb),
+
+  connectionsList: (): Promise<ConnectionSummary[]> => kira.connectionsList(),
+  connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>
+    kira.connectionsCreate(plain(input)),
+  connectionsUpdate: (id: string, input: ConnectionInput): Promise<ConnectionSummary> =>
+    kira.connectionsUpdate(plain({ id, input })),
+  connectionsDuplicate: (id: string): Promise<ConnectionSummary> =>
+    kira.connectionsDuplicate({ id }),
+  connectionsDelete: (id: string): Promise<void> => kira.connectionsDelete({ id }),
+  connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
+    kira.connectionsReorder(plain({ ids })),
+  connectionsReveal: (id: string): Promise<{ password: string | null }> =>
+    kira.connectionsReveal({ id }),
+  connectionsTest: (input: ConnectionInput): Promise<ConnectionTestResult> =>
+    kira.connectionsTest(plain({ input })),
+  connectionsConnect: (id: string): Promise<ConnectionState> => kira.connectionsConnect({ id }),
+  connectionsDisconnect: (id: string): Promise<ConnectionState> =>
+    kira.connectionsDisconnect({ id }),
+  connectionsStates: (): Promise<ConnectionState[]> => kira.connectionsStates(),
+  onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
+    kira.onConnectionState(cb),
+  onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>
+    kira.onConnectionMetadataInvalidated(cb),
+
+  treeChildren: (
+    connectionId: string,
+    path: string,
+    refresh?: boolean,
+  ): Promise<TreeChildrenResult> => kira.treeChildren({ connectionId, path, refresh }),
+  treeDescribe: (
+    connectionId: string,
+    path: string,
+    refresh?: boolean,
+  ): Promise<TreeDescribeResult> => kira.treeDescribe({ connectionId, path, refresh }),
+  treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
+    kira.treeInvalidate({ connectionId, path }),
+
+  filtersList: (connectionId: string): Promise<ConnectionFilter[]> =>
+    kira.filtersList({ connectionId }),
+  filtersReplace: (
+    connectionId: string,
+    filters: ConnectionFilterInput[],
+  ): Promise<ConnectionFilter[]> => kira.filtersReplace(plain({ connectionId, filters })),
+
+  opsRecent: (limit: number): Promise<OpRecord[]> => kira.opsRecent({ limit }),
+  opsCancel: (opId: string): Promise<void> => kira.opsCancel({ opId }),
+  onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => kira.onOpUpdate(cb),
 };

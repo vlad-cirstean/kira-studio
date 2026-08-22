@@ -111,7 +111,11 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
     list: () => listConnections(db),
 
     async create(input) {
-      let uri = input.uri;
+      // In fields mode `uri` is not authoritative — never store or return it, even if the
+      // draft still carries a stale value from a mode toggle (it can carry a password: D9's
+      // guarantee that connectionsList() never leaks one must hold regardless of what the
+      // client sends, not just what the dialog is expected to send).
+      let uri = input.mode === 'uri' ? input.uri : null;
       let password = input.password;
       if (input.mode === 'uri' && uri) {
         const stripped = stripUriPassword(uri);
@@ -129,7 +133,8 @@ export function createConnectionsService(db: Db, engineHost: EngineHost): Connec
     },
 
     async update(id, input) {
-      let uri = input.uri;
+      // See create()'s comment — `uri` is never stored/returned outside URI mode.
+      let uri = input.mode === 'uri' ? input.uri : null;
       // Three-state convention (Step 6a): null = unchanged, '' = clear, non-empty = replace.
       // In URI mode the dialog only ever submits a passwordless URI unless it explicitly
       // re-embedded a new one (Step 7's reveal flow) — stripUriPassword naturally yields

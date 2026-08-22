@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openCreateDialog } from '../../state/connections';
 import Codicon from '../../theme/Codicon.vue';
 import EmptyState from './EmptyState.vue';
 </script>
@@ -7,7 +8,12 @@ import EmptyState from './EmptyState.vue';
   <div class="flex h-full flex-col">
     <div class="border-border flex items-center justify-between border-b px-2 py-1 text-xs">
       <span>Project</span>
-      <button type="button" class="text-disabled" disabled aria-label="Add connection">
+      <button
+        type="button"
+        aria-label="Add connection"
+        data-testid="add-connection"
+        @click="openCreateDialog"
+      >
         <Codicon name="add" />
       </button>
     </div>
