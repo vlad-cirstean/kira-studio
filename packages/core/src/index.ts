@@ -1,3 +1,10 @@
+export { advanceColorState, allocateColor, initialColorState } from "./graph/colors.ts";
+export { EdgeBuffer } from "./graph/edges.ts";
+export type { BuiltEdges } from "./graph/edges.ts";
+export type { LaneAssignment } from "./graph/lanes.ts";
+export { assignLanes } from "./graph/lanes.ts";
+export type { LayoutAppendResult } from "./graph/layout.ts";
+export { layoutAppend, layoutTransferList } from "./graph/layout.ts";
 export type {
   ColorState,
   EdgeKind,
