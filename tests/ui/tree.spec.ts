@@ -221,7 +221,16 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, WIDE_TABLE_PATH);
-  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'copy-qualified-name']);
+  expect(await menuItemIds(page)).toEqual([
+    'open-data',
+    'open-data-new-tab',
+    'open-ddl',
+    'refresh',
+    'copy-name',
+    'copy-qualified-name',
+    'count-rows',
+    'saved-filters',
+  ]);
   await page.keyboard.press('Escape');
 
   // app is still expanded from the earlier expansion step — sequence:invoice_number_seq is
@@ -235,7 +244,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   const idColumnRow = await findRow(page, WIDE_TABLE_ID_COLUMN_PATH);
   await idColumnRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-  expect(await menuItemIds(page)).toEqual(['copy-name']);
+  expect(await menuItemIds(page)).toEqual(['copy-name', 'add-to-projection', 'sort-by']);
   await page.keyboard.press('Escape');
 
   // Collapse everything down to the bare connection row so a right-click well below it lands
