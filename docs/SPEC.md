@@ -89,6 +89,7 @@ See §7.
 | Packaging | electron-builder | unsigned local builds; signing/notarization after v1 |
 | DB tests | Testcontainers (Node) | real containers, real data; Colima |
 | UI tests | Playwright `_electron.launch` | every change validated |
+| Logging | `electron-log` | main process only (`electron-log/main`), scoped loggers (`log.scope(name)`); the engine `utilityProcess` keeps writing to stdout/stderr, which main pipes into the same sink — single log file, single source of truth |
 
 Driver libraries — the best-maintained option per engine: `pg`, `mariadb`, `mongodb`, `ioredis`,
 `@confluentinc/kafka-javascript` (native, heavier, but actively maintained where `kafkajs` has
@@ -590,4 +591,7 @@ docs/
 ## 12. Working agreement
 
 - **One feature branch for all of v1.** No per-phase PRs — there is nothing to review against.
+  `feature/kickoff` is that branch: everything specified in this document is v1, and agents
+  working from this spec build directly on top of `feature/kickoff` rather than branching off
+  `main`.
 - Biome default rules, no exceptions files without a reason recorded.
