@@ -127,7 +127,9 @@ kira-version-vscode/
 ├── playwright.config.ts            projects: harness (fast), electron, vscode
 ├── docs/
 │   ├── SPEC.md                     this document
-│   └── plans/                      Opus-authored phase plans, P0.md … P11.md
+│   ├── design/
+│   │   └── panel-mockup.html       the approved visual reference (§6.7)
+│   └── plans/                      phase plans, P0.md … P11.md
 ├── resources/
 │   ├── icon.svg                    panel view container icon
 │   └── marketplace/                README assets, screenshots
@@ -742,14 +744,28 @@ Vertically the graph is virtualized to whatever height the panel has, down to ~3
 
 ### 6.4 Detail pane (on commit click)
 
-- **Metadata**: full and short sha (click to copy), subject, body with URL/issue linkification,
-  author + committer with avatar initials and both timestamps when they differ, parents as
-  clickable shas, all refs pointing at this commit, signature verification status
-  (`%G?` from `git show`), and trailers parsed out (`Co-authored-by`, `Signed-off-by`).
-- **File tree**: hierarchical, collapsible, with per-file status (A/M/D/R/C), rename arrows,
-  and `+adds/−dels`. Directory rows aggregate their children's counts. Clicking a file opens
-  the diff (in-app unified view; "Open in editor" additionally offered under VS Code).
-  Toggle between tree and flat list; a filter box within the tree.
+**Open and close by clicking the row.** Clicking a commit opens the pane on it; clicking that
+same commit again closes the pane and gives the width back to the graph. `Esc` also closes it.
+The pane is a mode the user enters and leaves deliberately, not a region that is permanently
+half the panel.
+
+**Order within the pane, top to bottom: message, then files, then details.** The file tree is
+what the user came for and sits where it can be reached without scrolling past reference
+material; sha, parents, dates and refs are things you drop to when you need them, and they sit
+below.
+
+1. **Message** — subject, then body with URL and issue linkification, and trailers parsed out
+   (`Co-authored-by`, `Signed-off-by`).
+2. **File tree** — hierarchical, collapsible, with per-file status (A/M/D/R/C), rename arrows,
+   and `+adds/−dels`. Directory rows aggregate their children's counts. Toggle between tree
+   and flat list; a filter box within the tree.
+3. **Details** — full and short sha, parents as clickable shas, author and committer with both
+   timestamps when they differ, all refs pointing at this commit, and signature verification
+   status (`%G?` from `git show`, for this commit only per D20).
+
+**Clicking a sha copies it** — in the details block and in the list's sha column, which is a
+button rather than text. Feedback is immediate and names what was copied. If the clipboard
+write fails, say so; a copy affordance that silently does nothing is worse than none.
 - **Clicking a file opens its diff for that commit** — this is the primary interaction of the
   pane, not a secondary action. The diff is `<parent> → <commit>` for that path (for merges,
   against the selected parent), rendered in the in-app unified diff view described in §3.3,
@@ -760,12 +776,23 @@ Vertically the graph is virtualized to whatever height the panel has, down to ~3
   following the selection, so a commit can be reviewed file by file without the mouse.
   Renames show the old → new path; binary files and LFS pointers are labelled rather than
   rendered as garbage.
-- **Actions**: checkout this commit, create branch here, **create tag here (§7.9)**,
-  reset to here (§7.7), **revert this commit (§7.10)**, cherry-pick (v1: single commit, no
-  conflict-resolution UI beyond reporting), copy sha, copy message. Reset and revert sit
-  adjacent with their difference stated inline — revert adds a commit and is safe on pushed
-  branches; reset moves the branch pointer and is not.
 - For merge commits, a parent selector controls which diff is shown.
+
+**The pane carries no action row.** Commit actions live on the row's **context menu**
+(right-click), which is where a list in this workbench is expected to keep them, and which
+keeps the pane's vertical space for content in a panel that is short to begin with. The menu:
+checkout this commit · create branch here · create tag here (§7.9) · revert this commit
+(§7.10) · cherry-pick (v1: single commit, no conflict-resolution UI beyond reporting) · reset
+to here with the three modes as a submenu (§7.7) · copy sha · copy message.
+
+Reset and revert sit adjacent with their difference stated in the menu — revert adds a commit
+and is safe on pushed branches; reset moves the branch pointer and is not.
+
+Right-clicking a row **also selects it**, so the menu never acts on a commit the user cannot
+see. The accepted cost of moving actions off-surface is discoverability: nothing on screen
+advertises that these actions exist. We take it — every action is also in the command palette
+and keyboard-reachable (§6.6) — and revisit if it proves to be a real complaint rather than a
+predicted one.
 
 ### 6.5 VS Code integration points
 
@@ -787,12 +814,31 @@ setting. We do not hide or fight the built-in item.
 
 ### 6.6 Interaction
 
-Keyboard-first: `↑/↓` move selection, `Enter` open detail, `/` focus search, `F5` refresh,
-`Ctrl/Cmd+F` search, `Esc` close overlay/drawer. Full keyboard reachability and ARIA roles
+Keyboard-first: `↑/↓` move selection, `Enter` open the detail pane (again on the same row
+closes it, matching the click behaviour in §6.4), `Shift+F10` or the Menu key opens the row's
+context menu, `/` focus search, `F5` refresh, `Ctrl/Cmd+F` search, `Esc` closes — in order —
+an open menu, then the diff view, then the detail pane or drawer. Full keyboard reachability and ARIA roles
 on the virtualized list are v1 requirements, not polish.
 
 Every mutating action is available from a context menu on the row it applies to and from the
 toolbar where it is repo-scoped.
+
+---
+
+### 6.7 Reference mockup
+
+`docs/design/panel-mockup.html` is the approved visual reference for §6 — open it in a browser.
+It is a static drawing, not an implementation, but it is not decoration either: the lane graph
+is a real layout pass over a real commit topology rendered to canvas, and the theme switcher
+demonstrates the token bridge from §3.4 repainting that canvas on a theme change.
+
+It shows the panel in place beside the Terminal tab, all four theme kinds, the conflicted
+state (§7.11), and the narrow-panel drawer breakpoint (§6.3).
+
+Its standing: **where the mockup and this document disagree, this document wins** — the mockup
+is a picture of one moment in the design and will drift. Where it shows something §6 does not
+describe, that gap is a bug in §6, not licence to invent. It is not a P4 acceptance target;
+the acceptance criteria are in §10.
 
 ---
 

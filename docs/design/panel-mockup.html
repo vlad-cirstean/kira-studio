@@ -1,0 +1,1100 @@
+<title>Kira Version Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ─── page chrome tokens: light is the base, dark redefines only tokens ─── */
+:root{
+  --pg-bg:#F2F4F7;
+  --pg-surface:#FFFFFF;
+  --pg-ink:#12161B;
+  --pg-muted:#5E6975;
+  --pg-faint:#8A94A0;
+  --pg-rule:#DDE2E8;
+  --pg-accent:#0E6E6E;
+  --pg-accent-soft:#E2EFEE;
+  --pg-warn:#8A5A12;
+  --pg-warn-soft:#F6EEDF;
+  --pg-shadow:0 1px 2px rgba(16,22,28,.06),0 8px 28px rgba(16,22,28,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --pg-bg:#101418;
+    --pg-surface:#171C22;
+    --pg-ink:#E7ECF1;
+    --pg-muted:#9AA6B2;
+    --pg-faint:#6C7885;
+    --pg-rule:#252C34;
+    --pg-accent:#4FBFB6;
+    --pg-accent-soft:#16302F;
+    --pg-warn:#D9A85C;
+    --pg-warn-soft:#2A2317;
+    --pg-shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --pg-bg:#101418;
+  --pg-surface:#171C22;
+  --pg-ink:#E7ECF1;
+  --pg-muted:#9AA6B2;
+  --pg-faint:#6C7885;
+  --pg-rule:#252C34;
+  --pg-accent:#4FBFB6;
+  --pg-accent-soft:#16302F;
+  --pg-warn:#D9A85C;
+  --pg-warn-soft:#2A2317;
+  --pg-shadow:0 1px 2px rgba(0,0,0,.4),0 10px 34px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--pg-bg);
+  color:var(--pg-ink);
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1320px;margin:0 auto;padding:56px 28px 80px}
+.col{max-width:68ch}
+
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--pg-accent);margin:0 0 14px;
+}
+h1{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-weight:600;font-size:clamp(28px,4vw,40px);line-height:1.15;
+  letter-spacing:-.02em;margin:0 0 16px;text-wrap:balance;
+}
+h2{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-weight:600;font-size:15px;letter-spacing:.02em;
+  margin:0 0 12px;text-wrap:balance;
+}
+p{margin:0 0 14px;color:var(--pg-muted)}
+.col p strong{color:var(--pg-ink);font-weight:600}
+code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;
+  background:var(--pg-accent-soft);color:var(--pg-ink);
+  padding:1px 5px;border-radius:3px;
+}
+
+.note{
+  display:flex;gap:12px;align-items:flex-start;
+  background:var(--pg-warn-soft);
+  border-left:3px solid var(--pg-warn);
+  padding:14px 16px;border-radius:0 4px 4px 0;margin:0 0 34px;max-width:68ch;
+}
+.note p{margin:0;color:var(--pg-ink);font-size:14.5px;line-height:1.55}
+.note .tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--pg-warn);white-space:nowrap;padding-top:3px;
+}
+
+/* ─── controls ─── */
+.controls{
+  display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;
+  margin:34px 0 18px;padding-bottom:18px;border-bottom:1px solid var(--pg-rule);
+}
+.ctl-group{display:flex;flex-direction:column;gap:7px}
+.ctl-label{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--pg-faint);
+}
+.seg{display:flex;background:var(--pg-surface);border:1px solid var(--pg-rule);border-radius:5px;overflow:hidden}
+.seg button{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:12px;font-weight:500;
+  background:transparent;color:var(--pg-muted);
+  border:0;border-right:1px solid var(--pg-rule);
+  padding:7px 13px;cursor:pointer;white-space:nowrap;
+  transition:background .12s ease,color .12s ease;
+}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--pg-accent-soft);color:var(--pg-ink)}
+.seg button[aria-pressed="true"]{background:var(--pg-accent);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--pg-accent);outline-offset:-2px}
+
+/* ─── window frame ─── */
+.frame-outer{margin:0 0 18px}
+.frame{
+  border:1px solid var(--pg-rule);border-radius:8px;overflow:hidden;
+  box-shadow:var(--pg-shadow);background:var(--vscode-editor-background,#1F1F1F);
+  max-width:100%;transition:max-width .28s ease;
+}
+.frame.narrow{max-width:600px}
+
+.legend{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:12px 26px;margin:26px 0 0;padding:20px 0 0;border-top:1px solid var(--pg-rule);
+}
+.legend div{font-size:13.5px;line-height:1.5;color:var(--pg-muted)}
+.legend b{
+  display:block;color:var(--pg-ink);font-weight:600;font-size:12px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;letter-spacing:.01em;margin-bottom:2px;
+}
+.legend span{color:var(--pg-faint);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px}
+
+/* ══════════════════════════════════════════════════════════════════
+   THE MOCK — VS Code palettes. Every colour below is a --vscode-*
+   token, exactly as §3.4 requires of the real UI.
+   ══════════════════════════════════════════════════════════════════ */
+.vsc{
+  --vscode-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Ubuntu","Droid Sans",sans-serif;
+  --vscode-editor-font-family:"SF Mono",Monaco,Menlo,"DejaVu Sans Mono","Courier New",monospace;
+  font-family:var(--vscode-font-family);
+  font-size:13px;line-height:1.4;
+  color:var(--vscode-foreground);
+  background:var(--vscode-panel-background);
+  user-select:none;
+}
+/* Dark Modern */
+.vsc.dark{
+  --vscode-editor-background:#1F1F1F;
+  --vscode-panel-background:#181818;
+  --vscode-panel-border:#2B2B2B;
+  --vscode-contrastBorder:transparent;
+  --vscode-foreground:#CCCCCC;
+  --vscode-descriptionForeground:#9D9D9D;
+  --vscode-disabledForeground:#5A5A5A;
+  --vscode-list-hoverBackground:#2A2D2E;
+  --vscode-list-activeSelectionBackground:#04395E;
+  --vscode-list-activeSelectionForeground:#FFFFFF;
+  --vscode-focusBorder:#0078D4;
+  --vscode-button-background:#0078D4;
+  --vscode-button-foreground:#FFFFFF;
+  --vscode-input-background:#313131;
+  --vscode-input-border:#3C3C3C;
+  --vscode-badge-background:#616161;
+  --vscode-badge-foreground:#F8F8F8;
+  --vscode-textLink-foreground:#4DAAFC;
+  --vscode-toolbar-hoverBackground:#5A5D5E50;
+  --vscode-gitDecoration-modifiedResourceForeground:#E2C08D;
+  --vscode-gitDecoration-addedResourceForeground:#81B88B;
+  --vscode-gitDecoration-deletedResourceForeground:#C74E39;
+  --vscode-gitDecoration-untrackedResourceForeground:#73C991;
+  --vscode-statusBar-background:#181818;
+  --vscode-statusBar-foreground:#CCCCCC;
+  --vscode-inputValidation-warningBackground:#352A05;
+  --vscode-inputValidation-warningBorder:#B89500;
+  --vscode-menu-background:#1F1F1F;--vscode-menu-foreground:#CCCCCC;
+  --vscode-menu-border:#454545;--vscode-menu-selectionBackground:#0078D4;
+  --vscode-menu-selectionForeground:#FFFFFF;--vscode-menu-separatorBackground:#454545;
+  --kv-lane-1:#4FC1FF;--kv-lane-2:#C586C0;--kv-lane-3:#4EC9B0;
+  --kv-lane-4:#DCDCAA;--kv-lane-5:#CE9178;--kv-lane-6:#9CDCFE;
+  --kv-badge-local-bg:#0E639C;--kv-badge-local-fg:#FFFFFF;
+  --kv-badge-remote-bg:#3A3D41;--kv-badge-remote-fg:#CCCCCC;
+  --kv-badge-tag-bg:#4B3A63;--kv-badge-tag-fg:#E4D4F4;
+  --kv-badge-stash-bg:#4A3A22;--kv-badge-stash-fg:#E2C08D;
+}
+/* Light Modern */
+.vsc.light{
+  --vscode-editor-background:#FFFFFF;
+  --vscode-panel-background:#F8F8F8;
+  --vscode-panel-border:#E5E5E5;
+  --vscode-contrastBorder:transparent;
+  --vscode-foreground:#3B3B3B;
+  --vscode-descriptionForeground:#767676;
+  --vscode-disabledForeground:#A0A0A0;
+  --vscode-list-hoverBackground:#F0F0F0;
+  --vscode-list-activeSelectionBackground:#0060C0;
+  --vscode-list-activeSelectionForeground:#FFFFFF;
+  --vscode-focusBorder:#005FB8;
+  --vscode-button-background:#005FB8;
+  --vscode-button-foreground:#FFFFFF;
+  --vscode-input-background:#FFFFFF;
+  --vscode-input-border:#CECECE;
+  --vscode-badge-background:#CCCCCC;
+  --vscode-badge-foreground:#3B3B3B;
+  --vscode-textLink-foreground:#005FB8;
+  --vscode-toolbar-hoverBackground:#B8B8B850;
+  --vscode-gitDecoration-modifiedResourceForeground:#895503;
+  --vscode-gitDecoration-addedResourceForeground:#587C0C;
+  --vscode-gitDecoration-deletedResourceForeground:#AD0707;
+  --vscode-gitDecoration-untrackedResourceForeground:#3F8E3F;
+  --vscode-statusBar-background:#F8F8F8;
+  --vscode-statusBar-foreground:#3B3B3B;
+  --vscode-inputValidation-warningBackground:#FFF6D8;
+  --vscode-inputValidation-warningBorder:#B89500;
+  --vscode-menu-background:#FFFFFF;--vscode-menu-foreground:#3B3B3B;
+  --vscode-menu-border:#CECECE;--vscode-menu-selectionBackground:#005FB8;
+  --vscode-menu-selectionForeground:#FFFFFF;--vscode-menu-separatorBackground:#D4D4D4;
+  --kv-lane-1:#0451A5;--kv-lane-2:#AF00DB;--kv-lane-3:#098658;
+  --kv-lane-4:#795E26;--kv-lane-5:#A31515;--kv-lane-6:#007ACC;
+  --kv-badge-local-bg:#005FB8;--kv-badge-local-fg:#FFFFFF;
+  --kv-badge-remote-bg:#DEDEDE;--kv-badge-remote-fg:#3B3B3B;
+  --kv-badge-tag-bg:#EADCF6;--kv-badge-tag-fg:#5C3A80;
+  --kv-badge-stash-bg:#F6EBD8;--kv-badge-stash-fg:#77510A;
+}
+/* High Contrast Dark */
+.vsc.hc-dark{
+  --vscode-editor-background:#000000;
+  --vscode-panel-background:#000000;
+  --vscode-panel-border:#6FC3DF;
+  --vscode-contrastBorder:#6FC3DF;
+  --vscode-foreground:#FFFFFF;
+  --vscode-descriptionForeground:#FFFFFF;
+  --vscode-disabledForeground:#A6A6A6;
+  --vscode-list-hoverBackground:#000000;
+  --vscode-list-activeSelectionBackground:#000000;
+  --vscode-list-activeSelectionForeground:#FFFFFF;
+  --vscode-focusBorder:#F38518;
+  --vscode-button-background:#000000;
+  --vscode-button-foreground:#FFFFFF;
+  --vscode-input-background:#000000;
+  --vscode-input-border:#6FC3DF;
+  --vscode-badge-background:#000000;
+  --vscode-badge-foreground:#FFFFFF;
+  --vscode-textLink-foreground:#3794FF;
+  --vscode-toolbar-hoverBackground:#00000000;
+  --vscode-gitDecoration-modifiedResourceForeground:#E2C08D;
+  --vscode-gitDecoration-addedResourceForeground:#81B88B;
+  --vscode-gitDecoration-deletedResourceForeground:#FF6B5B;
+  --vscode-gitDecoration-untrackedResourceForeground:#73C991;
+  --vscode-statusBar-background:#000000;
+  --vscode-statusBar-foreground:#FFFFFF;
+  --vscode-inputValidation-warningBackground:#000000;
+  --vscode-inputValidation-warningBorder:#FFCC00;
+  --vscode-menu-background:#000000;--vscode-menu-foreground:#FFFFFF;
+  --vscode-menu-border:#6FC3DF;--vscode-menu-selectionBackground:#000000;
+  --vscode-menu-selectionForeground:#FFFFFF;--vscode-menu-separatorBackground:#6FC3DF;
+  --kv-lane-1:#3794FF;--kv-lane-2:#F38518;--kv-lane-3:#4EC9B0;
+  --kv-lane-4:#FFFF00;--kv-lane-5:#FF6B5B;--kv-lane-6:#6FC3DF;
+  --kv-badge-local-bg:#000000;--kv-badge-local-fg:#FFFFFF;
+  --kv-badge-remote-bg:#000000;--kv-badge-remote-fg:#FFFFFF;
+  --kv-badge-tag-bg:#000000;--kv-badge-tag-fg:#FFFFFF;
+  --kv-badge-stash-bg:#000000;--kv-badge-stash-fg:#FFFF00;
+}
+/* High Contrast Light */
+.vsc.hc-light{
+  --vscode-editor-background:#FFFFFF;
+  --vscode-panel-background:#FFFFFF;
+  --vscode-panel-border:#0F4A85;
+  --vscode-contrastBorder:#0F4A85;
+  --vscode-foreground:#292929;
+  --vscode-descriptionForeground:#292929;
+  --vscode-disabledForeground:#6B6B6B;
+  --vscode-list-hoverBackground:#FFFFFF;
+  --vscode-list-activeSelectionBackground:#0F4A85;
+  --vscode-list-activeSelectionForeground:#FFFFFF;
+  --vscode-focusBorder:#006BBD;
+  --vscode-button-background:#0F4A85;
+  --vscode-button-foreground:#FFFFFF;
+  --vscode-input-background:#FFFFFF;
+  --vscode-input-border:#0F4A85;
+  --vscode-badge-background:#FFFFFF;
+  --vscode-badge-foreground:#292929;
+  --vscode-textLink-foreground:#0F4A85;
+  --vscode-toolbar-hoverBackground:#FFFFFF00;
+  --vscode-gitDecoration-modifiedResourceForeground:#69511B;
+  --vscode-gitDecoration-addedResourceForeground:#374E06;
+  --vscode-gitDecoration-deletedResourceForeground:#AD0707;
+  --vscode-gitDecoration-untrackedResourceForeground:#2A6E2A;
+  --vscode-statusBar-background:#FFFFFF;
+  --vscode-statusBar-foreground:#292929;
+  --vscode-inputValidation-warningBackground:#FFFFFF;
+  --vscode-inputValidation-warningBorder:#A15C00;
+  --vscode-menu-background:#FFFFFF;--vscode-menu-foreground:#292929;
+  --vscode-menu-border:#0F4A85;--vscode-menu-selectionBackground:#0F4A85;
+  --vscode-menu-selectionForeground:#FFFFFF;--vscode-menu-separatorBackground:#0F4A85;
+  --kv-lane-1:#0F4A85;--kv-lane-2:#7B2D8E;--kv-lane-3:#0A6B3D;
+  --kv-lane-4:#7A5B00;--kv-lane-5:#A31515;--kv-lane-6:#00567A;
+  --kv-badge-local-bg:#FFFFFF;--kv-badge-local-fg:#0F4A85;
+  --kv-badge-remote-bg:#FFFFFF;--kv-badge-remote-fg:#292929;
+  --kv-badge-tag-bg:#FFFFFF;--kv-badge-tag-fg:#7B2D8E;
+  --kv-badge-stash-bg:#FFFFFF;--kv-badge-stash-fg:#7A5B00;
+}
+/* high-contrast themes demand real borders where others use fills */
+.vsc.hc-dark .badge,.vsc.hc-light .badge,
+.vsc.hc-dark .tb-btn,.vsc.hc-light .tb-btn,
+.vsc.hc-dark .search,.vsc.hc-light .search,
+.vsc.hc-dark .loadmore,.vsc.hc-light .loadmore,
+.vsc.hc-dark .act,.vsc.hc-light .act{border:1px solid var(--vscode-contrastBorder)}
+.vsc.hc-dark .row[aria-selected="true"],.vsc.hc-light .row[aria-selected="true"]{
+  outline:1px dotted var(--vscode-focusBorder);outline-offset:-1px;
+}
+
+/* editor sliver above the panel, for context */
+.editor-sliver{
+  background:var(--vscode-editor-background);
+  border-bottom:1px solid var(--vscode-panel-border);
+  padding:9px 14px 11px;display:flex;gap:16px;align-items:center;
+  font-size:12px;color:var(--vscode-descriptionForeground);
+}
+.tabpill{
+  background:var(--vscode-panel-background);color:var(--vscode-foreground);
+  padding:4px 12px;border-radius:3px 3px 0 0;font-size:12px;
+}
+.sliver-code{
+  font-family:var(--vscode-editor-font-family);font-size:11.5px;
+  color:var(--vscode-disabledForeground);white-space:nowrap;overflow:hidden;
+}
+
+/* panel tab strip */
+.panel-tabs{
+  display:flex;align-items:center;gap:2px;
+  padding:0 10px;border-bottom:1px solid var(--vscode-panel-border);
+  background:var(--vscode-panel-background);overflow-x:auto;
+}
+.ptab{
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--vscode-descriptionForeground);
+  padding:8px 10px 7px;border-bottom:1px solid transparent;white-space:nowrap;
+}
+.ptab.on{color:var(--vscode-foreground);border-bottom-color:var(--vscode-foreground)}
+.ptab-spacer{flex:1}
+
+/* toolbar */
+.toolbar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 10px;border-bottom:1px solid var(--vscode-panel-border);
+  background:var(--vscode-panel-background);
+}
+.tb-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  background:transparent;border:0;border-radius:4px;
+  color:var(--vscode-foreground);font-family:inherit;font-size:12px;
+  padding:4px 8px;cursor:pointer;white-space:nowrap;
+}
+.tb-btn:hover{background:var(--vscode-toolbar-hoverBackground)}
+.tb-btn:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:-1px}
+.tb-btn .gl{font-size:13px;line-height:1;opacity:.9}
+.tb-btn .cnt{color:var(--vscode-descriptionForeground);font-size:11px}
+.tb-sep{width:1px;height:16px;background:var(--vscode-panel-border);margin:0 3px}
+.tb-spacer{flex:1;min-width:8px}
+
+.search{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--vscode-input-background);
+  border:1px solid var(--vscode-input-border);
+  border-radius:4px;padding:2px 4px 2px 8px;
+}
+.search input{
+  background:transparent;border:0;outline:0;color:var(--vscode-foreground);
+  font-family:inherit;font-size:12px;width:132px;padding:2px 0;
+}
+.search input::placeholder{color:var(--vscode-descriptionForeground)}
+.sw{
+  background:transparent;border:0;border-radius:3px;cursor:pointer;
+  color:var(--vscode-descriptionForeground);
+  font-family:var(--vscode-editor-font-family);font-size:11px;
+  padding:2px 5px;line-height:1.5;
+}
+.sw:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
+.sw[aria-pressed="true"]{
+  background:var(--vscode-button-background);color:var(--vscode-button-foreground);
+}
+.sw:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:-1px}
+.scope{
+  background:transparent;border:0;border-left:1px solid var(--vscode-input-border);
+  color:var(--vscode-descriptionForeground);font-family:inherit;font-size:11px;
+  padding:2px 4px;margin-left:2px;cursor:pointer;
+}
+
+/* conflict banner */
+.banner{
+  display:none;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:7px 12px;font-size:12px;
+  background:var(--vscode-inputValidation-warningBackground);
+  border-bottom:1px solid var(--vscode-inputValidation-warningBorder);
+  color:var(--vscode-foreground);
+}
+.vsc.state-conflict .banner{display:flex}
+.banner .paths{
+  font-family:var(--vscode-editor-font-family);font-size:11px;
+  color:var(--vscode-descriptionForeground);
+}
+.banner .spacer{flex:1;min-width:6px}
+.act{
+  background:var(--vscode-button-background);color:var(--vscode-button-foreground);
+  border:0;border-radius:3px;font-family:inherit;font-size:11.5px;
+  padding:3px 10px;cursor:pointer;
+}
+.act.ghost{background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border)}
+.act[disabled]{opacity:.45;cursor:default}
+.act:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:1px}
+
+/* body: graph + detail */
+.panel-body{display:flex;height:352px;min-height:0}
+.graph-pane{flex:1;min-width:0;display:flex;flex-direction:column}
+.list-scroll{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;min-height:0}
+.rows{position:relative}
+#lanes{position:absolute;left:0;top:0;pointer-events:none}
+
+.row{
+  position:absolute;left:0;right:0;height:22px;display:flex;align-items:center;
+  gap:8px;padding-right:10px;cursor:pointer;white-space:nowrap;
+}
+.row:hover{background:var(--vscode-list-hoverBackground)}
+.row[aria-selected="true"]{
+  background:var(--vscode-list-activeSelectionBackground);
+  color:var(--vscode-list-activeSelectionForeground);
+}
+.row[aria-selected="true"] .meta{color:var(--vscode-list-activeSelectionForeground);opacity:.8}
+.row:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:-1px}
+.subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.meta{
+  color:var(--vscode-descriptionForeground);font-size:11.5px;
+  flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;
+}
+.meta.author{width:74px}
+.meta.when{width:52px;text-align:right;font-variant-numeric:tabular-nums}
+.meta.sha{
+  width:60px;text-align:right;font-family:var(--vscode-editor-font-family);font-size:11px;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:10.5px;line-height:1;padding:2px 6px;border-radius:9px;
+  flex:0 0 auto;max-width:190px;overflow:hidden;text-overflow:ellipsis;
+}
+.badge.local{background:var(--kv-badge-local-bg);color:var(--kv-badge-local-fg)}
+.badge.remote{background:var(--kv-badge-remote-bg);color:var(--kv-badge-remote-fg)}
+.badge.tag{background:var(--kv-badge-tag-bg);color:var(--kv-badge-tag-fg);border-radius:3px}
+.badge.stash{background:var(--kv-badge-stash-bg);color:var(--kv-badge-stash-fg);border-radius:3px}
+
+.loadmore{
+  border-top:1px solid var(--vscode-panel-border);
+  background:transparent;color:var(--vscode-textLink-foreground);
+  font-family:inherit;font-size:11.5px;padding:6px 10px;cursor:pointer;
+  text-align:left;display:flex;gap:8px;align-items:center;
+}
+.loadmore:hover{background:var(--vscode-list-hoverBackground)}
+.loadmore .rest{color:var(--vscode-descriptionForeground)}
+.loadmore:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:-1px}
+
+/* detail pane */
+.detail{
+  flex:0 0 340px;border-left:1px solid var(--vscode-panel-border);
+  display:flex;flex-direction:column;overflow-y:auto;background:var(--vscode-panel-background);
+}
+.vsc.state-narrow .detail{
+  position:absolute;right:0;top:0;bottom:0;width:min(300px,86%);z-index:5;
+  box-shadow:-8px 0 20px rgba(0,0,0,.28);
+}
+.vsc.state-narrow .panel-body{position:relative}
+.d-sec{padding:10px 12px;border-bottom:1px solid var(--vscode-panel-border)}
+.d-sec:last-child{border-bottom:0}
+.d-subject{font-size:12.5px;font-weight:600;margin:0 0 7px;white-space:normal;line-height:1.35}
+.d-body{
+  font-size:11.5px;color:var(--vscode-descriptionForeground);
+  margin:0 0 9px;white-space:normal;line-height:1.5;
+}
+.kv{display:grid;grid-template-columns:64px 1fr;gap:3px 10px;font-size:11.5px}
+.kv dt{color:var(--vscode-descriptionForeground)}
+.kv dd{
+  margin:0;font-family:var(--vscode-editor-font-family);font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.kv dd.plain{font-family:inherit;font-size:11.5px}
+.kv a{color:var(--vscode-textLink-foreground);text-decoration:none;cursor:pointer}
+.kv a:hover{text-decoration:underline}
+
+.d-head{
+  display:flex;align-items:center;gap:6px;margin:0 0 8px;
+  font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--vscode-descriptionForeground);
+}
+.d-head .stat{margin-left:auto;letter-spacing:0;text-transform:none;font-size:11px}
+.add{color:var(--vscode-gitDecoration-addedResourceForeground)}
+.del{color:var(--vscode-gitDecoration-deletedResourceForeground)}
+.mod{color:var(--vscode-gitDecoration-modifiedResourceForeground)}
+
+.tree{list-style:none;margin:0;padding:0;font-size:12px}
+.tree li{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;border-radius:3px}
+.tree li:hover{background:var(--vscode-list-hoverBackground)}
+.tree .ind{display:inline-block;width:12px;flex:0 0 auto}
+.tree .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tree .num{font-family:var(--vscode-editor-font-family);font-size:10.5px;flex:0 0 auto}
+.tree .dir{color:var(--vscode-foreground)}
+
+.detail.closed{display:none}
+
+/* sha is a copy affordance, in the row and in the detail pane */
+.sha-btn{
+  background:transparent;border:0;padding:0;cursor:copy;
+  font-family:var(--vscode-editor-font-family);font-size:11px;
+  color:inherit;text-align:right;
+}
+.sha-btn:hover{text-decoration:underline}
+.sha-btn:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:1px}
+.meta.sha{padding:0}
+
+/* right-click menu (§6.5) */
+.ctxmenu{
+  position:fixed;z-index:50;min-width:212px;padding:4px 0;
+  background:var(--vscode-menu-background);color:var(--vscode-menu-foreground);
+  border:1px solid var(--vscode-menu-border);border-radius:5px;
+  box-shadow:0 3px 14px rgba(0,0,0,.42);font-size:12.5px;
+}
+.ctxmenu[hidden]{display:none}
+.ctxmenu button{
+  display:flex;width:100%;align-items:center;gap:10px;
+  background:transparent;border:0;color:inherit;font-family:inherit;font-size:12.5px;
+  padding:4px 12px;cursor:pointer;text-align:left;white-space:nowrap;
+}
+.ctxmenu button:hover,.ctxmenu button:focus-visible{
+  background:var(--vscode-menu-selectionBackground);
+  color:var(--vscode-menu-selectionForeground);outline:0;
+}
+.ctxmenu button .sub{margin-left:auto;opacity:.65}
+.ctxmenu button.danger{color:var(--vscode-gitDecoration-deletedResourceForeground)}
+.ctxmenu button.danger:hover{color:var(--vscode-menu-selectionForeground)}
+.ctxmenu hr{border:0;border-top:1px solid var(--vscode-menu-separatorBackground);margin:4px 0}
+
+/* transient copy feedback */
+.toast{
+  position:fixed;z-index:60;pointer-events:none;
+  background:var(--vscode-menu-background);color:var(--vscode-menu-foreground);
+  border:1px solid var(--vscode-menu-border);border-radius:4px;
+  padding:4px 10px;font-size:11.5px;
+  font-family:var(--vscode-font-family);
+  opacity:0;transition:opacity .14s ease;
+}
+.toast.show{opacity:1}
+
+/* status bar */
+.statusbar{
+  display:flex;align-items:center;gap:14px;
+  background:var(--vscode-statusBar-background);color:var(--vscode-statusBar-foreground);
+  border-top:1px solid var(--vscode-panel-border);
+  padding:3px 12px;font-size:11.5px;
+}
+.sb-item{display:inline-flex;align-items:center;gap:5px;padding:1px 4px;border-radius:3px}
+.sb-item.ours{outline:1px dashed var(--vscode-textLink-foreground);outline-offset:1px}
+.sb-spacer{flex:1}
+.sb-note{color:var(--vscode-descriptionForeground);font-size:10.5px}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+@media (max-width:760px){
+  .wrap{padding:36px 18px 60px}
+  .detail{flex-basis:280px}
+}
+</style>
+
+<div class="wrap">
+  <div class="col">
+    <p class="eyebrow">Kira Version · v1 mockup</p>
+    <h1>The panel, as specified</h1>
+    <p>A working drawing of the git graph panel described in <code>docs/SPEC.md</code> — sitting
+    where the terminal sits, at the bottom of the window. The lane graph below is a real layout
+    pass over a real commit topology, drawn to canvas, repainting when you change the theme.
+    Everything else is presentation.</p>
+    <p><strong>Try it:</strong> click a commit to open the pane and click it again to close.
+    Right-click any row for the actions. Click a sha to copy it.</p>
+  </div>
+
+  <div class="note">
+    <span class="tag">Not built</span>
+    <p>Nothing in the repository implements this yet — P0 has not started. This is a mockup
+    drawn from the spec, so it is a proposal to argue with, not a screenshot. Where it and
+    <code>SPEC.md</code> disagree, the spec is what agents will build.</p>
+  </div>
+
+  <div class="controls">
+    <div class="ctl-group">
+      <span class="ctl-label" id="lbl-theme">Theme kind</span>
+      <div class="seg" role="group" aria-labelledby="lbl-theme">
+        <button type="button" data-theme-kind="dark" aria-pressed="true">Dark Modern</button>
+        <button type="button" data-theme-kind="light" aria-pressed="false">Light Modern</button>
+        <button type="button" data-theme-kind="hc-dark" aria-pressed="false">HC Dark</button>
+        <button type="button" data-theme-kind="hc-light" aria-pressed="false">HC Light</button>
+      </div>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label" id="lbl-state">State</span>
+      <div class="seg" role="group" aria-labelledby="lbl-state">
+        <button type="button" data-state="normal" aria-pressed="true">Normal</button>
+        <button type="button" data-state="conflict" aria-pressed="false">Conflicted</button>
+        <button type="button" data-state="narrow" aria-pressed="false">Narrow panel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame-outer">
+    <div class="frame" id="frame">
+      <div class="vsc dark state-normal" id="vsc">
+
+        <div class="editor-sliver">
+          <span class="tabpill">SPEC.md</span>
+          <span class="sliver-code">### 7.6 Stash — pre-flight predicts the pop with `merge-tree --write-tree` …</span>
+        </div>
+
+        <div class="panel-tabs">
+          <span class="ptab">Problems</span>
+          <span class="ptab">Output</span>
+          <span class="ptab">Debug Console</span>
+          <span class="ptab">Terminal</span>
+          <span class="ptab">Ports</span>
+          <span class="ptab on">Git Graph</span>
+          <span class="ptab-spacer"></span>
+          <span class="ptab" aria-hidden="true">⌃</span>
+          <span class="ptab" aria-hidden="true">✕</span>
+        </div>
+
+        <div class="banner" role="status">
+          <strong>Revert in progress</strong>
+          <span class="paths">2 unmerged paths — src/graph/layout.ts, src/store/intern.ts</span>
+          <span class="spacer"></span>
+          <button type="button" class="act">Resolve in VS&nbsp;Code</button>
+          <button type="button" class="act ghost" disabled>Continue</button>
+          <button type="button" class="act ghost">Abort</button>
+        </div>
+
+        <div class="toolbar">
+          <button type="button" class="tb-btn"><span class="gl">▤</span>kira-version <span class="cnt">▾</span></button>
+          <button type="button" class="tb-btn"><span class="gl">⎇</span>feature/kickoff <span class="cnt">▾</span></button>
+          <span class="tb-sep"></span>
+          <button type="button" class="tb-btn" title="Refresh"><span class="gl">⟳</span></button>
+          <span class="tb-sep"></span>
+          <button type="button" class="tb-btn">Fetch</button>
+          <button type="button" class="tb-btn">Pull <span class="cnt">↓0</span></button>
+          <button type="button" class="tb-btn">Push <span class="cnt">↑2</span></button>
+          <span class="tb-sep"></span>
+          <button type="button" class="tb-btn">Stash <span class="cnt">1 ▾</span></button>
+          <span class="tb-spacer"></span>
+          <div class="search">
+            <span class="gl" aria-hidden="true" style="opacity:.6">⌕</span>
+            <input type="text" placeholder="Search" aria-label="Search commits and refs">
+            <button type="button" class="sw" aria-pressed="false" title="Match case">Aa</button>
+            <button type="button" class="sw" aria-pressed="false" title="Whole word">ab|</button>
+            <button type="button" class="sw" aria-pressed="true" title="Regular expression">.*</button>
+            <button type="button" class="scope">Both ▾</button>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="graph-pane">
+            <div class="list-scroll" id="scroll">
+              <div class="rows" id="rows">
+                <canvas id="lanes"></canvas>
+              </div>
+            </div>
+            <button type="button" class="loadmore">
+              <span>Load 5,000 more</span>
+              <span class="rest">127,400 remaining</span>
+            </button>
+          </div>
+
+          <aside class="detail" id="detail" aria-label="Commit detail"></aside>
+        </div>
+
+        <div class="statusbar">
+          <span class="sb-item">⎇ feature/kickoff ↑2</span>
+          <span class="sb-item ours">◴ Git Graph</span>
+          <span class="sb-spacer"></span>
+          <span class="sb-note">the dashed item is ours — VS Code's own branch indicator sits to its left</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="ctxmenu" id="ctxmenu" role="menu" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="legend">
+    <div><b>Panel, not sidebar</b><span>SPEC §2.1</span>
+      A webview view in a panel container, so it shares the strip with Terminal.</div>
+    <div><b>Lanes drawn to canvas</b><span>SPEC §5.2–5.3</span>
+      Layout runs in a worker; rows are recycled DOM over one canvas.</div>
+    <div><b>Load more, not infinite scroll</b><span>SPEC §5.1.1</span>
+      5,000 a page, remaining count from <code>rev-list --count</code>.</div>
+    <div><b>Click opens, click again closes</b><span>SPEC §6.4</span>
+      Files first, then details. Clicking a file opens its diff.</div>
+    <div><b>Search toggles</b><span>SPEC §7.8</span>
+      Case, whole word, regex — scoped to commits, refs, or both.</div>
+    <div><b>Conflicts are delegated</b><span>SPEC §7.11</span>
+      We detect and gate; VS Code's merge editor resolves.</div>
+    <div><b>Every colour is a theme token</b><span>SPEC §3.4, §6.1</span>
+      All four theme kinds are first-class, high contrast included.</div>
+    <div><b>Actions live on right-click</b><span>SPEC §6.4</span>
+      No action row in the pane; the sha copies when you click it.</div>
+    <div><b>Status bar item</b><span>SPEC §6.5</span>
+      Sits beside VS Code's own, and can be switched off.</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ── a real topology: id, subject, parents, author, when, refs ──
+  const COMMITS = [
+    { id:"a1", s:"WIP on feature/kickoff: lane hit-testing", p:["b2"], a:"vlad", w:"12m",
+      refs:[["stash","stash@{0}"]], stash:true, sha:"7c41e0d" },
+    { id:"b2", s:"feat(graph): virtualize commit rows and recycle the DOM pool", p:["c3"], a:"vlad", w:"1h",
+      refs:[["local","feature/kickoff"]], sha:"de09a7a" },
+    { id:"c3", s:"feat(graph): canvas lane renderer, devicePixelRatio aware", p:["d4"], a:"vlad", w:"3h",
+      refs:[["remote","origin/feature/kickoff"]], sha:"0638f76" },
+    { id:"d4", s:"Merge branch 'perf/typed-store' into feature/kickoff", p:["e5","i9"], a:"vlad", w:"5h",
+      refs:[], sha:"3b7ca92", merge:true },
+    { id:"e5", s:"docs: add P0 foundation plan and narrow platform scope", p:["f6"], a:"vlad", w:"8h",
+      refs:[], sha:"8d5e08a" },
+    { id:"f6", s:"docs: add v1 specification and working agreement", p:["g7"], a:"vlad", w:"1d",
+      refs:[], sha:"b06a6d9" },
+    { id:"g7", s:"feat(ipc): typed contract with ArrayBuffer transfer", p:["h8"], a:"ioana", w:"1d",
+      refs:[], sha:"a4408ab" },
+    { id:"h8", s:"chore: scaffold bun workspace, biome and tsconfig base", p:["j10"], a:"ioana", w:"2d",
+      refs:[], sha:"f2c1b84" },
+    { id:"i9", s:"perf(store): intern author strings, pack subjects into one buffer", p:["k11"], a:"ioana", w:"2d",
+      refs:[["local","perf/typed-store"]], sha:"5e9d3a1" },
+    { id:"k11", s:"perf(store): store commits column-wise in typed arrays", p:["j10"], a:"ioana", w:"3d",
+      refs:[], sha:"c08f472" },
+    { id:"j10", s:"feat(git): persistent cat-file --batch process", p:["l12"], a:"vlad", w:"3d",
+      refs:[["local","main"],["remote","origin/main"],["tag","v0.1.0"]], sha:"91ab35e" },
+    { id:"l12", s:"feat(git): streaming NUL parser for git log", p:["m13"], a:"vlad", w:"4d",
+      refs:[], sha:"7d40c19" },
+    { id:"m13", s:"feat(git): discovery, version probe and the 2.38 floor", p:["n14"], a:"ioana", w:"5d",
+      refs:[], sha:"2ea8f60" },
+    { id:"n14", s:"chore: pin every dependency exactly", p:["o15"], a:"ioana", w:"5d",
+      refs:[], sha:"bb17d43" },
+    { id:"o15", s:"Initial commit", p:[], a:"vlad", w:"6d", refs:[], sha:"f91ae95" }
+  ];
+
+  // ── lane assignment: one forward pass, leftmost free lane (SPEC §5.2) ──
+  const lanes = [];                       // lanes[i] = commit id expected next in that lane
+  const rows = COMMITS.map(c => {
+    let lane = lanes.indexOf(c.id);
+    if (lane === -1) { lane = lanes.indexOf(null); if (lane === -1) lane = lanes.length; }
+    lanes[lane] = null;
+    const parentLanes = [];
+    c.p.forEach((pid, idx) => {
+      let pl = lanes.indexOf(pid);
+      if (pl === -1) {
+        pl = idx === 0 ? lane : lanes.indexOf(null);
+        if (pl === -1) pl = lanes.length;
+        lanes[pl] = pid;
+      }
+      parentLanes.push(pl);
+    });
+    return { c, lane, parentLanes, active: lanes.slice() };
+  });
+  const LANE_COUNT = Math.max(...rows.map(r => r.active.length), 1);
+
+  const ROW_H = 22, LANE_W = 13, PAD_L = 11, GUTTER = PAD_L + LANE_COUNT * LANE_W + 6;
+
+  // ── canvas: colours come from the token layer, re-read on theme change (§3.4) ──
+  const canvas = document.getElementById("lanes");
+  const ctx = canvas.getContext("2d");
+  const vsc = document.getElementById("vsc");
+
+  function laneColor(i) {
+    return getComputedStyle(vsc).getPropertyValue("--kv-lane-" + (i % 6 + 1)).trim() || "#888";
+  }
+  function surface() {
+    return getComputedStyle(vsc).getPropertyValue("--vscode-panel-background").trim() || "#181818";
+  }
+
+  function paint() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = GUTTER, h = rows.length * ROW_H;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = "round";
+
+    const x = i => PAD_L + i * LANE_W;
+
+    rows.forEach((r, i) => {
+      const yTop = i * ROW_H, yMid = yTop + ROW_H / 2, yBot = yTop + ROW_H;
+
+      // lanes passing straight through this row
+      const prev = i === 0 ? [] : rows[i - 1].active;
+      prev.forEach((id, li) => {
+        if (!id || li === r.lane) return;
+        if (r.active[li] === id) {
+          ctx.strokeStyle = laneColor(li);
+          ctx.beginPath(); ctx.moveTo(x(li), yTop); ctx.lineTo(x(li), yBot); ctx.stroke();
+        }
+      });
+
+      // edges from this commit down to each parent's lane
+      r.parentLanes.forEach(pl => {
+        ctx.strokeStyle = laneColor(pl);
+        ctx.beginPath();
+        ctx.moveTo(x(r.lane), yMid);
+        if (pl === r.lane) {
+          ctx.lineTo(x(pl), yBot);
+        } else {
+          ctx.bezierCurveTo(x(r.lane), yMid + 9, x(pl), yBot - 11, x(pl), yBot);
+        }
+        ctx.stroke();
+      });
+
+      // the node
+      const cx = x(r.lane), col = laneColor(r.lane);
+      ctx.beginPath();
+      ctx.arc(cx, yMid, r.c.merge ? 4.2 : 3.4, 0, Math.PI * 2);
+      if (r.c.stash) {
+        ctx.fillStyle = surface(); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.setLineDash([2.4, 2]); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (r.c.merge) {
+        ctx.fillStyle = surface(); ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1.6;
+      } else {
+        ctx.fillStyle = col; ctx.fill();
+      }
+    });
+  }
+
+  // ── rows ──
+  const rowsEl = document.getElementById("rows");
+  rowsEl.style.height = rows.length * ROW_H + "px";
+
+  const BADGE_CLASS = { local:"local", remote:"remote", tag:"tag", stash:"stash" };
+  const BADGE_GLYPH = { local:"⎇", remote:"⇅", tag:"🏷", stash:"≡" };
+
+  rows.forEach((r, i) => {
+    const el = document.createElement("div");
+    el.className = "row";
+    el.style.top = i * ROW_H + "px";
+    el.style.paddingLeft = GUTTER + "px";
+    el.setAttribute("role", "option");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-selected", String(i === 4));
+
+    r.c.refs.forEach(([kind, name]) => {
+      const b = document.createElement("span");
+      b.className = "badge " + BADGE_CLASS[kind];
+      b.textContent = (kind === "tag" ? BADGE_GLYPH.tag + " " : kind === "stash" ? "" : BADGE_GLYPH[kind] + " ") + name;
+      el.appendChild(b);
+    });
+
+    const s = document.createElement("span");
+    s.className = "subject"; s.textContent = r.c.s; el.appendChild(s);
+
+    const a = document.createElement("span");
+    a.className = "meta author"; a.textContent = r.c.a; el.appendChild(a);
+
+    const w = document.createElement("span");
+    w.className = "meta when"; w.textContent = r.c.w; el.appendChild(w);
+
+    const shWrap = document.createElement("span");
+    shWrap.className = "meta sha";
+    const shBtn = document.createElement("button");
+    shBtn.type = "button"; shBtn.className = "sha-btn"; shBtn.textContent = r.c.sha;
+    shBtn.title = "Copy commit sha";
+    shBtn.addEventListener("click", e => { e.stopPropagation(); copySha(r.c.sha, e); });
+    shWrap.appendChild(shBtn); el.appendChild(shWrap);
+
+    el.addEventListener("click", () => toggleRow(r));
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleRow(r); }
+      if (e.key === "Escape") closeDetail();
+    });
+    el.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      openRow(r);
+      openMenu(e.clientX, e.clientY, r);
+    });
+    rowsEl.appendChild(el);
+  });
+
+  // ── selection: clicking the open commit again closes the pane ──
+  let openId = null;
+
+  function paintSelection() {
+    rowsEl.querySelectorAll(".row").forEach((n, i) => {
+      n.setAttribute("aria-selected", String(rows[i].c.id === openId));
+    });
+    detailEl.classList.toggle("closed", openId === null);
+  }
+  function openRow(r) {
+    openId = r.c.id; renderDetail(r); paintSelection();
+  }
+  function closeDetail() { openId = null; paintSelection(); }
+  function toggleRow(r) { if (openId === r.c.id) closeDetail(); else openRow(r); }
+
+  // ── detail pane ──
+  const DETAILS = {
+    e5: {
+      body:"Plans the P0 row of the spec phasing table: workspace skeleton, TypeScript and Biome configuration, the ipc contract skeleton, the theme token layer and the fixture repository generator.",
+      author:"vlad <vlad@example.com>", authored:"22 Aug 2026, 14:02",
+      committed:"22 Aug 2026, 14:09",
+      parents:["b06a6d9"],
+      files:[
+        { d:"docs", dir:true },
+        { d:"SPEC.md", ind:1, st:"M", add:134, del:76 },
+        { d:"plans", ind:1, dir:true },
+        { d:"P0.md", ind:2, st:"A", add:405, del:0 },
+        { d:"README.md", ind:2, st:"M", add:4, del:1 }
+      ],
+      stat:"3 files · +543 −77"
+    }
+  };
+  const GENERIC = {
+    body:"Full commit body, trailers and signature status load lazily for the selected commit only — never in the bulk walk.",
+    author:"vlad <vlad@example.com>", authored:"22 Aug 2026, 09:14", committed:"22 Aug 2026, 09:14",
+    parents:["—"],
+    files:[
+      { d:"packages", dir:true },
+      { d:"core", ind:1, dir:true },
+      { d:"index.ts", ind:2, st:"M", add:28, del:6 },
+      { d:"git", ind:1, dir:true },
+      { d:"driver.ts", ind:2, st:"M", add:61, del:12 }
+    ],
+    stat:"2 files · +89 −18"
+  };
+
+  const detailEl = document.getElementById("detail");
+  const ST_CLASS = { A:"add", M:"mod", D:"del" };
+
+  function esc(t){ const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+  function renderDetail(r) {
+    const d = DETAILS[r.c.id] || GENERIC;
+    const refs = r.c.refs.length
+      ? r.c.refs.map(([k, n]) => `<span class="badge ${BADGE_CLASS[k]}">${esc(n)}</span>`).join(" ")
+      : '<span style="opacity:.6">none</span>';
+
+    detailEl.innerHTML = `
+      <div class="d-sec">
+        <p class="d-subject">${esc(r.c.s)}</p>
+        <p class="d-body">${esc(d.body)}</p>
+      </div>
+      <div class="d-sec">
+        <div class="d-head"><span>Files</span><span class="stat">${esc(d.stat)}</span></div>
+        <ul class="tree">
+          ${d.files.map(f => {
+            const pad = "<span class='ind'></span>".repeat(f.ind || 0);
+            if (f.dir) return `<li>${pad}<span class="nm dir">▾ ${esc(f.d)}</span></li>`;
+            return `<li>${pad}<span class="nm">${esc(f.d)}</span>
+              <span class="num ${ST_CLASS[f.st]}">${esc(f.st)}</span>
+              <span class="num add">+${f.add}</span>
+              <span class="num del">−${f.del}</span></li>`;
+          }).join("")}
+        </ul>
+      </div>
+      <div class="d-sec">
+        <div class="d-head"><span>Details</span></div>
+        <dl class="kv">
+          <dt>Commit</dt><dd><button type="button" class="sha-btn" data-copy="${esc(r.c.sha)}" title="Copy commit sha">${esc(r.c.sha)}</button></dd>
+          <dt>Parents</dt><dd>${d.parents.map(p => `<a>${esc(p)}</a>`).join(" ")}</dd>
+          <dt>Author</dt><dd class="plain">${esc(d.author)}</dd>
+          <dt>Authored</dt><dd class="plain">${esc(d.authored)}</dd>
+          <dt>Committed</dt><dd class="plain">${esc(d.committed)}</dd>
+          <dt>Refs</dt><dd class="plain">${refs}</dd>
+        </dl>
+      </div>`;
+
+    detailEl.querySelectorAll("[data-copy]").forEach(b => {
+      b.addEventListener("click", e => copySha(b.dataset.copy, e));
+    });
+  }
+  openRow(rows[4]);
+
+  // ── copy sha, with honest feedback ──
+  const toastEl = document.getElementById("toast");
+  let toastTimer = null;
+
+  function showToast(text, x, y) {
+    toastEl.textContent = text;
+    toastEl.style.left = Math.min(x + 12, window.innerWidth - 150) + "px";
+    toastEl.style.top = (y + 14) + "px";
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1100);
+  }
+  async function copySha(sha, ev) {
+    const x = ev ? ev.clientX : window.innerWidth / 2;
+    const y = ev ? ev.clientY : 60;
+    try {
+      await navigator.clipboard.writeText(sha);
+      showToast("Copied " + sha, x, y);
+    } catch {
+      showToast("Clipboard blocked here", x, y);
+    }
+  }
+
+  // ── right-click actions (§6.4 — the detail pane carries no action row) ──
+  const menuEl = document.getElementById("ctxmenu");
+
+  const MENU = r => [
+    ["Checkout " + (r.c.stash ? "stash" : r.c.sha)],
+    ["Create branch here…"],
+    ["Create tag here…"],
+    null,
+    ["Revert commit…"],
+    ["Cherry-pick…"],
+    ["Reset to here", "Soft · Mixed · Hard ▸", true],
+    null,
+    ["Copy commit sha", null, false, () => r.c.sha],
+    ["Copy message", null, false, () => r.c.s]
+  ];
+
+  function openMenu(x, y, r) {
+    menuEl.innerHTML = "";
+    MENU(r).forEach(item => {
+      if (!item) { menuEl.appendChild(document.createElement("hr")); return; }
+      const [label, sub, danger, copyFn] = item;
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "menuitem");
+      if (danger) b.className = "danger";
+      b.textContent = label;
+      if (sub) {
+        const sp = document.createElement("span");
+        sp.className = "sub"; sp.textContent = sub; b.appendChild(sp);
+      }
+      b.addEventListener("click", e => {
+        closeMenu();
+        if (copyFn) copySha(copyFn(), e);
+      });
+      menuEl.appendChild(b);
+    });
+
+    menuEl.hidden = false;
+    const rect = menuEl.getBoundingClientRect();
+    menuEl.style.left = Math.min(x, window.innerWidth - rect.width - 8) + "px";
+    menuEl.style.top = Math.min(y, window.innerHeight - rect.height - 8) + "px";
+    const first = menuEl.querySelector("button");
+    if (first) first.focus();
+  }
+  function closeMenu() { menuEl.hidden = true; }
+
+  document.addEventListener("click", e => { if (!menuEl.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+  window.addEventListener("blur", closeMenu);
+  document.getElementById("scroll").addEventListener("scroll", closeMenu);
+
+  // ── controls ──
+  document.querySelectorAll("[data-theme-kind]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-theme-kind]").forEach(b => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      vsc.classList.remove("dark", "light", "hc-dark", "hc-light");
+      vsc.classList.add(btn.dataset.themeKind);
+    });
+  });
+  document.querySelectorAll("[data-state]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-state]").forEach(b => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      vsc.classList.remove("state-normal", "state-conflict", "state-narrow");
+      vsc.classList.add("state-" + btn.dataset.state);
+      document.getElementById("frame").classList.toggle("narrow", btn.dataset.state === "narrow");
+    });
+  });
+  document.querySelectorAll(".sw").forEach(sw => {
+    sw.addEventListener("click", () => {
+      sw.setAttribute("aria-pressed", sw.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    });
+  });
+
+  // this is the §3.4 canvas bridge: CSS variables can't reach a canvas,
+  // so watch for the theme swap and repaint from the freshly-read tokens.
+  new MutationObserver(paint).observe(vsc, { attributes:true, attributeFilter:["class"] });
+  window.addEventListener("resize", paint);
+  paint();
+})();
+</script>
