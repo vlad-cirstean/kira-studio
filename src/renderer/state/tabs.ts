@@ -2,6 +2,7 @@ import { type DataTabState, defaultDataTabState, type TabRecord } from '@shared/
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { drop as dropPage } from '../views/grid/page';
+import { clearSelectedCellFor } from './cellSelection';
 import { settingsState } from './settings';
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
@@ -112,6 +113,7 @@ export function closeTab(id: string): void {
   tabsState.tabs.splice(idx, 1);
   tabsState.hydrated.delete(id);
   dropPage(id); // §2.2: closing a tab frees its cached page immediately.
+  clearSelectedCellFor(id);
 
   if (tabsState.tabs.length === 0) {
     tabsState.activeId = null;
@@ -130,6 +132,7 @@ export function closeOthers(id: string): void {
     if (t.id !== id) {
       tabsState.hydrated.delete(t.id);
       dropPage(t.id);
+      clearSelectedCellFor(t.id);
     }
   }
   tabsState.tabs = [keep];
@@ -144,6 +147,7 @@ export function closeToTheRight(id: string): void {
   for (const t of tabsState.tabs.slice(idx + 1)) {
     tabsState.hydrated.delete(t.id);
     dropPage(t.id);
+    clearSelectedCellFor(t.id);
   }
   tabsState.tabs = tabsState.tabs.slice(0, idx + 1);
   if (!tabsState.tabs.some((t) => t.active)) {
@@ -157,6 +161,7 @@ export function closeAll(): void {
   for (const t of tabsState.tabs) {
     tabsState.hydrated.delete(t.id);
     dropPage(t.id);
+    clearSelectedCellFor(t.id);
   }
   tabsState.tabs = [];
   tabsState.activeId = null;

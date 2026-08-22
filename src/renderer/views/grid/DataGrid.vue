@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import {
+  clearSelectedCellFor,
+  publishSelectedCell,
+  type SelectedCell,
+} from '../../state/cellSelection';
 import { settingsState } from '../../state/settings';
 import { patchTabState, tabsState } from '../../state/tabs';
-import { alignmentFor, columnOffsets, initialWidths, visibleColumnRange } from './columns';
+import {
+  alignmentFor,
+  columnOffsets,
+  initialWidths,
+  pageColumnIndexFor,
+  resolveColumnOrder,
+  visibleColumnRange,
+} from './columns';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import { searchState } from './search';
 import { runtime, setSort } from './state';
@@ -28,13 +40,7 @@ const page = computed(() => {
 const columnOrder = computed<string[]>(() => {
   const p = page.value;
   if (!p) return [];
-  const names = p.columns.map((c) => c.name);
-  const stored = tab()?.state.columnOrder;
-  if (!stored) return names;
-  const known = new Set(names);
-  const kept = stored.filter((n) => known.has(n));
-  const missing = names.filter((n) => !kept.includes(n));
-  return [...kept, ...missing];
+  return resolveColumnOrder(p, tab()?.state.columnOrder ?? null);
 });
 
 const columnByName = computed(() => {
@@ -90,7 +96,14 @@ onMounted(() => {
   }
   onScroll();
 });
-onUnmounted(() => resizeObserver?.disconnect());
+// The tab-id guard inside clearSelectedCellFor is load-bearing: MainView.vue keys DataView by
+// tab id, so switching tabs unmounts one grid and mounts another in an order that is not safe
+// to rely on. The guard means a late unmount here cannot clobber the freshly mounted tab's
+// publication, and an early one is corrected by the new grid's `immediate` publish watch below.
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  clearSelectedCellFor(props.tabId);
+});
 
 const rowRange = computed(() => {
   const rowCount = page.value?.rowCount ?? 0;
@@ -118,14 +131,6 @@ const visibleColumnIndices = computed(() => {
   return out;
 });
 
-// Position in `columnOrder` -> index into the page's own `columns`/`chunks` arrays.
-const displayIndexToPageIndex = computed(() => {
-  const p = page.value;
-  if (!p) return [];
-  const nameToIndex = new Map(p.columns.map((c, i) => [c.name, i]));
-  return columnOrder.value.map((name) => nameToIndex.get(name) ?? -1);
-});
-
 let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
 watch([scrollTop, scrollLeft], () => {
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
@@ -135,8 +140,10 @@ watch([scrollTop, scrollLeft], () => {
 });
 
 function cellAt(row: number, displayCol: number) {
-  const pageCol = displayIndexToPageIndex.value[displayCol];
-  if (pageCol === undefined || pageCol < 0) return { text: '', isNull: true, truncated: false };
+  const p = page.value;
+  if (!p) return { text: '', isNull: true, truncated: false };
+  const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
+  if (pageCol < 0) return { text: '', isNull: true, truncated: false };
   return cell(props.tabId, row, pageCol);
 }
 
@@ -221,6 +228,52 @@ function isSelected(row: number, displayCol: number): boolean {
   return false;
 }
 
+// A 'cell' selection publishes itself; a 'range' publishes its focus end — the moving end, the
+// cell the arrow keys are moving and the one the user last touched (D13). A 'row'/'column'
+// selection has no single value to render and publishes null.
+function selectionTarget(): { row: number; col: number } | null {
+  const sel = rt()?.selection;
+  if (!sel) return null;
+  if (sel.kind === 'cell' || sel.kind === 'range') return { row: sel.row, col: sel.col };
+  return null;
+}
+
+// Publishes the cell editor's target (D1). Depends on selection, page version and tab id —
+// deliberately never on scroll offsets, so scrolling never puts a decode on the frame budget
+// §2.1 forbids. `pageVersion` in the dependency list is what makes the still-highlighted cell
+// republish against a *new* page after paging/filtering/refreshing, so the panel and the grid
+// never disagree about which cell is shown.
+watch(
+  [() => rt()?.selection, () => pageVersion.n, () => props.tabId],
+  () => {
+    const p = page.value;
+    const t = tab();
+    const target = selectionTarget();
+    if (!p || !t || !target || target.row < 0 || target.row >= p.rowCount) {
+      publishSelectedCell(null);
+      return;
+    }
+    const pageCol = pageColumnIndexFor(p, columnOrder.value, target.col);
+    if (pageCol < 0) {
+      publishSelectedCell(null);
+      return;
+    }
+    const view = cell(props.tabId, target.row, pageCol);
+    const selected: SelectedCell = {
+      tabId: props.tabId,
+      connectionId: t.connectionId,
+      path: t.path,
+      columnIndex: pageCol,
+      column: p.columns[pageCol],
+      row: target.row,
+      value: view.isNull ? null : view.text,
+      truncated: view.truncated,
+    };
+    publishSelectedCell(selected);
+  },
+  { immediate: true },
+);
+
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per cell —
 // matches are keyed by the page's own column index, not display position.
 const matchIndex = computed(() => {
@@ -232,11 +285,15 @@ const matchIndex = computed(() => {
 });
 
 function isSearchMatch(row: number, displayCol: number): boolean {
-  const pageCol = displayIndexToPageIndex.value[displayCol];
+  const p = page.value;
+  if (!p) return false;
+  const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
   return matchIndex.value?.set.has(`${row}:${pageCol}`) ?? false;
 }
 function isCurrentSearchMatch(row: number, displayCol: number): boolean {
-  const pageCol = displayIndexToPageIndex.value[displayCol];
+  const p = page.value;
+  if (!p) return false;
+  const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
   const current = matchIndex.value?.current;
   return !!current && current.row === row && current.col === pageCol;
 }

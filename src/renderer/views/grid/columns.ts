@@ -84,3 +84,34 @@ export function visibleColumnRange(
 export function alignmentFor(descriptor: ColumnDescriptor): 'left' | 'right' {
   return descriptor.typeClass === 'number' ? 'right' : 'left';
 }
+
+/** The display order: stored order filtered to live columns, then any new columns appended. */
+export function resolveColumnOrder(page: TabularPage, stored: string[] | null): string[] {
+  const names = page.columns.map((c) => c.name);
+  if (!stored) return names;
+  const known = new Set(names);
+  const kept = stored.filter((n) => known.has(n));
+  const missing = names.filter((n) => !kept.includes(n));
+  return [...kept, ...missing];
+}
+
+// Pages are frozen and stable by reference (page.ts's setPage), so a WeakMap keyed by the page
+// itself memoises the name -> index lookup exactly once per page — the single mapping §0 note 4
+// exists to guarantee, kept O(1) per call so it stays cheap on the render path.
+const nameIndexCache = new WeakMap<TabularPage, Map<string, number>>();
+
+function nameIndexFor(page: TabularPage): Map<string, number> {
+  let map = nameIndexCache.get(page);
+  if (!map) {
+    map = new Map(page.columns.map((c, i) => [c.name, i]));
+    nameIndexCache.set(page, map);
+  }
+  return map;
+}
+
+/** Display position -> index into page.columns/page.chunks. -1 when the name is gone. */
+export function pageColumnIndexFor(page: TabularPage, order: string[], displayCol: number): number {
+  const name = order[displayCol];
+  if (name === undefined) return -1;
+  return nameIndexFor(page).get(name) ?? -1;
+}
