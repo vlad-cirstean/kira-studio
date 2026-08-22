@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { activeTab } from '../../state/tabs';
 import DataToolbar from '../../views/grid/DataToolbar.vue';
+import FilterToolbar from '../../views/grid/FilterToolbar.vue';
 import EmptyState from './EmptyState.vue';
 
 // §8.12: the connection's colour on the toolbar band, the second of three places it appears
@@ -26,7 +27,7 @@ const tintStyle = computed(() =>
 <template>
   <div v-if="activeTab && activeTab.kind === 'data'" class="toolbar-band" :style="tintStyle">
     <DataToolbar />
-    <!-- FilterToolbar lands in Step 10, stacked below this row (D21). -->
+    <FilterToolbar />
   </div>
   <EmptyState v-else icon="tools" label="No connection selected" />
 </template>
