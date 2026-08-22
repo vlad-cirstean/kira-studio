@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
 import Toolbar from './panels/Toolbar.vue';
+import FilterToolbar from './FilterToolbar.vue';
 import Splitter from './Splitter.vue';
 import StatusBar from './StatusBar.vue';
+import { findDataTab, tabsState } from './state/tabs';
 import {
   layoutState,
   setCellEditorHeight,
@@ -18,6 +20,12 @@ import {
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const cellVisible = computed(() => layoutState.panel.cellEditor.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
+const filterVisible = ref(false);
+// P2 renders the data toolbar only for a `data` tab (P4's `ddl` tab is out of scope here).
+const activeTab = computed(() => {
+  if (tabsState.activeId === null) return null;
+  return findDataTab(tabsState.activeId);
+});
 
 const gridStyle = computed(() => ({
   '--project-w': projectVisible.value ? `${layoutState.panel.project.width}px` : '0px',
@@ -50,9 +58,12 @@ const gridStyle = computed(() => ({
     />
 
     <div class="main-column" style="grid-area: main">
-      <div class="panel-surface tab-strip" data-testid="tab-strip"><TabStrip /></div>
-      <div class="panel-surface toolbar" data-testid="toolbar"><Toolbar /></div>
-      <div class="panel-surface main-view" data-testid="main-view"><MainView /></div>
+      <div class="tab-strip" data-testid="tab-strip"><TabStrip /></div>
+      <div class="toolbar" data-testid="toolbar">
+        <Toolbar v-if="activeTab" :tab-id="activeTab.id" @toggle-filter="filterVisible = !filterVisible" />
+      </div>
+      <FilterToolbar v-if="filterVisible && activeTab" :tab="activeTab" />
+      <div class="main-view" data-testid="main-view"><MainView /></div>
     </div>
 
     <Splitter
@@ -65,12 +76,7 @@ const gridStyle = computed(() => ({
       :max="480"
       @resize="setCellEditorHeight"
     />
-    <div
-      v-if="cellVisible"
-      class="panel-surface"
-      style="grid-area: cell"
-      data-testid="cell-editor"
-    >
+    <div v-if="cellVisible" style="grid-area: cell" data-testid="cell-editor">
       <CellEditorPanel />
     </div>
 
@@ -116,7 +122,8 @@ const gridStyle = computed(() => ({
     1fr var(--cell-split-h) var(--cell-h) var(--ops-split-h) var(--ops-h)
     var(--kira-statusbar-h);
   gap: var(--kira-gap);
-  padding: var(--kira-gap);
+  padding: var(--kira-shell-pad);
+  border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);
 }
 
@@ -139,8 +146,9 @@ const gridStyle = computed(() => ({
 }
 
 .tab-strip {
-  height: 32px;
+  height: 36px;
   flex-shrink: 0;
+  background: var(--kira-bg-chrome);
 }
 
 .toolbar {

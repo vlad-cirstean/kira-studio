@@ -15,7 +15,10 @@
 
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/connection';
+import type { CountRequest, ReadRequest } from '../../shared/data';
 import type { ConnectInfo, ResolvedConnectionConfig } from '../../shared/engine-ops';
+import type { Page } from '../../shared/page';
+import type { SourceText } from '../../shared/ddl';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/tree';
 
 export interface Progress {
@@ -45,6 +48,22 @@ export interface Adapter {
   /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
 
+  /** DDL for one object. Reconstructed (pg tables) or exact (views/functions, MariaDB) per D5. */
+  ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>;
+
+  /** One page of table/view data (P2 D6). The cursor is dual: keyset on PK, else offset. */
+  read(req: ReadRequest, ctx: OpCtx): Promise<Page>;
+
+  /** Exact or estimated row count (P2 D8). Estimate is only offered with no filter. */
+  count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }>;
+
+  /**
+   * Quote one identifier for this dialect (D12). The ONLY valid source of the argument is cached
+   * catalog metadata (a decoded NodePath segment or a describe() column name) — never user
+   * free-text. Postgres doubles `"`, MariaDB doubles `` ` ``; both reject `\0`.
+   */
+  quoteIdent(name: string): string;
+
   /**
    * Forward a cancel for an in-flight op to the server (D5). Returns false when the op was unknown
    * or the server refused; never throws for "already finished". Adapters with caps.cancel === false
@@ -60,10 +79,8 @@ export interface AdapterDeps {
 }
 
 // Adapter roadmap (normative, D3). Each later phase adds exactly these members:
-//   P2   read(req, ctx) -> Page          (Page = TabularPage | DocumentPage | KeyValuePage | StreamPage)
-//   P2   count(req, ctx) -> { value, exact }
-//   P4   ddl(path, ctx) -> SourceText    (caps.ddl)
+//   P4   ddl(path, ctx) -> SourceText    (caps.ddl) — implemented
 //   P5   preview(plan) -> string[]       (caps.writable, synchronous)
 //   P5   mutate(plan, ctx) -> MutationResult (caps.writable)
 //   P5.5 execute(req, ctx) -> Page[]     (caps.sql)
-// Do not add them early.
+// read/count/quoteIdent landed in P2 — do not change them now.

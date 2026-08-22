@@ -12,6 +12,7 @@ import { AdapterError } from './adapters/errors';
 interface ActiveOp {
   controller: AbortController;
   connectionId: string | null;
+  tabId: string | null;
 }
 
 const active = new Map<string, ActiveOp>();
@@ -32,18 +33,20 @@ export interface OpResult<T> {
 type OpFn<T> = (ctx: OpCtx & { setRows(n: number): void }) => Promise<T>;
 
 export async function runOp<T>(
-  spec: { connectionId: string | null; kind: OpKind },
+  spec: { connectionId: string | null; kind: OpKind; tabId?: string | null },
   fn: OpFn<T>,
 ): Promise<OpResult<T>> {
   const opId = randomUUID();
   const controller = new AbortController();
   let rows: number | null = null;
   let command: string | null = null;
+  const tabId = spec.tabId ?? null;
 
-  active.set(opId, { controller, connectionId: spec.connectionId });
+  active.set(opId, { controller, connectionId: spec.connectionId, tabId });
   emitEvent(ENGINE_EVENT.opStart, {
     opId,
     connectionId: spec.connectionId,
+    tabId,
     kind: spec.kind,
     startedAt: new Date().toISOString(),
   });

@@ -53,8 +53,15 @@ function onSave(): void {
 <template>
   <div class="scrim" data-testid="filters-dialog" @click.self="onClose">
     <div class="dialog" role="dialog" aria-modal="true">
+      <div class="header">
+        <span>Saved filters</span>
+        <button type="button" class="header-close" aria-label="Close" @click="onClose">
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
+
       <div class="dialog-body">
-        <div class="preview muted-note">
+        <div class="muted-note preview">
           {{ preview.hidden ? `Hides ${preview.hidden} of ${preview.total} cached nodes.` : 'No nodes hidden.' }}
         </div>
 
@@ -75,7 +82,7 @@ function onSave(): void {
             <input v-model="rule.isRegex" type="checkbox" />
             <span>Regex</span>
           </label>
-          <button type="button" aria-label="Remove rule" @click="removeRule(i)">
+          <button type="button" class="remove" aria-label="Remove rule" @click="removeRule(i)">
             <Codicon name="trash" :size="14" />
           </button>
         </div>
@@ -87,6 +94,7 @@ function onSave(): void {
       </div>
 
       <div class="dialog-footer">
+        <div class="flex-1" />
         <button type="button" data-testid="filters-cancel" @click="onClose">Cancel</button>
         <button type="button" class="primary" data-testid="filters-save" @click="onSave">Save</button>
       </div>
@@ -107,13 +115,46 @@ function onSave(): void {
 
 .dialog {
   width: 480px;
+  max-width: calc(100vw - 32px);
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
+  border-radius: 8px;
   box-shadow: var(--kira-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-size: 12px;
+  color: var(--kira-fg);
+}
+
+.header {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.header-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: var(--kira-radius);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+}
+
+.header-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .dialog-body {
@@ -138,11 +179,17 @@ function onSave(): void {
 .rule-row select,
 .rule-row input[type='text'] {
   background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   border-radius: var(--kira-radius);
   color: var(--kira-fg);
   padding: 3px 6px;
   font-size: 12px;
+  outline: none;
+}
+
+.rule-row select:focus,
+.rule-row input[type='text']:focus {
+  border-color: var(--kira-focus);
 }
 
 .rule-row input[type='text'] {
@@ -158,7 +205,7 @@ function onSave(): void {
   white-space: nowrap;
 }
 
-.rule-row button {
+.rule-row .remove {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,7 +216,7 @@ function onSave(): void {
   cursor: pointer;
 }
 
-.rule-row button:hover {
+.rule-row .remove:hover {
   color: var(--kira-error);
 }
 
@@ -180,10 +227,15 @@ function onSave(): void {
   align-self: flex-start;
   padding: 3px 8px;
   border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   cursor: pointer;
+  font-size: 12px;
+}
+
+.add-rule:hover {
+  background: var(--kira-hover);
 }
 
 .muted-note {
@@ -192,6 +244,7 @@ function onSave(): void {
 }
 
 .dialog-footer {
+  flex-shrink: 0;
   border-top: var(--kira-border-width) solid var(--kira-border);
   padding: 8px 12px;
   display: flex;
@@ -205,15 +258,25 @@ function onSave(): void {
   gap: 4px;
   padding: 4px 10px;
   border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   cursor: pointer;
+  font-size: 12px;
+}
+
+.dialog-footer button:hover {
+  background: var(--kira-hover);
 }
 
 .dialog-footer button.primary {
   background: var(--kira-accent);
   border-color: var(--kira-accent);
   color: var(--kira-accent-fg);
+}
+
+.dialog-footer button.primary:hover {
+  background: var(--kira-accent);
+  filter: brightness(1.1);
 }
 </style>

@@ -1,7 +1,7 @@
 import type { MessagePortMain } from 'electron';
 import type { PortRequest, PortResponse } from '../shared/port';
 import { handleFrame } from './control';
-import { dispatch } from './rpc';
+import { dispatch, setPortEmitter } from './rpc';
 
 let activePort: MessagePortMain | null = null;
 
@@ -16,6 +16,7 @@ process.parentPort.on('message', (e) => {
     const port = e.ports[0];
     if (!port) return;
     activePort = port;
+    setPortEmitter((topic, payload) => activePort?.postMessage({ kind: 'evt', topic, payload }));
     port.start();
     port.on('message', (portEvent) => {
       handleRequest(port, portEvent.data as PortRequest);

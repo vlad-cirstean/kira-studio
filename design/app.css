@@ -1,0 +1,19 @@
+/* The handful of things Tailwind utilities genuinely can't express — kept tiny on purpose. */
+
+.kira-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.kira-scroll::-webkit-scrollbar-thumb {
+  background: var(--kira-scrollbar);
+  border-radius: var(--kira-radius);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.kira-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kira-mono {
+  font-family: var(--kira-font-family);
+}

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { RowDensity } from '@shared/settings';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, reactive, ref } from 'vue';
 import Codicon from '../theme/Codicon.vue';
-import { patchSettings, settingsState } from './state/settings';
+import { applyAppearance, patchSettings, settingsState } from './state/settings';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -11,6 +11,32 @@ type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
 
 const dialogRef = ref<HTMLElement | null>(null);
+
+// Draft-based editing: changes preview live but are only persisted on Save. Closing (or Escape /
+// scrim) restores the values that were persisted when the dialog opened.
+const saved = { ...settingsState.appearance };
+const draft = reactive({ ...settingsState.appearance });
+
+function preview(): void {
+  Object.assign(settingsState.appearance, draft);
+  applyAppearance();
+}
+
+async function onSave(): Promise<void> {
+  await patchSettings({ appearance: { ...draft } });
+  emit('close');
+}
+
+function onClose(): void {
+  Object.assign(settingsState.appearance, saved);
+  applyAppearance();
+  emit('close');
+}
+
+function setRowDensity(density: RowDensity): void {
+  draft.rowDensity = density;
+  preview();
+}
 
 function focusable(): HTMLElement[] {
   if (!dialogRef.value) return [];
@@ -23,7 +49,7 @@ function focusable(): HTMLElement[] {
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
-    emit('close');
+    onClose();
     return;
   }
   if (e.key !== 'Tab') return;
@@ -48,25 +74,23 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
 });
-
-function onFontFamilyChange(e: Event): void {
-  void patchSettings({ appearance: { fontFamily: (e.target as HTMLInputElement).value } });
-}
-
-function onFontSizeChange(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (Number.isNaN(value)) return;
-  void patchSettings({ appearance: { fontSize: value } });
-}
-
-function setRowDensity(density: RowDensity): void {
-  void patchSettings({ appearance: { rowDensity: density } });
-}
 </script>
 
 <template>
-  <div class="scrim" data-testid="settings-dialog" @click.self="emit('close')">
+  <div class="scrim" data-testid="settings-dialog" @click.self="onClose">
     <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="header">
+        <span>Settings</span>
+        <button
+          type="button"
+          class="header-close"
+          aria-label="Close settings"
+          @click="onClose"
+        >
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
+
       <div class="dialog-body">
         <nav class="section-list">
           <button
@@ -89,8 +113,8 @@ function setRowDensity(density: RowDensity): void {
               <input
                 type="text"
                 list="kira-font-families"
-                :value="settingsState.appearance.fontFamily"
-                @change="onFontFamilyChange"
+                v-model="draft.fontFamily"
+                @input="preview"
               />
               <datalist id="kira-font-families">
                 <option value="'SF Mono', Menlo, monospace" />
@@ -106,8 +130,8 @@ function setRowDensity(density: RowDensity): void {
                 type="number"
                 min="9"
                 max="24"
-                :value="settingsState.appearance.fontSize"
-                @change="onFontSizeChange"
+                v-model.number="draft.fontSize"
+                @change="preview"
               />
             </label>
 
@@ -116,14 +140,14 @@ function setRowDensity(density: RowDensity): void {
               <div class="segmented">
                 <button
                   type="button"
-                  :class="{ active: settingsState.appearance.rowDensity === 'compact' }"
+                  :class="{ active: draft.rowDensity === 'compact' }"
                   @click="setRowDensity('compact')"
                 >
                   Compact
                 </button>
                 <button
                   type="button"
-                  :class="{ active: settingsState.appearance.rowDensity === 'comfortable' }"
+                  :class="{ active: draft.rowDensity === 'comfortable' }"
                   @click="setRowDensity('comfortable')"
                 >
                   Comfortable
@@ -157,7 +181,7 @@ function setRowDensity(density: RowDensity): void {
               <span>Hit rate</span>
               <input type="text" value="—" disabled />
             </label>
-            <button type="button" disabled>Clear caches</button>
+            <button type="button" class="secondary-button" disabled>Clear caches</button>
             <p class="muted-note">Available once data views land.</p>
           </template>
 
@@ -176,9 +200,17 @@ function setRowDensity(density: RowDensity): void {
       </div>
 
       <div class="dialog-footer">
-        <button type="button" data-testid="settings-close" @click="emit('close')">
-          <Codicon name="close" />
+        <button
+          type="button"
+          class="footer-close"
+          data-testid="settings-close"
+          @click="onClose"
+        >
+          <Codicon name="close" :size="12" />
           Close
+        </button>
+        <button type="button" class="footer-save" data-testid="settings-save" @click="onSave">
+          Save
         </button>
       </div>
     </div>
@@ -201,11 +233,41 @@ function setRowDensity(density: RowDensity): void {
   height: 400px;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
+  border-radius: 8px;
   box-shadow: var(--kira-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.header {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.header-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: var(--kira-radius);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+}
+
+.header-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .dialog-body {
@@ -220,7 +282,7 @@ function setRowDensity(density: RowDensity): void {
   border-right: var(--kira-border-width) solid var(--kira-border);
   display: flex;
   flex-direction: column;
-  padding: var(--kira-gap);
+  padding: 4px;
   gap: 2px;
 }
 
@@ -232,6 +294,12 @@ function setRowDensity(density: RowDensity): void {
   border: none;
   color: var(--kira-fg-muted);
   cursor: pointer;
+  font-size: 12px;
+}
+
+.section-item:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 
 .section-item.active {
@@ -262,12 +330,23 @@ function setRowDensity(density: RowDensity): void {
 }
 
 .field input[type='text'],
-.field input[type='number'] {
+.field input[type='number'],
+.field input[type='checkbox'] {
   background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   border-radius: var(--kira-radius);
   color: var(--kira-fg);
   padding: 4px 6px;
+  outline: none;
+}
+
+.field input[type='text']:focus,
+.field input[type='number']:focus {
+  border-color: var(--kira-focus);
+}
+
+.field input[disabled] {
+  color: var(--kira-fg-disabled);
 }
 
 .segmented {
@@ -279,15 +358,27 @@ function setRowDensity(density: RowDensity): void {
   flex: 1;
   padding: 4px 8px;
   border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
   cursor: pointer;
+  font-size: 12px;
 }
 
 .segmented button.active {
   background: var(--kira-select);
   color: var(--kira-fg);
+}
+
+.secondary-button {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .muted-note {
@@ -296,21 +387,42 @@ function setRowDensity(density: RowDensity): void {
 }
 
 .dialog-footer {
+  flex-shrink: 0;
   border-top: var(--kira-border-width) solid var(--kira-border);
   padding: 8px 12px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
-.dialog-footer button {
+.footer-close {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
   border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   cursor: pointer;
+  font-size: 12px;
+}
+
+.footer-close:hover {
+  background: var(--kira-hover);
+}
+
+.footer-save {
+  padding: 4px 10px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-accent);
+  background: var(--kira-accent);
+  color: var(--kira-accent-fg);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.footer-save:hover {
+  filter: brightness(1.1);
 }
 </style>

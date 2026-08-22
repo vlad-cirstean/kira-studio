@@ -14,6 +14,8 @@
   --color-disabled: var(--kira-fg-disabled);
   --color-border: var(--kira-border);
   --color-border-strong: var(--kira-border-strong);
+  --color-line: var(--kira-border);
+  --color-line-strong: var(--kira-border-strong);
   --color-focus: var(--kira-focus);
   --color-accent: var(--kira-accent);
   --color-accent-fg: var(--kira-accent-fg);
@@ -21,6 +23,7 @@
   --color-hover: var(--kira-hover);
   --color-badge: var(--kira-badge);
   --color-error: var(--kira-error);
+  --color-err: var(--kira-error);
   --color-warn: var(--kira-warn);
   --color-ok: var(--kira-ok);
   --color-info: var(--kira-info);
@@ -39,6 +42,12 @@
   --color-conn-grey: var(--kira-conn-grey);
 
   --radius-kira: var(--kira-radius);
+  --shadow-kira: var(--kira-shadow);
+}
+
+/* Design-review chrome (design/app.css): the handful of things utilities can't express. */
+.kira-mono {
+  font-family: var(--kira-font-family);
 }
 
 html,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import EmptyState from './EmptyState.vue';
+// No cell selected yet (P3 cell editor). The panel renders as a plain background.
 </script>
 
 <template>
-  <EmptyState icon="edit" label="No cell selected" />
+  <div />
 </template>

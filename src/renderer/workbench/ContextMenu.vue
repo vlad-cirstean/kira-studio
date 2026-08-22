@@ -59,14 +59,15 @@ function onBlur(): void {
 }
 
 watch(
-  () => contextMenuState.open,
-  (open) => {
+  () => [contextMenuState.open, contextMenuState.x, contextMenuState.y] as const,
+  ([open]) => {
     if (open) {
       pos.value = { x: contextMenuState.x, y: contextMenuState.y };
       openSubmenu.value = null;
       clamp();
     }
   },
+  { immediate: true },
 );
 
 onMounted(() => {
@@ -150,7 +151,7 @@ onUnmounted(() => {
   border: var(--kira-border-width) solid var(--kira-border-strong);
   border-radius: var(--kira-radius);
   box-shadow: var(--kira-shadow);
-  padding: 3px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
 }
@@ -159,8 +160,9 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 8px;
+  height: 26px;
+  padding: 0 8px;
   border-radius: var(--kira-radius);
   font-size: 12px;
   color: var(--kira-fg);
@@ -169,16 +171,32 @@ onUnmounted(() => {
 }
 
 .menu-item:hover {
-  background: var(--kira-select);
+  background: var(--kira-accent);
+  color: #fff;
+}
+
+.menu-item:hover .item-icon,
+.menu-item:hover .chevron {
+  color: #fff;
 }
 
 .menu-item.danger {
   color: var(--kira-error);
 }
 
+.menu-item.danger:hover {
+  background: var(--kira-error);
+  color: #fff;
+}
+
 .menu-item.disabled {
   color: var(--kira-fg-disabled);
   cursor: default;
+}
+
+.menu-item.disabled:hover {
+  background: transparent;
+  color: var(--kira-fg-disabled);
 }
 
 .gutter {
@@ -190,8 +208,12 @@ onUnmounted(() => {
 }
 
 .item-icon {
+  width: 14px;
   color: var(--kira-fg-muted);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .label {
@@ -208,19 +230,19 @@ onUnmounted(() => {
 .separator {
   height: 1px;
   background: var(--kira-border);
-  margin: 3px 6px;
+  margin: 4px 2px;
 }
 
 .submenu {
   position: absolute;
   left: calc(100% + 2px);
-  top: -3px;
+  top: -4px;
   min-width: 180px;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
   border-radius: var(--kira-radius);
   box-shadow: var(--kira-shadow);
-  padding: 3px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
 }

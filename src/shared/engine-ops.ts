@@ -20,9 +20,17 @@ export const ENGINE_OP = {
   disconnect: 'adapter:disconnect',
   children: 'adapter:children',
   describe: 'adapter:describe',
+  ddl: 'adapter:ddl',
   test: 'adapter:test',
   cancel: 'adapter:cancel',
+  configure: 'engine:configure',
 } as const;
+
+export const configurePayloadSchema = z.object({
+  l2BudgetBytes: z.number(),
+  l3TtlSeconds: z.number(),
+});
+export type ConfigurePayload = z.infer<typeof configurePayloadSchema>;
 
 export const ENGINE_EVENT = {
   opStart: 'op:start',
@@ -63,8 +71,22 @@ export type TestResult = z.infer<typeof testResultSchema>;
 // ---- request payload schemas (engine parses these before use) ----
 export const connectPayloadSchema = resolvedConnectionConfigSchema;
 export const disconnectPayloadSchema = z.object({ connectionId: z.string() });
-export const childrenPayloadSchema = z.object({ connectionId: z.string(), path: z.string() });
-export const describePayloadSchema = z.object({ connectionId: z.string(), path: z.string() });
+export const childrenPayloadSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+  refresh: z.boolean().default(false),
+});
+export const describePayloadSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+  refresh: z.boolean().default(false),
+});
+export const ddlPayloadSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+  refresh: z.boolean().default(false),
+});
+export type DdlPayload = z.infer<typeof ddlPayloadSchema>;
 export const testPayloadSchema = resolvedConnectionConfigSchema;
 export const cancelPayloadSchema = z.object({ opId: z.string() });
 
@@ -72,6 +94,7 @@ export const cancelPayloadSchema = z.object({ opId: z.string() });
 export const opStartEventSchema = z.object({
   opId: z.string(),
   connectionId: z.string().nullable(),
+  tabId: z.string().nullable(),
   kind: opKindSchema,
   startedAt: z.string(),
 });

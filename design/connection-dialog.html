@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Kira Studio — Connection dialog design</title>
+<link rel="stylesheet" href="../node_modules/@vscode/codicons/dist/codicon.css" />
+<link rel="stylesheet" href="../src/renderer/theme/tokens.css" />
+<link rel="stylesheet" href="app.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+<body class="bg-neutral-950 text-neutral-300 font-sans">
+<div class="min-h-full flex flex-col items-center gap-6 p-8">
+
+  <nav class="w-full max-w-[1400px] flex gap-4 text-xs text-neutral-400">
+    <a href="index.html" class="hover:text-white">← All components</a>
+    <a href="workbench.html" class="hover:text-white">Workbench shell</a>
+    <a href="connection-dialog.html" class="text-white">Connection dialog</a>
+  </nav>
+
+  <div class="w-full flex items-center justify-center py-10">
+    <div class="w-[440px] rounded-lg border border-line-strong bg-elevated shadow-kira overflow-hidden kira-mono text-[12px] text-fg">
+
+      <div class="h-9 flex items-center justify-between px-3 border-b border-line text-[13px] font-semibold">
+        <span>Edit connection</span>
+        <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg"><span class="codicon codicon-close"></span></button>
+      </div>
+
+      <div class="p-4 flex flex-col gap-4">
+
+        <div class="flex items-center gap-3">
+          <label class="w-[72px] flex-shrink-0 text-muted">Name</label>
+          <input class="flex-1 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" value="shop_prod" />
+        </div>
+
+        <div class="flex items-start gap-3">
+          <label class="w-[72px] flex-shrink-0 text-muted pt-1">Color</label>
+          <div class="flex flex-wrap gap-2 flex-1">
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-red)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-orange)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-amber)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-olive)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-green)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-teal)"></button>
+            <button class="w-5 h-5 rounded-full ring-2 ring-offset-2 ring-offset-elevated ring-white" style="background: var(--kira-conn-blue)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-cyan)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-indigo)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-violet)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-magenta)"></button>
+            <button class="w-5 h-5 rounded-full" style="background: var(--kira-conn-grey)"></button>
+          </div>
+        </div>
+
+        <div class="flex gap-1 border-b border-line -mx-4 px-4">
+          <button class="h-7 px-3 text-xs font-medium border-b-2 border-accent text-fg">Fields</button>
+          <button class="h-7 px-3 text-xs font-medium border-b-2 border-transparent text-muted hover:text-fg">URI</button>
+        </div>
+
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center gap-3">
+            <label class="w-[72px] flex-shrink-0 text-muted">Host</label>
+            <input class="flex-1 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" value="prod-pg.internal.shop.co" />
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="w-[72px] flex-shrink-0 text-muted">Port</label>
+            <input class="w-24 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" value="5432" />
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="w-[72px] flex-shrink-0 text-muted">Database</label>
+            <input class="flex-1 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" value="shop" />
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="w-[72px] flex-shrink-0 text-muted">User</label>
+            <input class="flex-1 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" value="app_readwrite" />
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="w-[72px] flex-shrink-0 text-muted">Password</label>
+            <div class="flex-1 flex items-center gap-1">
+              <input class="flex-1 h-6 bg-input border border-line-strong rounded-kira text-fg text-xs px-2 outline-none focus:border-focus" type="password" value="••••••••••••" />
+              <button class="w-6 h-6 rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg flex-shrink-0" title="Reveal"><span class="codicon codicon-eye"></span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-2 rounded-kira border border-line bg-warn/10 px-2.5 py-2 text-[11px] text-warn">
+          <span class="codicon codicon-warning flex-shrink-0 mt-px"></span>
+          <span>Credentials are stored in plain text at <code class="font-mono">~/.kira-studio/kira.sqlite</code>.</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 flex-shrink-0 whitespace-nowrap cursor-pointer">
+            <span class="relative inline-block w-8 h-[18px] flex-shrink-0">
+              <input type="checkbox" class="sr-only peer" />
+              <span class="absolute inset-0 rounded-full bg-input border border-line-strong peer-checked:bg-accent peer-checked:border-accent transition-colors"></span>
+              <span class="absolute left-[2px] top-[2px] w-3.5 h-3.5 rounded-full bg-fg-disabled bg-white/80 transition-transform peer-checked:translate-x-[14px]"></span>
+            </span>
+            <span class="text-fg">Read-only</span>
+          </label>
+          <span class="text-[11px] text-disabled">Blocks every mutation path for this connection, enforced in the engine.</span>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button class="h-7 px-3 rounded-kira border border-line-strong bg-input text-xs font-medium flex items-center gap-1.5 hover:bg-hover">
+            <span class="codicon codicon-plug"></span> Test connection
+          </button>
+          <span class="flex items-center gap-1.5 text-[11px] text-ok"><span class="codicon codicon-check"></span> Connected — PostgreSQL 17.2</span>
+        </div>
+
+      </div>
+
+      <div class="h-11 flex items-center gap-2 px-4 border-t border-line">
+        <button class="h-6 px-3 rounded-kira border border-line-strong bg-input text-xs font-medium text-err hover:bg-hover">Delete</button>
+        <div class="flex-1"></div>
+        <button class="h-6 px-3 rounded-kira border border-line-strong bg-input text-xs font-medium hover:bg-hover">Cancel</button>
+        <button class="h-6 px-3 rounded-kira bg-accent text-accent-fg text-xs font-medium hover:brightness-110">Save</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

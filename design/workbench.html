@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Kira Studio — Workbench design</title>
+<link rel="stylesheet" href="../node_modules/@vscode/codicons/dist/codicon.css" />
+<link rel="stylesheet" href="../src/renderer/theme/tokens.css" />
+<link rel="stylesheet" href="app.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+<body class="bg-neutral-950 text-neutral-300 font-sans">
+<div class="min-h-full flex flex-col items-center gap-3 p-8">
+
+  <nav class="w-full max-w-[1400px] flex gap-4 text-xs text-neutral-400">
+    <a href="index.html" class="hover:text-white">← All components</a>
+    <a href="workbench.html" class="text-white">Workbench shell</a>
+    <a href="connection-dialog.html" class="hover:text-white">Connection dialog</a>
+  </nav>
+
+  <div class="w-full max-w-[1400px] rounded-[10px] overflow-hidden border border-black shadow-[0_24px_64px_rgba(0,0,0,0.55)] kira-mono">
+
+    <!-- title bar -->
+    <div class="h-7 bg-chrome border-b border-black flex items-center relative flex-shrink-0">
+      <div class="flex gap-2 pl-3">
+        <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
+        <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
+        <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
+      </div>
+      <div class="absolute left-1/2 -translate-x-1/2 text-xs text-muted">Kira Studio — orders · shop_prod</div>
+    </div>
+
+    <!-- workbench shell -->
+    <div class="h-[860px] flex flex-col gap-1 p-1 bg-chrome text-[12px]">
+
+      <div class="flex-1 flex gap-1 min-h-0">
+
+        <!-- project panel -->
+        <div class="w-[260px] flex-shrink-0 rounded-kira border border-line bg-bg flex flex-col overflow-hidden" data-testid="project-panel">
+          <div class="h-7 flex items-center justify-between px-2 text-[11px] font-semibold uppercase tracking-wide text-muted border-b border-line flex-shrink-0">
+            <span>Project</span>
+            <div class="flex gap-0.5">
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Filters"><span class="codicon codicon-filter"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="New connection"><span class="codicon codicon-add"></span></button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 px-2 py-1.5 border-b border-line text-disabled flex-shrink-0">
+            <span class="codicon codicon-search"></span>
+            <input class="flex-1 bg-transparent outline-none text-fg placeholder-disabled text-xs" placeholder="Search cached nodes…" value="ord" />
+          </div>
+
+          <div class="flex-1 overflow-auto kira-scroll py-1">
+
+            <div class="relative h-[22px] flex items-center gap-1 pl-2 pr-2 hover:bg-hover cursor-default">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-down text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0"></span>
+              <span class="codicon codicon-server-environment text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">shop_prod</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0" style="box-shadow: 0 0 4px var(--kira-ok)"></span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:24px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-down text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-database text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">shop</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:40px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-down text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-symbol-namespace text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">public</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 bg-select cursor-default" style="padding-left:56px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-table text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate"><mark class="bg-conn-amber/40 text-inherit rounded-sm px-0.5">ord</mark>ers</span>
+              <span class="text-[10px] text-disabled flex-shrink-0">~842k</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:56px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-table text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate"><mark class="bg-conn-amber/40 text-inherit rounded-sm px-0.5">ord</mark>er_items</span>
+              <span class="text-[10px] text-disabled flex-shrink-0">~2.1M</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:56px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-table text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">customers</span>
+              <span class="text-[10px] text-disabled flex-shrink-0">~118k</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:56px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-eye text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">customer_ltv</span>
+              <span class="text-[10px] px-1.5 py-px rounded-sm bg-badge text-fg flex-shrink-0">VIEW</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pr-2 hover:bg-hover cursor-default" style="padding-left:24px">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-blue)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="codicon codicon-database text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate">analytics</span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pl-2 pr-2 hover:bg-hover cursor-default">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-amber)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-disabled flex-shrink-0"></span>
+              <span class="codicon codicon-server-environment text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate text-muted">reporting_readonly</span>
+              <span class="codicon codicon-lock text-[10px] text-disabled flex-shrink-0" title="Read-only"></span>
+            </div>
+
+            <div class="relative h-[22px] flex items-center gap-1 pl-2 pr-2 hover:bg-hover cursor-default">
+              <span class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85" style="background: var(--kira-conn-green)"></span>
+              <span class="codicon codicon-chevron-right text-muted text-[13px] w-3.5 flex-shrink-0"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-disabled flex-shrink-0"></span>
+              <span class="codicon codicon-server-environment text-muted text-sm flex-shrink-0"></span>
+              <span class="flex-1 truncate text-muted">mariadb_legacy</span>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="w-1 flex-shrink-0 cursor-col-resize"></div>
+
+        <!-- main column -->
+        <div class="flex-1 flex flex-col gap-1 min-w-0 min-h-0">
+
+          <!-- tab strip -->
+          <div class="h-9 flex-shrink-0 rounded-kira border border-line bg-chrome overflow-hidden flex" data-testid="tab-strip">
+            <div class="flex items-stretch overflow-x-auto flex-1 min-w-0">
+              <div class="relative flex items-center gap-2 pl-3 pr-2 min-w-[120px] max-w-[200px] border-r border-line border-t-2 bg-bg text-fg group cursor-default" style="border-top-color: var(--kira-conn-blue)">
+                <span class="codicon codicon-table text-[15px] flex-shrink-0 text-muted"></span>
+                <span class="flex-1 truncate">orders</span>
+                <span class="codicon codicon-close w-[18px] h-[18px] flex items-center justify-center rounded text-[12px] flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-hover"></span>
+              </div>
+              <div class="relative flex items-center gap-2 pl-3 pr-2 min-w-[120px] max-w-[200px] border-r border-line border-t-2 border-t-transparent text-muted hover:text-fg hover:bg-hover group cursor-default">
+                <span class="codicon codicon-table text-[15px] flex-shrink-0"></span>
+                <span class="flex-1 truncate">orders</span>
+                <span class="text-[10px] text-disabled flex-shrink-0 group-hover:hidden">2</span>
+                <span class="codicon codicon-close w-[18px] h-[18px] flex items-center justify-center rounded text-[12px] flex-shrink-0 hidden group-hover:flex hover:bg-hover"></span>
+              </div>
+              <div class="relative flex items-center gap-2 pl-3 pr-2 min-w-[120px] max-w-[200px] border-r border-line border-t-2 border-t-transparent text-muted hover:text-fg hover:bg-hover group cursor-default">
+                <span class="codicon codicon-symbol-field text-[15px] flex-shrink-0"></span>
+                <span class="flex-1 truncate">order_items</span>
+                <span class="codicon codicon-close w-[18px] h-[18px] flex items-center justify-center rounded text-[12px] flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-hover"></span>
+              </div>
+              <div class="relative flex items-center gap-2 pl-3 pr-2 min-w-[120px] max-w-[200px] border-r border-line border-t-2 border-t-transparent text-muted hover:text-fg hover:bg-hover group cursor-default">
+                <span class="codicon codicon-code text-[15px] flex-shrink-0"></span>
+                <span class="flex-1 truncate">DDL: customers</span>
+                <span class="codicon codicon-close w-[18px] h-[18px] flex items-center justify-center rounded text-[12px] flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-hover"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- toolbar + filter row -->
+          <div class="flex-shrink-0 rounded-kira border bg-bg" style="border-color: var(--kira-conn-blue)" data-testid="toolbar">
+            <div class="h-8 flex items-center gap-0.5 px-1.5">
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Refresh"><span class="codicon codicon-refresh"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-err hover:bg-hover" title="Stop"><span class="codicon codicon-debug-stop"></span></button>
+              <div class="w-px h-4 bg-line mx-1"></div>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="First page"><span class="codicon codicon-arrow-left"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Previous page"><span class="codicon codicon-chevron-left"></span></button>
+              <span class="text-[11px] text-muted px-1 whitespace-nowrap">page 1 of ?</span>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Next page"><span class="codicon codicon-chevron-right"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Last page"><span class="codicon codicon-arrow-right"></span></button>
+              <div class="w-px h-4 bg-line mx-1"></div>
+              <select class="h-[22px] bg-input border border-line-strong rounded-kira text-fg text-xs px-1 outline-none" title="Page size">
+                <option>100</option>
+                <option selected>1,000</option>
+                <option>10,000</option>
+              </select>
+              <button class="h-[22px] px-1.5 rounded-kira flex items-center gap-1 text-muted hover:bg-hover hover:text-fg text-[11px]" title="Count all rows"><span class="codicon codicon-symbol-numeric"></span>Count</button>
+              <button class="h-[22px] px-1.5 rounded-kira flex items-center gap-1 text-muted hover:bg-hover hover:text-fg text-[11px]" title="Columns / projection"><span class="codicon codicon-list-selection"></span>Columns</button>
+              <div class="w-px h-4 bg-line mx-1"></div>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Add row"><span class="codicon codicon-add"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Delete row"><span class="codicon codicon-remove"></span></button>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Preview command"><span class="codicon codicon-terminal"></span></button>
+              <div class="flex-1"></div>
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Search in results"><span class="codicon codicon-search"></span></button>
+            </div>
+            <div class="h-7 flex items-center border-t border-line px-1.5 gap-1">
+              <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="History"><span class="codicon codicon-history"></span></button>
+              <span class="text-[10px] font-semibold text-disabled tracking-wide px-1 flex-shrink-0">WHERE</span>
+              <input class="flex-[1.4] h-5 bg-input border border-line-strong rounded-kira text-fg text-[11px] px-2 outline-none focus:border-focus" value="status = 'paid' and total_cents &gt; 5000" />
+              <span class="text-[10px] font-semibold text-disabled tracking-wide px-1 flex-shrink-0">ORDER BY</span>
+              <input class="flex-1 h-5 bg-input border border-line-strong rounded-kira text-fg text-[11px] px-2 outline-none focus:border-focus text-right" value="created_at DESC" />
+            </div>
+          </div>
+
+          <!-- data grid -->
+          <div class="flex-1 min-h-0 rounded-kira border bg-bg overflow-hidden flex flex-col" style="border-color: var(--kira-conn-blue)" data-testid="main-view">
+            <div class="flex-1 overflow-auto kira-scroll">
+              <div class="flex sticky top-0 bg-chrome border-b border-line z-10">
+                <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line"></div>
+                <div class="w-16 h-[26px] flex-shrink-0 flex items-center gap-1 px-2 border-r border-line text-[11px] font-semibold text-muted">id <span class="codicon codicon-key text-[11px] opacity-80"></span></div>
+                <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line text-[11px] font-semibold text-muted">customer_id</div>
+                <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center gap-1 px-2 border-r border-line text-[11px] font-semibold text-fg">created_at <span class="codicon codicon-arrow-down text-[11px] opacity-80"></span></div>
+                <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line text-[11px] font-semibold text-muted">status</div>
+                <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line text-[11px] font-semibold text-muted">total_cents</div>
+                <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line text-[11px] font-semibold text-muted">shipping_address</div>
+                <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line text-[11px] font-semibold text-muted">metadata</div>
+              </div>
+
+              <div>
+                <div class="flex hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">1</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">88213</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">4471</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">2026-08-21 14:02:11</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-ok/15 text-ok">paid</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">14299</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">221 Baker St, London</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate text-[#9cdcfe]">{"gift":true,"note":…}</div>
+                </div>
+                <div class="flex bg-white/[0.015] hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">2</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums bg-select">88214</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate bg-select">1820</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate bg-select">2026-08-21 13:58:40</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line bg-select"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-ok/15 text-ok">paid</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums bg-select">5899</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate bg-select">9 Rue Lafayette, Paris</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate italic text-disabled bg-select">NULL</div>
+                </div>
+                <div class="flex hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">3</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">88215</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">7710</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">2026-08-21 13:41:02</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-warn/15 text-warn">pending</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">22140</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">Alexanderplatz 3, Berlin</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate text-[#9cdcfe]">{"gift":false}</div>
+                </div>
+                <div class="flex bg-white/[0.015] hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">4</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">88216</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">3391</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">2026-08-21 13:30:55</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-err/15 text-err">refunded</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">7650</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate italic text-disabled">NULL</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate text-[#9cdcfe]">{"gift":true,"note":"leave at door"}</div>
+                </div>
+                <div class="flex hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">5</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">88217</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">9042</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">2026-08-21 13:12:09</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-ok/15 text-ok">paid</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">3120</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">Via Roma 12, Milan</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate text-[#9cdcfe]">{}</div>
+                </div>
+                <div class="flex bg-white/[0.015] hover:bg-hover">
+                  <div class="w-10 h-[26px] flex-shrink-0 flex items-center justify-end px-2 text-[11px] text-disabled bg-chrome border-r border-line">6</div>
+                  <div class="w-16 h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">88218</div>
+                  <div class="w-[140px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">1820</div>
+                  <div class="w-[150px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">2026-08-21 12:59:31</div>
+                  <div class="w-[110px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line"><span class="text-[10px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide bg-ok/15 text-ok">paid</span></div>
+                  <div class="w-[120px] h-[26px] flex-shrink-0 flex items-center justify-end px-2 border-r border-line tabular-nums">9990</div>
+                  <div class="w-[220px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate">9 Rue Lafayette, Paris</div>
+                  <div class="w-[200px] h-[26px] flex-shrink-0 flex items-center px-2 border-r border-line truncate text-[#9cdcfe]">{"gift":false}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- cell editor -->
+          <div class="h-[160px] flex-shrink-0 rounded-kira border bg-bg flex flex-col overflow-hidden" style="border-color: var(--kira-conn-blue)" data-testid="cell-editor">
+            <div class="h-7 flex items-center justify-between px-2 text-[11px] font-semibold uppercase tracking-wide text-muted border-b border-line flex-shrink-0">
+              <span>Cell editor — orders.shipping_address (row 2)</span>
+              <div class="flex gap-1 items-center normal-case font-normal">
+                <select class="h-5 bg-input border border-line-strong rounded-kira text-fg text-[11px] px-1 outline-none">
+                  <option>Auto (text)</option>
+                  <option>JSON</option>
+                  <option>XML</option>
+                  <option>Base64</option>
+                </select>
+                <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Indented"><span class="codicon codicon-symbol-array"></span></button>
+                <button class="w-[22px] h-[22px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Compact"><span class="codicon codicon-whole-word"></span></button>
+              </div>
+            </div>
+            <div class="flex-1 p-3 text-xs overflow-auto kira-scroll">9 Rue Lafayette, Paris, 75009, FR</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="h-1 flex-shrink-0 cursor-row-resize"></div>
+
+      <!-- operations panel -->
+      <div class="h-[190px] flex-shrink-0 rounded-kira border border-line bg-bg flex flex-col overflow-hidden" data-testid="operations-panel">
+        <div class="h-7 flex items-center justify-between px-2 text-[11px] font-semibold uppercase tracking-wide text-muted border-b border-line flex-shrink-0">
+          <span>Operations</span>
+          <input class="h-5 w-40 bg-input border border-line-strong rounded-kira text-fg text-[11px] px-2 outline-none normal-case font-normal" placeholder="Filter…" />
+        </div>
+        <div class="flex-1 overflow-auto kira-scroll text-[11px]">
+          <div class="flex items-center gap-2.5 h-6 px-2.5 border-b border-line text-muted hover:bg-hover">
+            <span class="w-[60px] text-disabled tabular-nums flex-shrink-0">14:02:11</span>
+            <span class="w-2 h-2 rounded-sm flex-shrink-0" style="background: var(--kira-conn-blue)"></span>
+            <span class="w-[70px] truncate flex-shrink-0">orders</span>
+            <span class="w-14 text-info flex-shrink-0">read</span>
+            <span class="w-16 flex items-center gap-1 flex-shrink-0 text-ok">ok</span>
+            <span class="w-14 text-right tabular-nums flex-shrink-0">42 ms</span>
+            <span class="w-20 text-right tabular-nums flex-shrink-0">1,000 rows</span>
+            <span class="flex-1 truncate">SELECT id, customer_id, created_at, status … FROM orders WHERE status = 'paid' ORDER BY created_at DESC LIMIT 1000</span>
+          </div>
+          <div class="relative flex items-center gap-2.5 h-6 px-2.5 border-b border-line text-fg hover:bg-hover">
+            <span class="w-[60px] text-disabled tabular-nums flex-shrink-0">14:02:09</span>
+            <span class="w-2 h-2 rounded-sm flex-shrink-0" style="background: var(--kira-conn-amber)"></span>
+            <span class="w-[70px] truncate flex-shrink-0">console</span>
+            <span class="w-14 text-info flex-shrink-0">count</span>
+            <span class="w-16 flex items-center gap-1 flex-shrink-0 text-warn"><span class="w-[9px] h-[9px] rounded-full border-[1.5px] border-warn border-t-transparent animate-spin"></span>running</span>
+            <span class="w-14 text-right tabular-nums flex-shrink-0">—</span>
+            <span class="w-20 text-right tabular-nums flex-shrink-0">—</span>
+            <span class="flex-1 truncate">SELECT count(*) FROM order_items</span>
+            <button class="absolute right-1 w-5 h-5 rounded-kira flex items-center justify-center text-err hover:bg-hover" title="Cancel"><span class="codicon codicon-debug-stop"></span></button>
+          </div>
+          <div class="flex items-center gap-2.5 h-6 px-2.5 border-b border-line text-muted hover:bg-hover">
+            <span class="w-[60px] text-disabled tabular-nums flex-shrink-0">14:01:52</span>
+            <span class="w-2 h-2 rounded-sm flex-shrink-0" style="background: var(--kira-conn-blue)"></span>
+            <span class="w-[70px] truncate flex-shrink-0">tree</span>
+            <span class="w-14 text-info flex-shrink-0">describe</span>
+            <span class="w-16 flex items-center gap-1 flex-shrink-0 text-ok">ok</span>
+            <span class="w-14 text-right tabular-nums flex-shrink-0">11 ms</span>
+            <span class="w-20 text-right tabular-nums flex-shrink-0">14 cols</span>
+            <span class="flex-1 truncate">catalog: pg_attribute for shop.public.customers</span>
+          </div>
+          <div class="flex items-center gap-2.5 h-6 px-2.5 border-b border-line text-muted hover:bg-hover">
+            <span class="w-[60px] text-disabled tabular-nums flex-shrink-0">13:58:03</span>
+            <span class="w-2 h-2 rounded-sm flex-shrink-0" style="background: var(--kira-conn-green)"></span>
+            <span class="w-[70px] truncate flex-shrink-0">tree</span>
+            <span class="w-14 text-info flex-shrink-0">connect</span>
+            <span class="w-16 flex items-center gap-1 flex-shrink-0 text-err">error</span>
+            <span class="w-14 text-right tabular-nums flex-shrink-0">3.0 s</span>
+            <span class="w-20 text-right tabular-nums flex-shrink-0">—</span>
+            <span class="flex-1 truncate">connection timeout after 3000ms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- status bar -->
+      <div class="h-[22px] flex-shrink-0 flex items-center justify-between px-2 text-[11px] text-muted" data-testid="status-bar">
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1"><span class="codicon codicon-circle-large-filled text-ok" style="font-size:9px"></span>engine ok</span>
+          <span>L2 cache 18.4 / 64 MB</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1 text-warn"><span class="codicon codicon-lock"></span>read-only</span>
+          <button class="w-[18px] h-[18px] rounded-kira flex items-center justify-center text-fg bg-select" title="Toggle Project Panel"><span class="codicon codicon-layout-sidebar-left text-[14px]"></span></button>
+          <button class="w-[18px] h-[18px] rounded-kira flex items-center justify-center text-fg bg-select" title="Toggle Operations Panel"><span class="codicon codicon-layout-panel text-[14px]"></span></button>
+          <button class="w-[18px] h-[18px] rounded-kira flex items-center justify-center text-muted hover:bg-hover hover:text-fg" title="Settings"><span class="codicon codicon-settings-gear text-[14px]"></span></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- context menu example -->
+  <div class="w-full max-w-[1400px] mt-6">
+    <div class="text-[11px] uppercase tracking-wide text-neutral-500 mb-1.5">Context menu (right-click on a table row)</div>
+    <div class="w-[220px] bg-elevated border border-line-strong rounded-kira shadow-kira p-1 kira-mono text-[12px]">
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-table text-sm w-3.5 text-muted group-hover:text-white"></span>Open data
+      </div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-empty-window text-sm w-3.5 text-muted group-hover:text-white"></span>Open data in new tab
+      </div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-terminal text-sm w-3.5 text-muted group-hover:text-white"></span>Open query console
+      </div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-code text-sm w-3.5 text-muted group-hover:text-white"></span>Open DDL
+      </div>
+      <div class="h-px bg-line my-1 mx-0.5"></div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-refresh text-sm w-3.5 text-muted group-hover:text-white"></span>Refresh
+      </div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-copy text-sm w-3.5 text-muted group-hover:text-white"></span>Copy name
+      </div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-bookmark text-sm w-3.5 text-muted group-hover:text-white"></span>Saved filters<span class="codicon codicon-chevron-right ml-auto text-xs"></span>
+      </div>
+      <div class="h-px bg-line my-1 mx-0.5"></div>
+      <div class="flex items-center gap-2 h-[26px] px-2 rounded text-fg hover:bg-accent hover:text-white group cursor-default">
+        <span class="codicon codicon-symbol-numeric text-sm w-3.5 text-muted group-hover:text-white"></span>Count rows
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

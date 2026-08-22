@@ -8,8 +8,11 @@ import type {
 import type { TestResult } from './engine-ops';
 import type { Layout, LayoutPatch } from './layout';
 import type { OpRecord } from './ops';
+import type { SavedQuery } from './saved-query';
 import type { Settings, SettingsPatch } from './settings';
+import type { SourceText } from './ddl';
 import type { ObjectMeta, TreeNode } from './tree';
+import type { TabRecord } from './tabs';
 
 export const IPC = {
   appInfo: 'kira:app:info',
@@ -38,10 +41,19 @@ export const IPC = {
 
   treeChildren: 'kira:tree:children',
   treeDescribe: 'kira:tree:describe',
+  treeDdl: 'kira:tree:ddl',
   treeInvalidate: 'kira:tree:invalidate',
 
   filtersList: 'kira:filters:list',
   filtersReplace: 'kira:filters:replace',
+
+  tabsGetAll: 'kira:tabs:getAll',
+  tabsReplace: 'kira:tabs:replace',
+  savedQueriesList: 'kira:savedQueries:list',
+  savedQueriesUpsert: 'kira:savedQueries:upsert',
+  savedQueriesDelete: 'kira:savedQueries:delete',
+  savedQueriesTouch: 'kira:savedQueries:touch',
+  savedQueriesPrune: 'kira:savedQueries:prune',
 
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
@@ -87,6 +99,11 @@ export interface TreeDescribeResult {
   source: 'cache' | 'server';
 }
 
+export interface TreeDdlResult {
+  ddl: SourceText;
+  source: 'cache' | 'server';
+}
+
 export interface TreeChildrenPayload {
   connectionId: string;
   path: string;
@@ -94,6 +111,12 @@ export interface TreeChildrenPayload {
 }
 
 export interface TreeDescribePayload {
+  connectionId: string;
+  path: string;
+  refresh?: boolean;
+}
+
+export interface TreeDdlPayload {
   connectionId: string;
   path: string;
   refresh?: boolean;
@@ -107,6 +130,29 @@ export interface TreeInvalidatePayload {
 export interface FiltersReplacePayload {
   connectionId: string;
   filters: ConnectionFilterInput[];
+}
+
+export interface SavedQueryListPayload {
+  connectionId: string;
+  path: string;
+  kind: string;
+}
+
+export interface SavedQueryUpsertPayload {
+  connectionId: string;
+  path: string;
+  name: string;
+  kind: string;
+  body: { where: string; orderBy: string };
+}
+
+export interface SavedQueryIdPayload {
+  id: string;
+}
+
+export interface SavedQueryPrunePayload {
+  connectionId: string;
+  path: string;
 }
 
 export interface OpsRecentPayload {
@@ -143,10 +189,19 @@ export interface KiraApi {
 
   treeChildren(payload: TreeChildrenPayload): Promise<TreeChildrenResult>;
   treeDescribe(payload: TreeDescribePayload): Promise<TreeDescribeResult>;
+  treeDdl(payload: TreeDdlPayload): Promise<TreeDdlResult>;
   treeInvalidate(payload: TreeInvalidatePayload): Promise<void>;
 
   filtersList(payload: IdPayload): Promise<ConnectionFilter[]>;
   filtersReplace(payload: FiltersReplacePayload): Promise<ConnectionFilter[]>;
+
+  tabsGetAll(): Promise<TabRecord[]>;
+  tabsReplace(tabs: TabRecord[]): Promise<void>;
+  savedQueriesList(payload: SavedQueryListPayload): Promise<SavedQuery[]>;
+  savedQueriesUpsert(payload: SavedQueryUpsertPayload): Promise<SavedQuery>;
+  savedQueriesDelete(payload: SavedQueryIdPayload): Promise<void>;
+  savedQueriesTouch(payload: SavedQueryIdPayload): Promise<void>;
+  savedQueriesPrune(payload: SavedQueryPrunePayload): Promise<void>;
 
   opsRecent(payload: OpsRecentPayload): Promise<OpRecord[]>;
   opsCancel(payload: OpsCancelPayload): Promise<void>;

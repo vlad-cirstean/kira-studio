@@ -1,5 +1,6 @@
 {
   "name": "kira-studio",
+  "productName": "Kira Studio",
   "version": "0.1.0",
   "private": true,
   "main": "out/main/index.js",
@@ -22,6 +23,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
+    "@codemirror/lang-sql": "6.10.0",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/state": "6.7.1",
+    "@codemirror/view": "6.43.9",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "26.2.0",

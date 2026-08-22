@@ -12,6 +12,7 @@ const KIND_ICON: Record<NodeKind, string> = {
   matview: 'symbol-structure',
   sequence: 'list-ordered',
   function: 'symbol-method',
+  routine: 'symbol-method',
   column: 'symbol-field',
 };
 

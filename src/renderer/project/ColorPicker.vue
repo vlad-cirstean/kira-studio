@@ -10,7 +10,7 @@ const emit = defineEmits<{ 'update:modelValue': [ConnectionColor] }>();
 </script>
 
 <template>
-  <div class="color-picker" role="radiogroup" aria-label="Connection color">
+  <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Connection color">
     <button
       v-for="color in COLORS"
       :key="color"
@@ -19,32 +19,10 @@ const emit = defineEmits<{ 'update:modelValue': [ConnectionColor] }>();
       :aria-checked="color === modelValue"
       :aria-label="color"
       :data-testid="`color-${color}`"
-      class="swatch"
-      :class="{ selected: color === modelValue }"
+      class="h-5 w-5 rounded-full ring-offset-2 ring-offset-elevated"
+      :class="{ 'ring-2 ring-white': color === modelValue }"
       :style="{ background: `var(--kira-conn-${color})` }"
       @click="emit('update:modelValue', color)"
     />
   </div>
 </template>
-
-<style scoped>
-.color-picker {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.swatch {
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.swatch.selected {
-  outline: 2px solid var(--kira-focus);
-  outline-offset: 1px;
-}
-</style>

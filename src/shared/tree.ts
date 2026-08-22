@@ -9,6 +9,7 @@ export const nodeKindSchema = z.enum([
   'matview',
   'function',
   'sequence',
+  'routine',
   'column',
 ]);
 export type NodeKind = z.infer<typeof nodeKindSchema>;

@@ -7,9 +7,10 @@ import { metadataCache } from './schema';
 // The unique index is (connection_id, path) — `kind` is NOT part of the key — so a `children`
 // payload and a `describe` payload for the same path live in one row as
 // `{ children?: TreeNode[]; describe?: ObjectMeta }`, with the `kind` column set to whichever was
-// written last (informational). See Step 2d of the P1 plan.
+// written last (informational). P4 adds `ddl?: SourceText` as a third slot in the same row. See
+// Step 2d of the P1 plan.
 
-export type MetaKind = 'children' | 'describe';
+export type MetaKind = 'children' | 'describe' | 'ddl';
 
 // L1's only size story: a payload whose JSON exceeds 4 MB is not cached. A schema with 200 000
 // relations should degrade to "slow expand", not a bloated SQLite file.

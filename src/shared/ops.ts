@@ -1,7 +1,16 @@
 import { z } from 'zod';
 
-// `opKind` grows in P2 (`read`, `count`) and P5 (`mutate`) — do not add those members now.
-export const opKindSchema = z.enum(['connect', 'disconnect', 'children', 'describe', 'test']);
+// `opKind` grows in P5 (`mutate`) — do not add those members now.
+export const opKindSchema = z.enum([
+  'connect',
+  'disconnect',
+  'children',
+  'describe',
+  'test',
+  'read',
+  'count',
+  'ddl',
+]);
 export type OpKind = z.infer<typeof opKindSchema>;
 
 export const opStatusSchema = z.enum(['running', 'ok', 'error', 'cancelled']);

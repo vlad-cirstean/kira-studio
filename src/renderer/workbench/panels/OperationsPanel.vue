@@ -82,11 +82,10 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 
 <template>
   <div class="flex h-full flex-col">
-    <div class="border-border flex items-center gap-2 border-b px-2 py-1 text-xs">
-      <div class="filter-input">
-        <Codicon name="filter" :size="12" class="filter-icon" />
-        <input v-model="opsState.filterText" type="text" placeholder="Filter" data-testid="ops-filter" />
-      </div>
+    <div class="flex h-7 flex-shrink-0 items-center gap-1.5 border-b border-line px-1.5 text-[11px]">
+      <span class="px-1 text-[10px] font-semibold uppercase tracking-wide text-disabled"
+        >Operations</span
+      >
 
       <div class="segmented">
         <button
@@ -115,11 +114,30 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
         </button>
       </div>
 
-      <span class="muted" data-testid="ops-running-count">{{ runningCount }} running</span>
+      <span class="text-[10px] text-disabled" data-testid="ops-running-count"
+        >{{ runningCount }} running</span
+      >
+
+      <div class="flex-1" />
+
+      <div class="relative">
+        <Codicon
+          name="filter"
+          :size="11"
+          class="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-muted"
+        />
+        <input
+          v-model="opsState.filterText"
+          type="text"
+          placeholder="Filter…"
+          class="h-5 w-40 rounded-kira border border-line-strong bg-input pr-2 pl-5 text-[11px] text-fg outline-none placeholder:text-disabled focus:border-focus"
+          data-testid="ops-filter"
+        />
+      </div>
 
       <button
         type="button"
-        class="clear-button"
+        class="h-5 rounded-kira border border-line-strong bg-input px-1.5 text-[11px] text-muted hover:bg-hover hover:text-fg"
         title="Clears the in-memory ring only — op_log retention is automatic"
         @click="clearOps"
       >
@@ -131,7 +149,6 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
       <div class="header-row">
         <span class="col time">time</span>
         <span class="col conn">connection</span>
-        <span class="col tab">tab</span>
         <span class="col kind">kind</span>
         <span class="col status">status</span>
         <span class="col duration">duration</span>
@@ -149,19 +166,18 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
               @click="toggleExpand(item.id)"
               @contextmenu.prevent.stop="onOpContextMenu($event, item)"
             >
-              <span class="col time muted mono">{{ formatTime(item.startedAt) }}</span>
+              <span class="col time muted tabular">{{ formatTime(item.startedAt) }}</span>
               <span class="col conn">
                 <span
                   v-if="connectionColor(item.connectionId)"
                   class="chip"
                   :style="{ background: `var(--kira-conn-${connectionColor(item.connectionId)})` }"
                 />
-                {{ connectionName(item.connectionId) }}
+                <span class="truncate">{{ connectionName(item.connectionId) }}</span>
               </span>
-              <span class="col tab muted">—</span>
               <span class="col kind">{{ item.kind }}</span>
               <span class="col status" :class="item.status">
-                <Codicon v-if="item.status === 'running'" name="loading" :size="12" class="spin" />
+                <Codicon v-if="item.status === 'running'" name="loading" :size="11" class="spin" />
                 {{ item.status }}
                 <button
                   v-if="item.status === 'running'"
@@ -171,11 +187,11 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
                   data-testid="op-cancel"
                   @click.stop="cancelOp(item.id)"
                 >
-                  <Codicon name="debug-stop" :size="12" />
+                  <Codicon name="debug-stop" :size="11" />
                 </button>
               </span>
-              <span class="col duration muted">{{ item.durationMs === null ? '—' : formatDuration(item.durationMs) }}</span>
-              <span class="col rows muted">{{ item.rows ?? '—' }}</span>
+              <span class="col duration muted tabular">{{ item.durationMs === null ? '—' : formatDuration(item.durationMs) }}</span>
+              <span class="col rows muted tabular">{{ item.rows ?? '—' }}</span>
               <span
                 v-if="item.status === 'error'"
                 class="col command error"
@@ -208,8 +224,8 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 .op-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px;
+  gap: 8px;
+  padding: 0 10px;
   white-space: nowrap;
   font-size: 11px;
 }
@@ -218,14 +234,17 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
   color: var(--kira-fg-disabled);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  font-size: 10px;
+  flex-shrink: 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .op-row {
-  height: 100%;
+  height: var(--kira-row-height);
+  flex-shrink: 0;
   cursor: pointer;
   overflow: hidden;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .op-row:hover {
@@ -243,37 +262,36 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 }
 
 .col.time {
-  width: 90px;
+  width: 60px;
 }
 
 .col.conn {
-  width: 140px;
+  width: 90px;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.col.tab {
-  width: 40px;
+  gap: 5px;
 }
 
 .col.kind {
-  width: 80px;
+  width: 64px;
+  color: var(--kira-info);
 }
 
 .col.status {
-  width: 84px;
+  width: 64px;
   display: flex;
   align-items: center;
   gap: 3px;
 }
 
 .col.duration {
-  width: 64px;
+  width: 60px;
+  text-align: right;
 }
 
 .col.rows {
-  width: 48px;
+  width: 64px;
+  text-align: right;
 }
 
 .col.command {
@@ -301,7 +319,7 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 }
 
 .status.running {
-  color: var(--kira-info);
+  color: var(--kira-warn);
 }
 
 .command.error {
@@ -325,6 +343,18 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
   color: var(--kira-error);
 }
 
+.muted {
+  color: var(--kira-fg-muted);
+}
+
+.mono {
+  font-family: var(--kira-font-family);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 .spin {
   animation: kira-spin 1s linear infinite;
 }
@@ -338,44 +368,22 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 .detail {
   flex-shrink: 0;
   border-top: var(--kira-border-width) solid var(--kira-border);
-  padding: 4px 8px;
+  padding: 4px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-height: 40%;
+  overflow-y: auto;
 }
 
 .detail-line {
   font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .detail-line.error {
   color: var(--kira-error);
-}
-
-.filter-input {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.filter-icon {
-  position: absolute;
-  left: 5px;
-  color: var(--kira-fg-muted);
-  pointer-events: none;
-}
-
-.filter-input input {
-  width: 110px;
-  padding: 2px 4px 2px 18px;
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  color: var(--kira-fg);
-  font-size: 11px;
 }
 
 .segmented {
@@ -396,24 +404,5 @@ function onOpContextMenu(e: MouseEvent, record: OpRecord): void {
 .segmented button.active {
   background: var(--kira-select);
   color: var(--kira-fg);
-}
-
-.muted {
-  color: var(--kira-fg-muted);
-}
-
-.mono {
-  font-family: var(--kira-font-family);
-}
-
-.clear-button {
-  margin-left: auto;
-  padding: 1px 6px;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 11px;
 }
 </style>

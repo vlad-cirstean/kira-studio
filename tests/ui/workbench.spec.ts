@@ -4,6 +4,50 @@ import { expect, test } from './fixtures';
 // state/layout.ts). Give them time to land before closing the app and relaunching.
 const PERSIST_SETTLE_MS = 300;
 
+test('connect ops carry a null tabId (no tab exists yet)', async ({ kira, relaunch }) => {
+  const { window } = kira;
+  const created = await window.evaluate(
+    () =>
+      (window as unknown as { kira: { connectionsCreate: (i: unknown) => Promise<unknown> } }).kira
+        .connectionsCreate({
+          name: 'pg',
+          kind: 'postgres',
+          color: 'blue',
+          mode: 'fields',
+          readOnly: false,
+          host: 'localhost',
+          port: 5432,
+          database: 'postgres',
+          username: 'postgres',
+          password: 'wrong',
+          uri: null,
+          options: {},
+        }),
+  );
+  const id = (created as { id: string }).id;
+  await window.evaluate(
+    (x) =>
+      (window as unknown as { kira: { connectionsConnect: (i: unknown) => Promise<unknown> } }).kira
+        .connectionsConnect({ id: x }),
+    id,
+  ).catch(() => {});
+
+  // The connect op lands in op_log with tabId null (D9); assert end-to-end it is null, not ''.
+  await expect
+    .poll(async () => {
+      const ops = await window.evaluate(
+        () => (window as unknown as { kira: { opsRecent: (i: unknown) => Promise<unknown> } }).kira.opsRecent({ limit: 20 }),
+      );
+      return (ops as Array<{ kind: string; tabId: string | null }>).find((o) => o.kind === 'connect') ?? null;
+    })
+    .toBeTruthy();
+  const connectOp = await window.evaluate(
+    () => (window as unknown as { kira: { opsRecent: (i: unknown) => Promise<unknown> } }).kira.opsRecent({ limit: 20 }),
+  ).then((ops) => (ops as Array<{ kind: string; tabId: string | null }>).find((o) => o.kind === 'connect'));
+  expect(connectOp?.tabId).toBeNull();
+  await relaunch();
+});
+
 test('panel visibility toggles persist across relaunch', async ({ relaunch }) => {
   let { window } = await relaunch();
 
@@ -45,7 +89,7 @@ test('settings dialog appearance font size persists across relaunch', async ({ r
     .toBe('16px');
 
   await window.screenshot({ path: 'test-results/screenshots/settings.png' });
-  await window.click('[data-testid="settings-close"]');
+  await window.click('[data-testid="settings-save"]');
 
   await window.waitForTimeout(PERSIST_SETTLE_MS);
   ({ window } = await relaunch());

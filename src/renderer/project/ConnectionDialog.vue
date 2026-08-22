@@ -13,11 +13,12 @@ import {
   connectionsState,
   createConnection,
   draftToInput,
+  refreshConnections,
   updateConnection,
 } from './state/connections';
 
-// §8.12 connection dialog. Same visual language as SettingsDialog (scrim, Escape, focus trap,
-// footer buttons) — the .field / .segmented / .dialog CSS is copied, not shared (P1 rule).
+// §8.12 connection dialog. Same visual language as the design-review mockup (design/connection-dialog.html):
+// header with close, label-left field rows, Fields/URI tabs, warning box, switch, footer actions.
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -145,6 +146,13 @@ async function onSave(): Promise<void> {
   }
 }
 
+async function onDelete(): Promise<void> {
+  if (!editing.value || !targetId.value) return;
+  await control.connectionsDelete({ id: targetId.value });
+  await refreshConnections();
+  onClose();
+}
+
 function onClose(): void {
   closeDialog();
   emit('close');
@@ -191,87 +199,119 @@ onUnmounted(() => {
 <template>
   <div class="scrim" data-testid="connection-dialog" @click.self="onClose">
     <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="dialog-body">
+      <div class="header">
+        <span>{{ editing ? 'Edit connection' : 'New connection' }}</span>
+        <button type="button" class="header-close" aria-label="Close" @click="onClose">
+          <Codicon name="close" :size="14" />
+        </button>
+      </div>
+
+      <div class="body">
         <div class="row">
-          <label class="field grow">
-            <span>Name</span>
-            <input v-model="draft.name" type="text" data-testid="connection-name" />
+          <label class="row-label">Name</label>
+          <div class="min-w-0 flex-1">
+            <input
+              v-model="draft.name"
+              type="text"
+              class="input"
+              data-testid="connection-name"
+            />
             <span v-if="issuesFor('name').length" class="issue">{{ issuesFor('name')[0] }}</span>
-          </label>
-          <div class="field">
-            <span>Color</span>
-            <ColorPicker v-model="draft.color" />
           </div>
         </div>
 
-        <label class="field">
-          <span>Kind</span>
-          <select v-model="draft.kind" data-testid="connection-kind">
-            <option v-for="kind in KINDS" :key="kind.value" :value="kind.value" :disabled="!kind.supported">
+        <div class="row items-start">
+          <label class="row-label pt-0.5">Color</label>
+          <ColorPicker v-model="draft.color" />
+        </div>
+
+        <div class="row">
+          <label class="row-label">Kind</label>
+          <select v-model="draft.kind" class="input" data-testid="connection-kind">
+            <option
+              v-for="kind in KINDS"
+              :key="kind.value"
+              :value="kind.value"
+              :disabled="!kind.supported"
+            >
               {{ kind.supported ? kind.label : `${kind.label} — not yet supported` }}
             </option>
           </select>
-        </label>
+        </div>
 
-        <div class="field">
-          <span>Mode</span>
-          <div class="segmented">
-            <button
-              type="button"
-              data-testid="connection-mode-fields"
-              :class="{ active: draft.mode === 'fields' }"
-              @click="setMode('fields')"
-            >
-              Fields
-            </button>
-            <button
-              type="button"
-              data-testid="connection-mode-uri"
-              :class="{ active: draft.mode === 'uri' }"
-              @click="setMode('uri')"
-            >
-              URI
-            </button>
-          </div>
+        <div class="mode-tabs">
+          <button
+            type="button"
+            class="mode-tab"
+            :class="{ active: draft.mode === 'fields' }"
+            data-testid="connection-mode-fields"
+            @click="setMode('fields')"
+          >
+            Fields
+          </button>
+          <button
+            type="button"
+            class="mode-tab"
+            :class="{ active: draft.mode === 'uri' }"
+            data-testid="connection-mode-uri"
+            @click="setMode('uri')"
+          >
+            URI
+          </button>
         </div>
 
         <template v-if="draft.mode === 'fields'">
           <div class="row">
-            <label class="field grow">
-              <span>Host</span>
-              <input v-model="draft.host" type="text" data-testid="connection-host" />
+            <label class="row-label">Host</label>
+            <div class="min-w-0 flex-1">
+              <input v-model="draft.host" type="text" class="input" data-testid="connection-host" />
               <span v-if="issuesFor('host').length" class="issue">{{ issuesFor('host')[0] }}</span>
-            </label>
-            <label class="field">
-              <span>Port</span>
+            </div>
+          </div>
+          <div class="row">
+            <label class="row-label">Port</label>
+            <div class="w-24">
               <input
                 type="number"
                 min="1"
                 max="65535"
                 :value="draft.port ?? ''"
+                class="input"
                 data-testid="connection-port"
                 @input="onPortInput"
               />
               <span v-if="issuesFor('port').length" class="issue">{{ issuesFor('port')[0] }}</span>
-            </label>
+            </div>
           </div>
-
-          <label class="field">
-            <span>Database</span>
-            <input v-model="draft.database" type="text" data-testid="connection-database" />
-          </label>
-
-          <label class="field">
-            <span>User</span>
-            <input v-model="draft.username" type="text" data-testid="connection-user" />
-          </label>
-
-          <label class="field">
-            <span>Password</span>
-            <div class="password-wrap">
+          <div class="row">
+            <label class="row-label">Database</label>
+            <div class="min-w-0 flex-1">
+              <input
+                v-model="draft.database"
+                type="text"
+                class="input"
+                data-testid="connection-database"
+              />
+            </div>
+          </div>
+          <div class="row">
+            <label class="row-label">User</label>
+            <div class="min-w-0 flex-1">
+              <input
+                v-model="draft.username"
+                type="text"
+                class="input"
+                data-testid="connection-user"
+              />
+            </div>
+          </div>
+          <div class="row">
+            <label class="row-label">Password</label>
+            <div class="relative min-w-0 flex-1">
               <input
                 :type="revealPassword ? 'text' : 'password'"
                 :value="draft.password"
+                class="input pr-8"
                 data-testid="connection-password"
                 @input="onPasswordInput"
               />
@@ -284,55 +324,94 @@ onUnmounted(() => {
                 <Codicon :name="revealPassword ? 'eye-closed' : 'eye'" :size="14" />
               </button>
             </div>
-          </label>
+          </div>
         </template>
 
         <template v-else>
-          <label class="field">
-            <span>URI</span>
-            <input v-model="draft.uri" type="text" data-testid="connection-uri" @blur="uriReason = null" />
-            <span v-if="issuesFor('uri').length" class="issue">{{ issuesFor('uri')[0] }}</span>
-            <span v-else-if="uriReason" class="issue">{{ uriReason }}</span>
-            <span v-else-if="uriHint" class="muted-note mono">{{ uriHint }}</span>
-          </label>
+          <div class="row">
+            <label class="row-label">URI</label>
+            <div class="min-w-0 flex-1">
+              <input
+                v-model="draft.uri"
+                type="text"
+                class="input mono"
+                data-testid="connection-uri"
+                @blur="uriReason = null"
+              />
+              <span v-if="issuesFor('uri').length" class="issue">{{ issuesFor('uri')[0] }}</span>
+              <span v-else-if="uriReason" class="issue">{{ uriReason }}</span>
+              <span v-else-if="uriHint" class="muted-note mono">{{ uriHint }}</span>
+            </div>
+          </div>
         </template>
 
-        <label class="field checkbox">
-          <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
-          <span>Read-only</span>
-        </label>
-        <p class="muted-note">Blocks every mutation path for this connection.</p>
+        <div class="warn">
+          <Codicon name="warning" :size="14" class="mt-px shrink-0" />
+          <span
+            >Credentials are stored unencrypted at
+            <code class="font-mono">~/.kira-studio/kira.sqlite</code>.</span
+          >
+        </div>
 
-        <p class="warn">Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.</p>
-        <p v-if="saveError" class="issue">{{ saveError }}</p>
-      </div>
+        <div class="row">
+          <label class="switch">
+            <input
+              type="checkbox"
+              class="peer sr-only"
+              v-model="draft.readOnly"
+              data-testid="connection-readonly"
+            />
+            <span
+              class="pointer-events-none absolute inset-0 rounded-full border border-line-strong bg-input transition-colors peer-checked:border-accent peer-checked:bg-accent"
+            />
+            <span
+              class="pointer-events-none absolute top-[2px] left-[2px] h-3.5 w-3.5 rounded-full bg-white/80 transition-transform peer-checked:translate-x-[14px]"
+            />
+          </label>
+          <span class="readonly-label">Read-only</span>
+          <span class="readonly-hint">Blocks every mutation path for this connection.</span>
+        </div>
 
-      <div class="dialog-footer">
-        <div class="footer-left">
-          <button type="button" data-testid="connection-test" :disabled="testing" @click="onTest">
-            <Codicon name="debug-start" :size="14" />
+        <div class="row pt-1">
+          <button type="button" class="test-button" data-testid="connection-test" :disabled="testing" @click="onTest">
+            <Codicon name="plug" :size="13" />
             Test connection
           </button>
           <span v-if="testing" class="chip muted">Testing…</span>
           <span v-else-if="testResult?.ok" class="chip ok" data-testid="connection-test-ok">
-            OK — {{ testResult.serverVersion }}
+            Connected — {{ testResult.serverVersion }}
           </span>
           <span v-else-if="testResult && !testResult.ok" class="chip error" data-testid="connection-test-fail">
             {{ testResult.error }}
           </span>
         </div>
-        <div class="footer-right">
-          <button type="button" data-testid="connection-cancel" @click="onClose">Cancel</button>
-          <button
-            type="button"
-            class="primary"
-            data-testid="connection-save"
-            :disabled="!isValid || saving"
-            @click="onSave"
-          >
-            Save
-          </button>
-        </div>
+
+        <p v-if="saveError" class="issue">{{ saveError }}</p>
+      </div>
+
+      <div class="footer">
+        <button
+          v-if="editing"
+          type="button"
+          class="footer-button danger"
+          data-testid="connection-delete"
+          @click="onDelete"
+        >
+          Delete
+        </button>
+        <div class="flex-1" />
+        <button type="button" class="footer-button" data-testid="connection-cancel" @click="onClose">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="footer-button primary"
+          data-testid="connection-save"
+          :disabled="!isValid || saving"
+          @click="onSave"
+        >
+          Save
+        </button>
       </div>
     </div>
   </div>
@@ -350,109 +429,93 @@ onUnmounted(() => {
 }
 
 .dialog {
-  width: 520px;
+  width: 460px;
+  max-width: calc(100vw - 32px);
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
+  border-radius: 8px;
   box-shadow: var(--kira-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-size: 12px;
+  color: var(--kira-fg);
 }
 
-.dialog-body {
-  padding: 14px 16px;
+.header {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.header-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: var(--kira-radius);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+}
+
+.header-close:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+
+.body {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 70vh;
+  gap: 14px;
+  max-height: 72vh;
   overflow: auto;
 }
 
 .row {
   display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.grow {
-  flex: 1;
+.row-label {
+  width: 72px;
+  flex-shrink: 0;
+  color: var(--kira-fg-muted);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-}
-
-.field.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.field input[type='text'],
-.field input[type='number'],
-.field input[type='password'],
-.field select {
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  color: var(--kira-fg);
-  padding: 4px 6px;
-}
-
-.field select option:disabled {
-  color: var(--kira-fg-disabled);
-}
-
-.password-wrap {
-  position: relative;
-}
-
-.password-wrap input {
+.input {
   width: 100%;
   box-sizing: border-box;
-  padding-right: 26px;
-}
-
-.eye {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-
-.segmented {
-  display: flex;
-  gap: 2px;
-}
-
-.segmented button {
-  flex: 1;
-  padding: 4px 8px;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
+  height: 24px;
+  padding: 0 8px;
   background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-}
-
-.segmented button.active {
-  background: var(--kira-select);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius);
   color: var(--kira-fg);
+  font-size: 12px;
+  outline: none;
 }
 
-.muted-note {
+.input:focus {
+  border-color: var(--kira-focus);
+}
+
+.input[disabled] {
   color: var(--kira-fg-disabled);
-  font-size: 11px;
-  margin: 0;
+}
+
+select.input option:disabled {
+  color: var(--kira-fg-disabled);
 }
 
 .mono {
@@ -460,59 +523,114 @@ onUnmounted(() => {
   word-break: break-all;
 }
 
-.warn {
-  color: var(--kira-warn);
-  font-size: 11px;
-  margin: 0;
-}
-
-.issue {
-  color: var(--kira-error);
-  font-size: 11px;
-}
-
-.dialog-footer {
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  padding: 8px 12px;
+.eye {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.footer-left,
-.footer-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dialog-footer button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--kira-fg-muted);
   cursor: pointer;
 }
 
-.dialog-footer button:disabled {
+.eye:hover {
+  color: var(--kira-fg);
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 -16px;
+  padding: 0 16px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.mode-tab {
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--kira-fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mode-tab:hover {
+  color: var(--kira-fg);
+}
+
+.mode-tab.active {
+  border-bottom-color: var(--kira-accent);
+  color: var(--kira-fg);
+}
+
+.warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  background: color-mix(in srgb, var(--kira-warn) 10%, transparent);
+  color: var(--kira-warn);
+  font-size: 11px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.readonly-label {
+  color: var(--kira-fg);
+  flex-shrink: 0;
+}
+
+.readonly-hint {
+  color: var(--kira-fg-disabled);
+  font-size: 11px;
+}
+
+.test-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.test-button:hover:not(:disabled) {
+  background: var(--kira-hover);
+}
+
+.test-button:disabled {
   color: var(--kira-fg-disabled);
   cursor: default;
 }
 
-.dialog-footer button.primary {
-  background: var(--kira-accent);
-  border-color: var(--kira-accent);
-  color: var(--kira-accent-fg);
-}
-
 .chip {
   font-size: 11px;
-  max-width: 260px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -528,5 +646,65 @@ onUnmounted(() => {
 
 .chip.muted {
   color: var(--kira-fg-muted);
+}
+
+.muted-note {
+  color: var(--kira-fg-disabled);
+  font-size: 11px;
+  margin: 0;
+}
+
+.issue {
+  color: var(--kira-error);
+  font-size: 11px;
+}
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-top: var(--kira-border-width) solid var(--kira-border);
+}
+
+.footer-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.footer-button:hover:not(:disabled) {
+  background: var(--kira-hover);
+}
+
+.footer-button:disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+
+.footer-button.primary {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+
+.footer-button.primary:hover:not(:disabled) {
+  background: var(--kira-accent);
+  filter: brightness(1.1);
+}
+
+.footer-button.danger {
+  color: var(--kira-error);
 }
 </style>

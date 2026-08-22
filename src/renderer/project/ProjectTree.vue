@@ -39,7 +39,7 @@ function onBackgroundMenu(e: MouseEvent): void {
   flex-shrink: 0;
   padding: 4px 8px;
   border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
+  color: var(--kira-fg-disabled);
   font-size: 11px;
 }
 </style>

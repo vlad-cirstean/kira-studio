@@ -91,8 +91,13 @@ export function injectUriPassword(uri: string, password: string | null): string 
 // §8.12: URI → fields is a best-effort round-trip. When it cannot round-trip, the dialog stays in
 // URI mode rather than silently dropping information.
 export function canRoundTripToFields(parsed: ParsedUri, kind: ConnectionKind): boolean {
-  if (kind !== 'postgres') return false;
-  if (parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql') return false;
+  if (kind === 'postgres') {
+    if (parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql') return false;
+  } else if (kind === 'mariadb') {
+    if (parsed.scheme !== 'mariadb' && parsed.scheme !== 'mysql') return false;
+  } else {
+    return false;
+  }
   if (!parsed.host || parsed.host.startsWith('/')) return false; // unix socket or missing host
   if (parsed.host.includes(',')) return false; // multi-host connection string
   // Userinfo characters that are structural in a URI cannot be stored unambiguously in fields.

@@ -1,4 +1,4 @@
-import type { Client, QueryResultRow } from 'pg';
+import type { Client, QueryArrayConfig, QueryArrayResult, QueryConfig, QueryResultRow } from 'pg';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 
@@ -9,8 +9,9 @@ export interface RunningQuery {
 }
 
 // node-postgres sets `processID` on the client after the startup message, but @types/pg does not
-// expose it; read it through a narrow cast.
-function backendPid(client: Client): number {
+// expose it; read it through a narrow cast. Exported for D11 (the read op records the leased
+// client's pid so cancel targets exactly that backend).
+export function backendPid(client: Client): number {
   return (client as Client & { processID?: number }).processID ?? -1;
 }
 
@@ -65,6 +66,40 @@ export async function runQuery<R extends QueryResultRow>(
       (result) => finish(() => resolve(result.rows)),
       // The server may later reject the query (e.g. 57014 after pg_cancel_backend) once we have
       // already aborted locally; `settled` makes that a no-op so it never surfaces.
+      (err) => finish(() => reject(toAdapterError(err))),
+    );
+  });
+}
+
+// Read queries need `rowMode: 'array'` and raw type parsers (D4), which a plain (sql, params) call
+// cannot express — this is the query-config variant of runQuery with the same abort semantics. It
+// returns the full QueryResult so the caller can read `.fields` (the OID→encoding map) as well as
+// the rows. The config carries `rowMode: 'array'`, so the row type is a plain unknown[] (never a
+// row object) — that is exactly what feeds encodeTabular.
+export function runQueryConfig<R = unknown[]>(
+  client: Client,
+  config: QueryArrayConfig,
+  ctx: OpCtx,
+  track: (q: RunningQuery) => void,
+): Promise<QueryArrayResult<R[]>> {
+  ctx.setCommand(config.text ?? '');
+  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'cancelled');
+  track({ backendPid: backendPid(client) });
+
+  const query = client.query(config);
+
+  return new Promise<QueryArrayResult<R[]>>((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      ctx.signal.removeEventListener('abort', onAbort);
+      fn();
+    };
+    const onAbort = (): void => finish(() => reject(new AdapterError('E_CANCELLED', 'cancelled')));
+    ctx.signal.addEventListener('abort', onAbort, { once: true });
+    query.then(
+      (result) => finish(() => resolve(result as QueryArrayResult<R[]>)),
       (err) => finish(() => reject(toAdapterError(err))),
     );
   });

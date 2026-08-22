@@ -17,12 +17,22 @@ import type {
   TreeChildrenResult,
   TreeDescribePayload,
   TreeDescribeResult,
+  TreeDdlPayload,
+  TreeDdlResult,
   TreeInvalidatePayload,
   UpdateConnectionPayload,
 } from '@shared/ipc';
 import type { Layout, LayoutPatch } from '@shared/layout';
 import type { OpRecord } from '@shared/ops';
+import type { SavedQuery } from '@shared/saved-query';
+import type {
+  SavedQueryIdPayload,
+  SavedQueryListPayload,
+  SavedQueryPrunePayload,
+  SavedQueryUpsertPayload,
+} from '@shared/ipc';
 import type { Settings, SettingsPatch } from '@shared/settings';
+import type { TabRecord } from '@shared/tabs';
 
 const kira = window.kira;
 
@@ -61,11 +71,25 @@ export const control = {
     kira.treeChildren(payload),
   treeDescribe: (payload: TreeDescribePayload): Promise<TreeDescribeResult> =>
     kira.treeDescribe(payload),
+  treeDdl: (payload: TreeDdlPayload): Promise<TreeDdlResult> => kira.treeDdl(payload),
   treeInvalidate: (payload: TreeInvalidatePayload): Promise<void> => kira.treeInvalidate(payload),
 
   filtersList: (payload: IdPayload): Promise<ConnectionFilter[]> => kira.filtersList(payload),
   filtersReplace: (payload: FiltersReplacePayload): Promise<ConnectionFilter[]> =>
     kira.filtersReplace(payload),
+
+  tabsGetAll: (): Promise<TabRecord[]> => kira.tabsGetAll(),
+  tabsReplace: (tabs: TabRecord[]): Promise<void> => kira.tabsReplace(tabs),
+  savedQueriesList: (payload: SavedQueryListPayload): Promise<SavedQuery[]> =>
+    kira.savedQueriesList(payload),
+  savedQueriesUpsert: (payload: SavedQueryUpsertPayload): Promise<SavedQuery> =>
+    kira.savedQueriesUpsert(payload),
+  savedQueriesDelete: (payload: SavedQueryIdPayload): Promise<void> =>
+    kira.savedQueriesDelete(payload),
+  savedQueriesTouch: (payload: SavedQueryIdPayload): Promise<void> =>
+    kira.savedQueriesTouch(payload),
+  savedQueriesPrune: (payload: SavedQueryPrunePayload): Promise<void> =>
+    kira.savedQueriesPrune(payload),
 
   opsRecent: (payload: OpsRecentPayload): Promise<OpRecord[]> => kira.opsRecent(payload),
   opsCancel: (payload: OpsCancelPayload): Promise<void> => kira.opsCancel(payload),

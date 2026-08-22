@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AdapterError } from '../engine/adapters/errors';
+import { type SourceText, sourceTextSchema } from '../shared/ddl';
 import { ENGINE_OP } from '../shared/engine-ops';
 import { IPC } from '../shared/ipc';
 import { type ObjectMeta, objectMetaSchema, type TreeNode, treeNodeSchema } from '../shared/tree';
@@ -8,7 +9,7 @@ import type { EngineHost } from './engine-host';
 import type { Db } from './storage/db';
 import { dropCached, getCached, putCached } from './storage/metadata-cache';
 
-// L1 cache-aside for children/describe (D10). SQLite is checked first and only a miss (or an
+// L1 cache-aside for children/describe/ddl (D10). SQLite is checked first and only a miss (or an
 // explicit refresh) reaches the engine, so the tree renders from cache while disconnected and is
 // instant on launch. A cached payload that fails validation is dropped and treated as a miss.
 
@@ -25,6 +26,11 @@ export interface TreeService {
     path: string,
     refresh?: boolean,
   ): Promise<{ meta: ObjectMeta; source: 'cache' | 'server' }>;
+  ddl(
+    connectionId: string,
+    path: string,
+    refresh?: boolean,
+  ): Promise<{ ddl: SourceText; source: 'cache' | 'server' }>;
   invalidate(connectionId: string, path?: string): Promise<void>;
 }
 
@@ -56,7 +62,11 @@ export function createTreeService(
       }
     }
     await requireConnected(connectionId);
-    const nodes = await engineHost.call<TreeNode[]>(ENGINE_OP.children, { connectionId, path });
+    const nodes = await engineHost.call<TreeNode[]>(ENGINE_OP.children, {
+      connectionId,
+      path,
+      refresh,
+    });
     const validated = z.array(treeNodeSchema).parse(nodes);
     await putCached(db, connectionId, path, 'children', validated);
     return { nodes: validated, source: 'server' };
@@ -76,10 +86,38 @@ export function createTreeService(
       }
     }
     await requireConnected(connectionId);
-    const meta = await engineHost.call<ObjectMeta>(ENGINE_OP.describe, { connectionId, path });
+    const meta = await engineHost.call<ObjectMeta>(ENGINE_OP.describe, {
+      connectionId,
+      path,
+      refresh,
+    });
     const validated = objectMetaSchema.parse(meta);
     await putCached(db, connectionId, path, 'describe', validated);
     return { meta: validated, source: 'server' };
+  }
+
+  async function ddl(
+    connectionId: string,
+    path: string,
+    refresh = false,
+  ): Promise<{ ddl: SourceText; source: 'cache' | 'server' }> {
+    if (!refresh) {
+      const cached = await getCached(db, connectionId, path, 'ddl');
+      if (cached !== null) {
+        const parsed = sourceTextSchema.safeParse(cached);
+        if (parsed.success) return { ddl: parsed.data, source: 'cache' };
+        await dropCached(db, connectionId, path);
+      }
+    }
+    await requireConnected(connectionId);
+    const source = await engineHost.call<SourceText>(ENGINE_OP.ddl, {
+      connectionId,
+      path,
+      refresh,
+    });
+    const validated = sourceTextSchema.parse(source);
+    await putCached(db, connectionId, path, 'ddl', validated);
+    return { ddl: validated, source: 'server' };
   }
 
   async function invalidate(connectionId: string, path?: string): Promise<void> {
@@ -87,5 +125,5 @@ export function createTreeService(
     push(IPC.connectionMetadataInvalidated, { connectionId, path });
   }
 
-  return { children, describe, invalidate };
+  return { children, describe, ddl, invalidate };
 }

@@ -1,10 +1,13 @@
 import type { ConnectionState } from '../shared/connection';
+import type { CountRequest, ReadRequest } from '../shared/data';
 import {
   type ConnectInfo,
   cancelPayloadSchema,
   childrenPayloadSchema,
   connectInfoSchema,
   connectPayloadSchema,
+  configurePayloadSchema,
+  ddlPayloadSchema,
   describePayloadSchema,
   disconnectPayloadSchema,
   ENGINE_EVENT,
@@ -13,11 +16,13 @@ import {
   type TestResult,
   testPayloadSchema,
 } from '../shared/engine-ops';
+import type { Page } from '../shared/page';
 import type { PortRequest, PortResponse } from '../shared/port';
 import { decodePath } from '../shared/tree';
 import type { Adapter } from './adapters/adapter';
 import { toWireError } from './adapters/errors';
 import { createAdapter } from './adapters/registry';
+import { dropConnection as dropCacheConnection, dropPath as dropCachePath } from './cache';
 import { abortOp, emitEvent, runOp } from './ops';
 
 // Main↔engine control dispatch. Parses every inbound frame with its Zod schema before use (trust
@@ -46,7 +51,7 @@ export async function handleFrame(request: PortRequest): Promise<void> {
   process.parentPort.postMessage(response);
 }
 
-async function dispatch(request: PortRequest): Promise<unknown> {
+export async function dispatch(request: PortRequest): Promise<unknown> {
   switch (request.op) {
     case ENGINE_OP.connect:
       return connect(connectPayloadSchema.parse(request.payload));
@@ -56,13 +61,54 @@ async function dispatch(request: PortRequest): Promise<unknown> {
       return children(childrenPayloadSchema.parse(request.payload));
     case ENGINE_OP.describe:
       return describe(describePayloadSchema.parse(request.payload));
+    case ENGINE_OP.ddl:
+      return ddl(ddlPayloadSchema.parse(request.payload));
     case ENGINE_OP.test:
       return test(testPayloadSchema.parse(request.payload));
     case ENGINE_OP.cancel:
       return cancel(cancelPayloadSchema.parse(request.payload));
+    case ENGINE_OP.configure:
+      return configureEngine(configurePayloadSchema.parse(request.payload));
     default:
       throw new Error(`unknown engine op: ${request.op}`);
   }
+}
+
+// Engine-level configuration (settings changes, D25/D26): L2 budget and L3 TTL land in the cache
+// module. Called from main on startup and whenever cache settings change.
+async function configureEngine(payload: {
+  l2BudgetBytes: number;
+  l3TtlSeconds: number;
+}): Promise<void> {
+  configureCache({ l2BudgetBytes: payload.l2BudgetBytes, l3TtlMs: payload.l3TtlSeconds * 1000 });
+  return undefined;
+}
+
+import { configure as configureCache } from './cache';
+
+// The data path (P2 D1): read/count requests travel over the port and dispatch here. They run inside
+// runOp so they land in the op log with a working stop button (D9). `readRaw`/`countRaw` are the
+// engine-side implementation the rpc.ts cache layer calls after its own lookup.
+export async function readRaw(req: ReadRequest): Promise<Page> {
+  const adapter = requireAdapter(req.connectionId);
+  const { value } = await runOp(
+    { connectionId: req.connectionId, kind: 'read', tabId: req.tabId },
+    async (ctx) => {
+      const page = await adapter.read(req, ctx);
+      if (page.kind === 'tabular') ctx.setRows(page.rowCount);
+      return page;
+    },
+  );
+  return value;
+}
+
+export async function countRaw(req: CountRequest): Promise<{ value: number; exact: boolean }> {
+  const adapter = requireAdapter(req.connectionId);
+  const { value } = await runOp(
+    { connectionId: req.connectionId, kind: 'count', tabId: req.tabId },
+    (ctx) => adapter.count(req, ctx),
+  );
+  return value;
 }
 
 async function connect(cfg: ResolvedConnectionConfig): Promise<ConnectInfo> {
@@ -101,6 +147,8 @@ async function disconnect(payload: { connectionId: string }): Promise<void> {
       adapter.disconnect(),
     );
   }
+  // D26: disconnect drops everything cached for that connection.
+  dropCacheConnection(payload.connectionId);
   emitState({
     connectionId: payload.connectionId,
     status: 'disconnected',
@@ -110,8 +158,15 @@ async function disconnect(payload: { connectionId: string }): Promise<void> {
   });
 }
 
-async function children(payload: { connectionId: string; path: string }): Promise<unknown> {
+async function children(payload: {
+  connectionId: string;
+  path: string;
+  refresh?: boolean;
+}): Promise<unknown> {
   const adapter = requireAdapter(payload.connectionId);
+  // D26: a refreshing enumerate on a path drops that path's L2/L3 entries (the metadata the pages
+  // depend on may have changed).
+  if (payload.refresh) dropCachePath(payload.connectionId, payload.path);
   const { value } = await runOp(
     { connectionId: payload.connectionId, kind: 'children' },
     async (ctx) => {
@@ -123,8 +178,13 @@ async function children(payload: { connectionId: string; path: string }): Promis
   return value;
 }
 
-async function describe(payload: { connectionId: string; path: string }): Promise<unknown> {
+async function describe(payload: {
+  connectionId: string;
+  path: string;
+  refresh?: boolean;
+}): Promise<unknown> {
   const adapter = requireAdapter(payload.connectionId);
+  if (payload.refresh) dropCachePath(payload.connectionId, payload.path);
   const { value } = await runOp(
     { connectionId: payload.connectionId, kind: 'describe' },
     async (ctx) => {
@@ -133,6 +193,21 @@ async function describe(payload: { connectionId: string; path: string }): Promis
       return meta;
     },
   );
+  return value;
+}
+
+async function ddl(payload: {
+  connectionId: string;
+  path: string;
+  refresh?: boolean;
+}): Promise<unknown> {
+  const adapter = requireAdapter(payload.connectionId);
+  if (payload.refresh) dropCachePath(payload.connectionId, payload.path);
+  const { value } = await runOp({ connectionId: payload.connectionId, kind: 'ddl' }, async (ctx) => {
+    const source = await adapter.ddl(decodePath(payload.connectionId, payload.path), ctx);
+    ctx.setRows(1); // one object
+    return source;
+  });
   return value;
 }
 

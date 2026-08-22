@@ -23,6 +23,9 @@ import {
   refreshExpanded,
   type TreeRowVm,
 } from './state/tree';
+import { openData } from '../workbench/state/tabs';
+import { cachedSavedFilters, countRowsFor, scheduleTabRead } from '../workbench/state/filters';
+import { activate, updateTabState } from '../workbench/state/tabs';
 
 // The P1 context-menu subset (Step 9b). Items marked (P#) in §8.10 are omitted entirely — not
 // rendered disabled — because the feature they open does not exist yet.
@@ -43,6 +46,38 @@ function qualifiedName(path: string): string {
 
 function connectionSummary(connectionId: string): ConnectionSummary | null {
   return connectionsState.records.find((r) => r.id === connectionId) ?? null;
+}
+
+// §8.10 "Saved filters ▸": lists that path's named saved_queries entries, each opening a new tab
+// with that filter applied (D14). Reads from the filter cache (populated by the FilterToolbar's
+// history dropdown and by saves); an empty cache shows a disabled placeholder rather than lying.
+function savedFilterItems(connectionId: string, path: string): MenuEntry[] {
+  const entries = cachedSavedFilters(connectionId, path);
+  if (entries.length === 0) {
+    return [
+      { type: 'item', id: 'no-saved', label: 'No saved filters', disabled: true, run: () => {} },
+    ];
+  }
+  return entries.map(
+    (entry): MenuEntry => ({
+      type: 'item',
+      id: `saved-${entry.id}`,
+      label: entry.name,
+      run: () => {
+        const tab = openData(connectionId, path, { newTab: true });
+        updateTabState(tab.id, {
+          where: entry.body.where,
+          orderBy: entry.body.orderBy,
+          cursor: { kind: 'offset', offset: 0 },
+          pageIndex: 1,
+          totalRows: null,
+          totalExact: false,
+        });
+        activate(tab.id);
+        void scheduleTabRead(tab.id);
+      },
+    }),
+  );
 }
 
 function isConnected(connectionId: string): boolean {
@@ -221,14 +256,36 @@ export function treeRowMenu(row: TreeRowVm): MenuItem[] {
     ];
   }
 
-  if (kind === 'table' || kind === 'view' || kind === 'matview') {
+  if (kind === 'table' || kind === 'view' || kind === 'matview' || kind === 'routine') {
     return [
+      {
+        type: 'item',
+        id: 'open-data',
+        label: 'Open data',
+        icon: 'table',
+        run: () => openData(connectionId, node.path),
+      },
+      {
+        type: 'item',
+        id: 'open-data-new-tab',
+        label: 'Open data in new tab',
+        icon: 'diff-added',
+        run: () => openData(connectionId, node.path, { newTab: true }),
+      },
+      { type: 'separator' },
       {
         type: 'item',
         id: 'refresh',
         label: 'Refresh',
         icon: 'refresh',
         run: () => refresh(connectionId, node.path),
+      },
+      {
+        type: 'item',
+        id: 'count-rows',
+        label: 'Count rows',
+        icon: 'list-ordered',
+        run: () => countRowsFor(connectionId, node.path),
       },
       {
         type: 'item',
@@ -243,6 +300,13 @@ export function treeRowMenu(row: TreeRowVm): MenuItem[] {
         label: 'Copy qualified name',
         icon: 'copy',
         run: () => copy(qualifiedName(node.path)),
+      },
+      {
+        type: 'submenu',
+        id: 'saved-filters',
+        label: 'Saved filters',
+        icon: 'filter',
+        items: savedFilterItems(connectionId, node.path),
       },
     ];
   }

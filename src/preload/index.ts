@@ -8,17 +8,25 @@ import type {
   OpsCancelPayload,
   OpsRecentPayload,
   ReorderPayload,
+  SavedQueryListPayload,
+  SavedQueryUpsertPayload,
+  SavedQueryIdPayload,
+  SavedQueryPrunePayload,
   TreeChildrenPayload,
   TreeChildrenResult,
   TreeDescribePayload,
   TreeDescribeResult,
+  TreeDdlPayload,
+  TreeDdlResult,
   TreeInvalidatePayload,
   UpdateConnectionPayload,
 } from '../shared/ipc';
 import { IPC } from '../shared/ipc';
 import type { LayoutPatch } from '../shared/layout';
 import type { OpRecord } from '../shared/ops';
+import type { SavedQuery } from '../shared/saved-query';
 import type { SettingsPatch } from '../shared/settings';
+import type { TabRecord } from '../shared/tabs';
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => cb(payload);
@@ -58,6 +66,8 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.treeChildren, payload),
   treeDescribe: (payload: TreeDescribePayload): Promise<TreeDescribeResult> =>
     ipcRenderer.invoke(IPC.treeDescribe, payload),
+  treeDdl: (payload: TreeDdlPayload): Promise<TreeDdlResult> =>
+    ipcRenderer.invoke(IPC.treeDdl, payload),
   treeInvalidate: (payload: TreeInvalidatePayload) =>
     ipcRenderer.invoke(IPC.treeInvalidate, payload),
 
@@ -65,6 +75,19 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.filtersList, payload),
   filtersReplace: (payload: FiltersReplacePayload): Promise<ConnectionFilter[]> =>
     ipcRenderer.invoke(IPC.filtersReplace, payload),
+
+  tabsGetAll: (): Promise<TabRecord[]> => ipcRenderer.invoke(IPC.tabsGetAll),
+  tabsReplace: (tabs: TabRecord[]): Promise<void> => ipcRenderer.invoke(IPC.tabsReplace, tabs),
+  savedQueriesList: (payload: SavedQueryListPayload): Promise<SavedQuery[]> =>
+    ipcRenderer.invoke(IPC.savedQueriesList, payload),
+  savedQueriesUpsert: (payload: SavedQueryUpsertPayload): Promise<SavedQuery> =>
+    ipcRenderer.invoke(IPC.savedQueriesUpsert, payload),
+  savedQueriesDelete: (payload: SavedQueryIdPayload): Promise<void> =>
+    ipcRenderer.invoke(IPC.savedQueriesDelete, payload),
+  savedQueriesTouch: (payload: SavedQueryIdPayload): Promise<void> =>
+    ipcRenderer.invoke(IPC.savedQueriesTouch, payload),
+  savedQueriesPrune: (payload: SavedQueryPrunePayload): Promise<void> =>
+    ipcRenderer.invoke(IPC.savedQueriesPrune, payload),
 
   opsRecent: (payload: OpsRecentPayload): Promise<OpRecord[]> =>
     ipcRenderer.invoke(IPC.opsRecent, payload),

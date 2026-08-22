@@ -23,7 +23,8 @@
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders. */
   --kira-radius: 6px;
-  --kira-gap: 4px;
+  --kira-gap: 2px;
+  --kira-shell-pad: 4px;
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);

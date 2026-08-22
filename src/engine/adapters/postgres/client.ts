@@ -1,11 +1,15 @@
 import { Client, type ClientConfig } from 'pg';
 import type { ResolvedConnectionConfig } from '../../../shared/engine-ops';
+import { LeasePool, type Lease } from '../../lease';
 
-// D14: one Client per (connection, database) — not a Pool — so pg_cancel_backend can target the
-// exact backend. The primary client is the configured database; `get(name)` opens a per-database
-// client for the multi-database tree. Bound at 8 databases, LRU-evicting non-primary clients.
+// D11: exclusive leases, not one shared Client per database. P2 runs read + count + prefetch
+// concurrently on one connection, and `pg_cancel_backend(pid)` cancels *whatever that backend is
+// currently running* — so a shared client would let the stop button kill the wrong query. Each
+// database gets a LeasePool<Client> of max 3, still bounded at MAX_DATABASES databases, LRU-evicting
+// non-primary pools.
 
-const MAX_CLIENTS = 8;
+const MAX_DATABASES = 8;
+const LEASES_PER_DB = 3;
 
 export function buildClientConfig(
   cfg: ResolvedConnectionConfig,
@@ -44,39 +48,48 @@ export function buildClientConfig(
 
 export class ClientSet {
   private readonly config: ClientConfig;
-  private readonly clients = new Map<string, Client>();
+  private readonly pools = new Map<string, LeasePool<Client>>();
   private readonly order: string[] = [];
-  private primaryClient: Client | null = null;
+  private primaryPool: LeasePool<Client> | null = null;
 
   constructor(cfg: ResolvedConnectionConfig, warn?: (m: string) => void) {
     this.config = buildClientConfig(cfg, warn);
   }
 
-  primary(): Promise<Client> {
-    return this.get(null);
-  }
-
-  private async open(database: string | null): Promise<Client> {
-    const client = new Client(database === null ? this.config : { ...this.config, database });
-    await client.connect();
-    return client;
-  }
-
-  async get(database: string | null): Promise<Client> {
+  private poolFor(database: string | null): LeasePool<Client> {
     if (database === null) {
-      if (!this.primaryClient) this.primaryClient = await this.open(null);
-      return this.primaryClient;
+      this.primaryPool ??= this.makePool(null);
+      return this.primaryPool;
     }
-    const existing = this.clients.get(database);
-    if (existing) {
+    let pool = this.pools.get(database);
+    if (pool) {
       this.touch(database);
-      return existing;
+      return pool;
     }
-    if (this.clients.size >= MAX_CLIENTS) this.evictLru();
-    const client = await this.open(database);
-    this.clients.set(database, client);
+    if (this.pools.size >= MAX_DATABASES) this.evictLru();
+    pool = this.makePool(database);
+    this.pools.set(database, pool);
     this.order.unshift(database);
-    return client;
+    return pool;
+  }
+
+  private makePool(database: string | null): LeasePool<Client> {
+    return new LeasePool<Client>({
+      max: LEASES_PER_DB,
+      open: async () => {
+        const client = new Client(database === null ? this.config : { ...this.config, database });
+        await client.connect();
+        return client;
+      },
+      close: async (client) => {
+        await client.end().catch(() => {});
+      },
+    });
+  }
+
+  /** Exclusive lease of the connection for `database` (D11). */
+  lease(database: string | null, signal?: AbortSignal): Promise<Lease<Client>> {
+    return this.poolFor(database).acquire(signal);
   }
 
   private touch(database: string): void {
@@ -88,25 +101,25 @@ export class ClientSet {
   private evictLru(): void {
     for (let i = this.order.length - 1; i >= 0; i--) {
       const db = this.order[i];
-      const client = this.clients.get(db);
-      if (!client) continue;
+      const pool = this.pools.get(db);
+      if (!pool) continue;
       this.order.splice(i, 1);
-      this.clients.delete(db);
-      void client.end().catch(() => {});
+      this.pools.delete(db);
+      void pool.closeAll();
       return;
     }
   }
 
   async closeAll(): Promise<void> {
-    const clients = [this.primaryClient, ...this.clients.values()];
-    this.primaryClient = null;
-    this.clients.clear();
+    const pools = [this.primaryPool, ...this.pools.values()];
+    this.primaryPool = null;
+    this.pools.clear();
     this.order.length = 0;
-    await Promise.all(clients.filter(Boolean).map((c) => (c as Client).end().catch(() => {})));
+    await Promise.all(pools.filter(Boolean).map((p) => (p as LeasePool<Client>).closeAll()));
   }
 }
 
-// pg_cancel_backend on a fresh side connection (D14). The caller resolves the backend pid from its
+// pg_cancel_backend on a fresh side connection (D11). The caller resolves the backend pid from its
 // running-query map. Returns the boolean the server returned (true = cancel signal sent).
 export async function cancelBackend(config: ClientConfig, backendPid: number): Promise<boolean> {
   const client = new Client(config);

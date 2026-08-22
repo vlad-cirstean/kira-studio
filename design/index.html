@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Kira Studio — Design review</title>
+<link rel="stylesheet" href="../node_modules/@vscode/codicons/dist/codicon.css" />
+<link rel="stylesheet" href="../src/renderer/theme/tokens.css" />
+<link rel="stylesheet" href="app.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+<body class="bg-neutral-950 text-neutral-300 font-sans">
+<div class="min-h-full flex flex-col items-center gap-2 p-8">
+
+  <h1 class="w-full max-w-[1400px] text-xl font-semibold text-white">Kira Studio — visual design review</h1>
+  <p class="w-full max-w-[1400px] text-[13px] text-neutral-400 mb-2 leading-relaxed">
+    Plain HTML + Tailwind (Play CDN), built against the app's real token set
+    (<code class="font-mono">src/renderer/theme/tokens.css</code>, VS Code Dark Modern derived) and real
+    <code class="font-mono">@vscode/codicons</code>. Not wired to any state — for visual review only.
+  </p>
+
+  <div class="flex gap-6 max-w-[1400px] w-full flex-wrap">
+
+    <a class="w-[340px] rounded-[10px] overflow-hidden border border-black shadow-[0_12px_32px_rgba(0,0,0,0.4)] no-underline text-inherit hover:-translate-y-0.5 transition-transform" href="workbench.html">
+      <div class="h-[190px] bg-chrome flex items-center justify-center text-disabled">
+        <span class="codicon codicon-layout text-[32px]"></span>
+      </div>
+      <div class="bg-[#191919] px-3.5 py-3">
+        <div class="text-[13px] font-semibold text-white mb-1">Workbench shell</div>
+        <div class="text-[11px] text-neutral-400 leading-relaxed">
+          Full chrome: project tree, tabs, toolbar + filter row, virtualized-style data grid,
+          cell editor, operations panel, status bar, and a context-menu example.
+        </div>
+      </div>
+    </a>
+
+    <a class="w-[340px] rounded-[10px] overflow-hidden border border-black shadow-[0_12px_32px_rgba(0,0,0,0.4)] no-underline text-inherit hover:-translate-y-0.5 transition-transform" href="connection-dialog.html">
+      <div class="h-[190px] bg-chrome flex items-center justify-center text-disabled">
+        <span class="codicon codicon-plug text-[32px]"></span>
+      </div>
+      <div class="bg-[#191919] px-3.5 py-3">
+        <div class="text-[13px] font-semibold text-white mb-1">Connection dialog</div>
+        <div class="text-[11px] text-neutral-400 leading-relaxed">
+          Fields/URI mode switch, 12-swatch color picker, read-only toggle, plain-text credential
+          warning, test-connection state.
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+</div>
+</body>
+</html>

@@ -17,8 +17,7 @@ const isConnection = computed(() => props.row.node.kind === 'connection');
 const isColumn = computed(() => props.row.node.kind === 'column');
 
 const color = computed<ConnectionColor | null>(() => {
-  if (!isConnection.value) return null;
-  return connectionsState.records.find((r) => r.id === props.row.connectionId)?.color ?? 'grey';
+  return connectionsState.records.find((r) => r.id === props.row.connectionId)?.color ?? null;
 });
 
 const state = computed(() =>
@@ -83,7 +82,8 @@ function onContextMenu(e: MouseEvent): void {
 
 <template>
   <div
-    class="tree-row"
+    class="relative flex cursor-default items-center gap-1 whitespace-nowrap text-xs hover:bg-hover"
+    :class="{ selected: treeState.selected === k }"
     :style="{
       height: 'var(--kira-row-height)',
       paddingLeft: `${8 + row.depth * 14}px`,
@@ -92,95 +92,78 @@ function onContextMenu(e: MouseEvent): void {
     :data-path="row.node.path"
     :data-kind="row.node.kind"
     :data-status="state ?? undefined"
-    :class="{ selected: treeState.selected === k }"
     @click="select"
     @dblclick="onDblClick"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <span v-if="color" class="rail" :style="{ background: `var(--kira-conn-${color})` }" />
+    <span
+      v-if="color"
+      class="absolute left-0 top-[3px] bottom-[3px] w-[2px] rounded-sm opacity-85"
+      :style="{ background: `var(--kira-conn-${color})` }"
+    />
 
     <button
       v-if="row.node.hasChildren"
       type="button"
-      class="twisty"
+      class="flex h-[14px] w-[14px] shrink-0 items-center justify-center text-muted"
       :aria-expanded="expanded"
       @click.stop="onTwisty"
     >
-      <Codicon v-if="loading" name="loading" :size="14" class="spin" />
-      <Codicon v-else :name="expanded ? 'chevron-down' : 'chevron-right'" :size="14" />
+      <Codicon v-if="loading" name="loading" :size="13" class="spin" />
+      <Codicon v-else :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
-    <span v-else class="twisty-spacer" />
+    <span v-else class="w-[14px] shrink-0" />
 
     <span
       v-if="isConnection"
-      class="dot"
+      class="h-1.5 w-1.5 shrink-0 rounded-full"
       :class="{ pulse: state === 'connecting' }"
       :style="{ background: statusColor }"
       :title="statusTitle"
     />
 
-    <Codicon :name="icon" :size="14" class="node-icon" />
+    <Codicon :name="icon" :size="14" class="shrink-0 text-muted" />
 
-    <span class="label" :title="row.node.name">
+    <span class="min-w-0 flex-1 truncate" :title="row.node.name">
       <template v-for="(seg, i) in labelSegments" :key="i">
-        <span v-if="seg.match" class="highlight">{{ seg.text }}</span>
+        <mark v-if="seg.match" class="rounded-sm bg-conn-amber/40 px-0.5 text-inherit">{{
+          seg.text
+        }}</mark>
         <template v-else>{{ seg.text }}</template>
       </template>
     </span>
 
-    <span v-if="row.node.badges?.length" class="badges">
-      <span v-for="badge in row.node.badges" :key="badge" class="badge">{{ badge }}</span>
+    <span v-if="row.node.badges?.length" class="flex shrink-0 gap-0.5">
+      <span
+        v-for="badge in row.node.badges"
+        :key="badge"
+        class="rounded-sm bg-badge px-1.5 py-px text-[10px] leading-[14px] text-fg"
+        >{{ badge }}</span
+      >
     </span>
 
-    <span v-if="row.node.detail" class="detail">{{ row.node.detail }}</span>
+    <span
+      v-if="isConnection && state === 'connected'"
+      class="h-1.5 w-1.5 shrink-0 rounded-full"
+      :style="{ background: 'var(--kira-ok)', boxShadow: '0 0 4px var(--kira-ok)' }"
+    />
+
+    <span
+      v-if="row.node.detail"
+      class="ml-auto shrink-0 text-[10px] text-disabled"
+      :title="row.node.detail"
+      >{{ row.node.detail }}</span
+    >
   </div>
 </template>
 
 <style scoped>
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  position: relative;
-  padding-right: 6px;
-  cursor: default;
-  white-space: nowrap;
-  font-size: 12px;
-}
-
-.tree-row:hover {
-  background: var(--kira-hover);
-}
-
-.tree-row.selected {
+.selected {
   background: var(--kira-select);
 }
 
-.rail {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-}
-
-.twisty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-}
-
-.twisty-spacer {
-  width: 14px;
-  flex-shrink: 0;
+.selected:hover {
+  background: var(--kira-select);
 }
 
 .spin {
@@ -193,14 +176,7 @@ function onContextMenu(e: MouseEvent): void {
   }
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.dot.pulse {
+.pulse {
   animation: kira-pulse 1.2s ease-in-out infinite;
 }
 
@@ -208,46 +184,5 @@ function onContextMenu(e: MouseEvent): void {
   50% {
     opacity: 0.4;
   }
-}
-
-.node-icon {
-  color: var(--kira-fg-muted);
-  flex-shrink: 0;
-}
-
-.label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.highlight {
-  background: var(--kira-select);
-  color: var(--kira-fg);
-  border-radius: 2px;
-}
-
-.badges {
-  display: flex;
-  gap: 3px;
-  flex-shrink: 0;
-}
-
-.badge {
-  background: var(--kira-badge);
-  color: var(--kira-fg);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 14px;
-}
-
-.detail {
-  margin-left: auto;
-  color: var(--kira-fg-muted);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
 }
 </style>

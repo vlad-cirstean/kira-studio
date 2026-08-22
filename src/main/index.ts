@@ -4,23 +4,27 @@ import { ENGINE_EVENT, opEndEventSchema, opStartEventSchema } from '../shared/en
 import { IPC } from '../shared/ipc';
 import type { OpKind, OpRecord } from '../shared/ops';
 import { startEngine } from './engine-host';
-import { registerIpc } from './ipc';
+import { registerIpc, pushCacheConfigToEngine } from './ipc';
 import { log } from './log';
 import { buildMenu } from './menu';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { appendOp, finishOp, pruneOps } from './storage/oplog';
 import { ensureLayout, kiraHome } from './storage/paths';
+import { getAllSettings } from './storage/settings';
 import { broadcast, createWindow } from './window';
 
 app.setName('Kira Studio');
 if (process.env.KIRA_HOME) {
   app.setPath('userData', join(kiraHome(), 'electron'));
 }
-Menu.setApplicationMenu(buildMenu());
 
 async function main(): Promise<void> {
   await app.whenReady();
+
+  // Install the menu only once the app is fully launched: on macOS the first menu's title is the
+  // app name, which Electron resolves from productName/name at that point.
+  Menu.setApplicationMenu(buildMenu());
 
   ensureLayout();
   const handle = await openDb();
@@ -29,6 +33,9 @@ async function main(): Promise<void> {
 
   const engineHost = startEngine();
   const services = registerIpc(db, engineHost);
+  // The engine owns L2/L3 — teach it the configured budget/TTL before any data op can land.
+  const initial = await getAllSettings(db);
+  pushCacheConfigToEngine(engineHost, initial);
   void pruneOps(db);
 
   // Op log wiring (D19): the engine emits op:start/op:end; main persists them and forwards each as
@@ -36,7 +43,7 @@ async function main(): Promise<void> {
   // finish patch, so main joins them via a small in-flight map.
   const opStart = new Map<
     string,
-    { connectionId: string | null; kind: OpKind; startedAt: string }
+    { connectionId: string | null; kind: OpKind; startedAt: string; tabId: string | null }
   >();
   engineHost.on(ENGINE_EVENT.opStart, (payload) => {
     const start = opStartEventSchema.parse(payload);
@@ -44,11 +51,12 @@ async function main(): Promise<void> {
       connectionId: start.connectionId,
       kind: start.kind,
       startedAt: start.startedAt,
+      tabId: start.tabId,
     });
     const record: OpRecord = {
       id: start.opId,
       connectionId: start.connectionId,
-      tabId: null,
+      tabId: start.tabId,
       startedAt: start.startedAt,
       durationMs: null,
       kind: start.kind,
@@ -79,7 +87,7 @@ async function main(): Promise<void> {
     const record: OpRecord = {
       id: end.opId,
       connectionId: start.connectionId,
-      tabId: null,
+      tabId: start.tabId,
       startedAt: start.startedAt,
       durationMs: end.durationMs,
       kind: start.kind,

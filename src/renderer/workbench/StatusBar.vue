@@ -17,11 +17,15 @@ import { settingsOpen } from './state/settings';
       >
         <Codicon
           name="circle-large-filled"
-          :size="10"
+          :size="9"
           :style="{ color: engineState.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
         />
         engine {{ engineState.status }}
       </span>
+      <span v-if="engineState.lastPingMs !== null" class="muted">{{ engineState.lastPingMs }} ms</span>
+    </div>
+
+    <div class="side">
       <button
         type="button"
         class="toggle-button"
@@ -69,7 +73,7 @@ import { settingsOpen } from './state/settings';
 .status-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 8px;
   font-size: 11px;
   color: var(--kira-fg-muted);
@@ -78,13 +82,17 @@ import { settingsOpen } from './state/settings';
 .side {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .engine-indicator {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.muted {
+  color: var(--kira-fg-disabled);
 }
 
 .toggle-button {
