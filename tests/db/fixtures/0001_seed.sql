@@ -148,6 +148,39 @@ INSERT INTO app.nested_json (id, data) VALUES (
 );
 
 -- ---------------------------------------------------------------------------------------------
+-- formats — one row per §8.6 autodetect format, all in a plain `text` column so the detector
+-- has to work from the value alone (typeClass 'text' enables every detector, §5a). `kind` names
+-- the expected detection and is asserted by tests/ui/cell-editor.spec.ts, which looks rows up
+-- by that value rather than by insertion order (P3 D20).
+-- ---------------------------------------------------------------------------------------------
+CREATE TABLE app.formats (
+  id     serial PRIMARY KEY,
+  kind   text NOT NULL,
+  sample text NOT NULL
+);
+
+INSERT INTO app.formats (kind, sample) VALUES
+  -- A 20-digit integer literal — the lossless-roundtrip proof (P3 D10): it must survive
+  -- Indented/Compact byte-for-byte.
+  ('json', $${"id": 12345678901234567890, "name": "sample", "tags": ["a", "b"]}$$),
+  ('xml', $$<?xml version="1.0"?><root attr="a value"><!-- a comment --><![CDATA[raw data]]></root>$$),
+  ('sql', 'SELECT id, name FROM app.formats WHERE kind = ''json'' ORDER BY id'),
+  -- base64 of "Hello, World!" — 13 bytes decoded (P3 D9's worked example).
+  ('base64', 'SGVsbG8sIFdvcmxkIQ=='),
+  ('hex', '0xcafebabedeadbeef'),
+  ('epochSeconds', '1705315425'),
+  ('epochMillis', '1705315425123'),
+  ('iso8601', '2024-01-15T10:23:45.123Z'),
+  ('uuid', '00000000-0000-0000-0000-000000000001'),
+  ('url', 'https://example.com/path?q=1'),
+  ('csv', $$a,b,c
+1,2,3
+4,5,6$$),
+  ('text', 'The quick brown fox jumps over the lazy dog, a plain sentence of prose.'),
+  -- Cut mid-string — §5b's 0.35 "looks like JSON, invalid at offset N" case.
+  ('json-invalid', $${"a": "value truncated mid-string$$);
+
+-- ---------------------------------------------------------------------------------------------
 -- composite_pk — a two-column primary key.
 -- ---------------------------------------------------------------------------------------------
 CREATE TABLE app.composite_pk (
