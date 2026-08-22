@@ -4,6 +4,7 @@
  * one selected commit, then discarded." This is the store that rule describes, built on
  * `ShaTable` (W3) and `StringInterner`/`SubjectBuffer` (W2).
  */
+import type { LayoutInput } from "../graph/types.ts";
 import type { CommitIdentity, CommitRecord, DecorationRef } from "../model/commit.ts";
 import { assert } from "../util/assert.ts";
 import { StringInterner, SubjectBuffer } from "./intern.ts";
@@ -29,7 +30,9 @@ type TypedIntArray = Uint32Array | Int32Array;
 class GrowableColumn<T extends TypedIntArray> {
   #array: T;
   #length = 0;
-  readonly #Ctor: new (length: number) => T;
+  readonly #Ctor: new (
+    length: number,
+  ) => T;
 
   constructor(Ctor: new (length: number) => T, initialCapacity = 1024) {
     this.#Ctor = Ctor;
@@ -129,6 +132,12 @@ export class CommitStore {
 
   #rowCount = 0;
   #clampedTimestampCount = 0;
+  /** Every parent slot resolved since the last `layoutInput()` call, regardless of whether it
+   *  happened via `append()` or `appendPage()` — `layoutInput()` is normally called once per
+   *  page, after many individual `append()` calls (the pipeline's per-record sink), so this
+   *  accumulates across all of them rather than relying on a caller to thread each call's own
+   *  `AppendResult.resolvedParentSlots` through by hand. */
+  #resolvedSinceLastLayoutInput: number[] = [];
 
   constructor() {
     this.#parentOffsets.push(0);
@@ -196,6 +205,7 @@ export class CommitStore {
       resolved.push(slot);
     }
     for (const slot of resolved) this.#pendingParents.delete(slot);
+    this.#resolvedSinceLastLayoutInput.push(...resolved);
     return resolved;
   }
 
@@ -265,6 +275,30 @@ export class CommitStore {
     };
   }
 
+  /**
+   * The row range `[from, to)` plus the parent CSR the layout algorithm reads — the *whole*
+   * store's `parentOffsets`/`parentRows` columns, not sliced, since a patch may need to reach
+   * back to a row outside `[from, to)`. `resolvedParentSlots` is every parent slot resolved
+   * since the last call to this method (see the field's own doc comment), then cleared —
+   * calling this twice in a row without an intervening append yields an empty second result,
+   * not a repeat of the first.
+   */
+  layoutInput(from: number, to: number): LayoutInput {
+    assert(
+      from >= 0 && to <= this.#rowCount && from <= to,
+      `CommitStore.layoutInput(${from}, ${to}): out of range for ${this.#rowCount} rows`,
+    );
+    const resolvedParentSlots = Uint32Array.from(this.#resolvedSinceLastLayoutInput);
+    this.#resolvedSinceLastLayoutInput = [];
+    return {
+      from,
+      to,
+      parentOffsets: this.#parentOffsets.view(),
+      parentRows: this.#parentRows.view(),
+      resolvedParentSlots,
+    };
+  }
+
   stats(): CommitStoreStats {
     const columnBytes =
       this.#authorName.byteLength +
@@ -297,6 +331,7 @@ export class CommitStore {
     this.#pendingParents.clear();
     this.#rowCount = 0;
     this.#clampedTimestampCount = 0;
+    this.#resolvedSinceLastLayoutInput = [];
     this.#authorName.clear();
     this.#authorEmail.clear();
     this.#authorTime.clear();

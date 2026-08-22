@@ -52,7 +52,12 @@ function hashFirstFourBytes(bytes: Uint8Array): number {
 
 /** Compares `sha` (a full `widthBytes`-length array or view, always indexed from 0) against
  *  `widthBytes` bytes of `rows` starting at `rowStart`. */
-function shaEqualsRow(sha: Uint8Array, rows: Uint8Array, rowStart: number, widthBytes: number): boolean {
+function shaEqualsRow(
+  sha: Uint8Array,
+  rows: Uint8Array,
+  rowStart: number,
+  widthBytes: number,
+): boolean {
   for (let i = 0; i < widthBytes; i++) {
     if (sha[i] !== rows[rowStart + i]) return false;
   }

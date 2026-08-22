@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { ShaTable } from "./shaTable.ts";
 
 /** A deterministic, genuinely unique-per-seed hex string — sha1 (40 hex) or sha256-truncated
@@ -45,8 +45,10 @@ describe("ShaTable", () => {
     expect(table.count).toBe(100_000);
 
     for (let idx = 0; idx < shas.length; idx += 997) {
-      expect(table.rowOfHex(shas[idx] as string)).toBe(rows[idx]);
-      expect(table.hexAt(rows[idx] as number)).toBe(shas[idx]);
+      const sha = shas[idx] as string;
+      const row = rows[idx] as number;
+      expect(table.rowOfHex(sha)).toBe(row);
+      expect(table.hexAt(row)).toBe(sha);
     }
     // A sha that was never appended, sharing no accidental prefix with any real entry.
     expect(table.rowOfHex("f".repeat(40))).toBe(-1);
@@ -97,7 +99,7 @@ describe("ShaTable", () => {
     for (let i = 0; i < 500; i++) shas.push(hexOfLength(i, 40));
     const rows = shas.map((hex) => table.append(hex));
     for (let i = 0; i < shas.length; i++) {
-      expect(table.rowOfHex(shas[i] as string)).toBe(rows[i]);
+      expect(table.rowOfHex(shas[i] as string)).toBe(rows[i] as number);
     }
   });
 

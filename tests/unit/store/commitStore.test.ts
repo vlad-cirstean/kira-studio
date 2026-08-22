@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { fan, octopusOf, topology } from "../../../../tests/fixtures/topology.ts";
-import { CommitStore } from "./commitStore.ts";
+import { CommitStore } from "../../../packages/core/src/store/commitStore.ts";
+import { fan, octopusOf, topology } from "../../fixtures/topology.ts";
 
 describe("CommitStore — single-page append", () => {
   test("appends a root, a linear chain, and reconstructs each row exactly", () => {
@@ -10,7 +10,7 @@ describe("CommitStore — single-page append", () => {
 
     expect(store.rowCount).toBe(3);
     for (let row = 0; row < 3; row++) {
-      expect(store.commitAt(row)).toEqual(records[row]);
+      expect(store.commitAt(row)).toEqual(records[row] as (typeof records)[number]);
     }
   });
 
@@ -29,12 +29,7 @@ describe("CommitStore — single-page append", () => {
   });
 
   test("commitAt reconstructs byte-identical records for every W1 shape", () => {
-    const shapes = [
-      topology(["A", "B:A", "C:A", "D:B,C"]),
-      fan(5, 3),
-      octopusOf(3),
-      octopusOf(12),
-    ];
+    const shapes = [topology(["A", "B:A", "C:A", "D:B,C"]), fan(5, 3), octopusOf(3), octopusOf(12)];
     for (const records of shapes) {
       const store = new CommitStore();
       store.appendPage(records);
@@ -61,7 +56,7 @@ describe("CommitStore — single-page append", () => {
     // Every record shares the same fixture author/committer identity.
     expect(store.stats().internedStringBytes).toBeGreaterThan(0);
     for (let row = 0; row < store.rowCount; row++) {
-      expect(store.authorAt(row).name).toBe(records[0]?.author.name);
+      expect(store.authorAt(row).name).toBe(records[0]?.author.name as string);
     }
   });
 });
@@ -96,7 +91,7 @@ describe("CommitStore — page-boundary equivalence", () => {
     expect(Array.from(store.parentsOf(0))).toEqual([-1]);
     expect(first.resolvedParentSlots).toHaveLength(0);
     // commitAt must still report A's real sha even though it isn't a resolvable row yet.
-    expect(store.commitAt(0).parents).toEqual([records[1]?.sha]);
+    expect(store.commitAt(0).parents).toEqual([records[1]?.sha as string]);
 
     const second = store.appendPage([records[1] as (typeof records)[number]]); // now A
     expect(second.resolvedParentSlots).toEqual(Uint32Array.from([0]));

@@ -16,10 +16,21 @@
  * empty subject, and a commit decorated by a branch, a tag and three remotes at once.
  */
 import { execFileSync } from "node:child_process";
-import { dirname, join } from "node:path";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
+  logArgs,
+  mergeTreeArgs,
+  nameStatusArgs,
+  numstatArgs,
+  refsArgs,
+  showMetadataArgs,
+  stashListArgs,
+  statusArgs,
+} from "../../packages/git/src/index.ts";
+import {
+  baseEnv,
   branchy,
   conflicting,
   crissCross,
@@ -27,18 +38,7 @@ import {
   octopus,
   withRemote,
   withStash,
-  baseEnv,
 } from "./generateRepo.ts";
-import {
-  logArgs,
-  refsArgs,
-  statusArgs,
-  numstatArgs,
-  nameStatusArgs,
-  stashListArgs,
-  mergeTreeArgs,
-  showMetadataArgs,
-} from "../../packages/git/src/index.ts";
 
 const OUT_DIR = join(import.meta.dir, "porcelain");
 

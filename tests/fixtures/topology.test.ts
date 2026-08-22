@@ -5,8 +5,8 @@ describe("topology()", () => {
   test("round-trips a linear chain, newest first", () => {
     const records = topology(["A", "B:A", "C:B"]);
     expect(records.map((r) => r.subject)).toEqual(["C", "B", "A"]);
-    expect(records[0]?.parents).toEqual([records[1]?.sha]);
-    expect(records[1]?.parents).toEqual([records[2]?.sha]);
+    expect(records[0]?.parents).toEqual([records[1]?.sha as string]);
+    expect(records[1]?.parents).toEqual([records[2]?.sha as string]);
     expect(records[2]?.parents).toEqual([]);
   });
 
@@ -24,8 +24,8 @@ describe("topology()", () => {
   test("a merge commit carries multiple parents in spec order", () => {
     const records = topology(["A", "B:A", "C:A", "D:B,C"]);
     const merge = records.find((r) => r.subject === "D");
-    const bSha = records.find((r) => r.subject === "B")?.sha;
-    const cSha = records.find((r) => r.subject === "C")?.sha;
+    const bSha = records.find((r) => r.subject === "B")?.sha as string;
+    const cSha = records.find((r) => r.subject === "C")?.sha as string;
     expect(merge?.parents).toEqual([bSha, cSha]);
   });
 

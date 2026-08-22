@@ -7,7 +7,7 @@
  * per commit and can express all of them directly.
  */
 import { createHash } from "node:crypto";
-import type { CommitRecord } from "@kira-version/core";
+import type { CommitRecord } from "../../packages/core/src/model/commit.ts";
 
 const EPOCH_SECONDS = 1_700_000_000;
 const STEP_SECONDS = 3600;

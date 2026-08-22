@@ -60,7 +60,7 @@ export class StringInterner {
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-8", { fatal: false });
 
-function growBuffer(current: Uint8Array, minLength: number): Uint8Array {
+function growBuffer(current: Uint8Array<ArrayBuffer>, minLength: number): Uint8Array<ArrayBuffer> {
   let capacity = current.length === 0 ? 1024 : current.length;
   while (capacity < minLength) capacity *= 2;
   const grown = new Uint8Array(capacity);
@@ -68,7 +68,10 @@ function growBuffer(current: Uint8Array, minLength: number): Uint8Array {
   return grown;
 }
 
-function growOffsets(current: Uint32Array, minLength: number): Uint32Array {
+function growOffsets(
+  current: Uint32Array<ArrayBuffer>,
+  minLength: number,
+): Uint32Array<ArrayBuffer> {
   let capacity = current.length === 0 ? 256 : current.length;
   while (capacity < minLength) capacity *= 2;
   const grown = new Uint32Array(capacity);
