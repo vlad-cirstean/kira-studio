@@ -322,11 +322,22 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="search-close"]');
   await expect(searchToolbar).toHaveCount(0);
 
-  // --- stop: a 10 000-row read, cancelled mid-flight, previous page stays on screen --------
+  // --- stop: a filtered read cancelled mid-flight, previous page stays on screen -----------
   await page.click('[data-testid="page-size-10000"]');
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('10000');
   const firstBeforeStop = await firstGutterNumber(page);
-  await page.click('[data-testid="pager-next"]');
+  // `(SELECT pg_sleep(2)) IS NULL` is an uncorrelated subquery — Postgres hoists it into a
+  // one-shot InitPlan regardless of row count, giving this filtered read a flat, deterministic
+  // ~2s cost (Postgres/OS caches being warm from earlier reads would otherwise make a plain
+  // 10 000-row read resolve too fast to reliably click Stop before it finishes). Applying the
+  // filter itself is what starts the slow read here — not a follow-up pager click — so there's
+  // no risk of the D-prefetch background fetch (§8) having already warmed the next page and
+  // turning the click into an instant cache hit. It goes first in an OR (not AND) with the real
+  // predicate: pg_sleep() returns void, which is never NULL, so the left disjunct is always
+  // false and the right one (`id > 0`, true for this table) alone decides the match — an AND
+  // here would make the always-false left side veto every row.
+  await page.fill('[data-testid="filter-where-input"]', '(SELECT pg_sleep(2)) IS NULL OR id > 0');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
   await page.click('[data-testid="toolbar-stop"]');
   await expect
     .poll(async () => ofKind(await getOps(page, connectionId), 'read')[0]?.status, {
@@ -334,16 +345,25 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
     })
     .toBe('cancelled');
   await expect.poll(() => firstGutterNumber(page)).toBe(firstBeforeStop);
-  await page.click('[data-testid="pager-first"]');
+  await page.fill('[data-testid="filter-where-input"]', '');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
   await page.click('[data-testid="page-size-100"]');
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('100');
 
-  // --- cache: revisiting a page is a hit (no new op row); ↻ forces exactly one -------------
+  // --- cache: revisiting the exact same cursor is a hit; ↻ forces exactly one -------------
   const opsBeforeCacheRoundTrip = await getOps(page, connectionId);
+  // The page cache key includes the request's cursor verbatim (D12: "each page/cursor pair is
+  // its own entry"), and this table's id-sorted default is keyset-eligible, so every hop after
+  // the first uses a token cursor rather than plain offsets (§5c). That makes ► a miss (a fresh
+  // 'after' cursor), ◄ back to page 1 a miss too (a *different*, 'before' cursor — not the
+  // 'offset:0' one page 1 was originally cached under), and only the second ► a hit: its 'after'
+  // cursor encodes page 1's own last row, which is identical both times, so it reuses the exact
+  // cache entry the first ► already stored.
   await page.click('[data-testid="pager-next"]');
-  await page.click('[data-testid="pager-prev"]'); // back to page 1, already in L2
+  await page.click('[data-testid="pager-prev"]');
+  await page.click('[data-testid="pager-next"]');
   expect(ofKind(await getOps(page, connectionId), 'read')).toHaveLength(
-    ofKind(opsBeforeCacheRoundTrip, 'read').length + 1, // only the forward hop was a miss
+    ofKind(opsBeforeCacheRoundTrip, 'read').length + 2, // ► and ◄ were misses, the second ► a hit
   );
   const opsBeforeRefresh = await getOps(page, connectionId);
   await page.click('[data-testid="toolbar-refresh"]');
@@ -358,9 +378,19 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="pager-next"]');
   await page.waitForTimeout(500); // let the idle-scheduled prefetch fire
   const opsAfterFirstNext = ofKind(await getOps(page, connectionId), 'read');
+  // schedulePrefetch() already read the page one further ahead in the background (its op is
+  // opsAfterFirstNext[0], the most recent) — this second ► should be served from that cache
+  // entry rather than issuing the identical query again.
+  const prefetchedCommand = opsAfterFirstNext[0]?.command;
   await page.click('[data-testid="pager-next"]');
   await page.waitForTimeout(100);
-  expect(ofKind(await getOps(page, connectionId), 'read')).toHaveLength(opsAfterFirstNext.length);
+  const opsAfterSecondNext = ofKind(await getOps(page, connectionId), 'read');
+  // Don't assert on the raw op count here: schedulePrefetch() reruns after *every* successful
+  // load (cache hit or not), so this click's own landing may already have kicked off another
+  // background prefetch (for the page after this one) within the same 100ms window — that's
+  // expected, ongoing read-ahead, not a sign this click missed the cache. The real signal that
+  // this click hit the cache is that its own cursor wasn't queried a second time.
+  expect(opsAfterSecondNext.filter((o) => o.command === prefetchedCommand)).toHaveLength(1);
   await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
 
   // --- NULL vs '' -------------------------------------------------------------------------
