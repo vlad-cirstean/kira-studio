@@ -1,5 +1,6 @@
 import { type Connection, createConnection } from 'mariadb';
 import type { SourceText } from '../../../shared/domain/ddl';
+import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
   type NodePath,
@@ -22,6 +23,7 @@ import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
 import { buildDdl } from './ddl';
+import * as mutate from './mutate';
 import { type RunningQuery, runQuery } from './query';
 import { countRows, readPage } from './read';
 
@@ -38,7 +40,6 @@ class MariaDbAdapter implements Adapter {
   private cfg: ResolvedConnectionConfig | null = null;
   private primaryDatabase: string | null = null;
   private readonly runningByOp = new Map<string, RunningQuery>();
-  // Recorded for a future write path — P2 issues no writes, so there is nothing to guard yet.
   private readOnly = false;
 
   constructor(private readonly deps: AdapterDeps) {}
@@ -240,6 +241,25 @@ class MariaDbAdapter implements Adapter {
     const exec = this.execFor(conn, ctx);
     const target = await catalog.getReadTarget(exec, databaseSegment.name, objectSegment.name);
     return { conn, target };
+  }
+
+  preview(plan: MutationPlan): string[] {
+    return mutate.preview(plan);
+  }
+
+  async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
+    const [databaseSegment] = plan.path.segments;
+    if (databaseSegment?.kind !== 'database') {
+      throw new AdapterError('E_NOT_FOUND', `unexpected root path segment kind: ${databaseSegment?.kind}`);
+    }
+    const conn = await this.requireConnection(databaseSegment.name);
+    return mutate.mutate(
+      conn,
+      ctx,
+      (q) => this.runningByOp.set(ctx.opId, q),
+      this.readOnly,
+      plan,
+    );
   }
 
   async cancel(opId: string): Promise<boolean> {

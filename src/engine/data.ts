@@ -1,9 +1,16 @@
+import type { MutationPlan } from '../shared/domain/mutations';
 import { decodePath } from '../shared/domain/tree';
 import {
   type CountRequestWire,
   type CountResponse,
   countRequestWireSchema,
+  type MutateRequestWire,
+  type MutateResponse,
+  mutateRequestWireSchema,
   type PrefetchResponse,
+  type PreviewRequestWire,
+  type PreviewResponse,
+  previewRequestWireSchema,
   type ReadRequestWire,
   type ReadResponse,
   readRequestWireSchema,
@@ -100,4 +107,36 @@ export async function handlePrefetch(payload: unknown): Promise<PrefetchResponse
     warmed: response.source === 'server',
     bytes: response.source === 'server' ? page.byteSize : 0,
   };
+}
+
+// Never a database operation (P5 D9, same class as configureCache) — adapter.preview() is
+// synchronous and never touches the server, so this never reaches the op log.
+export async function handlePreview(payload: unknown): Promise<PreviewResponse> {
+  const req: PreviewRequestWire = previewRequestWireSchema.parse(payload);
+  const adapter = getLiveAdapter(req.connectionId);
+  if (!adapter) {
+    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+  }
+  const plan: MutationPlan = { path: decodePath(req.connectionId, req.path), ops: req.ops };
+  return { statements: adapter.preview(plan) };
+}
+
+export async function handleMutate(payload: unknown): Promise<MutateResponse> {
+  const req: MutateRequestWire = mutateRequestWireSchema.parse(payload);
+  const adapter = getLiveAdapter(req.connectionId);
+  if (!adapter) {
+    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+  }
+
+  const path = decodePath(req.connectionId, req.path);
+  const plan: MutationPlan = { path, ops: req.ops };
+  const { value } = await runOp(
+    { connectionId: req.connectionId, kind: 'mutate', opId: req.opId, tabId: req.tabId },
+    (ctx) => adapter.mutate(plan, ctx),
+  );
+
+  // Same-process, not a round trip back through main (P5 D12) — mirrors DATA_OP.invalidate's
+  // existing handler exactly.
+  cache.dropTarget(req.connectionId, req.path);
+  return { affectedRows: value.affectedRows };
 }

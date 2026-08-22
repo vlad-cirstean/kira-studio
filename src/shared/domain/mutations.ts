@@ -1,0 +1,25 @@
+import { z } from 'zod';
+import type { NodePath } from './tree';
+
+const textValueSchema = z.string().nullable();
+const rowValuesSchema = z.record(z.string(), textValueSchema);
+
+// The wire form's `ops` array is exactly this shape (data-ops.ts's MutateRequestWire/
+// PreviewRequestWire carry `path` separately, as an encoded string — D13).
+export const mutationRowOpSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('update'), key: rowValuesSchema, changes: rowValuesSchema }),
+  z.object({ kind: z.literal('insert'), values: rowValuesSchema }),
+  z.object({ kind: z.literal('delete'), key: rowValuesSchema }),
+]);
+export type MutationRowOp = z.infer<typeof mutationRowOpSchema>;
+
+// Adapter-side only (D1): always one table. Constructed by engine/data.ts from a decoded
+// NodePath plus the wire's own `ops` — never parsed as a whole from an external boundary.
+export interface MutationPlan {
+  path: NodePath;
+  ops: MutationRowOp[];
+}
+
+export interface MutationResult {
+  affectedRows: number;
+}

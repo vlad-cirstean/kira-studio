@@ -3,8 +3,12 @@ import {
   type CountRequestWire,
   type CountResponse,
   DATA_OP,
+  type MutateRequestWire,
+  type MutateResponse,
   PORT_EVENT,
   type PrefetchResponse,
+  type PreviewRequestWire,
+  type PreviewResponse,
   type ReadRequestWire,
   type ReadResponse,
 } from '@shared/protocol/data-ops';
@@ -40,6 +44,10 @@ export const data = {
   invalidate: async (connectionId: string, path: string): Promise<void> => {
     await request(DATA_OP.invalidate, { connectionId, path });
   },
+  preview: (req: PreviewRequestWire): Promise<PreviewResponse> =>
+    request(DATA_OP.preview, plain(req), NO_TIMEOUT) as Promise<PreviewResponse>,
+  mutate: (req: MutateRequestWire): Promise<MutateResponse> =>
+    request(DATA_OP.mutate, plain(req), NO_TIMEOUT) as Promise<MutateResponse>,
   clearCaches: async (): Promise<void> => {
     await request(DATA_OP.cacheClear);
   },

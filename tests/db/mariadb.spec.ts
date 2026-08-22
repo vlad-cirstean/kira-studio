@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
 import { createConnection } from 'mariadb';
 import type { Adapter, AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
@@ -311,6 +312,12 @@ describe('mariadb adapter (§9.1)', () => {
             throw new Error('not used by this test');
           },
           count() {
+            throw new Error('not used by this test');
+          },
+          preview() {
+            throw new Error('not used by this test');
+          },
+          mutate() {
             throw new Error('not used by this test');
           },
           async cancel() {
@@ -994,6 +1001,253 @@ describe('mariadb adapter (§9.1)', () => {
       } finally {
         await cleanup.end();
       }
+    }
+  });
+
+  // composite_pk has no inbound foreign key (unlike customers/regions/products/orders, which
+  // all reference or are referenced by something in the fixture graph) — a clean target for
+  // delete/insert without tripping an FK constraint the mutation scenarios aren't testing.
+  const compositePkPath = () =>
+    path([
+      { kind: 'database', name: 'kira_test' },
+      { kind: 'table', name: 'composite_pk' },
+    ]);
+
+  test('20. preview: exact text, never executes', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'new tenant' } },
+          { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
+          { kind: 'update', key: { tenant_id: '1', entity_id: '1' }, changes: { name: "O'Brien Co" } },
+        ],
+      };
+      const statements = adapter.preview(plan);
+      expect(statements).toEqual([
+        'DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = \'2\' AND `entity_id` = \'1\'',
+        'UPDATE `kira_test`.`composite_pk` SET `name` = \'O\'\'Brien Co\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
+        'INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES (\'3\', \'1\', \'new tenant\')',
+      ]);
+
+      const rows = await adapter.read(
+        {
+          path: compositePkPath(),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(rows.rowCount).toBe(3);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('21. mutate: update lands in the op log', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      let loggedCommand = '';
+      const ctx: OpCtx = {
+        opId: crypto.randomUUID(),
+        signal: new AbortController().signal,
+        setCommand(text) {
+          loggedCommand = text;
+        },
+      };
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          {
+            kind: 'update',
+            key: { tenant_id: '1', entity_id: '1' },
+            changes: { name: 'tenant 1 / entity 1 updated' },
+          },
+        ],
+      };
+      const result = await adapter.mutate(plan, ctx);
+      expect(result.affectedRows).toBe(1);
+      expect(loggedCommand).toBe(
+        'UPDATE `kira_test`.`composite_pk` SET `name` = \'tenant 1 / entity 1 updated\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
+      );
+
+      const rows = await adapter.read(
+        {
+          path: compositePkPath(),
+          projection: null,
+          filter: 'tenant_id = 1 AND entity_id = 1',
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(cellAt(rows, rows.columns.findIndex((c) => c.name === 'name'), 0)).toBe(
+        'tenant 1 / entity 1 updated',
+      );
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('22. mutate: unknown column is E_NOT_FOUND', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          { kind: 'update', key: { tenant_id: '1', entity_id: '1' }, changes: { bogus_col: 'z' } },
+        ],
+      };
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('23. mutate: read-only connection is E_UNSUPPORTED', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect({ ...fixture.config, readOnly: true }, makeCtx());
+    try {
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          {
+            kind: 'update',
+            key: { tenant_id: '1', entity_id: '1' },
+            changes: { name: 'should not land' },
+          },
+        ],
+      };
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('24. mutate: a row-count conflict rolls back the whole batch', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
+          { kind: 'update', key: { tenant_id: '9', entity_id: '9' }, changes: { name: 'nope' } },
+        ],
+      };
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_QUERY' });
+
+      const rows = await adapter.read(
+        {
+          path: compositePkPath(),
+          projection: null,
+          filter: 'tenant_id = 2 AND entity_id = 1',
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      // The delete that ran before the failing update must have been rolled back too.
+      expect(rows.rowCount).toBe(1);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('25. mutate: delete + update + insert, one transaction', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      let loggedCommand = '';
+      const ctx: OpCtx = {
+        opId: crypto.randomUUID(),
+        signal: new AbortController().signal,
+        setCommand(text) {
+          loggedCommand = text;
+        },
+      };
+      const plan: MutationPlan = {
+        path: compositePkPath(),
+        ops: [
+          { kind: 'insert', values: { tenant_id: '3', entity_id: '1', name: 'tenant 3 / entity 1' } },
+          { kind: 'delete', key: { tenant_id: '2', entity_id: '1' } },
+          {
+            kind: 'update',
+            key: { tenant_id: '1', entity_id: '1' },
+            changes: { name: 'tenant 1 / entity 1 final' },
+          },
+        ],
+      };
+      const result = await adapter.mutate(plan, ctx);
+      expect(result.affectedRows).toBe(3);
+      expect(loggedCommand).toBe(
+        [
+          'DELETE FROM `kira_test`.`composite_pk` WHERE `tenant_id` = \'2\' AND `entity_id` = \'1\'',
+          'UPDATE `kira_test`.`composite_pk` SET `name` = \'tenant 1 / entity 1 final\' WHERE `tenant_id` = \'1\' AND `entity_id` = \'1\'',
+          'INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES (\'3\', \'1\', \'tenant 3 / entity 1\')',
+        ].join(';\n'),
+      );
+
+      const rows = await adapter.read(
+        {
+          path: compositePkPath(),
+          projection: null,
+          filter: null,
+          sort: {
+            kind: 'structured',
+            terms: [
+              { column: 'tenant_id', direction: 'asc' },
+              { column: 'entity_id', direction: 'asc' },
+            ],
+          },
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(rows.rowCount).toBe(3);
+      const nameCol = rows.columns.findIndex((c) => c.name === 'name');
+      expect(cellAt(rows, nameCol, 0)).toBe('tenant 1 / entity 1 final');
+      expect(cellAt(rows, nameCol, 2)).toBe('tenant 3 / entity 1');
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('26. mutate: no primary key is E_UNSUPPORTED', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const probeConn = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+      database: 'kira_test',
+    });
+    try {
+      await probeConn.query('CREATE TABLE IF NOT EXISTS no_pk_probe (col VARCHAR(50))');
+
+      const plan: MutationPlan = {
+        path: path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'table', name: 'no_pk_probe' },
+        ]),
+        ops: [{ kind: 'update', key: { col: 'x' }, changes: { col: 'y' } }],
+      };
+      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+    } finally {
+      await probeConn.query('DROP TABLE IF EXISTS no_pk_probe');
+      await probeConn.end();
+      await adapter.disconnect();
     }
   });
 });

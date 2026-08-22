@@ -1,6 +1,7 @@
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/domain/connection';
 import type { SourceText } from '../../shared/domain/ddl';
+import type { MutationPlan, MutationResult } from '../../shared/domain/mutations';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
 import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
 import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
@@ -94,6 +95,19 @@ export interface Adapter {
 
   /** `exact` is false when the adapter can only estimate (caps.exactCount === false). */
   count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }>;
+
+  /**
+   * Exact-command preview (§8.13). Synchronous and never executes — no catalog lookup, no
+   * network, trusts `plan`'s column names as given. Gated by `caps.writable`.
+   */
+  preview(plan: MutationPlan): string[];
+
+  /**
+   * Commits a pending-change set: fresh catalog validation in this same op (D7, mirrors
+   * `resolveProjection`'s discipline), delete/update/insert in that order (D8), one transaction,
+   * one op-log row. Throws `E_UNSUPPORTED` if the connection is read-only. Gated by `caps.writable`.
+   */
+  mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>;
 }
 
 export interface AdapterDeps {
@@ -103,13 +117,11 @@ export interface AdapterDeps {
 export type AdapterFactory = (deps: AdapterDeps) => Adapter;
 
 /**
- * Adapter roadmap (normative, D3). `read`/`count` shipped in P2 (above). Each later phase adds
- * exactly these members. Do not add them early; do not change the signatures without amending
- * docs/plans/P1-connections-and-tree.md §4b.
+ * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5 (both
+ * above). Each later phase adds exactly these members. Do not add them early; do not change the
+ * signatures without amending docs/plans/P1-connections-and-tree.md §4b.
  *
  * | Phase | Added to `Adapter`                                                              | Gated by         |
  * |-------|----------------------------------------------------------------------------------|------------------|
- * | P5    | `preview(plan: MutationPlan): string[]` — synchronous, never executes              | `caps.writable`  |
- * | P5    | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>`                   | `caps.writable`  |
  * | P5.5  | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>`                         | `caps.sql`       |
  */

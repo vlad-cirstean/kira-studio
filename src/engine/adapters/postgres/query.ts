@@ -119,3 +119,56 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
       });
   });
 }
+
+export interface CommandOptions {
+  /** setCommand() was already called once for the whole batch (P5 D9) — do not call it again. */
+  suppressCommand?: boolean;
+}
+
+// mutate.ts's counterpart to runQuery: an UPDATE/DELETE/INSERT/BEGIN/COMMIT/ROLLBACK has no
+// `.rows` worth returning — its `rowCount` is the thing every caller actually needs. Cancellation
+// and error-mapping are identical to runQuery's; only the settled value and the setCommand
+// discipline differ (Adapter rule 3 vs. P5 D9's one-setCommand-per-batch rule).
+export async function runCommand(
+  client: Client,
+  sql: string,
+  params: unknown[],
+  ctx: OpCtx,
+  track: (q: RunningQuery) => void,
+  opts?: CommandOptions,
+): Promise<{ rowCount: number }> {
+  if (!opts?.suppressCommand) ctx.setCommand(sql);
+
+  if (ctx.signal.aborted) {
+    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
+  }
+
+  const backendPid = (client as unknown as { processID?: number }).processID;
+  if (typeof backendPid === 'number') track({ backendPid });
+
+  return new Promise<{ rowCount: number }>((resolve, reject) => {
+    let settled = false;
+
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
+    };
+    ctx.signal.addEventListener('abort', onAbort, { once: true });
+
+    client
+      .query(sql, params)
+      .then((result: { rowCount: number | null }) => {
+        if (settled) return;
+        settled = true;
+        ctx.signal.removeEventListener('abort', onAbort);
+        resolve({ rowCount: result.rowCount ?? 0 });
+      })
+      .catch((err: unknown) => {
+        if (settled) return;
+        settled = true;
+        ctx.signal.removeEventListener('abort', onAbort);
+        reject(mapPgError(err));
+      });
+  });
+}

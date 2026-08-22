@@ -124,3 +124,55 @@ export async function runQuery<R = unknown>(
       });
   });
 }
+
+export interface CommandOptions {
+  /** setCommand() was already called once for the whole batch (P5 D9) — do not call it again. */
+  suppressCommand?: boolean;
+}
+
+// mutate.ts's counterpart to runQuery: for a non-SELECT statement, `conn.query()` resolves an
+// OkPacket-shaped object (`{ affectedRows, insertId, warningStatus }`), not an array of rows —
+// this is what every mutate.ts caller actually needs. Cancellation and error-mapping mirror
+// runQuery's; only the settled value and the setCommand discipline differ.
+export async function runCommand(
+  conn: Connection,
+  sql: string,
+  params: unknown[],
+  ctx: OpCtx,
+  track: (q: RunningQuery) => void,
+  opts?: CommandOptions,
+): Promise<{ affectedRows: number }> {
+  if (!opts?.suppressCommand) ctx.setCommand(sql);
+
+  if (ctx.signal.aborted) {
+    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
+  }
+
+  track({ threadId: conn.threadId });
+
+  return new Promise<{ affectedRows: number }>((resolve, reject) => {
+    let settled = false;
+
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
+    };
+    ctx.signal.addEventListener('abort', onAbort, { once: true });
+
+    conn
+      .query({ sql }, params)
+      .then((result: { affectedRows?: number }) => {
+        if (settled) return;
+        settled = true;
+        ctx.signal.removeEventListener('abort', onAbort);
+        resolve({ affectedRows: result.affectedRows ?? 0 });
+      })
+      .catch((err: unknown) => {
+        if (settled) return;
+        settled = true;
+        ctx.signal.removeEventListener('abort', onAbort);
+        reject(mapMariaError(err));
+      });
+  });
+}

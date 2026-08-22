@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type MutationRowOp, mutationRowOpSchema } from '../domain/mutations';
 import { type SortSpec, sortSpecSchema } from '../domain/queries';
 import type { Page } from './page';
 
@@ -11,6 +12,10 @@ export const DATA_OP = {
   prefetch: 'data:prefetch',
   /** Drops L2 pages + the L3 count for one target. The ↻ button; P5's mutation hook (D13). */
   invalidate: 'data:invalidate',
+  /** Never executes (P5 D6) — adapter.preview() renders literal SQL text for display only. */
+  preview: 'data:preview',
+  /** P5: adapter.mutate(), then a same-process cache.dropTarget() on success. */
+  mutate: 'data:mutate',
   cacheStats: 'cache:stats',
   cacheClear: 'cache:clear',
 } as const;
@@ -100,6 +105,42 @@ export interface CountResponse {
 export interface PrefetchResponse {
   warmed: boolean;
   bytes: number;
+}
+
+export interface PreviewRequestWire {
+  connectionId: string;
+  path: string;
+  ops: MutationRowOp[];
+}
+
+export const previewRequestWireSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+  ops: z.array(mutationRowOpSchema),
+});
+
+export interface PreviewResponse {
+  statements: string[];
+}
+
+export interface MutateRequestWire {
+  opId: string;
+  tabId: string | null;
+  connectionId: string;
+  path: string;
+  ops: MutationRowOp[];
+}
+
+export const mutateRequestWireSchema = z.object({
+  opId: z.string(),
+  tabId: z.string().nullable(),
+  connectionId: z.string(),
+  path: z.string(),
+  ops: z.array(mutationRowOpSchema),
+});
+
+export interface MutateResponse {
+  affectedRows: number;
 }
 
 export const cacheStatsSchema = z.object({
