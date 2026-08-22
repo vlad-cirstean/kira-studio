@@ -9,5 +9,7 @@ import type { KiraApi } from '@shared/protocol/ipc';
 declare global {
   interface Window {
     kira: KiraApi;
+    /** Playwright-only hook (src/renderer/main.ts) — the exact §2.2 retained-bytes figure. */
+    __kiraGridRetainedBytes?: () => number;
   }
 }
