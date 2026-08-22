@@ -74,7 +74,9 @@ CREATE TABLE app.wide_table (
   jsonb_b       jsonb,
   jsonb_c       jsonb,
   jsonb_d       jsonb,
-  bytea_a       bytea,
+  -- Defaulted like ts_a/uuid_a above so every row gets a real value without touching the INSERT
+  -- column list — cell-editor.spec.ts's scenario 3 needs a non-NULL bytea_a to detect as hex.
+  bytea_a       bytea DEFAULT '\xcafebabedeadbeef',
   bytea_b       bytea,
   bytea_c       bytea,
   intarray_a    int[],
