@@ -1,7 +1,319 @@
 <script setup lang="ts">
+import type { OpRecord } from '@shared/domain/ops';
+import { computed, ref } from 'vue';
+import { control } from '../../bridge/control';
+import { connectionsState } from '../../state/connections';
+import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
+import Codicon from '../../theme/Codicon.vue';
+import VirtualList from '../VirtualList.vue';
 import EmptyState from './EmptyState.vue';
+
+interface OpsListItem {
+  key: string;
+  kind: 'op' | 'detail-command' | 'detail-error';
+  record: OpRecord;
+}
+
+const expandedId = ref<string | null>(null);
+
+function toggleExpanded(record: OpRecord): void {
+  expandedId.value = expandedId.value === record.id ? null : record.id;
+}
+
+const listItems = computed<OpsListItem[]>(() => {
+  const out: OpsListItem[] = [];
+  for (const record of visibleOps.value) {
+    out.push({ key: record.id, kind: 'op', record });
+    if (expandedId.value === record.id) {
+      if (record.command) out.push({ key: `${record.id}-cmd`, kind: 'detail-command', record });
+      if (record.error) out.push({ key: `${record.id}-err`, kind: 'detail-error', record });
+    }
+  }
+  return out;
+});
+
+function connectionFor(record: OpRecord) {
+  return record.connectionId
+    ? connectionsState.records.find((r) => r.id === record.connectionId)
+    : undefined;
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms === null) return '—';
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`;
+}
+
+async function onCancel(record: OpRecord): Promise<void> {
+  await control.opsCancel(record.id);
+}
 </script>
 
 <template>
-  <EmptyState icon="checklist" label="No operations yet" />
+  <div class="ops-panel">
+    <div class="ops-header">
+      <div class="filter-input">
+        <Codicon name="filter" :size="12" />
+        <input v-model="opsState.filterText" type="text" placeholder="Filter" data-testid="ops-filter" />
+      </div>
+      <div class="segmented">
+        <button type="button" :class="{ active: opsState.statusFilter === 'all' }" @click="opsState.statusFilter = 'all'">All</button>
+        <button type="button" :class="{ active: opsState.statusFilter === 'running' }" @click="opsState.statusFilter = 'running'">Running</button>
+        <button type="button" :class="{ active: opsState.statusFilter === 'error' }" @click="opsState.statusFilter = 'error'">Errors</button>
+      </div>
+      <span class="running-count">{{ runningCount }} running</span>
+      <button
+        type="button"
+        class="clear-button"
+        title="Clears the in-memory ring only — op_log retention is automatic"
+        @click="clearOps"
+      >
+        Clear
+      </button>
+    </div>
+
+    <div v-if="visibleOps.length === 0" class="min-h-0 flex-1">
+      <EmptyState icon="checklist" label="No operations yet" />
+    </div>
+    <template v-else>
+      <div class="ops-columns">
+        <span>Time</span>
+        <span>Connection</span>
+        <span>Tab</span>
+        <span>Kind</span>
+        <span>Status</span>
+        <span>Duration</span>
+        <span>Rows</span>
+        <span>Command</span>
+      </div>
+      <div class="ops-body">
+        <VirtualList :items="listItems" :row-height="20">
+          <template #default="{ item }">
+            <div
+              v-if="item.kind === 'op'"
+              class="ops-row"
+              :class="{ error: item.record.status === 'error' }"
+              data-testid="op-row"
+              :data-status="item.record.status"
+              @click="toggleExpanded(item.record)"
+            >
+              <span class="mono">{{ formatTime(item.record.startedAt) }}</span>
+              <span class="connection-cell">
+                <span
+                  v-if="connectionFor(item.record)"
+                  class="chip"
+                  :style="{ background: `var(--kira-conn-${connectionFor(item.record)?.color})` }"
+                />
+                <span class="truncate">{{ connectionFor(item.record)?.name ?? '—' }}</span>
+              </span>
+              <span>—</span>
+              <span>{{ item.record.kind }}</span>
+              <span class="status-cell">
+                <Codicon v-if="item.record.status === 'running'" name="loading" class="spin" :size="12" />
+                {{ item.record.status }}
+                <button
+                  v-if="item.record.status === 'running'"
+                  type="button"
+                  class="cancel-button"
+                  aria-label="Cancel operation"
+                  @click.stop="onCancel(item.record)"
+                >
+                  <Codicon name="debug-stop" :size="12" />
+                </button>
+              </span>
+              <span>{{ formatDuration(item.record.durationMs) }}</span>
+              <span>{{ item.record.rows ?? '—' }}</span>
+              <span v-if="item.record.status === 'error'" class="mono truncate error-text" :title="item.record.error ?? ''">
+                {{ item.record.error }}
+              </span>
+              <span v-else class="mono truncate" :title="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
+            </div>
+            <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row mono">
+              command: {{ item.record.command }}
+            </div>
+            <div v-else class="ops-detail-row mono error-text">error: {{ item.record.error }}</div>
+          </template>
+        </VirtualList>
+      </div>
+    </template>
+  </div>
 </template>
+
+<style scoped>
+.ops-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-size: 11px;
+}
+
+.ops-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.filter-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 160px;
+  color: var(--kira-fg-muted);
+}
+
+.filter-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--kira-fg);
+  font-size: 11px;
+  outline: none;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+}
+
+.segmented button {
+  padding: 2px 6px;
+  border-radius: var(--kira-radius);
+  border: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.segmented button.active {
+  background: var(--kira-select);
+  color: var(--kira-fg);
+}
+
+.running-count {
+  color: var(--kira-fg-muted);
+  margin-left: auto;
+}
+
+.clear-button {
+  background: transparent;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.ops-columns,
+.ops-row,
+.ops-detail-row {
+  display: grid;
+  grid-template-columns: 90px 140px 40px 80px 90px 70px 60px 1fr;
+  gap: 8px;
+  padding: 0 8px;
+  align-items: center;
+}
+
+.ops-columns {
+  flex-shrink: 0;
+  height: 20px;
+  color: var(--kira-fg-muted);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-weight: 600;
+}
+
+.ops-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.ops-row {
+  height: 20px;
+  cursor: pointer;
+}
+
+.ops-row:hover {
+  background: var(--kira-hover);
+}
+
+.ops-row.error {
+  color: var(--kira-error);
+}
+
+.connection-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chip {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.mono {
+  font-family: var(--kira-font-family);
+}
+
+.error-text {
+  color: var(--kira-error);
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spin {
+  animation: ops-spin 1s linear infinite;
+}
+
+@keyframes ops-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cancel-button {
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+}
+
+.ops-detail-row {
+  height: 20px;
+  grid-template-columns: 1fr;
+  color: var(--kira-fg-muted);
+  background: var(--kira-bg-elevated);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
