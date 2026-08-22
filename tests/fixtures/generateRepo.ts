@@ -372,11 +372,26 @@ export function withRemote(opts: WithRemoteOptions = {}): GeneratedRepo {
 }
 
 // ---------------------------------------------------------------------------------------
-// large(n) — via `git fast-import`, cached under a gitignored directory keyed by inputs.
+// large(n) / largeBranchy(n) — via `git fast-import`, cached under a gitignored directory
+// keyed by inputs. Both write a commit-graph by default (§4.4, W13): `git gc` has written one
+// by default since 2.24, so a repository of this size that has ever been gc'd already has one
+// — "with a graph" is the realistic configuration a real user's machine has, not "without".
+// D21 (never write a commit-graph into a *user's* repository) does not apply here: these are
+// repositories this fixture generates and owns, not a user's `.git`.
 // ---------------------------------------------------------------------------------------
 
-function cacheKey(n: number): string {
-  return createHash("sha256").update(`large:${n}:v1`).digest("hex").slice(0, 16);
+export interface LargeRepoOptions {
+  /** `git commit-graph write --reachable --split` after generation (default true — see the
+   *  module comment above). Set false to get the "no commit-graph" configuration W13/W15
+   *  measure the cost of, cached separately from the default. */
+  readonly commitGraph?: boolean;
+}
+
+function cacheKey(prefix: string, n: number, opts: Required<LargeRepoOptions>): string {
+  return createHash("sha256")
+    .update(`${prefix}:${n}:v2:graph=${opts.commitGraph}`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 function buildFastImportStream(n: number): string {
@@ -405,27 +420,14 @@ function buildFastImportStream(n: number): string {
   return lines.join("\n");
 }
 
-/**
- * Perf-scale generation. `n` invocations of `git commit` would be minutes to hours at
- * 100k, so this feeds a single `git fast-import` stream instead — single-digit seconds
- * for 100k commits. Cached under tests/fixtures/.cache/, keyed by the generator inputs,
- * so it is built once per machine.
- */
-export function large(n: number): GeneratedRepo {
-  const key = cacheKey(n);
-  const cached = join(CACHE_DIR, key);
-
-  if (existsSync(join(cached, ".git"))) {
-    const repo = new Repo(cached);
-    return { dir: cached, commits: [], refs: { main: repo.head() } };
-  }
-
+/** Builds `building` from a fast-import stream, repacks, optionally writes a commit-graph,
+ *  then atomically installs it at `cached`. Shared by `large()` and `largeBranchy()`. */
+function buildAndInstall(cached: string, stream: string, opts: Required<LargeRepoOptions>): string {
   mkdirSync(CACHE_DIR, { recursive: true });
   const building = `${cached}.building-${process.pid}`;
   rmSync(building, { recursive: true, force: true });
   const repo = new Repo(building);
   repo.init("main");
-  const stream = buildFastImportStream(n);
   execFileSync("git", ["fast-import", "--quiet"], {
     cwd: repo.dir,
     input: stream,
@@ -433,15 +435,148 @@ export function large(n: number): GeneratedRepo {
   });
   repo.git(["reset", "--quiet", "--hard", "main"]);
   repo.git(["repack", "-a", "-d", "--quiet"]);
+  if (opts.commitGraph) {
+    repo.git(["commit-graph", "write", "--reachable", "--split"]);
+  }
 
   const headSha = repo.head();
   rmSync(cached, { recursive: true, force: true });
   execFileSync("mv", [building, cached]);
+  return headSha;
+}
 
+const DEFAULT_LARGE_REPO_OPTIONS: Required<LargeRepoOptions> = { commitGraph: true };
+
+/**
+ * Perf-scale generation. `n` invocations of `git commit` would be minutes to hours at
+ * 100k, so this feeds a single `git fast-import` stream instead — single-digit seconds
+ * for 100k commits. Cached under tests/fixtures/.cache/, keyed by the generator inputs,
+ * so it is built once per machine.
+ */
+export function large(n: number, opts: LargeRepoOptions = {}): GeneratedRepo {
+  const resolved = { ...DEFAULT_LARGE_REPO_OPTIONS, ...opts };
+  const key = cacheKey("large", n, resolved);
+  const cached = join(CACHE_DIR, key);
+
+  if (existsSync(join(cached, ".git"))) {
+    const repo = new Repo(cached);
+    return { dir: cached, commits: [], refs: { main: repo.head() } };
+  }
+
+  const headSha = buildAndInstall(cached, buildFastImportStream(n), resolved);
   return { dir: cached, commits: [], refs: { main: headSha } };
 }
 
-/** Removes every cached large() repo. Exposed for tests that need a clean cache. */
+export interface LargeBranchyOptions extends LargeRepoOptions {
+  /** Concurrently open branches merged back into main every `commitsPerRound` commits each.
+   *  Default 12 — "on the order of 8-16 concurrent branches" (docs/plans/P2.md W13). */
+  readonly branchCount?: number;
+  readonly commitsPerRound?: number;
+}
+
+/**
+ * `largeBranchy(n)` is `large(n)`'s layout-stress counterpart: `large()` is a single linear
+ * branch (one lane, one edge per row) and says nothing about the algorithm P2's layout is
+ * judged on. This distributes `n` commits across `branchCount` concurrently open branches,
+ * merging each back into main every `commitsPerRound` commits, plus one deliberately
+ * long-lived branch (index 0) that merges only in the final commit — so `maxEdgeSpan` is
+ * exercised the way a real long-running feature branch would.
+ */
+function buildLargeBranchyStream(n: number, branchCount: number, commitsPerRound: number): string {
+  const lines: string[] = [];
+  lines.push("reset refs/heads/main");
+  let mark = 0;
+  const nextMark = () => ++mark;
+
+  function emitCommit(ref: string, m: number, index: number, parents: readonly number[]): void {
+    const date = dateFor(index);
+    lines.push(`commit ${ref}`);
+    lines.push(`mark :${m}`);
+    lines.push(`author ${AUTHOR_NAME} <${AUTHOR_EMAIL}> ${date}`);
+    lines.push(`committer ${AUTHOR_NAME} <${AUTHOR_EMAIL}> ${date}`);
+    const message = `commit ${index}`;
+    lines.push(`data ${message.length}`);
+    lines.push(message);
+    if (parents.length === 0) {
+      lines.push("deleteall");
+    } else {
+      lines.push(`from :${parents[0]}`);
+      for (let p = 1; p < parents.length; p++) lines.push(`merge :${parents[p]}`);
+    }
+    lines.push("M 100644 inline file.txt");
+    const content = `line ${index}\n`;
+    lines.push(`data ${content.length}`);
+    lines.push(content);
+    lines.push("");
+  }
+
+  let produced = 0;
+  const rootMark = nextMark();
+  emitCommit("refs/heads/main", rootMark, produced, []);
+  produced++;
+  let mainTip = rootMark;
+
+  const LONG_LIVED_INDEX = 0;
+  const tailReserve = Math.max(1, Math.min(Math.floor(n * 0.1), 2000));
+  const mainPhaseTarget = Math.max(1, n - tailReserve);
+
+  const branchNames = Array.from({ length: branchCount }, (_, b) => `refs/heads/topic-${b}`);
+  const branchTips = new Array<number>(branchCount).fill(mainTip);
+
+  outer: while (produced < mainPhaseTarget) {
+    for (let b = 0; b < branchCount; b++) {
+      let tip = branchTips[b] as number;
+      for (let c = 0; c < commitsPerRound; c++) {
+        if (produced >= mainPhaseTarget) break outer;
+        const m = nextMark();
+        emitCommit(branchNames[b] as string, m, produced, [tip]);
+        tip = m;
+        produced++;
+      }
+      branchTips[b] = tip;
+      if (b !== LONG_LIVED_INDEX) {
+        if (produced >= mainPhaseTarget) continue;
+        const m = nextMark();
+        emitCommit("refs/heads/main", m, produced, [mainTip, tip]);
+        mainTip = m;
+        branchTips[b] = mainTip;
+        produced++;
+      }
+    }
+  }
+
+  let longTip = branchTips[LONG_LIVED_INDEX] as number;
+  while (produced < n - 1) {
+    const m = nextMark();
+    emitCommit(branchNames[LONG_LIVED_INDEX] as string, m, produced, [longTip]);
+    longTip = m;
+    produced++;
+  }
+  const finalMark = nextMark();
+  emitCommit("refs/heads/main", finalMark, produced, [mainTip, longTip]);
+  produced++;
+
+  return lines.join("\n");
+}
+
+export function largeBranchy(n: number, opts: LargeBranchyOptions = {}): GeneratedRepo {
+  const branchCount = opts.branchCount ?? 12;
+  const commitsPerRound = opts.commitsPerRound ?? 200;
+  const resolved = { commitGraph: opts.commitGraph ?? DEFAULT_LARGE_REPO_OPTIONS.commitGraph };
+  const key = cacheKey(`largeBranchy:${branchCount}:${commitsPerRound}`, n, resolved);
+  const cached = join(CACHE_DIR, key);
+
+  if (existsSync(join(cached, ".git"))) {
+    const repo = new Repo(cached);
+    return { dir: cached, commits: [], refs: { main: repo.head() } };
+  }
+
+  const stream = buildLargeBranchyStream(n, branchCount, commitsPerRound);
+  const headSha = buildAndInstall(cached, stream, resolved);
+  return { dir: cached, commits: [], refs: { main: headSha } };
+}
+
+/** Removes every cached large()/largeBranchy() repo. Exposed for tests that need a clean cache. */
 export function clearLargeCache(): void {
   if (existsSync(CACHE_DIR)) {
     for (const entry of readdirSync(CACHE_DIR)) {
