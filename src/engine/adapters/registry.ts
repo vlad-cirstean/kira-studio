@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '../../shared/domain/connection';
 import type { Adapter, AdapterDeps, AdapterFactory } from './adapter';
 import { AdapterError } from './errors';
+import { createMariaDbAdapter } from './mariadb';
 import { createPostgresAdapter } from './postgres';
 
 // Explicit object literal, not dynamic import — a v1 with seven adapters is not big enough to
@@ -8,6 +9,7 @@ import { createPostgresAdapter } from './postgres';
 // the renderer/main bundle regardless.
 const factories: Partial<Record<ConnectionKind, AdapterFactory>> = {
   postgres: createPostgresAdapter,
+  mariadb: createMariaDbAdapter,
 };
 
 export function createAdapter(kind: ConnectionKind, deps: AdapterDeps): Adapter {

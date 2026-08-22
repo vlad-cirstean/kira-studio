@@ -3,6 +3,7 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
+import { DEFAULT_PORT } from '@shared/domain/connection';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 
@@ -48,7 +49,7 @@ export function defaultDraft(): ConnectionInput {
     mode: 'fields',
     readOnly: false,
     host: '',
-    port: 5432,
+    port: DEFAULT_PORT.postgres ?? null,
     database: null,
     username: null,
     password: null,

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
-import { connectionInputSchema, connectionKindSchema } from '@shared/domain/connection';
+import {
+  connectionInputSchema,
+  connectionKindSchema,
+  DEFAULT_PORT,
+} from '@shared/domain/connection';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../bridge/control';
@@ -17,7 +21,7 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   sqs: 'SQS',
   s3: 'S3',
 };
-const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set(['postgres']);
+const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set(['postgres', 'mariadb']);
 const kinds = connectionKindSchema.options;
 
 const draft = computed(() => connectionsState.dialog.draft);
@@ -112,6 +116,8 @@ function onKindChange(kind: ConnectionKind): void {
   const d = draft.value;
   if (!d || !SUPPORTED_KINDS.has(kind)) return;
   d.kind = kind;
+  const defaultPort = DEFAULT_PORT[kind];
+  if (defaultPort !== undefined) d.port = defaultPort;
 }
 
 async function onTest(): Promise<void> {

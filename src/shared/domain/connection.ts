@@ -8,8 +8,15 @@ export const connectionKindSchema = z.enum([
   'kafka',
   'sqs',
   's3',
-]); // all v1 kinds; only 'postgres' has an adapter in P1
+]); // all v1 kinds; postgres (P1) and mariadb (P2) have adapters so far
 export type ConnectionKind = z.infer<typeof connectionKindSchema>;
+
+// The connection dialog's default port per kind (D27's "kind-driven default port", not a
+// second hardcoded number per adapter). Kinds with no conventional default port are absent.
+export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
+  postgres: 5432,
+  mariadb: 3306,
+};
 
 export const connectionColorSchema = z.enum([
   'red',
