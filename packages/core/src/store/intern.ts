@@ -49,6 +49,12 @@ export class StringInterner {
   get byteLength(): number {
     return this.#byteLength;
   }
+
+  clear(): void {
+    this.#idOf.clear();
+    this.#values.length = 0;
+    this.#byteLength = 0;
+  }
 }
 
 const textEncoder = new TextEncoder();
@@ -121,5 +127,12 @@ export class SubjectBuffer {
   /** Actual allocated bytes: the encoded-subject buffer plus the offset index. */
   get byteLength(): number {
     return this.#bytes.byteLength + this.#offsets.byteLength;
+  }
+
+  clear(): void {
+    this.#bytes = new Uint8Array(0);
+    this.#byteLength = 0;
+    this.#offsets = new Uint32Array(1);
+    this.#count = 0;
   }
 }

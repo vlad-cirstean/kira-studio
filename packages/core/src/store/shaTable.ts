@@ -112,6 +112,13 @@ export class ShaTable {
     return this.#bytes.byteLength + this.#slots.byteLength;
   }
 
+  clear(): void {
+    this.#widthBytes = this.#requestedWidthBytes;
+    this.#bytes = new Uint8Array(0);
+    this.#count = 0;
+    this.#allocateSlots(nextPowerOfTwo(Math.max(16, this.#initialRowCapacity * 2)));
+  }
+
   append(hex: string): number {
     if (this.#widthBytes === undefined) {
       const detected = hex.length / 2;

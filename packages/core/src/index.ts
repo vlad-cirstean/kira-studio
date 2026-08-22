@@ -11,6 +11,11 @@ export type {
 export type { RefKind, RefRecord, RefTrack } from "./model/ref.ts";
 export type { HeadState, RepoIdentity } from "./model/repo.ts";
 export type { StashEntry } from "./model/stash.ts";
+export type { AppendResult, CommitStoreStats } from "./store/commitStore.ts";
+export { CommitStore } from "./store/commitStore.ts";
+export { StringInterner, SubjectBuffer } from "./store/intern.ts";
+export type { ShaTableOptions } from "./store/shaTable.ts";
+export { ShaTable } from "./store/shaTable.ts";
 export type {
   FileStatusCode,
   IgnoredStatusEntry,
