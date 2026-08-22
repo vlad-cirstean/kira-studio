@@ -1,16 +1,23 @@
+import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
+// @ts-expect-error — ResolvedGitImpl is deliberately not exported (discovery.ts's header
+// comment): the only way to obtain a `ResolvedGit` is `locateGit()`'s "ok" branch, which is
+// unreachable for a sub-2.38 git. This import existing at all is the regression this guards
+// against — if it ever stops erroring, the type-level floor guarantee has been broken.
+import type { ResolvedGitImpl as _NeverExported } from "../../packages/git/src/discovery.ts";
 import {
-  MINIMUM_GIT_VERSION,
   locateGit,
+  MINIMUM_GIT_VERSION,
   resolveRepoIdentity,
 } from "../../packages/git/src/discovery.ts";
 import { NodeProcessRunner } from "../../packages/git/src/nodeProcessRunner.ts";
 import { makeFakeGit } from "../fixtures/fakeGit.ts";
 import { conflicting, linear } from "../fixtures/generateRepo.ts";
+
+type _AssertStillOpaque = _NeverExported;
 
 const runner = new NodeProcessRunner();
 
