@@ -21,10 +21,11 @@ These differ from, or are not stated in, the P0 plan. Do not rediscover them the
 4. **There is no `SettingsDialog/sections/` directory** — the dialog is one file with inline `<template v-if>` blocks per section. Follow that pattern if you touch it (you should not need to in P1).
 5. **`metadata_cache` already has `UNIQUE (connection_id, path)`** and `ON DELETE CASCADE` from `connections`. So deleting a connection already drops its L1 cache, its filters and its saved queries. No new migration is needed for P1 — the P0 schema is complete for this phase. **Do not add a `0002_*.sql`.** If you think you need one, you are building something out of scope.
 6. **`tabs."order"` is quoted everywhere** — irrelevant to P1 (no tabs), listed so you do not touch that table.
-7. **IPC channel names live in one `IPC` const object** in `src/shared/ipc.ts`, keyed camelCase. Extend it; do not scatter string literals.
+7. **IPC channel names live in one `IPC` const object** in `src/shared/protocol/ipc.ts`, keyed camelCase. Extend it; do not scatter string literals.
 8. **The Playwright fixture is `kira` / `relaunch` / `consoleErrors`** in `tests/ui/fixtures.ts`, with `KIRA_HOME` isolated under `tmpdir()` and an assertion enforcing that. `consoleErrors` must stay empty in every spec — a Vue warning fails the suite.
 9. **`externalizeDepsPlugin()` externalises `dependencies`, bundles `devDependencies`.** `pg` is loaded by the engine at runtime from `node_modules`, so it goes in **`dependencies`**, not `devDependencies`. `zod` is already there and is correct.
-10. **Renderer state modules are plain `reactive()`** under `src/renderer/workbench/state/` (D4 of P0, no Pinia). Keep that. New project-panel state goes under `src/renderer/project/state/` per SPEC §11's `renderer/project/` directory.
+10. **Renderer state modules are plain `reactive()`** (D4 of P0, no Pinia). As of this phase they follow SPEC §11's three-way split: state more than one area needs (the active-connection map, the operations ring) lives in the new top-level `src/renderer/state/`; state used by exactly one area stays local to it (`src/renderer/project/state/tree.ts` for the tree's node cache; `src/renderer/workbench/state/{layout,settings,engine,contextMenu}.ts`, unchanged from P0/Step 9). See note 11 below for what this phase does and does not restructure.
+11. **This phase begins applying SPEC §11's nested repository layout**, proposed after P0 landed with a flatter one (see SPEC §11's own note there). Per that section's rule — a file migrates only in the phase that actually touches it — P1 restructures exactly what it substantially rewrites (`src/shared/*`, `src/main/ipc.ts`, the storage accessors P1 adds or modifies, `src/engine/ops.ts`, the two new cross-view renderer state modules) and leaves everything else exactly where P0 put it: `src/main/window.ts`, `src/main/menu.ts`, `src/main/log.ts`, `src/main/engine-host.ts`'s location (only its contents change, per D2), `src/renderer/workbench/panels/`, and `src/renderer/workbench/state/{layout,settings,engine}.ts`. Do not "clean up" any of those in passing — that is scope this plan does not budget for, and a later phase that actually touches them is what relocates them.
 
 ### Prerequisites to verify before Step 1
 
@@ -50,9 +51,9 @@ The spec leaves these open. They are decided here — implement as written, do n
 | **D3** | **`Adapter` ships with only the methods P1 implements** (`connect`, `disconnect`, `children`, `describe`, `cancel`) plus `kind` and `caps`. Future methods are *specified* in the normative roadmap table in §4 of this plan, not stubbed in code. | P0's discipline: no scaffolding forward. Declaring `read()` with a placeholder `Page` type in P1 guarantees P2 redesigns it, and an interface with five `throw new Error('not implemented')` bodies is a lie the type system endorses. The roadmap table is binding: P2–P5 add exactly those signatures, so nothing is re-litigated. |
 | **D4** | **`Caps`, by contrast, ships complete** — every flag any v1 adapter will need, decided now, including three additions to §5's list (`cancel`, `defaultPageKind`, `pagination`) and one replacement (`pagination` replaces `keysetPagination`). | Caps is a *data* type the UI branches on. Getting it wrong later means touching every adapter and every view. §5.1's mapping table already implies fields §5's `Caps` lacks: S3 has no cancel-free story, Kafka paginates by offset window, Mongo's default view is documents. See §4 for the full type and a per-database fill-in of the whole §5.1 table. |
 | **D5** | **`cancel(opId)` is a core `Adapter` method**, not a P2 addition, and `caps.cancel` reports whether it works. | §5.1's closing paragraph: "Cancellation is never 'stop showing the result' — it is always forwarded to the server. If a driver cannot cancel, the capability is absent and the stop button says so rather than lying." That is a P1 contract; the stop button that consumes it is P2's. A tree expansion against a 40k-table catalog is exactly the op you need to be able to kill. |
-| **D6** | **Node paths are encoded strings, `kind:name` segments joined by `/`, with `name` percent-encoded.** `NodePath` is `{ connectionId, segments }` in memory; `encodePath` / `decodePath` in `src/shared/tree.ts` are the only conversions. The encoded form excludes the connection id, because `metadata_cache`'s key is already `(connection_id, path)`. | §6's `metadata_cache.path`, `saved_queries.path` and `tabs.path` are all `TEXT`. A canonical, human-diffable, stable string is required. `kind:` prefixes make an encoded path self-describing, so a stale cache row is legible in `sqlite3` and a decode can validate without a schema lookup. |
+| **D6** | **Node paths are encoded strings, `kind:name` segments joined by `/`, with `name` percent-encoded.** `NodePath` is `{ connectionId, segments }` in memory; `encodePath` / `decodePath` in `src/shared/domain/tree.ts` are the only conversions. The encoded form excludes the connection id, because `metadata_cache`'s key is already `(connection_id, path)`. | §6's `metadata_cache.path`, `saved_queries.path` and `tabs.path` are all `TEXT`. A canonical, human-diffable, stable string is required. `kind:` prefixes make an encoded path self-describing, so a stale cache row is legible in `sqlite3` and a decode can validate without a schema lookup. |
 | **D7** | **In URI mode, the password is extracted out of the URI at save time.** `connections.uri` stores the URI with the userinfo password removed; `connections.password` stores the extracted password. On connect, main re-injects it. | Makes `ConnectionSummary.uri` safe to hand to the renderer verbatim (the *Copy URI* menu item, the dialog, the tree tooltip) with no redaction pass that can be forgotten. Gives exactly one secret channel for the `SecretStore` to own regardless of mode. Re-injection is a mechanical userinfo edit and round-trips. |
-| **D8** | **`SecretStore` is an async, connection-id-keyed interface in `src/main/storage/secrets.ts`.** P1's implementation is `PlaintextColumnSecretStore`, backed by `connections.password` per §6. Nothing outside that file reads or writes the column. | §6 mandates the indirection. Async now so the eventual Keychain implementation (Electron's `safeStorage.encryptString`, which is Keychain-derived and dependency-free — the named future swap) is a one-file change and not an API break. §1 defers credential encryption; do **not** implement it here. |
+| **D8** | **`SecretStore` is an async, connection-id-keyed interface in `src/main/storage/repos/secrets.ts`.** P1's implementation is `PlaintextColumnSecretStore`, backed by `connections.password` per §6. Nothing outside that file reads or writes the column. It lives under `repos/`, not loose in `storage/`, because it is the one file besides `repos/connections.ts` that touches the `connections` table directly — SPEC §11's rule that `repos/` holds "the only files that import the Drizzle instance" applies to it too. | §6 mandates the indirection. Async now so the eventual Keychain implementation (Electron's `safeStorage.encryptString`, which is Keychain-derived and dependency-free — the named future swap) is a one-file change and not an API break. §1 defers credential encryption; do **not** implement it here. |
 | **D9** | **The renderer receives `ConnectionSummary`, which has no `password` field at all.** Reading a secret requires an explicit `kira:connections:reveal(id)` call, which main logs. | The connection dialog genuinely must show the password when editing (§8.12 stores plain text and says so). Making that a separate, logged, single-purpose call means every other renderer surface — list, tree, tooltips, op log, copy-URI — is structurally incapable of leaking it. |
 | **D10** | **L1 metadata cache lives in main, cache-aside, in the existing `metadata_cache` table.** `kira:tree:children` checks SQLite first and only calls the engine on a miss or an explicit refresh. | Follows from D1. Also means the tree renders from cache while *disconnected*, which is what makes the panel useful on launch (§7, §8.3). |
 | **D11** | **On a successful connect, main deletes every `metadata_cache` row for that connection and pushes `kira:connection:metadataInvalidated`; the renderer re-fetches only the paths it currently has expanded.** | §7: "the whole connection's metadata is refreshed on **every reconnect**". A blunt delete alone would blank the tree; re-fetching the expanded set (which the renderer already knows) refreshes without a flash and without walking a catalog the user never opened. |
@@ -63,7 +64,7 @@ The spec leaves these open. They are decided here — implement as written, do n
 | **D16** | **A table node expands to its columns**, sourced from the same `describe()` result that feeds L1. | Cheapest possible end-to-end proof that `describe` and the metadata cache work, it is what §8.10's "Column (tree)" row implies exists, and P2/P7 need column metadata cached anyway. |
 | **D17** | **`ObjectMeta` carries `referencedBy` (inbound FKs) as well as `foreignKeys`.** | One flipped `WHERE` clause in the same `pg_constraint` query. P7's FK navigation needs the reverse edge and would otherwise force a metadata cache format change and a full re-fetch across every connection. Cost now: zero. |
 | **D18** | **Connection color is stored as a palette *name*** (`'red' … 'grey'`), never a hex string, and resolved to `var(--kira-conn-<name>)` in CSS. | The twelve tokens already exist in `tokens.css` from P0. Storing names means a future palette re-tune restyles existing connections instead of stranding them on dead hexes. |
-| **D19** | **`op_log` is written by main**, from `op:start` / `op:end` events the engine emits. The renderer keeps a capped in-memory ring (500 entries) hydrated from `op_log` at startup. Retention pruning (30 days, hard cap 20 000 rows) runs once at startup. | Main owns SQLite (P0 D2) and is already "the single source of truth for state and logging" (§4). §8.11 requires the panel be "capped in memory, persisted to `op_log` with retention". |
+| **D19** | **`op_log` is written by main**, from `op:start` / `op:end` events the engine emits. The renderer keeps a capped in-memory ring (500 entries) hydrated from `op_log` at startup. Retention pruning (30 days, hard cap 20 000 rows) runs once at startup. Split across two files per SPEC §11: `src/main/storage/repos/ops.ts` is the plain CRUD (`appendOp`/`finishOp`/`recentOps`/`pruneOps`) and the only file that touches the `op_log` table; `src/main/oplog.ts` is the orchestration — subscribes to the engine's events, calls the repo, forwards `kira:op:update`, calls `pruneOps` once at startup — matching §11's explicit top-level `main/oplog.ts` listing. | Main owns SQLite (P0 D2) and is already "the single source of truth for state and logging" (§4). §8.11 requires the panel be "capped in memory, persisted to `op_log` with retention". |
 | **D20** | **`OpCtx` gains `setCommand(text)`.** The adapter reports the exact statement it is about to run; that string is what lands in `op_log.command` and in the operations panel. | §8.11's `command` column must show the real statement, and §9.1 requires "command preview correctness". Deriving it anywhere but inside the adapter would mean guessing. |
 | **D21** | **DB integration tests run under `bun test` via a new `test:db` script**, in `tests/db/`, separate from the Playwright `tests/ui/` suite. | §3 names Bun as the test runner; §9's "two suites only" maps cleanly onto two scripts. Adapters import nothing from `electron`, so they are directly importable by a plain Bun process. See the risk register for the fallback if `dockerode` misbehaves under Bun. |
 | **D22** | **UI specs that need a live database start their own Testcontainers Postgres** (reusing `tests/db/support/postgres.ts`) and **skip with a Colima-naming reason** if the Docker daemon is unreachable. Connection-CRUD specs that need no database never skip. | §9.2 wants the real UI against real containers, but a developer with a stopped Colima VM should get a legible skip on the DB-backed specs, not a wall of red on all of them. |
@@ -74,32 +75,66 @@ The spec leaves these open. They are decided here — implement as written, do n
 
 New and modified files only; everything else from P0 is untouched.
 
+Paths below follow SPEC §11's nested layout (see ground-rule note 11): P1 is the first phase to
+substantially touch `shared/`, `main/ipc.ts`, the storage accessors, and `engine/ops.ts`, so it is the
+one that moves them into the proposed shape. Everything P1 does not touch stays exactly where P0 left
+it — `main/window.ts`, `main/menu.ts`, `main/log.ts`, `main/engine-host.ts`'s location,
+`renderer/workbench/panels/`, `renderer/workbench/state/{layout,settings,engine}.ts`.
+
 ```
 package.json                                    + pg, testcontainers, @types/pg; + test:db script
 src/
   shared/
     caps.ts                          NEW  Caps, PageKind, PaginationStrategy, per-kind cap tables
-    connection.ts                    NEW  Zod: kind, color, mode, ConnectionRecord/Input/Summary, state
-    tree.ts                          NEW  NodeKind, NodePath, encode/decodePath, TreeNode, ObjectMeta (+Zod)
-    engine-ops.ts                    NEW  main<->engine op names + payload types/schemas
-    ops.ts                           NEW  OpRecord (op_log row) + Zod, OpKind, OpStatus
-    uri.ts                           NEW  parse/format/redact/inject for connection URIs (+Zod)
-    ipc.ts                           MOD  new channel names + KiraApi methods
+    domain/                          NEW  (SPEC §11's shared/domain/ — "what the concepts mean")
+      connection.ts                       Zod: kind, color, mode, ConnectionRecord/Input/Summary, state
+      tree.ts                             NodeKind, NodePath, encode/decodePath, TreeNode, ObjectMeta (+Zod)
+      ops.ts                               OpRecord (op_log row) + Zod, OpKind, OpStatus
+      uri.ts                               parse/format/redact/inject for connection URIs (+Zod)
+    protocol/                        NEW  (SPEC §11's shared/protocol/ — "bytes on the wire")
+      ipc.ts                              MOD, moved from the flat src/shared/ipc.ts P0 left; new
+                                           channel names + KiraApi methods
+      port.ts                             — NOT moved: P1 does not touch it, stays at src/shared/port.ts
+                                           (note 11 — only a phase that touches a file relocates it)
+      engine-ops.ts                       NEW  main<->engine op names + payload types/schemas
   main/
-    ipc.ts                           MOD  register the P1 handlers
-    engine-host.ts                   MOD  request/response `call()`, event stream, D2
+    ipc/                              NEW  (SPEC §11's main/ipc/ — one file per domain + registry.ts,
+                                           replacing the single growing src/main/ipc.ts)
+      registry.ts                         NEW  wires every domain's handlers into ipcMain
+      app.ts                              MOD  moved from ipc.ts: kira:app:info
+      settings.ts                         MOD  moved from ipc.ts: kira:settings:*
+      layout.ts                           MOD  moved from ipc.ts: kira:layout:*
+      engine.ts                           MOD  moved from ipc.ts: kira:engine:status
+      connections.ts                      NEW  the P1 connections channels
+      tree.ts                             NEW  the P1 tree channels
+      filters.ts                          NEW  the P1 filters channels
+      ops.ts                               NEW  the P1 ops channels
+    engine-host.ts                   MOD  request/response `call()`, event stream, D2 — stays top-level,
+                                           only its contents change
     connections.ts                   NEW  CRUD orchestration: storage + secrets + engine + state
     tree-service.ts                  NEW  L1 cache-aside for children/describe (D10)
+    oplog.ts                         NEW  subscribes engine op:start/op:end, forwards kira:op:update,
+                                           calls pruneOps at startup (D19) — SPEC §11's top-level
+                                           main/oplog.ts, distinct from the repo below
     storage/
-      connections.ts                 NEW  connections table accessors (Zod-validated)
-      secrets.ts                     NEW  SecretStore interface + PlaintextColumnSecretStore (D8)
-      filters.ts                     NEW  connection_filters accessors
-      metadata-cache.ts              NEW  metadata_cache accessors
-      oplog.ts                       NEW  op_log append/query/prune (D19)
+      repos/                          NEW  (SPEC §11's storage/repos/ — "the only files that import
+                                           the Drizzle instance"; one file per table)
+        settings.ts                       MOD  moved from storage/settings.ts (P0)
+        layout.ts                         MOD  moved from storage/layout.ts (P0)
+        connections.ts                     NEW  connections table accessors (Zod-validated)
+        secrets.ts                         NEW  SecretStore interface + PlaintextColumnSecretStore (D8)
+        filters.ts                         NEW  connection_filters accessors
+        metadata-cache.ts                  NEW  metadata_cache accessors
+        ops.ts                              NEW  op_log append/query/prune (D19) — the repo half; the
+                                           orchestration half is main/oplog.ts above
   engine/
     index.ts                         MOD  route control frames to control.ts
-    control.ts                       NEW  main<->engine dispatch, connection registry
-    ops.ts                           NEW  runOp(): opId, AbortController, op:start/op:end, cancel registry
+    control.ts                       NEW  main<->engine dispatch, connection registry — stays top-level,
+                                           sibling to main/connections.ts's orchestration role
+    scheduler/                       NEW  (SPEC §11's engine/scheduler/ — "op lifecycle, cancellation,
+                                           progress — driver-agnostic")
+      ops.ts                              NEW  runOp(): opId, AbortController, op:start/op:end, cancel
+                                           registry
     adapters/
       adapter.ts                     NEW  Adapter, OpCtx, AdapterFactory, ConnectInfo (D3)
       registry.ts                    NEW  kind -> factory
@@ -111,8 +146,12 @@ src/
         catalog.ts                   NEW  the catalog SQL, one function per level
         caps.ts                      NEW  the Postgres Caps literal
   renderer/
-    env.d.ts                         MOD  (nothing — KiraApi is imported from @shared/ipc)
+    env.d.ts                         MOD  (nothing — KiraApi is imported from @shared/protocol/ipc)
     bridge/control.ts                MOD  wrappers for the new channels
+    state/                           NEW  (SPEC §11's renderer/state/ — cross-view app state; its own
+                                           examples are "active connection" and "op log ring")
+      connections.ts                      records, states, dialog open/edit target
+      ops.ts                               operations ring buffer + filters
     project/                         NEW  (SPEC §11's renderer/project/)
       ProjectTree.vue                     virtualized tree body
       TreeRow.vue                         one row: twisty, icon, color rail, dot, label, detail
@@ -123,15 +162,15 @@ src/
       icons.ts                            NodeKind + column type -> codicon name
       filter.ts                           glob/regex matching + rule evaluation (D13)
       state/
-        connections.ts                    records, states, dialog open/edit target
-        tree.ts                           node cache, expansion set, loading/error per path, search
+        tree.ts                           node cache, expansion set, loading/error per path, search —
+                                           stays local to project/: nothing outside the tree reads it
     workbench/
-      ContextMenu.vue                NEW  renderer-drawn menu + submenu (D12)
+      ContextMenu.vue                NEW  renderer-drawn menu + submenu (D12) — stays in workbench/,
+                                           SPEC §11 names "context-menu service" as one of its jobs
       VirtualList.vue                NEW  fixed-row-height windowing, used by tree and op panel
       StatusBar.vue                  MOD  "● N connected" indicator (§8.1)
       state/
         contextMenu.ts               NEW  the single ContextMenu service (§8.10)
-        ops.ts                       NEW  operations ring buffer + filters
       panels/
         ProjectPanel.vue             MOD  header + search + tree, replacing the empty state
         OperationsPanel.vue          MOD  real table, replacing the empty state
@@ -154,7 +193,7 @@ docs/plans/P1-connections-and-tree.md     (this file)
 
 ## 3. Shared contracts (Step 1 writes these; the rest of the plan refers back)
 
-### 3a. `src/shared/tree.ts`
+### 3a. `src/shared/domain/tree.ts`
 
 ```ts
 export const nodeKindSchema = z.enum([
@@ -217,7 +256,7 @@ export type ObjectMeta = z.infer<typeof objectMetaSchema>;
 
 Both schemas are used to parse `metadata_cache.payload_json` on read-back (§6's rule). A row that fails to parse is **deleted and treated as a miss** — never surfaced as an error.
 
-### 3b. `src/shared/connection.ts`
+### 3b. `src/shared/domain/connection.ts`
 
 ```ts
 export const connectionKindSchema = z.enum([
@@ -262,9 +301,9 @@ export const connectionStateSchema = z.object({
 export type ConnectionState = z.infer<typeof connectionStateSchema>;
 ```
 
-`ResolvedConnectionConfig` (main → engine only, never renderer-visible) is `ConnectionSummary` plus `password: string | null` plus `uri` with the password re-injected (D7). Declare it in `src/shared/engine-ops.ts`, not `connection.ts`, so it is obvious that only the engine channel carries it.
+`ResolvedConnectionConfig` (main → engine only, never renderer-visible) is `ConnectionSummary` plus `password: string | null` plus `uri` with the password re-injected (D7). Declare it in `src/shared/protocol/engine-ops.ts`, not `connection.ts`, so it is obvious that only the engine channel carries it.
 
-### 3c. `src/shared/uri.ts`
+### 3c. `src/shared/domain/uri.ts`
 
 ```ts
 export interface ParsedUri {
@@ -284,7 +323,7 @@ Implementation notes:
 - `canRoundTripToFields` is **false** when: the scheme is not `postgres`/`postgresql`, the host section contains a comma (multi-host), the host is empty or begins with `/` (unix socket path), or the userinfo contains characters that do not survive `encodeURIComponent` round-tripping. When false, §8.12's rule applies: the dialog **stays in URI mode**.
 - `params` come from `searchParams`; they are stored into `connections.options_json`, so a `?sslmode=require` survives a fields↔URI flip.
 
-### 3d. `src/shared/ops.ts`
+### 3d. `src/shared/domain/ops.ts`
 
 ```ts
 export const opKindSchema  = z.enum(['connect','disconnect','children','describe','test']);
@@ -432,7 +471,7 @@ Rules that hold for every adapter, present and future — put them as a doc comm
 5. **`children()` returns `[]` for a leaf, never throws.** `hasChildren` on the parent is the adapter's promise; getting it wrong shows a twisty that expands to nothing, which is a bug to fix in the parent's query, not to paper over.
 6. **An adapter is single-connection.** One instance ↔ one `connections` row. The registry in `src/engine/control.ts` owns the `Map<connectionId, Adapter>`.
 
-### 4c. `src/engine/ops.ts`
+### 4c. `src/engine/scheduler/ops.ts`
 
 ```ts
 export async function runOp<T>(
@@ -451,11 +490,11 @@ export async function runOp<T>(
 
 ## Step 1 — Shared contracts and Zod schemas
 
-**Files:** `src/shared/{caps,connection,tree,uri,ops,engine-ops}.ts`, `src/shared/ipc.ts` (mod)
+**Files:** `src/shared/caps.ts`, `src/shared/domain/{connection,tree,uri,ops}.ts`, `src/shared/protocol/engine-ops.ts` (new), `src/shared/protocol/ipc.ts` (moved from `src/shared/ipc.ts`, mod)
 
 Write §3 and §4a of this plan verbatim as code. No behaviour, no imports from `main`/`engine`/`renderer`.
 
-`src/shared/engine-ops.ts` declares the main↔engine wire (D2):
+`src/shared/protocol/engine-ops.ts` declares the main↔engine wire (D2):
 
 ```ts
 export const ENGINE_OP = {
@@ -479,7 +518,7 @@ export interface ResolvedConnectionConfig { /* ConnectionSummary + password + ur
 // main parses every inbound event. Both are trust boundaries (§3).
 ```
 
-`src/shared/ipc.ts` gains the P1 channels and the matching `KiraApi` methods:
+`src/shared/protocol/ipc.ts` (relocated from the flat `src/shared/ipc.ts` P0 left, per note 11) gains the P1 channels and the matching `KiraApi` methods:
 
 ```
 kira:connections:list        () -> ConnectionSummary[]
@@ -511,11 +550,11 @@ Main → renderer pushes: `kira:connection:state`, `kira:connection:metadataInva
 
 ## Step 2 — Storage: connections, secrets, filters, metadata cache, op log
 
-**Files:** `src/main/storage/{connections,secrets,filters,metadata-cache,oplog}.ts`
+**Files:** `src/main/storage/repos/{connections,secrets,filters,metadata-cache,ops}.ts`
 
 **No migration.** The P0 schema already has every table and index P1 needs (see §0 note 5).
 
-### 2a. `secrets.ts` (D8)
+### 2a. `repos/secrets.ts` (D8)
 
 ```ts
 export interface SecretStore {
@@ -526,7 +565,7 @@ export interface SecretStore {
 export function createSecretStore(db: Db): SecretStore   // returns PlaintextColumnSecretStore
 ```
 
-The implementation reads and writes `connections.password` and **nothing else in the codebase may reference that column** — enforce it by never selecting `password` in `storage/connections.ts`'s queries. Add the one-line comment naming `safeStorage.encryptString` as the intended replacement and §1's deferral as the reason it is not used yet.
+The implementation reads and writes `connections.password` and **nothing else in the codebase may reference that column** — enforce it by never selecting `password` in `storage/repos/connections.ts`'s queries. Add the one-line comment naming `safeStorage.encryptString` as the intended replacement and §1's deferral as the reason it is not used yet.
 
 ### 2b. `connections.ts`
 
@@ -568,7 +607,7 @@ countCached(db, connectionId): number
 - **Size guard:** a payload whose JSON exceeds **4 MB** is not cached — return without writing and log at `warn`. A schema with 200 000 relations should degrade to "slow expand" rather than to a bloated SQLite file. This is L1's only size story; see §7 discussion in Step 6c.
 - **No TTL, no LRU, no eviction timer.** §7 is explicit: entries die when the connection is deleted (already handled by `ON DELETE CASCADE`), when the connection reconnects (D11), or on a manual *Refresh*.
 
-### 2e. `oplog.ts` (D19)
+### 2e. `repos/ops.ts` (D19)
 
 ```ts
 appendOp(db, record: OpRecord): void          // INSERT with status 'running'
@@ -576,7 +615,9 @@ finishOp(db, id, patch): void                 // UPDATE status/duration/rows/err
 recentOps(db, limit): OpRecord[]              // ORDER BY started_at DESC LIMIT ?
 pruneOps(db): void                            // older than 30 days, then hard cap 20 000 rows
 ```
-`pruneOps` runs once from `main/index.ts` after `migrate()`. Rows are parsed back through `opRecordSchema` on read; unparseable rows are skipped.
+Pure CRUD — the only file that touches `op_log` through Drizzle. The orchestration that decides *when*
+to call these (subscribing to engine events, calling `pruneOps` once at startup) is `src/main/oplog.ts`,
+covered in Step 6d. Rows are parsed back through `opRecordSchema` on read; unparseable rows are skipped.
 
 **Acceptance:** a scratch script (or a temporary Playwright `app.evaluate`) inserts, lists, updates and deletes a connection and a filter set; `sqlite3` shows the expected rows; deleting the connection cascades its filters and cache rows away. `bun run lint && bun run typecheck` green.
 
@@ -609,9 +650,9 @@ export interface EngineHost {
 `index.ts` keeps the port handling exactly as it is and forwards every non-`attach-port` frame to `control.handleFrame`. `control.ts`:
 
 - Owns `const adapters = new Map<string, Adapter>()` and `const states = new Map<string, ConnectionState>()`.
-- Dispatch table over `ENGINE_OP`, each handler parsing its payload with the Zod schema from `shared/engine-ops.ts` **before** use.
+- Dispatch table over `ENGINE_OP`, each handler parsing its payload with the Zod schema from `shared/protocol/engine-ops.ts` **before** use.
 - `emit(topic, payload)` → `process.parentPort.postMessage({ kind: 'evt', topic, payload })`.
-- Every handler that touches the server wraps its body in `runOp` (Step 4c / `engine/ops.ts`).
+- Every handler that touches the server wraps its body in `runOp` (Step 4c / `engine/scheduler/ops.ts`).
 - `adapter:connect`: if a live adapter exists for that id, disconnect it first (a reconnect is a disconnect + connect, never two clients). Build the adapter from the registry by `cfg.kind`; a kind with no registered factory throws `E_UNSUPPORTED` with the message `"<kind> connections are not supported yet"` — which is exactly what the UI should show for a MariaDB row in P1.
 
 **Acceptance:** a temporary `adapter:test` handler that returns `{ ok: true }` for a hardcoded config is callable from an `ipcMain.handle` and returns to the renderer; killing the engine (`kill <pid>`) makes an in-flight call reject within 100 ms rather than hanging.
@@ -620,7 +661,7 @@ export interface EngineHost {
 
 ## Step 4 — Adapter interface, registry, ops
 
-**Files:** `src/engine/adapters/{adapter,registry,errors}.ts`, `src/engine/ops.ts`
+**Files:** `src/engine/adapters/{adapter,registry,errors}.ts`, `src/engine/scheduler/ops.ts`
 
 Write §4b and §4c of this plan verbatim. `registry.ts` is:
 
@@ -809,7 +850,7 @@ WHERE con.contype = 'f' AND con.conrelid = $1::oid
 
 ## Step 6 — Main-side services: connections, tree/L1, op log
 
-**Files:** `src/main/{connections,tree-service}.ts`, `src/main/ipc.ts` (mod), `src/main/index.ts` (mod)
+**Files:** `src/main/{connections,tree-service,oplog}.ts`, `src/main/ipc/{registry,app,settings,layout,engine,connections,tree,filters,ops}.ts` (registry + app/settings/layout/engine moved out of the old `src/main/ipc.ts`, which this step retires; connections/tree/filters/ops new), `src/main/index.ts` (mod)
 
 ### 6a. `connections.ts`
 
@@ -856,13 +897,31 @@ async function children(connectionId, path, refresh): Promise<{ nodes, source }>
 
 That is the entire L1 story and it is deliberately smaller than L2's. §2.2's byte-budgeted LRU applies to result pages (P2), which are orders of magnitude larger and in memory; metadata is small, on disk, and the whole point is that it never expires.
 
-### 6d. Op log wiring (D19)
+### 6d. Op log wiring (D19) — `src/main/oplog.ts`
 
-In `main/index.ts`, after `registerIpc`: subscribe to the engine's `op:start` / `op:end` events, `appendOp` / `finishOp`, and forward each as a `kira:op:update` push to every window. Call `pruneOps(db)` once at startup.
+Exports `wireOplog(engineHost, db, broadcast)`, called from `main/index.ts` after `registerIpc`:
+subscribes to the engine's `op:start` / `op:end` events, calls `repos/ops.ts`'s `appendOp` / `finishOp`,
+and forwards each as a `kira:op:update` push to every window. Also calls `repos/ops.ts`'s `pruneOps(db)`
+once at startup. This file is pure orchestration — it never touches Drizzle directly (rule from
+`repos/`'s doc comment); every actual query goes through `repos/ops.ts`.
 
-### 6e. `ipc.ts`
+### 6e. `main/ipc/` — registry and the per-domain handler files
 
-Register every channel from Step 1. Each handler:
+SPEC §11's `main/ipc/` split lands here: the single `src/main/ipc.ts` P0 built (four handlers:
+`app:info`, `settings:*`, `layout:*`, `engine:status`) is retired in favor of one file per domain plus
+a `registry.ts` that wires all of them into `ipcMain`. Moving the P0 handlers is mechanical — same
+bodies, new files — and is done in this step because splitting `ipc.ts` at all means touching every
+handler already in it.
+
+- `ipc/app.ts`, `ipc/settings.ts`, `ipc/layout.ts`, `ipc/engine.ts` — the four P0 handlers, relocated
+  verbatim (bodies unchanged; only the file and its `registerXHandlers(...)`-style export are new).
+- `ipc/connections.ts`, `ipc/tree.ts`, `ipc/filters.ts`, `ipc/ops.ts` — the new P1 handlers, one file
+  per domain from Step 1's channel list.
+- `ipc/registry.ts` — a single `registerIpc(deps)` that calls each domain module's registration
+  function. `main/index.ts` calls only `registerIpc`, never a domain file directly — the same shape
+  P0's `registerIpc` had, just backed by eight files instead of one.
+
+Each handler, regardless of which domain file it lives in:
 1. parses its payload with the channel's Zod schema (this is a trust boundary — §3),
 2. delegates to `connections.ts` / `tree-service.ts` / a storage module,
 3. converts thrown `AdapterError`s into a rejected invoke whose message is the server's verbatim text with the code prefixed as `[E_QUERY] …` so the renderer can branch on the code without a separate error envelope.
@@ -873,9 +932,13 @@ Register every channel from Step 1. Each handler:
 
 ## Step 7 — Renderer: connection state, dialog, CRUD, colors
 
-**Files:** `src/renderer/project/{ConnectionDialog,ColorPicker}.vue`, `src/renderer/project/state/connections.ts`, `src/renderer/bridge/control.ts` (mod)
+**Files:** `src/renderer/project/{ConnectionDialog,ColorPicker}.vue`, `src/renderer/state/connections.ts`, `src/renderer/bridge/control.ts` (mod)
 
-### 7a. `state/connections.ts`
+### 7a. `src/renderer/state/connections.ts`
+
+Lives in the new top-level `renderer/state/`, not `project/state/` — SPEC §11 names the active-connection
+map as its example of cross-view state, and P2's grid/tabs will need to read connection state too, not
+just the tree.
 
 ```ts
 export const connectionsState = reactive({
@@ -1056,9 +1119,13 @@ Items marked *(P#)* below are in §8.10 but are **omitted entirely** in P1 — n
 
 ## Step 10 — Operations panel (§8.11)
 
-**Files:** `src/renderer/workbench/state/ops.ts`, `src/renderer/workbench/panels/OperationsPanel.vue` (rewrite)
+**Files:** `src/renderer/state/ops.ts`, `src/renderer/workbench/panels/OperationsPanel.vue` (rewrite)
 
-### 10a. `state/ops.ts`
+### 10a. `src/renderer/state/ops.ts`
+
+Lives in the new top-level `renderer/state/`, not `workbench/state/` — SPEC §11 names "op log ring" as
+its other example of cross-view state, alongside connections (Step 7a). The panel that renders it stays
+in `workbench/panels/` (that part of the split is presentation, not state).
 
 ```ts
 export const opsState = reactive({
@@ -1209,7 +1276,7 @@ Playwright runs under Node, so `testcontainers` works there unchanged.
 
 ## Step 13 — Drizzle for the internal SQLite layer (appended at request)
 
-**Files:** `package.json` (mod), `src/main/storage/schema.ts` (new), `src/main/storage/db.ts` (mod), `src/main/storage/{settings,layout,connections,secrets,filters,metadata-cache,oplog}.ts` (mod), `src/main/{connections,tree-service,ipc,index}.ts` (mod, signature-only)
+**Files:** `package.json` (mod), `src/main/storage/schema/{settings,layout,connections,connection-filters,metadata-cache,ops}.ts` (new — SPEC §11's `storage/schema/`, one file per table this phase actually uses), `src/main/storage/db.ts` (mod), `src/main/storage/repos/{settings,layout,connections,secrets,filters,metadata-cache,ops}.ts` (mod), `src/main/{connections,tree-service,index}.ts` (mod, signature-only)
 **Deps:** `bun add drizzle-orm`
 
 Migrate the internal SQLite access layer from hand-written SQL over the `Db` interface to Drizzle's
@@ -1237,13 +1304,19 @@ Settle during implementation against drizzle's `.d.ts` (do not guess): the exact
 `run`. Use drizzle's `.returning()` (needs SQLite ≥ 3.35, satisfied by node:sqlite) for inserts that
 need the new row back.
 
-### 13b. Schema (`schema.ts`)
+### 13b. Schema (`storage/schema/`)
 
-One `sqliteTable(...)` per table, matching `migrations/0001_init.sql` exactly: `settings`, `layout`,
-`connections`, `connection_filters`, `metadata_cache`, `op_log`, `tabs`, `saved_queries`. Booleans
-use `integer(..., { mode: 'boolean' })` so the 0/1 ↔ boolean transform (P0 note 2) is handled by
-Drizzle and the `? 1 : 0` sprinkling disappears from the storage modules. `payload_json` / JSON
-columns stay `text` and keep the existing `JSON.parse` at the storage boundary.
+One file per table, each exporting one `sqliteTable(...)`, matching `migrations/0001_init.sql`
+exactly: `settings.ts`, `layout.ts`, `connections.ts`, `connection-filters.ts`, `metadata-cache.ts`,
+`ops.ts` (the `op_log` table) — the six tables P1 actually has a `repos/` module for. SPEC §11 says
+`storage/schema/` "mirrors `migrations/` 1:1", but P0's no-scaffolding-forward rule wins where they'd
+conflict: `tabs` and `saved_queries` already exist as columns in `0001_init.sql`, yet nothing in P1
+reads or writes them, so **do not add `tabs.ts` or `saved-queries.ts` here** — P2 and P5.5 add their
+own schema file in the same step that adds their `repos/` module, which is what "1:1 with what's
+actually used" means in practice until the whole schema has a consumer. Booleans use
+`integer(..., { mode: 'boolean' })` so the 0/1 ↔ boolean transform (P0 note 2) is handled by Drizzle
+and the `? 1 : 0` sprinkling disappears from the storage modules. `payload_json` / JSON columns stay
+`text` and keep the existing `JSON.parse` at the storage boundary.
 
 ### 13c. `db.ts` + migrations
 
@@ -1255,17 +1328,18 @@ and the PRAGMA setup are otherwise unchanged.
 
 ### 13d. Storage module rewrites
 
-Rewrite each module's queries in the builder, keeping public signatures (callers only thread `db`
-through, so their code is unchanged):
+Rewrite each `storage/repos/` module's queries in the builder, keeping public signatures (callers only
+thread `db` through, so their code — including `main/oplog.ts`, which calls `repos/ops.ts` but never
+Drizzle directly — is unchanged):
 
-- `settings.ts` / `layout.ts` — `db.select()` + `db.update()`; read-back validation stays.
-- `connections.ts` — `select/insert/update/delete` + `sql\`COALESCE(MAX(sort_order), -1)\``; the
+- `repos/settings.ts` / `repos/layout.ts` — `db.select()` + `db.update()`; read-back validation stays.
+- `repos/connections.ts` — `select/insert/update/delete` + `sql\`COALESCE(MAX(sort_order), -1)\``; the
   "skip unparseable row" read-back discipline is unchanged.
-- `secrets.ts` — `db.select({ password })` / `db.update`.
-- `filters.ts` — `replaceFilters` becomes `db.transaction(async (tx) => …)`; delete-all + insert.
-- `metadata-cache.ts` — `putCached`'s read-modify-write becomes `db.transaction(async (tx) => …)`;
+- `repos/secrets.ts` — `db.select({ password })` / `db.update`.
+- `repos/filters.ts` — `replaceFilters` becomes `db.transaction(async (tx) => …)`; delete-all + insert.
+- `repos/metadata-cache.ts` — `putCached`'s read-modify-write becomes `db.transaction(async (tx) => …)`;
   the `fooTx()`/`foo()` split from P0 note 1 still applies (never nest transactions).
-- `oplog.ts` — `appendOp`/`finishOp`/`recentOps`/`pruneOps` in the builder.
+- `repos/ops.ts` — `appendOp`/`finishOp`/`recentOps`/`pruneOps` in the builder.
 
 ### 13e. Acceptance
 
@@ -1335,7 +1409,7 @@ Two of these have defaults I have chosen and implemented in the plan; they are c
 
 1. `bun install && bun run lint && bun run typecheck && bun run build && bun run test:ui && bun run test:db` is green from a clean clone with Colima running.
 2. A PostgreSQL connection can be created in fields mode **and** in URI mode, tested, saved, edited, duplicated, colored, marked read-only and deleted — all surviving a relaunch.
-3. `kira:connections:list` provably never returns a password; `connections.password` is touched only by `src/main/storage/secrets.ts`.
+3. `kira:connections:list` provably never returns a password; `connections.password` is touched only by `src/main/storage/repos/secrets.ts`.
 4. Connecting turns the dot green and shows the server version on hover; disconnecting turns it grey; a failed connect shows the server's verbatim message.
 5. The tree lazily expands connection → database → schema → table/view/matview/sequence/function → column, virtualized, at the configured row density.
 6. A second expansion of the same node issues **no** database round-trip (visible as zero new operations-panel rows); *Refresh* issues exactly one; reconnecting invalidates and re-fetches exactly the expanded paths.
