@@ -1,5 +1,6 @@
 import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '../domain/connection-filter';
+import type { SourceText } from '../domain/ddl';
 import type { OpRecord } from '../domain/ops';
 import type { FilterBody, FilterHistoryEntry, SavedQuery, SortSpec } from '../domain/queries';
 import type { TabRecord } from '../domain/tabs';
@@ -33,6 +34,7 @@ export const IPC = {
   connectionsStates: 'kira:connections:states',
   treeChildren: 'kira:tree:children',
   treeDescribe: 'kira:tree:describe',
+  treeDdl: 'kira:tree:ddl',
   treeInvalidate: 'kira:tree:invalidate',
   filtersList: 'kira:filters:list',
   filtersReplace: 'kira:filters:replace',
@@ -84,6 +86,11 @@ export interface TreeDescribeResult {
   source: 'cache' | 'server';
 }
 
+export interface TreeDdlResult {
+  ddl: SourceText;
+  source: 'cache' | 'server';
+}
+
 export interface KiraApi {
   appInfo(): Promise<AppInfo>;
   settingsGetAll(): Promise<Settings>;
@@ -120,6 +127,7 @@ export interface KiraApi {
     path: string;
     refresh?: boolean;
   }): Promise<TreeDescribeResult>;
+  treeDdl(args: { connectionId: string; path: string; refresh?: boolean }): Promise<TreeDdlResult>;
   treeInvalidate(args: { connectionId: string; path?: string }): Promise<void>;
 
   filtersList(args: { connectionId: string }): Promise<ConnectionFilter[]>;

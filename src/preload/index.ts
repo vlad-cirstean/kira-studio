@@ -14,6 +14,7 @@ import type {
   EngineStatus,
   KiraApi,
   TreeChildrenResult,
+  TreeDdlResult,
   TreeDescribeResult,
 } from '../shared/protocol/ipc';
 import { IPC } from '../shared/protocol/ipc';
@@ -78,6 +79,8 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.treeChildren, args) as Promise<TreeChildrenResult>,
   treeDescribe: (args: { connectionId: string; path: string; refresh?: boolean }) =>
     ipcRenderer.invoke(IPC.treeDescribe, args) as Promise<TreeDescribeResult>,
+  treeDdl: (args: { connectionId: string; path: string; refresh?: boolean }) =>
+    ipcRenderer.invoke(IPC.treeDdl, args) as Promise<TreeDdlResult>,
   treeInvalidate: (args: { connectionId: string; path?: string }) =>
     ipcRenderer.invoke(IPC.treeInvalidate, args),
 

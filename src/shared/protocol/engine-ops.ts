@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { capsSchema } from '../caps';
 import type { ConnectionSummary } from '../domain/connection';
 import { connectionSummarySchema } from '../domain/connection';
+import { sourceTextSchema } from '../domain/ddl';
 import { opKindSchema } from '../domain/ops';
 import { nodeKindSchema, objectMetaSchema, treeNodeSchema } from '../domain/tree';
 
@@ -10,6 +11,7 @@ export const ENGINE_OP = {
   disconnect: 'adapter:disconnect',
   children: 'adapter:children',
   describe: 'adapter:describe',
+  ddl: 'adapter:ddl',
   test: 'adapter:test',
   cancel: 'adapter:cancel',
   /** Not a database operation — runs outside runOp and never reaches the op log (Step 3). */
@@ -44,6 +46,7 @@ export const engineOpPayloadSchema = {
   [ENGINE_OP.disconnect]: z.object({ connectionId: z.string() }),
   [ENGINE_OP.children]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
   [ENGINE_OP.describe]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
+  [ENGINE_OP.ddl]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
   [ENGINE_OP.test]: z.object({ config: resolvedConnectionConfigSchema }),
   [ENGINE_OP.cancel]: z.object({ opId: z.string() }),
   [ENGINE_OP.configureCache]: z.object({ l2BudgetBytes: z.number().int().min(1) }),
@@ -60,6 +63,7 @@ export const engineOpResultSchema = {
   [ENGINE_OP.disconnect]: z.object({}),
   [ENGINE_OP.children]: z.object({ nodes: z.array(treeNodeSchema) }),
   [ENGINE_OP.describe]: z.object({ meta: objectMetaSchema }),
+  [ENGINE_OP.ddl]: z.object({ ddl: sourceTextSchema }),
   [ENGINE_OP.test]: z.object({
     ok: z.boolean(),
     serverVersion: z.string().optional(),
