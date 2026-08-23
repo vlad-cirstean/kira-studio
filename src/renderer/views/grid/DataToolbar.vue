@@ -2,8 +2,10 @@
 import type { DataTabState } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../../state/connections';
+import { useRunState } from '../../state/runState';
 import { activeDataTab } from '../../state/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import RunState from '../../theme/primitives/RunState.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
@@ -60,6 +62,8 @@ const isWritable = computed(() => {
 const tabHasPending = computed(() => (tab.value ? hasPending(tab.value.id) : false));
 
 const previewOpen = ref(false);
+
+const runState = useRunState(() => tab.value?.id);
 
 const pageDisplay = computed(() => (tab.value ? tab.value.state.pageIndex + 1 : 1));
 
@@ -312,17 +316,6 @@ function onDiscard(): void {
           @close="columnsOpen = false"
         />
       </div>
-
-      <div class="preview-anchor">
-        <IconButton
-          icon="eye"
-          data-testid="toolbar-preview-command"
-          :disabled="!isWritable"
-          :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
-          @click="previewOpen = !previewOpen"
-        />
-        <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
-      </div>
     </div>
 
     <div class="sep" />
@@ -353,9 +346,21 @@ function onDiscard(): void {
     <span class="p-push" />
 
     <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
-         accent-filled control on the whole screen. -->
+         accent-filled control on the whole screen. The preview-command eye sits in this same
+         group (only ever relevant while there is something pending to preview) rather than off
+         in the count/columns group above. -->
     <div v-if="tabHasPending" class="group">
       <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
+      <div class="preview-anchor">
+        <IconButton
+          icon="eye"
+          data-testid="toolbar-preview-command"
+          :disabled="!isWritable"
+          :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
+          @click="previewOpen = !previewOpen"
+        />
+        <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
+      </div>
       <IconButton
         icon="discard"
         data-testid="toolbar-discard-changes"
@@ -373,19 +378,13 @@ function onDiscard(): void {
       />
     </div>
 
-    <!-- The run-state ring moved here, after the unconditional p-push above: its label's width
-         changes with status ('', 'fetching…', 'query failed'), and sitting at the very end of
-         the toolbar means that never reflows the pager/page-size/count/columns controls to its
-         left (the bug this fixes — see DataView.vue's own note on this LAW). -->
-    <span
-      class="p-run-state"
-      :class="{ 'is-running': rt?.status === 'loading', 'is-error': rt?.status === 'error' }"
-      :title="rt?.status === 'error' ? rt?.error?.message : undefined"
-    >
-      <span class="ring" />
-      <template v-if="rt?.status === 'loading'">fetching…</template>
-      <template v-else-if="rt?.status === 'error'">query failed</template>
-    </span>
+    <!-- The shared RunState primitive (LAW 12), same component/host every other view's toolbar
+         ends with (ViewChrome.vue) — sitting after the unconditional p-push above means its
+         growing/shrinking label can never reflow the pager/page-size/count/columns controls to
+         its left (the bug this fixes — see DataView.vue's own note on this LAW). Driven by
+         opsState via useRunState, same as every ViewChrome-hosted view, so it now shows the
+         query's real elapsed time instead of the literal words "fetching…"/"query failed". -->
+    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
   </div>
 </template>
 

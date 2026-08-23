@@ -275,7 +275,11 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await roCompositeRow.dblclick();
   await expect(page.locator('[data-testid="grid-header-cell"][data-column="name"]')).toBeVisible();
 
-  for (const testId of ['toolbar-add-row', 'toolbar-delete-row', 'toolbar-preview-command']) {
+  for (const testId of ['toolbar-add-row', 'toolbar-delete-row']) {
     await expect(page.locator(`[data-testid="${testId}"]`)).toBeDisabled();
   }
+  // Preview-command now only renders alongside the pending-changes group (P16 toolbar-order
+  // cleanup) — a read-only connection can never stage a pending change in the first place, so
+  // there is nothing to preview and the button is absent rather than present-but-disabled.
+  await expect(page.locator('[data-testid="toolbar-preview-command"]')).toHaveCount(0);
 });

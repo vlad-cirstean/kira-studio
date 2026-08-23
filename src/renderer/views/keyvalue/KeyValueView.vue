@@ -420,6 +420,10 @@ onUnmounted(() => {
           >Exact count</Button>
         </div>
 
+        <div class="sep" />
+
+        <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
+             DataToolbar.vue's own page-size segmented control occupies. -->
         <div class="p-seg" data-testid="keyvalue-page-size-picker">
           <button
             v-for="size in PAGE_SIZES"
@@ -435,7 +439,45 @@ onUnmounted(() => {
 
         <div class="sep" />
 
+        <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
+             add-before-delete order), search trails, same as every other view. -->
         <div class="group">
+          <div class="add-anchor">
+            <IconButton
+              icon="add"
+              data-testid="keyvalue-add"
+              :disabled="!canInsert"
+              :title="addTitle"
+              @click="openAdd"
+            />
+            <Popover v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
+              <div class="popover-form">
+                <div class="popover-title p-sm muted">Add key (string value)</div>
+                <TextField v-model="addName" placeholder="Key name" data-testid="keyvalue-add-name" />
+                <TextField
+                  v-model="addValue"
+                  placeholder="Initial value"
+                  data-testid="keyvalue-add-value"
+                  @keydown.enter="submitAdd"
+                  @keydown.escape="closeAdd"
+                />
+                <div v-if="addError" class="p-xs popover-error" data-testid="keyvalue-add-error">
+                  {{ addError }}
+                </div>
+                <div class="popover-actions">
+                  <Button kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
+                  <Button
+                    kind="dialog"
+                    variant="primary"
+                    data-testid="keyvalue-add-save"
+                    :disabled="addSaving"
+                    @click="submitAdd"
+                  >Save</Button>
+                </div>
+              </div>
+            </Popover>
+          </div>
+
           <div class="edit-anchor">
             <IconButton
               icon="edit"
@@ -477,42 +519,6 @@ onUnmounted(() => {
             :title="deleteTitle"
             @click="onDeleteKey"
           />
-
-          <div class="add-anchor">
-            <IconButton
-              icon="add"
-              data-testid="keyvalue-add"
-              :disabled="!canInsert"
-              :title="addTitle"
-              @click="openAdd"
-            />
-            <Popover v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
-              <div class="popover-form">
-                <div class="popover-title p-sm muted">Add key (string value)</div>
-                <TextField v-model="addName" placeholder="Key name" data-testid="keyvalue-add-name" />
-                <TextField
-                  v-model="addValue"
-                  placeholder="Initial value"
-                  data-testid="keyvalue-add-value"
-                  @keydown.enter="submitAdd"
-                  @keydown.escape="closeAdd"
-                />
-                <div v-if="addError" class="p-xs popover-error" data-testid="keyvalue-add-error">
-                  {{ addError }}
-                </div>
-                <div class="popover-actions">
-                  <Button kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
-                  <Button
-                    kind="dialog"
-                    variant="primary"
-                    data-testid="keyvalue-add-save"
-                    :disabled="addSaving"
-                    @click="submitAdd"
-                  >Save</Button>
-                </div>
-              </div>
-            </Popover>
-          </div>
 
           <IconButton
             icon="search"
