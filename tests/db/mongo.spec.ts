@@ -126,7 +126,7 @@ describe('mongo adapter (§9.1, P8)', () => {
     expect(mongoCaps.tabular).toBe(false);
     expect(mongoCaps.documents).toBe(true);
     expect(mongoCaps.defaultPageKind).toBe('document');
-    expect(mongoCaps.ddl).toBe(false);
+    expect(mongoCaps.definition).toBe(false);
     expect(mongoCaps.exactCount).toBe(false);
     expect(mongoCaps.pagination).toBe('cursor');
     expect(mongoCaps.cancel).toBe(true);
@@ -175,12 +175,12 @@ describe('mongo adapter (§9.1, P8)', () => {
     }
   });
 
-  test('7. ddl is unsupported', async () => {
+  test('7. definition is unsupported', async () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: MONGO_DATABASE },
             { kind: 'collection', name: 'widgets' },

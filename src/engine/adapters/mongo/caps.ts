@@ -1,7 +1,7 @@
 import type { Caps } from '../../../shared/caps';
 
 // §5.1's mongodb row: document-shaped, cursor pagination, estimate-only count, no FK
-// navigation (§8.5), no DDL, a shell-style console (§8.14).
+// navigation (§8.5), no definition, a shell-style console (§8.14).
 export const mongoCaps: Caps = {
   tabular: false,
   documents: true,
@@ -9,7 +9,7 @@ export const mongoCaps: Caps = {
   stream: false,
   defaultPageKind: 'document',
   sql: true,
-  ddl: false,
+  definition: false,
   projection: true,
   serverFilter: true,
   exactCount: false,

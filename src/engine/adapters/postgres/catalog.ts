@@ -115,7 +115,9 @@ export async function listRelationsAndFunctions(
         { kind: 'schema', name: schema },
         { kind, name: row.name },
       ]),
-      hasChildren: kind !== 'sequence',
+      // P19 D5: every relation is a leaf now — a table/view/matview's columns moved into the
+      // definition view, and a sequence never had children.
+      hasChildren: false,
       detail,
     };
   });
@@ -145,31 +147,15 @@ export async function listRelationsAndFunctions(
   return [...relationNodes, ...functionNodes];
 }
 
-export async function getRelationOid(
-  exec: QueryExecutor,
-  schema: string,
-  table: string,
-): Promise<string> {
-  const rows = await exec<{ oid: string }>(
-    `SELECT c.oid::text AS oid FROM pg_class c
-     JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = $1 AND c.relname = $2`,
-    [schema, table],
-  );
-  const row = rows[0];
-  if (!row) throw new AdapterError('E_NOT_FOUND', `relation "${schema}"."${table}" not found`);
-  return row.oid;
-}
-
 export interface RelationInfo {
   oid: string;
   comment: string | null;
   rowEstimate: number | null;
 }
 
-// describe()'s counterpart to getRelationOid — also pulls the comment and row estimate so
-// ObjectMeta doesn't need a second round trip for what listRelationsAndFunctions already knows
-// how to compute at the schema level.
+// describe()'s own OID lookup — also pulls the comment and row estimate so ObjectMeta doesn't
+// need a second round trip for what listRelationsAndFunctions already knows how to compute at
+// the schema level.
 export async function getRelationInfo(
   exec: QueryExecutor,
   schema: string,

@@ -2,15 +2,23 @@ import { z } from 'zod';
 import { sortSpecSchema } from './queries';
 import { pathTail } from './tree';
 
-export const tabKindSchema = z.enum(['data', 'ddl', 'document', 'keyvalue', 'stream', 'console']);
+export const tabKindSchema = z.enum([
+  'data',
+  'definition',
+  'document',
+  'keyvalue',
+  'stream',
+  'console',
+]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
-// 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5, 'document' in P8,
-// 'keyvalue' in P9, 'stream' in P10. The restore path drops rows of any other kind with a `warn` —
-// a closed vocabulary decided once, same discipline as P1's Caps/connectionKind.
+// 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
+// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10. The restore path drops rows of any
+// other kind with a `warn` — a closed vocabulary decided once, same discipline as P1's
+// Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
-  'ddl',
+  'definition',
   'console',
   'document',
   'keyvalue',
@@ -33,11 +41,17 @@ export const dataTabStateSchema = z.object({
 });
 export type DataTabState = z.infer<typeof dataTabStateSchema>;
 
-export const ddlTabStateSchema = z.object({}); // D4: nothing to remember
-export type DdlTabState = z.infer<typeof ddlTabStateSchema>;
+// P19 D7: which pane (Structure/Source) the tab was last showing — the one thing this tab now
+// has worth remembering. `.default('structure')` keeps a tab saved under the old empty `{}` shape
+// (D4: "nothing to remember", true while there was only one pane) restorable, the same discipline
+// keyValueTabStateSchema's own `pageSize` comment records.
+export const definitionTabStateSchema = z.object({
+  pane: z.enum(['structure', 'source']).default('structure'),
+});
+export type DefinitionTabState = z.infer<typeof definitionTabStateSchema>;
 
 // Only the editor's own text is session state (§8.4) — the last run's results are runtime-only,
-// like `views/ddl/state.ts`'s `ddl` field, and never round-trip through `tabs.save`.
+// like `views/definition/state.ts`'s `definition` field, and never round-trip through `tabs.save`.
 export const consoleTabStateSchema = z.object({
   text: z.string(),
 });
@@ -122,7 +136,7 @@ const tabRecordBase = {
 
 export const tabRecordSchema = z.discriminatedUnion('kind', [
   z.object({ ...tabRecordBase, kind: z.literal('data'), state: dataTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('ddl'), state: ddlTabStateSchema }),
+  z.object({ ...tabRecordBase, kind: z.literal('definition'), state: definitionTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('console'), state: consoleTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('keyvalue'), state: keyValueTabStateSchema }),
@@ -130,7 +144,7 @@ export const tabRecordSchema = z.discriminatedUnion('kind', [
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
-export type DdlTabRecord = Extract<TabRecord, { kind: 'ddl' }>;
+export type DefinitionTabRecord = Extract<TabRecord, { kind: 'definition' }>;
 export type ConsoleTabRecord = Extract<TabRecord, { kind: 'console' }>;
 export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
 export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
@@ -170,8 +184,8 @@ export function defaultDataTabState(pageSize: PageSize): DataTabState {
   };
 }
 
-export function defaultDdlTabState(): DdlTabState {
-  return {};
+export function defaultDefinitionTabState(): DefinitionTabState {
+  return { pane: 'structure' };
 }
 
 export function defaultConsoleTabState(): ConsoleTabState {

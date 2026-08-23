@@ -1,25 +1,25 @@
-import type { SourceText } from '@shared/domain/ddl';
+import type { ObjectDefinition } from '@shared/domain/definition';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { tabsState } from '../../state/tabs';
 
-export interface DdlViewRuntime {
+export interface DefinitionViewRuntime {
   status: 'idle' | 'loading' | 'error';
   error: string | null; // the raw IPC message, '[CODE] text' and all (§0 note 13)
   source: 'cache' | 'server' | null;
-  ddl: SourceText | null;
+  definition: ObjectDefinition | null;
 }
 
-export const runtime = reactive({} as Record<string, DdlViewRuntime>);
+export const runtime = reactive({} as Record<string, DefinitionViewRuntime>);
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
 
-function defaultRuntime(): DdlViewRuntime {
-  return { status: 'idle', error: null, source: null, ddl: null };
+function defaultRuntime(): DefinitionViewRuntime {
+  return { status: 'idle', error: null, source: null, definition: null };
 }
 
 // Returns through `runtime[tabId]` even on creation — never the object literal handed to the
@@ -27,9 +27,9 @@ function defaultRuntime(): DdlViewRuntime {
 // raw target. A raw reference's property writes bypass the proxy's set trap entirely: they land
 // in the same underlying storage (a later `runtime[tabId]` read sees them) but fire no trigger,
 // so nothing re-renders until some unrelated reactive write happens to sweep the view along with
-// it. DdlView has no such unrelated write to ride on, unlike the grid's runtime map, where
+// it. DefinitionView has no such unrelated write to ride on, unlike the grid's runtime map, where
 // `setPage()` re-rendering the page data papers over the same shape of bug on a tab's first load.
-function ensureRuntime(tabId: string): DdlViewRuntime {
+function ensureRuntime(tabId: string): DefinitionViewRuntime {
   if (!runtime[tabId]) {
     runtime[tabId] = defaultRuntime();
   }
@@ -37,7 +37,7 @@ function ensureRuntime(tabId: string): DdlViewRuntime {
 }
 
 function findTab(tabId: string) {
-  return tabsState.tabs.find((t) => t.id === tabId && t.kind === 'ddl') ?? null;
+  return tabsState.tabs.find((t) => t.id === tabId && t.kind === 'definition') ?? null;
 }
 
 // Deliberately simpler than the grid's load(): there is no op-id bookkeeping and no supersession
@@ -51,8 +51,8 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   rt.error = null;
 
   try {
-    const response = await control.treeDdl(tab.connectionId, tab.path, opts?.refresh);
-    rt.ddl = response.ddl;
+    const response = await control.treeDefinition(tab.connectionId, tab.path, opts?.refresh);
+    rt.definition = response.definition;
     rt.source = response.source;
     rt.status = 'idle';
   } catch (err) {

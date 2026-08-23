@@ -138,7 +138,19 @@ describe('mariadb adapter (§9.1)', () => {
       const wideTable = dbChildren.find((n) => n.name === 'wide_table');
       expect(wideTable?.path).toBe('database:kira_test/table:wide_table');
 
-      const columns = await adapter.children(
+      // P19 D5: every relation is a tree leaf now — its columns live in describe(), not
+      // children(). wide_table's own children() call returns [] rather than 59 column nodes.
+      expect(wideTable?.hasChildren).toBe(false);
+      const noColumns = await adapter.children(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'table', name: 'wide_table' },
+        ]),
+        makeCtx(),
+      );
+      expect(noColumns).toEqual([]);
+
+      const wideTableMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'wide_table' },
@@ -147,10 +159,9 @@ describe('mariadb adapter (§9.1)', () => {
       );
       // 59, not the Postgres fixture's 60 — MariaDB has no equivalent of Postgres's array,
       // inet, and interval types, so wide_table has 3 fewer columns here.
-      expect(columns).toHaveLength(59);
-      expect(columns[0]?.name).toBe('id');
-      expect(columns[0]?.path).toBe('database:kira_test/table:wide_table/column:id');
-      expect(columns[1]?.name).toBe('int_a');
+      expect(wideTableMeta.columns).toHaveLength(59);
+      expect(wideTableMeta.columns[0]?.name).toBe('id');
+      expect(wideTableMeta.columns[1]?.name).toBe('int_a');
     } finally {
       await adapter.disconnect();
     }
@@ -168,23 +179,25 @@ describe('mariadb adapter (§9.1)', () => {
       expect(names).toContain('weird`name');
       expect(names).toContain('Order Items');
 
-      const weirdColumns = await adapter.children(
+      // P19 D5: quoting coverage moves to describe() — listColumns (which these exercise) is
+      // unchanged and still reached from there; only the tree-node round trip moved away.
+      const weirdMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'weird`name' },
         ]),
         makeCtx(),
       );
-      expect(weirdColumns.map((c) => c.name).sort()).toEqual(['id', 'value']);
+      expect(weirdMeta.columns.map((c) => c.name).sort()).toEqual(['id', 'value']);
 
-      const spacedColumns = await adapter.children(
+      const spacedMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'Order Items' },
         ]),
         makeCtx(),
       );
-      expect(spacedColumns.map((c) => c.name).sort()).toEqual(['id', 'note']);
+      expect(spacedMeta.columns.map((c) => c.name).sort()).toEqual(['id', 'note']);
     } finally {
       await adapter.disconnect();
     }
@@ -313,7 +326,7 @@ describe('mariadb adapter (§9.1)', () => {
           describe() {
             throw new Error('not used by this test');
           },
-          ddl() {
+          definition() {
             throw new Error('not used by this test');
           },
           read() {
@@ -854,21 +867,21 @@ describe('mariadb adapter (§9.1)', () => {
     }
   });
 
-  test('19. ddl', async () => {
+  test('19. definition', async () => {
     const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
-    let wideTableDdl: Awaited<ReturnType<Adapter['ddl']>>;
+    let wideTableDefinition: Awaited<ReturnType<Adapter['definition']>>;
     try {
       // 1. Passthrough.
-      wideTableDdl = await adapter.ddl(
+      wideTableDefinition = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'wide_table' },
         ]),
         makeCtx(),
       );
-      expect(wideTableDdl.origin).toBe('server');
-      expect(wideTableDdl.statements).toHaveLength(1);
+      expect(wideTableDefinition.origin).toBe('server');
+      expect(wideTableDefinition.statements).toHaveLength(1);
 
       const sideConn = await createConnection({
         host: fixture.config.host ?? undefined,
@@ -882,13 +895,13 @@ describe('mariadb adapter (§9.1)', () => {
           'SHOW CREATE TABLE wide_table',
         );
         const expected = row['Create Table'].replace(/;\s*$/, '');
-        expect(wideTableDdl.statements[0]).toBe(expected);
+        expect(wideTableDefinition.statements[0]).toBe(expected);
       } finally {
         await sideConn.end();
       }
 
       // 3. View.
-      const orderSummary = await adapter.ddl(
+      const orderSummary = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'order_summary' },
@@ -901,7 +914,7 @@ describe('mariadb adapter (§9.1)', () => {
 
       // 4. Unsupported and not-found.
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'function', name: 'noop_procedure' },
@@ -911,7 +924,7 @@ describe('mariadb adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
 
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'function', name: 'full_name' },
@@ -921,11 +934,11 @@ describe('mariadb adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
 
       await expect(
-        adapter.ddl(path([{ kind: 'database', name: 'kira_test' }]), makeCtx()),
+        adapter.definition(path([{ kind: 'database', name: 'kira_test' }]), makeCtx()),
       ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
 
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'table', name: 'does_not_exist' },
@@ -946,8 +959,8 @@ describe('mariadb adapter (§9.1)', () => {
       password: 'kira',
     });
     try {
-      await admin.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
-      await admin.query('CREATE DATABASE kira_ddl_roundtrip');
+      await admin.query('DROP DATABASE IF EXISTS kira_definition_roundtrip');
+      await admin.query('CREATE DATABASE kira_definition_roundtrip');
     } finally {
       await admin.end();
     }
@@ -958,10 +971,10 @@ describe('mariadb adapter (§9.1)', () => {
         port: fixture.config.port ?? undefined,
         user: 'root',
         password: 'kira',
-        database: 'kira_ddl_roundtrip',
+        database: 'kira_definition_roundtrip',
       });
       try {
-        await roundTripConn.query(wideTableDdl.statements[0]);
+        await roundTripConn.query(wideTableDefinition.statements[0]);
       } finally {
         await roundTripConn.end();
       }
@@ -983,14 +996,19 @@ describe('mariadb adapter (§9.1)', () => {
 
       const copyAdapter = await createAdapter('mariadb', deps);
       await copyAdapter.connect(
-        { ...fixture.config, username: 'root', password: 'kira', database: 'kira_ddl_roundtrip' },
+        {
+          ...fixture.config,
+          username: 'root',
+          password: 'kira',
+          database: 'kira_definition_roundtrip',
+        },
         makeCtx(),
       );
       let copy: Awaited<ReturnType<Adapter['describe']>>;
       try {
         copy = await copyAdapter.describe(
           path([
-            { kind: 'database', name: 'kira_ddl_roundtrip' },
+            { kind: 'database', name: 'kira_definition_roundtrip' },
             { kind: 'table', name: 'wide_table' },
           ]),
           makeCtx(),
@@ -1023,7 +1041,7 @@ describe('mariadb adapter (§9.1)', () => {
         password: 'kira',
       });
       try {
-        await cleanup.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+        await cleanup.query('DROP DATABASE IF EXISTS kira_definition_roundtrip');
       } finally {
         await cleanup.end();
       }

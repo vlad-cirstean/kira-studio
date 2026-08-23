@@ -62,7 +62,7 @@ const targetIcon = computed(() => {
 });
 
 // Every data view's crumbar starts with the connection's engine icon (ViewHeader's connKind),
-// same as Documents/KeyValue/Stream/Console/Ddl — the grid mockup (Main.html) opened straight on
+// same as Documents/KeyValue/Stream/Console/Definition — the grid mockup (Main.html) opened straight on
 // its toolbar with no view-head, but that leaves the grid as the one view that doesn't say which
 // connection/engine a tab belongs to at a glance.
 const pathPrefix = computed(() => {

@@ -108,7 +108,7 @@ describe('s3 adapter (§9.1, P17)', () => {
     expect(s3Caps.tabular).toBe(false);
     expect(s3Caps.keyValue).toBe(true);
     expect(s3Caps.defaultPageKind).toBe('keyvalue');
-    expect(s3Caps.ddl).toBe(false);
+    expect(s3Caps.definition).toBe(false);
     expect(s3Caps.sql).toBe(false);
     expect(s3Caps.exactCount).toBe(false);
     expect(s3Caps.pagination).toBe('token');
@@ -186,7 +186,7 @@ describe('s3 adapter (§9.1, P17)', () => {
     }
   });
 
-  test('8. describe/ddl are unsupported', async () => {
+  test('8. describe/definition are unsupported', async () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
@@ -194,7 +194,7 @@ describe('s3 adapter (§9.1, P17)', () => {
       await expect(adapter.describe(target, makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.ddl(target, makeCtx())).rejects.toMatchObject({
+      await expect(adapter.definition(target, makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
     } finally {

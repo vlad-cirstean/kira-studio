@@ -1,5 +1,5 @@
 import type { Admin, Kafka } from 'kafkajs';
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
@@ -83,9 +83,9 @@ class KafkaAdapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for kafka');
   }
 
-  async ddl(): Promise<SourceText> {
-    // caps.ddl === false gates §8.10's "Open DDL" menu item for kafka — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'ddl is not supported for kafka');
+  async definition(): Promise<ObjectDefinition> {
+    // caps.definition === false gates §8.10's "Open definition" menu item for kafka — never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for kafka');
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

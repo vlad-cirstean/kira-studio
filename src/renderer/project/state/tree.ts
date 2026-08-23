@@ -6,13 +6,17 @@ import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { evaluate } from '../filter';
+import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
 
 export interface TreeRowVm {
   key: string;
   depth: number;
   connectionId: string;
   path: string;
-  kind: NodeKind | 'connection';
+  kind: NodeKind | 'connection' | 'group';
+  /** Group rows only (P19 D2): the NodeKind this folder collects, for the icon and the empty
+   *  check — the row's own `kind` is always the literal `'group'`. */
+  groupKind?: NodeKind;
   name: string;
   hasChildren: boolean;
   detail?: string;
@@ -25,6 +29,18 @@ export interface TreeRowVm {
   color?: ConnectionColor;
   status?: ConnectionStatus;
   statusDetail?: string | null;
+}
+
+// `database:kira_test/schema:app#function` — a real encoded path can never contain '#'
+// (encodeURIComponent('#') is '%23', and every path segment is `${kind}:${name}`), so this
+// collides with no node's path and no other group's (P19 D2/realities #8).
+export function groupPath(parentPath: string, kind: NodeKind): string {
+  return `${parentPath}#${kind}`;
+}
+
+// The parent path a group's own Refresh/menu actions target — the inverse of groupPath().
+export function groupParentPath(path: string): string {
+  return path.slice(0, path.lastIndexOf('#'));
 }
 
 // key: `${connectionId}|${encodedPath}` — '' encodes the connection's own root.
@@ -131,6 +147,16 @@ export async function expand(connectionId: string, path: string): Promise<void> 
 
 export function collapse(connectionId: string, path: string): void {
   treeState.expanded.delete(rowKey(connectionId, path));
+}
+
+// P19 D4: a group row is a pure view over its parent's already-fetched children — there is no
+// adapter path for it, so toggling flips treeState.expanded directly rather than going through
+// expand()/collapse(), which would connect the connection and issue an IPC call for a synthetic
+// path no adapter has ever heard of.
+export function toggleGroup(connectionId: string, path: string): void {
+  const k = rowKey(connectionId, path);
+  if (treeState.expanded.has(k)) treeState.expanded.delete(k);
+  else treeState.expanded.add(k);
 }
 
 export async function refresh(connectionId: string, path: string): Promise<void> {
@@ -247,8 +273,71 @@ interface SearchStats {
   incomplete: boolean;
 }
 
+// One TreeNode's own row, plus its expanded subtree — shared by ungrouped nodes and group
+// members alike (P19 D2: a group's members go through exactly this, one depth deeper, never a
+// second grouping pass). Returns whether this node or anything under it matched the search query.
+function buildNodeRow(
+  connectionId: string,
+  node: TreeNode,
+  depth: number,
+  filters: ConnectionFilter[],
+  query: string,
+  out: TreeRowVm[],
+  stats: SearchStats,
+): boolean {
+  const k = rowKey(connectionId, node.path);
+  const selfMatches = query ? node.name.toLowerCase().includes(query) : false;
+  // P19 D5: a table/view/matview is a leaf regardless of what a cached node's own hasChildren
+  // says — its columns moved into the definition view, but an L1 payload cached before this
+  // phase can still carry `hasChildren: true` until the connection's next reconnect.
+  const leaf = isLeafKind(node.kind);
+  const childNodes = leaf ? undefined : treeState.children[k];
+  const naturallyExpanded = !leaf && treeState.expanded.has(k);
+
+  if (query && node.hasChildren && !leaf && !childNodes) stats.incomplete = true;
+
+  const childOut: TreeRowVm[] = [];
+  let descendantMatch = false;
+  // Search looks inside anything already cached, regardless of expansion state (§8c:
+  // "searching cached nodes only" — it never triggers a fetch).
+  if (childNodes && (query ? true : naturallyExpanded)) {
+    descendantMatch = buildRows(
+      connectionId,
+      node.path,
+      childNodes,
+      depth + 1,
+      filters,
+      query,
+      childOut,
+      stats,
+    );
+  }
+
+  if (query && !selfMatches && !descendantMatch) return false;
+
+  const rowExpanded = query ? naturallyExpanded || descendantMatch : naturallyExpanded;
+  out.push({
+    key: k,
+    depth,
+    connectionId,
+    path: node.path,
+    kind: node.kind,
+    name: node.name,
+    hasChildren: leaf ? false : node.hasChildren,
+    detail: node.detail,
+    badges: node.badges,
+    expanded: rowExpanded,
+    loading: treeState.loading.has(k),
+    error: treeState.errors[k],
+    matched: query ? selfMatches : undefined,
+  });
+  if (rowExpanded) out.push(...childOut);
+  return selfMatches || descendantMatch;
+}
+
 function buildRows(
   connectionId: string,
+  parentPath: string,
   nodes: TreeNode[],
   depth: number,
   filters: ConnectionFilter[],
@@ -257,52 +346,43 @@ function buildRows(
   stats: SearchStats,
 ): boolean {
   let anyMatch = false;
-  for (const node of nodes) {
-    if (!evaluate(node, filters)) continue;
+  const visible = nodes.filter((node) => evaluate(node, filters));
+  const { ungrouped, groups } = partitionChildren(visible);
 
-    const k = rowKey(connectionId, node.path);
-    const selfMatches = query ? node.name.toLowerCase().includes(query) : false;
-    const childNodes = treeState.children[k];
-    const naturallyExpanded = treeState.expanded.has(k);
+  for (const node of ungrouped) {
+    if (buildNodeRow(connectionId, node, depth, filters, query, out, stats)) anyMatch = true;
+  }
 
-    if (query && node.hasChildren && !childNodes) stats.incomplete = true;
-
+  if (groups.length === 0) return anyMatch;
+  const connectionKind = connectionsState.records.find((c) => c.id === connectionId)?.kind;
+  for (const group of groups) {
+    const path = groupPath(parentPath, group.kind);
+    const k = rowKey(connectionId, path);
     const childOut: TreeRowVm[] = [];
-    let descendantMatch = false;
-    // Search looks inside anything already cached, regardless of expansion state (§8c:
-    // "searching cached nodes only" — it never triggers a fetch).
-    if (childNodes && (query ? true : naturallyExpanded)) {
-      descendantMatch = buildRows(
-        connectionId,
-        childNodes,
-        depth + 1,
-        filters,
-        query,
-        childOut,
-        stats,
-      );
+    let anyChildMatch = false;
+    for (const member of group.nodes) {
+      if (buildNodeRow(connectionId, member, depth + 1, filters, query, childOut, stats)) {
+        anyChildMatch = true;
+      }
     }
+    if (query && !anyChildMatch) continue;
 
-    if (query && !selfMatches && !descendantMatch) continue;
-
-    const rowExpanded = query ? naturallyExpanded || descendantMatch : naturallyExpanded;
+    const naturallyExpanded = treeState.expanded.has(k);
+    const rowExpanded = query ? naturallyExpanded || anyChildMatch : naturallyExpanded;
     out.push({
       key: k,
       depth,
       connectionId,
-      path: node.path,
-      kind: node.kind,
-      name: node.name,
-      hasChildren: node.hasChildren,
-      detail: node.detail,
-      badges: node.badges,
+      path,
+      kind: 'group',
+      groupKind: group.kind,
+      name: connectionKind ? labelForGroup(group.kind, connectionKind) : group.kind,
+      hasChildren: true,
       expanded: rowExpanded,
-      loading: treeState.loading.has(k),
-      error: treeState.errors[k],
-      matched: query ? selfMatches : undefined,
+      loading: false,
     });
     if (rowExpanded) out.push(...childOut);
-    anyMatch = anyMatch || selfMatches || descendantMatch;
+    anyMatch = anyMatch || anyChildMatch;
   }
   return anyMatch;
 }
@@ -324,7 +404,7 @@ const searchResult = computed(() => {
     const childOut: TreeRowVm[] = [];
     let descendantMatch = false;
     if (childNodes && (query ? true : naturallyExpanded)) {
-      descendantMatch = buildRows(conn.id, childNodes, 1, filters, query, childOut, stats);
+      descendantMatch = buildRows(conn.id, '', childNodes, 1, filters, query, childOut, stats);
     }
 
     const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;

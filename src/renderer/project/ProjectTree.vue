@@ -17,6 +17,7 @@ import {
   searchIncomplete,
   selectRow,
   type TreeRowVm,
+  toggleGroup,
   treeState,
   visibleRows,
 } from './state/tree';
@@ -60,10 +61,15 @@ function onSelect(row: TreeRowVm): void {
   selectRow(row.key);
 }
 
-// The twisty always expands/collapses, regardless of kind — a table's columns must stay
-// reachable in the tree (tree.spec.ts's own WIDE_TABLE_PATH scenario). Only double-click
-// (onOpen) is kind-aware: it opens data for a table/view/matview instead of expanding it.
+// The twisty always expands/collapses. A group row (P19) has no adapter path behind it — it's a
+// pure view over its parent's already-fetched children — so it toggles treeState.expanded
+// directly rather than going through expand()/collapse(), which would connect the connection and
+// issue an IPC call for a synthetic path no adapter has ever heard of.
 function onToggle(row: TreeRowVm): void {
+  if (row.kind === 'group') {
+    toggleGroup(row.connectionId, row.path);
+    return;
+  }
   if (row.expanded) collapse(row.connectionId, row.path);
   else void expand(row.connectionId, row.path);
 }
@@ -72,6 +78,11 @@ function onToggle(row: TreeRowVm): void {
 // (connectionId, path) used to just refocus it — no refetch. A freshly created tab is about to
 // fetch on mount anyway, so only the reused case needs an explicit reload here.
 function onOpen(row: TreeRowVm): void {
+  // A group folder only ever toggles on double-click — it opens nothing (P19 D4).
+  if (row.kind === 'group') {
+    toggleGroup(row.connectionId, row.path);
+    return;
+  }
   if (OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openDataTab(row.connectionId, row.path);
     if (reused) void reloadDataTab(id);

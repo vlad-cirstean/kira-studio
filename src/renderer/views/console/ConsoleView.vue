@@ -15,7 +15,7 @@ import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { resultPageKey, run, runtime, setText, stop } from './state';
 
-// MainView.vue keys this component by tab.id — same discipline as DdlView.vue/DataView.vue.
+// MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
 
 const connectionStatus = computed(() =>
@@ -24,7 +24,7 @@ const connectionStatus = computed(() =>
     : 'disconnected',
 );
 
-// §8.4's gate, copied literally from DdlView.vue.
+// §8.4's gate, copied literally from DefinitionView.vue.
 const needsReconnect = computed(
   () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
 );
@@ -117,7 +117,7 @@ const statusLine = computed(() => {
       <!-- The console's search_path/schema control and the "writes go to production" chip from
            Console.html both need tracked data this app does not have yet (no per-console
            schema, no per-connection write-warning flag) — skipped rather than faked. Refresh is
-           permanently disabled here (reserved slot, same as DdlToolbar's Stop): Run/Run all are
+           permanently disabled here (reserved slot, same as the definition view's Stop): Run/Run all are
            the console's two start verbs, and neither one is "refresh". -->
       <template #toolbar>
         <Button

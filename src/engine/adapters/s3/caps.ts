@@ -2,7 +2,8 @@ import type { Caps } from '../../../shared/caps';
 
 // §5.1's s3 row: reuses the keyvalue shape (page.ts's own doc comment on KeyValuePage explains
 // why — a single object's metadata+body is exactly a flat field/value listing, same as a redis
-// hash). Read-only browsing only in this phase (P17): no insert/update/delete, no DDL, no console.
+// hash). Read-only browsing only in this phase (P17): no insert/update/delete, no definition, no
+// console.
 export const s3Caps: Caps = {
   tabular: false,
   documents: false,
@@ -10,7 +11,7 @@ export const s3Caps: Caps = {
   stream: false,
   defaultPageKind: 'keyvalue',
   sql: false,
-  ddl: false,
+  definition: false,
   projection: false,
   serverFilter: false,
   // count() (s3/read.ts's countObject) answers a single object's own field count via HeadObject,

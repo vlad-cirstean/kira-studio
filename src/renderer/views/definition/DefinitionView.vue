@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ddlText } from '@shared/domain/ddl';
-import type { DdlTabRecord } from '@shared/domain/tabs';
+import { definitionText } from '@shared/domain/definition';
+import type { DefinitionTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted } from 'vue';
 import { copyText } from '../../clipboard';
@@ -17,7 +17,7 @@ import { load, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab — same discipline as
 // DataView.vue.
-const props = defineProps<{ tab: DdlTabRecord }>();
+const props = defineProps<{ tab: DefinitionTabRecord }>();
 
 const connectionStatus = computed(() =>
   props.tab.connectionId
@@ -53,7 +53,7 @@ function onOpenConsole(): void {
 }
 
 function onCopy(): void {
-  if (ddl.value) copyText(ddlText(ddl.value));
+  if (definition.value) copyText(definitionText(definition.value));
 }
 
 let unregisterCommand: (() => void) | null = null;
@@ -72,8 +72,8 @@ onUnmounted(() => {
 const targetTail = computed(() => pathTail(props.tab.path));
 const targetLabel = computed(() => targetTail.value?.name ?? props.tab.path);
 
-const ddl = computed(() => rt.value?.ddl ?? null);
-const document = computed(() => (ddl.value ? ddlText(ddl.value) : ''));
+const definition = computed(() => rt.value?.definition ?? null);
+const document = computed(() => (definition.value ? definitionText(definition.value) : ''));
 
 const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   if (!props.tab.connectionId) return undefined;
@@ -82,7 +82,7 @@ const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
 });
 
 const originPhrase = computed(() =>
-  ddl.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
+  definition.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
 );
 
 // P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
@@ -106,18 +106,18 @@ const breadcrumb = computed(() => {
 
 <template>
   <div
-    class="ddl-view"
-    data-testid="ddl-view"
+    class="definition-view"
+    data-testid="definition-view"
     :data-path="tab.path"
-    :data-origin="ddl?.origin ?? ''"
+    :data-origin="definition?.origin ?? ''"
     :data-source="rt?.source ?? ''"
-    data-read-only-reason="ddl-not-editable"
+    data-read-only-reason="definition-not-editable"
   >
     <ReconnectGate
       v-if="needsReconnect"
       variant="default"
-      container-testid="ddl-reconnect"
-      button-testid="ddl-reconnect-load"
+      container-testid="definition-reconnect"
+      button-testid="definition-reconnect-load"
       @reconnect="onReconnectAndLoad"
     />
     <!-- Column/index/constraint counts and the Definition/Columns/Indexes/Constraints segmented
@@ -129,8 +129,8 @@ const breadcrumb = computed(() => {
       icon="code"
       :path="breadcrumb"
       :name="targetLabel"
-      target-testid="ddl-target"
-      refresh-testid="ddl-refresh"
+      target-testid="definition-target"
+      refresh-testid="definition-refresh"
       :can-refresh="!loading"
       :can-stop="false"
       @refresh="onRefresh"
@@ -148,13 +148,18 @@ const breadcrumb = computed(() => {
            exist. -->
       <template #toolbar-end>
         <div class="sep" />
-        <Button icon="copy" title="Copy DDL to clipboard" data-testid="ddl-copy" @click="onCopy">
+        <Button
+          icon="copy"
+          title="Copy definition to clipboard"
+          data-testid="definition-copy"
+          @click="onCopy"
+        >
           Copy
         </Button>
         <Button
           icon="terminal"
           title="Open query console here"
-          data-testid="ddl-open-console"
+          data-testid="definition-open-console"
           @click="onOpenConsole"
         >
           Open in console
@@ -162,13 +167,22 @@ const breadcrumb = computed(() => {
       </template>
 
       <template #strips>
-        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" data-testid="ddl-error">
+        <Strip
+          v-if="rt?.status === 'error' && rt.error"
+          tone="err"
+          icon="error"
+          data-testid="definition-error"
+        >
           <span class="err-message">{{ rt.error }}</span>
         </Strip>
-        <div v-if="ddl && ddl.notes.length > 0" class="p-strip note" data-testid="ddl-notes">
+        <div
+          v-if="definition && definition.notes.length > 0"
+          class="p-strip note"
+          data-testid="definition-notes"
+        >
           <span class="icon-box"><Codicon name="info" :size="14" /></span>
           <ul class="notes-list">
-            <li v-for="(note, i) in ddl.notes" :key="i">{{ note }}</li>
+            <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
           </ul>
         </div>
       </template>
@@ -183,7 +197,7 @@ const breadcrumb = computed(() => {
 </template>
 
 <style scoped>
-.ddl-view {
+.definition-view {
   height: 100%;
   display: flex;
   flex-direction: column;

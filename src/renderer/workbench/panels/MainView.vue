@@ -14,7 +14,7 @@ import {
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
 import ConsoleTabView from '../../views/console/ConsoleView.vue';
-import DdlTabView from '../../views/ddl/DdlView.vue';
+import DefinitionTabView from '../../views/definition/DefinitionView.vue';
 import DocumentTabView from '../../views/documents/DocumentView.vue';
 import DataTabView from '../../views/grid/DataView.vue';
 import KeyValueTabView from '../../views/keyvalue/KeyValueView.vue';
@@ -65,7 +65,11 @@ function openRecent(entry: RecentTableEntry): void {
 
 <template>
   <DataTabView v-if="activeTab && activeTab.kind === 'data'" :key="activeTab.id" :tab="activeTab" />
-  <DdlTabView v-else-if="activeTab && activeTab.kind === 'ddl'" :key="activeTab.id" :tab="activeTab" />
+  <DefinitionTabView
+    v-else-if="activeTab && activeTab.kind === 'definition'"
+    :key="activeTab.id"
+    :tab="activeTab"
+  />
   <ConsoleTabView
     v-else-if="activeTab && activeTab.kind === 'console'"
     :key="activeTab.id"

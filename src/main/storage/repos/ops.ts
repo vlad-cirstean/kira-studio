@@ -54,13 +54,17 @@ export async function recentOps(db: KiraDb, limit: number): Promise<OpRecord[]> 
   const rows = await db.select().from(opLog).orderBy(desc(opLog.startedAt)).limit(limit);
   const out: OpRecord[] = [];
   for (const row of rows) {
+    // P19 legacy coercion: an op logged before the ddl->definition rename has kind: 'ddl' on
+    // disk — map it forward rather than blanking those rows from the Operations panel on the
+    // first launch after the upgrade.
+    const kind = row.kind === 'ddl' ? 'definition' : row.kind;
     const candidate = {
       id: row.id,
       connectionId: row.connectionId,
       tabId: row.tabId,
       startedAt: row.startedAt,
       durationMs: row.durationMs,
-      kind: row.kind,
+      kind,
       status: row.status,
       rows: row.rows,
       command: row.command,

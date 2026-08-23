@@ -3,7 +3,7 @@ import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { metadataCache } from '../schema/metadata-cache';
 
-export type MetaKind = 'children' | 'describe' | 'ddl';
+export type MetaKind = 'children' | 'describe' | 'definition';
 
 // The unique index is (connection_id, path) — `kind` is not part of the key, so a `children`
 // payload and a `describe` payload for the same path share one row. Both live under this shape
@@ -11,7 +11,7 @@ export type MetaKind = 'children' | 'describe' | 'ddl';
 interface CachedPayload {
   children?: unknown;
   describe?: unknown;
-  ddl?: unknown;
+  definition?: unknown;
 }
 
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;

@@ -17,6 +17,8 @@ const emit = defineEmits<{
 }>();
 
 const icon = computed(() => {
+  // P19: a group folder's icon reflects its own expand state, unlike every other kind.
+  if (props.row.kind === 'group') return props.row.expanded ? 'folder-opened' : 'folder';
   if (props.row.kind === 'column' && props.row.detail) return columnTypeIcon(props.row.detail);
   return nodeIcon(props.row.kind === 'connection' ? 'connection' : props.row.kind);
 });

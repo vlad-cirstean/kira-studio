@@ -3,7 +3,7 @@ import Codicon from '../Codicon.vue';
 import Button from './Button.vue';
 
 // §8.4: a restored tab shows only this gate until pressed — nothing loads automatically. Every
-// data/stream/keyvalue/document/ddl/console view opens on the same `.p-empty` + button shape
+// data/stream/keyvalue/document/definition/console view opens on the same `.p-empty` + button shape
 // while `needsReconnect` holds; only the icon/label (StreamView alone shows both) and the
 // button's own testid/variant vary per view, which is why those are props rather than baked in.
 withDefaults(

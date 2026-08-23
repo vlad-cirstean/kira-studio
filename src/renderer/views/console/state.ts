@@ -29,7 +29,7 @@ function defaultRuntime(): ConsoleViewRuntime {
   return { status: 'idle', error: null, opId: null, results: [] };
 }
 
-// See views/ddl/state.ts's ensureRuntime comment: must return through `runtime[tabId]`, never
+// See views/definition/state.ts's ensureRuntime comment: must return through `runtime[tabId]`, never
 // the object literal itself, so mutations land on the reactive proxy Vue actually tracks.
 function ensureRuntime(tabId: string): ConsoleViewRuntime {
   if (!runtime[tabId]) {

@@ -24,7 +24,7 @@ function colorFor(tab: TabRecord): string | undefined {
 }
 
 function iconFor(tab: TabRecord): string {
-  if (tab.kind === 'ddl') return 'file-code';
+  if (tab.kind === 'definition') return 'file-code';
   if (tab.kind === 'console') return 'terminal';
   if (tab.kind === 'document') return 'json';
   // P17: a 'keyvalue' tab is a redis key OR an s3 object — pathTail's own node kind (already

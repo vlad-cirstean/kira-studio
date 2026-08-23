@@ -5,7 +5,7 @@ export const opKindSchema = z.enum([
   'disconnect',
   'children',
   'describe',
-  'ddl',
+  'definition',
   'test',
   'read',
   'count',

@@ -15,11 +15,16 @@ export async function listTabs(db: KiraDb): Promise<TabRecord[]> {
       log('warn', 'storage/tabs', `dropping tab ${row.id}: state_json is not valid JSON`);
       continue;
     }
+    // P19 legacy coercion: a tab persisted before the ddl->definition rename has kind: 'ddl' on
+    // disk — map it forward rather than dropping every already-open DDL/definition tab on the
+    // first launch after the upgrade. definitionTabStateSchema's `.default('structure')` handles
+    // the old empty `{}` state shape already stored alongside it.
+    const kind = row.kind === 'ddl' ? 'definition' : row.kind;
     const candidate = {
       id: row.id,
       connectionId: row.connectionId,
       path: row.path,
-      kind: row.kind,
+      kind,
       state,
       order: row.order,
       active: row.active,

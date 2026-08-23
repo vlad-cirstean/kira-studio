@@ -1,4 +1,4 @@
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
 import { getRelationInfo, type QueryExecutor } from './catalog';
@@ -52,7 +52,8 @@ interface CommentStmtRow {
 }
 
 // pg_get_viewdef/SHOW CREATE emit at most one trailing `;` — remove exactly that, untouched
-// otherwise. `statements` carries no trailing semicolons and no blank padding (shared/domain/ddl.ts).
+// otherwise. `statements` carries no trailing semicolons and no blank padding
+// (shared/domain/definition.ts).
 function stripOneTrailingSemicolon(text: string): string {
   const match = /;\s*$/.exec(text);
   return match ? text.slice(0, text.length - match[0].length) : text;
@@ -81,12 +82,12 @@ function columnLine(col: ColumnDdlRow): string {
  * its own. Queries run sequentially against `exec` — the same single-`Client` rule `describe()`
  * and `getReadTarget()` already document.
  */
-export async function buildDdl(
+export async function buildDefinition(
   exec: QueryExecutor,
   segments: NodePath['segments'],
   schema: string,
   object: { kind: RelationLikeKind; name: string },
-): Promise<SourceText> {
+): Promise<ObjectDefinition> {
   const { oid } = await getRelationInfo(exec, schema, object.name);
 
   const [shape] = await exec<RelationShapeRow>(
@@ -219,8 +220,11 @@ export async function buildDdl(
     kind: object.kind,
     qualifiedName: `${schema}.${object.name}`,
     statements,
+    language: 'sql',
     origin: 'composed',
     notes,
+    constraints: [],
+    documentSchema: null,
     generatedAt: new Date().toISOString(),
   };
 }

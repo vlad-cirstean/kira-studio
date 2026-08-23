@@ -1,5 +1,5 @@
 import type { S3Client } from '@aws-sdk/client-s3';
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
@@ -98,9 +98,9 @@ class S3Adapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for s3');
   }
 
-  async ddl(): Promise<SourceText> {
-    // caps.ddl === false gates §8.10's "Open DDL" menu item for s3 — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'ddl is not supported for s3');
+  async definition(): Promise<ObjectDefinition> {
+    // caps.definition === false gates §8.10's "Open definition" menu item for s3 — never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for s3');
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

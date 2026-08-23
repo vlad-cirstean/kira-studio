@@ -1,6 +1,6 @@
 import type { Db, MongoClient } from 'mongodb';
 import type { ConsoleRequest } from '../../../shared/domain/console';
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
@@ -137,9 +137,9 @@ class MongoAdapter implements Adapter {
     };
   }
 
-  async ddl(): Promise<SourceText> {
-    // caps.ddl === false gates §8.10's "Open DDL" menu item for mongodb — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'ddl is not supported for mongodb');
+  async definition(): Promise<ObjectDefinition> {
+    // caps.definition === false gates §8.10's "Open definition" menu item for mongodb — never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for mongodb');
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

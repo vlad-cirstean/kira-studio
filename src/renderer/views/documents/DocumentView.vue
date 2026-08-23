@@ -47,7 +47,7 @@ import {
   toggleExpanded,
 } from './state';
 
-// MainView.vue keys this component by tab.id — same discipline as DdlView.vue/ConsoleView.vue.
+// MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
 
 const connectionStatus = computed(() =>
@@ -690,7 +690,7 @@ onUnmounted(() => {
                 />
               </div>
             </div>
-            <!-- The editor is the same code surface DDL and the console views use — the only
+            <!-- The editor is the same code surface the definition view and the console views use — the only
                  difference is the language. -->
             <div v-if="isExpanded(rowAt(i)?.id ?? '')" class="doc-body" data-testid="document-body">
               <template v-if="editingId === rowAt(i)?.id">

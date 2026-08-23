@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { ddlText } from '@shared/domain/ddl';
+import { definitionText } from '@shared/domain/definition';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
 import { Client } from 'pg';
@@ -133,7 +133,11 @@ describe('postgres adapter (§9.1)', () => {
       expect(byKind('sequence')).toContain('invoice_number_seq');
       expect(byKind('function').sort()).toEqual(['full_name', 'noop_procedure']);
 
-      const columns = await adapter.children(
+      // P19 D5: every relation is a tree leaf now — its columns live in describe(), not
+      // children(). wide_table's own children() call returns [] rather than 60 column nodes.
+      const wideTable = appChildren.find((n) => n.name === 'wide_table');
+      expect(wideTable?.hasChildren).toBe(false);
+      const noColumns = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -141,9 +145,19 @@ describe('postgres adapter (§9.1)', () => {
         ]),
         makeCtx(),
       );
-      expect(columns).toHaveLength(60);
-      expect(columns[0]?.name).toBe('id');
-      expect(columns[1]?.name).toBe('int_a');
+      expect(noColumns).toEqual([]);
+
+      const wideTableMeta = await adapter.describe(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'schema', name: 'app' },
+          { kind: 'table', name: 'wide_table' },
+        ]),
+        makeCtx(),
+      );
+      expect(wideTableMeta.columns).toHaveLength(60);
+      expect(wideTableMeta.columns[0]?.name).toBe('id');
+      expect(wideTableMeta.columns[1]?.name).toBe('int_a');
     } finally {
       await adapter.disconnect();
     }
@@ -164,7 +178,9 @@ describe('postgres adapter (§9.1)', () => {
       expect(names).toContain('weird"name');
       expect(names).toContain('Order Items');
 
-      const weirdColumns = await adapter.children(
+      // P19 D5: quoting coverage moves to describe() — listColumns (which these exercise) is
+      // unchanged and still reached from there; only the tree-node round trip moved away.
+      const weirdMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -172,9 +188,9 @@ describe('postgres adapter (§9.1)', () => {
         ]),
         makeCtx(),
       );
-      expect(weirdColumns.map((c) => c.name).sort()).toEqual(['id', 'value']);
+      expect(weirdMeta.columns.map((c) => c.name).sort()).toEqual(['id', 'value']);
 
-      const spacedColumns = await adapter.children(
+      const spacedMeta = await adapter.describe(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -182,7 +198,7 @@ describe('postgres adapter (§9.1)', () => {
         ]),
         makeCtx(),
       );
-      expect(spacedColumns.map((c) => c.name).sort()).toEqual(['id', 'note']);
+      expect(spacedMeta.columns.map((c) => c.name).sort()).toEqual(['id', 'note']);
     } finally {
       await adapter.disconnect();
     }
@@ -297,7 +313,7 @@ describe('postgres adapter (§9.1)', () => {
           describe() {
             throw new Error('not used by this test');
           },
-          ddl() {
+          definition() {
             throw new Error('not used by this test');
           },
           read() {
@@ -846,12 +862,12 @@ describe('postgres adapter (§9.1)', () => {
     }
   });
 
-  test('20. ddl', async () => {
+  test('20. definition', async () => {
     const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       // 1. Shape.
-      const orderItems = await adapter.ddl(
+      const orderItems = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -870,7 +886,7 @@ describe('postgres adapter (§9.1)', () => {
       expect(orderItemsCreateTable).toMatch(/^CREATE TABLE app\.order_items \(/);
 
       // 2. Quoting.
-      const weird = await adapter.ddl(
+      const weird = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -881,7 +897,7 @@ describe('postgres adapter (§9.1)', () => {
       const weirdCreateTable = weird.statements.find((s) => s.startsWith('CREATE TABLE'));
       expect(weirdCreateTable).toContain('app."weird""name"');
 
-      const orders = await adapter.ddl(
+      const orders = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -893,7 +909,7 @@ describe('postgres adapter (§9.1)', () => {
       expect(ordersCreateTable).not.toContain('"app"."orders"');
 
       // 5. View.
-      const orderSummary = await adapter.ddl(
+      const orderSummary = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -908,7 +924,7 @@ describe('postgres adapter (§9.1)', () => {
       expect(orderSummary.statements[0].trimEnd().endsWith(';')).toBe(false);
 
       // 6. Matview.
-      const customerTotals = await adapter.ddl(
+      const customerTotals = await adapter.definition(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -923,7 +939,7 @@ describe('postgres adapter (§9.1)', () => {
 
       // 7. Unsupported and not-found.
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'schema', name: 'app' },
@@ -934,7 +950,7 @@ describe('postgres adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
 
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'schema', name: 'app' },
@@ -945,7 +961,7 @@ describe('postgres adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
 
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'schema', name: 'app' },
@@ -955,7 +971,7 @@ describe('postgres adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
 
       await expect(
-        adapter.ddl(
+        adapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'schema', name: 'app' },
@@ -965,8 +981,8 @@ describe('postgres adapter (§9.1)', () => {
         ),
       ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
 
-      // 8. ddlText round trip.
-      const doc = ddlText(orderItems);
+      // 8. definitionText round trip.
+      const doc = definitionText(orderItems);
       const chunks = doc.split('\n\n');
       expect(chunks).toHaveLength(orderItems.statements.length);
       for (const chunk of chunks) {
@@ -979,12 +995,12 @@ describe('postgres adapter (§9.1)', () => {
 
     // 3 & 4. Round trip — executed into a fresh database, described back, and compared against
     // the original. A second database (not a scratch schema) is what keeps the qualified names
-    // ddl() emitted valid verbatim, with no string rewriting in the test (D17).
+    // definition() emitted valid verbatim, with no string rewriting in the test (D17).
     async function roundTrip(objectName: string): Promise<void> {
       const sourceAdapter = await createAdapter('postgres', deps);
       await sourceAdapter.connect(fixture.config, makeCtx());
       let original: Awaited<ReturnType<Adapter['describe']>>;
-      let def: Awaited<ReturnType<Adapter['ddl']>>;
+      let def: Awaited<ReturnType<Adapter['definition']>>;
       try {
         original = await sourceAdapter.describe(
           path([
@@ -994,7 +1010,7 @@ describe('postgres adapter (§9.1)', () => {
           ]),
           makeCtx(),
         );
-        def = await sourceAdapter.ddl(
+        def = await sourceAdapter.definition(
           path([
             { kind: 'database', name: 'kira_test' },
             { kind: 'schema', name: 'app' },
@@ -1015,8 +1031,8 @@ describe('postgres adapter (§9.1)', () => {
       });
       await admin.connect();
       try {
-        await admin.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
-        await admin.query('CREATE DATABASE kira_ddl_roundtrip');
+        await admin.query('DROP DATABASE IF EXISTS kira_definition_roundtrip');
+        await admin.query('CREATE DATABASE kira_definition_roundtrip');
       } finally {
         await admin.end();
       }
@@ -1027,7 +1043,7 @@ describe('postgres adapter (§9.1)', () => {
           port: fixture.config.port ?? undefined,
           user: fixture.config.username ?? undefined,
           password: fixture.config.password ?? undefined,
-          database: 'kira_ddl_roundtrip',
+          database: 'kira_definition_roundtrip',
         });
         await roundTripClient.connect();
         try {
@@ -1038,12 +1054,15 @@ describe('postgres adapter (§9.1)', () => {
         }
 
         const copyAdapter = await createAdapter('postgres', deps);
-        await copyAdapter.connect({ ...fixture.config, database: 'kira_ddl_roundtrip' }, makeCtx());
+        await copyAdapter.connect(
+          { ...fixture.config, database: 'kira_definition_roundtrip' },
+          makeCtx(),
+        );
         let copy: Awaited<ReturnType<Adapter['describe']>>;
         try {
           copy = await copyAdapter.describe(
             path([
-              { kind: 'database', name: 'kira_ddl_roundtrip' },
+              { kind: 'database', name: 'kira_definition_roundtrip' },
               { kind: 'schema', name: 'app' },
               { kind: 'table', name: objectName },
             ]),
@@ -1079,7 +1098,7 @@ describe('postgres adapter (§9.1)', () => {
         });
         await cleanup.connect();
         try {
-          await cleanup.query('DROP DATABASE IF EXISTS kira_ddl_roundtrip');
+          await cleanup.query('DROP DATABASE IF EXISTS kira_definition_roundtrip');
         } finally {
           await cleanup.end();
         }

@@ -25,7 +25,7 @@ import { getPage, keyValueRow, pageVersion } from './kvPage';
 import { searchState } from './kvSearch';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
-// MainView.vue keys this component by tab.id — same discipline as DdlView.vue/DocumentView.vue.
+// MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
 const props = defineProps<{ tab: KeyValueTabRecord }>();
 
 const connectionStatus = computed(() =>

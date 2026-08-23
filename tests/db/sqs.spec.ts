@@ -136,7 +136,7 @@ describe('sqs adapter (§9.1, P10)', () => {
     expect(sqsCaps.tabular).toBe(false);
     expect(sqsCaps.stream).toBe(true);
     expect(sqsCaps.defaultPageKind).toBe('stream');
-    expect(sqsCaps.ddl).toBe(false);
+    expect(sqsCaps.definition).toBe(false);
     expect(sqsCaps.sql).toBe(false);
     expect(sqsCaps.exactCount).toBe(false);
     expect(sqsCaps.pagination).toBe('batch');
@@ -172,14 +172,14 @@ describe('sqs adapter (§9.1, P10)', () => {
     }
   });
 
-  test('6. describe/ddl are unsupported', async () => {
+  test('6. describe/definition are unsupported', async () => {
     const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.ddl(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
+      await expect(adapter.definition(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
     } finally {

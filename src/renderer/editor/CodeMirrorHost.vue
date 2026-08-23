@@ -16,11 +16,11 @@ const props = defineProps<{
   sqlDialect?: 'postgres' | 'mariadb';
   readOnly: boolean;
   /** P18 D10: off everywhere by default. On only for the query console on a SQL connection — the
-   *  cell editor, DDL viewer, document editor and op-log detail rows must not sprout a popup. */
+   *  cell editor, definition viewer, document editor and op-log detail rows must not sprout a popup. */
   autocomplete?: boolean;
 }>();
 
-// Every prior use of this host is read-only (DDL, previews, op-log detail rows); the query
+// Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
 // console (P5.5) is the first editable one. `update:doc` only ever fires from the user's own
 // typing (`EditorState.readOnly` already blocks programmatic edits from mattering when
 // `readOnly` is true), so a read-only host never emits.

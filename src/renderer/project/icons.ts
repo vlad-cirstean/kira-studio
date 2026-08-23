@@ -24,8 +24,11 @@ const KIND_ICON: Record<NodeKind, string> = {
   object: 'file', // P17: a leaf s3 object, opened as a key/value tab (redis's own 'key' precedent)
 };
 
-export function nodeIcon(kind: NodeKind): string {
-  return KIND_ICON[kind];
+// P19: 'group' isn't a real NodeKind (it's a renderer-only synthetic tree row, project/grouping.ts)
+// but TreeRowVm.kind carries it alongside every real NodeKind, so callers that pass a row's kind
+// straight through (project/menus.ts's per-row-kind menu builders) need this to stay total.
+export function nodeIcon(kind: NodeKind | 'group'): string {
+  return kind === 'group' ? 'folder' : KIND_ICON[kind];
 }
 
 // Misc-fixes: the icon picker in ConnectionDialog.vue's new connection-kind chooser. No brand

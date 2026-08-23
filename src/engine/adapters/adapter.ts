@@ -1,7 +1,7 @@
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/domain/connection';
 import type { ConsoleRequest } from '../../shared/domain/console';
-import type { SourceText } from '../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../shared/domain/mutations';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
 import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
@@ -81,8 +81,9 @@ export interface Adapter {
   /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
 
-  /** The object's definition as executable statements. Gated by caps.ddl; L1-cached by main. */
-  ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>;
+  /** The object's definition — executable statements for a SQL engine, a JSON document for
+   *  Mongo. Gated by caps.definition; L1-cached by main. */
+  definition(path: NodePath, ctx: OpCtx): Promise<ObjectDefinition>;
 
   /**
    * Forward a cancel for an in-flight op to the server (D5).

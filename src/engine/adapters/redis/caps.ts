@@ -1,6 +1,6 @@
 import type { Caps } from '../../../shared/caps';
 
-// §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, no DDL, a
+// §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, no definition, a
 // shell-style console (§8.14). Writable as of this phase — string-only edit/insert plus
 // type-agnostic delete (see the canInsert/canUpdate/canDelete comment below).
 export const redisCaps: Caps = {
@@ -10,7 +10,7 @@ export const redisCaps: Caps = {
   stream: false,
   defaultPageKind: 'keyvalue',
   sql: true,
-  ddl: false,
+  definition: false,
   projection: false,
   serverFilter: false,
   // Per-key counts use O(1) exact type-length commands (HLEN/SCARD/ZCARD/LLEN/XLEN, or 1 for a

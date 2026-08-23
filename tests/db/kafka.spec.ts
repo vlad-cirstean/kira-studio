@@ -99,7 +99,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     expect(kafkaCaps.tabular).toBe(false);
     expect(kafkaCaps.stream).toBe(true);
     expect(kafkaCaps.defaultPageKind).toBe('stream');
-    expect(kafkaCaps.ddl).toBe(false);
+    expect(kafkaCaps.definition).toBe(false);
     expect(kafkaCaps.sql).toBe(false);
     expect(kafkaCaps.exactCount).toBe(true);
     expect(kafkaCaps.pagination).toBe('offsetWindow');
@@ -166,14 +166,14 @@ describe('kafka adapter (§9.1, P10)', () => {
     }
   });
 
-  test('6. describe/ddl are unsupported', async () => {
+  test('6. describe/definition are unsupported', async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.ddl(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
+      await expect(adapter.definition(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
     } finally {

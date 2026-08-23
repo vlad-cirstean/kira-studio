@@ -1,6 +1,6 @@
 import { type Connection, createConnection } from 'mariadb';
 import type { ConsoleRequest } from '../../../shared/domain/console';
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
@@ -24,7 +24,7 @@ import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
 import * as consoleQuery from './console';
-import { buildDdl } from './ddl';
+import { buildDefinition } from './definition';
 import * as mutate from './mutate';
 import { type RunningQuery, runQuery, type TrackQuery } from './query';
 import { countRows, readPage } from './read';
@@ -109,15 +109,20 @@ class MariaDbAdapter implements Adapter {
     }
 
     if (segments.length === 2) {
-      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws.
-      if (objectSegment.kind === 'sequence' || objectSegment.kind === 'function') return [];
-      if (objectSegment.kind !== 'table' && objectSegment.kind !== 'view') {
-        throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
+      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws. P19 D5:
+      // table/view are leaves too now — their columns moved into the definition view, and
+      // catalog.ts's own hasChildren: false for tables/views is what keeps the tree from ever
+      // showing a twisty here in the first place.
+      if (
+        objectSegment.kind === 'sequence' ||
+        objectSegment.kind === 'function' ||
+        objectSegment.kind === 'table' ||
+        objectSegment.kind === 'view'
+      ) {
+        return [];
       }
-      return this.listColumnNodes(exec, segments, databaseSegment.name, objectSegment.name);
+      throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
     }
-
-    if (segments.length === 3) return []; // a column — leaf.
 
     throw new AdapterError('E_NOT_FOUND', `unrecognized path depth ${segments.length}`);
   }
@@ -181,7 +186,7 @@ class MariaDbAdapter implements Adapter {
     };
   }
 
-  async ddl(path: NodePath, ctx: OpCtx): Promise<SourceText> {
+  async definition(path: NodePath, ctx: OpCtx): Promise<ObjectDefinition> {
     const segments = path.segments;
     const [databaseSegment, objectSegment] = segments;
     if (
@@ -192,7 +197,7 @@ class MariaDbAdapter implements Adapter {
     ) {
       throw new AdapterError(
         'E_NOT_FOUND',
-        `ddl requires a database/table path, got depth ${segments.length}`,
+        `definition requires a database/table path, got depth ${segments.length}`,
       );
     }
     if (
@@ -200,15 +205,21 @@ class MariaDbAdapter implements Adapter {
       objectSegment.kind === 'function' ||
       objectSegment.kind === 'column'
     ) {
-      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+      throw new AdapterError(
+        'E_UNSUPPORTED',
+        `definition is not supported for ${objectSegment.kind}`,
+      );
     }
     if (objectSegment.kind !== 'table' && objectSegment.kind !== 'view') {
-      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+      throw new AdapterError(
+        'E_UNSUPPORTED',
+        `definition is not supported for ${objectSegment.kind}`,
+      );
     }
 
     const conn = await this.requireConnection(databaseSegment.name);
     const exec = this.execFor(conn, ctx);
-    return buildDdl(exec, segments, databaseSegment.name, {
+    return buildDefinition(exec, segments, databaseSegment.name, {
       kind: objectSegment.kind,
       name: objectSegment.name,
     });
@@ -329,25 +340,6 @@ class MariaDbAdapter implements Adapter {
     } finally {
       await sideConn?.end().catch(() => {});
     }
-  }
-
-  private async listColumnNodes(
-    exec: QueryExecutor,
-    segments: NodePath['segments'],
-    database: string,
-    table: string,
-  ): Promise<TreeNode[]> {
-    const columns = await catalog.listColumns(exec, database, table);
-    const indexes = await catalog.listIndexes(exec, database, table);
-    const pkColumns = new Set(catalog.primaryKeyFromIndexes(indexes) ?? []);
-    return columns.map((col) => ({
-      kind: 'column' as const,
-      name: col.name,
-      path: encodePath([...segments, { kind: 'column', name: col.name }]),
-      hasChildren: false,
-      detail: col.nullable ? col.dataType : `${col.dataType} NOT NULL`,
-      badges: pkColumns.has(col.name) ? ['PK'] : undefined,
-    }));
   }
 
   private async requireConnection(database: string | null) {

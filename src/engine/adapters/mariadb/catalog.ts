@@ -81,7 +81,9 @@ export async function listTablesAndRoutines(
         { kind: 'database', name: database },
         { kind, name: row.name },
       ]),
-      hasChildren: kind !== 'sequence',
+      // P19 D5: every relation is a leaf now — a table/view's columns moved into the
+      // definition view, and a sequence never had children.
+      hasChildren: false,
       detail,
     };
   });

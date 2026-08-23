@@ -20,7 +20,7 @@ import {
   findDataTab,
   openConsoleTab,
   openDataTab,
-  openDdlTab,
+  openDefinitionTab,
   openDocumentTab,
   openKeyValueTab,
   openStreamTab,
@@ -31,6 +31,7 @@ import type { MenuItem } from '../workbench/state/contextMenu';
 import { nodeIcon } from './icons';
 import {
   collapseAll,
+  groupParentPath,
   openFiltersDialog,
   refresh,
   refreshAllConnections,
@@ -60,6 +61,8 @@ function qualifiedNameFor(row: TreeRowVm): string {
 
 export function menuForRow(row: TreeRowVm): MenuItem[] {
   switch (row.kind) {
+    case 'group':
+      return groupMenu(row);
     case 'connection':
       return connectionMenu(row);
     case 'database':
@@ -89,15 +92,17 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
-    case 'column':
     case 'index':
+      // P19 D9: a table's column rows moved into the definition view (their own context menu
+      // lives there now); a Mongo index leaf still lives in the tree (P8's D10) and still uses
+      // this menu.
       return columnMenu(row);
     default:
       return [];
   }
 }
 
-// D5: offered only when the connection's caps say so, same discipline as "Open DDL" — shared by
+// D5: offered only when the connection's caps say so, same discipline as "Open definition" — shared by
 // all three menu builders below rather than repeated per-row-kind gating logic.
 function consoleMenuItem(row: TreeRowVm): MenuItem[] {
   if (connectionsState.states[row.connectionId]?.caps?.sql !== true) return [];
@@ -303,15 +308,15 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       },
     },
     // D5: offered only when the connection's caps say so — never a permanently disabled row.
-    ...(connectionsState.states[row.connectionId]?.caps?.ddl === true
+    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
       ? [
           {
             type: 'item' as const,
-            id: 'open-ddl',
-            label: 'Open DDL',
+            id: 'open-definition',
+            label: 'Open definition',
             icon: 'file-code',
             run: () => {
-              openDdlTab(row.connectionId, row.path);
+              openDefinitionTab(row.connectionId, row.path);
             },
           },
         ]
@@ -361,7 +366,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
 }
 
 // P8's collection row: near-copy of relationMenu, opening a 'document' tab instead of 'data' —
-// no "Open DDL" (Caps.ddl === false for mongo) and no saved-filters submenu (§8.10 names one for
+// no "Open definition" (Caps.definition === false for mongo) and no saved-filters submenu (§8.10 names one for
 // "Table / view / collection" generally, but a saved query body is a SQL WHERE/ORDER BY shape
 // that has no Mongo-filter analog yet).
 function collectionMenu(row: TreeRowVm): MenuItem[] {
@@ -415,6 +420,30 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
         const { id: tabId } = openDocumentTab(row.connectionId, row.path);
         void runDocumentCount(tabId);
       },
+    },
+  ];
+}
+
+// P19 D2's synthetic folder row: nothing that needs a real node behind it — Refresh reloads the
+// *parent* (the folder is just a view over that listing, so this is the only way to refresh what
+// it shows), Collapse all is the same global action every other row's menu omits but the tree
+// background menu offers, included here because a folder is the row most likely to be right-
+// clicked specifically to declutter a crowded schema.
+function groupMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'refresh',
+      label: 'Refresh',
+      icon: 'refresh',
+      run: () => refresh(row.connectionId, groupParentPath(row.path)),
+    },
+    {
+      type: 'item',
+      id: 'collapse-all',
+      label: 'Collapse all',
+      icon: 'collapse-all',
+      run: () => collapseAll(),
     },
   ];
 }

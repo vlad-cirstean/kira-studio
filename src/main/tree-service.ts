@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type SourceText, sourceTextSchema } from '../shared/domain/ddl';
+import { type ObjectDefinition, objectDefinitionSchema } from '../shared/domain/definition';
 import {
   decodePath,
   type ObjectMeta,
@@ -28,15 +28,15 @@ export interface TreeDescribeResult {
   source: 'cache' | 'server';
 }
 
-export interface TreeDdlResult {
-  ddl: SourceText;
+export interface TreeDefinitionResult {
+  definition: ObjectDefinition;
   source: 'cache' | 'server';
 }
 
 export interface TreeService {
   children(connectionId: string, path: string, refresh: boolean): Promise<TreeChildrenResult>;
   describe(connectionId: string, path: string, refresh: boolean): Promise<TreeDescribeResult>;
-  ddl(connectionId: string, path: string, refresh: boolean): Promise<TreeDdlResult>;
+  definition(connectionId: string, path: string, refresh: boolean): Promise<TreeDefinitionResult>;
   /** Drops L1 for one node (path given) or the whole connection (path omitted). No push of its
    * own — the caller already knows what it asked to invalidate. The D11 reconnect push is
    * `connections.onMetadataInvalidated`, a separate concern owned by connections.ts. */
@@ -99,23 +99,23 @@ export function createTreeService(
       return { meta: result.meta, source: 'server' };
     },
 
-    async ddl(connectionId, path, refresh) {
+    async definition(connectionId, path, refresh) {
       if (!refresh) {
-        const cached = await getCached(db, connectionId, path, 'ddl');
+        const cached = await getCached(db, connectionId, path, 'definition');
         if (cached !== null) {
-          const parsed = sourceTextSchema.safeParse(cached);
-          if (parsed.success) return { ddl: parsed.data, source: 'cache' };
+          const parsed = objectDefinitionSchema.safeParse(cached);
+          if (parsed.success) return { definition: parsed.data, source: 'cache' };
           await dropCached(db, connectionId, path);
         }
       }
       await requireConnected(connectionId);
       const nodePath = decodePath(connectionId, path);
-      const result = await engineHost.call<{ ddl: SourceText }>(ENGINE_OP.ddl, {
+      const result = await engineHost.call<{ definition: ObjectDefinition }>(ENGINE_OP.definition, {
         connectionId,
         path: nodePath,
       });
-      await putCached(db, connectionId, path, 'ddl', result.ddl);
-      return { ddl: result.ddl, source: 'server' };
+      await putCached(db, connectionId, path, 'definition', result.definition);
+      return { definition: result.definition, source: 'server' };
     },
 
     invalidate(connectionId, path) {

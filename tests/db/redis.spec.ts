@@ -165,7 +165,7 @@ describe('redis adapter (§9.1, P9)', () => {
     expect(redisCaps.tabular).toBe(false);
     expect(redisCaps.keyValue).toBe(true);
     expect(redisCaps.defaultPageKind).toBe('keyvalue');
-    expect(redisCaps.ddl).toBe(false);
+    expect(redisCaps.definition).toBe(false);
     expect(redisCaps.exactCount).toBe(true);
     expect(redisCaps.pagination).toBe('cursor');
     expect(redisCaps.cancel).toBe(true);
@@ -189,14 +189,14 @@ describe('redis adapter (§9.1, P9)', () => {
     }
   });
 
-  test('6. describe/ddl are unsupported', async () => {
+  test('6. describe/definition are unsupported', async () => {
     const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(keyPath('counter'), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.ddl(keyPath('counter'), makeCtx())).rejects.toMatchObject({
+      await expect(adapter.definition(keyPath('counter'), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
     } finally {

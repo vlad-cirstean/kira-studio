@@ -1,4 +1,4 @@
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
 import type { QueryExecutor } from './catalog';
@@ -11,7 +11,8 @@ interface TableTypeRow {
 }
 
 // pg_get_viewdef/SHOW CREATE emit at most one trailing `;` — remove exactly that, untouched
-// otherwise. `statements` carries no trailing semicolons and no blank padding (shared/domain/ddl.ts).
+// otherwise. `statements` carries no trailing semicolons and no blank padding
+// (shared/domain/definition.ts).
 function stripOneTrailingSemicolon(text: string): string {
   const match = /;\s*$/.exec(text);
   return match ? text.slice(0, text.length - match[0].length) : text;
@@ -22,12 +23,12 @@ function stripOneTrailingSemicolon(text: string): string {
  * that must reach the statement text goes through `quoteIdent`, resolved from
  * `information_schema` (with bound parameters) in this same op — Adapter rule 7.
  */
-export async function buildDdl(
+export async function buildDefinition(
   exec: QueryExecutor,
   segments: NodePath['segments'],
   database: string,
   object: { kind: RelationLikeKind; name: string },
-): Promise<SourceText> {
+): Promise<ObjectDefinition> {
   const [resolved] = await exec<TableTypeRow>(
     `SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
     [database, object.name],
@@ -65,7 +66,10 @@ export async function buildDdl(
       "This is the server's own SHOW CREATE VIEW text, including its DEFINER and SQL SECURITY clauses.",
     ];
   } else {
-    throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${resolved.TABLE_TYPE}`);
+    throw new AdapterError(
+      'E_UNSUPPORTED',
+      `definition is not supported for ${resolved.TABLE_TYPE}`,
+    );
   }
 
   return {
@@ -73,8 +77,11 @@ export async function buildDdl(
     kind: object.kind,
     qualifiedName: `${database}.${object.name}`,
     statements: [statement],
+    language: 'sql',
     origin: 'server',
     notes,
+    constraints: [],
+    documentSchema: null,
     generatedAt: new Date().toISOString(),
   };
 }

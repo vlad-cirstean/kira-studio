@@ -12,7 +12,7 @@ import {
   type DocumentTabState,
   defaultConsoleTabState,
   defaultDataTabState,
-  defaultDdlTabState,
+  defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
@@ -197,12 +197,12 @@ export function openDataTab(
   return { id, reused: false };
 }
 
-// Opens a 'ddl' tab, reusing an existing one for the same (connectionId, path) — mirrors
-// openDataTab's identity rule (§8.4), minus the `newTab` escape hatch: D14 gives DDL no
-// "open in new tab" affordance.
-export function openDdlTab(connectionId: string, path: string): string {
+// Opens a 'definition' tab, reusing an existing one for the same (connectionId, path) — mirrors
+// openDataTab's identity rule (§8.4), minus the `newTab` escape hatch: D14 gives the definition
+// view no "open in new tab" affordance.
+export function openDefinitionTab(connectionId: string, path: string): string {
   const existing = tabsState.tabs.find(
-    (t) => t.kind === 'ddl' && t.connectionId === connectionId && t.path === path,
+    (t) => t.kind === 'definition' && t.connectionId === connectionId && t.path === path,
   );
   if (existing) {
     activateTab(existing.id);
@@ -214,8 +214,8 @@ export function openDdlTab(connectionId: string, path: string): string {
     id,
     connectionId,
     path,
-    kind: 'ddl',
-    state: defaultDdlTabState(),
+    kind: 'definition',
+    state: defaultDefinitionTabState(),
     order: tabsState.tabs.length,
     active: true,
   };
@@ -228,7 +228,7 @@ export function openDdlTab(connectionId: string, path: string): string {
 }
 
 // Opens a new 'console' tab — always a fresh one, never reused by (connectionId, path): unlike
-// data/ddl, a console is a scratch work surface (like a SQL client's "New Query"), so the same
+// data/definition, a console is a scratch work surface (like a SQL client's "New Query"), so the same
 // target routinely wants several independent consoles open at once.
 //
 // D9: opened at the bare connection root (`path === ''`), a Postgres console has no session-
@@ -379,13 +379,13 @@ export function duplicateTab(id: string): string {
       order: tabsState.tabs.length,
       active: true,
     };
-  } else if (source.kind === 'ddl') {
+  } else if (source.kind === 'definition') {
     record = {
       id: newId,
       connectionId: source.connectionId,
       path: source.path,
-      kind: 'ddl',
-      state: defaultDdlTabState(),
+      kind: 'definition',
+      state: defaultDefinitionTabState(),
       order: tabsState.tabs.length,
       active: true,
     };

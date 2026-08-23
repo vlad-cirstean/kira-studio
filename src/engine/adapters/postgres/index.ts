@@ -1,6 +1,6 @@
 import { Client } from 'pg';
 import type { ConsoleRequest } from '../../../shared/domain/console';
-import type { SourceText } from '../../../shared/domain/ddl';
+import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
@@ -24,7 +24,7 @@ import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildClientConfig, ClientSet } from './client';
 import * as consoleQuery from './console';
-import { buildDdl } from './ddl';
+import { buildDefinition } from './definition';
 import * as mutate from './mutate';
 import { type RunningQuery, runQuery, type TrackQuery } from './query';
 import { countRows, readPage } from './read';
@@ -119,19 +119,21 @@ class PostgresAdapter implements Adapter {
     }
 
     if (segments.length === 3) {
-      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws.
-      if (objectSegment.kind === 'sequence' || objectSegment.kind === 'function') return [];
+      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws. P19 D5:
+      // table/view/matview are leaves too now — their columns moved into the definition view,
+      // and catalog.ts's own hasChildren: false for relations is what keeps the tree from ever
+      // showing a twisty here in the first place.
       if (
-        objectSegment.kind !== 'table' &&
-        objectSegment.kind !== 'view' &&
-        objectSegment.kind !== 'matview'
+        objectSegment.kind === 'sequence' ||
+        objectSegment.kind === 'function' ||
+        objectSegment.kind === 'table' ||
+        objectSegment.kind === 'view' ||
+        objectSegment.kind === 'matview'
       ) {
-        throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
+        return [];
       }
-      return this.listColumnNodes(exec, segments, schemaSegment.name, objectSegment.name);
+      throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
     }
-
-    if (segments.length === 4) return []; // a column — leaf.
 
     throw new AdapterError('E_NOT_FOUND', `unrecognized path depth ${segments.length}`);
   }
@@ -184,7 +186,7 @@ class PostgresAdapter implements Adapter {
     };
   }
 
-  async ddl(path: NodePath, ctx: OpCtx): Promise<SourceText> {
+  async definition(path: NodePath, ctx: OpCtx): Promise<ObjectDefinition> {
     const segments = path.segments;
     const [databaseSegment, schemaSegment, objectSegment] = segments;
     if (
@@ -197,7 +199,7 @@ class PostgresAdapter implements Adapter {
     ) {
       throw new AdapterError(
         'E_NOT_FOUND',
-        `ddl requires a database/schema/table path, got depth ${segments.length}`,
+        `definition requires a database/schema/table path, got depth ${segments.length}`,
       );
     }
     if (
@@ -205,19 +207,25 @@ class PostgresAdapter implements Adapter {
       objectSegment.kind === 'function' ||
       objectSegment.kind === 'column'
     ) {
-      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+      throw new AdapterError(
+        'E_UNSUPPORTED',
+        `definition is not supported for ${objectSegment.kind}`,
+      );
     }
     if (
       objectSegment.kind !== 'table' &&
       objectSegment.kind !== 'view' &&
       objectSegment.kind !== 'matview'
     ) {
-      throw new AdapterError('E_UNSUPPORTED', `ddl is not supported for ${objectSegment.kind}`);
+      throw new AdapterError(
+        'E_UNSUPPORTED',
+        `definition is not supported for ${objectSegment.kind}`,
+      );
     }
 
     const client = await this.requireClient(databaseSegment.name);
     const exec = this.execFor(client, ctx);
-    return buildDdl(exec, segments, schemaSegment.name, {
+    return buildDefinition(exec, segments, schemaSegment.name, {
       kind: objectSegment.kind,
       name: objectSegment.name,
     });
@@ -344,27 +352,6 @@ class PostgresAdapter implements Adapter {
     } finally {
       await sideClient.end().catch(() => {});
     }
-  }
-
-  private async listColumnNodes(
-    exec: QueryExecutor,
-    segments: NodePath['segments'],
-    schema: string,
-    table: string,
-  ): Promise<TreeNode[]> {
-    const oid = await catalog.getRelationOid(exec, schema, table);
-    // Sequential — see the comment in describe() above.
-    const columns = await catalog.listColumns(exec, schema, table);
-    const indexes = await catalog.listIndexes(exec, oid);
-    const pkColumns = new Set(catalog.primaryKeyFromIndexes(indexes) ?? []);
-    return columns.map((col) => ({
-      kind: 'column' as const,
-      name: col.name,
-      path: encodePath([...segments, { kind: 'column', name: col.name }]),
-      hasChildren: false,
-      detail: col.nullable ? col.dataType : `${col.dataType} NOT NULL`,
-      badges: pkColumns.has(col.name) ? ['PK'] : undefined,
-    }));
   }
 
   private async requireClient(database: string | null) {

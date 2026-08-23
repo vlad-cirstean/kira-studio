@@ -29,7 +29,7 @@ export interface Caps {
 
   // ---- language surfaces
   sql: boolean; // gates §8.14's query console menu item
-  ddl: boolean; // gates §8.10's "Open DDL"
+  definition: boolean; // gates §8.10's "Open definition" (P19, was "Open DDL")
 
   // ---- read pushdown
   projection: boolean; // can fetch a column subset server-side
@@ -66,7 +66,7 @@ export const capsSchema = z.object({
   stream: z.boolean(),
   defaultPageKind: pageKindSchema,
   sql: z.boolean(),
-  ddl: z.boolean(),
+  definition: z.boolean(),
   projection: z.boolean(),
   serverFilter: z.boolean(),
   exactCount: z.boolean(),
@@ -85,13 +85,13 @@ export const capsSchema = z.object({
  * implemented in P1; the rest is documentation, not code (do not create the other adapters'
  * cap literals here).
  *
- * | kind     | tree levels                                                              | defaultPageKind | pagination    | exactCount     | cancel mechanism                        | sql | ddl | foreignKeys |
- * |----------|---------------------------------------------------------------------------|-----------------|---------------|----------------|------------------------------------------|-----|-----|-------------|
- * | postgres | database → schema → table/view/matview/function/sequence → column        | tabular         | keyset        | yes            | pg_cancel_backend(pid), side connection | yes | yes | yes         |
- * | mariadb  | database → table/view/routine → column                                   | tabular         | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes | yes         |
- * | mongodb  | database → collection (+ indexes)                                        | document        | cursor        | estimate only  | cursor AbortSignal, killOp fallback     | yes | no  | no          |
- * | redis    | db index → key namespace (split on ':')                                  | keyvalue        | cursor (SCAN) | no (DBSIZE)    | abort the SCAN loop; CLIENT KILL        | yes | no  | no          |
- * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no  | no          |
- * | sqs      | region → queues                                                           | stream          | batch         | no (approx)    | SDK AbortSignal                          | no  | no  | no          |
- * | s3       | account → bucket → prefix/object (lazy, '/'-delimited)                   | keyvalue        | token         | no             | SDK AbortController                      | no  | no  | no          |
+ * | kind     | tree levels                                                              | defaultPageKind | pagination    | exactCount     | cancel mechanism                        | sql | definition | foreignKeys |
+ * |----------|---------------------------------------------------------------------------|-----------------|---------------|----------------|------------------------------------------|-----|------------|-------------|
+ * | postgres | database → schema → table/view/matview/function/sequence                 | tabular         | keyset        | yes            | pg_cancel_backend(pid), side connection | yes | yes        | yes         |
+ * | mariadb  | database → table/view/routine                                            | tabular         | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes        | yes         |
+ * | mongodb  | database → collection (+ indexes)                                        | document        | cursor        | estimate only  | cursor AbortSignal, killOp fallback     | yes | yes        | no          |
+ * | redis    | db index → key namespace (split on ':')                                  | keyvalue        | cursor (SCAN) | no (DBSIZE)    | abort the SCAN loop; CLIENT KILL        | yes | no         | no          |
+ * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no         | no          |
+ * | sqs      | region → queues                                                           | stream          | batch         | no (approx)    | SDK AbortSignal                          | no  | no         | no          |
+ * | s3       | account → bucket → prefix/object (lazy, '/'-delimited)                   | keyvalue        | token         | no             | SDK AbortController                      | no  | no         | no          |
  */
