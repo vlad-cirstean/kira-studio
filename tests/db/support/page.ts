@@ -1,5 +1,5 @@
 import type { Adapter, OpCtx, ReadRequest } from '../../../src/engine/adapters/adapter';
-import type { DocumentPage, TabularPage } from '../../../src/shared/protocol/page';
+import type { DocumentPage, KeyValuePage, TabularPage } from '../../../src/shared/protocol/page';
 
 // P8 widened Adapter.read() to return the Page union (TabularPage | DocumentPage). Postgres and
 // MariaDB are both tabular-only (mariadbCaps/postgresCaps: defaultPageKind: 'tabular') — every
@@ -27,6 +27,19 @@ export async function readDocument(
   const page = await adapter.read(req, ctx);
   if (page.kind !== 'document') {
     throw new Error(`expected a document page, got ${page.kind}`);
+  }
+  return page;
+}
+
+/** Redis's counterpart — redis.spec.ts is keyvalue-kind-only (redisCaps.defaultPageKind). */
+export async function readKeyValue(
+  adapter: Adapter,
+  req: ReadRequest,
+  ctx: OpCtx,
+): Promise<KeyValuePage> {
+  const page = await adapter.read(req, ctx);
+  if (page.kind !== 'keyvalue') {
+    throw new Error(`expected a keyvalue page, got ${page.kind}`);
   }
   return page;
 }

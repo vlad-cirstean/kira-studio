@@ -14,7 +14,7 @@ function chunkInsert(coll, docs) {
 }
 
 function hexId(i) {
-  return new ObjectId('0000000000000000000' + i.toString(16).padStart(5, '0'));
+  return new ObjectId(`0000000000000000000${i.toString(16).padStart(5, '0')}`);
 }
 
 const tiers = ['bronze', 'silver', 'gold', 'platinum'];

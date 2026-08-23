@@ -18,6 +18,7 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   postgres: 5432,
   mariadb: 3306,
   mongodb: 27017,
+  redis: 6379,
 };
 
 export const connectionColorSchema = z.enum([

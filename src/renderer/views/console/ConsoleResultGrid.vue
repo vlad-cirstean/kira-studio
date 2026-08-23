@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { settingsState } from '../../state/settings';
 import VirtualList from '../../workbench/VirtualList.vue';
 import { alignmentFor, initialWidths } from '../grid/columns';
-import { cell, documentRow, getPage, pageVersion } from './resultPages';
+import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
 // result has no pager, no sort, no pending-changes, no persisted column widths/order: every one
@@ -26,7 +26,7 @@ const widths = computed<Record<string, number>>(() =>
 );
 const totalWidth = computed(() => {
   const p = page.value;
-  if (!p || p.kind !== 'tabular') return 0;
+  if (p?.kind !== 'tabular') return 0;
   return p.columns.reduce((sum, c) => sum + (widths.value[c.name] ?? 96), 56);
 });
 const rowIndices = computed(() => Array.from({ length: page.value?.rowCount ?? 0 }, (_, i) => i));
@@ -37,6 +37,10 @@ function cellAt(row: number, col: number) {
 
 function docRowAt(row: number) {
   return documentRow(props.pageKey, row) ?? { id: '', body: '' };
+}
+
+function kvRowAt(row: number) {
+  return keyValueRow(props.pageKey, row) ?? { field: '', value: '' };
 }
 </script>
 
@@ -93,11 +97,19 @@ function docRowAt(row: number) {
         </div>
       </template>
     </VirtualList>
-    <VirtualList v-else :items="rowIndices" :row-height="96" class="body doc-body">
+    <VirtualList v-else-if="page.kind === 'document'" :items="rowIndices" :row-height="96" class="body doc-body">
       <template #default="{ item: r }">
         <div class="doc-row" data-testid="console-result-doc-row">
           <div class="doc-id">{{ docRowAt(r).id }}</div>
           <pre class="doc-body-text">{{ docRowAt(r).body }}</pre>
+        </div>
+      </template>
+    </VirtualList>
+    <VirtualList v-else :items="rowIndices" :row-height="rowHeight" class="body">
+      <template #default="{ item: r }">
+        <div class="row" data-testid="console-result-kv-row" :style="{ height: `${rowHeight}px` }">
+          <div class="cell kv-field">{{ kvRowAt(r).field }}</div>
+          <div class="cell kv-value">{{ kvRowAt(r).value }}</div>
         </div>
       </template>
     </VirtualList>
@@ -198,5 +210,16 @@ function docRowAt(row: number) {
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--kira-font-family-mono, monospace);
+}
+
+.kv-field {
+  width: 200px;
+  color: var(--kira-fg-muted);
+}
+
+.kv-value {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

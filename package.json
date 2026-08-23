@@ -51,6 +51,7 @@
     "bson": "6",
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",
+    "ioredis": "6.0.0",
     "mariadb": "3.5.3",
     "mongodb": "6",
     "pg": "8.23.0",

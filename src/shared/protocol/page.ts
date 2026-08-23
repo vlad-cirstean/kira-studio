@@ -53,7 +53,7 @@ export interface PagePosition {
   hasMore: boolean;
   nextToken: string | null;
   prevToken: string | null;
-  strategy: 'keyset' | 'offset';
+  strategy: 'keyset' | 'offset' | 'cursor';
 }
 
 export const pagePositionSchema = z.object({
@@ -62,7 +62,7 @@ export const pagePositionSchema = z.object({
   hasMore: z.boolean(),
   nextToken: z.string().nullable(),
   prevToken: z.string().nullable(),
-  strategy: z.enum(['keyset', 'offset']),
+  strategy: z.enum(['keyset', 'offset', 'cursor']),
 });
 
 export interface TabularPage {
@@ -93,10 +93,29 @@ export interface DocumentPage {
 }
 
 /**
- * P9 adds `KeyValuePage`, P10 `StreamPage` (D5). Switch on `page.kind` everywhere, even though
- * there are only two arms today — that is what makes widening additive instead of a rewrite.
+ * One row per element of the key (hash field, list index, set/zset member, stream entry id) —
+ * or a single row for a string. `fields`/`values` are fixed semantic columns reusing the exact
+ * same TextColumnChunk codec as DocumentPage's `ids`/`bodies`. TTL/memory/type are whole-key
+ * metadata, not per-row.
  */
-export type Page = TabularPage | DocumentPage;
+export interface KeyValuePage {
+  kind: 'keyvalue';
+  position: PagePosition;
+  redisType: 'string' | 'hash' | 'list' | 'set' | 'zset' | 'stream';
+  ttlMs: number | null;
+  memoryBytes: number | null;
+  fields: TextColumnChunk;
+  values: TextColumnChunk;
+  rowCount: number;
+  byteSize: number;
+  fetchedAt: number; // epoch ms
+}
+
+/**
+ * P10 adds `StreamPage` (D5). Switch on `page.kind` everywhere, even though there are only three
+ * arms today — that is what makes widening additive instead of a rewrite.
+ */
+export type Page = TabularPage | DocumentPage | KeyValuePage;
 
 export const MAX_CELL_BYTES = 64 * 1024;
 export const MAX_PAGE_SIZE = 10_000;
@@ -332,6 +351,50 @@ export function createDocumentPageBuilder(opts?: { singleRow?: boolean }): Docum
   };
 }
 
+/** Mirrors `createDocumentPageBuilder`, fixed to the two semantic columns `KeyValuePage` uses. */
+export interface KeyValuePageBuilder {
+  push(field: string, value: string): void;
+  finish(position: PagePosition): KeyValuePage;
+}
+
+export function createKeyValuePageBuilder(opts: {
+  redisType: KeyValuePage['redisType'];
+  ttlMs: number | null;
+  memoryBytes: number | null;
+}): KeyValuePageBuilder {
+  const fieldScratch = new ColumnScratch();
+  const valueScratch = new ColumnScratch();
+  const encoder = new TextEncoder();
+  let rowCount = 0;
+
+  return {
+    push(field, value) {
+      const row = rowCount;
+      fieldScratch.appendValue(field, row, encoder);
+      valueScratch.appendValue(value, row, encoder);
+      rowCount++;
+    },
+    finish(position) {
+      const fields = fieldScratch.finish(rowCount, false);
+      const values = valueScratch.finish(rowCount, false);
+      const page: KeyValuePage = {
+        kind: 'keyvalue',
+        position,
+        redisType: opts.redisType,
+        ttlMs: opts.ttlMs,
+        memoryBytes: opts.memoryBytes,
+        fields,
+        values,
+        rowCount,
+        byteSize: 0,
+        fetchedAt: Date.now(),
+      };
+      page.byteSize = chunkByteSize(fields) + chunkByteSize(values);
+      return page;
+    },
+  };
+}
+
 /**
  * The envelope-only schema (§4a): running Zod over every cell of a 600 000-cell page would
  * cost more than the query. Pair with `assertPageStructure` for the typed-array invariants.
@@ -354,9 +417,21 @@ export const documentPageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
+export const keyValuePageEnvelopeSchema = z.object({
+  kind: z.literal('keyvalue'),
+  redisType: z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream']),
+  ttlMs: z.number().int().nullable(),
+  memoryBytes: z.number().int().nullable(),
+  rowCount: z.number().int().min(0),
+  position: pagePositionSchema,
+  byteSize: z.number().int().min(0),
+  fetchedAt: z.number(),
+});
+
 export const pageEnvelopeSchema = z.discriminatedUnion('kind', [
   tabularPageEnvelopeSchema,
   documentPageEnvelopeSchema,
+  keyValuePageEnvelopeSchema,
 ]);
 
 function assertChunkStructure(chunk: TextColumnChunk, rowCount: number, label: string): void {
@@ -389,6 +464,11 @@ export function assertPageStructure(page: Page): void {
     for (const chunk of page.chunks) assertChunkStructure(chunk, page.rowCount, 'chunk');
     return;
   }
-  assertChunkStructure(page.ids, page.rowCount, 'ids');
-  assertChunkStructure(page.bodies, page.rowCount, 'bodies');
+  if (page.kind === 'document') {
+    assertChunkStructure(page.ids, page.rowCount, 'ids');
+    assertChunkStructure(page.bodies, page.rowCount, 'bodies');
+    return;
+  }
+  assertChunkStructure(page.fields, page.rowCount, 'fields');
+  assertChunkStructure(page.values, page.rowCount, 'values');
 }

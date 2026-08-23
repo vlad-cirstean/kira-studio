@@ -35,7 +35,10 @@ function onClick(): void {
 }
 
 function onDblClick(): void {
-  if (props.row.hasChildren) emit('open', props.row);
+  // Not gated on hasChildren: a redis 'key' leaf (P9) is childless by design (D14) but still
+  // needs double-click to open its keyvalue tab. onOpen() itself gates the expand/collapse
+  // fallback on hasChildren, so a childless non-openable row (column, index) still no-ops.
+  emit('open', props.row);
 }
 
 function onTwistyClick(e: MouseEvent): void {

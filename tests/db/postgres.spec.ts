@@ -826,11 +826,11 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('19. unsupported kind', () => {
-    // P8 gave mongodb a real adapter — redis is still unimplemented (P9), so it is the
+    // P9 gave redis a real adapter — kafka is still unimplemented (P10), so it is the
     // still-unsupported kind this test now targets.
-    expect(() => createAdapter('redis', deps)).toThrow(AdapterError);
+    expect(() => createAdapter('kafka', deps)).toThrow(AdapterError);
     try {
-      createAdapter('redis', deps);
+      createAdapter('kafka', deps);
       throw new Error('expected createAdapter to throw');
     } catch (err) {
       expect(err).toBeInstanceOf(AdapterError);

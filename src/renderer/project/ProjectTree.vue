@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
-import { openDataTab, openDocumentTab } from '../state/tabs';
+import { openDataTab, openDocumentTab, openKeyValueTab } from '../state/tabs';
 import { openContextMenu } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -23,6 +23,9 @@ import TreeRow from './TreeRow.vue';
 const OPENABLE_KINDS = new Set(['table', 'view', 'matview']);
 // A collection opens the same way, but into a 'document' tab (P8) — not the grid's 'data' tab.
 const DOCUMENT_OPENABLE_KINDS = new Set(['collection']);
+// A redis key opens into a 'keyvalue' tab (P9) — 'namespace'/'database' stay expand-only, like
+// mongo's own 'database' node.
+const KEYVALUE_OPENABLE_KINDS = new Set(['key']);
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
@@ -65,6 +68,13 @@ function onOpen(row: TreeRowVm): void {
     openDocumentTab(row.connectionId, row.path);
     return;
   }
+  if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
+    openKeyValueTab(row.connectionId, row.path);
+    return;
+  }
+  // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue
+  // now emits 'open' unconditionally (P9 fix), so this guard is what keeps dblclick a no-op there.
+  if (!row.hasChildren) return;
   if (row.expanded) collapse(row.connectionId, row.path);
   else void expand(row.connectionId, row.path);
 }

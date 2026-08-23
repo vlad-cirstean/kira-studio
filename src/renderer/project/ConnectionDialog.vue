@@ -21,7 +21,12 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   sqs: 'SQS',
   s3: 'S3',
 };
-const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set(['postgres', 'mariadb', 'mongodb']);
+const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
+  'postgres',
+  'mariadb',
+  'mongodb',
+  'redis',
+]);
 const kinds = connectionKindSchema.options;
 
 const draft = computed(() => connectionsState.dialog.draft);

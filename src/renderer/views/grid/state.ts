@@ -187,7 +187,11 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.hasMore = response.page.position.hasMore;
     rt.nextToken = response.page.position.nextToken;
     rt.prevToken = response.page.position.prevToken;
-    rt.lastStrategy = response.page.position.strategy;
+    // 'cursor' strategy is a keyvalue/stream-page concept (P9/P10) — a tabular page's own
+    // keyset/offset readers never produce it.
+    const strategy = response.page.position.strategy;
+    if (strategy === 'cursor') throw new Error('unexpected cursor pagination for a tabular page');
+    rt.lastStrategy = strategy;
     if (!rt.meta) void loadMeta(tabId);
     if (isFirstLoad && settingsState.data.countOnOpen) void runCount(tabId);
     schedulePrefetch(tabId);

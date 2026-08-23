@@ -5,10 +5,16 @@ import { pathTail } from './tree';
 export const tabKindSchema = z.enum(['data', 'ddl', 'document', 'keyvalue', 'stream', 'console']);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
-// 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5, 'document' in P8.
-// The restore path drops rows of any other kind with a `warn` — a closed vocabulary decided once,
-// same discipline as P1's Caps/connectionKind.
-export const RENDERABLE_TAB_KINDS: readonly TabKind[] = ['data', 'ddl', 'console', 'document'];
+// 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5, 'document' in P8,
+// 'keyvalue' in P9. The restore path drops rows of any other kind with a `warn` — a closed
+// vocabulary decided once, same discipline as P1's Caps/connectionKind.
+export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
+  'data',
+  'ddl',
+  'console',
+  'document',
+  'keyvalue',
+];
 
 const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
 export type PageSize = z.infer<typeof pageSizeSchema>;
@@ -45,6 +51,15 @@ export const documentTabStateSchema = z.object({
 });
 export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
 
+// Read-only view (P9's D2) — no edit/expand memory to persist, unlike documentTabStateSchema.
+// `pageIndex` is the offset-strategy fallback's own position (mirrors DataTabState's field,
+// grid/state.ts's goNext/goPrev) — needed because a redis list key's pagination has no id/cursor
+// token to advance by (P9's read.ts uses plain LRANGE offsets for lists).
+export const keyValueTabStateSchema = z.object({
+  pageIndex: z.number().int().min(0),
+});
+export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -58,12 +73,14 @@ export const tabRecordSchema = z.discriminatedUnion('kind', [
   z.object({ ...tabRecordBase, kind: z.literal('ddl'), state: ddlTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('console'), state: consoleTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
+  z.object({ ...tabRecordBase, kind: z.literal('keyvalue'), state: keyValueTabStateSchema }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
 export type DdlTabRecord = Extract<TabRecord, { kind: 'ddl' }>;
 export type ConsoleTabRecord = Extract<TabRecord, { kind: 'console' }>;
 export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
+export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -75,6 +92,10 @@ export function asConsoleTab(tab: TabRecord | null | undefined): ConsoleTabRecor
 
 export function asDocumentTab(tab: TabRecord | null | undefined): DocumentTabRecord | null {
   return tab && tab.kind === 'document' ? tab : null;
+}
+
+export function asKeyValueTab(tab: TabRecord | null | undefined): KeyValueTabRecord | null {
+  return tab && tab.kind === 'keyvalue' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -101,6 +122,10 @@ export function defaultConsoleTabState(): ConsoleTabState {
 
 export function defaultDocumentTabState(): DocumentTabState {
   return { expanded: {}, search: '' };
+}
+
+export function defaultKeyValueTabState(): KeyValueTabState {
+  return { pageIndex: 0 };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

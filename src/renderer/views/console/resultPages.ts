@@ -62,7 +62,7 @@ export interface CellView {
 /** Tabular-only, same contract as `views/grid/page.ts`'s `cell()`. */
 export function cell(key: string, row: number, col: number): CellView {
   const entry = pages.get(key);
-  if (!entry || entry.page.kind !== 'tabular') return { text: '', isNull: true, truncated: false };
+  if (entry?.page.kind !== 'tabular') return { text: '', isNull: true, truncated: false };
   const chunk = entry.page.chunks[col];
   if (!chunk) return { text: '', isNull: true, truncated: false };
   if (isNull(chunk, row)) return { text: '', isNull: true, truncated: false };
@@ -79,7 +79,7 @@ export function cell(key: string, row: number, col: number): CellView {
 /** Document-only: one document's id/body text, decoded from a DocumentPage's chunks. */
 export function documentRow(key: string, row: number): { id: string; body: string } | null {
   const entry = pages.get(key);
-  if (!entry || entry.page.kind !== 'document') return null;
+  if (entry?.page.kind !== 'document') return null;
   const page = entry.page;
   const idCacheKey = `id:${row}`;
   const bodyCacheKey = `body:${row}`;
@@ -94,4 +94,24 @@ export function documentRow(key: string, row: number): { id: string; body: strin
     entry.decodeCache.set(bodyCacheKey, body);
   }
   return { id, body };
+}
+
+/** Key/value-only: one field/value pair, decoded from a KeyValuePage's chunks. */
+export function keyValueRow(key: string, row: number): { field: string; value: string } | null {
+  const entry = pages.get(key);
+  if (entry?.page.kind !== 'keyvalue') return null;
+  const page = entry.page;
+  const fieldCacheKey = `field:${row}`;
+  const valueCacheKey = `value:${row}`;
+  let field = entry.decodeCache.get(fieldCacheKey);
+  if (field === undefined) {
+    field = cellText(page.fields, row, decoder);
+    entry.decodeCache.set(fieldCacheKey, field);
+  }
+  let value = entry.decodeCache.get(valueCacheKey);
+  if (value === undefined) {
+    value = cellText(page.values, row, decoder);
+    entry.decodeCache.set(valueCacheKey, value);
+  }
+  return { field, value };
 }

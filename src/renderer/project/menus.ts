@@ -22,6 +22,7 @@ import {
   openDataTab,
   openDdlTab,
   openDocumentTab,
+  openKeyValueTab,
 } from '../state/tabs';
 import { runCount as runDocumentCount } from '../views/documents/state';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
@@ -68,6 +69,10 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
       return relationMenu(row);
     case 'collection':
       return collectionMenu(row);
+    case 'namespace':
+      return namespaceMenu(row);
+    case 'key':
+      return keyMenu(row);
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
@@ -397,6 +402,60 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
         const tabId = openDocumentTab(row.connectionId, row.path);
         void runDocumentCount(tabId);
       },
+    },
+  ];
+}
+
+// P9's namespace level: a plain ':'-delimited container, no console-default/filters affordance
+// (those are SQL-specific) — minimal, per the read-only scope decision (D2/D14).
+function namespaceMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'refresh',
+      label: 'Refresh',
+      icon: 'refresh',
+      run: () => refresh(row.connectionId, row.path),
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      run: () => copyText(row.name),
+    },
+  ];
+}
+
+// P9's key leaf: minimal open/copy-name only (D14) — no edit/delete rows anywhere, per the
+// read-only scope decision (D2). No separate "copy qualified name": a key node's `name` is
+// already the complete literal Redis key (D3), so it would just duplicate "Copy name".
+function keyMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'open-keyvalue',
+      label: 'Open',
+      icon: 'symbol-key',
+      run: () => {
+        openKeyValueTab(row.connectionId, row.path);
+      },
+    },
+    {
+      type: 'item',
+      id: 'open-keyvalue-new-tab',
+      label: 'Open in new tab',
+      icon: 'symbol-key',
+      run: () => {
+        openKeyValueTab(row.connectionId, row.path, { newTab: true });
+      },
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      run: () => copyText(row.name),
     },
   ];
 }
