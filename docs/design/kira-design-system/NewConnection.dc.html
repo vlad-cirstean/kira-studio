@@ -1,0 +1,377 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* ============================================================
+       Kira Studio — one vocabulary, shared verbatim by every artboard.
+       Nothing below is re-declared per screen. If a screen needs a
+       measurement that is not here, the system is missing a rule.
+       ============================================================ */
+    :root {
+      /* surfaces + text (src/renderer/theme/tokens.css, unchanged) */
+      --bg: #1f1f1f; --bg-elevated: #202020; --bg-chrome: #181818; --bg-input: #313131;
+      --fg: #cccccc; --fg-muted: #9d9d9d; --fg-disabled: #6e6e6e;
+      --border: #2b2b2b; --border-strong: #313131;
+      --focus: #0078d4; --accent: #0078d4; --accent-fg: #ffffff;
+      --select: #04395e; --hover: #2a2d2e; --badge: #616161;
+      --error: #f14c4c; --warn: #cca700; --ok: #23d18b; --info: #3794ff;
+
+      /* connection colours — SOFTENED. oklch(0.72 0.09 h), one lightness and
+         one chroma for all eleven hues, so no connection shouts louder than
+         another. Grey is the same lightness at chroma 0.012. */
+      --conn-red: #d78e88;     --conn-orange: #d1966d;  --conn-amber: #bca260;
+      --conn-olive: #9fad6b;   --conn-green: #7db485;   --conn-teal: #5fb7a5;
+      --conn-cyan: #58b4c4;    --conn-blue: #7ba8dc;    --conn-indigo: #979fdd;
+      --conn-violet: #b296d2;  --conn-magenta: #cb8eb6; --conn-grey: #9fa5ac;
+
+      /* syntax (CodeMirror, unchanged) */
+      --sx-comment: #6a9955; --sx-string: #ce9178; --sx-number: #b5cea8;
+      --sx-keyword: #569cd6; --sx-control: #c586c0; --sx-name: #9cdcfe;
+      --sx-func: #dcdcaa; --sx-op: #d4d4d4; --sx-meta: #808080;
+
+      /* type — TWO roles, FOUR steps */
+      --font-ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+      --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --t-xs: 10px; --t-sm: 11px; --t-md: 12px; --t-lg: 13px;
+      /* space — SIX steps on a 2px base */
+      --s-1: 2px; --s-2: 4px; --s-3: 6px; --s-4: 8px; --s-5: 12px; --s-6: 16px;
+      /* size — FIVE control heights */
+      --h-xs: 18px; --h-sm: 22px; --h-md: 26px; --h-lg: 30px; --h-row: 22px;
+      --icon-box: 16px;
+      /* shape */
+      --r-sm: 4px; --r: 6px; --r-lg: 8px; --r-pill: 10px; --bw: 1px;
+      --shadow-float: 0 8px 28px rgb(0 0 0 / 0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg-chrome); overflow: hidden; }
+    body { font-family: var(--font-ui); font-size: var(--t-md); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; border: none; background: none; padding: 0; }
+    .icon { width: 13px; height: 13px; display: block; flex-shrink: 0; }
+    .icon-box { width: var(--icon-box); height: var(--icon-box); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--fg-muted); }
+    .dim { color: var(--fg-disabled); }
+    .sm { font-size: var(--t-sm); }
+    .xs { font-size: var(--t-xs); }
+    .push { margin-left: auto; }
+
+    /* ---------- P1 icon button ---------- */
+    .p-iconbtn { height: var(--h-sm); width: var(--h-sm); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--fg-muted); cursor: pointer; flex-shrink: 0; }
+    .p-iconbtn.is-hover { background: var(--hover); color: var(--fg); }
+    .p-iconbtn.is-active { background: var(--bg-input); color: var(--fg); }
+    .p-iconbtn.is-disabled { color: var(--fg-disabled); }
+    /* ---------- P2 text button ---------- */
+    .p-btn { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; flex-shrink: 0; }
+    .p-btn.is-hover { background: var(--hover); color: var(--fg); }
+    .p-btn.is-active { background: var(--bg-input); color: var(--fg); }
+    .p-btn.primary { background: var(--accent); color: var(--accent-fg); }
+    .p-btn.is-disabled { color: var(--fg-disabled); }
+    /* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
+    .p-dlgbtn { height: var(--h-md); display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); padding: 0 var(--s-5); border-radius: var(--r-sm); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); font-size: var(--t-sm); cursor: pointer; }
+    .p-dlgbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    .p-dlgbtn.is-disabled { opacity: 0.45; }
+    /* ---------- P4 input ---------- */
+    .p-input { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); font-family: var(--font-mono); font-size: var(--t-sm); }
+    .p-input.md { height: var(--h-md); }
+    .p-input.ui { font-family: var(--font-ui); }
+    .p-input.is-focus { border-color: var(--focus); outline: var(--bw) solid var(--focus); outline-offset: -2px; }
+    .p-input .ph { color: var(--fg-disabled); }
+    /* ---------- P5 select ---------- */
+    .p-select { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-2) 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; flex-shrink: 0; }
+    .p-select.bordered { height: var(--h-md); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); padding: 0 var(--s-2) 0 var(--s-3); }
+    /* ---------- P6 segmented ---------- */
+    .p-seg { display: inline-flex; height: var(--h-sm); border: var(--bw) solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
+    .p-seg.md { height: var(--h-md); }
+    .p-seg > * { display: flex; align-items: center; justify-content: center; padding: 0 var(--s-3); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; white-space: nowrap; }
+    .p-seg > * + * { border-left: var(--bw) solid var(--border-strong); }
+    .p-seg > .on { background: var(--bg-input); color: var(--fg); }
+    /* ---------- P7 tab ---------- */
+    .p-tab { height: var(--h-md); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); border: var(--bw) solid transparent; color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; max-width: 210px; flex-shrink: 0; }
+    .p-tab.is-active { background: var(--bg-elevated); border-color: var(--border-strong); color: var(--fg); }
+    /* ---------- P8 row ---------- */
+    .p-row { height: var(--h-row); display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg); font-size: var(--t-md); cursor: pointer; }
+    .p-row.is-hover { background: var(--hover); }
+    .p-row.is-selected { background: var(--select); }
+    /* ---------- P9 badge / count / chip ---------- */
+    .p-badge { height: var(--h-xs); display: inline-flex; align-items: center; padding: 0 var(--s-3); border-radius: var(--r-sm); background: var(--bg-input); color: var(--fg-muted); font-family: var(--font-mono); font-size: var(--t-xs); flex-shrink: 0; white-space: nowrap; }
+    .p-count { min-width: var(--h-xs); height: var(--h-xs); display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; border-radius: var(--r-pill); background: var(--badge); color: #f0f0f0; font-family: var(--font-mono); font-size: var(--t-xs); flex-shrink: 0; }
+    .p-chip { height: var(--h-xs); display: inline-flex; align-items: center; gap: 5px; padding: 0 var(--s-3); border-radius: var(--r-pill); font-size: var(--t-xs); flex-shrink: 0; white-space: nowrap; }
+    .p-chip.warn { background: rgba(204,167,0,0.16); color: var(--warn); }
+    .p-chip.err { background: rgba(241,76,76,0.16); color: var(--error); }
+    .p-chip.ok { background: rgba(35,209,139,0.14); color: var(--ok); }
+    .p-chip.info { background: rgba(55,148,255,0.16); color: var(--info); }
+    /* ---------- P10 status-bar item ---------- */
+    .p-status { height: var(--h-xs); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg); font-size: var(--t-sm); cursor: pointer; }
+    .p-status.is-on { background: var(--bg-input); }
+    .p-status.is-hover { background: var(--hover); }
+    /* ---------- P11 floating surface (menu / dialog / popover) ---------- */
+    .p-float { background: var(--bg-elevated); border: var(--bw) solid var(--border-strong); border-radius: var(--r); box-shadow: var(--shadow-float); overflow: hidden; }
+    .p-menu-label { height: var(--h-xs); display: flex; align-items: center; padding: 0 var(--s-3); font-size: var(--t-xs); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.06em; }
+    .p-sep { height: var(--bw); background: var(--border-strong); margin: var(--s-2) 0; }
+    /* ---------- P12 panel ---------- */
+    .p-panel { border: var(--bw) solid var(--border); border-radius: var(--r); background: var(--bg); overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+    .p-panel-head { height: var(--h-md); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-bottom: var(--bw) solid var(--border); font-size: var(--t-sm); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ---------- LAW 01: a toolbar is 28px, holds only h-sm controls ---------- */
+    .toolbar { height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); border-bottom: var(--bw) solid var(--border); }
+    .toolbar.last { border-bottom: none; }
+    .toolbar .group { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+    .toolbar .sep { width: var(--bw); height: 14px; background: var(--border-strong); margin: 0 var(--s-1); flex-shrink: 0; }
+
+    /* ---------- shell ---------- */
+    .app { width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg-chrome); }
+    .workbench { flex: 1; min-height: 0; display: flex; gap: var(--s-2); padding: var(--s-2); }
+    .col { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; flex: 1; }
+    .sidebar { width: 254px; flex-shrink: 0; }
+    .tree { flex: 1; min-height: 0; overflow: hidden; padding: var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+    .search-row { padding: var(--s-2) var(--s-2) 0; flex-shrink: 0; }
+    .search-row .p-input { width: 100%; }
+
+    /* LAW 07: connection colour is a rail — tree group, tab, toolbar. Nothing else. */
+    .conn-group { border-left: 2px solid var(--rail); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding-left: var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+    .conn-group + .conn-group { margin-top: var(--s-3); }
+    .conn-group.off { opacity: 0.75; }
+    .twist { width: var(--icon-box); height: var(--icon-box); display: flex; align-items: center; justify-content: center; color: var(--fg-muted); flex-shrink: 0; }
+    .twist.hidden { visibility: hidden; }
+    .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* connection state: filled dot = live, hollow ring = offline, red = failed */
+    .state { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .state.live { background: var(--ok); }
+    .state.off { border: 1.5px solid var(--fg-disabled); }
+    .state.err { background: var(--error); }
+    .state.busy { background: var(--warn); }
+
+    /* ---------- editor column ---------- */
+    .editor { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    /* LAW 07 — the connection colour reaches the view you are working in, as a
+       2px rail capping the primary toolbar. Not the top of the panel: the tab
+       strip above it holds tabs from several connections at once, so a rail
+       there would colour the whole panel for whichever one happens to be in
+       front. The toolbar is the row that acts on the current view, so that is
+       the row the colour belongs to. Same mark as the tree group rail and the
+       tab rail, at the same weight; never a tint, a background or a border.
+       No colour is the default, and then the rail is simply unpainted — the
+       slot is 2px either way, so nothing shifts when a colour is assigned. */
+    .toolbar-rail { height: 2px; flex-shrink: 0; background: var(--rail, transparent); }
+    /* the same identity, inline: a 5px dot before the connection name */
+    .conn-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: var(--rail, transparent); }
+    .conn-dot.none { background: none; border: 1px solid var(--fg-disabled); }
+    .conn-group.nocolour { border-left-color: transparent; }
+    .tabstrip { height: var(--h-lg); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-1); padding: 0 var(--s-2); border-bottom: var(--bw) solid var(--border); overflow: hidden; }
+    .tab-rail { width: 2px; height: 14px; border-radius: 1px; flex-shrink: 0; }
+    .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab-schema { color: var(--fg-disabled); }
+
+    /* ---------- view header — every non-grid view opens with this ---------- */
+    .view-head { height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); border-bottom: var(--bw) solid var(--border); }
+    .view-target { font-size: var(--t-md); color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .view-target .path { color: var(--fg-disabled); }
+
+    /* ---------- run state + strips: error / warning / note ---------- */
+    /* LAW 12 — work in progress is a ring and an elapsed time, in the toolbar
+       that started the work. A bar across the top said only "something is
+       happening"; the ring sits next to Refresh/Run/Poll, so it says WHICH
+       thing, and the number next to it is the only place a duration is
+       reported. Idle keeps the same 11px slot as a static ring holding the
+       last duration, so the toolbar never reflows when work starts. */
+    .run-state { display: flex; align-items: center; gap: var(--s-2); font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+    .run-state .ring { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--border-strong); }
+    .run-state.is-running { color: var(--info); }
+    .run-state.is-running .ring { border-color: var(--accent) transparent var(--accent) var(--accent); animation: spin 0.7s linear infinite; }
+    .run-state.is-error { color: var(--error); }
+    .run-state.is-error .ring { border-color: var(--error); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .strip { flex-shrink: 0; display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); font-size: var(--t-sm); line-height: 1.45; border-bottom: var(--bw) solid var(--border); }
+    .strip.err { background: rgba(241,76,76,0.10); color: #f3a3a3; }
+    .strip.warn { background: rgba(204,167,0,0.10); color: #d9c47a; }
+    .strip.note { background: rgba(55,148,255,0.08); color: #a8c8ee; }
+    .strip .strip-action { margin-left: auto; flex-shrink: 0; }
+
+    /* ---------- tabular body shared by grid / kv / stream / console ---------- */
+    .thead { height: var(--h-md); flex-shrink: 0; display: flex; background: var(--bg-elevated); border-bottom: var(--bw) solid var(--border-strong); }
+    .th { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-4); border-right: var(--bw) solid var(--border); font-size: var(--t-sm); color: var(--fg-muted); overflow: hidden; white-space: nowrap; }
+    .th .name { color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
+    .th .key { color: var(--warn); font-family: var(--font-mono); font-size: var(--t-xs); }
+    .tbody { flex: 1; min-height: 0; overflow: hidden; }
+    .tr { height: var(--h-row); display: flex; }
+    .tr:hover { background: var(--hover); }
+    .td { display: flex; align-items: center; padding: 0 var(--s-4); border-right: var(--bw) solid var(--border); border-bottom: var(--bw) solid var(--border); font-family: var(--font-mono); font-size: var(--t-md); color: var(--fg); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .td.gutter { justify-content: flex-end; color: var(--fg-disabled); font-size: var(--t-xs); background: var(--bg-elevated); border-right-color: var(--border-strong); position: relative; }
+    .tr.dirty .td.gutter::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--warn); }
+    .td.null { color: var(--fg-disabled); font-style: italic; }
+    .td.empty::after { content: ""; width: 12px; height: 1px; background: var(--fg-disabled); }
+    .td.num { justify-content: flex-end; }
+    .td.sel { background: var(--select); outline: var(--bw) solid var(--focus); outline-offset: -1px; }
+    .td.edited { color: var(--warn); }
+    .td.fk { color: var(--info); }
+
+    /* ---------- code surface (CodeMirror stand-in) ---------- */
+    .code { flex: 1; min-height: 0; overflow: hidden; display: flex; font-family: var(--font-mono); font-size: var(--t-md); line-height: 18px; }
+    .code .gutter-col { width: 38px; flex-shrink: 0; padding: var(--s-3) var(--s-3) 0 0; text-align: right; color: var(--fg-disabled); font-size: var(--t-sm); background: var(--bg); border-right: var(--bw) solid var(--border); }
+    .code pre { margin: 0; padding: var(--s-3) var(--s-4) 0; flex: 1; min-width: 0; overflow: hidden; white-space: pre; }
+    .k { color: var(--sx-keyword); } .c { color: var(--sx-control); } .s { color: var(--sx-string); }
+    .n { color: var(--sx-number); } .p { color: var(--sx-name); } .f { color: var(--sx-func); }
+    .cm { color: var(--sx-comment); } .o { color: var(--sx-op); } .m { color: var(--sx-meta); }
+
+    /* ---------- operations ---------- */
+    .ops-body { flex: 1; min-height: 0; padding: var(--s-2); display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+    .op-q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); }
+    .op-q.err { color: var(--error); }
+    .op-t { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); flex-shrink: 0; width: 52px; text-align: right; }
+    .op-kind { width: 58px; flex-shrink: 0; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+
+    /* ---------- status bar — toggles live on the RIGHT, icon-only ---------- */
+    .statusbar { height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s-3); }
+    .statusbar .side { display: flex; align-items: center; gap: var(--s-1); }
+    .sb-toggles { display: flex; align-items: center; gap: var(--s-1); margin-left: var(--s-2); padding-left: var(--s-2); border-left: var(--bw) solid var(--border-strong); }
+
+    /* ---------- empty state ---------- */
+    .empty { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); color: var(--fg-disabled); }
+    .empty .big { width: 24px; height: 24px; }
+    .empty .label { font-size: var(--t-md); color: var(--fg-muted); }
+  </style>
+</helmet>
+
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13 8A5 5 0 1 1 11.2 4.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 2.5V6H9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-play" viewBox="0 0 16 16"><path d="M5 3.4l7 4.6-7 4.6z" fill="currentColor"/></symbol>
+    <symbol id="i-run-all" viewBox="0 0 16 16"><path d="M3 3.4l5 4.6-5 4.6z" fill="currentColor"/><path d="M11 3.2v9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5L12.5 6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 16 16"><path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 16 16"><path d="M10 3.5L5.5 8L10 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 16 16"><path d="M6 3.5L10.5 8L6 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-ll" viewBox="0 0 16 16"><path d="M11 3.5L6.5 8L11 12.5M6 3.5L1.5 8L6 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-rr" viewBox="0 0 16 16"><path d="M5 3.5L9.5 8L5 12.5M10 3.5L14.5 8L10 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow-l" viewBox="0 0 16 16"><path d="M13 8H3.5M7 4L3 8l4 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow-r" viewBox="0 0 16 16"><path d="M3 8h9.5M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 16 16"><path d="M2.5 5.5h10M9.5 2.5l3 3-3 3M13.5 10.5h-10M6.5 7.5l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-db" viewBox="0 0 16 16"><ellipse cx="8" cy="3.4" rx="5" ry="1.8" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M3 3.4v9.2c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.4" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M3 8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-table" viewBox="0 0 16 16"><rect x="2.2" y="3" width="11.6" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2.2 6.6h11.6M2.2 10h11.6M6.8 3v10M11 3v10" stroke="currentColor" stroke-width="1"/></symbol>
+    <symbol id="i-view" viewBox="0 0 16 16"><rect x="2.2" y="3" width="11.6" height="10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2.6 1.6"/><path d="M2.2 6.6h11.6M6.8 6.6v6.4" stroke="currentColor" stroke-width="1"/></symbol>
+    <symbol id="i-code" viewBox="0 0 16 16"><path d="M5.6 4.5L2.2 8l3.4 3.5M10.4 4.5L13.8 8l-3.4 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 16 16"><path d="M2.5 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 16 16"><path d="M4 2h5l3 3v9H4z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 2v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 16 16"><path d="M2.5 3.5h11L9.2 8.6v4.2l-2.4 1.2V8.6z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 16 16"><path d="M4 2.5v11M8 2.5v11M12 2.5v11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-sidebar" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 2.5v11" stroke="currentColor" stroke-width="1.2"/><rect x="2.6" y="3.1" width="2.8" height="9.8" fill="currentColor" opacity="0.55"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2 9.5h12" stroke="currentColor" stroke-width="1.2"/><rect x="2.6" y="10.1" width="10.8" height="2.8" fill="currentColor" opacity="0.55"/></symbol>
+    <symbol id="i-string" viewBox="0 0 16 16"><path d="M4.6 11.5L7.4 4.5h1.2l2.8 7M5.8 9h4.4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><path d="M6.6 1.6h2.8l.3 1.75 1.2.7 1.6-.72 1.4 2.42-1.3 1.2v1.3l1.3 1.2-1.4 2.42-1.6-.72-1.2.7-.3 1.75H6.6l-.3-1.75-1.2-.7-1.6.72-1.4-2.42 1.3-1.2v-1.3l-1.3-1.2 1.4-2.42 1.6.72 1.2-.7z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-save" viewBox="0 0 16 16"><path d="M3 3h8l2 2v8H3z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.5 3v3.5h5V3M5.5 13v-3.5h5V13" fill="none" stroke="currentColor" stroke-width="1.1"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 16 16"><path d="M3 8A5 5 0 1 0 4.8 4.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 2.5V6h3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-arrow-out" viewBox="0 0 16 16"><path d="M6.5 3.5h6v6M12.5 3.5l-7 7M3.5 7v5.5H9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 16 16"><path d="M6 2.5v3M10 2.5v3M4 5.5h8v2.7A4 4 0 0 1 8 12.2 4 4 0 0 1 4 8.2V5.5Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 12.2v1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-history" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.8-3.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 2.6V6h3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/><path d="M8 5.4V8l2 1.4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 16 16"><path d="M4 2.5h8v11l-4-3-4 3z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 16 16"><path d="M8 2.4l1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.1l-3.4 1.8.7-3.8L2.5 6.4l3.8-.5z" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star-on" viewBox="0 0 16 16"><path d="M8 2.4l1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.1l-3.4 1.8.7-3.8L2.5 6.4l3.8-.5z" fill="currentColor"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 16 16"><path d="M4 6.5L8 10l4-3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 3h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-collapse" viewBox="0 0 16 16"><path d="M4 9.5L8 6l4 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 13h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-hash" viewBox="0 0 16 16"><path d="M6 2.5L4.6 13.5M11 2.5L9.6 13.5M2.8 5.6h11M2.2 10.4h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-tree" viewBox="0 0 16 16"><path d="M3 3.5h10M5.5 8h7.5M8 12.5h5M3 3.5v9h2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-flat" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-discard" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 1 1.8 3.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 11.4V8h3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M4.8 4.5l.6 9h5.2l.6-9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.2v4M8 4.8v.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 16 16"><path d="M8 2.6l5.8 10.2H2.2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.4v3.1M8 11.2v.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.4 8.4l3.1 3.1 6.1-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.6 8S4 4.2 8 4.2 14.4 8 14.4 8 12 11.8 8 11.8 1.6 8 1.6 8Z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="1.9" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-checklist" viewBox="0 0 16 16"><path d="M2.5 4.4l1.4 1.4 2.4-2.6M2.5 11.4l1.4 1.4 2.4-2.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.6 4.6h5M8.6 11.6h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 16 16"><path d="M9.6 3.2a3 3 0 0 0 3.9 3.9l-6.3 6.3a1.7 1.7 0 0 1-2.4-2.4z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 16 16"><path d="M10.8 2.6l2.6 2.6-8 8L2.6 14l.8-2.8z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 16 16"><circle cx="4" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="8" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 16 16"><path d="M5 3.2v9.6M5 3.2L3 5.4M5 3.2l2 2.2M11 12.8V3.2M11 12.8l-2-2.2M11 12.8l2-2.2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6.9 7.9L13 14M10.6 11.6l1.5-1.5M12.1 13.1l1.5-1.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 16 16"><rect x="1.8" y="4" width="3.2" height="8" rx="0.8" fill="none" stroke="currentColor" stroke-width="1.15"/><rect x="6.4" y="4" width="3.2" height="8" rx="0.8" fill="none" stroke="currentColor" stroke-width="1.15"/><rect x="11" y="4" width="3.2" height="8" rx="0.8" fill="none" stroke="currentColor" stroke-width="1.15"/></symbol>
+    <symbol id="i-stream" viewBox="0 0 16 16"><path d="M2.4 5h11M2.4 8h11M2.4 11h7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><circle cx="12.6" cy="11" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-bucket" viewBox="0 0 16 16"><path d="M2.8 4h10.4l-1.1 9.2a1 1 0 0 1-1 .8H4.9a1 1 0 0 1-1-.8z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2.4 4h11.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-braces" viewBox="0 0 16 16"><path d="M6.4 2.6c-1.6 0-1.9.8-1.9 2.2s.1 2.4-1.4 2.4v1.6c1.5 0 1.4 1 1.4 2.4s.3 2.2 1.9 2.2M9.6 2.6c1.6 0 1.9.8 1.9 2.2s-.1 2.4 1.4 2.4v1.6c-1.5 0-1.4 1-1.4 2.4s-.3 2.2-1.9 2.2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 10.5V3.5a1 1 0 0 1 1-1H10" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <!-- ===== Engine marks — the products' own logos, redrawn to 16px.
+         Filled shapes at this size stay legible where outlines would silt up. ===== -->
+    <symbol id="i-postgres" viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M8 1.6c-1.85 0-3.4.75-4.35 2-.75-.5-1.6-.4-2 .3-.4.75.05 1.6.9 1.95-.15.5-.2 1-.2 1.5 0 2.5 1.85 4.4 5.65 4.4s5.65-1.9 5.65-4.4c0-.5-.05-1-.2-1.5.85-.35 1.3-1.2.9-1.95-.4-.7-1.25-.8-2-.3C11.4 2.35 9.85 1.6 8 1.6zM5.1 5.6a.85.85 0 1 0 1.7 0 .85.85 0 1 0-1.7 0z"/><path fill="currentColor" d="M6.8 10.3c0 2.2.45 4.4 2.85 4.4 1.65 0 2.6-1.05 2.6-2.2 0-.65-.28-1.2-.75-1.55l-1.1 1.15c.27.22.38.38.38.6 0 .42-.32.7-.8.7-.9 0-1.18-.95-1.18-3.1z"/><path fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" d="M6.15 11 5.25 13.3"/></symbol>
+    <symbol id="i-mariadb" viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M2.1 6.95c.28-1.75 1.3-3.1 2.85-3.8.62-.28 1.12.03 1.22.7.18 1.15.85 2.05 1.98 2.85 1.85 1.32 3.42 2.85 4.85 4.55.6.7 1.28 1.15 2.05 1.35.6.15.75.62.3 1.02-.75.65-1.85 1-3.25 1.1-2.6.2-4.95.05-7.1-.45-.65-.15-.85-.65-.5-1.2.5-.8.6-1.6.3-2.4-.25-.65-.72-1.12-1.38-1.55-.92-.62-1.5-1.15-1.32-2.17zm2.05-1.85a.65.65 0 1 0 1.3 0 .65.65 0 1 0-1.3 0z"/></symbol>
+    <symbol id="i-mongodb" viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M8 1C5.85 3.7 3.85 6.3 3.85 9.1c0 2.45 1.6 4.35 3.55 4.75h1.2c1.95-.4 3.55-2.3 3.55-4.75C12.15 6.3 10.15 3.7 8 1zm.05 2.25c.52 1.4.75 2.55.75 3.85v6.1h-.62V7.1c0-1.3-.2-2.4-.66-3.65z"/><path fill="currentColor" d="M7.42 13.6h1.16l-.2 1.45h-.76z"/></symbol>
+    <symbol id="i-redis" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1.5 15 4.3 8 7.1 1 4.3z"/><path fill="currentColor" d="M1 6.05 8 8.85l7-2.8v1.6L8 10.45 1 7.65z"/><path fill="currentColor" d="M1 9.4 8 12.2l7-2.8V11L8 13.8 1 11z"/></symbol>
+    <symbol id="i-kafka" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M5.2 2.4v11.2"/><path fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" d="m5.3 8.15 5-3.6m-5 3.9 5.1 3.5"/><circle cx="5.2" cy="8" r="1.75" fill="currentColor"/><circle cx="11.4" cy="3.7" r="1.95" fill="currentColor"/><circle cx="11.5" cy="12.4" r="1.95" fill="currentColor"/></symbol>
+    <symbol id="i-sqs" viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M6.6 3.9h7.1c.72 0 1.3.58 1.3 1.3v5.6c0 .72-.58 1.3-1.3 1.3H6.6c-.72 0-1.3-.58-1.3-1.3V5.2c0-.72.58-1.3 1.3-1.3zm.5 1.55v5.1h6.1v-5.1l-3.05 2.45z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M1.2 5.9h2.5M1.2 8.1h2.5M1.2 10.3h2.5"/></symbol>
+    <symbol id="i-s3" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" d="M2.95 3.5l.9 9.25c.06.63.6 1.1 1.24 1.1h5.82c.64 0 1.18-.47 1.24-1.1l.9-9.25"/><ellipse cx="8" cy="3.4" rx="5.05" ry="1.7" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-clickhouse" viewBox="0 0 16 16"><path fill="currentColor" d="M1.35 1.9h2.1v12.2h-2.1zM4.2 1.9h2.1v12.2H4.2zM7.05 1.9h2.1v12.2h-2.1zM9.9 1.9H12v12.2H9.9zM12.75 6.95h2.1v2.1h-2.1z"/></symbol>
+  </defs>
+</svg>
+
+<style>
+  .kind-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-3); }
+  .kind { padding: var(--s-5) var(--s-4); border: var(--bw) solid var(--border); border-radius: var(--r); background: var(--bg); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); cursor: pointer; }
+  .kind:hover, .kind.is-hover { background: var(--hover); border-color: var(--border-strong); }
+  .kind.is-hover { outline: var(--bw) solid var(--focus); outline-offset: -1px; }
+  .kind.is-off { opacity: 0.4; cursor: default; }
+  .kind-ic { display: flex; margin-bottom: var(--s-2); }
+  .kind-name { font-size: var(--t-lg); color: var(--fg); }
+  .kind-sub { font-size: var(--t-sm); color: var(--fg-disabled); line-height: 1.4; }
+  .kind-grid { grid-template-columns: repeat(3, 1fr); }
+  body { background: rgba(0,0,0,0.32); }
+  .dlg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+  .dlg-box { width: 100%; max-width: 620px; background: var(--bg-elevated); border: var(--bw) solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-float); display: flex; flex-direction: column; overflow: hidden; }
+  .dlg-title { height: var(--h-lg); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4) 0 var(--s-5); border-bottom: var(--bw) solid var(--border); font-size: var(--t-lg); color: var(--fg); }
+  .dlg-body { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); }
+  .dlg-foot { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border-top: var(--bw) solid var(--border); }
+  .steps { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-sm); }
+  .step { display: flex; align-items: center; gap: var(--s-2); color: var(--fg-disabled); }
+  .step.on { color: var(--fg); }
+  .step .n { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--t-xs); background: var(--bg-input); color: var(--fg-muted); }
+  .step.on .n { background: var(--accent); color: var(--accent-fg); }
+</style>
+<div class="dlg">
+  <div class="dlg-box">
+    <div class="dlg-title">
+      <span class="icon-box muted"><svg class="icon"><use href="#i-plus"/></svg></span>
+      <span>New connection</span>
+      <!-- Step 1 of 2 is shown because the flow now HAS two steps: pick the
+           engine, then fill in only that engine's fields. -->
+      <span class="steps push"><span class="step on"><span class="n">1</span>Engine</span><span class="dim">›</span><span class="step"><span class="n">2</span>Details</span></span>
+      <button class="p-iconbtn" style="margin-left:var(--s-3)"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <span class="p-input ui md is-focus"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Search engines</span></span>
+      <div class="kind-grid">
+        <div class="kind is-hover"><span class="kind-ic" style="color:var(--conn-cyan)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-postgres"/></svg></span><span class="kind-name">PostgreSQL</span><span class="kind-sub">Tables, views, functions, DDL</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-blue)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-mariadb"/></svg></span><span class="kind-name">MariaDB</span><span class="kind-sub">Also MySQL 8 and Percona</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-green)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-mongodb"/></svg></span><span class="kind-name">MongoDB</span><span class="kind-sub">Collections and documents</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-red)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-redis"/></svg></span><span class="kind-name">Redis</span><span class="kind-sub">Keys, hashes, lists, sorted sets</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-amber)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-kafka"/></svg></span><span class="kind-name">Kafka</span><span class="kind-sub">Topics, partitions, consumer groups</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-magenta)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-sqs"/></svg></span><span class="kind-name">Amazon SQS</span><span class="kind-sub">Queues and dead-letter queues</span></div>
+        <div class="kind"><span class="kind-ic" style="color:var(--conn-olive)"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-s3"/></svg></span><span class="kind-name">Amazon S3</span><span class="kind-sub">Buckets and object prefixes</span></div>
+        <!-- unsupported engines stay visible but say so on the card itself,
+             instead of being a disabled row in a select nobody opens -->
+        <div class="kind is-off"><span class="kind-ic"><svg viewBox="0 0 16 16" width="22" height="22"><use href="#i-clickhouse"/></svg></span><span class="kind-name">ClickHouse</span><span class="kind-sub">Not supported yet</span></div>
+      </div>
+
+    </div>
+    <div class="dlg-foot">
+      <button class="p-dlgbtn"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Paste a URI</button>
+      <span class="push" style="display:flex; gap:var(--s-3)">
+        <button class="p-dlgbtn">Cancel</button>
+        <button class="p-dlgbtn primary">Continue<span class="icon-box"><svg class="icon"><use href="#i-chevron-right"/></svg></span></button>
+      </span>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

@@ -1,9 +1,0 @@
-{
-  "artboards": [
-    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Color assigned (red)" },
-    { "file": "MainNoColor.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "No color assigned" },
-    { "file": "ConnectionDialog.dc.html", "x": 0, "y": 1020, "w": 560, "h": 780 },
-    { "file": "SettingsDialog.dc.html", "x": 640, "y": 1020, "w": 700, "h": 540 }
-  ],
-  "launch": { "view": "focused", "file": "Main.dc.html" }
-}

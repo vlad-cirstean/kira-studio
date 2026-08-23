@@ -1,0 +1,23 @@
+        <!-- A connection with NO colour — the default. The group still has its
+             2px rail slot, just unpainted, so a coloured and an uncoloured
+             connection line up their names to the same pixel. -->
+        <div class="conn-group nocolour">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="icon-box"><span class="state live"></span></span><span class="tree-label" style="font-weight:600">warehouse</span><span class="p-badge push">postgres 16</span></div>
+          <div class="p-row" style="padding-left:22px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="icon-box muted"><svg class="icon"><use href="#i-db"/></svg></span><span class="tree-label">analytics</span></div>
+          <div class="p-row" style="padding-left:38px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="tree-label muted">public</span></div>
+          <div class="p-row" style="padding-left:54px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="tree-label muted">Tables</span><span class="p-count push">9</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">daily_revenue</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">orders</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">shipments</span></div>
+          <div class="p-row" style="padding-left:54px"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="tree-label muted">Views</span><span class="p-count push">4</span></div>
+          <div class="p-row" style="padding-left:22px"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box muted"><svg class="icon"><use href="#i-terminal"/></svg></span><span class="tree-label">Consoles</span><span class="p-count push">1</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-red)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state live"></span></span><span class="tree-label">prod-analytics</span><span class="p-badge push">postgres 16</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-violet)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label">staging-mongo</span><span class="p-badge push">mongodb 7</span></div>
+        </div>
+        <div class="conn-group nocolour off">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label">local-redis</span><span class="p-badge push">redis 7</span></div>
+        </div>

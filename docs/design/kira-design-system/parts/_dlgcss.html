@@ -1,0 +1,23 @@
+  body { background: rgba(0,0,0,0.32); }
+  .dlg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+  .dlg-box { width: 100%; background: var(--bg-elevated); border: var(--bw) solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-float); display: flex; flex-direction: column; overflow: hidden; max-height: 100%; }
+  .dlg-title { height: var(--h-lg); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4) 0 var(--s-5); border-bottom: var(--bw) solid var(--border); font-size: var(--t-lg); color: var(--fg); }
+  .dlg-body { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); overflow: hidden; }
+  .dlg-foot { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border-top: var(--bw) solid var(--border); }
+  /* one field object, one label style, one 12px gap — used by every dialog */
+  .fld { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; flex: 1; }
+  .fld > label { font-size: var(--t-sm); color: var(--fg-muted); }
+  .fld .p-input { width: 100%; }
+  .frow { display: flex; gap: var(--s-4); align-items: flex-start; }
+  .help { font-size: var(--t-xs); color: var(--fg-disabled); line-height: 1.5; }
+  .sec-label { font-size: var(--t-sm); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.06em; padding-top: var(--s-2); }
+  .swatches { display: flex; gap: var(--s-2); align-items: center; height: var(--h-md); }
+  .sw { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; }
+  .sw.on { outline: 2px solid var(--fg); outline-offset: 2px; }
+  /* No colour is the default, so it is the first swatch, not the absence of one. */
+  .sw.none { border: 1px dashed var(--fg-disabled); position: relative; }
+  .sw.none::after { content: ""; position: absolute; inset: 3px; border-top: 1px solid var(--fg-disabled); transform: rotate(-45deg); }
+  .chk { display: flex; align-items: flex-start; gap: var(--s-3); }
+  /* one checkbox object, used by the connection dialog and the tree filters alike */
+  .box { width: 14px; height: 14px; margin-top: 2px; border-radius: 3px; border: var(--bw) solid var(--border-strong); background: var(--bg-input); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--accent-fg); }
+  .box.on { background: var(--accent); border-color: var(--accent); }

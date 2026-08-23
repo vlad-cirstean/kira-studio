@@ -1,0 +1,116 @@
+<style>
+  .split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .result-head { height: var(--h-md); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); border-top: var(--bw) solid var(--border); border-bottom: var(--bw) solid var(--border); background: var(--bg-elevated); }
+</style>
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor">
+
+
+        <div class="tabstrip">
+          <!-- this tab belongs to prod-analytics and keeps its red rail; the active
+               console belongs to warehouse, which has no colour — the two sit side by
+               side and the difference costs no layout. -->
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <span class="p-tab is-active"><span class="tab-rail"></span><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span><span class="tab-name">Console 1</span><span class="p-chip warn" style="height:14px; padding:0 5px">unsaved</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="view-head">
+          <span class="conn-dot none" title="No colour set"></span>
+          <span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span>
+          <span class="view-target"><span class="path">warehouse / </span>analytics</span>
+          <!-- The console is the one place you can write arbitrary SQL, so the schema
+               it runs against is a control, not a label. -->
+          <span class="p-select bordered" style="height:var(--h-sm)">search_path: public<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          <span class="p-chip err"><svg class="icon" style="width:11px;height:11px"><use href="#i-warning"/></svg>writes go to production</span>
+        </div>
+
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <!-- Two run verbs that mean different things get different weights:
+                 "Run" is the accented default, "Run all" is a plain sibling. -->
+            <button class="p-btn primary" title="Run the statement under the cursor  ⌘⏎"><span class="icon-box"><svg class="icon"><use href="#i-play"/></svg></span>Run</button>
+            <button class="p-btn" title="Run every statement in the editor  ⇧⌘⏎"><span class="icon-box"><svg class="icon"><use href="#i-run-all"/></svg></span>Run all</button>
+            <button class="p-iconbtn" style="color:var(--error)" title="Stop"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <!-- LAW 12 — running is a spinning ring and a live elapsed time, next to
+                 the button that started it. No bar across the top of the view. -->
+            <span class="run-state is-running" title="Statement 2 running"><span class="ring"></span>1.8 s</span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-bookmark"/></svg></span>Saved queries<span class="p-count">7</span></button>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span>History</button>
+            <button class="p-iconbtn" title="Format"><svg class="icon"><use href="#i-tree"/></svg></button>
+          </div>
+          <div class="group push">
+            <span class="p-seg"><span class="on">autocommit</span><span>transaction</span></span>
+          </div>
+        </div>
+
+
+        <div class="split">
+          <!-- statement 2 is the one under the cursor: the run gutter marks it, so
+               "Run" never means an ambiguous statement -->
+          <div class="code" style="height:236px; border-bottom:var(--bw) solid var(--border)">
+            <div class="gutter-col">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12</div>
+<pre><span class="cm">-- daily revenue by currency, last 14 days</span>
+<span class="k">SELECT</span> <span class="p">date_trunc</span><span class="o">(</span><span class="s">'day'</span><span class="o">,</span> placed_at<span class="o">)</span> <span class="k">AS</span> day<span class="o">,</span>
+       currency<span class="o">,</span>
+       <span class="f">sum</span><span class="o">(</span>total<span class="o">)</span> <span class="k">AS</span> revenue<span class="o">,</span>
+       <span class="f">count</span><span class="o">(*)</span> <span class="k">AS</span> orders
+  <span class="k">FROM</span> public<span class="o">.</span>orders
+ <span class="k">WHERE</span> status <span class="o">=</span> <span class="s">'paid'</span>
+   <span class="c">AND</span> placed_at <span class="o">&gt;=</span> <span class="f">now</span><span class="o">()</span> <span class="o">-</span> <span class="k">interval</span> <span class="s">'14 days'</span>
+ <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">1</span><span class="o">,</span> <span class="n">2</span>
+ <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">1</span> <span class="k">DESC</span><span class="o">,</span> <span class="n">3</span> <span class="k">DESC</span><span class="o">;</span>
+
+<span class="cm">-- ⌘⏎ runs only the statement the cursor is in</span></pre>
+          </div>
+
+          <!-- Each result is labelled by the statement it came from, so a five-statement
+               run never leaves you counting grids. -->
+          <div class="result-head">
+            <span class="p-seg"><span class="on">Result 1</span><span>Messages</span><span>Plan</span></span>
+            <span class="sm muted">statement 2 · 14 rows · 1.8 s</span>
+            <span class="p-badge">SELECT</span>
+            <span class="push" style="display:flex; gap:var(--s-3)">
+              <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-arrow-out"/></svg></span>Open as tab</button>
+              <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Export</button>
+            </span>
+          </div>
+
+          <div class="p-panel" style="flex:1; min-height:0; border:none; border-radius:0">
+            <div class="thead">
+              <div class="th gutter" style="width:44px"></div>
+              <div class="th" style="width:170px"><span class="name">day</span><span class="p-badge">date</span></div>
+              <div class="th" style="width:120px"><span class="name">currency</span><span class="p-badge">text</span></div>
+              <div class="th" style="width:150px"><span class="name">revenue</span><span class="p-badge">numeric</span></div>
+              <div class="th" style="flex:1"><span class="name">orders</span><span class="p-badge">bigint</span></div>
+            </div>
+            <div class="tbody">
+              <div class="tr"><div class="td gutter" style="width:44px">1</div><div class="td" style="width:170px">2026-08-23</div><div class="td" style="width:120px">EUR</div><div class="td num" style="width:150px">18 402.55</div><div class="td num" style="flex:1">214</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">2</div><div class="td" style="width:170px">2026-08-23</div><div class="td" style="width:120px">USD</div><div class="td num" style="width:150px">9 118.20</div><div class="td num" style="flex:1">96</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">3</div><div class="td" style="width:170px">2026-08-23</div><div class="td" style="width:120px">GBP</div><div class="td num" style="width:150px">4 260.00</div><div class="td num" style="flex:1">41</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">4</div><div class="td" style="width:170px">2026-08-22</div><div class="td" style="width:120px">EUR</div><div class="td num" style="width:150px">21 774.10</div><div class="td num" style="flex:1">248</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">5</div><div class="td" style="width:170px">2026-08-22</div><div class="td" style="width:120px">USD</div><div class="td num" style="width:150px">11 020.75</div><div class="td num" style="flex:1">109</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">6</div><div class="td" style="width:170px">2026-08-22</div><div class="td" style="width:120px">GBP</div><div class="td num" style="width:150px">3 905.40</div><div class="td num" style="flex:1">38</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">7</div><div class="td" style="width:170px">2026-08-21</div><div class="td" style="width:120px">EUR</div><div class="td num" style="width:150px">17 331.90</div><div class="td num" style="flex:1">203</div></div>
+              <div class="tr"><div class="td gutter" style="width:44px">8</div><div class="td" style="width:170px">2026-08-21</div><div class="td" style="width:120px">USD</div><div class="td num" style="width:150px">8 447.05</div><div class="td num" style="flex:1">88</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

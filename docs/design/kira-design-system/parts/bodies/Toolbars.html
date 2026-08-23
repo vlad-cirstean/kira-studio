@@ -1,0 +1,153 @@
+<style>
+  body { overflow: auto; }
+  .sheet { padding: var(--s-6) 28px 40px; display: flex; flex-direction: column; gap: 28px; }
+  .sheet h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .sheet .lede { font-size: var(--t-lg); color: var(--fg-muted); margin-top: var(--s-3); line-height: 1.55; max-width: 760px; }
+  .band { display: flex; flex-direction: column; gap: var(--s-3); }
+  .band > h2 { font-size: var(--t-sm); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.07em; margin: 0; }
+  .band .note { font-size: var(--t-sm); color: var(--fg-muted); line-height: 1.5; max-width: 900px; }
+  .frame { border: var(--bw) solid var(--border); border-radius: var(--r); background: var(--bg); overflow: hidden; }
+  .frame .toolbar:last-child { border-bottom: none; }
+  .cap { font-size: var(--t-xs); color: var(--fg-disabled); font-family: var(--font-mono); }
+  .ruler { display: flex; align-items: center; gap: var(--s-3); }
+  .ruler .bar { height: 28px; width: 3px; background: var(--accent); border-radius: 2px; }
+</style>
+<div class="sheet">
+  <div>
+    <h1>Toolbars</h1>
+    <p class="lede">Every toolbar in Kira Studio is the same object: <b>28&nbsp;px tall</b>, holding only <b>22&nbsp;px</b> controls, <b>6&nbsp;px</b> between siblings, <b>8&nbsp;px</b> at the ends and between groups, hairline groups separated by a 14&nbsp;px rule. What changes between views is the verbs — never the metrics. Below is every toolbar the app has, drawn from the same parts.</p>
+  </div>
+
+  <div class="band">
+    <h2>01 · Data toolbar — three states</h2>
+    <p class="note">Refresh and Stop are one group and both are always present; Stop greys out rather than disappearing, so the button never moves under the cursor. The pager reads an absolute row range, because "page 3 of 47" answers a question nobody asked.</p>
+    <div class="frame">
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-ll"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-l"/></svg></button><span class="mono sm">1–200</span><span class="sm dim">of</span><span class="mono sm muted">9 412</span><button class="p-iconbtn"><svg class="icon"><use href="#i-chev-r"/></svg></button><button class="p-iconbtn"><svg class="icon"><use href="#i-chev-rr"/></svg></button><span class="p-select">200 / page<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-columns"/></svg></span>Columns<span class="p-count">8 / 11</span></button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Preview SQL</button></div>
+        <span class="cap push">idle</span>
+      </div>
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn" style="color:var(--error)"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><span class="p-chip info"><svg class="icon" style="width:11px;height:11px"><use href="#i-history"/></svg>fetching rows · 1.4 s</span></div>
+        <span class="cap push">running — Stop is live and red, Refresh is out</span>
+      </div>
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><span class="p-chip warn">2 rows edited</span><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-undo"/></svg></span>Revert</button><button class="p-btn primary"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Commit</button></div>
+        <span class="cap push">pending edits — the only accent fill on screen</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <h2>02 · Filter toolbar — four states</h2>
+    <p class="note">One row, two inputs, one verb. <span class="mono">WHERE</span> and <span class="mono">ORDER BY</span> are prefixes inside the field rather than placeholder text that vanishes the moment you type. A sort set by clicking a column header says so, so the field is never mysteriously full. <b>The row is permanent</b> — there is no close button, only <span class="mono">Clear</span>; a filter bar that can be dismissed makes the grid change height and hides the reason it is showing 41 rows.</p>
+    <div class="frame">
+      <div class="toolbar">
+        <button class="p-iconbtn"><svg class="icon"><use href="#i-history"/></svg></button>
+        <span class="p-input" style="flex:1"><span class="dim" style="font-family:var(--font-ui)">WHERE</span><span class="ph">status = 'paid'</span></span>
+        <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">ORDER BY</span><span class="ph">placed_at DESC</span></span>
+        <button class="p-btn is-disabled" style="height:var(--h-sm)">Apply</button>
+        <span class="cap">empty</span>
+      </div>
+      <div class="toolbar">
+        <button class="p-iconbtn"><svg class="icon"><use href="#i-history"/></svg></button>
+        <span class="p-input is-focus" style="flex:1"><span class="dim" style="font-family:var(--font-ui)">WHERE</span><span class="mono">status = 'paid' AND total &gt; 50</span></span>
+        <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">ORDER BY</span><span class="mono">placed_at DESC</span></span>
+        <span class="p-chip info"><svg class="icon" style="width:11px;height:11px"><use href="#i-sort"/></svg>from header</span>
+        <button class="p-btn primary" style="height:var(--h-sm)">Apply</button>
+        <button class="p-btn" style="height:var(--h-sm)">Clear</button>
+        <span class="cap">applied</span>
+      </div>
+      <div class="toolbar" style="border-bottom:none">
+        <button class="p-iconbtn"><svg class="icon"><use href="#i-history"/></svg></button>
+        <span class="p-input" style="flex:1; border-color:var(--error)"><span class="dim" style="font-family:var(--font-ui)">WHERE</span><span class="mono">status = 'paid' AND</span></span>
+        <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">ORDER BY</span><span class="ph">placed_at DESC</span></span>
+        <button class="p-btn is-disabled" style="height:var(--h-sm)">Apply</button>
+        <span class="cap">invalid</span>
+      </div>
+      <div class="strip err" style="border-bottom:none"><span class="icon-box"><svg class="icon"><use href="#i-warning"/></svg></span><span>Unexpected end of expression after <span class="mono">AND</span> — the filter was not sent to the server, so the grid still shows the last good result.</span></div>
+    </div>
+  </div>
+
+  <div class="band">
+    <h2>03 · Search toolbar — in-result find</h2>
+    <p class="note">Docks at the bottom of the result it searches, so it is obvious <em>what</em> is being searched. The three modifiers are labelled instead of cryptic: <span class="mono">Aa</span>, <span class="mono">ab</span> and <span class="mono">.*</span> only ever meant anything to whoever wrote them. <b>Search runs over the loaded rows only</b> — it never issues a query. The bar says which rows those are, so a hit count is never mistaken for a count over the whole table; to search further, widen the filter above and fetch more.</p>
+    <div class="frame">
+      <div class="toolbar" style="border-bottom:none">
+        <span class="icon-box muted"><svg class="icon"><use href="#i-search"/></svg></span>
+        <span class="p-input is-focus" style="width:280px"><span class="mono">refund</span></span>
+        <span class="p-seg"><span class="on" title="Match case">Case</span><span title="Whole word">Word</span><span title="Regular expression">Regex</span></span>
+        <div class="sep"></div>
+        <span class="sm muted"><b class="mono">3</b> of <b class="mono">17</b></span>
+        <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-l"/></svg></button>
+        <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-r"/></svg></button>
+        <div class="sep"></div>
+        <span class="sm dim">in the 200 loaded rows</span>
+        <button class="p-iconbtn push"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="toolbar" style="border-top:var(--bw) solid var(--border); border-bottom:none">
+        <span class="icon-box" style="color:var(--error)"><svg class="icon"><use href="#i-search"/></svg></span>
+        <span class="p-input" style="width:280px; border-color:var(--error)"><span class="mono">(unclosed</span></span>
+        <span class="p-seg"><span>Case</span><span>Word</span><span class="on">Regex</span></span>
+        <div class="sep"></div>
+        <span class="sm" style="color:var(--error)">Unterminated group</span>
+        <button class="p-iconbtn push"><svg class="icon"><use href="#i-close"/></svg></button>
+        <span class="cap">bad regex — states the fault, keeps the last match count out of the way</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <h2>04 · The other views, same object</h2>
+    <p class="note">DDL, documents, key/value, stream and console differ only in their verbs. Read down the left edge: Refresh-then-Stop, or Run-then-Stop, in the same place every time.</p>
+    <div class="frame">
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <span class="p-seg"><span class="on">Definition</span><span>Columns</span><span>Indexes</span><span>Constraints</span></span>
+        <div class="sep"></div>
+        <span class="p-select">include: comments, grants<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+        <div class="group push"><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Copy</button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span>Open in console</button></div>
+        <span class="cap" style="margin-left:var(--s-4)">DDL</span>
+      </div>
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-l"/></svg></button><span class="mono sm">1–50</span><span class="sm dim">of</span><span class="mono sm muted">≈ 40 000</span><button class="p-iconbtn"><svg class="icon"><use href="#i-arrow-r"/></svg></button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-hash"/></svg></span>Exact count</button></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-expand"/></svg></button><button class="p-iconbtn"><svg class="icon"><use href="#i-collapse"/></svg></button></div>
+        <span class="cap push">documents — MongoDB</span>
+      </div>
+      <div class="toolbar">
+        <div class="group"><button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-l"/></svg></button><span class="mono sm">1–14</span><span class="sm dim">of</span><span class="mono sm muted">≈ 14</span><button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-r"/></svg></button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-hash"/></svg></span>Exact count</button></div>
+        <div class="sep"></div>
+        <span class="p-input ui" style="width:200px"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">MATCH pattern</span></span>
+        <div class="group push"><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span>Set TTL</button><button class="p-btn" style="color:var(--error)"><span class="icon-box"><svg class="icon"><use href="#i-trash"/></svg></span>Delete key</button></div>
+        <span class="cap" style="margin-left:var(--s-4)">key/value — Redis</span>
+      </div>
+      <div class="toolbar">
+        <div class="group"><button class="p-btn is-active"><span class="icon-box"><svg class="icon"><use href="#i-swap"/></svg></span>Poll</button><button class="p-iconbtn" style="color:var(--error)"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><span class="p-select">from: latest<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span><span class="p-select">50 messages<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span><span class="p-select">all partitions<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span></div>
+        <div class="group push"><span class="p-chip ok">polling · 3 s ago</span></div>
+        <span class="cap" style="margin-left:var(--s-4)">stream — Kafka / SQS</span>
+      </div>
+      <div class="toolbar" style="border-bottom:none">
+        <div class="group"><button class="p-btn primary"><span class="icon-box"><svg class="icon"><use href="#i-play"/></svg></span>Run</button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-run-all"/></svg></span>Run all</button><button class="p-iconbtn" style="color:var(--error)"><svg class="icon"><use href="#i-stop"/></svg></button></div>
+        <div class="sep"></div>
+        <div class="group"><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-bookmark"/></svg></span>Saved queries<span class="p-count">7</span></button><button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span>History</button><button class="p-iconbtn"><svg class="icon"><use href="#i-tree"/></svg></button></div>
+        <div class="group push"><span class="p-seg"><span class="on">autocommit</span><span>transaction</span></span></div>
+        <span class="cap" style="margin-left:var(--s-4)">console — SQL</span>
+      </div>
+    </div>
+  </div>
+</div>

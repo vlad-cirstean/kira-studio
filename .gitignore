@@ -145,3 +145,11 @@ vite.config.ts.timestamp-*
 # Playwright
 test-results/
 playwright-report/
+
+# macOS
+.DS_Store
+
+# Design canvas — the seeded page is a 3 MB build product (it bundles the
+# canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
+# and the design skill's seed-canvas.mjs; the design itself lives in parts/.
+docs/design/*/[a-z]*-design-system.html

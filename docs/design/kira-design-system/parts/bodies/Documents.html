@@ -1,0 +1,120 @@
+<style>
+  .doc-list { flex: 1; min-height: 0; overflow: hidden; }
+  .doc-row { border-bottom: var(--bw) solid var(--border); }
+  .doc-head { height: var(--h-md); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); cursor: pointer; }
+  .doc-head:hover { background: var(--hover); }
+  .doc-row.open > .doc-head { background: var(--bg-elevated); }
+  .doc-id { font-family: var(--font-mono); font-size: var(--t-md); color: var(--fg); flex-shrink: 0; }
+  .doc-preview { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .doc-body { border-top: var(--bw) solid var(--border); background: var(--bg-elevated); display: flex; flex-direction: column; }
+</style>
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-violet)">
+
+
+        <div class="tabstrip">
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-violet)"></span><span class="icon-box" style="color:var(--conn-violet)"><svg class="icon"><use href="#i-doc"/></svg></span><span class="tab-name"><span class="tab-schema">app.</span>sessions</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-violet)"></span><span class="icon-box" style="color:var(--conn-violet)"><svg class="icon"><use href="#i-doc"/></svg></span><span class="tab-name"><span class="tab-schema">app.</span>events</span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <!-- The view header is the SAME 28px object as a toolbar: it just carries
+             identity instead of actions, so documents / key-value / stream / DDL
+             all open the same way. -->
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-violet)" title="Connection colour"></span>
+          <span class="icon-box" style="color:var(--conn-violet)"><svg class="icon"><use href="#i-doc"/></svg></span>
+          <span class="view-target"><span class="path">staging-mongo / app / </span>sessions</span>
+          <span class="p-badge">collection</span>
+          <span class="p-badge">avg 1.4 KB</span>
+        </div>
+
+        <!-- ===== DOCUMENT TOOLBAR ===== -->
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <button class="p-iconbtn is-hover" title="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <button class="p-iconbtn is-disabled" title="Nothing running"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <span class="run-state" title="Last fetch took 96 ms"><span class="ring"></span>96 ms</span>
+          </div>
+          <div class="sep"></div>
+          <!-- Same pager vocabulary as the SQL grid: absolute document range, not "page n". -->
+          <div class="group">
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-l"/></svg></button>
+            <span class="mono sm">1–50</span>
+            <span class="sm dim">of</span>
+            <span class="mono sm muted">≈ 40 000</span>
+            <button class="p-iconbtn"><svg class="icon"><use href="#i-arrow-r"/></svg></button>
+            <button class="p-btn" title="Run an exact countDocuments() — the estimate above is metadata"><span class="icon-box"><svg class="icon"><use href="#i-hash"/></svg></span>Exact count</button>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-iconbtn" title="Expand all"><svg class="icon"><use href="#i-expand"/></svg></button>
+            <button class="p-iconbtn" title="Collapse all"><svg class="icon"><use href="#i-collapse"/></svg></button>
+          </div>
+          <!-- Pending changes are reported here, in the same place and the same
+               three parts as the SQL grid: count, Revert, Commit. A document is
+               not a special kind of edit and does not get a panel of its own. -->
+          <div class="group push">
+            <span class="p-chip warn">1 document edited</span>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-undo"/></svg></span>Revert</button>
+            <button class="p-btn primary"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Commit</button>
+          </div>
+        </div>
+
+        <!-- ===== FILTER TOOLBAR — the Mongo dialect of the same row ===== -->
+        <div class="toolbar">
+          <button class="p-iconbtn" title="Saved &amp; recent filters"><svg class="icon"><use href="#i-history"/></svg></button>
+          <span class="p-input is-focus" style="flex:1; min-width:0"><span class="dim" style="font-family:var(--font-ui)">FIND</span><span class="mono">{ status: 'active', region: 'eu' }</span></span>
+          <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">SORT</span><span class="mono">{ lastSeen: -1 }</span></span>
+          <button class="p-btn primary" style="height:var(--h-sm)">Apply</button>
+          <button class="p-btn" style="height:var(--h-sm)" title="Empty both fields and refetch">Clear</button>
+        </div>
+
+        <div class="doc-list">
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b1e</span><span class="doc-preview">{ userId: 'u_8841', status: 'active', region: 'eu', lastSeen: 2026-08-23T08:14:02Z, … }</span><span class="p-badge">7 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+
+          <!-- One document expanded. The editor is the same code surface the DDL and
+               console views use — the only difference is the language. -->
+          <div class="doc-row open">
+            <div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="doc-id">65f2a10c4b1f</span><span class="doc-preview">{ userId: 'u_9002', status: 'active', region: 'eu', … }</span><span class="p-chip warn">edited</span><button class="p-iconbtn is-active"><svg class="icon"><use href="#i-edit"/></svg></button></div>
+            <div class="doc-body">
+              <div class="code" style="height:210px">
+                <div class="gutter-col">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10</div>
+<pre>{
+  <span class="p">"_id"</span><span class="o">:</span> <span class="f">ObjectId</span><span class="o">(</span><span class="s">"65f2a10c4b1f"</span><span class="o">)</span>,
+  <span class="p">"userId"</span><span class="o">:</span> <span class="s">"u_9002"</span>,
+  <span class="p">"status"</span><span class="o">:</span> <span class="s">"active"</span>,
+  <span class="p">"region"</span><span class="o">:</span> <span class="s">"eu"</span>,
+  <span class="p">"device"</span><span class="o">:</span> { <span class="p">"os"</span><span class="o">:</span> <span class="s">"macOS 15.2"</span>, <span class="p">"app"</span><span class="o">:</span> <span class="s">"3.4.1"</span> },
+  <span class="p">"loginCount"</span><span class="o">:</span> <span class="n">148</span>,
+  <span class="p">"lastSeen"</span><span class="o">:</span> <span class="f">ISODate</span><span class="o">(</span><span class="s">"2026-08-23T07:58:41Z"</span><span class="o">)</span>,
+  <span class="p">"expiresAt"</span><span class="o">:</span> <span class="k">null</span>
+}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b20</span><span class="doc-preview">{ userId: 'u_1177', status: 'expired', region: 'us', lastSeen: 2026-08-21T19:02:55Z, … }</span><span class="p-badge">6 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b21</span><span class="doc-preview">{ userId: 'u_3390', status: 'active', region: 'eu', device: { os: 'iOS 18.3' }, … }</span><span class="p-badge">9 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b22</span><span class="doc-preview">{ userId: 'u_4512', status: 'active', region: 'apac', loginCount: 3, … }</span><span class="p-badge">7 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b23</span><span class="doc-preview">{ userId: 'u_7708', status: 'expired', region: 'eu', expiresAt: 2026-08-20T00:00:00Z, … }</span><span class="p-badge">6 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b24</span><span class="doc-preview">{ userId: 'u_2264', status: 'active', region: 'us', device: { os: 'Windows 11' }, … }</span><span class="p-badge">8 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+          <div class="doc-row"><div class="doc-head"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="doc-id">65f2a10c4b25</span><span class="doc-preview">{ userId: 'u_6031', status: 'active', region: 'eu', loginCount: 902, … }</span><span class="p-badge">7 fields</span><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button></div></div>
+        </div>
+
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

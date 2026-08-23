@@ -1,0 +1,228 @@
+    /* ============================================================
+       Kira Studio — one vocabulary, shared verbatim by every artboard.
+       Nothing below is re-declared per screen. If a screen needs a
+       measurement that is not here, the system is missing a rule.
+       ============================================================ */
+    :root {
+      /* surfaces + text (src/renderer/theme/tokens.css, unchanged) */
+      --bg: #1f1f1f; --bg-elevated: #202020; --bg-chrome: #181818; --bg-input: #313131;
+      --fg: #cccccc; --fg-muted: #9d9d9d; --fg-disabled: #6e6e6e;
+      --border: #2b2b2b; --border-strong: #313131;
+      --focus: #0078d4; --accent: #0078d4; --accent-fg: #ffffff;
+      --select: #04395e; --hover: #2a2d2e; --badge: #616161;
+      --error: #f14c4c; --warn: #cca700; --ok: #23d18b; --info: #3794ff;
+
+      /* connection colours — SOFTENED. oklch(0.72 0.09 h), one lightness and
+         one chroma for all eleven hues, so no connection shouts louder than
+         another. Grey is the same lightness at chroma 0.012. */
+      --conn-red: #d78e88;     --conn-orange: #d1966d;  --conn-amber: #bca260;
+      --conn-olive: #9fad6b;   --conn-green: #7db485;   --conn-teal: #5fb7a5;
+      --conn-cyan: #58b4c4;    --conn-blue: #7ba8dc;    --conn-indigo: #979fdd;
+      --conn-violet: #b296d2;  --conn-magenta: #cb8eb6; --conn-grey: #9fa5ac;
+
+      /* syntax (CodeMirror, unchanged) */
+      --sx-comment: #6a9955; --sx-string: #ce9178; --sx-number: #b5cea8;
+      --sx-keyword: #569cd6; --sx-control: #c586c0; --sx-name: #9cdcfe;
+      --sx-func: #dcdcaa; --sx-op: #d4d4d4; --sx-meta: #808080;
+
+      /* type — TWO roles, FOUR steps */
+      --font-ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+      --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --t-xs: 10px; --t-sm: 11px; --t-md: 12px; --t-lg: 13px;
+      /* space — SIX steps on a 2px base */
+      --s-1: 2px; --s-2: 4px; --s-3: 6px; --s-4: 8px; --s-5: 12px; --s-6: 16px;
+      /* size — FIVE control heights */
+      --h-xs: 18px; --h-sm: 22px; --h-md: 26px; --h-lg: 30px; --h-row: 22px;
+      --icon-box: 16px;
+      /* shape */
+      --r-sm: 4px; --r: 6px; --r-lg: 8px; --r-pill: 10px; --bw: 1px;
+      --shadow-float: 0 8px 28px rgb(0 0 0 / 0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg-chrome); overflow: hidden; }
+    body { font-family: var(--font-ui); font-size: var(--t-md); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; border: none; background: none; padding: 0; }
+    .icon { width: 13px; height: 13px; display: block; flex-shrink: 0; }
+    .icon-box { width: var(--icon-box); height: var(--icon-box); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--fg-muted); }
+    .dim { color: var(--fg-disabled); }
+    .sm { font-size: var(--t-sm); }
+    .xs { font-size: var(--t-xs); }
+    .push { margin-left: auto; }
+
+    /* ---------- P1 icon button ---------- */
+    .p-iconbtn { height: var(--h-sm); width: var(--h-sm); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--fg-muted); cursor: pointer; flex-shrink: 0; }
+    .p-iconbtn.is-hover { background: var(--hover); color: var(--fg); }
+    .p-iconbtn.is-active { background: var(--bg-input); color: var(--fg); }
+    .p-iconbtn.is-disabled { color: var(--fg-disabled); }
+    /* ---------- P2 text button ---------- */
+    .p-btn { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; flex-shrink: 0; }
+    .p-btn.is-hover { background: var(--hover); color: var(--fg); }
+    .p-btn.is-active { background: var(--bg-input); color: var(--fg); }
+    .p-btn.primary { background: var(--accent); color: var(--accent-fg); }
+    .p-btn.is-disabled { color: var(--fg-disabled); }
+    /* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
+    .p-dlgbtn { height: var(--h-md); display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); padding: 0 var(--s-5); border-radius: var(--r-sm); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); font-size: var(--t-sm); cursor: pointer; }
+    .p-dlgbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    .p-dlgbtn.is-disabled { opacity: 0.45; }
+    /* ---------- P4 input ---------- */
+    .p-input { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); font-family: var(--font-mono); font-size: var(--t-sm); }
+    .p-input.md { height: var(--h-md); }
+    .p-input.ui { font-family: var(--font-ui); }
+    .p-input.is-focus { border-color: var(--focus); outline: var(--bw) solid var(--focus); outline-offset: -2px; }
+    .p-input .ph { color: var(--fg-disabled); }
+    /* ---------- P5 select ---------- */
+    .p-select { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-2) 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; flex-shrink: 0; }
+    .p-select.bordered { height: var(--h-md); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); padding: 0 var(--s-2) 0 var(--s-3); }
+    /* ---------- P6 segmented ---------- */
+    .p-seg { display: inline-flex; height: var(--h-sm); border: var(--bw) solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
+    .p-seg.md { height: var(--h-md); }
+    .p-seg > * { display: flex; align-items: center; justify-content: center; padding: 0 var(--s-3); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; white-space: nowrap; }
+    .p-seg > * + * { border-left: var(--bw) solid var(--border-strong); }
+    .p-seg > .on { background: var(--bg-input); color: var(--fg); }
+    /* ---------- P7 tab ---------- */
+    .p-tab { height: var(--h-md); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); border: var(--bw) solid transparent; color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; max-width: 210px; flex-shrink: 0; }
+    .p-tab.is-active { background: var(--bg-elevated); border-color: var(--border-strong); color: var(--fg); }
+    /* ---------- P8 row ---------- */
+    .p-row { height: var(--h-row); display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg); font-size: var(--t-md); cursor: pointer; }
+    .p-row.is-hover { background: var(--hover); }
+    .p-row.is-selected { background: var(--select); }
+    /* ---------- P9 badge / count / chip ---------- */
+    .p-badge { height: var(--h-xs); display: inline-flex; align-items: center; padding: 0 var(--s-3); border-radius: var(--r-sm); background: var(--bg-input); color: var(--fg-muted); font-family: var(--font-mono); font-size: var(--t-xs); flex-shrink: 0; white-space: nowrap; }
+    .p-count { min-width: var(--h-xs); height: var(--h-xs); display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; border-radius: var(--r-pill); background: var(--badge); color: #f0f0f0; font-family: var(--font-mono); font-size: var(--t-xs); flex-shrink: 0; }
+    .p-chip { height: var(--h-xs); display: inline-flex; align-items: center; gap: 5px; padding: 0 var(--s-3); border-radius: var(--r-pill); font-size: var(--t-xs); flex-shrink: 0; white-space: nowrap; }
+    .p-chip.warn { background: rgba(204,167,0,0.16); color: var(--warn); }
+    .p-chip.err { background: rgba(241,76,76,0.16); color: var(--error); }
+    .p-chip.ok { background: rgba(35,209,139,0.14); color: var(--ok); }
+    .p-chip.info { background: rgba(55,148,255,0.16); color: var(--info); }
+    /* ---------- P10 status-bar item ---------- */
+    .p-status { height: var(--h-xs); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg); font-size: var(--t-sm); cursor: pointer; }
+    .p-status.is-on { background: var(--bg-input); }
+    .p-status.is-hover { background: var(--hover); }
+    /* ---------- P11 floating surface (menu / dialog / popover) ---------- */
+    .p-float { background: var(--bg-elevated); border: var(--bw) solid var(--border-strong); border-radius: var(--r); box-shadow: var(--shadow-float); overflow: hidden; }
+    .p-menu-label { height: var(--h-xs); display: flex; align-items: center; padding: 0 var(--s-3); font-size: var(--t-xs); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.06em; }
+    .p-sep { height: var(--bw); background: var(--border-strong); margin: var(--s-2) 0; }
+    /* ---------- P12 panel ---------- */
+    .p-panel { border: var(--bw) solid var(--border); border-radius: var(--r); background: var(--bg); overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+    .p-panel-head { height: var(--h-md); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-3); border-bottom: var(--bw) solid var(--border); font-size: var(--t-sm); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ---------- LAW 01: a toolbar is 28px, holds only h-sm controls ---------- */
+    .toolbar { height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); border-bottom: var(--bw) solid var(--border); }
+    .toolbar.last { border-bottom: none; }
+    .toolbar .group { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+    .toolbar .sep { width: var(--bw); height: 14px; background: var(--border-strong); margin: 0 var(--s-1); flex-shrink: 0; }
+
+    /* ---------- shell ---------- */
+    .app { width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg-chrome); }
+    .workbench { flex: 1; min-height: 0; display: flex; gap: var(--s-2); padding: var(--s-2); }
+    .col { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; flex: 1; }
+    .sidebar { width: 254px; flex-shrink: 0; }
+    .tree { flex: 1; min-height: 0; overflow: hidden; padding: var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+    .search-row { padding: var(--s-2) var(--s-2) 0; flex-shrink: 0; }
+    .search-row .p-input { width: 100%; }
+
+    /* LAW 07: connection colour is a rail — tree group, tab, toolbar. Nothing else. */
+    .conn-group { border-left: 2px solid var(--rail); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding-left: var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+    .conn-group + .conn-group { margin-top: var(--s-3); }
+    .conn-group.off { opacity: 0.75; }
+    .twist { width: var(--icon-box); height: var(--icon-box); display: flex; align-items: center; justify-content: center; color: var(--fg-muted); flex-shrink: 0; }
+    .twist.hidden { visibility: hidden; }
+    .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* connection state: filled dot = live, hollow ring = offline, red = failed */
+    .state { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .state.live { background: var(--ok); }
+    .state.off { border: 1.5px solid var(--fg-disabled); }
+    .state.err { background: var(--error); }
+    .state.busy { background: var(--warn); }
+
+    /* ---------- editor column ---------- */
+    .editor { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    /* LAW 07 — the connection colour reaches the view you are working in, as a
+       2px rail capping the primary toolbar. Not the top of the panel: the tab
+       strip above it holds tabs from several connections at once, so a rail
+       there would colour the whole panel for whichever one happens to be in
+       front. The toolbar is the row that acts on the current view, so that is
+       the row the colour belongs to. Same mark as the tree group rail and the
+       tab rail, at the same weight; never a tint, a background or a border.
+       No colour is the default, and then the rail is simply unpainted — the
+       slot is 2px either way, so nothing shifts when a colour is assigned. */
+    .toolbar-rail { height: 2px; flex-shrink: 0; background: var(--rail, transparent); }
+    /* the same identity, inline: a 5px dot before the connection name */
+    .conn-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: var(--rail, transparent); }
+    .conn-dot.none { background: none; border: 1px solid var(--fg-disabled); }
+    .conn-group.nocolour { border-left-color: transparent; }
+    .tabstrip { height: var(--h-lg); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-1); padding: 0 var(--s-2); border-bottom: var(--bw) solid var(--border); overflow: hidden; }
+    .tab-rail { width: 2px; height: 14px; border-radius: 1px; flex-shrink: 0; }
+    .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab-schema { color: var(--fg-disabled); }
+
+    /* ---------- view header — every non-grid view opens with this ---------- */
+    .view-head { height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4); border-bottom: var(--bw) solid var(--border); }
+    .view-target { font-size: var(--t-md); color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .view-target .path { color: var(--fg-disabled); }
+
+    /* ---------- run state + strips: error / warning / note ---------- */
+    /* LAW 12 — work in progress is a ring and an elapsed time, in the toolbar
+       that started the work. A bar across the top said only "something is
+       happening"; the ring sits next to Refresh/Run/Poll, so it says WHICH
+       thing, and the number next to it is the only place a duration is
+       reported. Idle keeps the same 11px slot as a static ring holding the
+       last duration, so the toolbar never reflows when work starts. */
+    .run-state { display: flex; align-items: center; gap: var(--s-2); font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+    .run-state .ring { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--border-strong); }
+    .run-state.is-running { color: var(--info); }
+    .run-state.is-running .ring { border-color: var(--accent) transparent var(--accent) var(--accent); animation: spin 0.7s linear infinite; }
+    .run-state.is-error { color: var(--error); }
+    .run-state.is-error .ring { border-color: var(--error); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .strip { flex-shrink: 0; display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); font-size: var(--t-sm); line-height: 1.45; border-bottom: var(--bw) solid var(--border); }
+    .strip.err { background: rgba(241,76,76,0.10); color: #f3a3a3; }
+    .strip.warn { background: rgba(204,167,0,0.10); color: #d9c47a; }
+    .strip.note { background: rgba(55,148,255,0.08); color: #a8c8ee; }
+    .strip .strip-action { margin-left: auto; flex-shrink: 0; }
+
+    /* ---------- tabular body shared by grid / kv / stream / console ---------- */
+    .thead { height: var(--h-md); flex-shrink: 0; display: flex; background: var(--bg-elevated); border-bottom: var(--bw) solid var(--border-strong); }
+    .th { display: flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-4); border-right: var(--bw) solid var(--border); font-size: var(--t-sm); color: var(--fg-muted); overflow: hidden; white-space: nowrap; }
+    .th .name { color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
+    .th .key { color: var(--warn); font-family: var(--font-mono); font-size: var(--t-xs); }
+    .tbody { flex: 1; min-height: 0; overflow: hidden; }
+    .tr { height: var(--h-row); display: flex; }
+    .tr:hover { background: var(--hover); }
+    .td { display: flex; align-items: center; padding: 0 var(--s-4); border-right: var(--bw) solid var(--border); border-bottom: var(--bw) solid var(--border); font-family: var(--font-mono); font-size: var(--t-md); color: var(--fg); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .td.gutter { justify-content: flex-end; color: var(--fg-disabled); font-size: var(--t-xs); background: var(--bg-elevated); border-right-color: var(--border-strong); position: relative; }
+    .tr.dirty .td.gutter::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--warn); }
+    .td.null { color: var(--fg-disabled); font-style: italic; }
+    .td.empty::after { content: ""; width: 12px; height: 1px; background: var(--fg-disabled); }
+    .td.num { justify-content: flex-end; }
+    .td.sel { background: var(--select); outline: var(--bw) solid var(--focus); outline-offset: -1px; }
+    .td.edited { color: var(--warn); }
+    .td.fk { color: var(--info); }
+
+    /* ---------- code surface (CodeMirror stand-in) ---------- */
+    .code { flex: 1; min-height: 0; overflow: hidden; display: flex; font-family: var(--font-mono); font-size: var(--t-md); line-height: 18px; }
+    .code .gutter-col { width: 38px; flex-shrink: 0; padding: var(--s-3) var(--s-3) 0 0; text-align: right; color: var(--fg-disabled); font-size: var(--t-sm); background: var(--bg); border-right: var(--bw) solid var(--border); }
+    .code pre { margin: 0; padding: var(--s-3) var(--s-4) 0; flex: 1; min-width: 0; overflow: hidden; white-space: pre; }
+    .k { color: var(--sx-keyword); } .c { color: var(--sx-control); } .s { color: var(--sx-string); }
+    .n { color: var(--sx-number); } .p { color: var(--sx-name); } .f { color: var(--sx-func); }
+    .cm { color: var(--sx-comment); } .o { color: var(--sx-op); } .m { color: var(--sx-meta); }
+
+    /* ---------- operations ---------- */
+    .ops-body { flex: 1; min-height: 0; padding: var(--s-2); display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+    .op-q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); }
+    .op-q.err { color: var(--error); }
+    .op-t { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); flex-shrink: 0; width: 52px; text-align: right; }
+    .op-kind { width: 58px; flex-shrink: 0; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+
+    /* ---------- status bar — toggles live on the RIGHT, icon-only ---------- */
+    .statusbar { height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--s-3); }
+    .statusbar .side { display: flex; align-items: center; gap: var(--s-1); }
+    .sb-toggles { display: flex; align-items: center; gap: var(--s-1); margin-left: var(--s-2); padding-left: var(--s-2); border-left: var(--bw) solid var(--border-strong); }
+
+    /* ---------- empty state ---------- */
+    .empty { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); color: var(--fg-disabled); }
+    .empty .big { width: 24px; height: 24px; }
+    .empty .label { font-size: var(--t-md); color: var(--fg-muted); }
