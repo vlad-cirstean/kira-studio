@@ -6,7 +6,7 @@ import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
+import IdentifierField from '../../theme/primitives/IdentifierField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { runtime, setFilter, setSort } from './state';
 
@@ -16,6 +16,28 @@ const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
 // A query that failed is shown by the WHERE field turning error-red — the failure itself is
 // already reported by DataView.vue's error strip, this just points at the field that caused it.
 const hasError = computed(() => rt.value?.status === 'error');
+
+// P18: identifier autocomplete for the WHERE/ORDER BY boxes — column names (already loaded for
+// the columns menu/header hover, no extra fetch) plus a small curated set of SQL keywords each
+// box actually uses. Kept as two separate lists rather than one shared "SQL keywords" bag: WHERE
+// and ORDER BY use disjoint vocabularies (BETWEEN/LIKE/NULL have no business in an ORDER BY,
+// ASC/DESC have none in a WHERE), and mixing them would just make both lists noisier.
+const columnNames = computed(() => rt.value?.meta?.columns.map((c) => c.name) ?? []);
+const WHERE_KEYWORDS = [
+  'AND',
+  'OR',
+  'NOT',
+  'NULL',
+  'IS NULL',
+  'IS NOT NULL',
+  'IN',
+  'LIKE',
+  'ILIKE',
+  'BETWEEN',
+  'EXISTS',
+];
+const whereCandidates = computed(() => [...columnNames.value, ...WHERE_KEYWORDS]);
+const orderByCandidates = computed(() => [...columnNames.value, 'ASC', 'DESC']);
 
 function sortToText(sort: SortSpec | null): string {
   if (!sort) return '';
@@ -88,13 +110,17 @@ async function onClear(): Promise<void> {
   recordHistory(null, null);
 }
 
-function onWhereEscape(e: KeyboardEvent): void {
+// IdentifierField's own @escape only ever fires once its suggestion dropdown is already closed
+// (an open one consumes Escape itself, to dismiss just the dropdown) — so by the time this runs,
+// focus is still genuinely on the field itself, and blurring the active element is exactly
+// blurring it.
+function onWhereEscape(): void {
   whereText.value = tab.value?.state.filter ?? '';
-  (e.target as HTMLInputElement).blur();
+  (document.activeElement as HTMLElement | null)?.blur();
 }
-function onOrderByEscape(e: KeyboardEvent): void {
+function onOrderByEscape(): void {
   orderByText.value = sortToText(tab.value?.state.sort ?? null);
-  (e.target as HTMLInputElement).blur();
+  (document.activeElement as HTMLElement | null)?.blur();
 }
 
 const historyOpen = ref(false);
@@ -130,25 +156,27 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </div>
     <div class="where-input">
-      <TextField
+      <IdentifierField
         v-model="whereText"
         prefix="WHERE"
         placeholder="status = 'paid'"
         data-testid="filter-where-input"
         :invalid="hasError"
+        :candidates="whereCandidates"
         @enter="applyWhere"
-        @keydown.esc="onWhereEscape"
+        @escape="onWhereEscape"
         @blur="applyWhere"
       />
     </div>
     <div class="orderby-input">
-      <TextField
+      <IdentifierField
         v-model="orderByText"
         prefix="ORDER BY"
         placeholder="placed_at DESC"
         data-testid="filter-orderby-input"
+        :candidates="orderByCandidates"
         @enter="applyOrderBy"
-        @keydown.esc="onOrderByEscape"
+        @escape="onOrderByEscape"
         @blur="applyOrderBy"
       />
     </div>

@@ -149,6 +149,10 @@ playwright-report/
 # macOS
 .DS_Store
 
+# Claude Code agent worktrees — isolated scratch checkouts for background
+# subagents (see .claude/worktrees/*), never repo content.
+.claude/
+
 # Design canvas — the seeded page is a 3 MB build product (it bundles the
 # canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
 # and the design skill's seed-canvas.mjs; the design itself lives in parts/.

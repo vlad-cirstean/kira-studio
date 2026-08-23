@@ -15,6 +15,7 @@ import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import IdentifierField from '../../theme/primitives/IdentifierField.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -110,6 +111,34 @@ function onSearchInput(): void {
   setSearch(props.tab.id, searchText.value);
   recordFilterHistory(searchText.value, props.tab.state.sort);
 }
+
+// P18: identifier autocomplete for the filter/sort boxes — field names already computed for the
+// Fields/projection menu (fieldNamesOnPage, no extra fetch), plus a small curated set of Mongo
+// query operators (filter box only — the sort box's own vocabulary is just 1/-1, handled as a
+// separate, tiny candidate list rather than folding into this one).
+const MONGO_OPERATORS = [
+  '$eq',
+  '$ne',
+  '$gt',
+  '$gte',
+  '$lt',
+  '$lte',
+  '$in',
+  '$nin',
+  '$exists',
+  '$regex',
+  '$and',
+  '$or',
+  '$not',
+];
+const filterCandidates = computed(() => {
+  void pageVersion.n;
+  return [...fieldNamesOnPage(props.tab.id), ...MONGO_OPERATORS];
+});
+const sortCandidates = computed(() => {
+  void pageVersion.n;
+  return fieldNamesOnPage(props.tab.id);
+});
 
 // The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
 // read.ts explicitly rejects a `{kind:'text'}` sort (a free-text expression has no server-side
@@ -581,22 +610,24 @@ onUnmounted(() => {
           />
         </div>
         <div class="filter-field">
-          <TextField
+          <IdentifierField
             v-model="searchText"
             placeholder="Filter (e.g. { name: 'a' })"
             data-testid="document-search"
-            @keyup.enter="onSearchInput"
+            :candidates="filterCandidates"
+            @enter="onSearchInput"
             @blur="onSearchInput"
           />
         </div>
         <div class="sort-field">
-          <TextField
+          <IdentifierField
             v-model="sortText"
             prefix="SORT"
             placeholder="{ createdAt: -1, name: 1 }"
             title="Mongo sort document: 1 = ascending, -1 = descending"
             data-testid="document-sort"
-            @keyup.enter="onSortInput"
+            :candidates="sortCandidates"
+            @enter="onSortInput"
             @blur="onSortInput"
           />
         </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -46,7 +47,14 @@ onMounted(() => {
       lineNumbers(),
       highlightSpecialChars(),
       EditorView.lineWrapping,
-      keymap.of(defaultKeymap),
+      // P18: basic SQL keyword completion — lang-sql's own sql() extension (languages.ts) already
+      // registers a keyword completion source per dialect; this is the one thing that actually
+      // activates it (and any future language's own completions) in every CodeMirrorHost
+      // consumer (console, DDL, cell editor) — completionKeymap adds the standard
+      // Ctrl+Space/Tab-accept/Escape-dismiss bindings, kept ahead of defaultKeymap so its own
+      // Escape (dismiss the completion popup) takes priority over any conflicting default.
+      autocompletion(),
+      keymap.of([...completionKeymap, ...defaultKeymap]),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
