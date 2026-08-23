@@ -28,7 +28,6 @@ test.afterAll(async () => {
 
 const DB_PATH = 'database:kira_test';
 const ORDER_ITEMS_PATH = `${DB_PATH}/table:order_items`;
-const ORDER_ITEMS_ID_COLUMN_PATH = `${ORDER_ITEMS_PATH}/column:id`;
 const BIG_ROWS_PATH = `${DB_PATH}/table:big_rows`;
 
 function treeContainer(page: Page): Locator {
@@ -122,13 +121,15 @@ test('mariadb — connect, tree, data tab, count, filter, cancel', async ({
     timeout: 10_000,
   });
 
-  // --- tree: database -> table -> columns, no schema level in between --------------------
+  // --- tree: database -> table, no schema level in between --------------------------------
   await expandRow(page, '');
   const dbRow = await expandRow(page, DB_PATH);
   await expect(dbRow).toHaveAttribute('data-kind', 'database');
-  const orderItemsRow = await expandRow(page, ORDER_ITEMS_PATH);
+  // P19 D5: tables are tree leaves — no twisty, no column children. Columns moved into the
+  // definition view (definition.spec.ts covers that in depth).
+  const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
   await expect(orderItemsRow).toHaveAttribute('data-kind', 'table');
-  await expect(await findRow(page, ORDER_ITEMS_ID_COLUMN_PATH)).toBeVisible();
+  await expect(orderItemsRow.locator('.twisty')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/screenshots/mariadb.png' });
 

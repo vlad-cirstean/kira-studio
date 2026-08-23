@@ -30,13 +30,12 @@ const APP_PATH = `${DB_PATH}/schema:app`;
 const ORDER_ITEMS_PATH = `${APP_PATH}/table:order_items`;
 const INVOICE_SEQ_PATH = `${APP_PATH}/sequence:invoice_number_seq`;
 const FULL_NAME_PATH = `${APP_PATH}/function:full_name`;
-const ORDER_ITEMS_ID_COLUMN_PATH = `${ORDER_ITEMS_PATH}/column:id`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
 }
 
-// See ddl.spec.ts's identically named helper for why this waits on the container's own 'scroll'
+// See definition.spec.ts's identically named helper for why this waits on the container's own 'scroll'
 // event rather than a fixed timeout.
 async function scrollAndSettle(container: Locator, mode: 'reset' | 'advance'): Promise<void> {
   await container.evaluate(
@@ -163,8 +162,10 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expandRow(page, APP_PATH);
 
   // --- scenario 1: menu coverage, gated on caps.sql (D5) — offered on connection/container/
-  // relation rows, absent on sequences, functions and columns (§8.10 lists no console entry
-  // for those kinds). ------------------------------------------------------------------------
+  // relation rows, absent on sequences and functions (§8.10 lists no console entry for those
+  // kinds). Columns no longer have their own tree row (P19 D5: tables are leaves) or a console
+  // item in the definition view's Columns section either (project/menus.ts's
+  // columnsSectionMenu offers only Copy name/Add to projection/Sort by). ----------------------
   await openRowMenu(page, '');
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -185,12 +186,7 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
-  await expandRow(page, ORDER_ITEMS_PATH);
-  await openRowMenu(page, ORDER_ITEMS_ID_COLUMN_PATH);
-  await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
-  // --- scenario 2: opening always creates a fresh tab, never reuses one (unlike DDL/data) -----
+  // --- scenario 2: opening always creates a fresh tab, never reuses one (unlike definition/data) --
   const tabsBeforeOpen = await page.locator('[data-testid="tab"]').count();
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
   const consoleTab1 = page.locator('[data-testid="tab"][data-active="true"]');

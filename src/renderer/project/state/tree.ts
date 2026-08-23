@@ -165,12 +165,16 @@ export async function refresh(connectionId: string, path: string): Promise<void>
 }
 
 // D11's handler: re-fetches every currently-expanded path for the reconnected connection,
-// breadth-first, sequentially — never fans out N parallel engine calls on one client.
+// breadth-first, sequentially — never fans out N parallel engine calls on one client. An
+// expanded group's synthetic '#'-path is skipped (P19 D2/D4): it has no adapter path of its own,
+// and its members are already covered by re-fetching its real parent — issuing a `treeChildren`
+// call for it would decode as a bogus node name and error for nothing.
 export async function refreshExpanded(connectionId: string): Promise<void> {
   const prefix = `${connectionId}|`;
   const paths = [...treeState.expanded]
     .filter((k) => k.startsWith(prefix))
     .map((k) => k.slice(prefix.length))
+    .filter((path) => !path.includes('#'))
     .sort((a, b) => a.split('/').length - b.split('/').length);
   for (const path of paths) {
     await loadChildren(connectionId, path, true);

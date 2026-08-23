@@ -39,7 +39,9 @@ const ORDER_ITEMS_PATH = `${APP_PATH}/table:order_items`;
 const ORDERS_PATH = `${APP_PATH}/table:orders`;
 const ORDER_SUMMARY_PATH = `${APP_PATH}/view:order_summary`;
 const SEQUENCE_PATH = `${APP_PATH}/sequence:invoice_number_seq`;
-const WIDE_TABLE_ID_COLUMN_PATH = `${WIDE_TABLE_PATH}/column:id`;
+// P19 D2: a group folder's path is its parent's path plus `#<kind>` — a renderer-only synthetic
+// path, never sent to an adapter (project/state/tree.ts's groupPath()).
+const SEQUENCES_FOLDER_PATH = `${APP_PATH}#sequence`;
 
 interface OpRecordLike {
   id: string;
@@ -201,24 +203,49 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     opsAfterConnect.filter((o) => o.connectionId === connectionId && o.kind === 'connect'),
   ).toHaveLength(1);
 
-  // --- expand connection -> database -> app -> wide_table -> columns ---------------------
+  // --- expand connection -> database -> app -----------------------------------------------
   await expandRow(page, '');
   await expandRow(page, DB_PATH);
   const appRow = await expandRow(page, APP_PATH);
   await expect(appRow).toHaveAttribute('data-kind', 'schema');
-  const wideTableRow = await expandRow(page, WIDE_TABLE_PATH);
+
+  // P19 D5: tables are tree leaves — no twisty, and children() returns [] regardless of what a
+  // pre-upgrade cache entry might still say. Columns moved into the definition view.
+  const wideTableRow = await findRow(page, WIDE_TABLE_PATH);
   await expect(wideTableRow).toHaveAttribute('data-kind', 'table');
+  await expect(wideTableRow.locator('.twisty')).toHaveCount(0);
 
   const wideTableChildren = await page.evaluate(
     ({ id, path }) => window.kira.treeChildren({ connectionId: id, path }),
     { id: connectionId, path: WIDE_TABLE_PATH },
   );
-  expect(wideTableChildren.nodes).toHaveLength(60);
-  expect(wideTableChildren.nodes[0]?.name).toBe('id');
-  expect(wideTableChildren.nodes[1]?.name).toBe('int_a');
+  expect(wideTableChildren.nodes).toEqual([]);
 
-  const firstColumnRow = await findRow(page, WIDE_TABLE_ID_COLUMN_PATH);
-  await expect(firstColumnRow).toBeVisible();
+  // P19 D1-D3: every other listed kind (views, materialized views, sequences, functions)
+  // collapses into its own per-kind folder below the ungrouped tables, collapsed by default.
+  const viewsFolder = await findRow(page, `${APP_PATH}#view`);
+  await expect(viewsFolder).toBeVisible();
+  await expect(viewsFolder).toHaveAttribute('data-kind', 'group');
+  await expect(viewsFolder).toContainText('Views');
+  const matviewsFolder = await findRow(page, `${APP_PATH}#matview`);
+  await expect(matviewsFolder).toBeVisible();
+  await expect(matviewsFolder).toContainText('Materialized views');
+  const functionsFolder = await findRow(page, `${APP_PATH}#function`);
+  await expect(functionsFolder).toBeVisible();
+  await expect(functionsFolder).toContainText('Functions');
+  const sequencesFolder = await findRow(page, SEQUENCES_FOLDER_PATH);
+  await expect(sequencesFolder).toBeVisible();
+  await expect(sequencesFolder).toContainText('Sequences');
+  await expect(sequencesFolder).toHaveAttribute('data-kind', 'group');
+
+  // D2/D4's own acceptance bar: expanding a folder is a pure render over already-fetched
+  // children — zero IPC calls, zero op-log rows, asserted rather than assumed.
+  const opsBeforeFolderExpand = await getOps(page);
+  await sequencesFolder.locator('.twisty').click();
+  const sequenceRow = await findRow(page, SEQUENCE_PATH);
+  await expect(sequenceRow).toBeVisible();
+  await expect(sequenceRow).toHaveAttribute('data-kind', 'sequence');
+  expect(await getOps(page)).toHaveLength(opsBeforeFolderExpand.length);
 
   await page.screenshot({ path: 'test-results/screenshots/project-tree.png' });
   await page.screenshot({ path: 'test-results/screenshots/operations-panel.png' });
@@ -295,7 +322,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   expect(await menuItemIds(page)).toEqual([
     'open-data',
     'open-data-new-tab',
-    'open-ddl',
+    'open-definition',
     'open-console',
     'refresh',
     'copy-name',
@@ -305,15 +332,21 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   ]);
   await page.keyboard.press('Escape');
 
-  // app is still expanded from the earlier expansion step — sequence:invoice_number_seq is
-  // already one of its rendered children.
+  // P19 D2/D9: a group folder's own menu — Refresh (targets the *parent*, not the synthetic
+  // path itself) and Collapse all, nothing that needs a real node.
+  await openRowMenu(page, SEQUENCES_FOLDER_PATH);
+  expect(await menuItemIds(page)).toEqual(['refresh', 'collapse-all']);
+  await page.keyboard.press('Escape');
+
+  // The Sequences folder is still expanded from the earlier expansion step —
+  // sequence:invoice_number_seq is already one of its rendered children.
   await openRowMenu(page, SEQUENCE_PATH);
   expect(await menuItemIds(page)).toEqual(['copy-name', 'copy-qualified-name']);
   await page.keyboard.press('Escape');
 
-  await openRowMenu(page, WIDE_TABLE_ID_COLUMN_PATH);
-  expect(await menuItemIds(page)).toEqual(['copy-name', 'add-to-projection', 'sort-by']);
-  await page.keyboard.press('Escape');
+  // Column rows no longer live in the tree (P19 D5) — the "Copy name / Add to projection /
+  // Sort by" menu relocated into the definition view's Columns section; covered there in
+  // definition.spec.ts (D9).
 
   // Collapse everything down to the bare connection row so a right-click well below it lands
   // on the virtual list's empty spacer, not on a `.tree-row` (which stops propagation itself).
@@ -332,16 +365,18 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.click('[data-testid="menu-item-disconnect"]');
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
-  // wide_table is cached (L1 survives disconnect) — collapse/re-expand still works.
-  await (await findRow(page, WIDE_TABLE_PATH)).locator('.twisty').click();
-  const wideTableAgain = await expandRow(page, WIDE_TABLE_PATH);
-  await expect(wideTableAgain.locator('.row-error')).toHaveCount(0);
+  // app is cached (L1 survives disconnect) — collapse/re-expand still works. Tables/collections
+  // no longer have their own expand cycle to exercise here (P19 D5); a schema is the closest
+  // still-lazy level.
+  await (await findRow(page, APP_PATH)).locator('.twisty').click();
+  const appRowAgain = await expandRow(page, APP_PATH);
+  await expect(appRowAgain.locator('.row-error')).toHaveCount(0);
 
-  // order_items was never expanded — no cache entry, and the connection is down: an inline
+  // analytics was never expanded — no cache entry, and the connection is down: an inline
   // error, not a native/error-dialog affordance.
-  const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
-  await orderItemsRow.locator('.twisty').click();
-  await expect(orderItemsRow.locator('.row-error')).toContainText(/not connected/i, {
+  const analyticsRow = await findRow(page, ANALYTICS_PATH);
+  await analyticsRow.locator('.twisty').click();
+  await expect(analyticsRow.locator('.row-error')).toContainText(/not connected/i, {
     timeout: 10_000,
   });
 
@@ -353,13 +388,15 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     timeout: 10_000,
   });
 
-  await expect(orderItemsRow.locator('.row-error')).toHaveCount(0, { timeout: 10_000 });
+  await expect(analyticsRow.locator('.row-error')).toHaveCount(0, { timeout: 10_000 });
 
-  // Currently-expanded paths for this connection: '', database, schema, wide_table,
-  // order_items — 5 — plus the connect op itself.
+  // Currently-expanded *real* paths for this connection: '', database, app schema, analytics
+  // schema — 4 — plus the connect op itself. The Sequences folder is also still "expanded" but
+  // is a synthetic '#'-path with no adapter path of its own, so it is skipped, not re-fetched
+  // (project/state/tree.ts's refreshExpanded()) — its members already reload with its parent.
   await expect
     .poll(async () => (await getOps(page)).length, { timeout: 10_000 })
-    .toBe(opsBeforeReconnect.length + 1 + 5);
+    .toBe(opsBeforeReconnect.length + 1 + 4);
 
   // --- search: cached-only, matches + ancestors, incomplete note --------------------------
   await page.fill('[data-testid="tree-search"]', 'order');

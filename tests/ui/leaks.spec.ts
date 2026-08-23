@@ -126,9 +126,9 @@ async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
   await page.click('[data-testid="menu-item-open-console"]');
 }
 
-async function openDdlFromMenu(page: Page, path: string): Promise<void> {
+async function openDefinitionFromMenu(page: Page, path: string): Promise<void> {
   await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-ddl"]');
+  await page.click('[data-testid="menu-item-open-definition"]');
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
@@ -173,7 +173,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
 
   // --- scenario 1: tab open/close symmetry across all five page stores (F4, F5, D4, D5) -------
   // A data tab and a console tab (with a large result set) both retain bytes in one of the five
-  // stores this file's own `__kiraRetainedBytes` sums; a DDL tab retains none of them but must
+  // stores this file's own `__kiraRetainedBytes` sums; a definition tab retains none of them but must
   // still close cleanly alongside the other two.
   const baseline1 = await retainedBytes(page);
 
@@ -187,8 +187,8 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   await page.click('[data-testid="console-run-all"]');
   await expect(consoleView.locator('[data-testid="console-result-grid"]')).toHaveCount(1);
 
-  await openDdlFromMenu(page, ORDER_ITEMS_PATH);
-  await expect(page.locator('[data-testid="ddl-view"]')).toBeVisible();
+  await openDefinitionFromMenu(page, ORDER_ITEMS_PATH);
+  await expect(page.locator('[data-testid="definition-view"]')).toBeVisible();
 
   expect(await retainedBytes(page)).toBeGreaterThan(baseline1);
 

@@ -2,7 +2,7 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P18 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Status: **P0–P19 implemented** on the v1 feature branch — see §10's phasing table for the record.
 > Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
 > shipped.
 
@@ -83,7 +83,7 @@ See §7.
 | Build | electron-vite | Vite HMR for renderer, esbuild for main/engine |
 | UI | Vue 3 (`<script setup>`, Composition API) | |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
-| Text editing / viewing | CodeMirror 6 | DDL tab, cell editor, document view, command preview |
+| Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
 | Validation | Zod | runtime validation at every trust boundary: IPC control-channel payloads, stored settings/layout/connection rows read back from SQLite, connection-dialog input |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
@@ -142,7 +142,7 @@ type Caps = {
   keyValue: boolean         // renders in the key browser
   stream: boolean           // renders in the stream view
   sql: boolean
-  ddl: boolean
+  definition: boolean       // gates "Open definition" — a structured + raw-text object view
   projection: boolean       // can fetch a column subset server-side
   serverFilter: boolean
   exactCount: boolean
@@ -158,7 +158,7 @@ interface Adapter {
   disconnect(): Promise<void>
   children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]>      // lazy tree level
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>      // columns, PK, FK, indexes
-  ddl(path: NodePath, ctx: OpCtx): Promise<SourceText>
+  definition(path: NodePath, ctx: OpCtx): Promise<ObjectDefinition>
   read(req: ReadRequest, ctx: OpCtx): Promise<Page>              // shape depends on caps
   count(req: CountRequest, ctx: OpCtx): Promise<number>
   preview(plan: MutationPlan): string[]                          // exact commands, no execution
@@ -176,8 +176,8 @@ type OpCtx = { opId: string; signal: AbortSignal; onProgress?: (p: Progress) => 
 
 | DB | Tree levels | Default view | Pagination | Exact count | Cancel mechanism |
 |---|---|---|---|---|---|
-| PostgreSQL | database → schema → tables/views/matviews/functions/sequences | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `pg_cancel_backend(pid)` on a side connection |
-| MariaDB | database → tables/views/routines | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
+| PostgreSQL | database → schema → tables (ungrouped), views/matviews/functions/sequences grouped into per-kind folders | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `pg_cancel_backend(pid)` on a side connection |
+| MariaDB | database → tables (ungrouped), views/routines grouped into per-kind folders (routines labelled "Routines") | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
 | MongoDB | database → collections (+ indexes) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `AbortSignal` on the cursor, `killOp` fallback |
 | Redis | db index → key namespaces (split on `:`) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
 | Kafka | cluster → topics, consumer groups | stream | offset window per partition | end-offset − begin-offset | stop consumer, `AbortSignal` |
@@ -236,7 +236,7 @@ ever see that one bucket and commonly deny `s3:ListAllMyBuckets` outright).
 
 Three tiers, each with an explicit invalidation story.
 
-**L1 — metadata** (databases, schemas, tables, columns, PK/FK, indexes, DDL).
+**L1 — metadata** (databases, schemas, tables, columns, PK/FK, indexes, object definitions).
 Persisted in `metadata_cache`. Survives restart. **No TTL** — an entry is dropped only when its
 connection is deleted, and the whole connection's metadata is refreshed on **every reconnect**. Plus
 manual *Refresh* from the tree context menu. This is what makes the project panel instant on launch and what lets panel search
@@ -274,7 +274,7 @@ Native macOS title bar. Below it, the workbench:
 │   Project    ├────────────────────────────────────────────┤
 │    panel     │  toolbar (colored per connection)          │
 │              ├────────────────────────────────────────────┤
-│              │  main view (grid / documents / DDL / …)    │
+│              │  main view (grid / documents / definition / …) │
 │              ├────────────────────────────────────────────┤
 │              │  cell editor panel                         │
 ├──────────────┴────────────────────────────────────────────┤
@@ -309,6 +309,13 @@ Modal, sectioned. v1 sections:
 Tree of connections. Each connection shows its **color** as a left rail/dot and a **green status dot**
 when connected. Levels are lazy and cached (§7 L1).
 
+**Grouping (P19).** Tables (and Mongo collections) show first, ungrouped, in the tree's own order.
+Every other listed object kind — views, materialized views, sequences, functions (MariaDB's
+routines) — collapses into a per-kind folder below them; a kind with no members renders no folder.
+Folders are a renderer-only grouping of an already-fetched child list: expanding one issues no IPC
+call and creates no op-log row. Tables/views/matviews/collections no longer expand in the tree —
+their columns, indexes and constraints moved into the definition view (§8.10-adjacent, below).
+
 - **Search box** — filters the tree over **cached nodes only**. Never issues a query. Nodes that have
   never been expanded are simply not searchable, and the panel says so rather than silently
   under-reporting.
@@ -320,8 +327,8 @@ when connected. Levels are lazy and cached (§7 L1).
 
 A tab is `{ id, connectionId, path, kind, state }`. **Identity is `id`, not `path`** — the same table
 opens any number of times, each with independent paging, projection, sort, filter and scroll state.
-Tabs are tinted with the connection color. Kinds: `data`, `ddl`, `document`, `keyvalue`, `stream`,
-`console`.
+Tabs are tinted with the connection color. Kinds: `data`, `definition`, `document`, `keyvalue`,
+`stream`, `console`.
 
 **Session restore.** On relaunch the previous tabs are reopened but their connections are **not**
 opened automatically. A restored tab renders a centred **Reconnect & load** button and nothing else
@@ -403,8 +410,9 @@ Every one of these has a menu; the app has a single `ContextMenu` service so non
 |---|---|
 | Connection | Connect, Disconnect, **Open query console**, Refresh, Edit, Duplicate, Copy name, Copy URI, Filters…, Color ▸, Read-only ✓, Delete |
 | Database / schema | **Open query console**, Refresh, Copy name, Filters…, (Postgres) Set as default |
-| Table / view / collection | Open data, Open data in new tab, **Open query console**, Open DDL, Refresh, Copy name, Copy qualified name, Count rows, Saved filters ▸ |
-| Column (tree) | Copy name, Add to projection, Sort by |
+| Table / view / collection | Open data, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name, Copy qualified name, Count rows, Saved filters ▸ |
+| Object-kind folder (P19) | Refresh, Collapse all |
+| Column (definition view) | Copy name, Add to projection, Sort by |
 | Tab | Close, Close others, Close to the right, Close all, Duplicate tab, Copy name, Reveal in project panel |
 | Grid cell | Copy, Copy with header, Copy as JSON, Edit, Set NULL, Filter by this value, Go to referenced row |
 | Grid row | Copy row(s) ▸ (TSV/CSV/JSON/INSERT), Duplicate row, Delete row |
@@ -413,14 +421,30 @@ Every one of these has a menu; the app has a single `ContextMenu` service so non
 | Operations log row | Copy command, Copy error, Re-run, Reveal originating tab, Cancel (if running) |
 | Empty tree background | New connection, Refresh all, Collapse all |
 
-### 8.11 Operations panel
+### 8.11 Definition view
+
+One tab, two panes via a **Structure / Source** toggle (Structure is the default). Both panes are
+read-only. **Structure** shows Columns (type icon, PK/FK badge, type, nullable, default, comment;
+right-click gives the "Column (definition view)" row above), Indexes, and — for a SQL table/view —
+Constraints, each with a count badge; a Mongo collection replaces Constraints with **Validation**:
+its `$jsonSchema` fields as a table (name, bsonType, required, description) with
+`validationLevel`/`validationAction` chips, or the validator rendered as raw JSON when it isn't a
+`$jsonSchema`, or an honest "no validator set" line when the collection has none. **Source** shows
+the object's underlying text highlighted in CodeMirror — SQL DDL composed from the catalog (or
+passed through verbatim on engines that support `SHOW CREATE`) for Postgres/MariaDB, and a Mongo
+collection's creation-options document (EJSON) for MongoDB — with the same notes strip and Copy
+behaviour as before. Available wherever `caps.definition` is true: Postgres/MariaDB tables, views
+and materialized views, and Mongo collections; never for sequences, functions, indexes, or any
+Redis/Kafka/SQS/S3 node.
+
+### 8.12 Operations panel
 
 Every DB operation, live. Columns: time, connection (color chip), tab, kind, status, duration, rows,
 command (truncated, expandable in CodeMirror). Running ops show a spinner and a cancel button.
 Filter box + level filter. Virtualized, capped in memory, persisted to `op_log` with retention.
 Clicking a row reveals the tab that issued it.
 
-### 8.12 Connections
+### 8.13 Connections
 
 Two modes in one dialog:
 - **Fields** — host, port, database, user, password.
@@ -441,7 +465,7 @@ URI → fields is parsed best-effort and the dialog stays in URI mode if it cann
 
 The color appears on: the tree rail, the tab, and the data-view toolbar.
 
-### 8.13 Pending changes
+### 8.14 Pending changes
 
 Cell edits, added rows and deleted rows accumulate in a per-tab **pending-change set** — nothing
 reaches the database until *Commit*. Changed cells are tinted, added rows marked in the gutter,
@@ -450,7 +474,7 @@ deleted rows struck through. *Preview command* renders the exact statements the 
 primary key; a table with no PK is editable only if the adapter can identify a row unambiguously
 (e.g. `ctid`), otherwise editing is disabled with the reason shown.
 
-### 8.14 Query console
+### 8.15 Query console
 
 A `console` tab bound to a connection (and optionally a default database/schema). CodeMirror with
 SQL highlighting, run-statement / run-all, result grids reusing §8.5, and errors surfaced verbatim.
@@ -458,7 +482,7 @@ For non-SQL engines the console takes that engine's native command form (Mongo s
 Redis commands); where an adapter has no console, `caps.sql` is false and the menu item is absent.
 Console contents are saved to `saved_queries`.
 
-### 8.15 Keyboard shortcuts
+### 8.16 Keyboard shortcuts
 
 A **minimal, VS Code-flavoured** set only — command palette, tab switching/closing, panel toggles,
 find, refresh, run. **Not remappable in v1**; the binding table is a single data file so remapping
@@ -481,7 +505,7 @@ One container per engine, one fixture module per engine that seeds a realistic d
 `NULL`s, unicode, large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs,
 ≥ 1 M rows in one table to exercise paging and counts.
 
-Scenarios per engine: connect/disconnect, tree enumeration, describe, DDL, first page, deep page,
+Scenarios per engine: connect/disconnect, tree enumeration, describe, definition, first page, deep page,
 count, projection, sort, filter, cancel-mid-query (asserted **server-side** — the query must actually
 be gone from `pg_stat_activity` / `SHOW PROCESSLIST` / `currentOp`), cache hit/miss behaviour,
 add/delete row, command preview correctness.
@@ -527,7 +551,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P16 Misc fixes** | Explicit per-connection preconnect-mode checkbox (overrides P11's settle-window auto-detection); connection-kind icon picker; click-to-open connection-error popover; `scripts/demo-dbs/` full six-engine coverage; two font-family bugs; testcontainers preset packages for Postgres/MariaDB/Redis | Not a planned deliverable — a batch of user-directed fixes surfaced after P15 shipped, grouped into one phase rather than reopening P1/P9/P10/P11/P14 |
 | **P17 S3** | Adapter + object browser view (bucket → prefix/object, `/`-delimited, per §4/§9 above) | Implemented: the tree mirrors redis's own namespace-tree shape exactly ('/' delimiter instead of ':', `bucket`/`prefix`/`object` node kinds instead of `database`/`namespace`/`key'), and an object reuses the `keyvalue` page kind — its metadata (ContentType/Size/LastModified/ETag/StorageClass/user Metadata) plus a `Body` field/value row is exactly the flat listing a redis hash key already renders, so `KeyValueView.vue` needed no new view. Read-only browsing only in this phase (no insert/update/delete of buckets or objects); `tests/db/s3.spec.ts` against a LocalStack container, mirroring `sqs.spec.ts`'s own structure |
 | **P18 Autocomplete** | Field/identifier autocomplete in each connection kind's filter surface (the WHERE-clause-style input, and whatever the equivalent filter/query input is per engine), plus the same in the query console, plus basic SQL syntax (keyword) completion there | Implemented, scoped exactly to the four surfaces with a real free-text identifier grammar (SQL's WHERE/ORDER BY, Mongo's filter/SORT) plus the query console — Redis/Kafka/SQS/S3 have no such surface (local-page search, a structured multiselect, or nothing) and get nothing, per docs/plans/P18-autocomplete.md's D1. A new `AutocompleteField.vue` primitive owns its own `<input>` rather than wrapping `TextField.vue` (verified, not assumed, that a wrapper can't safely intercept Enter across two components — see the plan's §1); SQL columns are inserted dialect-quoted only when needed, Mongo fields as `field: ` with `_id` included and a curated `$`-operator vocabulary, and the console gets `@codemirror/autocomplete`'s keyword source gated to connections with a resolved SQL dialect so a Mongo/Redis shell console never offers SQL keywords |
-| **P19 Tree reorganization + generic object-definition view** | Tree shows tables first, ungrouped; every other object kind (functions, sequences, etc.) grouped into per-kind folders by default. Tables no longer expand to show columns in the tree — that moves into the definition view. The definition view (today's DDL tab) defaults to a nicely parsed structured display (columns/indexes/constraints) with a toggle to see the raw SQL text as it works today; gains a MongoDB implementation (indexes, and the collection's JSON Schema validator if set); renamed to a more generic term than "DDL" to fit non-SQL connections | Not yet implemented — user-requested, to be researched and planned in detail when picked up |
+| **P19 Tree reorganization + generic object-definition view** | Tree shows tables first, ungrouped; every other object kind (functions, sequences, etc.) grouped into per-kind folders by default. Tables no longer expand to show columns in the tree — that moves into the definition view. The definition view (today's DDL tab) defaults to a nicely parsed structured display (columns/indexes/constraints) with a toggle to see the raw SQL text as it works today; gains a MongoDB implementation (indexes, and the collection's JSON Schema validator if set); renamed to a more generic term than "DDL" to fit non-SQL connections | Implemented, per `docs/plans/P19-tree-reorg-definition-view.md`: a renderer-only `GROUPED_KINDS` table (view/matview/sequence/function, MariaDB's function folder labelled "Routines") splits an already-fetched child list into ungrouped tables/collections plus collapsed per-kind folders — expanding one issues no IPC call and no op-log row. Tables/views/matviews/collections became tree leaves; both SQL adapters' `children()` return `[]` at that depth and the DB specs' column assertions moved to `describe()`. The DDL feature was renamed end to end (`Caps.ddl`→`Caps.definition`, the adapter method, IPC channel, tab kind, L1 cache key, `views/ddl/`→`views/definition/`), with a legacy `'ddl'`-row coercion on read so upgrading doesn't drop open tabs or blank the Operations panel. `ObjectDefinition` gained `language`/`constraints`/`documentSchema`: Postgres fills `constraints` from the `pg_constraint` query it already runs for its DDL text (zero extra round trips), MariaDB from one added `information_schema.TABLE_CONSTRAINTS` query on the definition path only. The definition tab is one view with a Structure/Source `<Segmented>` toggle (not the mockup's four-way split) — Structure stacks Columns/Indexes/Constraints (SQL) or Indexes/Validation (Mongo) sections with count badges, fed by a second, independently-cached `describe()` load; the tree's former column-row context menu (Copy name/Add to projection/Sort by) relocated into the Columns section. Mongo's `definition()` sources Source from the collection's creation-options document (EJSON-relaxed) and Validation from its `$jsonSchema` validator, rendered as a field table when it is one, else raw JSON, with an honest empty state when there's none |
 | **P20 Electrobun migration spike** | On a branch cut from this point, migrate the app off Electron onto Electrobun; then run the full automated perf suite (`tests/ui/budgets.spec.ts`, `perf.spec.ts`, `memory.spec.ts`, `startup.spec.ts` — see `docs/PERF.md`) on both branches and record the results side by side. Run each branch's suite multiple times, not once — these tests have real run-to-run variability (see `docs/PERF.md` §2.1's methodology note), so a single sample per branch isn't sufficient to call a difference real | Not yet implemented — user-requested, to be researched and planned in detail when picked up. Comparative, not a one-way door: the deliverable is the measured before/after, not a commitment to ship the migration |
 
 ---
@@ -561,7 +585,7 @@ src/
                     cancellation are independent concerns that today live in one file)
     adapters/
       registry.ts   capability-keyed adapter lookup
-      postgres/     index.ts (Adapter impl), client.ts, query.ts, ddl.ts, read.ts
+      postgres/     index.ts (Adapter impl), client.ts, query.ts, definition.ts, read.ts
       mariadb/      same shape as postgres/
       mongo/ redis/ kafka/ sqs/ s3/   -- same shape once each ships; a new engine is
                     "add one folder matching this shape", never a change to scheduler/ or cache/
@@ -569,7 +593,7 @@ src/
     workbench/      shell, panels, status bar, settings dialog, context-menu service
     project/        tree, connection dialog, filters, search
     views/
-      grid/ documents/ keyvalue/ stream/ ddl/ celleditor/ console/
+      grid/ documents/ keyvalue/ stream/ definition/ celleditor/ console/
                     -- each owns its own state module; a new page kind is one new folder here
                        plus one Page variant in shared/protocol, not a change to existing views
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
@@ -598,7 +622,7 @@ docs/
   lifecycles (an op's cancellation vs a page's eviction) that P1/P2 currently co-locate; keeping them
   separate now avoids a forced split later when Kafka/SQS streaming ops need scheduler changes that
   have nothing to do with caching.
-- **Adapters keep one fixed internal shape** (`index.ts`/`client.ts`/`query.ts`/`ddl.ts`/`read.ts`)
+- **Adapters keep one fixed internal shape** (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`)
   so `tests/db/` can mirror `engine/adapters/` 1:1 and a reviewer already knows where MongoDB's
   `read.ts` will be before it exists.
 - **`renderer/state/`** exists so `views/*` are siblings that depend downward on shared state, never
