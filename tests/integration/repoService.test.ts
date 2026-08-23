@@ -3,22 +3,29 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ProcessRunner, SpawnedProcess, SpawnRequest } from "../../packages/core/src/index.ts";
-import { defaultSettings } from "../../packages/core/src/index.ts";
+import type {
+  CommitRecord,
+  ProcessRunner,
+  SpawnedProcess,
+  SpawnRequest,
+} from "../../packages/core/src/index.ts";
+import { CommitStore, defaultSettings } from "../../packages/core/src/index.ts";
 import { FakeLogger } from "../../packages/core/src/ports/testFakes.ts";
+import { locateGit, resolveRepoIdentity } from "../../packages/git/src/discovery.ts";
+import { openLogSession } from "../../packages/git/src/logSession.ts";
 import { NodeFileWatcher } from "../../packages/git/src/nodeFileWatcher.ts";
 import { NodeProcessRunner } from "../../packages/git/src/nodeProcessRunner.ts";
 import type { GraphChunkPayload } from "../../packages/git/src/repoService.ts";
 import { RepoService } from "../../packages/git/src/repoService.ts";
-import { baseEnv, linear } from "../fixtures/generateRepo.ts";
+import { baseEnv, branchy, linear, withStash } from "../fixtures/generateRepo.ts";
 
 /**
  * W7's own coverage of its "Done when" criteria (open/stream/loadMore/close; a resumed stream
  * spawns nothing; eviction then reveal spawns exactly one; a refsChanged marks stale and the
  * next stream restarts at row 0; a cancelled stream kills nothing a subsequent stream needs).
- * The fuller spawn-counting suite promised by the plan for W16 (`repoService.test.ts` against
- * `linear`/`branchy`/`withStash`, row-for-row store comparison) is that later item's job; this
- * file is W7's own bar, against real git and a real `NodeFileWatcher`.
+ * W16 adds the fuller spawn-counting suite the plan promised for this file: open/stream/
+ * loadMore/close over `branchy`/`withStash` (not just `linear`), and a row-for-row comparison
+ * between a store built from streamed chunks and one built directly from `logSession`.
  */
 
 class CountingRunner implements ProcessRunner {
@@ -69,6 +76,19 @@ async function waitFor(predicate: () => boolean, maxMs = 5000): Promise<void> {
   while (!predicate() && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+}
+
+/** The exact rev-set `logSessionArgs("all")` walks (`parse/log.ts`'s `revSetArgs`) — `--all
+ *  --glob=refs/stash`, so a stash entry counts here too. Used instead of a hand-derived number
+ *  so these tests assert against what git itself considers reachable, not against this file's
+ *  own arithmetic. */
+function revListAllCount(dir: string): number {
+  const out = execFileSync("git", ["rev-list", "--count", "--all", "--glob=refs/stash"], {
+    cwd: dir,
+    env: baseEnv(dir),
+    encoding: "utf8",
+  });
+  return Number(out.trim());
 }
 
 describe("RepoService", () => {
@@ -273,6 +293,137 @@ describe("RepoService", () => {
       await service.loadMore(opened.repoId, 2);
       expect(service.status(opened.repoId)).toEqual({ loaded: 9, remaining: 0, exhausted: true });
       expect(runner.logSpawnCount).toBe(1);
+    } finally {
+      service.dispose();
+    }
+  });
+
+  test("open, stream, loadMore and close over a branchy repo", async () => {
+    const repo = branchy({ mainCommits: 4, featureCommits: 3, mergeBack: true });
+    const total = revListAllCount(repo.dir);
+    const runner = new CountingRunner();
+    const service = await RepoService.create({
+      runner,
+      fileWatcher: new NodeFileWatcher(),
+      logger: new FakeLogger(),
+      settings: settingsWithPageSize(3),
+      configuredGitCandidates: [],
+    });
+    try {
+      const opened = await service.open(repo.dir);
+      expect(opened.kind).toBe("ok");
+      if (opened.kind !== "ok") throw new Error("unreachable");
+      const { repoId } = opened;
+
+      const first = await streamAll(service, repoId);
+      expect(totalRows(first)).toBe(3);
+      expect(first.every((chunk) => chunk.source === "git")).toBe(true);
+
+      // More pages than strictly needed: the last full page a repo's row count divides evenly
+      // into does not by itself reveal exhaustion (§5.1.1 — that needs one more read that comes
+      // back empty), and `loadMore`'s own loop already stops early once `exhausted` flips.
+      await service.loadMore(repoId, total);
+      expect(service.status(repoId)).toEqual({ loaded: total, remaining: 0, exhausted: true });
+
+      const second = await streamAll(service, repoId, 3);
+      expect(second.every((chunk) => chunk.source === "cache")).toBe(true);
+      expect(totalRows(second)).toBe(total - 3);
+
+      service.close(repoId);
+      expect(() => service.status(repoId)).toThrow();
+    } finally {
+      service.dispose();
+    }
+  });
+
+  test("open, stream, loadMore and close over a withStash repo", async () => {
+    const repo = withStash({ includeUntracked: true });
+    // `revSetArgs("all")` globs `refs/stash` too (parse/log.ts), so the stash's own WIP commit
+    // (and its extra parents, for the -u variant) are reachable rows here, not just the one real
+    // commit `repo.commits` records.
+    const total = revListAllCount(repo.dir);
+    const runner = new CountingRunner();
+    const service = await RepoService.create({
+      runner,
+      fileWatcher: new NodeFileWatcher(),
+      logger: new FakeLogger(),
+      settings: settingsWithPageSize(10),
+      configuredGitCandidates: [],
+    });
+    try {
+      const opened = await service.open(repo.dir);
+      expect(opened.kind).toBe("ok");
+      if (opened.kind !== "ok") throw new Error("unreachable");
+      const { repoId } = opened;
+
+      const first = await streamAll(service, repoId);
+      expect(totalRows(first)).toBe(total);
+      expect(service.status(repoId)).toEqual({ loaded: total, remaining: 0, exhausted: true });
+
+      await service.loadMore(repoId, 1); // a no-op past exhaustion, must not spawn or throw
+      expect(service.status(repoId)).toEqual({ loaded: total, remaining: 0, exhausted: true });
+
+      service.close(repoId);
+      expect(() => service.status(repoId)).toThrow();
+    } finally {
+      service.dispose();
+    }
+  });
+
+  test("the store built from streamed chunks matches one built directly from logSession, row for row", async () => {
+    const repo = branchy({ mainCommits: 5, featureCommits: 4, mergeBack: true });
+    const runner = new NodeProcessRunner();
+    const service = await RepoService.create({
+      runner,
+      fileWatcher: new NodeFileWatcher(),
+      logger: new FakeLogger(),
+      settings: settingsWithPageSize(3),
+      configuredGitCandidates: [],
+    });
+    try {
+      const opened = await service.open(repo.dir);
+      if (opened.kind !== "ok") throw new Error("unreachable");
+      const { repoId } = opened;
+
+      const chunks = await streamAll(service, repoId); // one page from git (pageSize 3)
+      const firstCount = totalRows(chunks);
+      // More pages than strictly needed — `loadMore`'s own loop stops early once exhausted.
+      await service.loadMore(repoId, revListAllCount(repo.dir));
+      // Every row loaded since the first stream, replayed from the store's cache — the first
+      // stream already emitted rows [0, firstCount) as "git" chunks, so this resumes from there.
+      const rest = await streamAll(service, repoId, firstCount);
+      const allChunks = [...chunks, ...rest];
+
+      const streamedStore = new CommitStore();
+      for (const chunk of allChunks) streamedStore.appendPacked(chunk.commits);
+
+      const gitResolution = await locateGit({ runner });
+      if (gitResolution.kind !== "ok") throw new Error("no usable system git found for this test");
+      const identityResolution = await resolveRepoIdentity(gitResolution.git, runner, repo.dir);
+      if (identityResolution.kind !== "ok") throw new Error("expected a real repository");
+
+      const session = openLogSession(gitResolution.git, runner, identityResolution.identity.root, {
+        scope: "all",
+      });
+      const records: CommitRecord[] = [];
+      try {
+        for (;;) {
+          const outcome = await session.readPage((record) => records.push(record));
+          if (outcome.kind === "stale")
+            throw new Error("unreachable: nothing else touches this repo");
+          if (outcome.exhausted) break;
+        }
+      } finally {
+        session.dispose();
+      }
+      const directStore = new CommitStore();
+      directStore.appendPage(records);
+
+      expect(streamedStore.rowCount).toBe(directStore.rowCount);
+      expect(streamedStore.rowCount).toBe(revListAllCount(repo.dir));
+      for (let row = 0; row < directStore.rowCount; row++) {
+        expect(streamedStore.commitAt(row)).toEqual(directStore.commitAt(row));
+      }
     } finally {
       service.dispose();
     }
