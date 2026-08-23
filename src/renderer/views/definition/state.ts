@@ -1,4 +1,5 @@
 import type { ObjectDefinition } from '@shared/domain/definition';
+import type { ObjectMeta } from '@shared/domain/tree';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
@@ -9,6 +10,9 @@ export interface DefinitionViewRuntime {
   error: string | null; // the raw IPC message, '[CODE] text' and all (§0 note 13)
   source: 'cache' | 'server' | null;
   definition: ObjectDefinition | null;
+  // D8: Structure's columns/indexes come from the same describe() the grid already calls — an
+  // independently-cached second load, not a field ObjectDefinition duplicates.
+  meta: ObjectMeta | null;
 }
 
 export const runtime = reactive({} as Record<string, DefinitionViewRuntime>);
@@ -19,7 +23,7 @@ registerTabRuntimeCleanup((tabId) => {
 });
 
 function defaultRuntime(): DefinitionViewRuntime {
-  return { status: 'idle', error: null, source: null, definition: null };
+  return { status: 'idle', error: null, source: null, definition: null, meta: null };
 }
 
 // Returns through `runtime[tabId]` even on creation — never the object literal handed to the
@@ -51,9 +55,13 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   rt.error = null;
 
   try {
-    const response = await control.treeDefinition(tab.connectionId, tab.path, opts?.refresh);
-    rt.definition = response.definition;
-    rt.source = response.source;
+    const [definitionResponse, describeResponse] = await Promise.all([
+      control.treeDefinition(tab.connectionId, tab.path, opts?.refresh),
+      control.treeDescribe(tab.connectionId, tab.path, opts?.refresh),
+    ]);
+    rt.definition = definitionResponse.definition;
+    rt.source = definitionResponse.source;
+    rt.meta = describeResponse.meta;
     rt.status = 'idle';
   } catch (err) {
     // On error this stores the message and nothing else (§0 note 13). It does not parse the

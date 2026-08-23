@@ -7,13 +7,24 @@ import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
-import { isHydrated, markHydrated, openConsoleTab } from '../../state/tabs';
+import {
+  isHydrated,
+  markHydrated,
+  openConsoleTab,
+  patchDefinitionTabState,
+} from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Segmented from '../../theme/primitives/Segmented.vue';
 import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
+import ColumnsSection from './ColumnsSection.vue';
+import ConstraintsSection from './ConstraintsSection.vue';
+import IndexesSection from './IndexesSection.vue';
 import { load, runtime } from './state';
+import { buildConstraintRows } from './structure';
+import ValidationSection from './ValidationSection.vue';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab — same discipline as
 // DataView.vue.
@@ -73,7 +84,29 @@ const targetTail = computed(() => pathTail(props.tab.path));
 const targetLabel = computed(() => targetTail.value?.name ?? props.tab.path);
 
 const definition = computed(() => rt.value?.definition ?? null);
+const meta = computed(() => rt.value?.meta ?? null);
 const document = computed(() => (definition.value ? definitionText(definition.value) : ''));
+
+// D7: Structure (default) vs Source, persisted per tab; `.default('structure')` (tabs.ts) keeps
+// a tab saved under the pre-P19 empty `{}` shape restorable.
+const pane = computed(() => props.tab.state.pane);
+const PANE_OPTIONS = [
+  { value: 'structure' as const, label: 'Structure', testid: 'definition-pane-structure' },
+  { value: 'source' as const, label: 'Source', testid: 'definition-pane-source' },
+];
+function setPane(value: 'structure' | 'source'): void {
+  patchDefinitionTabState(props.tab.id, { pane: value });
+}
+
+// Mongo collections have documents, not columns/constraints (D9/D11's scope is SQL relations);
+// Indexes is the one section every kind shares (P8's D10).
+const isCollection = computed(() => definition.value?.kind === 'collection');
+const foreignKeyColumnNames = computed(
+  () => new Set(meta.value?.foreignKeys.flatMap((fk) => fk.columns) ?? []),
+);
+const constraintRows = computed(() =>
+  definition.value && meta.value ? buildConstraintRows(definition.value, meta.value) : [],
+);
 
 const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   if (!props.tab.connectionId) return undefined;
@@ -120,9 +153,6 @@ const breadcrumb = computed(() => {
       button-testid="definition-reconnect-load"
       @reconnect="onReconnectAndLoad"
     />
-    <!-- Column/index/constraint counts and the Definition/Columns/Indexes/Constraints segmented
-         view from the mockup need structured catalog data this tab doesn't fetch (only the raw
-         statement text) — skipped rather than faked. -->
     <ViewChrome
       v-else
       :tab="tab"
@@ -146,16 +176,32 @@ const breadcrumb = computed(() => {
       <!-- Stop is permanently disabled: this load has no cancellation to offer (state.ts tracks
            no op-id for it) — the slot stays reserved rather than wired to a stop that doesn't
            exist. -->
-      <template #toolbar-end>
+      <template #toolbar>
         <div class="sep" />
-        <Button
-          icon="copy"
-          title="Copy definition to clipboard"
-          data-testid="definition-copy"
-          @click="onCopy"
-        >
-          Copy
-        </Button>
+        <div class="group">
+          <Segmented
+            :model-value="pane"
+            :options="PANE_OPTIONS"
+            data-testid="definition-pane"
+            @update:model-value="setPane"
+          />
+        </div>
+      </template>
+
+      <template #toolbar-end>
+        <!-- D7: Copy/notes describe the Source pane's raw text specifically — Structure has its
+             own per-section content and count badges, nothing to copy as one document. -->
+        <template v-if="pane === 'source'">
+          <div class="sep" />
+          <Button
+            icon="copy"
+            title="Copy definition to clipboard"
+            data-testid="definition-copy"
+            @click="onCopy"
+          >
+            Copy
+          </Button>
+        </template>
         <Button
           icon="terminal"
           title="Open query console here"
@@ -176,7 +222,7 @@ const breadcrumb = computed(() => {
           <span class="err-message">{{ rt.error }}</span>
         </Strip>
         <div
-          v-if="definition && definition.notes.length > 0"
+          v-if="pane === 'source' && definition && definition.notes.length > 0"
           class="p-strip note"
           data-testid="definition-notes"
         >
@@ -187,8 +233,25 @@ const breadcrumb = computed(() => {
         </div>
       </template>
 
-      <div class="editor-body">
-        <CodeMirrorHost :doc="document" language="sql" :sql-dialect="dialect" :read-only="true" />
+      <div v-if="pane === 'source'" class="editor-body">
+        <CodeMirrorHost
+          :doc="document"
+          :language="definition?.language === 'json' ? 'json' : 'sql'"
+          :sql-dialect="dialect"
+          :read-only="true"
+        />
+      </div>
+      <div v-else-if="definition && meta" class="structure-body">
+        <ColumnsSection
+          v-if="!isCollection"
+          :columns="meta.columns"
+          :foreign-key-column-names="foreignKeyColumnNames"
+          :connection-id="tab.connectionId ?? ''"
+          :table-path="tab.path"
+        />
+        <IndexesSection :indexes="meta.indexes" />
+        <ConstraintsSection v-if="!isCollection" :constraints="constraintRows" />
+        <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
       </div>
       <!-- LAW — there is no editor status line: identity moved to the view header above,
            duration to the toolbar's run-state, and this tab has no pending edits to report. -->
@@ -217,5 +280,15 @@ const breadcrumb = computed(() => {
 .editor-body {
   flex: 1;
   min-height: 0;
+}
+
+.structure-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-6);
+  padding: var(--kira-s-5);
 }
 </style>

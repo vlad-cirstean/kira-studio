@@ -8,6 +8,7 @@ import {
   type ConsoleTabState,
   type DataTabRecord,
   type DataTabState,
+  type DefinitionTabState,
   type DocumentTabRecord,
   type DocumentTabState,
   defaultConsoleTabState,
@@ -550,6 +551,14 @@ export function patchDataTabState(id: string, patch: Partial<DataTabState>): voi
 export function patchConsoleTabState(id: string, patch: Partial<ConsoleTabState>): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (target?.kind !== 'console') return;
+  if (!patchChanged(target.state, patch)) return;
+  Object.assign(target.state, patch);
+  saveDebounced();
+}
+
+export function patchDefinitionTabState(id: string, patch: Partial<DefinitionTabState>): void {
+  const target = tabsState.tabs.find((t) => t.id === id);
+  if (target?.kind !== 'definition') return;
   if (!patchChanged(target.state, patch)) return;
   Object.assign(target.state, patch);
   saveDebounced();
