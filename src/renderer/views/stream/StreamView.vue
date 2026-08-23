@@ -29,6 +29,21 @@ const caps = computed(() => {
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
 
+// P16 design system LAW: connection colour is a 2px rail — here capping the toolbar and as a
+// dot in the view header — never a background tint. Mirrors Toolbar.vue's `color`/`railStyle`
+// pair exactly. No colour assigned leaves `--kira-rail` unset, so the reserved slot stays blank
+// instead of shifting anything.
+const connectionRecord = computed(() =>
+  props.tab.connectionId
+    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
+    : undefined,
+);
+const railStyle = computed(() => ({
+  '--kira-rail': connectionRecord.value?.color
+    ? `var(--kira-conn-${connectionRecord.value.color})`
+    : undefined,
+}));
+
 // D10/D12: SQS's 'batch' pagination is never auto-loaded — the user must click Poll, because
 // every poll consumes messages from the queue (subject to VisibilityTimeout) rather than
 // merely browsing them. Kafka's 'offsetWindow' strategy is a pure browse and auto-loads like
@@ -104,39 +119,76 @@ onUnmounted(() => {
 
 <template>
   <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="stream-reconnect">
-      <button type="button" data-testid="stream-reconnect-load" @click="onReconnectAndLoad">
+    <div v-if="needsReconnect" class="p-empty" data-testid="stream-reconnect">
+      <Codicon name="debug-disconnect" :size="24" class="big" />
+      <span class="label">Not connected</span>
+      <button
+        type="button"
+        class="p-dlgbtn primary"
+        data-testid="stream-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <div class="header">
-        <span class="target" data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span>
-        <div class="meta" v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined">
-          <span class="badge" data-testid="stream-visibility-timeout"
-            >visibility: {{ page.visibilityTimeoutSeconds }}s</span
+      <!-- LAW: the view header is 28px, and the connection colour appears here only as a dot
+           (never a tint) — the rail below caps the toolbar instead, per Toolbar.vue. -->
+      <div class="p-view-head">
+        <span class="p-conn-dot" :class="{ none: !connectionRecord?.color }" :style="railStyle" title="Connection colour" />
+        <span class="icon-box" :style="{ color: connectionRecord?.color ? `var(--kira-conn-${connectionRecord?.color})` : 'var(--kira-fg-muted)' }">
+          <Codicon name="broadcast" :size="14" />
+        </span>
+        <span class="p-view-target">
+          <span v-if="connectionRecord" class="path">{{ connectionRecord.name }} / </span>
+          <span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span>
+        </span>
+        <span
+          v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
+          class="p-badge p-push"
+          data-testid="stream-visibility-timeout"
+        >
+          visibility {{ page.visibilityTimeoutSeconds }}s
+        </span>
+      </div>
+
+      <!-- LAW: the connection colour caps the toolbar as a 2px rail, never the whole panel. -->
+      <div class="p-toolbar-rail" :style="railStyle" />
+      <div class="p-toolbar">
+        <div class="group">
+          <button
+            type="button"
+            class="p-iconbtn"
+            data-testid="stream-refresh"
+            title="Refresh"
+            @click="reload(tab.id)"
           >
-        </div>
-        <div class="toolbar">
-          <button type="button" data-testid="stream-refresh" title="Refresh" @click="reload(tab.id)">
             <Codicon name="refresh" :size="13" />
           </button>
-          <button type="button" data-testid="stream-count" title="Count" @click="runCount(tab.id)">
+          <button
+            type="button"
+            class="p-iconbtn"
+            data-testid="stream-count"
+            title="Count"
+            @click="runCount(tab.id)"
+          >
             <Codicon name="symbol-number" :size="13" />
           </button>
           <button
             v-if="isBatch"
             type="button"
+            class="p-btn is-active"
             data-testid="stream-poll"
             title="Poll for messages"
             @click="onPoll"
           >
-            <Codicon name="arrow-swap" :size="13" />
+            <span class="icon-box"><Codicon name="arrow-swap" :size="13" /></span>
             Poll
           </button>
           <button
             v-else
             type="button"
+            class="p-iconbtn"
             data-testid="stream-next"
             :disabled="!rt?.hasMore"
             title="Next page"
@@ -144,56 +196,98 @@ onUnmounted(() => {
           >
             <Codicon name="arrow-right" :size="13" />
           </button>
-          <button v-if="running" type="button" data-testid="stream-stop" title="Stop" @click="onStop">
+          <!-- LAW: Stop always follows the verb that started the work, disabled when idle — never
+               its own separate control elsewhere. -->
+          <button
+            v-if="running"
+            type="button"
+            class="p-iconbtn"
+            data-testid="stream-stop"
+            title="Stop"
+            style="color: var(--kira-error)"
+            @click="onStop"
+          >
             <Codicon name="debug-stop" :size="13" />
           </button>
+          <!-- LAW: work-in-progress is a ring in the toolbar next to the verb that started it,
+               never a bar across the top of the view. -->
+          <span
+            class="p-run-state"
+            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
+            :title="running ? 'Loading' : rt?.status === 'error' ? 'Last run failed' : undefined"
+          >
+            <span class="ring" />
+          </span>
         </div>
       </div>
 
-      <div v-if="isBatch" class="warn-strip" data-testid="stream-poll-warning">
-        Each poll consumes messages from the queue (subject to the visibility timeout above) — it
-        does not browse a stable position.
+      <!-- The one destructive truth of this view, stated once at the top. -->
+      <div v-if="isBatch" class="p-strip warn" data-testid="stream-poll-warning">
+        <span class="icon-box"><Codicon name="warning" :size="13" /></span>
+        <span
+          >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
+          above) — it does not browse a stable position.</span
+        >
       </div>
 
-      <div v-if="rt?.status === 'loading'" class="loading-bar" data-testid="stream-loading" />
-      <div v-if="rt?.status === 'error' && rt.error" class="error-strip" data-testid="stream-error">
-        {{ rt.error.message }}
+      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="stream-error">
+        <span class="icon-box"><Codicon name="error" :size="13" /></span>
+        <span>{{ rt.error.message }}</span>
       </div>
 
       <div class="list-body" data-testid="stream-list">
-        <div v-if="isBatch && !rt?.polled" class="no-rows">Click Poll to fetch messages</div>
-        <div v-else-if="!rt || rt.rowCount === 0" class="no-rows">{{ rt ? 'No messages' : '' }}</div>
-        <table v-else class="stream-table">
-          <thead>
-            <tr>
-              <th>key</th>
-              <th>timestamp</th>
-              <th>headers</th>
-              <th>attrs</th>
-              <th>body</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
+        <div v-if="isBatch && !rt?.polled" class="p-empty no-rows">
+          <Codicon name="arrow-swap" :size="24" class="big" />
+          <span class="label">Click Poll to fetch messages</span>
+        </div>
+        <div v-else-if="!rt || rt.rowCount === 0" class="p-empty no-rows">
+          <Codicon name="inbox" :size="24" class="big" />
+          <span class="label">{{ rt ? 'No messages' : '' }}</span>
+        </div>
+        <template v-else>
+          <div class="p-thead">
+            <div class="p-th gutter" style="width: 40px" />
+            <div class="p-th" style="width: 160px"><span class="name">key</span></div>
+            <div class="p-th" style="width: 160px"><span class="name">timestamp</span></div>
+            <div class="p-th" style="width: 140px"><span class="name">headers</span></div>
+            <div class="p-th" style="width: 140px"><span class="name">attrs</span></div>
+            <div class="p-th" style="flex: 1"><span class="name">body</span></div>
+          </div>
+          <div class="tbody-scroll">
+            <div
               v-for="i in rowIndices"
               :key="i"
               class="stream-row"
               data-testid="stream-row"
               @contextmenu="onRowContextMenu($event, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '')"
             >
-              <td class="stream-key" data-testid="stream-key">{{ rowAt(i)?.key ?? '(none)' }}</td>
-              <td class="stream-timestamp" data-testid="stream-timestamp">{{ rowAt(i)?.timestamp ?? '' }}</td>
-              <td class="stream-headers" data-testid="stream-headers">{{ rowAt(i)?.headers }}</td>
-              <td class="stream-attrs" data-testid="stream-attrs">{{ rowAt(i)?.attrs }}</td>
-              <td class="stream-body" data-testid="stream-body">
+              <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
+              <div
+                class="p-td"
+                :class="{ null: rowAt(i)?.key === null }"
+                style="width: 160px"
+                data-testid="stream-key"
+              >
+                {{ rowAt(i)?.key ?? '(none)' }}
+              </div>
+              <div class="p-td" style="width: 160px" data-testid="stream-timestamp">
+                {{ rowAt(i)?.timestamp ?? '' }}
+              </div>
+              <div class="p-td" style="width: 140px" data-testid="stream-headers">
+                {{ rowAt(i)?.headers }}
+              </div>
+              <div class="p-td" style="width: 140px" data-testid="stream-attrs">
+                {{ rowAt(i)?.attrs }}
+              </div>
+              <div class="p-td msg-body" style="flex: 1" data-testid="stream-body">
                 {{ rowAt(i)?.body }}
-                <span v-if="rowAt(i)?.isTruncated" class="truncated-marker" title="body truncated"
+                <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" title="body truncated"
                   >(truncated)</span
                 >
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <div class="status-line" data-testid="stream-status">{{ statusLine }}</div>
@@ -209,196 +303,57 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */
+.path {
+  color: var(--kira-fg-disabled);
 }
 
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.badge {
-  padding: 1px 6px;
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.toolbar button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-}
-
-.toolbar button:hover:not(:disabled) {
-  background: var(--kira-hover);
-}
-
-.toolbar button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.warn-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-  color: var(--kira-fg-muted);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.loading-bar {
-  height: 2px;
-  flex-shrink: 0;
-  background: linear-gradient(90deg, transparent, var(--kira-accent), transparent);
-  background-size: 200% 100%;
-  animation: loading-sweep 1.2s linear infinite;
-}
-
-@keyframes loading-sweep {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  white-space: pre-wrap;
-}
-
-.list-body {
+/* tabular body shared shape (P16's .thead/.th/.td law) — .p-thead/.p-th/.p-td come from
+   primitives.css; the flex row container and the scrolling wrapper around it are local glue,
+   same as the source design's own (unshared) .tbody/.tr rules. */
+.tbody-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
 
-.no-rows {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-fg-muted);
-  font-size: 12px;
-}
-
-.stream-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--kira-font-family);
-  font-size: 11px;
-}
-
-.stream-table thead th {
-  position: sticky;
-  top: 0;
-  text-align: left;
-  padding: 4px 8px;
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  font-weight: 600;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
 .stream-row {
+  display: flex;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.stream-key,
-.stream-timestamp,
-.stream-headers,
-.stream-attrs {
-  padding: 4px 8px;
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
-  vertical-align: top;
+.stream-row:hover {
+  background: var(--kira-hover);
 }
 
-.stream-body {
-  padding: 4px 8px;
-  color: var(--kira-fg);
-  white-space: pre-wrap;
-  word-break: break-word;
+/* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
+.msg-body {
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
 }
 
-.truncated-marker {
-  padding-left: 6px;
-  font-size: 10px;
-  color: var(--kira-fg-muted);
+.list-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.list-body .p-empty {
+  height: 100%;
 }
 
 .status-line {
   flex-shrink: 0;
-  padding: 3px 8px;
+  padding: 0 var(--kira-s-4);
+  height: var(--kira-h-xs);
+  display: flex;
+  align-items: center;
   border-top: var(--kira-border-width) solid var(--kira-border);
   color: var(--kira-fg-muted);
-  font-size: 10px;
+  font-size: var(--kira-t-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
