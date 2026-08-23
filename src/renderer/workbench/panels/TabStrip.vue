@@ -28,6 +28,7 @@ function iconFor(tab: TabRecord): string {
   if (tab.kind === 'console') return 'terminal';
   if (tab.kind === 'document') return 'json';
   if (tab.kind === 'keyvalue') return 'symbol-key';
+  if (tab.kind === 'stream') return 'broadcast';
   const tail = pathTail(tab.path);
   const KIND_ICON: Record<string, string> = {
     table: 'table',

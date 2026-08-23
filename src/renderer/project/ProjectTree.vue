@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
-import { openDataTab, openDocumentTab, openKeyValueTab } from '../state/tabs';
+import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
 import { openContextMenu } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -26,6 +26,10 @@ const DOCUMENT_OPENABLE_KINDS = new Set(['collection']);
 // A redis key opens into a 'keyvalue' tab (P9) — 'namespace'/'database' stay expand-only, like
 // mongo's own 'database' node.
 const KEYVALUE_OPENABLE_KINDS = new Set(['key']);
+// A kafka topic or sqs queue opens into a 'stream' tab (P10) — 'partition'/'consumerGroup' stay
+// browse-only leaves with nothing to open (onOpen's hasChildren guard makes double-click a no-op
+// on them, same as a column/index leaf).
+const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
@@ -70,6 +74,10 @@ function onOpen(row: TreeRowVm): void {
   }
   if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
     openKeyValueTab(row.connectionId, row.path);
+    return;
+  }
+  if (STREAM_OPENABLE_KINDS.has(row.kind)) {
+    openStreamTab(row.connectionId, row.path);
     return;
   }
   // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue

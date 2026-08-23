@@ -1,5 +1,10 @@
 import type { Adapter, OpCtx, ReadRequest } from '../../../src/engine/adapters/adapter';
-import type { DocumentPage, KeyValuePage, TabularPage } from '../../../src/shared/protocol/page';
+import type {
+  DocumentPage,
+  KeyValuePage,
+  StreamPage,
+  TabularPage,
+} from '../../../src/shared/protocol/page';
 
 // P8 widened Adapter.read() to return the Page union (TabularPage | DocumentPage). Postgres and
 // MariaDB are both tabular-only (mariadbCaps/postgresCaps: defaultPageKind: 'tabular') — every
@@ -40,6 +45,19 @@ export async function readKeyValue(
   const page = await adapter.read(req, ctx);
   if (page.kind !== 'keyvalue') {
     throw new Error(`expected a keyvalue page, got ${page.kind}`);
+  }
+  return page;
+}
+
+/** Kafka's/SQS's counterpart — kafka.spec.ts/sqs.spec.ts are stream-kind-only (P10's D13). */
+export async function readStream(
+  adapter: Adapter,
+  req: ReadRequest,
+  ctx: OpCtx,
+): Promise<StreamPage> {
+  const page = await adapter.read(req, ctx);
+  if (page.kind !== 'stream') {
+    throw new Error(`expected a stream page, got ${page.kind}`);
   }
   return page;
 }

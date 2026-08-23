@@ -26,6 +26,8 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'mariadb',
   'mongodb',
   'redis',
+  'kafka',
+  'sqs',
 ]);
 const kinds = connectionKindSchema.options;
 
@@ -155,6 +157,10 @@ async function onSave(): Promise<void> {
 const isValid = computed(() =>
   draft.value ? connectionInputSchema.safeParse(draft.value).success : false,
 );
+
+// SQS has no host/port at all (D — connection.ts's superRefine exception); fields mode instead
+// repurposes `database` for the AWS region and `username` for a named profile (S10's client.ts).
+const isSqs = computed(() => draft.value?.kind === 'sqs');
 </script>
 
 <template>
@@ -226,7 +232,7 @@ const isValid = computed(() =>
         </div>
 
         <template v-if="draft.mode === 'fields'">
-          <div class="field-row">
+          <div v-if="!isSqs" class="field-row">
             <label class="field">
               <span>Host</span>
               <input v-model="draft.host" type="text" data-testid="connection-host" />
@@ -238,14 +244,14 @@ const isValid = computed(() =>
           </div>
           <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
           <label class="field">
-            <span>Database</span>
+            <span>{{ isSqs ? 'Region' : 'Database' }}</span>
             <input v-model="draft.database" type="text" data-testid="connection-database" />
           </label>
           <label class="field">
-            <span>User</span>
+            <span>{{ isSqs ? 'AWS profile (optional)' : 'User' }}</span>
             <input v-model="draft.username" type="text" data-testid="connection-username" />
           </label>
-          <label class="field">
+          <label v-if="!isSqs" class="field">
             <span>Password</span>
             <div class="password-row">
               <input

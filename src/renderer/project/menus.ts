@@ -23,10 +23,12 @@ import {
   openDdlTab,
   openDocumentTab,
   openKeyValueTab,
+  openStreamTab,
 } from '../state/tabs';
 import { runCount as runDocumentCount } from '../views/documents/state';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
+import { nodeIcon } from './icons';
 import {
   collapseAll,
   openFiltersDialog,
@@ -73,6 +75,12 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
       return namespaceMenu(row);
     case 'key':
       return keyMenu(row);
+    case 'topic':
+    case 'queue':
+      return streamNodeMenu(row);
+    case 'partition':
+    case 'consumerGroup':
+      return simpleObjectMenu(row);
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
@@ -448,6 +456,38 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
       icon: 'symbol-key',
       run: () => {
         openKeyValueTab(row.connectionId, row.path, { newTab: true });
+      },
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      run: () => copyText(row.name),
+    },
+  ];
+}
+
+// P10's topic/queue leaf: minimal open/copy-name only (D13), same discipline as keyMenu — no
+// edit/delete rows anywhere, per the read-only scope decision.
+function streamNodeMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'open-stream',
+      label: 'Open',
+      icon: nodeIcon(row.kind),
+      run: () => {
+        openStreamTab(row.connectionId, row.path);
+      },
+    },
+    {
+      type: 'item',
+      id: 'open-stream-new-tab',
+      label: 'Open in new tab',
+      icon: nodeIcon(row.kind),
+      run: () => {
+        openStreamTab(row.connectionId, row.path, { newTab: true });
       },
     },
     {

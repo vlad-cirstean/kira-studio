@@ -14,6 +14,10 @@ export const nodeKindSchema = z.enum([
   'index', // P8: a leaf under a collection (or a table, later)
   'namespace', // P9: an intermediate ':'-delimited level in a redis key tree
   'key', // P9: a leaf redis key, opened as a key/value tab
+  'topic', // P10: a kafka topic, opened as a stream tab
+  'partition', // P10: a browse-only leaf under a kafka topic
+  'consumerGroup', // P10: a browse-only, informational leaf under a kafka topic
+  'queue', // P10: an sqs queue, opened as a stream tab
 ]);
 export type NodeKind = z.infer<typeof nodeKindSchema>;
 

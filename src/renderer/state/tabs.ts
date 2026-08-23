@@ -3,6 +3,7 @@ import {
   asDataTab,
   asDocumentTab,
   asKeyValueTab,
+  asStreamTab,
   type ConsoleTabRecord,
   type ConsoleTabState,
   type DataTabRecord,
@@ -14,8 +15,11 @@ import {
   defaultDdlTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
+  defaultStreamTabState,
   type KeyValueTabRecord,
   type KeyValueTabState,
+  type StreamTabRecord,
+  type StreamTabState,
   type TabRecord,
 } from '@shared/domain/tabs';
 import { computed, reactive } from 'vue';
@@ -25,6 +29,7 @@ import { dropForTab as dropDocumentPagesForTab } from '../views/documents/docPag
 import { dropForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
 import { dropForTab as dropKeyValuePagesForTab } from '../views/keyvalue/kvPage';
+import { dropForTab as dropStreamPagesForTab } from '../views/stream/streamPage';
 import { clearSelectedCellFor } from './cellSelection';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
@@ -37,6 +42,7 @@ function dropAllPagesForTab(id: string): void {
   dropConsoleResultPagesForTab(id);
   dropDocumentPagesForTab(id);
   dropKeyValuePagesForTab(id);
+  dropStreamPagesForTab(id);
 }
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
@@ -257,6 +263,41 @@ export function openKeyValueTab(
   return id;
 }
 
+// Opens a 'stream' tab, reusing an existing one for the same (connectionId, path) — mirrors
+// openDataTab's identity rule (§8.4); `newTab` opens a fresh one regardless.
+export function openStreamTab(
+  connectionId: string,
+  path: string,
+  opts?: { newTab?: boolean },
+): string {
+  if (!opts?.newTab) {
+    const existing = tabsState.tabs.find(
+      (t) => t.kind === 'stream' && t.connectionId === connectionId && t.path === path,
+    );
+    if (existing) {
+      activateTab(existing.id);
+      return existing.id;
+    }
+  }
+
+  const id = crypto.randomUUID();
+  const record: TabRecord = {
+    id,
+    connectionId,
+    path,
+    kind: 'stream',
+    state: defaultStreamTabState(),
+    order: tabsState.tabs.length,
+    active: true,
+  };
+  deactivateAll();
+  tabsState.tabs.push(record);
+  tabsState.activeId = id;
+  tabsState.hydrated.add(id);
+  saveNow();
+  return id;
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
@@ -301,6 +342,16 @@ export function duplicateTab(id: string): string {
       path: source.path,
       kind: 'keyvalue',
       state: defaultKeyValueTabState(),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  } else if (source.kind === 'stream') {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'stream',
+      state: defaultStreamTabState(),
       order: tabsState.tabs.length,
       active: true,
     };
@@ -443,6 +494,13 @@ export function patchKeyValueTabState(id: string, patch: Partial<KeyValueTabStat
   saveDebounced();
 }
 
+export function patchStreamTabState(id: string, patch: Partial<StreamTabState>): void {
+  const target = tabsState.tabs.find((t) => t.id === id);
+  if (target?.kind !== 'stream') return;
+  Object.assign(target.state, patch);
+  saveDebounced();
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -476,6 +534,10 @@ export function findDocumentTab(id: string): DocumentTabRecord | null {
 
 export function findKeyValueTab(id: string): KeyValueTabRecord | null {
   return asKeyValueTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findStreamTab(id: string): StreamTabRecord | null {
+  return asStreamTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));

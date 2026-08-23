@@ -1,0 +1,120 @@
+import type { SQSClient } from '@aws-sdk/client-sqs';
+import type { SourceText } from '../../../shared/domain/ddl';
+import type { MutationResult } from '../../../shared/domain/mutations';
+import {
+  encodePath,
+  type NodePath,
+  type ObjectMeta,
+  type TreeNode,
+} from '../../../shared/domain/tree';
+import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
+import type { Page } from '../../../shared/protocol/page';
+import type {
+  Adapter,
+  AdapterDeps,
+  ConnectInfo,
+  CountRequest,
+  OpCtx,
+  ReadRequest,
+} from '../adapter';
+import { AdapterError } from '../errors';
+import { sqsCaps } from './caps';
+import * as catalog from './catalog';
+import { connectSqs } from './client';
+import { mapSqsError } from './errors';
+import { countQueue, pollQueue } from './read';
+
+class SqsAdapter implements Adapter {
+  readonly kind = 'sqs' as const;
+  readonly caps = sqsCaps;
+
+  private client: SQSClient | null = null;
+
+  constructor(private readonly deps: AdapterDeps) {}
+
+  async connect(cfg: ResolvedConnectionConfig): Promise<ConnectInfo> {
+    const { client } = connectSqs(cfg, this.deps.log);
+    try {
+      await catalog.listQueues(client);
+    } catch (err) {
+      client.destroy();
+      throw mapSqsError(err);
+    }
+    this.client = client;
+    return { serverVersion: 'Amazon SQS' };
+  }
+
+  async disconnect(): Promise<void> {
+    this.client?.destroy();
+    this.client = null;
+  }
+
+  async children(path: NodePath): Promise<TreeNode[]> {
+    // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a 'queue'
+    // node never has children (§5.1's flat "region -> queues" tree, no deeper level).
+    if (path.segments.length > 0) return [];
+    return catalog.listQueues(this.requireClient());
+  }
+
+  async describe(): Promise<ObjectMeta> {
+    // §8.9 has no column/FK navigation for streams — never reached by a 'stream' tab.
+    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for sqs');
+  }
+
+  async ddl(): Promise<SourceText> {
+    // caps.ddl === false gates §8.10's "Open DDL" menu item for sqs — never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'ddl is not supported for sqs');
+  }
+
+  async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
+    const client = this.requireClient();
+    const queueUrl = await catalog.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
+    return pollQueue(client, queueUrl, req, ctx);
+  }
+
+  async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
+    const client = this.requireClient();
+    const queueUrl = await catalog.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
+    return countQueue(client, queueUrl, ctx);
+  }
+
+  preview(): string[] {
+    // caps.writable === false — read-only in v1 (P10's ground rules); no producer UI in scope.
+    throw new AdapterError('E_UNSUPPORTED', 'sqs connections are read-only in this version');
+  }
+
+  async mutate(): Promise<MutationResult> {
+    throw new AdapterError('E_UNSUPPORTED', 'sqs connections are read-only in this version');
+  }
+
+  async execute(): Promise<Page[]> {
+    // caps.sql === false — no console for sqs (P10's D13); never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'sqs has no query console');
+  }
+
+  // D14: the SDK's own abortSignal request option (passed straight through in read.ts/pollQueue)
+  // is the sole cancel mechanism — this stays a permanent no-op, mirroring kafka's own cancel().
+  async cancel(): Promise<boolean> {
+    return false;
+  }
+
+  private requireClient(): SQSClient {
+    if (!this.client) throw new AdapterError('E_CONNECT', 'adapter is not connected');
+    return this.client;
+  }
+
+  private resolveQueueTarget(path: NodePath): string {
+    const [queueSegment] = path.segments;
+    if (queueSegment?.kind !== 'queue') {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `read requires a queue path, got: ${encodePath(path.segments)}`,
+      );
+    }
+    return queueSegment.name;
+  }
+}
+
+export function createSqsAdapter(deps: AdapterDeps): Adapter {
+  return new SqsAdapter(deps);
+}

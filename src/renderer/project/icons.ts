@@ -14,6 +14,10 @@ const KIND_ICON: Record<NodeKind, string> = {
   index: 'symbol-key',
   namespace: 'symbol-namespace', // P9: an intermediate ':'-delimited redis key level
   key: 'tag', // P9: a leaf redis key, matching TabStrip.vue's keyvalue-tab icon
+  topic: 'broadcast', // P10: a kafka topic, matching TabStrip.vue's stream-tab icon
+  partition: 'symbol-array', // P10: a browse-only leaf under a kafka topic
+  consumerGroup: 'organization', // P10: a browse-only, informational leaf under a kafka topic
+  queue: 'inbox', // P10: an sqs queue, matching TabStrip.vue's stream-tab icon
 };
 
 export function nodeIcon(kind: NodeKind): string {

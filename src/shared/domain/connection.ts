@@ -19,6 +19,7 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   mariadb: 3306,
   mongodb: 27017,
   redis: 6379,
+  kafka: 9092,
 };
 
 export const connectionColorSchema = z.enum([
@@ -60,10 +61,12 @@ const connectionFieldsSchema = z.object({
 
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
   if (input.mode === 'fields') {
-    if (!input.host) {
+    // SQS has no host/port at all (P10's D8) — fields mode repurposes `database` for the AWS
+    // region and `username` for the named profile instead, per §5.1's "named AWS profile" wording.
+    if (input.kind !== 'sqs' && !input.host) {
       ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
     }
-    if (!input.port) {
+    if (input.kind !== 'sqs' && !input.port) {
       ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
     }
   } else {

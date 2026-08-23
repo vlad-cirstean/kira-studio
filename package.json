@@ -32,6 +32,8 @@
     "@lezer/highlight": "1.2.3",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
+    "@testcontainers/kafka": "12.1.0",
+    "@testcontainers/localstack": "12.1.0",
     "@types/node": "26.2.0",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -48,10 +50,13 @@
     "vue-tsc": "3.3.11"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "3.1116.0",
+    "@aws-sdk/credential-providers": "3.1116.0",
     "bson": "6",
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",
     "ioredis": "6.0.0",
+    "kafkajs": "2.2.4",
     "mariadb": "3.5.3",
     "mongodb": "6",
     "pg": "8.23.0",

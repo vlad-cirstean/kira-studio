@@ -53,7 +53,7 @@ export interface PagePosition {
   hasMore: boolean;
   nextToken: string | null;
   prevToken: string | null;
-  strategy: 'keyset' | 'offset' | 'cursor';
+  strategy: 'keyset' | 'offset' | 'cursor' | 'offsetWindow' | 'batch';
 }
 
 export const pagePositionSchema = z.object({
@@ -62,7 +62,7 @@ export const pagePositionSchema = z.object({
   hasMore: z.boolean(),
   nextToken: z.string().nullable(),
   prevToken: z.string().nullable(),
-  strategy: z.enum(['keyset', 'offset', 'cursor']),
+  strategy: z.enum(['keyset', 'offset', 'cursor', 'offsetWindow', 'batch']),
 });
 
 export interface TabularPage {
@@ -112,10 +112,27 @@ export interface KeyValuePage {
 }
 
 /**
- * P10 adds `StreamPage` (D5). Switch on `page.kind` everywhere, even though there are only three
- * arms today — that is what makes widening additive instead of a rewrite.
+ * One row per message/record. `keys`/`headers`/`attrs`/`timestamps`/`bodies` are fixed semantic
+ * columns reusing the exact same TextColumnChunk codec as DocumentPage's `ids`/`bodies` — `attrs`
+ * is the one column whose meaning differs per engine (partition/offset JSON for Kafka, system
+ * attributes JSON for SQS, per §8.9). `visibilityTimeoutSeconds` is SQS-only whole-page metadata
+ * (null for Kafka), mirroring KeyValuePage's ttlMs/memoryBytes precedent.
  */
-export type Page = TabularPage | DocumentPage | KeyValuePage;
+export interface StreamPage {
+  kind: 'stream';
+  position: PagePosition;
+  keys: TextColumnChunk;
+  headers: TextColumnChunk;
+  attrs: TextColumnChunk;
+  timestamps: TextColumnChunk;
+  bodies: TextColumnChunk;
+  rowCount: number;
+  byteSize: number;
+  fetchedAt: number; // epoch ms
+  visibilityTimeoutSeconds: number | null;
+}
+
+export type Page = TabularPage | DocumentPage | KeyValuePage | StreamPage;
 
 export const MAX_CELL_BYTES = 64 * 1024;
 export const MAX_PAGE_SIZE = 10_000;
@@ -395,6 +412,69 @@ export function createKeyValuePageBuilder(opts: {
   };
 }
 
+/** Mirrors `createKeyValuePageBuilder`, fixed to the five semantic columns `StreamPage` uses. */
+export interface StreamPageBuilder {
+  push(row: {
+    key: string | null;
+    headers: string;
+    attrs: string;
+    timestamp: string | null;
+    body: string;
+  }): void;
+  finish(position: PagePosition): StreamPage;
+}
+
+export function createStreamPageBuilder(opts: {
+  visibilityTimeoutSeconds: number | null;
+}): StreamPageBuilder {
+  const keyScratch = new ColumnScratch();
+  const headerScratch = new ColumnScratch();
+  const attrScratch = new ColumnScratch();
+  const timestampScratch = new ColumnScratch();
+  const bodyScratch = new ColumnScratch();
+  const encoder = new TextEncoder();
+  let rowCount = 0;
+
+  return {
+    push(row) {
+      const i = rowCount;
+      keyScratch.appendValue(row.key, i, encoder);
+      headerScratch.appendValue(row.headers, i, encoder);
+      attrScratch.appendValue(row.attrs, i, encoder);
+      timestampScratch.appendValue(row.timestamp, i, encoder);
+      bodyScratch.appendValue(row.body, i, encoder);
+      rowCount++;
+    },
+    finish(position) {
+      const keys = keyScratch.finish(rowCount, false);
+      const headers = headerScratch.finish(rowCount, false);
+      const attrs = attrScratch.finish(rowCount, false);
+      const timestamps = timestampScratch.finish(rowCount, false);
+      const bodies = bodyScratch.finish(rowCount, false);
+      const page: StreamPage = {
+        kind: 'stream',
+        position,
+        keys,
+        headers,
+        attrs,
+        timestamps,
+        bodies,
+        rowCount,
+        byteSize: 0,
+        fetchedAt: Date.now(),
+        visibilityTimeoutSeconds: opts.visibilityTimeoutSeconds,
+      };
+      page.byteSize =
+        chunkByteSize(keys) +
+        chunkByteSize(headers) +
+        chunkByteSize(attrs) +
+        chunkByteSize(timestamps) +
+        chunkByteSize(bodies);
+      return page;
+    },
+  };
+}
+
 /**
  * The envelope-only schema (§4a): running Zod over every cell of a 600 000-cell page would
  * cost more than the query. Pair with `assertPageStructure` for the typed-array invariants.
@@ -428,10 +508,20 @@ export const keyValuePageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
+export const streamPageEnvelopeSchema = z.object({
+  kind: z.literal('stream'),
+  rowCount: z.number().int().min(0),
+  position: pagePositionSchema,
+  byteSize: z.number().int().min(0),
+  fetchedAt: z.number(),
+  visibilityTimeoutSeconds: z.number().int().nullable(),
+});
+
 export const pageEnvelopeSchema = z.discriminatedUnion('kind', [
   tabularPageEnvelopeSchema,
   documentPageEnvelopeSchema,
   keyValuePageEnvelopeSchema,
+  streamPageEnvelopeSchema,
 ]);
 
 function assertChunkStructure(chunk: TextColumnChunk, rowCount: number, label: string): void {
@@ -469,6 +559,14 @@ export function assertPageStructure(page: Page): void {
     assertChunkStructure(page.bodies, page.rowCount, 'bodies');
     return;
   }
-  assertChunkStructure(page.fields, page.rowCount, 'fields');
-  assertChunkStructure(page.values, page.rowCount, 'values');
+  if (page.kind === 'keyvalue') {
+    assertChunkStructure(page.fields, page.rowCount, 'fields');
+    assertChunkStructure(page.values, page.rowCount, 'values');
+    return;
+  }
+  assertChunkStructure(page.keys, page.rowCount, 'keys');
+  assertChunkStructure(page.headers, page.rowCount, 'headers');
+  assertChunkStructure(page.attrs, page.rowCount, 'attrs');
+  assertChunkStructure(page.timestamps, page.rowCount, 'timestamps');
+  assertChunkStructure(page.bodies, page.rowCount, 'bodies');
 }

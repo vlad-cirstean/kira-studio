@@ -5,6 +5,7 @@ import DdlTabView from '../../views/ddl/DdlView.vue';
 import DocumentTabView from '../../views/documents/DocumentView.vue';
 import DataTabView from '../../views/grid/DataView.vue';
 import KeyValueTabView from '../../views/keyvalue/KeyValueView.vue';
+import StreamTabView from '../../views/stream/StreamView.vue';
 import EmptyState from './EmptyState.vue';
 </script>
 
@@ -23,6 +24,11 @@ import EmptyState from './EmptyState.vue';
   />
   <KeyValueTabView
     v-else-if="activeTab && activeTab.kind === 'keyvalue'"
+    :key="activeTab.id"
+    :tab="activeTab"
+  />
+  <StreamTabView
+    v-else-if="activeTab && activeTab.kind === 'stream'"
     :key="activeTab.id"
     :tab="activeTab"
   />

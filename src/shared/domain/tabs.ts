@@ -6,14 +6,15 @@ export const tabKindSchema = z.enum(['data', 'ddl', 'document', 'keyvalue', 'str
 export type TabKind = z.infer<typeof tabKindSchema>;
 
 // 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5, 'document' in P8,
-// 'keyvalue' in P9. The restore path drops rows of any other kind with a `warn` — a closed
-// vocabulary decided once, same discipline as P1's Caps/connectionKind.
+// 'keyvalue' in P9, 'stream' in P10. The restore path drops rows of any other kind with a `warn` —
+// a closed vocabulary decided once, same discipline as P1's Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
   'ddl',
   'console',
   'document',
   'keyvalue',
+  'stream',
 ];
 
 const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
@@ -60,6 +61,15 @@ export const keyValueTabStateSchema = z.object({
 });
 export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 
+// Read-only view (mirrors keyValueTabStateSchema's D2 precedent) — no edit memory to persist.
+// Unlike KeyValueTabState, there is no offset-fallback position to remember either: Kafka's
+// offsetWindow strategy is always token-driven (no list-key-style plain-offset case), and SQS's
+// batch strategy has no position at all (D11). Whether the user has clicked Poll yet (SQS's D10
+// gate) is runtime-only state — like `status` in views/keyvalue/state.ts's runtime — since a
+// restored tab has no loaded page to show either way, so nothing belongs in session state here.
+export const streamTabStateSchema = z.object({});
+export type StreamTabState = z.infer<typeof streamTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -74,6 +84,7 @@ export const tabRecordSchema = z.discriminatedUnion('kind', [
   z.object({ ...tabRecordBase, kind: z.literal('console'), state: consoleTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('keyvalue'), state: keyValueTabStateSchema }),
+  z.object({ ...tabRecordBase, kind: z.literal('stream'), state: streamTabStateSchema }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -81,6 +92,7 @@ export type DdlTabRecord = Extract<TabRecord, { kind: 'ddl' }>;
 export type ConsoleTabRecord = Extract<TabRecord, { kind: 'console' }>;
 export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
 export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
+export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -96,6 +108,10 @@ export function asDocumentTab(tab: TabRecord | null | undefined): DocumentTabRec
 
 export function asKeyValueTab(tab: TabRecord | null | undefined): KeyValueTabRecord | null {
   return tab && tab.kind === 'keyvalue' ? tab : null;
+}
+
+export function asStreamTab(tab: TabRecord | null | undefined): StreamTabRecord | null {
+  return tab && tab.kind === 'stream' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -126,6 +142,10 @@ export function defaultDocumentTabState(): DocumentTabState {
 
 export function defaultKeyValueTabState(): KeyValueTabState {
   return { pageIndex: 0 };
+}
+
+export function defaultStreamTabState(): StreamTabState {
+  return {};
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */
