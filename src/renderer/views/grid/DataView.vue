@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
+import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
@@ -7,6 +8,7 @@ import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
+import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
@@ -31,14 +33,47 @@ const needsReconnect = computed(
 
 const rt = computed(() => runtime[props.tab.id]);
 
+const connectionRecord = computed(() =>
+  props.tab.connectionId
+    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
+    : undefined,
+);
+
 // P16 design system LAW: the connection colour caps the toolbar as a 2px rail, never a tint on
 // the whole view. Moved here from the shell-level Toolbar.vue this component's toolbars used to
 // be rendered by (see DataToolbar.vue/FilterToolbar.vue — they render their own .p-toolbar bands
 // unchanged, only who mounts them changed).
-const railStyle = computed(() => {
-  const id = props.tab.connectionId;
-  const color = id ? connectionsState.records.find((r) => r.id === id)?.color : undefined;
-  return { '--kira-rail': connColorVar(color) };
+const railStyle = computed(() => ({ '--kira-rail': connColorVar(connectionRecord.value?.color) }));
+
+const iconColor = computed(
+  () => connColorVar(connectionRecord.value?.color) ?? 'var(--kira-fg-muted)',
+);
+
+const targetTail = computed(() => pathTail(props.tab.path));
+
+const KIND_ICON: Record<string, string> = {
+  table: 'table',
+  view: 'eye',
+  matview: 'symbol-structure',
+};
+const targetIcon = computed(() => {
+  const kind = targetTail.value?.kind;
+  return (kind && KIND_ICON[kind]) || 'table';
+});
+
+// Every data view's crumbar starts with the connection's engine icon (ViewHeader's connKind),
+// same as Documents/KeyValue/Stream/Console/Ddl — the grid mockup (Main.html) opened straight on
+// its toolbar with no view-head, but that leaves the grid as the one view that doesn't say which
+// connection/engine a tab belongs to at a glance.
+const pathPrefix = computed(() => {
+  const connectionId = props.tab.connectionId;
+  if (!connectionId) return '';
+  const connectionName = connectionRecord.value?.name;
+  const segments = decodePath(connectionId, props.tab.path).segments;
+  const parts = [connectionName, ...segments.slice(0, -1).map((s) => s.name)].filter(
+    (p): p is string => !!p,
+  );
+  return parts.length ? `${parts.join(' / ')} / ` : '';
 });
 
 async function onReconnectAndLoad(): Promise<void> {
@@ -88,9 +123,18 @@ function onCloseSearch(): void {
 
 <template>
   <div class="data-view">
-    <!-- The grid has no view-head (Main.html opens straight on its toolbar) — DataToolbar and
-         FilterToolbar render their own .p-toolbar bands unchanged; this is just their new host,
-         moved from the shell-level Toolbar.vue so every view's chrome lives inside the view. -->
+    <ViewHeader
+      :icon="targetIcon"
+      :icon-color="iconColor"
+      :path="pathPrefix"
+      :name="targetTail?.name ?? tab.path"
+      :conn-color="connectionRecord?.color ?? null"
+      :conn-kind="connectionRecord?.kind"
+      target-testid="grid-target"
+    />
+    <!-- DataToolbar and FilterToolbar render their own .p-toolbar bands unchanged; this is just
+         their new host, moved from the shell-level Toolbar.vue so every view's chrome lives
+         inside the view. -->
     <div class="toolbar-band" :style="railStyle">
       <div class="p-toolbar-rail" :style="railStyle" />
       <DataToolbar />
