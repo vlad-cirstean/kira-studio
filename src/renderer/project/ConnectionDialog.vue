@@ -26,17 +26,6 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   sqs: 'SQS',
   s3: 'S3',
 };
-// NewConnection.html's per-kind subtitle and accent colour for the engine picker tile —
-// cosmetic copy/tint, not tied to anything persisted.
-const KIND_SUB: Record<ConnectionKind, string> = {
-  postgres: 'Tables, views, functions, DDL',
-  mariadb: 'Also MySQL 8 and Percona',
-  mongodb: 'Collections and documents',
-  redis: 'Keys, hashes, lists, sorted sets',
-  kafka: 'Topics, partitions, consumer groups',
-  sqs: 'Queues and dead-letter queues',
-  s3: 'Buckets and object prefixes',
-};
 const KIND_ACCENT: Record<ConnectionKind, string> = {
   postgres: 'cyan',
   mariadb: 'blue',
@@ -163,11 +152,6 @@ function pickKind(kind: ConnectionKind): void {
 function continueToDetails(): void {
   const d = draft.value;
   if (!d || !SUPPORTED_KINDS.has(d.kind)) return;
-  step.value = 'details';
-}
-
-function pasteUri(): void {
-  setMode('uri');
   step.value = 'details';
 }
 
@@ -300,7 +284,6 @@ const preconnectText = computed({
               <EngineIcon :kind="kind" :size="22" />
             </span>
             <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
-            <span class="kind-sub">{{ SUPPORTED_KINDS.has(kind) ? KIND_SUB[kind] : 'Not supported yet' }}</span>
           </button>
         </div>
       </div>
@@ -460,7 +443,6 @@ const preconnectText = computed({
     </template>
 
     <template v-if="step === 'engine'" #footer>
-      <Button kind="dialog" icon="code" @click="pasteUri">Paste a URI</Button>
       <span class="footer-actions p-push">
         <Button kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</Button>
         <Button kind="dialog" variant="primary" @click="continueToDetails">
@@ -712,11 +694,5 @@ const preconnectText = computed({
 .kind-name {
   font-size: var(--kira-t-lg);
   color: var(--kira-fg);
-}
-
-.kind-sub {
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-disabled);
-  line-height: 1.4;
 }
 </style>
