@@ -2,7 +2,7 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P14 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Status: **P0–P15 implemented** on the v1 feature branch — see §10's phasing table for the record.
 > Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
 > shipped.
 

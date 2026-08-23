@@ -1,5 +1,7 @@
 # Kira Studio
 
+[![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
+
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
 Vue 3 — one workbench across six database engines.
 
@@ -91,7 +93,7 @@ bun install
 bun run package:mac
 ```
 
-Artifacts land in `dist/`: `Kira Studio-0.1.0-arm64.dmg`, `Kira Studio-0.1.0-arm64-mac.zip`, and
+Artifacts land in `dist/`: `Kira Studio-0.1.0-arm64.dmg`, `Kira Studio-0.1.0-arm64.zip`, and
 the unpacked `dist/mac-arm64/Kira Studio.app`. `bun run package:mac:dir` builds only the `.app`
 and is faster for iterating.
 
@@ -127,10 +129,15 @@ bun run dev        # electron-vite dev, HMR for the renderer
 | `bun run test:ui` | Builds, then runs Playwright against the real app |
 | `bun run package:mac` | `.dmg` + `.zip` + `.app`, unsigned arm64 |
 | `bun run package:mac:dir` | `.app` only (faster) |
+| `bun run verify:packaging` | Confirms the packaging config still ships no auto-update behavior |
 
 **App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
 environment variable relocates that whole directory — the test suite uses it to keep tests off a
 developer's real data.
+
+**Git hooks:** `bun install` points `core.hooksPath` at `.githooks/` (via the `prepare` lifecycle
+script), which installs a `pre-commit` hook running `bun run lint` and `bun run typecheck` — about
+six seconds. Bypass it for a work-in-progress commit with `git commit --no-verify`.
 
 ## Tests
 
@@ -184,7 +191,7 @@ See [`docs/SPEC.md`](docs/SPEC.md) §11 for the full directory breakdown.
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
-- [`docs/plans/`](docs/plans/) — one implementation plan per phase, P0 through P14.
+- [`docs/plans/`](docs/plans/) — one implementation plan per phase, P0 through P15.
 - [`docs/design/vscode-modern-ui/`](docs/design/vscode-modern-ui/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
@@ -194,7 +201,8 @@ See [`docs/SPEC.md`](docs/SPEC.md) §11 for the full directory breakdown.
 
 S3; MySQL; SQLite as a connection target; light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; multiple windows; credential encryption; SSH
-tunneling (planned for v2); code signing/notarization; auto-update; unit tests; CI. Writes are
+tunneling (planned for v2); code signing/notarization; unit tests. **Auto-update is deliberately
+absent and verified as such** — see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7. Writes are
 limited to add-row, delete-row and cell-edit — Redis, Kafka and SQS are read-only.
 
 ## License

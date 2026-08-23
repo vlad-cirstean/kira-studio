@@ -16,7 +16,7 @@ bun run package:mac        # electron-vite build, then electron-builder --mac --
 
 Expected artifacts:
 - `dist/Kira Studio-0.1.0-arm64.dmg`
-- `dist/Kira Studio-0.1.0-arm64-mac.zip`
+- `dist/Kira Studio-0.1.0-arm64.zip`
 - `dist/mac-arm64/Kira Studio.app`
 
 `bun run package:mac:dir` produces only the `.app` (skips `dmg`/`zip` packaging) and is the faster
@@ -59,7 +59,11 @@ creation, and full click-through of the app.
 
 ## 4. Human checklist (run on macOS 13+ arm64)
 
-Every item below is a pass/fail a human should record here after running it for real:
+Every item below is a pass/fail a human should record here after running it for real. Items **1,
+2's config precondition, 3 and 9 are now also checked automatically**, on genuine macOS hardware,
+by the `package-smoke` job in `.github/workflows/ci.yml` (§7) — but the row below is only updated
+from an *observed* run, never from expectation, so it may still read "not yet run" here even once
+that automation exists.
 
 1. `codesign -dv --verbose=2 "dist/mac-arm64/Kira Studio.app"` reports `Signature=adhoc`. — *not
    yet run*
@@ -83,7 +87,8 @@ Every item below is a pass/fail a human should record here after running it for 
 8. RSS cross-check: rebuild the 5-connection/10-tab scenario by hand, sum the app's processes via
    `ps -o rss=` or Activity Monitor, record against 350 MB. — *not yet run, see `docs/PERF.md` §3*
 9. Record the `.app` on-disk size (lever L-D). — **252 MB**, recorded above from the Linux `--dir`
-   build; re-confirm on macOS since a real macOS build may differ slightly.
+   build; re-confirm on macOS since a real macOS build may differ slightly. Automated going forward
+   via `du -sh` in `package-smoke`.
 
 ## 5. Off-macOS verification (what this environment could actually check)
 
@@ -116,8 +121,74 @@ genuinely requires real macOS.
   phase, not invented here.
 - **Ad-hoc signature only.** The build is not distributable outside the machine that built it —
   SPEC.md §3 explicitly defers signing/notarization past v1.
-- **No CI, no tag-triggered build, no auto-update.** All P15's job.
 - **`dmg` construction requires real macOS** (the `sips` dependency above) — the `zip` target and
   the `.app` bundle itself do not.
 - **Human checklist items in §4 are unrun** — no macOS hardware has been available in this
   environment. Whoever runs a build on real hardware should fill in the "not yet run" rows above.
+
+CI, the tag-triggered release build, and the auto-update decision are covered in §7 — P15 closed
+those gaps; the DB test suite and the §4 human items remain deliberately out of CI's scope.
+
+## 7. CI, releases, and the auto-update decision
+
+**What runs on every push/PR** (`.github/workflows/ci.yml`, `macos-15`, pinned rather than
+`macos-latest` so a runner-image change can't silently swap architecture or toolchain): `checks`
+(lint, typecheck, build, `bun run verify:packaging`) on every push and PR to `main`;
+`ui-smoke` (`bun run test:ui`) after `checks` passes;
+`package-smoke` (`bun run package:mac:dir` plus the bundle assertions in §3/§4 items 1-3/9) after
+`checks` passes, skipped on pull requests. No dependency caching and no pinned Bun version — this
+repo pins neither elsewhere, and a stale cache serving old Electron would be a green CI for a build
+nobody actually made.
+
+**Why `bun run test:db` is not in CI.** GitHub-hosted macOS runners have no Docker and no nested
+virtualization, so the Testcontainers-backed DB suite cannot run there at all. SPEC.md §9.1 already
+scoped this suite as local-only for v1. The consequence: of the 22 UI specs, only the four that need
+no container (`smoke`, `workbench`, `connections`, `startup`) really execute in `ui-smoke`; the other
+18 skip with `DOCKER_UNAVAILABLE_MESSAGE`, not a failure. **The DB suite and the 18 container-backed
+UI specs stay a local, pre-merge responsibility — CI does not replace them.**
+
+**Cutting a release** (`.github/workflows/release.yml`, triggered on tags matching `v*.*.*`):
+1. Bump `version` in `package.json`, commit it.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. The workflow checks the tag matches `package.json`'s version, re-runs `lint`/`typecheck`, runs
+   `bun run package:mac` unmodified, deletes any `.blockmap` electron-builder wrote, re-verifies
+   packaging in strict mode, and opens a **draft** GitHub Release with the `.dmg`/`.zip` attached
+   plus a build-log artifact upload.
+4. A human runs the §4 checklist against the draft release's artifacts on real hardware, fills in
+   the rows, then publishes the release. The workflow does not publish automatically — five of §4's
+   nine checks need a human on real macOS, and none of them are unrun by the time a user downloads a
+   published release.
+
+**The auto-update verification.** SPEC.md states "no auto-update" for v1 in three places (§1's
+deferred list, §3's app-identity line, and by implication §10's P12 scope). Building a real
+auto-updater now would also be incoherent with the rest of v1: macOS auto-update requires a *signed
+and notarized* app, and signing is itself deferred (`mac.identity: '-'` is ad-hoc and satisfies no
+Gatekeeper check). So P15 does not add `electron-updater`, a `publish:` provider, or a `latest-mac.yml`
+feed — it **verifies** that the shipped configuration produces none of that, and keeps re-verifying
+it:
+
+- No `electron-updater`/`update-electron-app` dependency, and no `autoUpdater` reference in `src/`.
+- `electron-builder.yml` has no `publish:` key at all, and both packaging scripts pass
+  `--publish never` — so electron-builder never resolves a publish target.
+- `dmg.writeUpdateInfo: false` stays set on the dmg target.
+- No `dist/latest*.yml` update-feed file is ever produced (confirmed empirically: none exists after
+  a full build).
+- **One byproduct needed an action, not just an assertion**: electron-builder's macOS `zip` target
+  writes a `.blockmap` — a differential-update artifact — unconditionally, regardless of publish
+  config. It's inert without a feed file, but it *is* update machinery, so shipping it in a release
+  would contradict a verified "no auto-update" posture. The release workflow deletes every
+  `dist/*.blockmap` before creating the release and re-runs verification in strict mode
+  (`KIRA_STRICT_UPDATE_CHECK=1`), which turns a leftover blockmap into a hard failure. A local
+  `bun run package:mac` still leaves one behind — `bun run verify:packaging` reports it as a note,
+  not a failure, so ordinary local builds stay ergonomic.
+
+`bun run verify:packaging` (`scripts/verify-packaging.sh`) is the command that re-checks all of the
+above, both locally and in CI (`checks` and `package-smoke`), and is what the release workflow runs
+in strict mode before publishing an artifact.
+
+**What a future auto-update would require, in order:** code signing and notarization (SPEC.md
+§1/§3), then a SPEC.md scope change reversing "no auto-update", then an update feed and
+`electron-updater` wiring. None of that is P15's job.
+
+**Whether the release workflow has actually run:** *the release workflow has not yet been run; the
+first tag pushed to this repository is its first execution.*
