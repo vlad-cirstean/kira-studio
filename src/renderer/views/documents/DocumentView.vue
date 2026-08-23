@@ -108,25 +108,35 @@ function onSearchInput(): void {
 // The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
 // read.ts explicitly rejects a `{kind:'text'}` sort (a free-text expression has no server-side
 // meaning here) — so this box parses straight into the structured form itself, never the text
-// variant, mirroring how clicking a grid column header builds structured terms.
+// variant, mirroring how clicking a grid column header builds structured terms. The box's own
+// syntax is Mongo's own sort-document shape (`{ field: 1, field2: -1 }`, `1` ascending / `-1`
+// descending — a `db.collection.find().sort(...)` argument, not SQL's `ORDER BY field ASC`) so a
+// Mongo user can type what they already know; `sortSpecToText`/`parseSortText` are this box's own
+// serializer/parser and must round-trip each other exactly.
 const sortText = ref(sortSpecToText(props.tab.state.sort));
 
 function sortSpecToText(sort: SortSpec | null): string {
-  if (sort?.kind !== 'structured') return '';
-  return sort.terms.map((t) => `${t.column} ${t.direction.toUpperCase()}`).join(', ');
+  if (sort?.kind !== 'structured' || sort.terms.length === 0) return '';
+  const body = sort.terms.map((t) => `${t.column}: ${t.direction === 'desc' ? -1 : 1}`).join(', ');
+  return `{ ${body} }`;
 }
 
+// Lenient by design (matches how a Mongo shell user actually types a sort document): braces are
+// optional, keys may be bare or quoted (single or double), and `asc`/`desc` are tolerated
+// alongside Mongo's own `1`/`-1` for anyone still transitioning off the old ORDER BY-style box.
+// Anything that isn't a `key: value` pair is simply skipped rather than rejecting the whole
+// string, since a half-typed sort document while the user is still editing is not an error.
+const SORT_TERM_RE = /(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_.$]+))\s*:\s*(-?1|asc|desc)/gi;
+
 function parseSortText(text: string): SortSpec | null {
-  const terms = text
-    .split(',')
-    .map((part) => part.trim())
-    .filter((part) => part !== '')
-    .map((part) => {
-      const [column, dirRaw] = part.split(/\s+/);
-      const direction: 'asc' | 'desc' = dirRaw?.toLowerCase() === 'desc' ? 'desc' : 'asc';
-      return { column, direction };
-    })
-    .filter((t) => t.column !== '');
+  const terms: { column: string; direction: 'asc' | 'desc' }[] = [];
+  for (const match of text.matchAll(SORT_TERM_RE)) {
+    const column = match[1] ?? match[2] ?? match[3];
+    if (!column) continue;
+    const value = match[4].toLowerCase();
+    const direction: 'asc' | 'desc' = value === '-1' || value === 'desc' ? 'desc' : 'asc';
+    terms.push({ column, direction });
+  }
   return terms.length > 0 ? { kind: 'structured', terms } : null;
 }
 
@@ -361,12 +371,14 @@ onUnmounted(() => {
 
       <template #toolbar>
         <div class="sep"></div>
+        <!-- Canonical order (DataToolbar.vue is the reference): pager, then page-size, then a
+             count/columns-equivalent group, then the add/search group. -->
         <div class="group">
           <IconButton
             icon="arrow-left"
             :size="13"
             data-testid="document-prev"
-            :disabled="!rt?.prevToken"
+            :disabled="tab.state.pageIndex === 0"
             title="Previous page"
             @click="goPrev(tab.id)"
           />
@@ -385,29 +397,6 @@ onUnmounted(() => {
             title="Next page"
             @click="goNext(tab.id)"
           />
-          <Button
-            icon="symbol-number"
-            data-testid="document-count"
-            title="Run an exact countDocuments() — the estimate above is metadata"
-            @click="runCount(tab.id)"
-          >Exact count</Button>
-        </div>
-        <div class="sep"></div>
-        <div class="group">
-          <IconButton
-            icon="expand-all"
-            :size="13"
-            title="Expand all"
-            data-testid="document-expand-all"
-            @click="onExpandAll"
-          />
-          <IconButton
-            icon="collapse-all"
-            :size="13"
-            title="Collapse all"
-            data-testid="document-collapse-all"
-            @click="onCollapseAll"
-          />
         </div>
         <div class="sep"></div>
         <!-- Left as the hand-rolled .p-seg group, same as DataToolbar.vue's own page-size picker
@@ -425,15 +414,15 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="sep"></div>
+        <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
+             the exact count, the fields/projection menu, and expand/collapse-all. -->
         <div class="group">
-          <IconButton
-            icon="add"
-            :size="13"
-            data-testid="document-add"
-            :disabled="!caps?.canInsert"
-            :title="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
-            @click="onAddDocument"
-          />
+          <Button
+            icon="symbol-number"
+            data-testid="document-count"
+            title="Run an exact countDocuments() — the estimate above is metadata"
+            @click="runCount(tab.id)"
+          >Exact count</Button>
           <div class="projection-anchor">
             <IconButton
               icon="list-selection"
@@ -450,6 +439,33 @@ onUnmounted(() => {
             />
           </div>
           <IconButton
+            icon="expand-all"
+            :size="13"
+            title="Expand all"
+            data-testid="document-expand-all"
+            @click="onExpandAll"
+          />
+          <IconButton
+            icon="collapse-all"
+            :size="13"
+            title="Collapse all"
+            data-testid="document-collapse-all"
+            @click="onCollapseAll"
+          />
+        </div>
+        <div class="sep"></div>
+        <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
+             affordance in the toolbar (deletion lives on the row's own context menu). -->
+        <div class="group">
+          <IconButton
+            icon="add"
+            :size="13"
+            data-testid="document-add"
+            :disabled="!caps?.canInsert"
+            :title="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
+            @click="onAddDocument"
+          />
+          <IconButton
             icon="search"
             :active="rt?.searchOpen"
             title="Search this page"
@@ -462,7 +478,7 @@ onUnmounted(() => {
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
            SORT box beside it (read.ts's structured-sort-only rule, see sortSpecToText/
            parseSortText above), FilterToolbar.vue's ORDER BY box narrowed to the one form Mongo
-           can actually execute. -->
+           can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's. -->
       <template #toolbar-2>
         <div class="filter-field">
           <TextField
@@ -477,7 +493,8 @@ onUnmounted(() => {
           <TextField
             v-model="sortText"
             prefix="SORT"
-            placeholder="name ASC, price DESC"
+            placeholder="{ createdAt: -1, name: 1 }"
+            title="Mongo sort document: 1 = ascending, -1 = descending"
             data-testid="document-sort"
             @keyup.enter="onSortInput"
             @blur="onSortInput"
@@ -615,9 +632,11 @@ onUnmounted(() => {
 }
 
 /* FilterToolbar.vue's orderby-input precedent: a fixed width beside the filter field that grows
-   to fill, same TextField inheritAttrs:false reasoning as `.filter-field` above. */
+   to fill, same TextField inheritAttrs:false reasoning as `.filter-field` above. Widened from the
+   SQL-style box's 230px — a Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer
+   than the old `field ASC, field2 DESC` text it replaced. */
 .sort-field {
-  width: 230px;
+  width: 280px;
   flex-shrink: 0;
 }
 

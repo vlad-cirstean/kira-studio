@@ -330,6 +330,51 @@ describe('mongo adapter (§9.1, P8)', () => {
     }
   });
 
+  // Regression test for the paging bug this fixed (renderer's DocumentTabState.pageIndex /
+  // goNext/goPrev, not this adapter): a single-field sort can look "applied" even when only the
+  // first key of a multi-term sort actually reached findOptions.sort — `active` alone only
+  // groups true/false, it can't prove `price` was honoured as the tiebreaker inside each group.
+  // Sorting by both together and checking the exact row order across the group boundary is what
+  // actually exercises `sortTerms.map(...)` building every term, not just `sortTerms[0]`.
+  test('10b. read: multi-field sort actually reorders results', async () => {
+    const adapter = await createAdapter('mongodb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const target = path([
+        { kind: 'database', name: MONGO_DATABASE },
+        { kind: 'collection', name: 'widgets' },
+      ]);
+      const page = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: null,
+          sort: {
+            kind: 'structured',
+            terms: [
+              { column: 'active', direction: 'desc' },
+              { column: 'price', direction: 'asc' },
+            ],
+          },
+          pageSize: WIDGET_COUNT,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page.position.strategy).toBe('offset');
+      expect(page.rowCount).toBe(WIDGET_COUNT);
+      // active: true (i even, 13 docs) sorts before active: false (i odd, 12 docs); within each
+      // group, price (== (i+1)*1.5, monotonic in i) sorts ascending.
+      expect(docBodyAt(page, 0).name).toBe('widget-0'); // lowest price, active: true
+      expect(docBodyAt(page, 12).name).toBe('widget-24'); // highest price, active: true
+      expect(docBodyAt(page, 13).name).toBe('widget-1'); // lowest price, active: false
+      expect(docBodyAt(page, WIDGET_COUNT - 1).name).toBe('widget-23'); // highest price, active: false
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
   test('11. read: filter', async () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());

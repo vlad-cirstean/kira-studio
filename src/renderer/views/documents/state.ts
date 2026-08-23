@@ -59,7 +59,15 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
-  const effectiveCursor: PageCursor = cursor ?? { mode: 'offset', offset: 0 };
+  // Mirrors views/grid/state.ts's `load()`: the fallback cursor tracks `pageIndex * pageSize`,
+  // not a hardcoded 0 — a real (non-`_id`) sort forces mongo/read.ts's skip/limit strategy (D6),
+  // which returns no keyset token, so this is what keeps a bare `load(tabId)` (reload, or any
+  // setter below) re-fetching the page the user is actually on instead of silently snapping back
+  // to page one.
+  const effectiveCursor: PageCursor = cursor ?? {
+    mode: 'offset',
+    offset: tab.state.pageIndex * tab.state.pageSize,
+  };
   const opId = crypto.randomUUID();
   rt.status = 'loading';
   rt.opId = opId;
@@ -138,42 +146,60 @@ export function stop(tabId: string): void {
   if (rt?.opId) void control.opsCancel(rt.opId);
 }
 
+// D7's cursor choice (views/grid/state.ts's own goNext precedent): prefer the token when one is
+// available, falling back to offset — `pageIndex` always advances by one regardless of which
+// strategy served it. Bug fix: this used to fall back to a hardcoded `offset: 0` whenever
+// `rt.nextToken` was null, which is exactly the case any real (non-`_id`) sort leaves it in
+// (mongo/read.ts's skip/limit fallback never mints a token) — so Next silently reloaded page one
+// forever instead of advancing, which is what "sort doesn't work" looked like once a collection
+// spanned more than one page.
 export async function goNext(tabId: string): Promise<void> {
+  const tab = findDocumentTab(tabId);
+  if (!tab) return;
   const rt = ensureRuntime(tabId);
+  const nextIndex = tab.state.pageIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
-    : { mode: 'offset', offset: 0 };
+    : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
+  patchDocumentTabState(tabId, { pageIndex: nextIndex });
   await load(tabId, cursor);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
+  const tab = findDocumentTab(tabId);
+  if (!tab) return;
   const rt = ensureRuntime(tabId);
+  const prevIndex = Math.max(0, tab.state.pageIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: 0 };
+    : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
+  patchDocumentTabState(tabId, { pageIndex: prevIndex });
   await load(tabId, cursor);
 }
 
 export function setSearch(tabId: string, text: string): void {
-  patchDocumentTabState(tabId, { search: text });
+  patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
   void load(tabId);
 }
 
-// Mirrors views/grid/state.ts's setProjection/setSort/setPageSize — a document tab has no
-// pageIndex to reset (it pages by cursor token, not an offset counter), so each of these is just
-// "patch the tab's own state, then reload from the top" (setSearch's exact precedent above).
+// Mirrors views/grid/state.ts's setProjection/setSort/setPageSize — each resets `pageIndex` to 0
+// alongside the field it actually changes, same as the grid's own setters, since a new
+// filter/sort/projection/pageSize invalidates whatever "page N" meant under the old one. A
+// document tab pages by cursor token only when the sort is unset or purely by `_id` (mongo/
+// read.ts's D6 keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
+// goNext/goPrev (above) use to compute that offset.
 export function setProjection(tabId: string, projection: string[] | null): void {
-  patchDocumentTabState(tabId, { projection });
+  patchDocumentTabState(tabId, { projection, pageIndex: 0 });
   void load(tabId);
 }
 
 export function setSort(tabId: string, sort: SortSpec | null): void {
-  patchDocumentTabState(tabId, { sort });
+  patchDocumentTabState(tabId, { sort, pageIndex: 0 });
   void load(tabId);
 }
 
 export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize']): void {
-  patchDocumentTabState(tabId, { pageSize });
+  patchDocumentTabState(tabId, { pageSize, pageIndex: 0 });
   void load(tabId);
 }
 
