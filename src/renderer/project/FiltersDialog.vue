@@ -5,6 +5,7 @@ import type {
   FilterNodeKind,
 } from '@shared/domain/connection-filter';
 import { computed, ref, watch } from 'vue';
+import { connectionsState } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
 import { evaluate } from './filter';
 import { closeFiltersDialog, filtersDialogState, saveFilters, treeState } from './state/tree';
@@ -82,13 +83,20 @@ async function onSave(): Promise<void> {
   );
   closeFiltersDialog();
 }
+
+// Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off
+// the store that already has it, same as ConnectionDialog.vue does; adds no new state.
+const connectionName = computed(
+  () => connectionsState.records.find((r) => r.id === filtersDialogState.connectionId)?.name ?? '',
+);
 </script>
 
 <template>
   <div v-if="filtersDialogState.open" class="scrim" data-testid="filters-dialog" @click.self="closeFiltersDialog">
     <div class="dialog" role="dialog" aria-modal="true">
       <div class="dialog-title">
-        <span>Filters</span>
+        <span class="icon-box muted"><Codicon name="filter" :size="14" /></span>
+        <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
         <button
           type="button"
           class="title-close"
@@ -100,35 +108,56 @@ async function onSave(): Promise<void> {
         </button>
       </div>
       <div class="dialog-body">
-        <div v-for="(rule, index) in draft" :key="index" class="rule-row">
-          <select v-model="rule.nodeKind">
-            <option v-for="(label, kind) in NODE_KIND_LABEL" :key="kind" :value="kind">{{ label }}</option>
-          </select>
-          <select v-model="rule.action">
-            <option value="hide">Hide</option>
-            <option value="show">Show</option>
-          </select>
-          <input v-model="rule.pattern" type="text" class="pattern-input" placeholder="pg_*" />
-          <label class="regex-checkbox">
-            <input v-model="rule.isRegex" type="checkbox" />
-            Regex
-          </label>
-          <button type="button" class="icon-button" aria-label="Delete rule" @click="removeRule(index)">
-            <Codicon name="trash" :size="14" />
-          </button>
-          <span v-if="ruleError(rule)" class="rule-error">{{ ruleError(rule) }}</span>
+        <!-- Rules run top to bottom, last match wins — the preview strip below is the running
+             answer to "what will the tree actually show", so nobody has to evaluate the order
+             by hand. -->
+        <span class="help">
+          Rules run top to bottom; the last matching rule wins. This never changes what a query
+          returns — only what is listed on the left.
+        </span>
+
+        <div class="rule-list">
+          <div v-for="(rule, index) in draft" :key="index" class="rule-row">
+            <select v-model="rule.nodeKind" class="p-select bordered">
+              <option v-for="(label, kind) in NODE_KIND_LABEL" :key="kind" :value="kind">{{ label }}</option>
+            </select>
+            <select v-model="rule.action" class="p-select bordered">
+              <option value="hide">Hide</option>
+              <option value="show">Show</option>
+            </select>
+            <div class="p-input md pattern-input-wrap">
+              <input v-model="rule.pattern" type="text" class="pattern-input" placeholder="pg_*" />
+            </div>
+            <label class="regex-checkbox">
+              <input v-model="rule.isRegex" type="checkbox" />
+              Regex
+            </label>
+            <button type="button" class="p-iconbtn" aria-label="Delete rule" @click="removeRule(index)">
+              <Codicon name="trash" :size="14" />
+            </button>
+            <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
+          </div>
         </div>
 
-        <button type="button" class="add-rule" @click="addRule">
-          <Codicon name="add" :size="12" />
+        <button type="button" class="p-btn add-rule" @click="addRule">
+          <span class="icon-box"><Codicon name="add" :size="12" /></span>
           Add rule
         </button>
 
-        <p class="preview-line">hides {{ preview.hidden }} of {{ preview.total }} cached nodes</p>
+        <div class="p-strip note preview-strip">
+          <span class="icon-box"><Codicon name="info" :size="14" /></span>
+          <span>
+            Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
+            is deleted — removing a rule brings it straight back.
+          </span>
+        </div>
       </div>
       <div class="dialog-footer">
-        <button type="button" @click="closeFiltersDialog">Cancel</button>
-        <button type="button" @click="onSave">Save</button>
+        <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+        <span class="footer-actions p-push">
+          <button type="button" class="p-dlgbtn" @click="closeFiltersDialog">Cancel</button>
+          <button type="button" class="p-dlgbtn primary" @click="onSave">Save filters</button>
+        </span>
       </div>
     </div>
   </div>
@@ -146,7 +175,7 @@ async function onSave(): Promise<void> {
 }
 
 .dialog {
-  width: 460px;
+  width: 560px;
   max-height: 70vh;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
@@ -158,18 +187,20 @@ async function onSave(): Promise<void> {
 }
 
 .dialog-title {
+  height: var(--kira-h-lg);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 8px 8px 16px;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--kira-t-lg);
+  color: var(--kira-fg);
 }
 
 .title-close {
-  width: 20px;
-  height: 20px;
+  width: var(--kira-h-sm);
+  height: var(--kira-h-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,31 +220,40 @@ async function onSave(): Promise<void> {
 .dialog-body {
   flex: 1;
   overflow: auto;
-  padding: 12px 16px;
+  padding: var(--kira-s-5);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
+  gap: var(--kira-s-4);
+}
+
+.help {
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: var(--kira-font-family);
+}
+
+.rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-2);
 }
 
 .rule-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--kira-s-2);
   flex-wrap: wrap;
 }
 
-.rule-row select,
-.rule-row input[type='text'] {
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  padding: 3px 5px;
-  font-size: 12px;
+.rule-row select {
+  height: var(--kira-h-md);
 }
 
-.pattern-input {
+.pattern-input-wrap {
   flex: 1;
   min-width: 100px;
 }
@@ -221,63 +261,53 @@ async function onSave(): Promise<void> {
 .regex-checkbox {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--kira-s-2);
+  font-size: var(--kira-t-sm);
   color: var(--kira-fg-muted);
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.icon-button {
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
+.regex-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--kira-accent);
   cursor: pointer;
-  padding: 2px;
+}
+
+.field-error {
+  color: var(--kira-error);
+  font-size: var(--kira-t-xs);
 }
 
 .rule-error {
-  color: var(--kira-error);
-  font-size: 11px;
   width: 100%;
 }
 
 .add-rule {
   align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: none;
-  color: var(--kira-accent);
-  cursor: pointer;
-  padding: 2px 0;
-  font-size: 12px;
 }
 
-.preview-line {
-  color: var(--kira-fg-muted);
-  font-size: 11px;
+/* the live-consequence strip is boxed rather than full-bleed, since it sits inside the
+   dialog body rather than spanning a whole view */
+.preview-strip {
+  align-self: stretch;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
 }
 
 .dialog-footer {
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  padding: 8px 12px;
+  height: 46px;
+  flex-shrink: 0;
+  padding: 0 var(--kira-s-5);
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: var(--kira-s-3);
+  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 
-.dialog-footer button {
-  padding: 4px 10px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-}
-
-.dialog-footer button:last-child {
-  background: var(--kira-accent);
-  border-color: var(--kira-accent);
-  color: var(--kira-accent-fg);
+.footer-actions {
+  display: flex;
+  gap: var(--kira-s-3);
 }
 </style>

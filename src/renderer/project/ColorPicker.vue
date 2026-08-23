@@ -27,23 +27,29 @@ const colors = connectionColorSchema.options;
 </template>
 
 <style scoped>
+/* P16 design system: the "swatches" object — a row of 16px hue circles, one
+   lightness and chroma for all twelve (tokens.css's --kira-conn-*), selection
+   shown as an outline rather than a tint so the colour itself never changes. */
 .color-picker {
   display: flex;
-  gap: 6px;
+  gap: var(--kira-s-2);
+  align-items: center;
   flex-wrap: wrap;
+  height: var(--kira-h-md);
 }
 
 .swatch {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: none;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .swatch.selected {
-  border-color: var(--kira-focus);
-  box-shadow: 0 0 0 1px var(--kira-bg-elevated);
+  outline: 2px solid var(--kira-fg);
+  outline-offset: 2px;
 }
 </style>

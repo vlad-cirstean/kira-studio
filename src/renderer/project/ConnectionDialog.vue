@@ -10,8 +10,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
+import EngineIcon from '../theme/EngineIcon.vue';
 import ColorPicker from './ColorPicker.vue';
-import { connectionKindIcon } from './icons';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
@@ -21,6 +21,26 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   kafka: 'Kafka',
   sqs: 'SQS',
   s3: 'S3',
+};
+// NewConnection.html's per-kind subtitle and accent colour for the engine picker tile —
+// cosmetic copy/tint, not tied to anything persisted.
+const KIND_SUB: Record<ConnectionKind, string> = {
+  postgres: 'Tables, views, functions, DDL',
+  mariadb: 'Also MySQL 8 and Percona',
+  mongodb: 'Collections and documents',
+  redis: 'Keys, hashes, lists, sorted sets',
+  kafka: 'Topics, partitions, consumer groups',
+  sqs: 'Queues and dead-letter queues',
+  s3: 'Buckets and object prefixes',
+};
+const KIND_ACCENT: Record<ConnectionKind, string> = {
+  postgres: 'cyan',
+  mariadb: 'blue',
+  mongodb: 'green',
+  redis: 'red',
+  kafka: 'amber',
+  sqs: 'magenta',
+  s3: 'olive',
 };
 const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
@@ -34,6 +54,14 @@ const kinds = connectionKindSchema.options;
 
 const draft = computed(() => connectionsState.dialog.draft);
 const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
+
+// P16 design system: NewConnection.html (step 1, pick the engine) and ConnectionDialog.html
+// (step 2, only that engine's fields) are two mockups for this one dialog — both steps live
+// here. The fields step stays the default entry (unchanged from before the redesign) and the
+// engine grid is reached through "Change engine"; the kind is settled there, not by a dropdown
+// on step 2.
+const step = ref<'engine' | 'details'>('details');
+const engineSearch = ref('');
 
 const showPassword = ref(false);
 const uriNote = ref('');
@@ -128,6 +156,32 @@ function onKindChange(kind: ConnectionKind): void {
   if (defaultPort !== undefined) d.port = defaultPort;
 }
 
+// Engine tiles pick and, since the engine is all step 1 exists for, immediately advance —
+// the same radio-button "click selects" interaction this picker already had, just now
+// followed by a step change instead of nothing.
+function pickKind(kind: ConnectionKind): void {
+  if (!SUPPORTED_KINDS.has(kind)) return;
+  onKindChange(kind);
+  step.value = 'details';
+}
+
+function continueToDetails(): void {
+  const d = draft.value;
+  if (!d || !SUPPORTED_KINDS.has(d.kind)) return;
+  step.value = 'details';
+}
+
+function pasteUri(): void {
+  setMode('uri');
+  step.value = 'details';
+}
+
+const filteredKinds = computed(() => {
+  const q = engineSearch.value.trim().toLowerCase();
+  if (!q) return kinds;
+  return kinds.filter((kind) => KIND_LABEL[kind].toLowerCase().includes(q));
+});
+
 async function onTest(): Promise<void> {
   const d = draft.value;
   if (!d) return;
@@ -175,208 +229,288 @@ const preconnectText = computed({
 
 <template>
   <div v-if="draft" class="scrim" data-testid="connection-dialog" @click.self="closeDialog">
-    <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="dialog-title">
-        <span>{{ isEdit ? 'Edit Connection' : 'New Connection' }}</span>
-        <button
-          type="button"
-          class="title-close"
-          aria-label="Close"
-          data-testid="connection-dialog-close"
-          @click="closeDialog"
-        >
-          <Codicon name="close" :size="14" />
-        </button>
-      </div>
-      <div class="dialog-body">
-        <div class="field-row">
-          <label class="field name-field">
-            <span>Name</span>
-            <input v-model="draft.name" type="text" data-testid="connection-name" />
-          </label>
-          <label class="field">
-            <span>Color</span>
-            <ColorPicker v-model="draft.color" />
-          </label>
+    <div
+      ref="dialogRef"
+      class="dialog"
+      :class="{ 'is-engine-step': step === 'engine' }"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
+      <template v-if="step === 'engine'">
+        <div class="dialog-title">
+          <span class="icon-box muted"><Codicon name="database" :size="14" /></span>
+          <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
+          <span class="title-mid p-push">
+            <span v-if="!isEdit" class="steps">
+              <span class="step on"><span class="n">1</span>Engine</span>
+              <span class="dim">›</span>
+              <span class="step"><span class="n">2</span>Details</span>
+            </span>
+          </span>
+          <button
+            v-if="isEdit"
+            type="button"
+            class="p-btn"
+            @click="step = 'details'"
+          >
+            <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
+            Back
+          </button>
+          <button
+            type="button"
+            class="title-close"
+            aria-label="Close"
+            data-testid="connection-dialog-close"
+            @click="closeDialog"
+          >
+            <Codicon name="close" :size="14" />
+          </button>
         </div>
-        <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
 
-        <div class="field">
-          <span>Kind</span>
-          <div class="kind-picker" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
+        <div class="dialog-body engine-body">
+          <div class="p-input ui md">
+            <span class="icon-box"><Codicon name="search" :size="14" /></span>
+            <input v-model="engineSearch" type="text" placeholder="Search engines" data-testid="connection-engine-search" />
+          </div>
+
+          <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
             <button
-              v-for="kind in kinds"
+              v-for="kind in filteredKinds"
               :key="kind"
               type="button"
-              class="kind-btn"
-              :class="{ selected: draft.kind === kind }"
+              class="kind"
+              :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
               :disabled="!SUPPORTED_KINDS.has(kind)"
               role="radio"
               :aria-checked="draft.kind === kind"
               :title="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
               :data-testid="`connection-kind-${kind}`"
-              @click="onKindChange(kind)"
+              @click="pickKind(kind)"
             >
-              <Codicon :name="connectionKindIcon(kind)" :size="16" />
-              <span class="kind-label">{{ KIND_LABEL[kind] }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="field">
-          <span>Mode</span>
-          <div class="segmented">
-            <button
-              type="button"
-              :class="{ active: draft.mode === 'fields' }"
-              data-testid="mode-fields"
-              @click="setMode('fields')"
-            >
-              Fields
-            </button>
-            <button
-              type="button"
-              :class="{ active: draft.mode === 'uri' }"
-              data-testid="mode-uri"
-              @click="setMode('uri')"
-            >
-              URI
-            </button>
-          </div>
-        </div>
-
-        <template v-if="draft.mode === 'fields'">
-          <div v-if="!isSqs" class="field-row">
-            <label class="field">
-              <span>Host</span>
-              <input v-model="draft.host" type="text" data-testid="connection-host" />
-            </label>
-            <label class="field port-field">
-              <span>Port</span>
-              <input v-model.number="draft.port" type="number" data-testid="connection-port" />
-            </label>
-          </div>
-          <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
-          <label class="field">
-            <span>{{ isSqs ? 'Region' : 'Database' }}</span>
-            <input v-model="draft.database" type="text" data-testid="connection-database" />
-          </label>
-          <label class="field">
-            <span>{{ isSqs ? 'AWS profile (optional)' : 'User' }}</span>
-            <input v-model="draft.username" type="text" data-testid="connection-username" />
-          </label>
-          <label v-if="!isSqs" class="field">
-            <span>Password</span>
-            <div class="password-row">
-              <input
-                v-model="draft.password"
-                :type="showPassword ? 'text' : 'password'"
-                data-testid="connection-password"
-              />
-              <button
-                type="button"
-                class="icon-button"
-                :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                @click="showPassword = !showPassword"
+              <span
+                class="kind-ic"
+                :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
               >
-                <Codicon :name="showPassword ? 'eye-closed' : 'eye'" />
-              </button>
-            </div>
-          </label>
-        </template>
-        <template v-else>
-          <label class="field">
-            <span>URI</span>
-            <input
-              v-model="draft.uri"
-              type="text"
-              class="mono"
-              data-testid="connection-uri"
-              @input="refreshUriNote"
-              @blur="refreshUriNote"
-            />
-          </label>
-          <p class="mono uri-note">{{ uriNote }}</p>
-        </template>
+                <EngineIcon :kind="kind" :size="22" />
+              </span>
+              <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
+              <span class="kind-sub">{{ SUPPORTED_KINDS.has(kind) ? KIND_SUB[kind] : 'Not supported yet' }}</span>
+            </button>
+          </div>
+        </div>
 
-        <label class="field checkbox">
-          <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
-          <span>Read-only</span>
-          <span class="helper-text">Blocks every mutation path for this connection.</span>
-        </label>
-
-        <label class="field">
-          <span>Pre-connect command (optional)</span>
-          <input
-            v-model="preconnectText"
-            type="text"
-            class="mono"
-            data-testid="connection-preconnect"
-          />
-          <span class="helper-text">
-            Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
-          </span>
-          <span v-if="preconnectText" class="preconnect-warning" data-testid="connection-preconnect-warning">
-            This command runs on your machine with your permissions every time this connection
-            connects.
-          </span>
-        </label>
-        <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
-
-        <label v-if="preconnectText" class="field checkbox">
-          <input
-            v-model="draft.preconnectSidecar"
-            type="checkbox"
-            data-testid="connection-preconnect-sidecar"
-          />
-          <span>Keep it running, disconnect if it dies</span>
-          <span class="helper-text">
-            On: the command stays alive for the whole session — e.g. a port-forward — and this
-            connection drops the moment it exits. Off (default): a fresh instance runs each time
-            you connect, and its exit is never monitored — the right choice for a one-off prep
-            script.
-          </span>
-        </label>
-
-        <p class="credential-warning">
-          Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
-        </p>
-      </div>
-
-      <div class="dialog-footer">
-        <div class="test-area">
-          <button type="button" data-testid="connection-test" @click="onTest">
-            <Codicon name="plug" />
-            Test connection
+        <div class="dialog-footer">
+          <button type="button" class="p-dlgbtn" @click="pasteUri">
+            <span class="icon-box"><Codicon name="code" :size="14" /></span>
+            Paste a URI
           </button>
-          <span
-            v-if="testState.status !== 'idle'"
-            class="test-chip"
-            :class="testState.status"
-            data-testid="connection-test-result"
-          >
-            {{
-              testState.status === 'testing'
-                ? 'Testing…'
-                : testState.status === 'ok'
-                  ? `OK — ${testState.message}`
-                  : testState.message
-            }}
+          <span class="footer-actions p-push">
+            <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">
+              Cancel
+            </button>
+            <button type="button" class="p-dlgbtn primary" @click="continueToDetails">
+              Continue
+              <span class="icon-box"><Codicon name="chevron-right" :size="14" /></span>
+            </button>
           </span>
         </div>
-        <div class="footer-actions">
-          <button type="button" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
+      </template>
+
+      <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
+           is identity here, not a control (changed via "Change engine" back to step 1). -->
+      <template v-else>
+        <div class="dialog-title">
+          <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
+            <EngineIcon :kind="draft.kind" :size="16" />
+          </span>
+          <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
+          <button type="button" class="p-btn p-push" title="Pick a different engine" @click="step = 'engine'">
+            <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
+            Change engine
+          </button>
           <button
             type="button"
-            class="primary"
-            data-testid="connection-save"
-            :disabled="!isValid"
-            @click="onSave"
+            class="title-close"
+            aria-label="Close"
+            data-testid="connection-dialog-close"
+            @click="closeDialog"
           >
-            Save
+            <Codicon name="close" :size="14" />
           </button>
         </div>
-      </div>
+        <div class="dialog-body">
+          <div class="field-row">
+            <div class="field name-field">
+              <label>Name</label>
+              <div class="p-input md ui">
+                <input v-model="draft.name" type="text" data-testid="connection-name" />
+              </div>
+            </div>
+            <div class="field color-field">
+              <label>Color</label>
+              <ColorPicker v-model="draft.color" />
+            </div>
+          </div>
+          <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
+
+          <div class="field">
+            <label>Mode</label>
+            <div class="segmented">
+              <button
+                type="button"
+                :class="{ active: draft.mode === 'fields' }"
+                data-testid="mode-fields"
+                @click="setMode('fields')"
+              >
+                Fields
+              </button>
+              <button
+                type="button"
+                :class="{ active: draft.mode === 'uri' }"
+                data-testid="mode-uri"
+                @click="setMode('uri')"
+              >
+                Connection URI
+              </button>
+            </div>
+          </div>
+
+          <template v-if="draft.mode === 'fields'">
+            <div v-if="!isSqs" class="field-row">
+              <div class="field">
+                <label>Host</label>
+                <div class="p-input md"><input v-model="draft.host" type="text" data-testid="connection-host" /></div>
+              </div>
+              <div class="field port-field">
+                <label>Port</label>
+                <div class="p-input md"><input v-model.number="draft.port" type="number" data-testid="connection-port" /></div>
+              </div>
+            </div>
+            <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
+            <div class="field-row">
+              <div class="field">
+                <label>{{ isSqs ? 'Region' : 'Database' }}</label>
+                <div class="p-input md"><input v-model="draft.database" type="text" data-testid="connection-database" /></div>
+              </div>
+              <div class="field">
+                <label>{{ isSqs ? 'AWS profile (optional)' : 'User' }}</label>
+                <div class="p-input md"><input v-model="draft.username" type="text" data-testid="connection-username" /></div>
+              </div>
+            </div>
+            <div v-if="!isSqs" class="field">
+              <label>Password</label>
+              <div class="p-input md password-row">
+                <input
+                  v-model="draft.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  data-testid="connection-password"
+                />
+                <button
+                  type="button"
+                  class="p-iconbtn"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  @click="showPassword = !showPassword"
+                >
+                  <Codicon :name="showPassword ? 'eye-closed' : 'eye'" :size="14" />
+                </button>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="field">
+              <label>Connection URI</label>
+              <div class="p-input md">
+                <input
+                  v-model="draft.uri"
+                  type="text"
+                  class="mono"
+                  data-testid="connection-uri"
+                  @input="refreshUriNote"
+                  @blur="refreshUriNote"
+                />
+              </div>
+            </div>
+            <p class="mono uri-note">{{ uriNote }}</p>
+          </template>
+
+          <label class="field checkbox">
+            <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
+            <span>Read-only</span>
+            <span class="helper-text">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
+          </label>
+
+          <div class="field">
+            <label>Pre-connect command <span class="dim">— optional</span></label>
+            <div class="p-input md">
+              <input v-model="preconnectText" type="text" class="mono" data-testid="connection-preconnect" />
+            </div>
+            <span class="helper-text">
+              Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
+            </span>
+            <span v-if="preconnectText" class="preconnect-warning" data-testid="connection-preconnect-warning">
+              This command runs on your machine with your permissions every time this connection
+              connects.
+            </span>
+          </div>
+          <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
+
+          <label v-if="preconnectText" class="field checkbox">
+            <input
+              v-model="draft.preconnectSidecar"
+              type="checkbox"
+              data-testid="connection-preconnect-sidecar"
+            />
+            <span>Keep it running, disconnect if it dies</span>
+            <span class="helper-text">
+              On: the command stays alive for the whole session — e.g. a port-forward — and this
+              connection drops the moment it exits. Off (default): a fresh instance runs each time
+              you connect, and its exit is never monitored — the right choice for a one-off prep
+              script.
+            </span>
+          </label>
+
+          <p class="credential-warning">
+            Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
+          </p>
+        </div>
+
+        <div class="dialog-footer">
+          <div class="test-area">
+            <button type="button" class="p-dlgbtn" data-testid="connection-test" @click="onTest">
+              <span class="icon-box"><Codicon name="plug" :size="14" /></span>
+              Test connection
+            </button>
+            <span
+              v-if="testState.status !== 'idle'"
+              class="test-chip p-chip"
+              :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
+              data-testid="connection-test-result"
+            >
+              {{
+                testState.status === 'testing'
+                  ? 'Testing…'
+                  : testState.status === 'ok'
+                    ? `OK — ${testState.message}`
+                    : testState.message
+              }}
+            </span>
+          </div>
+          <div class="footer-actions">
+            <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
+            <button
+              type="button"
+              class="p-dlgbtn primary"
+              data-testid="connection-save"
+              :disabled="!isValid"
+              @click="onSave"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -393,7 +527,7 @@ const preconnectText = computed({
 }
 
 .dialog {
-  width: 480px;
+  width: 560px;
   max-height: 80vh;
   background: var(--kira-bg-elevated);
   border: var(--kira-border-width) solid var(--kira-border-strong);
@@ -404,20 +538,35 @@ const preconnectText = computed({
   overflow: hidden;
 }
 
+.dialog.is-engine-step {
+  width: 620px;
+}
+
 .dialog-title {
+  height: var(--kira-h-lg);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 8px 8px 16px;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--kira-t-lg);
+  color: var(--kira-fg);
+}
+
+.title-mid {
+  display: flex;
+  min-width: 0;
+}
+
+.engine-mark {
+  display: flex;
   flex-shrink: 0;
 }
 
 .title-close {
-  width: 20px;
-  height: 20px;
+  width: var(--kira-h-sm);
+  height: var(--kira-h-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -437,23 +586,32 @@ const preconnectText = computed({
 .dialog-body {
   flex: 1;
   overflow: auto;
-  padding: 12px 16px;
+  padding: var(--kira-s-5);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--kira-s-4);
+}
+
+.engine-body {
+  gap: var(--kira-s-5);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: var(--kira-s-2);
   flex: 1;
+}
+
+.field > label {
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
 }
 
 .field-row {
   display: flex;
-  gap: 12px;
+  gap: var(--kira-s-4);
+  align-items: flex-start;
 }
 
 .name-field {
@@ -461,25 +619,26 @@ const preconnectText = computed({
 }
 
 .port-field {
-  flex: 0 0 90px;
+  flex: 0 0 96px;
+}
+
+.color-field {
+  flex: 0 0 auto;
 }
 
 .field.checkbox {
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: var(--kira-s-3);
   flex-wrap: wrap;
+  cursor: pointer;
 }
 
-.field input[type='text'],
-.field input[type='number'],
-.field input[type='password'],
-.field select {
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  padding: 4px 6px;
+.field.checkbox input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--kira-accent);
+  cursor: pointer;
 }
 
 .mono {
@@ -487,172 +646,142 @@ const preconnectText = computed({
 }
 
 .password-row {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.password-row input {
-  flex: 1;
-}
-
-.icon-button {
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 2px;
+  gap: var(--kira-s-2);
 }
 
 .segmented {
-  display: flex;
-  gap: 2px;
+  display: inline-flex;
+  height: var(--kira-h-md);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius-sm);
+  overflow: hidden;
+  align-self: flex-start;
 }
 
 .segmented button {
-  flex: 1;
-  padding: 4px 8px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
+  padding: 0 var(--kira-s-3);
   color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
   cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.segmented button + button {
+  border-left: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
 .segmented button.active {
-  background: var(--kira-select);
-  color: var(--kira-fg);
-}
-
-.kind-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.kind-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.kind-btn.selected {
-  background: var(--kira-select);
-  border-color: var(--kira-focus);
   color: var(--kira-fg);
-}
-
-.kind-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.kind-label {
-  white-space: nowrap;
 }
 
 .uri-note {
   color: var(--kira-fg-muted);
-  font-size: 11px;
+  font-size: var(--kira-t-xs);
 }
 
 .helper-text {
-  color: var(--kira-fg-muted);
-  font-size: 11px;
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  line-height: 1.5;
   width: 100%;
 }
 
 .field-error {
   color: var(--kira-error);
-  font-size: 11px;
+  font-size: var(--kira-t-xs);
 }
 
 .credential-warning {
   color: var(--kira-warn);
-  font-size: 11px;
+  font-size: var(--kira-t-xs);
 }
 
 .preconnect-warning {
   color: var(--kira-warn);
-  font-size: 11px;
+  font-size: var(--kira-t-xs);
 }
 
 .dialog-footer {
   border-top: var(--kira-border-width) solid var(--kira-border);
-  padding: 8px 12px;
+  height: 46px;
+  flex-shrink: 0;
+  padding: 0 var(--kira-s-5);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: var(--kira-s-3);
 }
 
 .test-area {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--kira-s-3);
   min-width: 0;
 }
 
 .test-chip {
-  font-size: 11px;
-  color: var(--kira-fg-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.test-chip.ok {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--kira-radius-pill);
-  background: #1c3d2c;
-  color: var(--kira-ok);
-}
-
-.test-chip.error {
-  color: var(--kira-error);
-}
-
 .footer-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--kira-s-3);
   flex-shrink: 0;
 }
 
-.dialog-footer button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: var(--kira-radius-sm);
+/* ---------- engine picker (parts/_kindcss.html) ---------- */
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--kira-s-3);
+}
+
+.kind {
+  padding: var(--kira-s-5) var(--kira-s-4);
   border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
+  border-radius: var(--kira-radius);
+  background: var(--kira-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kira-s-2);
   cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
 }
 
-.dialog-footer button:disabled {
+.kind:hover:not(.is-off) {
+  background: var(--kira-hover);
+  border-color: var(--kira-border-strong);
+}
+
+.kind.is-selected {
+  border-color: var(--kira-focus);
+}
+
+.kind.is-off {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.kind-ic {
+  display: flex;
+  margin-bottom: var(--kira-s-2);
+  color: var(--kira-fg-muted);
+}
+
+.kind-name {
+  font-size: var(--kira-t-lg);
+  color: var(--kira-fg);
+}
+
+.kind-sub {
+  font-size: var(--kira-t-sm);
   color: var(--kira-fg-disabled);
-  cursor: not-allowed;
-}
-
-.dialog-footer button.primary {
-  background: var(--kira-accent);
-  border-color: var(--kira-accent);
-  color: var(--kira-accent-fg);
-}
-
-.dialog-footer button.primary:disabled {
-  background: var(--kira-bg-input);
-  border-color: var(--kira-border);
-  color: var(--kira-fg-disabled);
+  line-height: 1.4;
 }
 </style>
