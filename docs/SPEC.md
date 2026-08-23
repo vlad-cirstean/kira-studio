@@ -166,6 +166,7 @@ kira-version-vscode/
 │   │   └── src/
 │   │       ├── driver.ts           spawn discipline, env hygiene, write queue, cancellation (§4.3)
 │   │       ├── nodeProcessRunner.ts the one real ProcessRunner (Node child_process) (§4.3)
+│   │       ├── nodeFileWatcher.ts  the one real FileWatcher (Node fs.watch) (§4.5)
 │   │       ├── discovery.ts        locate git, probe version, enforce the 2.38 floor (§4.2)
 │   │       ├── capabilities.ts     per-repo facts: commit-graph, sparse, linked worktree
 │   │       ├── catFile.ts          persistent `cat-file --batch` process

@@ -5,7 +5,16 @@
  * timing control, which a real spawned process cannot offer deterministically. Not exported
  * from index.ts: this is test scaffolding, not product surface.
  */
-import type { ProcessExit, ProcessRunner, SpawnedProcess, SpawnRequest } from "@kira-version/core";
+import type {
+  Disposable,
+  FileWatchEvent,
+  FileWatcher,
+  FileWatchOptions,
+  ProcessExit,
+  ProcessRunner,
+  SpawnedProcess,
+  SpawnRequest,
+} from "@kira-version/core";
 import { locateGit, type ResolvedGit } from "./discovery.ts";
 
 export class FakeProcess implements SpawnedProcess {
@@ -113,6 +122,37 @@ export class FakeProcessRunner implements ProcessRunner {
       else request.signal.addEventListener("abort", () => proc.kill("SIGTERM"), { once: true });
     }
     return proc;
+  }
+}
+
+/**
+ * A controllable `FileWatcher` double for `watcher.ts`'s unit tests: records every `watch()`
+ * call (paths + options) and lets a test fire a synthetic event to every still-subscribed
+ * listener via `emit`, without touching a real filesystem.
+ */
+export class FakeFileWatcher implements FileWatcher {
+  readonly calls: Array<{ readonly paths: readonly string[]; readonly opts: FileWatchOptions }> =
+    [];
+  readonly #listeners = new Set<(event: FileWatchEvent) => void>();
+
+  watch(
+    paths: readonly string[],
+    opts: FileWatchOptions,
+    onEvent: (event: FileWatchEvent) => void,
+  ): Disposable {
+    this.calls.push({ paths, opts });
+    this.#listeners.add(onEvent);
+    return { dispose: () => this.#listeners.delete(onEvent) };
+  }
+
+  /** Fires `event` to every still-subscribed listener — the test's stand-in for a real fs
+   *  change. */
+  emit(event: FileWatchEvent): void {
+    for (const listener of this.#listeners) listener(event);
+  }
+
+  get listenerCount(): number {
+    return this.#listeners.size;
   }
 }
 

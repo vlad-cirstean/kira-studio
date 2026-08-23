@@ -32,6 +32,7 @@ export type { GitErrorKind } from "./errors.ts";
 export { classifyGitError, GitCancelled, GitError, GitSpawnFailed } from "./errors.ts";
 export type { LogSession, LogSessionOptions, PageOutcome, ReadPageOptions } from "./logSession.ts";
 export { openLogSession } from "./logSession.ts";
+export { FileWatchError, NodeFileWatcher } from "./nodeFileWatcher.ts";
 export { NodeProcessRunner, ProcessSpawnError } from "./nodeProcessRunner.ts";
 export type { NameStatusEntry, NumstatEntry } from "./parse/diffTree.ts";
 export {
@@ -64,3 +65,5 @@ export {
   stashList,
   status,
 } from "./queries.ts";
+export type { RepoWatcher, WatchRepoOptions, WatchSignal } from "./watcher.ts";
+export { watchRepo } from "./watcher.ts";

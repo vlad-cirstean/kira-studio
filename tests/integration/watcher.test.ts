@@ -1,0 +1,101 @@
+import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { locateGit, resolveRepoIdentity } from "../../packages/git/src/discovery.ts";
+import { NodeFileWatcher } from "../../packages/git/src/nodeFileWatcher.ts";
+import { NodeProcessRunner } from "../../packages/git/src/nodeProcessRunner.ts";
+import { type WatchSignal, watchRepo } from "../../packages/git/src/watcher.ts";
+import { baseEnv, linear } from "../fixtures/generateRepo.ts";
+
+const runner = new NodeProcessRunner();
+
+async function resolvedIdentity(dir: string) {
+  const gitResolution = await locateGit({ runner });
+  if (gitResolution.kind !== "ok") throw new Error("no usable system git found for this test");
+  const identityResolution = await resolveRepoIdentity(gitResolution.git, runner, dir);
+  if (identityResolution.kind !== "ok") throw new Error("expected a real repository");
+  return identityResolution.identity;
+}
+
+async function waitForSignal(
+  seen: readonly WatchSignal[],
+  signal: WatchSignal,
+  maxMs = 2000,
+): Promise<void> {
+  const deadline = Date.now() + maxMs;
+  while (!seen.includes(signal) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+describe("watchRepo against a real repository", () => {
+  test("git tag produces exactly one refsChanged", async () => {
+    const { dir } = linear(1);
+    const identity = await resolvedIdentity(dir);
+    const fileWatcher = new NodeFileWatcher();
+    const repoWatcher = watchRepo(fileWatcher, identity);
+    const seen: WatchSignal[] = [];
+    repoWatcher.onSignal((signal) => seen.push(signal));
+    try {
+      execFileSync("git", ["tag", "v1"], { cwd: dir, env: baseEnv(dir) });
+      await waitForSignal(seen, "refsChanged");
+      await new Promise((resolve) => setTimeout(resolve, 300)); // let any trailing coalescing settle
+      expect(seen.filter((signal) => signal === "refsChanged")).toHaveLength(1);
+    } finally {
+      repoWatcher.dispose();
+    }
+  }, 10_000);
+
+  test("git branch produces exactly one refsChanged", async () => {
+    const { dir } = linear(1);
+    const identity = await resolvedIdentity(dir);
+    const fileWatcher = new NodeFileWatcher();
+    const repoWatcher = watchRepo(fileWatcher, identity);
+    const seen: WatchSignal[] = [];
+    repoWatcher.onSignal((signal) => seen.push(signal));
+    try {
+      execFileSync("git", ["branch", "feature"], { cwd: dir, env: baseEnv(dir) });
+      await waitForSignal(seen, "refsChanged");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(seen.filter((signal) => signal === "refsChanged")).toHaveLength(1);
+    } finally {
+      repoWatcher.dispose();
+    }
+  }, 10_000);
+
+  test("a packed-refs rewrite (git pack-refs --all) produces exactly one refsChanged", async () => {
+    const { dir } = linear(1);
+    execFileSync("git", ["branch", "feature"], { cwd: dir, env: baseEnv(dir) });
+    const identity = await resolvedIdentity(dir);
+    const fileWatcher = new NodeFileWatcher();
+    const repoWatcher = watchRepo(fileWatcher, identity);
+    const seen: WatchSignal[] = [];
+    repoWatcher.onSignal((signal) => seen.push(signal));
+    try {
+      execFileSync("git", ["pack-refs", "--all"], { cwd: dir, env: baseEnv(dir) });
+      await waitForSignal(seen, "refsChanged");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(seen.filter((signal) => signal === "refsChanged")).toHaveLength(1);
+    } finally {
+      repoWatcher.dispose();
+    }
+  }, 10_000);
+
+  test("git add produces worktreeChanged", async () => {
+    const { dir } = linear(1);
+    const identity = await resolvedIdentity(dir);
+    const fileWatcher = new NodeFileWatcher();
+    const repoWatcher = watchRepo(fileWatcher, identity);
+    const seen: WatchSignal[] = [];
+    repoWatcher.onSignal((signal) => seen.push(signal));
+    try {
+      writeFileSync(join(dir, "new-file.txt"), "hello");
+      execFileSync("git", ["add", "new-file.txt"], { cwd: dir, env: baseEnv(dir) });
+      await waitForSignal(seen, "worktreeChanged");
+      expect(seen).toContain("worktreeChanged");
+    } finally {
+      repoWatcher.dispose();
+    }
+  }, 10_000);
+});
