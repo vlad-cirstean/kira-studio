@@ -21,6 +21,26 @@ export function decode<T>(payload: T): T {
   return payload;
 }
 
+/**
+ * Asserts every buffer in `transfer` appears exactly once. `postMessage` itself throws a
+ * `DataCloneError` on a duplicate, but only after doing whatever other work preceded the call
+ * (§5.5's "transfers, not clones" rule, W3) — this is the same assertion made loud and early
+ * enough to name the offending code path in a stack trace. It never filters or dedupes; a
+ * caller that produces the same buffer twice has a bug the packer should not paper over.
+ */
+export function dedupeTransferList(transfer: readonly ArrayBuffer[]): readonly ArrayBuffer[] {
+  const seen = new Set<ArrayBuffer>();
+  for (const buffer of transfer) {
+    if (seen.has(buffer)) {
+      throw new Error(
+        "dedupeTransferList: the same ArrayBuffer appears twice in one transfer list",
+      );
+    }
+    seen.add(buffer);
+  }
+  return transfer;
+}
+
 function collectTransferables(value: unknown, out: ArrayBuffer[]): void {
   if (value instanceof ArrayBuffer) {
     out.push(value);

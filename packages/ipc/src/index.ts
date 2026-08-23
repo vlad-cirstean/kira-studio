@@ -1,23 +1,34 @@
+export type { EncodedMessage } from "./codec.ts";
+export { decode, dedupeTransferList, encode } from "./codec.ts";
 export type {
   Contract,
+  DecorationRef,
   EventKey,
   EventPayload,
+  GitStatus,
+  HeadState,
+  HostKind,
+  PackedCommitChunk,
   ParamsOf,
+  RepoCandidate,
+  RepoOpenResult,
+  RepoSummary,
   RequestKey,
   ResultOf,
+  SettingsSnapshot,
   StreamChunkOf,
   StreamKey,
   StreamParamsOf,
 } from "./contract.ts";
-export { decode, encode } from "./codec.ts";
-export type { EncodedMessage } from "./codec.ts";
-export { TransportError } from "./transport.ts";
 export type { Transport, TransportErrorCode } from "./transport.ts";
+export { TransportError } from "./transport.ts";
+export type { ContractChannel, VersionedEnvelope } from "./validate.ts";
 export {
+  assertContractShape,
   CONTRACT_VERSION,
+  ContractShapeError,
   ContractVersionMismatchError,
   unwrapVersioned,
   validateVersion,
   wrapVersioned,
 } from "./validate.ts";
-export type { VersionedEnvelope } from "./validate.ts";
