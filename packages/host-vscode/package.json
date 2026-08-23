@@ -1,7 +1,14 @@
 {
-  "name": "@kira-version/host-vscode",
+  "name": "kira-version",
   "private": true,
   "type": "module",
+  "main": "../../dist/vscode/extension.js",
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },
@@ -15,6 +22,31 @@
     "@types/vscode": "1.134.0"
   },
   "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "kiraVersion",
+          "title": "Git Graph",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiraVersion": [
+        {
+          "id": "kiraVersion.graph",
+          "name": "Graph",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiraVersion.focusGraph",
+        "title": "Focus Graph",
+        "category": "Kira Version"
+      }
+    ],
     "configuration": {
       "properties": {
         "kiraVersion.git.path": {

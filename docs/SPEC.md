@@ -218,6 +218,7 @@ kira-version-vscode/
 │   │       ├── panelView.ts        WebviewViewProvider for the panel container (§2.1)
 │   │       ├── html.ts             CSP, nonce, asset URIs, initial state injection
 │   │       ├── transport.ts        postMessage Transport implementation
+│   │       ├── webview/main.ts     browser-context entry mounted inside the webview; never imports `vscode`
 │   │       └── ports/              one file per port in core/src/ports
 │   │
 │   └── host-electron/
