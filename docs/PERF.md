@@ -1,5 +1,7 @@
 # Performance: budgets, measurement, and results
 
+See the [README](../README.md) for what the app is and how to run it.
+
 This doc is the P12 deliverable named by SPEC.md §2's two hard requirements (§2.1 "Silky UI",
 §2.2 "Small RAM footprint"): where each budget is measured, whether that measurement is automated
 or manual, and the numbers recorded from a real run. It is expected to be re-measured, not

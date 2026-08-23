@@ -4,6 +4,10 @@ Spins up four databases (PostgreSQL, MariaDB, MongoDB, Redis) via
 [Colima](https://github.com/abiosoft/colima) + Docker Compose, each with a full
 schema, foreign keys, indexes, and ~20k rows of seed data.
 
+This stack covers four of Kira Studio's six supported engines — Kafka and SQS have no Compose
+service here and are instead exercised through `@testcontainers/kafka`/`@testcontainers/localstack`
+inside `bun run test:db`.
+
 ## Requirements
 
 - [Colima](https://github.com/abiosoft/colima) running with the Docker runtime

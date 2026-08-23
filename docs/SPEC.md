@@ -2,7 +2,9 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **agreed.** Nothing is implemented.
+> Status: **P0–P14 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
+> shipped.
 
 > **Start here:** read `AGENTS.md` first — the working agreement — before this spec. Per-phase
 > implementation plans live in `docs/plans/`.
@@ -520,10 +522,11 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 
 ## 11. Repository layout
 
-**Proposal — not yet applied to the tree.** P0/P1 landed with the flatter layout this supersedes;
-migrating existing files is scoped to whichever future phase touches them, not a one-shot rewrite.
-The goal is to make two things cheap: **adding an adapter** and **adding an IPC-exposed domain**,
-without growing any single file into a junk drawer as v1 fills in.
+**This is the tree as built**, with one exception: `main/window/` stayed a single `main/window.ts`
+alongside sibling modules (`menu.ts`, `log.ts`, `oplog.ts`, `connections.ts`, `engine-host.ts`,
+`engine-config.ts`, `preconnect.ts`, `tree-service.ts`) rather than its own directory. The goal was
+to make two things cheap: **adding an adapter** and **adding an IPC-exposed domain**, without
+growing any single file into a junk drawer as v1 filled in.
 
 ```
 src/

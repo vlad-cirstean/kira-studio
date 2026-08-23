@@ -1,5 +1,7 @@
 # Packaging: local build and verification
 
+See the [README](../README.md) for what the app is and how to run it.
+
 Kira Studio ships as an unsigned (ad-hoc), local, arm64-only macOS build in v1 — see SPEC.md §1/§3.
 Config lives in `electron-builder.yml`; packaging scripts live in `package.json`.
 
