@@ -512,6 +512,9 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P10 Kafka + SQS** | Adapters + stream view | Most divergent semantics; benefits from everything above |
 | **P11 Pre-connect scripts** | Per-connection optional shell command (e.g. port-forward) run before connect; connection marked disconnected if the process exits while in use; config UI in the connection dialog | Cuts across every adapter, so it lands once the adapter surface is complete, ahead of the final hardening pass |
 | **P12 Hardening** | Memory/perf pass against §2 budgets, cache tuning, cold-start time, unsigned packaging | Measure once the surface is complete — nothing should still be changing under it |
+| **P13 Nonfunctional checks** | Sweep for memory leaks, storage leaks, inefficient/redundant DB interaction, and insufficient caching across the whole codebase; fix everything found | P12 measured against budgets and only pulled the levers its numbers justified — several items were deliberately left open for a dedicated sweep (`docs/PERF.md` §4); this phase closes them before the surface is described in docs |
+| **P14 Docs** | Descriptions in every expected in-repo location plus the main repository README — full functionality, install and dev-setup instructions | Written once the app's behavior and nonfunctional characteristics are final, so nothing documented here needs revisiting |
+| **P15 GH tooling** | Pre-commit hook; GitHub Actions CI (macOS-only); tag-triggered unsigned macOS binary build; auto-update configuration verified | Last, since CI and release tooling should target a finished, documented build rather than a moving one |
 
 ---
 
