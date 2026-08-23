@@ -378,17 +378,33 @@ function formatUtcAndLocal(d: Date): string {
   return `${utc} · ${local} local`;
 }
 
-const ISO8601_OFFSET_RE = /(Z|[+-]\d{2}:?\d{2})$/;
+// Matches detectIso8601's own ISO8601_RE offset group exactly (the minutes half is optional) —
+// Postgres's default text output for a whole-hour UTC offset is just "+00", not "+00:00"/"+0000",
+// so a stricter pattern here (requiring the minutes digits) missed that extremely common case,
+// silently breaking decoding for the majority of real timestamptz values.
+const ISO8601_OFFSET_RE = /(Z|[+-]\d{2}(:?\d{2})?)$/;
+const ISO8601_HAS_TIME_RE = /[T ]\d{2}:\d{2}/;
 
 // An ISO-8601-shaped value with no explicit offset (Postgres's `timestamp without time zone`,
 // e.g. "2024-01-15 10:23:45") is genuinely ambiguous — JS's own Date constructor would silently
 // read it as *local* time instead, which is wrong far more often than right for a DB timestamp.
-// Treat a bare clock time as UTC (the common backend convention) rather than guess local; a
-// value that already states its offset is parsed as-is.
+// Treat a bare clock time as UTC (the common backend convention) rather than guess local.
+//
+// A value that already states its offset is left with its ORIGINAL separator, not normalized to
+// 'T' — V8's date parser runs two different grammars depending on that separator: with 'T' it's
+// strict ISO-8601, which requires a full ±HH:MM/±HHMM offset and rejects a bare 2-digit "+00";
+// with a space it falls back to a lenient legacy parser that accepts exactly that shape. Since
+// Postgres's own text output *is* space-separated with a bare "+00" for a whole-hour UTC offset,
+// converting the separator here would take an already-parseable value and make V8 reject it
+// (verified against this app's actual runtime, not assumed from spec reading).
+//
+// A date-only value (no time part at all, e.g. a `date` column) is left untouched too — the
+// "YYYY-MM-DD" form is already specified as UTC by Date.parse itself.
 function parseIso8601(t: string): Date | null {
   const hasOffset = ISO8601_OFFSET_RE.test(t);
-  const isoish = t.replace(' ', 'T');
-  const d = new Date(hasOffset ? isoish : `${isoish}Z`);
+  const hasTime = ISO8601_HAS_TIME_RE.test(t);
+  const normalized = !hasTime || hasOffset ? t : `${t.replace(' ', 'T')}Z`;
+  const d = new Date(normalized);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
