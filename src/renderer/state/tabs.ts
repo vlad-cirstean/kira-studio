@@ -150,6 +150,15 @@ function deactivateAll(): void {
   for (const t of tabsState.tabs) t.active = false;
 }
 
+// Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
+// (Task 62) rather than a fresh one created — a fresh tab is about to fetch on mount anyway, so
+// only a caller that cares about the double-click "also reload the data" behavior needs to check
+// this; everyone else can destructure just `id` and ignore it.
+export interface OpenTabResult {
+  id: string;
+  reused: boolean;
+}
+
 // Without `newTab`, activates an existing tab for the same (connectionId, path) if one exists
 // (§8.10's "Open data"). "Open data in new tab" always creates (`newTab: true`), so the same
 // table can be open N times with independent state — identity is `id`, never `path` (§8.4).
@@ -157,14 +166,14 @@ export function openDataTab(
   connectionId: string,
   path: string,
   opts?: { newTab?: boolean },
-): string {
+): OpenTabResult {
   if (!opts?.newTab) {
     const existing = tabsState.tabs.find(
       (t) => t.kind === 'data' && t.connectionId === connectionId && t.path === path,
     );
     if (existing) {
       activateTab(existing.id);
-      return existing.id;
+      return { id: existing.id, reused: true };
     }
   }
 
@@ -185,7 +194,7 @@ export function openDataTab(
   tabsState.hydrated.add(id);
   recordRecent(connectionId, path, 'data');
   saveNow();
-  return id;
+  return { id, reused: false };
 }
 
 // Opens a 'ddl' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -251,14 +260,14 @@ export function openDocumentTab(
   connectionId: string,
   path: string,
   opts?: { newTab?: boolean },
-): string {
+): OpenTabResult {
   if (!opts?.newTab) {
     const existing = tabsState.tabs.find(
       (t) => t.kind === 'document' && t.connectionId === connectionId && t.path === path,
     );
     if (existing) {
       activateTab(existing.id);
-      return existing.id;
+      return { id: existing.id, reused: true };
     }
   }
 
@@ -278,7 +287,7 @@ export function openDocumentTab(
   tabsState.hydrated.add(id);
   recordRecent(connectionId, path, 'document');
   saveNow();
-  return id;
+  return { id, reused: false };
 }
 
 // Opens a 'keyvalue' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -287,14 +296,14 @@ export function openKeyValueTab(
   connectionId: string,
   path: string,
   opts?: { newTab?: boolean },
-): string {
+): OpenTabResult {
   if (!opts?.newTab) {
     const existing = tabsState.tabs.find(
       (t) => t.kind === 'keyvalue' && t.connectionId === connectionId && t.path === path,
     );
     if (existing) {
       activateTab(existing.id);
-      return existing.id;
+      return { id: existing.id, reused: true };
     }
   }
 
@@ -314,7 +323,7 @@ export function openKeyValueTab(
   tabsState.hydrated.add(id);
   recordRecent(connectionId, path, 'keyvalue');
   saveNow();
-  return id;
+  return { id, reused: false };
 }
 
 // Opens a 'stream' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -323,14 +332,14 @@ export function openStreamTab(
   connectionId: string,
   path: string,
   opts?: { newTab?: boolean },
-): string {
+): OpenTabResult {
   if (!opts?.newTab) {
     const existing = tabsState.tabs.find(
       (t) => t.kind === 'stream' && t.connectionId === connectionId && t.path === path,
     );
     if (existing) {
       activateTab(existing.id);
-      return existing.id;
+      return { id: existing.id, reused: true };
     }
   }
 
@@ -350,7 +359,7 @@ export function openStreamTab(
   tabsState.hydrated.add(id);
   recordRecent(connectionId, path, 'stream');
   saveNow();
-  return id;
+  return { id, reused: false };
 }
 
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
