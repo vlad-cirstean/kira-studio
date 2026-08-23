@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { KeyValueTabRecord } from '@shared/domain/tabs';
-import { pathTail } from '@shared/domain/tree';
+import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
@@ -37,6 +37,34 @@ const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
 
 const targetTail = computed(() => pathTail(props.tab.path));
+
+const connRecord = computed(() =>
+  props.tab.connectionId
+    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
+    : undefined,
+);
+
+// P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
+// plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
+const connColor = computed(() => connRecord.value?.color);
+const railStyle = computed(() => ({
+  '--kira-rail': connColor.value ? `var(--kira-conn-${connColor.value})` : undefined,
+}));
+
+// The view header's breadcrumb: "connection / dbN / ". Redis's tree always roots a key's path
+// at its `database` segment (see redis/catalog.ts), so this reads existing path structure —
+// no new state.
+const dbLabel = computed(() => {
+  if (!props.tab.connectionId) return null;
+  try {
+    return (
+      decodePath(props.tab.connectionId, props.tab.path).segments.find((s) => s.kind === 'database')
+        ?.name ?? null
+    );
+  } catch {
+    return null;
+  }
+});
 
 const page = computed(() => {
   void pageVersion.n;
@@ -111,28 +139,90 @@ onUnmounted(() => {
 
 <template>
   <div class="keyvalue-view" data-testid="keyvalue-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="keyvalue-reconnect">
-      <button type="button" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
+    <div v-if="needsReconnect" class="p-empty" data-testid="keyvalue-reconnect">
+      <button
+        type="button"
+        class="p-dlgbtn primary"
+        data-testid="keyvalue-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <div class="header">
-        <span class="target" data-testid="keyvalue-target">{{ targetTail?.name ?? tab.path }}</span>
-        <div class="meta" v-if="page">
-          <span class="badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
-          <span class="badge" data-testid="keyvalue-ttl">TTL: {{ ttlText(page.ttlMs) }}</span>
-          <span class="badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
-        </div>
-        <div class="toolbar">
-          <button type="button" data-testid="keyvalue-refresh" title="Refresh" @click="reload(tab.id)">
-            <Codicon name="refresh" :size="13" />
-          </button>
-          <button type="button" data-testid="keyvalue-count" title="Exact count" @click="runCount(tab.id)">
-            <Codicon name="symbol-number" :size="13" />
-          </button>
+      <div class="p-view-head">
+        <span
+          class="p-conn-dot"
+          :class="{ none: !connColor }"
+          :style="railStyle"
+          title="Connection colour"
+        />
+        <span
+          class="icon-box"
+          :style="{ color: connColor ? `var(--kira-conn-${connColor})` : 'var(--kira-info)' }"
+        >
+          <Codicon name="key" :size="13" />
+        </span>
+        <span class="p-view-target" data-testid="keyvalue-target">
+          <span v-if="dbLabel" class="path"
+            >{{ connRecord?.name ? `${connRecord.name} / ` : '' }}{{ dbLabel }} / </span
+          >
+          <span class="mono">{{ targetTail?.name ?? tab.path }}</span>
+        </span>
+        <template v-if="page">
+          <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
+          <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
+               vanish should look like one (see the mockup's KeyValue.html). -->
+          <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
+            <Codicon name="history" :size="11" />
+            {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
+          </span>
+          <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
+          <span v-if="connRecord" class="p-badge">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</span>
+        </template>
+      </div>
+
+      <!-- LAW: the connection's colour caps the toolbar as a 2px rail, never a tint on the
+           whole view. No colour assigned still reserves the slot, so nothing shifts. -->
+      <div class="p-toolbar-rail" :style="railStyle" />
+      <div class="p-toolbar">
+        <div class="group">
           <button
             type="button"
+            class="p-iconbtn"
+            data-testid="keyvalue-refresh"
+            title="Refresh"
+            @click="reload(tab.id)"
+          >
+            <Codicon name="refresh" :size="13" />
+          </button>
+          <!-- LAW: Stop always follows Refresh, disabled when idle — cancelling lives in one
+               place instead of only appearing once work starts. -->
+          <button
+            type="button"
+            class="p-iconbtn"
+            data-testid="keyvalue-stop"
+            :disabled="!running"
+            title="Stop"
+            @click="onStop"
+          >
+            <Codicon name="debug-stop" :size="13" />
+          </button>
+          <!-- LAW: work-in-progress is a ring in the toolbar, not a bar across the view. Idle
+               keeps the same slot as a still ring. -->
+          <span
+            class="p-run-state"
+            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
+            :title="running ? 'Loading…' : rt?.status === 'error' ? 'Last run failed' : 'Idle'"
+          >
+            <span class="ring" />
+          </span>
+        </div>
+        <div class="sep" />
+        <div class="group">
+          <button
+            type="button"
+            class="p-iconbtn"
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
             title="Previous page"
@@ -140,8 +230,10 @@ onUnmounted(() => {
           >
             <Codicon name="arrow-left" :size="13" />
           </button>
+          <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <button
             type="button"
+            class="p-iconbtn"
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
             title="Next page"
@@ -149,47 +241,60 @@ onUnmounted(() => {
           >
             <Codicon name="arrow-right" :size="13" />
           </button>
-          <button v-if="running" type="button" data-testid="keyvalue-stop" title="Stop" @click="onStop">
-            <Codicon name="debug-stop" :size="13" />
+          <button
+            type="button"
+            class="p-btn"
+            data-testid="keyvalue-count"
+            title="Exact count"
+            @click="runCount(tab.id)"
+          >
+            <span class="icon-box"><Codicon name="symbol-number" :size="13" /></span>Exact count
           </button>
         </div>
       </div>
 
-      <div v-if="rt?.status === 'loading'" class="loading-bar" data-testid="keyvalue-loading" />
-      <div v-if="rt?.status === 'error' && rt.error" class="error-strip" data-testid="keyvalue-error">
+      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="keyvalue-error">
         {{ rt.error.message }}
       </div>
 
-      <div class="list-body" data-testid="keyvalue-list">
-        <div v-if="!rt || rt.rowCount === 0" class="no-rows">{{ rt ? 'No data' : '' }}</div>
-        <table v-else class="kv-table">
-          <thead>
-            <tr>
-              <th>{{ page?.redisType === 'string' ? '' : page?.redisType === 'list' ? 'index' : 'field' }}</th>
-              <th>{{ page?.redisType === 'zset' ? 'score' : 'value' }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
+      <div class="p-panel table-panel">
+        <div class="p-thead">
+          <div class="p-th gutter kv-col-gutter"></div>
+          <div class="p-th kv-col-field">
+            <span class="name">{{
+              page?.redisType === 'string' ? '' : page?.redisType === 'list' ? 'index' : 'field'
+            }}</span>
+          </div>
+          <div class="p-th kv-col-value">
+            <span class="name">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
+          </div>
+        </div>
+        <div class="tbody" data-testid="keyvalue-list">
+          <div v-if="!rt || rt.rowCount === 0" class="p-empty">
+            <span class="label">{{ rt ? 'No data' : '' }}</span>
+          </div>
+          <template v-else>
+            <div
               v-for="i in rowIndices"
               :key="i"
               class="kv-row"
               data-testid="keyvalue-row"
               @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.field, rowAt(i)!.value)"
             >
-              <td class="kv-field" data-testid="keyvalue-field">{{ rowAt(i)?.field }}</td>
-              <td class="kv-value" data-testid="keyvalue-value">
+              <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
+              <div class="p-td kv-col-field" :title="rowAt(i)?.field" data-testid="keyvalue-field">
+                {{ rowAt(i)?.field }}
+              </div>
+              <div class="p-td kv-col-value" :title="rowAt(i)?.value" data-testid="keyvalue-value">
                 {{ rowAt(i)?.value }}
-                <span v-if="rowAt(i)?.isTruncated" class="truncated-marker" title="value truncated"
-                  >(truncated)</span
+                <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" title="value truncated"
+                  >truncated</span
                 >
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
-
-      <div class="status-line" data-testid="keyvalue-status">{{ statusLine }}</div>
     </template>
   </div>
 </template>
@@ -202,185 +307,49 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.badge {
-  padding: 1px 6px;
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.toolbar button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-}
-
-.toolbar button:hover:not(:disabled) {
-  background: var(--kira-hover);
-}
-
-.toolbar button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.loading-bar {
-  height: 2px;
-  flex-shrink: 0;
-  background: linear-gradient(90deg, transparent, var(--kira-accent), transparent);
-  background-size: 200% 100%;
-  animation: loading-sweep 1.2s linear infinite;
-}
-
-@keyframes loading-sweep {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  white-space: pre-wrap;
-}
-
-.list-body {
+.table-panel {
   flex: 1;
   min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.tbody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
 }
 
-.no-rows {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-fg-muted);
-  font-size: 12px;
+.kv-col-gutter {
+  width: 40px;
+  flex-shrink: 0;
 }
 
-.kv-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--kira-font-family);
-  font-size: 11px;
+.kv-col-field {
+  width: 220px;
+  flex-shrink: 0;
 }
 
-.kv-table thead th {
-  position: sticky;
-  top: 0;
-  text-align: left;
-  padding: 4px 8px;
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  font-weight: 600;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+.kv-col-value {
+  flex: 1;
+  min-width: 0;
 }
 
 .kv-row {
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  height: var(--kira-row-height);
+  display: flex;
 }
 
-.kv-field {
-  padding: 4px 8px;
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
-  vertical-align: top;
+.kv-row:hover {
+  background: var(--kira-hover);
 }
 
-.kv-value {
-  padding: 4px 8px;
-  color: var(--kira-fg);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.truncated-marker {
-  padding-left: 6px;
-  font-size: 10px;
-  color: var(--kira-fg-muted);
-}
-
-.status-line {
+.truncated-chip {
+  margin-left: var(--kira-s-3);
   flex-shrink: 0;
-  padding: 3px 8px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--kira-bg-input);
+  color: var(--kira-fg-disabled);
 }
 </style>
