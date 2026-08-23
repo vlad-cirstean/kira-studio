@@ -97,11 +97,19 @@ export interface DocumentPage {
  * or a single row for a string. `fields`/`values` are fixed semantic columns reusing the exact
  * same TextColumnChunk codec as DocumentPage's `ids`/`bodies`. TTL/memory/type are whole-key
  * metadata, not per-row.
+ *
+ * P17 reuses this exact shape for a single s3 object (`redisType: 'object'`): `fields`/`values`
+ * carry the object's metadata (ContentType, ContentLength, LastModified, ETag, StorageClass, ...)
+ * plus a synthetic `Body` row for its (possibly truncated) text content — a flat field/value
+ * listing is exactly what a hash-like key already renders, and s3's own tree (bucket → prefix →
+ * object, '/'-delimited) already mirrors redis's own namespace tree (db → namespace, ':'-
+ * delimited) closely enough that browsing one object's contents needs no new page kind. `ttlMs`/
+ * `memoryBytes` are always null for an s3 object — neither concept exists there.
  */
 export interface KeyValuePage {
   kind: 'keyvalue';
   position: PagePosition;
-  redisType: 'string' | 'hash' | 'list' | 'set' | 'zset' | 'stream';
+  redisType: 'string' | 'hash' | 'list' | 'set' | 'zset' | 'stream' | 'object';
   ttlMs: number | null;
   memoryBytes: number | null;
   fields: TextColumnChunk;
@@ -378,7 +386,13 @@ export function createKeyValuePageBuilder(opts: {
   redisType: KeyValuePage['redisType'];
   ttlMs: number | null;
   memoryBytes: number | null;
+  // Mirrors createDocumentPageBuilder's own singleRow — DOCUMENT_TRUNCATE_BYTES_SINGLE's "a
+  // bigger budget when this is the one thing being fetched directly" reasoning applies just as
+  // well to an s3 object's Body field (P17) as it does to a document; every redis type keeps the
+  // plain MAX_CELL_BYTES default since none of them have a single dominant large-value field.
+  singleRow?: boolean;
 }): KeyValuePageBuilder {
+  const valueMaxBytes = opts.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : MAX_CELL_BYTES;
   const fieldScratch = new ColumnScratch();
   const valueScratch = new ColumnScratch();
   const encoder = new TextEncoder();
@@ -388,7 +402,7 @@ export function createKeyValuePageBuilder(opts: {
     push(field, value) {
       const row = rowCount;
       fieldScratch.appendValue(field, row, encoder);
-      valueScratch.appendValue(value, row, encoder);
+      valueScratch.appendValue(value, row, encoder, valueMaxBytes);
       rowCount++;
     },
     finish(position) {
@@ -499,7 +513,7 @@ export const documentPageEnvelopeSchema = z.object({
 
 export const keyValuePageEnvelopeSchema = z.object({
   kind: z.literal('keyvalue'),
-  redisType: z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream']),
+  redisType: z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream', 'object']),
   ttlMs: z.number().int().nullable(),
   memoryBytes: z.number().int().nullable(),
   rowCount: z.number().int().min(0),

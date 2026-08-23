@@ -28,8 +28,9 @@ const OPENABLE_KINDS = new Set(['table', 'view', 'matview']);
 // A collection opens the same way, but into a 'document' tab (P8) — not the grid's 'data' tab.
 const DOCUMENT_OPENABLE_KINDS = new Set(['collection']);
 // A redis key opens into a 'keyvalue' tab (P9) — 'namespace'/'database' stay expand-only, like
-// mongo's own 'database' node.
-const KEYVALUE_OPENABLE_KINDS = new Set(['key']);
+// mongo's own 'database' node. An s3 object reuses the exact same tab kind (P17's page.ts doc
+// comment explains why) — 'prefix'/'bucket' stay expand-only the same way.
+const KEYVALUE_OPENABLE_KINDS = new Set(['key', 'object']);
 // A kafka topic or sqs queue opens into a 'stream' tab (P10) — 'partition'/'consumerGroup' stay
 // browse-only leaves with nothing to open (onOpen's hasChildren guard makes double-click a no-op
 // on them, same as a column/index leaf).

@@ -73,14 +73,17 @@ const connectionFieldsSchema = z.object({
   preconnectSidecar: z.boolean().default(false),
 });
 
+// SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes
+// `database` for the AWS region and `username` for the named profile instead, per §5.1's "named
+// AWS profile" wording.
+export const AWS_STYLE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqs', 's3']);
+
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
   if (input.mode === 'fields') {
-    // SQS has no host/port at all (P10's D8) — fields mode repurposes `database` for the AWS
-    // region and `username` for the named profile instead, per §5.1's "named AWS profile" wording.
-    if (input.kind !== 'sqs' && !input.host) {
+    if (!AWS_STYLE_KINDS.has(input.kind) && !input.host) {
       ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
     }
-    if (input.kind !== 'sqs' && !input.port) {
+    if (!AWS_STYLE_KINDS.has(input.kind) && !input.port) {
       ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
     }
   } else {

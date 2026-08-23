@@ -18,6 +18,9 @@ export const nodeKindSchema = z.enum([
   'partition', // P10: a browse-only leaf under a kafka topic
   'consumerGroup', // P10: a browse-only, informational leaf under a kafka topic
   'queue', // P10: an sqs queue, opened as a stream tab
+  'bucket', // P17: an s3 bucket — the root container, redis's 'database' equivalent
+  'prefix', // P17: an intermediate '/'-delimited level in an s3 bucket, redis's 'namespace' equivalent
+  'object', // P17: a leaf s3 object, opened as a key/value tab (redis's 'key' equivalent)
 ]);
 export type NodeKind = z.infer<typeof nodeKindSchema>;
 

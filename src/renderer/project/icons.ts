@@ -19,6 +19,9 @@ const KIND_ICON: Record<NodeKind, string> = {
   partition: 'symbol-array', // P10: a browse-only leaf under a kafka topic
   consumerGroup: 'organization', // P10: a browse-only, informational leaf under a kafka topic
   queue: 'inbox', // P10: an sqs queue, matching TabStrip.vue's stream-tab icon
+  bucket: 'archive', // P17: an s3 bucket, matching CONNECTION_KIND_ICON's own s3 pick below
+  prefix: 'folder', // P17: an intermediate '/'-delimited s3 key level
+  object: 'file', // P17: a leaf s3 object, opened as a key/value tab (redis's own 'key' precedent)
 };
 
 export function nodeIcon(kind: NodeKind): string {

@@ -15,6 +15,7 @@ const loaders: Partial<Record<ConnectionKind, (deps: AdapterDeps) => Promise<Ada
   redis: async (deps) => (await import('./redis')).createRedisAdapter(deps),
   kafka: async (deps) => (await import('./kafka')).createKafkaAdapter(deps),
   sqs: async (deps) => (await import('./sqs')).createSqsAdapter(deps),
+  s3: async (deps) => (await import('./s3')).createS3Adapter(deps),
 };
 
 export async function createAdapter(kind: ConnectionKind, deps: AdapterDeps): Promise<Adapter> {

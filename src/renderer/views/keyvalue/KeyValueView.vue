@@ -68,15 +68,17 @@ const connRecord = computed(() =>
 const connColor = computed(() => connRecord.value?.color);
 const iconColor = computed(() => connColorVar(connColor.value) ?? 'var(--kira-info)');
 
-// The view header's breadcrumb: "connection / dbN / ". Redis's tree always roots a key's path
-// at its `database` segment (see redis/catalog.ts), so this reads existing path structure —
-// no new state.
+// The view header's breadcrumb: "connection / dbN / " for redis, "connection / bucket / " for
+// s3 — each engine's tree roots a key's/object's path at its own top-level segment kind (redis's
+// `database`, see redis/catalog.ts; s3's `bucket`, see s3/catalog.ts), so this just reads whichever
+// one exists in the path — no new state.
 const dbLabel = computed(() => {
   if (!props.tab.connectionId) return null;
   try {
     return (
-      decodePath(props.tab.connectionId, props.tab.path).segments.find((s) => s.kind === 'database')
-        ?.name ?? null
+      decodePath(props.tab.connectionId, props.tab.path).segments.find(
+        (s) => s.kind === 'database' || s.kind === 'bucket',
+      )?.name ?? null
     );
   } catch {
     return null;
@@ -274,7 +276,9 @@ function onRowClick(i: number): void {
   if (!row || !p) return;
   const column: ColumnDescriptor = {
     name: p.redisType === 'string' ? 'value' : row.field,
-    dataType: `redis ${p.redisType}`,
+    // P17: an s3 object's field/value rows aren't a "redis" anything — dataType is the cell
+    // editor's own status-badge text, so this stays honest about which engine this page came from.
+    dataType: p.redisType === 'object' ? 's3 object field' : `redis ${p.redisType}`,
     typeClass: 'text',
     nullable: false,
     isPrimaryKey: false,
@@ -367,7 +371,7 @@ onUnmounted(() => {
     <ViewChrome
       v-else
       :tab="tab"
-      icon="key"
+      :icon="page?.redisType === 'object' ? 'file' : 'key'"
       :icon-color="iconColor"
       :path="pathPrefix"
       :name="targetTail?.name ?? tab.path"

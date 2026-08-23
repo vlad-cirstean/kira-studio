@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
 import {
+  AWS_STYLE_KINDS,
   connectionInputSchema,
   connectionKindSchema,
   DEFAULT_PORT,
@@ -42,6 +43,7 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'redis',
   'kafka',
   'sqs',
+  's3',
 ]);
 const kinds = connectionKindSchema.options;
 
@@ -192,9 +194,10 @@ const isValid = computed(() =>
   draft.value ? connectionInputSchema.safeParse(draft.value).success : false,
 );
 
-// SQS has no host/port at all (D — connection.ts's superRefine exception); fields mode instead
-// repurposes `database` for the AWS region and `username` for a named profile (S10's client.ts).
-const isSqs = computed(() => draft.value?.kind === 'sqs');
+// SQS/S3 have no host/port at all (connection.ts's AWS_STYLE_KINDS/superRefine exception); fields
+// mode instead repurposes `database` for the AWS region and `username` for a named profile
+// (sqs/client.ts's, s3/client.ts's own D8/D9).
+const isAwsStyle = computed(() => !!draft.value && AWS_STYLE_KINDS.has(draft.value.kind));
 
 // P11: '' <-> null bridging so an emptied field is "no script" rather than a schema violation
 // the user cannot see (min(1) on the underlying schema rejects '').
@@ -325,7 +328,7 @@ const preconnectText = computed({
           </div>
 
           <template v-if="draft.mode === 'fields'">
-            <div v-if="!isSqs" class="field-row">
+            <div v-if="!isAwsStyle" class="field-row">
               <div class="field">
                 <label>Host</label>
                 <TextField
@@ -349,7 +352,7 @@ const preconnectText = computed({
             <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
             <div class="field-row">
               <div class="field">
-                <label>{{ isSqs ? 'Region' : 'Database' }}</label>
+                <label>{{ isAwsStyle ? 'Region' : 'Database' }}</label>
                 <TextField
                   :model-value="draft.database ?? ''"
                   size="md"
@@ -358,7 +361,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="field">
-                <label>{{ isSqs ? 'AWS profile (optional)' : 'User' }}</label>
+                <label>{{ isAwsStyle ? 'AWS profile (optional)' : 'User' }}</label>
                 <TextField
                   :model-value="draft.username ?? ''"
                   size="md"
@@ -367,7 +370,7 @@ const preconnectText = computed({
                 />
               </div>
             </div>
-            <div v-if="!isSqs" class="field">
+            <div v-if="!isAwsStyle" class="field">
               <label>Password</label>
               <div class="password-row">
                 <div class="password-input">
