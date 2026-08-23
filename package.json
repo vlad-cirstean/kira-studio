@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "A visual database client (DataGrip/DBeaver class) for macOS, covering MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, and S3.",
   "author": "kirathecat",
+  "license": "MIT",
   "private": true,
   "main": "out/main/index.js",
   "trustedDependencies": [
