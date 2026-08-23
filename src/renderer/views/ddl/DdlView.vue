@@ -2,8 +2,9 @@
 import { ddlText } from '@shared/domain/ddl';
 import type { DdlTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
@@ -35,10 +36,20 @@ async function onReconnectAndLoad(): Promise<void> {
   await load(props.tab.id);
 }
 
+let unregisterCommand: (() => void) | null = null;
+
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
+  unregisterCommand = registerCommand(
+    'view.refresh',
+    () => void load(props.tab.id, { refresh: true }),
+  );
+});
+
+onUnmounted(() => {
+  unregisterCommand?.();
 });
 
 const targetTail = computed(() => pathTail(props.tab.path));

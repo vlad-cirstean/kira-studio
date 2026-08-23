@@ -59,6 +59,46 @@ const kiraApi: KiraApi = {
     ipcRenderer.on(IPC.toggleOperationsPanel, listener);
     return () => ipcRenderer.off(IPC.toggleOperationsPanel, listener);
   },
+  onCommandPalette: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.commandPalette, listener);
+    return () => ipcRenderer.off(IPC.commandPalette, listener);
+  },
+  onTabNext: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.tabNext, listener);
+    return () => ipcRenderer.off(IPC.tabNext, listener);
+  },
+  onTabPrev: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.tabPrev, listener);
+    return () => ipcRenderer.off(IPC.tabPrev, listener);
+  },
+  onTabClose: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.tabClose, listener);
+    return () => ipcRenderer.off(IPC.tabClose, listener);
+  },
+  onViewFind: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.viewFind, listener);
+    return () => ipcRenderer.off(IPC.viewFind, listener);
+  },
+  onViewRefresh: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.viewRefresh, listener);
+    return () => ipcRenderer.off(IPC.viewRefresh, listener);
+  },
+  onViewRun: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.viewRun, listener);
+    return () => ipcRenderer.off(IPC.viewRun, listener);
+  },
+  onViewRunAll: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.viewRunAll, listener);
+    return () => ipcRenderer.off(IPC.viewRunAll, listener);
+  },
   onFlushBeforeClose: (cb: () => void) => {
     const listener = (): void => cb();
     ipcRenderer.on(IPC.appFlushBeforeClose, listener);

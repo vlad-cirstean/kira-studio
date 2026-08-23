@@ -56,6 +56,32 @@ export function buildMenu(): Menu {
         accelerator: 'CmdOrCtrl+J',
         click: () => sendToFocusedWindow(IPC.toggleOperationsPanel),
       },
+      { type: 'separator' },
+      {
+        label: 'Command Palette…',
+        accelerator: 'CmdOrCtrl+Shift+P',
+        click: () => sendToFocusedWindow(IPC.commandPalette),
+      },
+      {
+        label: 'Find',
+        accelerator: 'CmdOrCtrl+F',
+        click: () => sendToFocusedWindow(IPC.viewFind),
+      },
+      {
+        label: 'Refresh',
+        accelerator: 'F5',
+        click: () => sendToFocusedWindow(IPC.viewRefresh),
+      },
+      {
+        label: 'Run Statement',
+        accelerator: 'CmdOrCtrl+Return',
+        click: () => sendToFocusedWindow(IPC.viewRun),
+      },
+      {
+        label: 'Run All',
+        accelerator: 'CmdOrCtrl+Shift+Return',
+        click: () => sendToFocusedWindow(IPC.viewRunAll),
+      },
       ...(isDev
         ? ([
             { type: 'separator' },
@@ -68,7 +94,29 @@ export function buildMenu(): Menu {
 
   const windowMenu: MenuItemConstructorOptions = {
     label: 'Window',
-    submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'close' }],
+    submenu: [
+      {
+        label: 'Next Tab',
+        accelerator: 'Control+Tab',
+        click: () => sendToFocusedWindow(IPC.tabNext),
+      },
+      {
+        label: 'Previous Tab',
+        accelerator: 'Control+Shift+Tab',
+        click: () => sendToFocusedWindow(IPC.tabPrev),
+      },
+      {
+        label: 'Close Tab',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => sendToFocusedWindow(IPC.tabClose),
+      },
+      { type: 'separator' },
+      { role: 'minimize' },
+      { role: 'zoom' },
+      // role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" above already claims — moved
+      // to Shift+W (browser-tab convention: plain W closes the active tab, Shift+W the window).
+      { role: 'close', accelerator: 'CmdOrCtrl+Shift+W' },
+    ],
   };
 
   return Menu.buildFromTemplate([appMenu, editMenu, viewMenu, windowMenu]);

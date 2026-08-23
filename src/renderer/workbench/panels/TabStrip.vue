@@ -3,6 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { tabTitle } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
+import { copyText } from '../../clipboard';
 import { revealPath } from '../../project/state/tree';
 import { connectionsState } from '../../state/connections';
 import {
@@ -45,10 +46,6 @@ function onMiddleClick(tab: TabRecord): void {
 function onClose(e: MouseEvent, tab: TabRecord): void {
   e.stopPropagation();
   closeTab(tab.id);
-}
-
-function copyText(text: string): void {
-  void navigator.clipboard.writeText(text);
 }
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·

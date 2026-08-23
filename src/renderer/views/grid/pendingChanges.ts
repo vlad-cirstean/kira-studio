@@ -81,6 +81,38 @@ export function stageEdit(tabId: string, row: number, column: string, value: str
   p.edits.set(row, { row, changes: { ...(existing?.changes ?? {}), [column]: value } });
 }
 
+// D4: the cell menu's "Set NULL" — sibling to stageEdit, skipping the inline <input> (which can
+// only ever produce a string) to stage an actual SQL NULL directly.
+export function stageNull(tabId: string, row: number, column: string): void {
+  const p = ensure(tabId);
+  if (p.deletes.has(row)) return;
+  const existing = p.edits.get(row);
+  p.edits.set(row, { row, changes: { ...(existing?.changes ?? {}), [column]: null } });
+}
+
+// D6: "Duplicate row" — one addInsertRow + stageInsertValue per non-primary-key column, copied
+// from the row's current *effective* value (staged edit if present, else the page's own cell).
+// Primary-key columns are left blank (null, addInsertRow's own default) for the user to fill in
+// — duplicating a PK verbatim would only ever produce a guaranteed-collision insert on commit.
+export function duplicateAsInsert(tabId: string, row: number): string | null {
+  const page = getPage(tabId);
+  if (!page) return null;
+  const columns = page.columns.filter((c) => !c.isPrimaryKey).map((c) => c.name);
+  const id = addInsertRow(tabId, columns);
+  for (let col = 0; col < page.columns.length; col++) {
+    const descriptor = page.columns[col];
+    if (descriptor.isPrimaryKey) continue;
+    const staged = stagedValue(tabId, row, descriptor.name);
+    if (staged !== undefined) {
+      if (staged !== null) stageInsertValue(tabId, id, descriptor.name, staged);
+      continue;
+    }
+    const view = cell(tabId, row, col);
+    if (!view.isNull) stageInsertValue(tabId, id, descriptor.name, view.text);
+  }
+  return id;
+}
+
 // Toggles delete for each row: already-pending rows are un-marked, others are marked (and any
 // pending edit on them is dropped — moot once the row is gone).
 export function toggleDelete(tabId: string, rows: number[]): void {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import DataGrid from './DataGrid.vue';
 import SearchToolbar from './SearchToolbar.vue';
-import { cancelPrefetch, load, runtime } from './state';
+import { cancelPrefetch, load, reload, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
@@ -34,16 +35,29 @@ async function onReconnectAndLoad(): Promise<void> {
   await load(props.tab.id);
 }
 
+let unregisterCommands: Array<() => void> = [];
+
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
+  // D11: this component is mounted only while its tab is the active one (MainView.vue's
+  // `v-else-if` chain), so registering here — rather than switching on tab kind in a global
+  // dispatcher — is what makes Find/Refresh always act on the currently visible data tab.
+  unregisterCommands = [
+    registerCommand('view.find', () => {
+      const rt = runtime[props.tab.id];
+      if (rt) rt.searchOpen = !rt.searchOpen;
+    }),
+    registerCommand('view.refresh', () => void reload(props.tab.id)),
+  ];
 });
 
 // This component is remounted per tab switch (see the note above) — its unmount is the natural
 // place to cancel whatever prefetch was pending for the tab being switched away from.
 onUnmounted(() => {
   cancelPrefetch(props.tab.id);
+  for (const off of unregisterCommands) off();
 });
 
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);

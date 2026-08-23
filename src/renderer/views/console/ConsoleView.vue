@@ -2,8 +2,9 @@
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
@@ -65,6 +66,19 @@ function runAll(): void {
 function onStop(): void {
   stop(props.tab.id);
 }
+
+let unregisterCommands: Array<() => void> = [];
+
+onMounted(() => {
+  unregisterCommands = [
+    registerCommand('view.run', runStatement),
+    registerCommand('view.run-all', runAll),
+  ];
+});
+
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
+});
 
 const statusLine = computed(() => {
   const r = rt.value;

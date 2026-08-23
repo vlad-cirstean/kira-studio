@@ -253,11 +253,40 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, DB_PATH);
-  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters', 'open-console']);
+  expect(await menuItemIds(page)).toEqual([
+    'refresh',
+    'copy-name',
+    'filters',
+    'open-console',
+    'set-as-default',
+  ]);
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, APP_PATH);
-  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters', 'open-console']);
+  expect(await menuItemIds(page)).toEqual([
+    'refresh',
+    'copy-name',
+    'filters',
+    'open-console',
+    'set-as-default',
+  ]);
+  // D9: "Set as default" is unchecked until chosen, then stays checked on this row and clears
+  // on the previously-default one — Postgres-only (§8.9), same connection this spec already has.
+  await expect(
+    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+  ).toHaveCount(0);
+  await page.click('[data-testid="menu-item-set-as-default"]');
+
+  await openRowMenu(page, DB_PATH);
+  await expect(
+    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+  ).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await openRowMenu(page, APP_PATH);
+  await expect(
+    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+  ).toBeVisible();
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, WIDE_TABLE_PATH);

@@ -2,6 +2,7 @@ import { connectionColorSchema } from '@shared/domain/connection';
 import { decodePath, pathParent } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
+import { copyText } from '../clipboard';
 import {
   connectConnection,
   connectionsState,
@@ -13,6 +14,7 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
+import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
 import { activeTab, findDataTab, openConsoleTab, openDataTab, openDdlTab } from '../state/tabs';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
@@ -25,10 +27,6 @@ import {
   type TreeRowVm,
   treeState,
 } from './state/tree';
-
-function copyText(text: string): void {
-  void navigator.clipboard.writeText(text);
-}
 
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview', 'sequence', 'function']);
 
@@ -201,6 +199,23 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
   return items;
 }
 
+// D9: Postgres-only — MariaDB's console can already switch database with its own `USE db;` as
+// the console's first statement, so there is nothing for this item to do there.
+function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
+  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  if (record?.kind !== 'postgres') return [];
+  return [
+    {
+      type: 'item',
+      id: 'set-as-default',
+      label: 'Set as default',
+      icon: 'star',
+      checked: consoleDefaultFor(row.connectionId) === row.path,
+      run: () => setConsoleDefault(row.connectionId, row.path),
+    },
+  ];
+}
+
 function containerMenu(row: TreeRowVm): MenuItem[] {
   return [
     {
@@ -225,6 +240,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       run: () => openFiltersDialog(row.connectionId),
     },
     ...consoleMenuItem(row),
+    ...setAsDefaultMenuItem(row),
   ];
 }
 

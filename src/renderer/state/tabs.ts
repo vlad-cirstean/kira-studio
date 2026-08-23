@@ -15,6 +15,7 @@ import { control } from '../bridge/control';
 import { dropForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
+import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
@@ -141,12 +142,17 @@ export function openDdlTab(connectionId: string, path: string): string {
 // Opens a new 'console' tab — always a fresh one, never reused by (connectionId, path): unlike
 // data/ddl, a console is a scratch work surface (like a SQL client's "New Query"), so the same
 // target routinely wants several independent consoles open at once.
+//
+// D9: opened at the bare connection root (`path === ''`), a Postgres console has no session-
+// level way to redirect itself to a non-primary database — substituting a remembered "Set as
+// default" path here, before the path ever reaches the engine, needs no adapter change at all.
 export function openConsoleTab(connectionId: string, path: string): string {
+  const effectivePath = path === '' ? (consoleDefaultFor(connectionId) ?? path) : path;
   const id = crypto.randomUUID();
   const record: TabRecord = {
     id,
     connectionId,
-    path,
+    path: effectivePath,
     kind: 'console',
     state: defaultConsoleTabState(),
     order: tabsState.tabs.length,
@@ -276,6 +282,24 @@ export function activateTab(id: string): void {
   for (const t of tabsState.tabs) t.active = t.id === id;
   tabsState.activeId = id;
   saveNow();
+}
+
+// D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's
+// own left-to-right visual order (`tabsState.tabs` is already kept in that order).
+function stepTab(delta: 1 | -1): void {
+  const tabs = tabsState.tabs;
+  if (tabs.length === 0) return;
+  const idx = tabs.findIndex((t) => t.id === tabsState.activeId);
+  const next = tabs[(idx + delta + tabs.length) % tabs.length];
+  activateTab(next.id);
+}
+
+export function activateNextTab(): void {
+  stepTab(1);
+}
+
+export function activatePrevTab(): void {
+  stepTab(-1);
 }
 
 export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { copyText } from '../../clipboard';
 import {
   clearSelectedCellFor,
   publishSelectedCell,
@@ -9,6 +11,8 @@ import {
 import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
+import { openContextMenu } from '../../workbench/state/contextMenu';
+import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
   alignmentFor,
   columnOffsets,
@@ -17,8 +21,10 @@ import {
   resolveColumnOrder,
   visibleColumnRange,
 } from './columns';
+import { cellMenu, headerMenu, rowMenu } from './gridMenu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
+  addInsertRow,
   isPendingDelete,
   pendingFor,
   stagedValue,
@@ -83,6 +89,25 @@ const isWritable = computed(() => {
 // Gates whether double-click/Enter starts an inline edit (D2/D14) — the toolbar's add/delete/
 // preview/commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
 const canEditTable = computed(() => isWritable.value && hasPrimaryKey.value);
+
+const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+  const t = tab();
+  if (!t?.connectionId) return undefined;
+  const record = connectionsState.records.find((r) => r.id === t.connectionId);
+  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+});
+
+// Produced locally from the path, never round-tripped to the engine for a string join —
+// the same discipline project/menus.ts's own qualifiedNameFor uses (§9b).
+const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
+function qualifiedName(): string {
+  const t = tab();
+  if (!t?.connectionId) return '';
+  return decodePath(t.connectionId, t.path)
+    .segments.filter((s) => QUALIFIED_KINDS.has(s.kind))
+    .map((s) => s.name)
+    .join('.');
+}
 
 const totalHeight = computed(
   () => ((page.value?.rowCount ?? 0) + insertRows.value.length) * rowHeight.value,
@@ -429,13 +454,238 @@ function onCellClick(row: number, displayCol: number, e: MouseEvent): void {
     runtimeEntry.selection = { kind: 'cell', row, col: displayCol };
   }
 }
-function onGutterClick(row: number): void {
+// D2: Shift extends a contiguous range from the last plain/ctrl click (not updated by the
+// extension itself, matching cell/range's own fixed-anchor precedent); Ctrl/Cmd toggles one row
+// into a disjoint set. A plain click still replaces the selection with a single row, as before.
+const rowAnchor = ref<number | null>(null);
+const colAnchor = ref<number | null>(null);
+
+function onGutterClick(row: number, e: MouseEvent): void {
   const runtimeEntry = rt();
-  if (runtimeEntry) runtimeEntry.selection = { kind: 'row', rows: [row] };
+  if (!runtimeEntry) return;
+  const sel = runtimeEntry.selection;
+  if (e.shiftKey && rowAnchor.value !== null) {
+    const [a, b] = [rowAnchor.value, row].sort((x, y) => x - y);
+    const rows: number[] = [];
+    for (let r = a; r <= b; r++) rows.push(r);
+    runtimeEntry.selection = { kind: 'row', rows };
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && sel?.kind === 'row') {
+    runtimeEntry.selection = {
+      kind: 'row',
+      rows: sel.rows.includes(row) ? sel.rows.filter((r) => r !== row) : [...sel.rows, row],
+    };
+    rowAnchor.value = row;
+    return;
+  }
+  runtimeEntry.selection = { kind: 'row', rows: [row] };
+  rowAnchor.value = row;
 }
-function onHeaderSelectClick(displayCol: number): void {
+function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  const sel = runtimeEntry.selection;
+  if (e.shiftKey && colAnchor.value !== null) {
+    const [a, b] = [colAnchor.value, displayCol].sort((x, y) => x - y);
+    const cols: number[] = [];
+    for (let c = a; c <= b; c++) cols.push(c);
+    runtimeEntry.selection = { kind: 'column', cols };
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && sel?.kind === 'column') {
+    runtimeEntry.selection = {
+      kind: 'column',
+      cols: sel.cols.includes(displayCol)
+        ? sel.cols.filter((c) => c !== displayCol)
+        : [...sel.cols, displayCol],
+    };
+    colAnchor.value = displayCol;
+    return;
+  }
+  runtimeEntry.selection = { kind: 'column', cols: [displayCol] };
+  colAnchor.value = displayCol;
+}
+
+// The row's effective values across the whole display column order (D6) — reused by row copy
+// and Duplicate row.
+function rowSnapshot(row: number): RowSnapshot {
+  const values: Record<string, string | null> = {};
+  for (let c = 0; c < columnOrder.value.length; c++) {
+    const name = columnOrder.value[c];
+    const dc = displayCell(row, c);
+    values[name] = dc.isNull ? null : dc.text;
+  }
+  return { columns: [...columnOrder.value], values };
+}
+
+// The loaded page's values only for one column (§8.5's own scope boundary) — used by the header
+// menu's "Copy column values".
+function columnValuesFor(displayCol: number): string[] {
+  const p = page.value;
+  if (!p) return [];
+  const out: string[] = [];
+  for (let r = 0; r < p.rowCount; r++) {
+    const dc = displayCell(r, displayCol);
+    out.push(dc.isNull ? '' : dc.text);
+  }
+  return out;
+}
+
+// D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
+// outside it replaces the selection with just that row first. Cell/header menus have no
+// multi-target actions, so those two always collapse to a single-item selection.
+function onGutterContextMenu(row: number, e: MouseEvent): void {
+  const p = page.value;
+  if (!p || row >= p.rowCount) return; // pending insert rows have no row menu yet
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  const sel = runtimeEntry.selection;
+  const inSelection = sel?.kind === 'row' && sel.rows.includes(row);
+  if (!inSelection) {
+    runtimeEntry.selection = { kind: 'row', rows: [row] };
+    rowAnchor.value = row;
+  }
+  const rows = inSelection && sel.kind === 'row' ? sel.rows : [row];
+  openContextMenu(
+    e,
+    rowMenu({
+      tabId: props.tabId,
+      rows,
+      qualifiedName: qualifiedName(),
+      snapshot: rowSnapshot,
+      canEdit: canEditTable.value,
+    }),
+  );
+}
+
+function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void {
+  const runtimeEntry = rt();
+  if (runtimeEntry) runtimeEntry.selection = { kind: 'cell', row, col: displayCol };
+  const dc = displayCell(row, displayCol);
+  const name = columnOrder.value[displayCol];
+  openContextMenu(
+    e,
+    cellMenu({
+      tabId: props.tabId,
+      row,
+      columnName: name,
+      isNull: dc.isNull,
+      text: dc.text,
+      dialect: dialect.value,
+      canEdit: canEditTable.value,
+      isDeleted: isDeleted(row),
+      startEdit: () => startEdit(row, displayCol),
+    }),
+  );
+}
+
+function onHeaderContextMenu(displayCol: number, e: MouseEvent): void {
   const runtimeEntry = rt();
   if (runtimeEntry) runtimeEntry.selection = { kind: 'column', cols: [displayCol] };
+  const name = columnOrder.value[displayCol];
+  openContextMenu(
+    e,
+    headerMenu({
+      tabId: props.tabId,
+      columnName: name,
+      currentSort: currentSortDirection(name),
+      currentProjection: tab()?.state.projection ?? null,
+      allColumnNames: page.value?.columns.map((c) => c.name) ?? [],
+      columnValues: () => columnValuesFor(displayCol),
+    }),
+  );
+}
+
+// D1: local, DOM-focus-scoped copy/paste — never a native Electron accelerator (see the ground
+// rules note at the top of docs/plans/P6-interaction-completeness.md for why).
+function onCopy(): void {
+  const sel = rt()?.selection;
+  const p = page.value;
+  if (!sel || !p) return;
+  if (sel.kind === 'cell') {
+    const dc = displayCell(sel.row, sel.col);
+    copyText(dc.isNull ? '' : dc.text);
+    return;
+  }
+  if (sel.kind === 'range') {
+    const [r0, r1] = [sel.anchorRow, sel.row].sort((a, b) => a - b);
+    const [c0, c1] = [sel.anchorCol, sel.col].sort((a, b) => a - b);
+    const lines: string[] = [];
+    for (let r = r0; r <= r1; r++) {
+      const cells: string[] = [];
+      for (let c = c0; c <= c1; c++) {
+        const dc = displayCell(r, c);
+        cells.push(dc.isNull ? '' : dc.text);
+      }
+      lines.push(cells.join('\t'));
+    }
+    copyText(lines.join('\n'));
+    return;
+  }
+  if (sel.kind === 'row') {
+    copyText(rowsToTsv(sel.rows.map(rowSnapshot)));
+    return;
+  }
+  const lines: string[] = [];
+  for (let r = 0; r < p.rowCount; r++) {
+    lines.push(
+      sel.cols
+        .map((c) => {
+          const dc = displayCell(r, c);
+          return dc.isNull ? '' : dc.text;
+        })
+        .join('\t'),
+    );
+  }
+  copyText(lines.join('\n'));
+}
+
+// D13: TSV-if-tab-else-CSV, applied column-by-column from the selection's anchor across the
+// current display column order — existing rows become stageEdit calls, rows past the loaded
+// page become new pending inserts (one addInsertRow per pasted row, reused across its columns).
+async function onPaste(): Promise<void> {
+  if (!canEditTable.value) return;
+  const sel = rt()?.selection;
+  const p = page.value;
+  if (!sel || !p) return;
+  if (sel.kind !== 'cell' && sel.kind !== 'range' && sel.kind !== 'row') return;
+
+  let clipboardText: string;
+  try {
+    clipboardText = await navigator.clipboard.readText();
+  } catch {
+    return;
+  }
+  if (!clipboardText) return;
+
+  const grid = parseDelimited(clipboardText);
+  const startRow =
+    sel.kind === 'row' ? Math.min(...sel.rows) : sel.kind === 'range' ? sel.anchorRow : sel.row;
+  const startCol = sel.kind === 'row' ? 0 : sel.kind === 'range' ? sel.anchorCol : sel.col;
+  const columns = columnOrder.value;
+  const insertIds = new Map<number, string>();
+
+  for (let ri = 0; ri < grid.length; ri++) {
+    const row = startRow + ri;
+    if (row < 0) continue;
+    const isNewRow = row >= p.rowCount;
+    let insertId = insertIds.get(row);
+    if (isNewRow && insertId === undefined) {
+      insertId = addInsertRow(props.tabId, columns);
+      insertIds.set(row, insertId);
+    }
+    const cols = grid[ri];
+    for (let ci = 0; ci < cols.length; ci++) {
+      const name = columns[startCol + ci];
+      if (!name) continue;
+      if (isNewRow) {
+        if (insertId) stageInsertValue(props.tabId, insertId, name, cols[ci]);
+      } else {
+        stageEdit(props.tabId, row, name, cols[ci]);
+      }
+    }
+  }
 }
 
 function scrollCellIntoView(row: number, displayCol: number): void {
@@ -457,6 +707,22 @@ function onKeydown(e: KeyboardEvent): void {
   const runtimeEntry = rt();
   const p = page.value;
   if (!runtimeEntry || !p) return;
+
+  // D1: fires only while the grid container itself has DOM focus (this handler is bound to
+  // it) — every plain <input> in the app keeps using Electron's native role:'copy'/'paste'
+  // instead, since `user-select: none` on .grid-cell leaves it nothing to act on here.
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'c') {
+    e.preventDefault();
+    onCopy();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && key === 'v') {
+    e.preventDefault();
+    void onPaste();
+    return;
+  }
+
   const sel = runtimeEntry.selection;
   if (!sel || (sel.kind !== 'cell' && sel.kind !== 'range')) return;
   let { row, col } = sel.kind === 'range' ? { row: sel.row, col: sel.col } : sel;
@@ -533,6 +799,7 @@ defineExpose({ scrollCellIntoView });
             width: `${offsets[c + 1] - offsets[c]}px`,
           }"
           @click="onHeaderClick(columnOrder[c])"
+          @contextmenu.prevent="onHeaderContextMenu(c, $event)"
           @dragstart="onHeaderDragStart($event, columnOrder[c])"
           @dragover.prevent
           @drop="onHeaderDrop($event, columnOrder[c])"
@@ -545,7 +812,7 @@ defineExpose({ scrollCellIntoView });
             role="button"
             aria-label="Select column"
             class="header-select-zone"
-            @click.stop="onHeaderSelectClick(c)"
+            @click.stop="onHeaderSelectClick(c, $event)"
           />
           <span
             class="resize-handle"
@@ -570,7 +837,8 @@ defineExpose({ scrollCellIntoView });
           class="gutter-cell"
           data-testid="grid-gutter-cell"
           :style="{ width: `${GUTTER_WIDTH}px` }"
-          @click="onGutterClick(r)"
+          @click="onGutterClick(r, $event)"
+          @contextmenu.prevent="onGutterContextMenu(r, $event)"
         >
           {{ rowNumberBase + r + 1 }}
         </div>
@@ -592,6 +860,7 @@ defineExpose({ scrollCellIntoView });
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
           @dblclick="onCellDblClick(r, c)"
+          @contextmenu.prevent="onCellContextMenu(r, c, $event)"
         >
           <input
             v-if="isEditing(r, c)"
@@ -628,7 +897,7 @@ defineExpose({ scrollCellIntoView });
           top: `${rowHeight + ((page?.rowCount ?? 0) + idx) * rowHeight}px`,
           height: `${rowHeight}px`,
         }"
-        @click="onGutterClick((page?.rowCount ?? 0) + idx)"
+        @click="onGutterClick((page?.rowCount ?? 0) + idx, $event)"
       >
         <div class="gutter-cell" :style="{ width: `${GUTTER_WIDTH}px` }">+</div>
         <div
@@ -772,6 +1041,9 @@ defineExpose({ scrollCellIntoView });
   text-overflow: ellipsis;
   border-right: var(--kira-border-width) solid var(--kira-border);
   cursor: default;
+  /* D1: guarantees the native role:'copy'/'paste' accelerators have nothing to act on while
+     the grid has focus, so they never race the grid's own local Ctrl+C/Ctrl+V handler. */
+  user-select: none;
 }
 
 .grid-cell.align-right {

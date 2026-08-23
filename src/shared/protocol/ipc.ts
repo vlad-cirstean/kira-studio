@@ -28,6 +28,14 @@ export const IPC = {
   openSettings: 'kira:open-settings',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
+  commandPalette: 'kira:menu:command-palette',
+  tabNext: 'kira:menu:tab-next',
+  tabPrev: 'kira:menu:tab-prev',
+  tabClose: 'kira:menu:tab-close',
+  viewFind: 'kira:menu:view-find',
+  viewRefresh: 'kira:menu:view-refresh',
+  viewRun: 'kira:menu:view-run',
+  viewRunAll: 'kira:menu:view-run-all',
   appFlushBeforeClose: 'kira:app:flush-before-close',
   appFlushed: 'kira:app:flushed',
 
@@ -117,6 +125,14 @@ export interface KiraApi {
   onOpenSettings(cb: () => void): () => void;
   onToggleProjectPanel(cb: () => void): () => void;
   onToggleOperationsPanel(cb: () => void): () => void;
+  onCommandPalette(cb: () => void): () => void;
+  onTabNext(cb: () => void): () => void;
+  onTabPrev(cb: () => void): () => void;
+  onTabClose(cb: () => void): () => void;
+  onViewFind(cb: () => void): () => void;
+  onViewRefresh(cb: () => void): () => void;
+  onViewRun(cb: () => void): () => void;
+  onViewRunAll(cb: () => void): () => void;
   // Quit handshake: main holds `before-quit` until every window acks this, so a debounced save
   // still pending when the user quits is never silently lost.
   onFlushBeforeClose(cb: () => void): () => void;

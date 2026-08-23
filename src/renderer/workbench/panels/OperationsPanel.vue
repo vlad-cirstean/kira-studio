@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
+import { splitSqlStatements } from '@shared/domain/sql-split';
 import { tabTitle } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
+import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
-import { activateTab, tabsState } from '../../state/tabs';
+import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { run as runConsole } from '../../views/console/state';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
 import EmptyState from './EmptyState.vue';
@@ -80,8 +83,21 @@ function sqlDialectFor(record: OpRecord): 'postgres' | 'mariadb' | undefined {
   return kind === 'postgres' || kind === 'mariadb' ? kind : undefined;
 }
 
+// D10: Re-run reopens the exact command text through a fresh console tab and runs it
+// immediately — the one execution path built for arbitrary, operator-supervised statement
+// replay, rather than blindly re-invoking whatever op kind (read/count/mutate/execute)
+// produced the row.
+function onRerun(record: OpRecord): void {
+  if (!record.connectionId || !record.command) return;
+  const statements = splitSqlStatements(record.command).map((s) => s.text);
+  if (statements.length === 0) return;
+  const tabId = openConsoleTab(record.connectionId, '');
+  void runConsole(tabId, statements);
+}
+
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   const hasTab = record.tabId !== null && tabsState.tabs.some((t) => t.id === record.tabId);
+  const canSql = !!record.connectionId && connectionsState.states[record.connectionId]?.caps?.sql;
   const items: MenuItem[] = [
     {
       type: 'item',
@@ -89,6 +105,38 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       label: 'Reveal originating tab',
       disabled: !hasTab,
       run: () => revealTab(record),
+    },
+    {
+      type: 'item',
+      id: 'copy-command',
+      label: 'Copy command',
+      icon: 'copy',
+      disabled: !record.command,
+      run: () => copyText(record.command ?? ''),
+    },
+    {
+      type: 'item',
+      id: 'copy-error',
+      label: 'Copy error',
+      icon: 'copy',
+      disabled: !record.error,
+      run: () => copyText(record.error ?? ''),
+    },
+    {
+      type: 'item',
+      id: 're-run',
+      label: 'Re-run',
+      icon: 'play',
+      disabled: !record.command || !canSql,
+      run: () => onRerun(record),
+    },
+    {
+      type: 'item',
+      id: 'cancel',
+      label: 'Cancel',
+      icon: 'debug-stop',
+      disabled: record.status !== 'running',
+      run: () => onCancel(record),
     },
   ];
   openContextMenu(event, items);
