@@ -297,25 +297,6 @@ function onResizeEnd(e: PointerEvent): void {
   (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
 }
 
-const dragColumn = ref<string | null>(null);
-function onHeaderDragStart(e: DragEvent, name: string): void {
-  dragColumn.value = name;
-  e.dataTransfer?.setData('text/plain', name);
-}
-function onHeaderDrop(e: DragEvent, name: string): void {
-  e.preventDefault();
-  const source = dragColumn.value;
-  dragColumn.value = null;
-  if (!source || source === name) return;
-  const order = [...columnOrder.value];
-  const from = order.indexOf(source);
-  const to = order.indexOf(name);
-  if (from < 0 || to < 0) return;
-  order.splice(from, 1);
-  order.splice(to, 0, source);
-  patchDataTabState(props.tabId, { columnOrder: order });
-}
-
 function rt() {
   return runtime[props.tabId];
 }
@@ -905,16 +886,12 @@ defineExpose({ scrollCellIntoView });
           class="header-cell"
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
-          draggable="true"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
             width: `${offsets[c + 1] - offsets[c]}px`,
           }"
           @click="onHeaderClick(columnOrder[c])"
           @contextmenu.prevent="onHeaderContextMenu(c, $event)"
-          @dragstart="onHeaderDragStart($event, columnOrder[c])"
-          @dragover.prevent
-          @drop="onHeaderDrop($event, columnOrder[c])"
         >
           <span class="header-label">{{ columnOrder[c] }}</span>
           <span
@@ -934,7 +911,6 @@ defineExpose({ scrollCellIntoView });
           />
           <span
             class="resize-handle"
-            draggable="false"
             @pointerdown="onResizeStart($event, columnOrder[c])"
             @pointermove="onResizeMove"
             @pointerup="onResizeEnd"
