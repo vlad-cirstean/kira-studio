@@ -136,12 +136,20 @@ function applyBeautify(mode: BeautifyMode): void {
   }
 }
 
+// Bug fix: this used to only reset the local display buffer. Auto-stage-on-blur (onEditorBlur)
+// fires on the same click that opens this button — clicking Reset moves focus off the editor
+// first, which fires `focusout` (staging whatever was in the buffer as a pending edit) *before*
+// this handler runs — so the buffer looked reverted while the just-staged edit silently stayed
+// pending underneath it, which is what "Revert doesn't work, it commits the change" looked like.
+// `onRevert` (set by DataGrid.vue alongside onEdit) un-stages that pending edit outright, so the
+// order those two events fire in no longer matters — either way this call is what wins last.
 function resetBuffer(): void {
   const c = cell.value;
   if (!c) return;
   doc.value = c.value ?? '';
   formatted.value = 'none';
   beautifyFailure.value = null;
+  c.onRevert?.();
 }
 
 // The buffer diverging from the stored value is what "there's something to save" means — true

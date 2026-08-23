@@ -206,6 +206,17 @@
 }
 
 /* ---------- P5 select ---------- */
+/* `appearance: none` + a manual background-image arrow only restyles the CLOSED control — the
+   opened option list is still a native, unstyled OS popup (a plain <select>'s listbox has no
+   CSS-reachable shadow boundary in the standard model), which is exactly the "still looks like
+   the system one" complaint: click it open and the app's dark theme vanishes. `appearance:
+   base-select` (Chromium's Customizable Select API — supported here since this app targets a
+   single pinned Electron/Chromium build, not arbitrary browsers) turns the popup into a normal,
+   CSS-reachable ::picker(select) part with plain <option> children and its own ::picker-icon part
+   for the arrow, so both halves can be themed like everything else. An unsupporting engine drops
+   every `base-select`/`::picker`-based declaration below as invalid and falls back to nothing
+   (a bare, unstyled native control) rather than this file's previous appearance:none + manual-SVG
+   approach — acceptable since, again, the Chromium version here is pinned, not guessed at. */
 .p-select {
   height: var(--kira-h-sm);
   display: inline-flex;
@@ -217,11 +228,32 @@
   font-size: var(--kira-t-sm);
   cursor: pointer;
   flex-shrink: 0;
-  appearance: none;
-  background-image: var(--kira-select-arrow);
-  background-repeat: no-repeat;
-  background-position: right var(--kira-s-2) center;
-  padding-right: calc(var(--kira-s-2) + 14px);
+  appearance: base-select;
+}
+.p-select::picker-icon {
+  color: var(--kira-fg-muted);
+}
+.p-select::picker(select) {
+  appearance: base-select;
+  margin-top: var(--kira-s-1);
+  padding: var(--kira-s-1);
+  background: var(--kira-bg-elevated);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius-sm);
+  box-shadow: var(--kira-shadow);
+}
+.p-select option {
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  background: none;
+}
+.p-select option:hover {
+  background: var(--kira-hover);
+}
+.p-select option:checked {
+  background: var(--kira-select);
+  color: var(--kira-fg);
 }
 .p-select.bordered {
   height: var(--kira-h-md);

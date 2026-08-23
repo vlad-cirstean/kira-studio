@@ -7,7 +7,7 @@ import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import FilterHistoryMenu from './FilterHistoryMenu.vue';
+import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { runtime, setFilter, setSort } from './state';
 
 const tab = computed(() => activeDataTab.value);
@@ -26,13 +26,25 @@ function sortToText(sort: SortSpec | null): string {
 const whereText = ref('');
 const orderByText = ref('');
 
-// The tab switch (MainView keys the whole view by tab.id) already remounts this component, so
-// `immediate: true` alone covers both "just opened" and "tab changed".
+// Watched as two separate primitive-returning getters, not `watch(tab, ...)` on the whole
+// object: DataView.vue keys this component's ancestor by tab.id (remounted on tab switch, so
+// `immediate: true` alone covers "just opened"/"tab changed"), but within one tab's lifetime
+// `patchDataTabState` mutates `tab.state` in place rather than replacing the tab object — a
+// non-deep watch on `tab` itself never sees that mutation. That silently broke this box after a
+// column-header click (DataGrid.vue's onHeaderClick calls setSort, which does exactly this
+// in-place patch): the ORDER BY field kept showing whatever was there before the click, so
+// blurring it (or pressing Enter) re-applied the stale text and clobbered the header's sort.
 watch(
-  tab,
-  (t) => {
-    whereText.value = t?.state.filter ?? '';
-    orderByText.value = sortToText(t?.state.sort ?? null);
+  () => tab.value?.state.filter ?? null,
+  (filter) => {
+    whereText.value = filter ?? '';
+  },
+  { immediate: true },
+);
+watch(
+  () => tab.value?.state.sort ?? null,
+  (sort) => {
+    orderByText.value = sortToText(sort);
   },
   { immediate: true },
 );
@@ -109,7 +121,10 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
       <FilterHistoryMenu
         v-if="historyOpen"
-        :tab-id="tab.id"
+        :connection-id="tab.connectionId"
+        :path="tab.path"
+        :current-filter="tab.state.filter"
+        :current-sort="tab.state.sort"
         @apply="applyFromHistory"
         @close="historyOpen = false"
       />

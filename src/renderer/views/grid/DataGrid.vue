@@ -28,6 +28,7 @@ import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } 
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
   addInsertRow,
+  discardCellEdit,
   isPendingDelete,
   pendingFor,
   stagedValue,
@@ -71,6 +72,23 @@ const columnByName = computed(() => {
   for (const c of page.value?.columns ?? []) map.set(c.name, c);
   return map;
 });
+
+// The DESCRIBE-derived metadata (rt().meta), not the page's own ColumnDescriptor — a comment
+// only ever lives on ObjectMeta.columns (ColumnMeta), never on the per-query page column shape.
+const columnMetaByName = computed(() => {
+  const map = new Map<string, { dataType: string; comment: string | null }>();
+  for (const c of rt()?.meta?.columns ?? []) map.set(c.name, c);
+  return map;
+});
+
+// Header hover: data type always (falls back to the page's own descriptor if DESCRIBE metadata
+// hasn't loaded yet), plus the column's DB comment when it has one.
+function headerTitleFor(name: string): string {
+  const meta = columnMetaByName.value.get(name);
+  const dataType = meta?.dataType ?? columnByName.value.get(name)?.dataType ?? '';
+  const comment = meta?.comment;
+  return comment ? `${dataType} — ${comment}` : dataType;
+}
 
 const widths = computed<Record<string, number>>(() => {
   const p = page.value;
@@ -388,6 +406,12 @@ watch(
       onEdit:
         canEditTable.value && !isDeleted(targetRow)
           ? (newValue: string) => stageEdit(props.tabId, targetRow, column.name, newValue)
+          : undefined,
+      // Sibling to onEdit — the panel's Revert button un-stages this cell's pending edit (if any)
+      // rather than only resetting its own display buffer (see discardCellEdit's own doc comment).
+      onRevert:
+        canEditTable.value && !isDeleted(targetRow)
+          ? () => discardCellEdit(props.tabId, targetRow, column.name)
           : undefined,
     };
     publishSelectedCell(selected);
@@ -911,6 +935,7 @@ defineExpose({ scrollCellIntoView });
           class="header-cell"
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
+          :title="headerTitleFor(columnOrder[c])"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
             width: `${offsets[c + 1] - offsets[c]}px`,
@@ -1035,7 +1060,7 @@ defineExpose({ scrollCellIntoView });
         }"
         @click="onGutterClick((page?.rowCount ?? 0) + idx, $event)"
       >
-        <div class="gutter-cell" :style="{ width: `${GUTTER_WIDTH}px` }">+</div>
+        <div class="gutter-cell inserted" :style="{ width: `${GUTTER_WIDTH}px` }">+</div>
         <div
           v-for="c in visibleColumnIndices"
           :key="columnOrder[c]"
@@ -1195,6 +1220,22 @@ defineExpose({ scrollCellIntoView });
   bottom: 0;
   width: 2px;
   background: var(--kira-warn);
+}
+
+/* A pending-insert row is not "edited" (nothing existing changed) — same 2px rail treatment,
+   coloured ok/green instead of warn/yellow so the two staged-change kinds read apart at a glance. */
+.gutter-cell.inserted {
+  position: relative;
+}
+
+.gutter-cell.inserted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-ok);
 }
 
 .grid-cell {

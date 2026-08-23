@@ -451,6 +451,23 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
   ).not.toHaveClass(/pending-edit/);
 
+  // Bug fix: clicking Revert straight from the editor (no deliberate blur first) used to *commit*
+  // the edit instead of discarding it — the click moves focus off the editor, which fires the
+  // same blur that auto-stages, and that firing races ahead of the click handler that's supposed
+  // to undo it. resetBuffer() now un-stages via SelectedCell.onRevert regardless of that race, so
+  // the pending edit must be gone, not just the on-screen text.
+  const originalSample = await cellText(page, 0, 'sample');
+  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('"edited then reverted"');
+  await page.click('[data-testid="cell-editor-beautify-reset"]');
+  expect(await editorText(page)).toBe(originalSample);
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
+  ).not.toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'sample')).toBe(originalSample);
+  await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
+
   // Ctrl+Enter stages immediately, without needing to blur.
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
   await page.keyboard.press('Control+A');

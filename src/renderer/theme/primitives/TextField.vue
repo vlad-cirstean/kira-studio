@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, useAttrs } from 'vue';
+import { computed, ref, useAttrs } from 'vue';
 import Codicon from '../Codicon.vue';
 
 // P4. inheritAttrs is off because the one attribute every call site actually needs to land
@@ -17,6 +17,11 @@ const props = withDefaults(
     size?: 'sm' | 'md';
     ui?: boolean;
     invalid?: boolean;
+    // Opt out of the up/down stepper a plain type="number" field otherwise gets — the pager's
+    // page-jump box (DataToolbar.vue/DocumentView.vue) has no sensible "next page number" to
+    // step to that Next/Prev don't already do better, and the stepper's width only cramps its
+    // already-narrow 46px box.
+    hideStepper?: boolean;
   }>(),
   { size: 'sm', type: 'text' },
 );
@@ -35,9 +40,11 @@ const inputRef = ref<HTMLInputElement | null>(null);
 // so this needs no min/max parsing of its own. Dispatching real input/change events (rather
 // than emitting update:modelValue directly) keeps both v-model callers and the plain
 // @change="..." callers (SettingsDialog) working exactly as they would for a native spinner.
+const showStepper = computed(() => props.type === 'number' && !props.hideStepper);
+
 function stepBy(dir: 1 | -1): void {
   const el = inputRef.value;
-  if (!el || props.type !== 'number' || 'disabled' in attrs) return;
+  if (!el || !showStepper.value || 'disabled' in attrs) return;
   if (dir > 0) el.stepUp();
   else el.stepDown();
   el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -48,7 +55,7 @@ function stepBy(dir: 1 | -1): void {
 <template>
   <span
     class="p-input"
-    :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': type === 'number' }"
+    :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper }"
     :style="invalid ? { borderColor: 'var(--kira-error)' } : undefined"
   >
     <span v-if="icon" class="icon-box"><Codicon :name="icon" :size="13" /></span>
@@ -63,7 +70,7 @@ function stepBy(dir: 1 | -1): void {
       @keydown.enter="emit('enter')"
       @blur="emit('blur', $event)"
     />
-    <span v-if="type === 'number'" class="stepper">
+    <span v-if="showStepper" class="stepper">
       <button
         type="button"
         class="step-btn"

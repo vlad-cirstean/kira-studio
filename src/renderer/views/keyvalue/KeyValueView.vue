@@ -412,12 +412,6 @@ onUnmounted(() => {
             title="Next page"
             @click="goNext(tab.id)"
           />
-          <IconButton
-            icon="symbol-number"
-            data-testid="keyvalue-count"
-            title="Exact count"
-            @click="runCount(tab.id)"
-          />
         </div>
 
         <div class="sep" />
@@ -435,6 +429,19 @@ onUnmounted(() => {
           >
             {{ PAGE_SIZE_LABEL[size] }}
           </button>
+        </div>
+
+        <div class="sep" />
+
+        <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
+             (a key has no schema), so this group is count alone, same slot as SQL/Document. -->
+        <div class="group">
+          <IconButton
+            icon="symbol-number"
+            data-testid="keyvalue-count"
+            title="Exact count"
+            @click="runCount(tab.id)"
+          />
         </div>
 
         <div class="sep" />

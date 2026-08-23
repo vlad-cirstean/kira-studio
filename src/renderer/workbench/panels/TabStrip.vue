@@ -2,7 +2,7 @@
 import type { TabRecord } from '@shared/domain/tabs';
 import { tabTitle } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { revealPath } from '../../project/state/tree';
 import { connectionsState } from '../../state/connections';
@@ -97,10 +97,30 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
 }
 
 const tabs = computed(() => tabsState.tabs);
+
+// Selecting a tab from anywhere other than this strip itself (a tree double-click, Cmd/Ctrl+click
+// nav, session restore) previously left the strip's own scroll position untouched — the newly
+// active tab could be selected yet scrolled out of view, with nothing on screen indicating a
+// selection had even happened until the user scrolled the strip by hand to go find it.
+const activeTabId = computed(() => tabsState.tabs.find((t) => t.active)?.id ?? null);
+const stripRef = ref<HTMLElement | null>(null);
+
+watch(
+  activeTabId,
+  (id) => {
+    if (!id) return;
+    void nextTick(() => {
+      stripRef.value
+        ?.querySelector<HTMLElement>(`[data-tab-id="${id}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <div v-if="tabs.length > 0" class="tab-strip" data-testid="tab-strip-row">
+  <div v-if="tabs.length > 0" ref="stripRef" class="tab-strip" data-testid="tab-strip-row">
     <button
       v-for="tab in tabs"
       :key="tab.id"

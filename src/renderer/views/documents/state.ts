@@ -177,6 +177,34 @@ export async function goPrev(tabId: string): Promise<void> {
   await load(tabId, cursor);
 }
 
+// First/last/jump — mirrors views/grid/state.ts's own goFirst/goLast/goToPage exactly. Mongo
+// supports an arbitrary skip()/limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's
+// per-partition offsets), so a page-N jump is just as meaningful here as it is for SQL.
+export async function goFirst(tabId: string): Promise<void> {
+  patchDocumentTabState(tabId, { pageIndex: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 });
+}
+
+// Requires a count, same as the grid's own goLast — the toolbar disables the Last-page button
+// until an exact/estimated count has run.
+export async function goLast(tabId: string): Promise<void> {
+  const tab = findDocumentTab(tabId);
+  const rt = runtime[tabId];
+  if (!tab || !rt?.count) return;
+  const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
+  const lastIndex = pageCount - 1;
+  patchDocumentTabState(tabId, { pageIndex: lastIndex });
+  await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize });
+}
+
+export async function goToPage(tabId: string, n: number): Promise<void> {
+  const tab = findDocumentTab(tabId);
+  if (!tab) return;
+  const index = Math.max(0, n);
+  patchDocumentTabState(tabId, { pageIndex: index });
+  await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize });
+}
+
 export function setSearch(tabId: string, text: string): void {
   patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
   void load(tabId);

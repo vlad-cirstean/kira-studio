@@ -244,6 +244,7 @@ function onDiscard(): void {
             v-model="pageInputValue"
             type="number"
             min="1"
+            hide-stepper
             data-testid="pager-page-input"
             @change="onJump"
           />

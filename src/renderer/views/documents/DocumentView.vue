@@ -4,6 +4,7 @@ import type { DocumentTabRecord, DocumentTabState } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { clearSelectedCellFor, publishSelectedCell } from '../../state/cellSelection';
@@ -19,14 +20,18 @@ import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
+import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import { documentRow, fieldNamesOnPage, isIdNull, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
 import { saveDocumentEdit, saveNewDocument } from './documentMutations';
 import ProjectionMenu from './ProjectionMenu.vue';
 import {
+  goFirst,
+  goLast,
   goNext,
   goPrev,
+  goToPage,
   load,
   reload,
   runCount,
@@ -103,6 +108,7 @@ const searchText = ref(props.tab.state.search);
 
 function onSearchInput(): void {
   setSearch(props.tab.id, searchText.value);
+  recordFilterHistory(searchText.value, props.tab.state.sort);
 }
 
 // The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
@@ -141,7 +147,40 @@ function parseSortText(text: string): SortSpec | null {
 }
 
 function onSortInput(): void {
-  setSort(props.tab.id, parseSortText(sortText.value));
+  const sort = parseSortText(sortText.value);
+  setSort(props.tab.id, sort);
+  recordFilterHistory(props.tab.state.search, sort);
+}
+
+// Mirrors FilterToolbar.vue's own history recording/Clear/apply — same generic {connectionId,
+// path} keyed storage (queriesHistoryRecord/queriesSave), just filed under Document's own
+// filter/sort vocabulary (a Mongo filter document + sort document, not a WHERE/ORDER BY pair).
+function recordFilterHistory(search: string, sort: SortSpec | null): void {
+  const connectionId = props.tab.connectionId;
+  if (!connectionId) return;
+  void control.queriesHistoryRecord(
+    connectionId,
+    props.tab.path,
+    search === '' ? null : search,
+    sort,
+  );
+}
+
+function onClearFilter(): void {
+  searchText.value = '';
+  sortText.value = '';
+  setSearch(props.tab.id, '');
+  setSort(props.tab.id, null);
+  recordFilterHistory('', null);
+}
+
+const filterHistoryOpen = ref(false);
+
+function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
+  searchText.value = where ?? '';
+  sortText.value = sortSpecToText(orderBy);
+  setSearch(props.tab.id, where ?? '');
+  setSort(props.tab.id, orderBy);
 }
 
 const PAGE_SIZES: DocumentTabState['pageSize'][] = [10, 100, 1000, 10000];
@@ -154,6 +193,24 @@ const PAGE_SIZE_LABEL: Record<DocumentTabState['pageSize'], string> = {
 
 function onPageSize(size: DocumentTabState['pageSize']): void {
   setPageSize(props.tab.id, size);
+}
+
+// Mirrors DataToolbar.vue's own pageDisplay/pageInputValue/pageCount/onJump exactly, now that
+// goFirst/goLast/goToPage give Document the same absolute-offset jump SQL has.
+const pageDisplay = computed(() => props.tab.state.pageIndex + 1);
+const pageInputValue = ref(String(pageDisplay.value));
+watch(pageDisplay, (v) => {
+  pageInputValue.value = String(v);
+});
+const pageCount = computed(() => {
+  const count = rt.value?.count;
+  const size = props.tab.state.pageSize;
+  if (!count || !size) return null;
+  return Math.max(1, Math.ceil(count.value / size));
+});
+function onJump(e: Event): void {
+  const value = Number((e.target as HTMLInputElement).value);
+  if (Number.isFinite(value) && value >= 1) void goToPage(props.tab.id, value - 1);
 }
 
 const projectionOpen = ref(false);
@@ -371,9 +428,19 @@ onUnmounted(() => {
 
       <template #toolbar>
         <div class="sep"></div>
-        <!-- Canonical order (DataToolbar.vue is the reference): pager, then page-size, then a
-             count/columns-equivalent group, then the add/search group. -->
-        <div class="group">
+        <!-- Canonical order and shape (DataToolbar.vue is the reference): first/prev/page-jump/
+             next/last, then page-size, then a count/columns-equivalent group, then the
+             add/search group. Mongo supports an arbitrary skip()/limit() offset, so — unlike
+             Redis/Kafka/SQS's cursor-only pagination — a real page-N jump box applies here too. -->
+        <div class="group pager" data-testid="document-pager">
+          <IconButton
+            icon="chevron-left"
+            :size="12"
+            title="First page"
+            data-testid="document-pager-first"
+            :disabled="tab.state.pageIndex === 0"
+            @click="goFirst(tab.id)"
+          />
           <IconButton
             icon="arrow-left"
             :size="13"
@@ -382,13 +449,20 @@ onUnmounted(() => {
             title="Previous page"
             @click="goPrev(tab.id)"
           />
-          <span class="mono p-sm">{{ rt?.rowCount ?? 0 }} loaded</span>
-          <template v-if="rt?.count">
-            <span class="p-sm dim">of</span>
-            <span class="mono p-sm muted"
-              >{{ rt.count.exact ? '' : '≈ ' }}{{ rt.count.value.toLocaleString() }}</span
-            >
-          </template>
+          <span class="page-label p-sm muted">
+            page
+            <div class="page-input">
+              <TextField
+                v-model="pageInputValue"
+                type="number"
+                min="1"
+                hide-stepper
+                data-testid="document-pager-page-input"
+                @change="onJump"
+              />
+            </div>
+            <template v-if="pageCount"> of {{ pageCount }}</template>
+          </span>
           <IconButton
             icon="arrow-right"
             :size="13"
@@ -396,6 +470,14 @@ onUnmounted(() => {
             :disabled="!rt?.hasMore"
             title="Next page"
             @click="goNext(tab.id)"
+          />
+          <IconButton
+            icon="chevron-right"
+            :size="12"
+            :title="pageCount ? 'Last page' : 'Count documents first'"
+            data-testid="document-pager-last"
+            :disabled="!pageCount"
+            @click="goLast(tab.id)"
           />
         </div>
         <div class="sep"></div>
@@ -477,8 +559,27 @@ onUnmounted(() => {
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
            SORT box beside it (read.ts's structured-sort-only rule, see sortSpecToText/
            parseSortText above), FilterToolbar.vue's ORDER BY box narrowed to the one form Mongo
-           can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's. -->
+           can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's.
+           History button and Clear button match FilterToolbar.vue's own layout exactly — this row
+           used to have neither. -->
       <template #toolbar-2>
+        <div class="history-anchor">
+          <IconButton
+            icon="history"
+            title="Saved &amp; recent filters"
+            data-testid="document-filter-history-button"
+            @click="filterHistoryOpen = !filterHistoryOpen"
+          />
+          <FilterHistoryMenu
+            v-if="filterHistoryOpen"
+            :connection-id="tab.connectionId"
+            :path="tab.path"
+            :current-filter="searchText === '' ? null : searchText"
+            :current-sort="tab.state.sort"
+            @apply="applyFromFilterHistory"
+            @close="filterHistoryOpen = false"
+          />
+        </div>
         <div class="filter-field">
           <TextField
             v-model="searchText"
@@ -499,6 +600,9 @@ onUnmounted(() => {
             @blur="onSortInput"
           />
         </div>
+        <Button title="Empty both fields and refetch" data-testid="document-filter-clear" @click="onClearFilter">
+          Clear
+        </Button>
       </template>
 
       <template #strips>
@@ -621,6 +725,35 @@ onUnmounted(() => {
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
    (see TextField.vue's inheritAttrs:false), so the permanent filter row's "grow to fill" sizing
    moves onto this wrapper instead of a style attribute on the component tag itself. */
+.history-anchor {
+  position: relative;
+}
+
+/* Mirrors DataToolbar.vue's own .pager/.page-label/.page-input rules exactly. */
+.pager {
+  gap: var(--kira-s-1);
+}
+
+.page-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-1);
+  white-space: nowrap;
+}
+
+.page-input {
+  width: 46px;
+}
+
+.page-input :deep(.p-input) {
+  width: 100%;
+  padding: 0 var(--kira-s-2);
+}
+
+.page-input :deep(input) {
+  text-align: center;
+}
+
 .filter-field {
   flex: 1;
   min-width: 0;

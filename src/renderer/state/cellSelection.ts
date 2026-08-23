@@ -28,6 +28,10 @@ export interface SelectedCell {
    *  KeyValue/Stream/Console) that never sets it keeps its cells read-only in the panel by
    *  default rather than needing to opt out. */
   onEdit?: (newValue: string) => void;
+  /** Sibling to `onEdit`, closing over `discardCellEdit(tabId, row, columnName)` — what the panel's
+   *  Revert button calls to un-stage a pending edit, not just visually reset its own buffer.
+   *  Always set alongside `onEdit` by the same publisher; never set without it. */
+  onRevert?: () => void;
 }
 
 export const cellSelectionState = reactive<{ current: SelectedCell | null }>({ current: null });

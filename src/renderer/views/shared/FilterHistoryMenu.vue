@@ -2,18 +2,25 @@
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import { findDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import SavedListMenu from '../shared/SavedListMenu.vue';
+import SavedListMenu from './SavedListMenu.vue';
 
-const props = defineProps<{ tabId: string }>();
+// Generic across every filter-bearing view (SQL's FilterToolbar.vue, Document's own filter row) —
+// `queriesList`/`queriesHistoryList`/`queriesSave` are keyed purely on {connectionId, path} in
+// storage, with no SQL-specific shape, so "where"/"orderBy" here just names the two textual halves
+// of whatever a view's filter row holds (a WHERE clause + ORDER BY for SQL, a Mongo filter
+// document + sort document for Document) rather than anything SQL-specific. Living in
+// views/shared/ (not views/grid/) is what makes this legal for Document to import — §11 forbids
+// sideways view imports.
+const props = defineProps<{
+  connectionId: string | null;
+  path: string;
+  currentFilter: string | null;
+  currentSort: SortSpec | null;
+}>();
 const emit = defineEmits<{ apply: [where: string | null, orderBy: SortSpec | null]; close: [] }>();
-
-function tab() {
-  return findDataTab(props.tabId);
-}
 
 const saved = ref<SavedFilterQuery[]>([]);
 const history = ref<FilterHistoryEntry[]>([]);
@@ -55,11 +62,10 @@ function cancelPrompt(): void {
 }
 
 async function reload(): Promise<void> {
-  const t = tab();
-  if (!t?.connectionId) return;
+  if (!props.connectionId) return;
   const [savedList, historyList] = await Promise.all([
-    control.queriesList(t.connectionId, t.path),
-    control.queriesHistoryList(t.connectionId, t.path, 20),
+    control.queriesList(props.connectionId, props.path),
+    control.queriesHistoryList(props.connectionId, props.path, 20),
   ]);
   saved.value = savedList;
   history.value = historyList;
@@ -118,15 +124,14 @@ async function remove(entry: SavedFilterQuery | FilterHistoryEntry): Promise<voi
 }
 
 async function saveCurrent(): Promise<void> {
-  const t = tab();
-  if (!t?.connectionId) return;
+  if (!props.connectionId) return;
   const name = await promptText('Name this filter', '');
   if (!name || name.trim() === '') return;
   await control.queriesSave({
-    connectionId: t.connectionId,
-    path: t.path,
+    connectionId: props.connectionId,
+    path: props.path,
     name: name.trim(),
-    body: { where: t.state.filter, orderBy: t.state.sort },
+    body: { where: props.currentFilter, orderBy: props.currentSort },
     pinned: false,
   });
   await reload();

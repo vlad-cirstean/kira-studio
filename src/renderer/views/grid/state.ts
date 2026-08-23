@@ -288,3 +288,10 @@ export async function setSort(tabId: string, sort: SortSpec | null): Promise<voi
   patchDataTabState(tabId, { sort, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
+
+// Purely a display concern (which page.columns index each display column reads from) — unlike
+// projection/filter/sort above, reordering never changes what the query returns, so this neither
+// resets tokens nor reloads.
+export function setColumnOrder(tabId: string, columnOrder: string[] | null): void {
+  patchDataTabState(tabId, { columnOrder });
+}

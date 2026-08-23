@@ -81,6 +81,21 @@ export function stageEdit(tabId: string, row: number, column: string, value: str
   p.edits.set(row, { row, changes: { ...(existing?.changes ?? {}), [column]: value } });
 }
 
+// The cell editor's Revert action (CellEditorView.vue's resetBuffer, via SelectedCell.onRevert) —
+// un-stages just this one column's edit rather than the whole row's (discardPending) or an
+// insert's (discardInsertRow). Deleting the row entry outright once its last column reverts, not
+// leaving behind an empty `changes: {}`, is what stops the row from still reading as "edited"
+// (hasPending/the pending-count badge, and DataGrid's own yellow row highlight) after its only
+// edit is undone.
+export function discardCellEdit(tabId: string, row: number, column: string): void {
+  const p = pendingState[tabId];
+  const existing = p?.edits.get(row);
+  if (!existing || !(column in existing.changes)) return;
+  const { [column]: _discarded, ...rest } = existing.changes;
+  if (Object.keys(rest).length === 0) p?.edits.delete(row);
+  else p?.edits.set(row, { row, changes: rest });
+}
+
 // D4: the cell menu's "Set NULL" — sibling to stageEdit, skipping the inline <input> (which can
 // only ever produce a string) to stage an actual SQL NULL directly.
 export function stageNull(tabId: string, row: number, column: string): void {
