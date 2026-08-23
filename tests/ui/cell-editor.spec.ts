@@ -176,10 +176,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   if (!pg) throw new Error('postgres fixture did not start');
   const { window: page } = kira;
 
-  // Zero-operations invariant (§0): the cell editor issues no DB ops of its own. Prefetch off
-  // so paging/opening never sneaks a background read into the delta below.
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
-
+  // Zero-operations invariant (§0): the cell editor issues no DB ops of its own.
   const cfg = {
     host: pg.config.host,
     port: pg.config.port,
@@ -411,26 +408,26 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     .click();
   await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
 
-  // --- scenario 9: an editable cell is genuinely editable, and Save stages into the SAME
-  // pending-change set the grid's own inline (double-click) edit and the toolbar's Commit/
-  // Discard already operate on (P5's stage/preview/commit model — nothing here writes to the
-  // server directly). `formats` has a primary key and this connection is writable, so this
-  // cell carries no read-only-reason at all.
+  // --- scenario 9: an editable cell is genuinely editable, and blurring the editor auto-stages
+  // into the SAME pending-change set the grid's own inline (double-click) edit and the toolbar's
+  // Commit/Discard already operate on (P5's stage/preview/commit model — nothing here writes to
+  // the server directly). `formats` has a primary key and this connection is writable, so this
+  // cell carries no read-only-reason at all. There is no separate Save button — leaving the
+  // editor (or Ctrl+Enter, without needing to leave it) is the stage signal, mirroring
+  // DataGrid.vue's own inline double-click edit, which stages on blur too.
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
   await expect(panel).not.toHaveAttribute('data-read-only-reason');
-  const saveButton = page.locator('[data-testid="cell-editor-save"]');
-  await expect(saveButton).toBeVisible();
-  await expect(saveButton).toBeDisabled(); // nothing typed yet — no diff to stage
+  await expect(page.locator('[data-testid="cell-editor-save"]')).toHaveCount(0);
 
   const beforeType = await editorText(page);
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('"edited from the cell editor"');
   expect(await editorText(page)).not.toBe(beforeType);
-  await expect(saveButton).toBeEnabled();
 
-  await saveButton.click();
+  // Blur by moving focus to the format select, still inside the panel but outside the editor.
+  await page.locator('[data-testid="cell-editor-format"]').focus();
   await expect(
     page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
   ).toHaveClass(/pending-edit/);
@@ -444,7 +441,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
   ).not.toHaveClass(/pending-edit/);
 
-  // Ctrl+Enter is a shortcut for the same Save action, alongside the button.
+  // Ctrl+Enter stages immediately, without needing to blur.
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('"edited via ctrl-enter"');

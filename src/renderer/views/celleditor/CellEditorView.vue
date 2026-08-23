@@ -148,26 +148,28 @@ function resetBuffer(): void {
 // for a beautified reformat as much as for a hand-typed edit (D6: Save stages whatever's on
 // screen, exactly like `stageEdit`'s own "verbatim, formatting included" contract).
 const isDirty = computed(() => cell.value !== null && doc.value !== (cell.value.value ?? ''));
-const saveDisabledTitle = computed<string | undefined>(() => {
-  if (!isDirty.value) return 'No changes to stage.';
-  return undefined;
-});
 
-// D5: a discoverable button, not an auto-stage-on-blur — this panel is for careful editing of
-// larger values (JSON, long text) where an accidental blur must never silently stage a change.
-// `stageEdit` (via `cell.onEdit`) only ever touches the SAME pending-change set the grid's own
-// inline edit and the toolbar's Commit/Discard already operate on (§P5) — nothing here writes to
-// the server directly, and there is no separate "commit" action in this panel.
+// Stages into the exact same pending-change set the grid's own inline edit and the toolbar's
+// Commit/Discard already operate on (§P5) — nothing here writes to the server directly, and
+// there is no separate "commit" action in this panel.
 function saveEdit(): void {
   const c = cell.value;
   if (!c || !isEditable.value || !c.onEdit) return;
   c.onEdit(doc.value);
 }
 
-// Ctrl/Cmd+Enter alongside the button, matching the beautify/reset trio's own click-only
-// affordances but for the one action here worth a keyboard shortcut — mirrors the same chord's
-// common meaning elsewhere (submit/run). Caught on the wrapping div: CodeMirror's own keymap
-// binds Enter for newlines, never Ctrl/Cmd+Enter, so the event still bubbles here unconsumed.
+// Auto-stages on blur, matching DataGrid.vue's own inline double-click edit (its `commitEdit`
+// fires on the same event) — no separate Save button needed since leaving the editor is already
+// the "I'm done with this value" signal, and the grid's own pending-edit row highlighting is the
+// feedback that it landed. `focusout` (not `blur`, which doesn't bubble) on the wrapping div.
+function onEditorBlur(): void {
+  if (isEditable.value && isDirty.value) saveEdit();
+}
+
+// Ctrl/Cmd+Enter alongside blur-to-stage, for staging without needing to move focus away —
+// mirrors the same chord's common meaning elsewhere (submit/run). Caught on the wrapping div:
+// CodeMirror's own keymap binds Enter for newlines, never Ctrl/Cmd+Enter, so the event still
+// bubbles here unconsumed.
 function onEditorKeydown(e: KeyboardEvent): void {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -189,17 +191,15 @@ const targetLabel = computed(() => {
   return `${tail?.name ?? c.path}.${c.column.name}`;
 });
 
+// The format itself is never restated here — the format-select right next to this badge already
+// shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
+// "X (manual)" segment here would just repeat what's a few pixels to the right.
 const statusLine = computed(() => {
   const c = cell.value;
   if (!c) return '';
   if (isNullValue.value) return 'NULL';
   const value = c.value ?? '';
   const parts: string[] = [];
-  parts.push(
-    override.value
-      ? `${FORMAT_LABEL[effectiveFormat.value]} (manual)`
-      : `detected ${FORMAT_LABEL[effectiveFormat.value]}`,
-  );
   parts.push(`${new TextEncoder().encode(value).length} bytes`);
   const reading = describeValue(effectiveFormat.value, value);
   if (reading) parts.push(reading);
@@ -275,21 +275,6 @@ const statusLine = computed(() => {
           :title="resetDisabledTitle"
           @click="resetBuffer"
         />
-
-        <!-- Only exists when this cell's publisher handed over a way to stage the write at all
-             (`cell.onEdit` — today only `DataGrid.vue`); disabled rather than hidden once that's
-             true but `readOnlyReason` or an empty buffer diff says there's nothing to do right
-             now, same convention as beautify/reset above. -->
-        <IconButton
-          v-if="cell.onEdit"
-          icon="check"
-          :size="14"
-          tone="primary"
-          data-testid="cell-editor-save"
-          :disabled="!isEditable || !isDirty"
-          :title="!isEditable ? readOnlyChipTitle ?? readOnlyChipText : saveDisabledTitle"
-          @click="saveEdit"
-        />
       </span>
 
       <template #trailing>
@@ -300,10 +285,11 @@ const statusLine = computed(() => {
       </template>
     </ViewHeader>
 
-    <!-- Ctrl/Cmd+Enter alongside the Save button: caught here, not on CodeMirrorHost itself,
-         since its own keymap only binds plain Enter (for newlines) and lets everything else
-         bubble. -->
-    <div class="editor-body" @keydown="onEditorKeydown">
+    <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
+         (onEditorKeydown) stages without needing to move focus away; neither is on CodeMirrorHost
+         itself, since its own keymap only binds plain Enter (for newlines) and lets everything
+         else bubble. -->
+    <div class="editor-body" @keydown="onEditorKeydown" @focusout="onEditorBlur">
       <CodeMirrorHost
         :doc="doc"
         :language="language"
@@ -335,6 +321,9 @@ const statusLine = computed(() => {
 
 .format-select {
   max-width: 160px;
+  /* .p-select.bordered defaults to --kira-h-md (26px) — taller than the IconButtons/28px header
+     row it sits in here; match --kira-h-sm like everything else alongside it. */
+  height: var(--kira-h-sm);
 }
 
 .format-select:disabled {
