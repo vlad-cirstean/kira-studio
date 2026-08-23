@@ -12,6 +12,7 @@ import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { cellClass } from '../../theme/cellClass';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { type MenuItem, openContextMenu } from '../../workbench/state/contextMenu';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
@@ -951,15 +952,17 @@ defineExpose({ scrollCellIntoView });
           :data-row="r"
           :data-column="columnOrder[c]"
           :data-null="displayCell(r, c).isNull"
-          :class="{
-            'align-right': alignFor(c) === 'right',
-            selected: isSelected(r, c),
-            'search-match': isSearchMatch(r, c),
-            'search-match-current': isCurrentSearchMatch(r, c),
-            'pending-edit': displayCell(r, c).staged,
-            fk: isForeignKeyDisplayCol(c) && !displayCell(r, c).isNull,
-            'has-nav': !!cellNavEntry(r, c),
-          }"
+          :class="
+            cellClass({
+              alignRight: alignFor(c) === 'right',
+              selected: isSelected(r, c),
+              searchMatch: isSearchMatch(r, c),
+              searchMatchCurrent: isCurrentSearchMatch(r, c),
+              pendingEdit: displayCell(r, c).staged,
+              fk: isForeignKeyDisplayCol(c) && !displayCell(r, c).isNull,
+              hasNav: !!cellNavEntry(r, c),
+            })
+          "
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
           @dblclick="onCellDblClick(r, c)"

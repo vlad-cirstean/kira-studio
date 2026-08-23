@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
+import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -235,7 +236,7 @@ onUnmounted(() => {
               <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
               <div
                 class="p-td"
-                :class="{ null: rowAt(i)?.key === null }"
+                :class="cellClass({ isNull: rowAt(i)?.key === null })"
                 style="width: 160px"
                 data-testid="stream-key"
               >

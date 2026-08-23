@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { settingsState } from '../../state/settings';
+import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../workbench/VirtualList.vue';
 import { alignmentFor, initialWidths } from '../grid/columns';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
@@ -61,7 +62,7 @@ function kvRowAt(row: number) {
             v-for="col in page.columns"
             :key="col.name"
             class="cell header-cell p-th"
-            :class="{ 'align-right': alignmentFor(col) === 'right' }"
+            :class="cellClass({ alignRight: alignmentFor(col) === 'right' })"
             :style="{ width: `${widths[col.name]}px` }"
           >
             <span class="name">{{ col.name }}</span>
@@ -78,7 +79,7 @@ function kvRowAt(row: number) {
             class="cell p-td"
             data-testid="console-result-cell"
             :data-null="cellAt(r, c).isNull"
-            :class="{ 'align-right': alignmentFor(col) === 'right' }"
+            :class="cellClass({ alignRight: alignmentFor(col) === 'right' })"
             :style="{ width: `${widths[col.name]}px` }"
           >
             <template v-if="cellAt(r, c).isNull">
