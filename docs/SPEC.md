@@ -518,6 +518,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P14 Docs** | Descriptions in every expected in-repo location plus the main repository README — full functionality, install and dev-setup instructions | Written once the app's behavior and nonfunctional characteristics are final, so nothing documented here needs revisiting |
 | **P15 GH tooling** | Pre-commit hook; GitHub Actions CI (macOS-only); tag-triggered unsigned macOS binary build; auto-update configuration verified | Last, since CI and release tooling should target a finished, documented build rather than a moving one |
 | **P16 Misc fixes** | Explicit per-connection preconnect-mode checkbox (overrides P11's settle-window auto-detection); connection-kind icon picker; click-to-open connection-error popover; `scripts/demo-dbs/` full six-engine coverage; two font-family bugs; testcontainers preset packages for Postgres/MariaDB/Redis | Not a planned deliverable — a batch of user-directed fixes surfaced after P15 shipped, grouped into one phase rather than reopening P1/P9/P10/P11/P14 |
+| **P17 S3** | Adapter + object browser view (bucket → prefix/object, `/`-delimited, per §4/§9 above) | Not yet implemented — S3 was scoped into v1 from the start (see §1, §9) but never got its own phase; the connection dialog still marks it "not yet supported" until this lands |
 
 ---
 
