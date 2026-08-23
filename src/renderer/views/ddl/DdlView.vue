@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ddlText } from '@shared/domain/ddl';
 import type { DdlTabRecord } from '@shared/domain/tabs';
-import { pathTail } from '@shared/domain/tree';
+import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
@@ -68,17 +68,27 @@ const originPhrase = computed(() =>
   ddl.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
 );
 
-const statusLine = computed(() => {
-  const d = ddl.value;
-  if (!d) return '';
-  const parts = [
-    originPhrase.value,
-    `${d.statements.length} statement${d.statements.length === 1 ? '' : 's'}`,
-    rt.value?.source === 'cache' ? 'from cache' : 'from server',
-    `generated ${new Date(d.generatedAt).toLocaleString()}`,
-    'read-only',
-  ];
-  return parts.join(' · ');
+// P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
+// cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
+// use for the rail elsewhere, just aimed at the dot instead.
+const connectionRecord = computed(() =>
+  connectionsState.records.find((r) => r.id === props.tab.connectionId),
+);
+const railColor = computed(() => connectionRecord.value?.color);
+const railStyle = computed(() => ({
+  '--kira-rail': railColor.value ? `var(--kira-conn-${railColor.value})` : undefined,
+}));
+
+// Produced locally from the path — the same discipline DataGrid.vue's own qualifiedName()
+// uses (never round-tripped to the engine for a string join): connection name plus every
+// segment above the target, joined for the view header's breadcrumb.
+const breadcrumb = computed(() => {
+  if (!props.tab.connectionId) return '';
+  const parents = decodePath(props.tab.connectionId, props.tab.path)
+    .segments.slice(0, -1)
+    .map((s) => s.name);
+  const parts = [connectionRecord.value?.name, ...parents].filter((p): p is string => !!p);
+  return parts.length > 0 ? `${parts.join(' / ')} / ` : '';
 });
 </script>
 
@@ -92,29 +102,56 @@ const statusLine = computed(() => {
     data-read-only-reason="ddl-not-editable"
   >
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="ddl-reconnect">
-      <button type="button" data-testid="ddl-reconnect-load" @click="onReconnectAndLoad">
+      <button
+        type="button"
+        class="p-dlgbtn"
+        data-testid="ddl-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <div class="header">
-        <span class="target" data-testid="ddl-target">{{ targetLabel }}</span>
-        <span class="type-pill">{{ targetTail?.kind }}</span>
+      <!-- LAW — every non-grid view opens with a p-view-head: connection dot, identity, kind,
+           and (since a DDL tab is always read-only) the reason stated as a fact, not a disabled
+           control. Column/index/constraint counts and the Definition/Columns/Indexes/Constraints
+           segmented view from the mockup need structured catalog data this tab doesn't fetch
+           (only the raw statement text) — skipped rather than faked. -->
+      <div class="p-view-head">
+        <span
+          class="p-conn-dot"
+          :class="{ none: !railColor }"
+          :style="railStyle"
+          title="Connection colour"
+        />
+        <span class="icon-box"><Codicon name="code" :size="14" /></span>
+        <span class="p-view-target" data-testid="ddl-target">
+          <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
+        </span>
+        <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
+        <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
+          <Codicon name="lock" :size="11" />
+          read-only — {{ originPhrase }}
+        </span>
       </div>
-      <div v-if="rt?.status === 'loading'" class="loading-bar" data-testid="ddl-loading" />
-      <div v-if="rt?.status === 'error' && rt.error" class="error-strip" data-testid="ddl-error">
-        {{ rt.error }}
+
+      <!-- LAW — work-in-progress is a ring + elapsed time in the toolbar that started it
+           (DdlToolbar.vue's p-run-state), never a bar across the view. -->
+      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="ddl-error">
+        <span class="icon-box"><Codicon name="error" :size="14" /></span>
+        <span class="err-message">{{ rt.error }}</span>
       </div>
-      <div v-if="ddl && ddl.notes.length > 0" class="notes-strip" data-testid="ddl-notes">
-        <Codicon name="info" :size="13" class="notes-icon" />
-        <ul>
+      <div v-if="ddl && ddl.notes.length > 0" class="p-strip note" data-testid="ddl-notes">
+        <span class="icon-box"><Codicon name="info" :size="14" /></span>
+        <ul class="notes-list">
           <li v-for="(note, i) in ddl.notes" :key="i">{{ note }}</li>
         </ul>
       </div>
       <div class="editor-body">
         <CodeMirrorHost :doc="document" language="sql" :sql-dialect="dialect" :read-only="true" />
       </div>
-      <div class="status-line" data-testid="ddl-status">{{ statusLine }}</div>
+      <!-- LAW — there is no editor status line: identity moved to the view header above,
+           duration to the toolbar's run-state, and this tab has no pending edits to report. -->
     </template>
   </div>
 </template>
@@ -134,113 +171,18 @@ const statusLine = computed(() => {
   justify-content: center;
 }
 
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.type-pill {
-  padding: 1px 5px;
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  font-weight: 400;
-  font-size: 10px;
-  flex-shrink: 0;
-}
-
-.loading-bar {
-  height: 2px;
-  flex-shrink: 0;
-  background: linear-gradient(90deg, transparent, var(--kira-accent), transparent);
-  background-size: 200% 100%;
-  animation: loading-sweep 1.2s linear infinite;
-}
-
-@keyframes loading-sweep {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
+.err-message {
   font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
   white-space: pre-wrap;
 }
 
-.notes-strip {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 6px 8px;
-  font-size: 11px;
-  color: var(--kira-fg-muted);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  flex-shrink: 0;
-}
-
-.notes-icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.notes-strip ul {
+.notes-list {
   margin: 0;
-  padding-left: 16px;
+  padding-left: var(--kira-s-5);
 }
 
 .editor-body {
   flex: 1;
   min-height: 0;
-}
-
-.status-line {
-  padding: 3px 8px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>
