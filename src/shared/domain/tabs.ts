@@ -46,14 +46,19 @@ export type ConsoleTabState = z.infer<typeof consoleTabStateSchema>;
 // Per-_id expand/collapse memory, the search text, and (mirroring DataTabState) the sort,
 // projection and pageSize the toolbar's own controls set are session state (§8.7) — the loaded
 // documents themselves stay runtime-only, like the grid's own rows, and never round-trip through
-// `tabs.save`. `.default()` on the three added fields keeps a tab saved before they existed
+// `tabs.save`. `.default()` on the four added fields keeps a tab saved before they existed
 // parsing successfully on restore, rather than being dropped by tabRecordSchema's safeParse.
+// `pageIndex` mirrors DataTabState's own field (D7's literal wording there): a real (non-`_id`)
+// sort forces mongo/read.ts's skip/limit fallback (D6), which — unlike the `_id`-keyset
+// strategy — hands back no next/prev token, so goNext/goPrev must track the page position
+// themselves the same way the grid does, or paging past page one silently collapses back to it.
 export const documentTabStateSchema = z.object({
   expanded: z.record(z.string(), z.boolean()),
   search: z.string(),
   sort: sortSpecSchema.nullable().default(null),
   projection: z.array(z.string()).nullable().default(null),
   pageSize: pageSizeSchema.default(100),
+  pageIndex: z.number().int().min(0).default(0),
 });
 export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
 
@@ -82,19 +87,28 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // restored tab has no loaded page to show either way, so nothing belongs in session state here.
 // `pageSize` mirrors DataTabState/KeyValueTabState/DocumentTabState's own field (`.default(100)`
 // for the same already-saved-tab-restores discipline as keyValueTabStateSchema's own comment).
-// The three filter fields are Kafka-only positioning knobs (SQS shows none of them — no matching
-// concept, per its own read.ts): `offsetFilter`/`partitionFilter` restrict a fresh browse's
+// The filter fields are Kafka-only positioning knobs (SQS shows none of them — no matching
+// concept, per its own read.ts): `offsetFilter`/`partitions` restrict a fresh browse's
 // starting windows (kafka/read.ts), `timestampFilter` seeks via kafkajs's
-// `fetchTopicOffsetsByTimestamp` — all three persisted per tab like DataTabState's own `filter`,
-// but kept structured (three independent strings) rather than one WHERE-style free-text field,
+// `fetchTopicOffsetsByTimestamp` — all persisted per tab like DataTabState's own `filter`,
+// but kept structured (independent fields) rather than one WHERE-style free-text field,
 // since Kafka has no predicate language to parse. Recent-filter *history* is deliberately NOT
 // here (views/stream/streamFilterHistory.ts) — same discipline as the SQL grid's own filter
 // history, kept out of `tabs.state_json`/SQLite entirely (session-only, never round-trips).
+// `partitions` (task #61) widened the old single `partitionFilter: string | null` free-text field
+// into a multiselect array — `.default([])` keeps a tab saved under the old shape restorable
+// (storage/repos/tabs.ts drops a tab row outright on a failed parse) rather than reviving the
+// old value, which is an acceptable loss for a browse convenience like this one.
 export const streamTabStateSchema = z.object({
   pageSize: pageSizeSchema.default(100),
   offsetFilter: z.string().nullable().default(null),
-  partitionFilter: z.string().nullable().default(null),
+  partitions: z.array(z.number().int()).default([]),
   timestampFilter: z.string().nullable().default(null),
+  // Item 4 (task #61): per-column pixel widths for the message table (key/timestamp/headers/
+  // attrs), mirroring DataTabState's own field — `.default({})` for the same already-saved-tab
+  // discipline as `partitions`/`pageSize`. The `body` column isn't resizable (it already fills
+  // remaining space via `flex: 1`) and so is never a key here.
+  columnWidths: z.record(z.string(), z.number()).default({}),
 });
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
@@ -165,7 +179,7 @@ export function defaultConsoleTabState(): ConsoleTabState {
 }
 
 export function defaultDocumentTabState(pageSize: PageSize = 100): DocumentTabState {
-  return { expanded: {}, search: '', sort: null, projection: null, pageSize };
+  return { expanded: {}, search: '', sort: null, projection: null, pageSize, pageIndex: 0 };
 }
 
 export function defaultKeyValueTabState(pageSize: PageSize = 100): KeyValueTabState {
@@ -173,7 +187,13 @@ export function defaultKeyValueTabState(pageSize: PageSize = 100): KeyValueTabSt
 }
 
 export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState {
-  return { pageSize, offsetFilter: null, partitionFilter: null, timestampFilter: null };
+  return {
+    pageSize,
+    offsetFilter: null,
+    partitions: [],
+    timestampFilter: null,
+    columnWidths: {},
+  };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */
