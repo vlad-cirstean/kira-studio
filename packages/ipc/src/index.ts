@@ -20,6 +20,15 @@ export type {
   StreamKey,
   StreamParamsOf,
 } from "./contract.ts";
+export type {
+  MessageChannelLike,
+  RequestHandler,
+  RpcServer,
+  ServerHandlers,
+  StreamHandler,
+  WireError,
+} from "./rpc.ts";
+export { createRpcClient, createRpcServer, RpcError } from "./rpc.ts";
 export type { Transport, TransportErrorCode } from "./transport.ts";
 export { TransportError } from "./transport.ts";
 export type { ContractChannel, VersionedEnvelope } from "./validate.ts";
