@@ -74,8 +74,9 @@ function tabTitleFor(record: OpRecord): string {
   return tab ? tabTitle(tab) : '—';
 }
 
-// §8.11: "Clicking a row reveals the tab that issued it" — a no-op when the tab has since
-// been closed, never an error.
+// Reveal is right-click-only (the row's context menu) — a no-op when the tab has since been
+// closed, never an error. A plain click just expands the row's command/error detail; it used to
+// also jump to the originating tab, which surprised anyone just trying to read a log entry.
 function revealTab(record: OpRecord): void {
   if (record.tabId && tabsState.tabs.some((t) => t.id === record.tabId)) {
     activateTab(record.tabId);
@@ -84,7 +85,6 @@ function revealTab(record: OpRecord): void {
 
 function onRowClick(record: OpRecord): void {
   toggleExpanded(record);
-  revealTab(record);
 }
 
 function sqlDialectFor(record: OpRecord): 'postgres' | 'mariadb' | undefined {
