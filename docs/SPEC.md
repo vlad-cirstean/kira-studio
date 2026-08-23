@@ -172,6 +172,7 @@ kira-version-vscode/
 │   │       ├── catFile.ts          persistent `cat-file --batch` process
 │   │       ├── logSession.ts       long-lived paged `git log` process (§5.1.1)
 │   │       ├── watcher.ts          .git + worktree watching → refsChanged / worktreeChanged
+│   │       ├── repoService.ts      composes driver+logSession+store+watcher; cache/eviction (§5.4)
 │   │       ├── errors.ts           exit code + stderr → typed error union
 │   │       ├── queries.ts          §4.4 read surface: argv + parser bound to typed queries
 │   │       ├── parse/              log.ts refs.ts status.ts diffTree.ts stash.ts mergeTree.ts

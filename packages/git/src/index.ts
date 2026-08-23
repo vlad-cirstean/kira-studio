@@ -65,5 +65,12 @@ export {
   stashList,
   status,
 } from "./queries.ts";
+export type {
+  GitStatus,
+  GraphChunkPayload,
+  RepoOpenOutcome,
+  RepoServiceDeps,
+} from "./repoService.ts";
+export { CHUNK_ROWS, HIDDEN_EVICT_MS, RepoService } from "./repoService.ts";
 export type { RepoWatcher, WatchRepoOptions, WatchSignal } from "./watcher.ts";
 export { watchRepo } from "./watcher.ts";
