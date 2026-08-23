@@ -250,6 +250,10 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await scrollColumnIntoView(page, 'ts_a');
   await selectCell(page, 0, 'ts_a');
   await expect(panel).toHaveAttribute('data-detected', 'iso8601');
+  // Task #72: an iso8601-detected value's status badge now reads out the UTC and local-timezone
+  // translation of the timestamp, not just its byte count.
+  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('UTC');
+  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('local');
   await scrollColumnIntoView(page, 'bytea_a');
   await selectCell(page, 0, 'bytea_a');
   await expect(panel).toHaveAttribute('data-detected', 'hex');

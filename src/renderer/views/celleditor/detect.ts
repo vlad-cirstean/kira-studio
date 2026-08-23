@@ -356,6 +356,42 @@ export function detectFormat(input: DetectInput): FormatGuess[] {
   return guesses;
 }
 
+function pad(n: number, len = 2): string {
+  return String(n).padStart(len, '0');
+}
+
+// No query, no round trip: the local half is read straight from the runtime's own timezone
+// (Intl/Date already know it), so this is pure client-side math against a value already sitting
+// in the buffer — never something that needs asking the server.
+function formatUtcAndLocal(d: Date): string {
+  const utc = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  const local = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  }).format(d);
+  return `${utc} · ${local} local`;
+}
+
+const ISO8601_OFFSET_RE = /(Z|[+-]\d{2}:?\d{2})$/;
+
+// An ISO-8601-shaped value with no explicit offset (Postgres's `timestamp without time zone`,
+// e.g. "2024-01-15 10:23:45") is genuinely ambiguous — JS's own Date constructor would silently
+// read it as *local* time instead, which is wrong far more often than right for a DB timestamp.
+// Treat a bare clock time as UTC (the common backend convention) rather than guess local; a
+// value that already states its offset is parsed as-is.
+function parseIso8601(t: string): Date | null {
+  const hasOffset = ISO8601_OFFSET_RE.test(t);
+  const isoish = t.replace(' ', 'T');
+  const d = new Date(hasOffset ? isoish : `${isoish}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** D15's one-line reading, or null when the format implies no decoding. Must never throw. */
 export function describeValue(format: CellFormat, text: string): string | null {
   const t = text.trim();
@@ -365,7 +401,11 @@ export function describeValue(format: CellFormat, text: string): string | null {
       if (!Number.isFinite(n)) return null;
       const d = new Date(format === 'epochSeconds' ? n * 1000 : n);
       if (Number.isNaN(d.getTime())) return null;
-      return d.toISOString();
+      return formatUtcAndLocal(d);
+    }
+    if (format === 'iso8601') {
+      const d = parseIso8601(t);
+      return d ? formatUtcAndLocal(d) : null;
     }
     if (format === 'base64') {
       const isUrlSafe = !BASE64_STD_RE.test(t) && BASE64_URL_RE.test(t);

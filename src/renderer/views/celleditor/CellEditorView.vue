@@ -234,7 +234,9 @@ const statusLine = computed(() => {
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
-      <span class="p-badge status-badge" data-testid="cell-editor-status">{{ statusLine }}</span>
+      <span class="p-badge status-badge" :title="statusLine" data-testid="cell-editor-status">{{
+        statusLine
+      }}</span>
 
       <span class="format-group">
         <select
@@ -330,11 +332,14 @@ const statusLine = computed(() => {
   color: var(--kira-fg-disabled);
 }
 
-/* the relocated statusLine (detected format / bytes / decoded reading / truncation note /
-   beautify failure) now lives in the header as a badge — LAW: no editor status line, everything
-   it used to say already exists in the view header. */
+/* the relocated statusLine (bytes / decoded reading — e.g. a timestamp's UTC + local translation
+   / truncation note / beautify failure) now lives in the header as a badge — LAW: no editor
+   status line, everything it used to say already exists in the view header. Widened from 220px:
+   the UTC+local timestamp reading runs longer than the old "N bytes" case this width was sized
+   for; still truncates with an ellipsis (title carries the full text) rather than growing
+   unbounded and pushing the trailing read-only chip around. */
 .status-badge {
-  max-width: 220px;
+  max-width: 340px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
