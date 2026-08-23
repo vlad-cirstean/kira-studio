@@ -48,8 +48,12 @@ export async function setSettings(db: KiraDb, patch: SettingsPatch): Promise<Set
     advanced: { ...current.advanced, ...validPatch.advanced },
   };
 
+  // D15: writes only the leaves the caller actually patched, not every leaf of every section —
+  // `merged` above still needs the read to return a complete `Settings`, but the eleven
+  // unrelated rows a full rewrite would touch never change.
   await db.transaction(async (tx) => {
-    for (const [section, values] of Object.entries(merged)) {
+    for (const [section, values] of Object.entries(validPatch)) {
+      if (!values) continue;
       for (const [key, value] of Object.entries(values)) {
         await tx
           .insert(settings)

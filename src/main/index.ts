@@ -5,7 +5,7 @@ import { createConnectionsService } from './connections';
 import { pushEngineConfig } from './engine-config';
 import { startEngine } from './engine-host';
 import { registerIpc } from './ipc/registry';
-import { log } from './log';
+import { log, sweepOldLogs } from './log';
 import { buildMenu } from './menu';
 import { wireOplog } from './oplog';
 import { openDb } from './storage/db';
@@ -58,6 +58,7 @@ async function main(): Promise<void> {
   await app.whenReady();
 
   ensureLayout();
+  sweepOldLogs();
   const { db, raw, close } = await openDb();
   migrate(raw);
   const settings = await getAllSettings(db);

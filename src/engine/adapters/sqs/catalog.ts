@@ -4,12 +4,19 @@ import { mapSqsError } from './errors';
 
 const PAGE_LIMIT = 1000; // ListQueues's own max MaxResults per call
 
+export interface QueueListing {
+  nodes: TreeNode[];
+  /** Name -> URL, surfaced so index.ts's queueUrls cache can populate itself for free (D14). */
+  urlByName: Map<string, string>;
+}
+
 // §5.1's sqs row: tree is a flat queue list, no deeper level. `name` is the URL's last path
-// segment (the queue name); the full URL is recovered at read time via listQueues's own lookup
-// (read.ts/index.ts resolve a leaf's name back to a URL by re-listing, mirroring how every other
-// adapter's tree node carries only a display name, never a resolved handle).
-export async function listQueues(client: SQSClient): Promise<TreeNode[]> {
+// segment (the queue name); listQueues already has every queue's full URL in hand while paging,
+// so it hands the name->URL map back instead of discarding it — index.ts caches it, avoiding a
+// GetQueueUrl round trip on every read()/count() (D14, fixes F14/F22).
+export async function listQueues(client: SQSClient): Promise<QueueListing> {
   const nodes: TreeNode[] = [];
+  const urlByName = new Map<string, string>();
   let nextToken: string | undefined;
   do {
     let result: { QueueUrls?: string[]; NextToken?: string };
@@ -22,6 +29,7 @@ export async function listQueues(client: SQSClient): Promise<TreeNode[]> {
     }
     for (const url of result.QueueUrls ?? []) {
       const name = url.slice(url.lastIndexOf('/') + 1);
+      urlByName.set(name, url);
       nodes.push({
         kind: 'queue',
         name,
@@ -33,7 +41,7 @@ export async function listQueues(client: SQSClient): Promise<TreeNode[]> {
   } while (nextToken);
 
   nodes.sort((a, b) => a.name.localeCompare(b.name));
-  return nodes;
+  return { nodes, urlByName };
 }
 
 /** Resolves a queue's leaf `name` back to its full URL — GetQueueUrl is a single cheap call. */

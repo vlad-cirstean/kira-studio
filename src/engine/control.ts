@@ -42,9 +42,18 @@ async function handleConnect(payload: unknown) {
   }
 
   const adapter = await createAdapter(config.kind, deps);
-  const { value } = await runOp({ connectionId: config.id, kind: 'connect' }, (ctx) =>
-    adapter.connect(config, ctx),
-  );
+  // P13 D2: the engine created this adapter, so the engine disconnects it on every path,
+  // including a failed probe or an aborted connect — an adapter left un-disconnected here can
+  // leak whatever its driver already opened (D1).
+  let value: Awaited<ReturnType<typeof adapter.connect>>;
+  try {
+    ({ value } = await runOp({ connectionId: config.id, kind: 'connect' }, (ctx) =>
+      adapter.connect(config, ctx),
+    ));
+  } catch (err) {
+    await adapter.disconnect().catch(() => {});
+    throw err;
+  }
   setLiveAdapter(config.id, adapter);
   emit(ENGINE_EVENT.connectionState, {
     connectionId: config.id,
@@ -107,10 +116,12 @@ async function handleTest(payload: unknown) {
     const { value } = await runOp({ connectionId: null, kind: 'test' }, (ctx) =>
       adapter.connect(config, ctx),
     );
-    await adapter.disconnect().catch(() => {});
     return { ok: true, serverVersion: value.serverVersion };
   } catch (err) {
     return { ok: false, error: toWireError(err).message };
+  } finally {
+    // P13 D2: unconditional, so a failed probe (F1) is cleaned up the same as a successful one.
+    await adapter.disconnect().catch(() => {});
   }
 }
 

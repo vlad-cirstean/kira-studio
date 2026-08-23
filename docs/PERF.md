@@ -163,26 +163,47 @@ and record the results here.
    `Kira Studio Helper` process.
 3. Record: `<total> MB — <date>, <machine>`.
 
-## 4. Items handed to P13 (nonfunctional checks)
+**Window-bounds debounce timer on close (F8, D8)** — `main/window.ts`'s resize/move-debounce
+`setTimeout` is now cleared on the window's `closed` event; there is no automated way to assert a
+timer handle was cleared rather than merely expired. Verify by resizing/moving the packaged app's
+window, quitting within the debounce window (< 250 ms of the last move), and confirming the process
+exits promptly rather than lingering on an unref'd-but-still-pending timer.
 
-Three known items, not fixed in P12 because they are outside its scope (leak sweeps and cache
-policy redesign are P13's job per the phase plan), each confirmed by reading the relevant source
-this phase:
+**Op-log reconciliation on an engine crash (F10, D10)** — `wireOplog` now marks in-flight ops
+`status: 'error'` when the engine process exits unexpectedly. Verify by force-killing the engine
+utility process (e.g. via Activity Monitor) while a long-running op is in flight, then confirming
+the Operations panel shows that op as failed rather than stuck `running` forever.
 
-1. **`src/engine/cache/counts.ts`'s `store` is a plain `Map<string, StoredCount>`** with no byte
-   budget or eviction policy, unlike `cache/pages.ts`'s `ByteLru`. It only shrinks via
-   `dropCountTarget`/`dropCountConnection`/`clearCounts()` (explicit invalidation), never via size
-   pressure — an unbounded growth path if a session opens many distinct tables/collections across
-   its lifetime without those explicit drops firing.
-2. **Renderer page retention (lever L-B)** — recorded above: Tab RSS delta for the 10-tab loaded
-   scenario vs. 0-tab baseline is ≈ 18–43 MB, and `__kiraGridRetainedBytes()`'s share of that delta
-   was not separately measured (the first half of L-B's AND condition already fails, so the lever
-   doesn't fire regardless). A retention policy that drops pages for cold (inactive) tabs was
-   explicitly out of scope for P12 per D20/L-B's own row, since it would risk the ≤ 50 ms
-   cached-tab-switch budget on re-activation — that trade is a design decision for P13, not a
-   tuning knob.
-3. **`src/engine/cache/pages.ts`'s `hits`/`misses` counters are lifetime-cumulative**, not reset by
-   `clearPages()` (which only clears the `ByteLru` store, not the two module-level `let` counters).
-   So a hit rate read from `pageStats()` after some connects/disconnects reflects the engine
-   process's entire lifetime, not just the current cache contents — worth deciding whether a hit
-   rate scoped to "since last clear" is more useful before this is exposed anywhere user-facing.
+**Log file retention (F12, D12)** — `main/log.ts` deletes `kira-*.log` files older than 30 days at
+startup. Verify by backdating a log file's mtime past 30 days in `~/.kira-studio/logs/`, relaunching
+the packaged app, and confirming that file is gone while newer ones remain.
+
+## 4. P13's nonfunctional sweep — the three items P12 handed forward
+
+The three items §4 previously handed to P13 are resolved as of P13. Each is confirmed against the
+implementation and the new coverage in `tests/db/*.spec.ts` / `tests/ui/leaks.spec.ts`.
+
+1. **`src/engine/cache/counts.ts`'s `store` was a plain `Map<string, StoredCount>`** with no byte
+   budget or eviction policy — **fixed (F19, D19)**. It is now a `ByteLru` sharing L2's shape:
+   `L3_BUDGET_BYTES = 256 * 1024`, a nominal `COUNT_ENTRY_BYTES = 128` per entry, ≈ 2 048 entries
+   before eviction. `tests/ui/leaks.spec.ts`'s "L3 is bounded" scenario drives 2 500 distinct
+   `{path, filter}` combinations through `data.count()` and observes `cacheStats().l3Entries`
+   plateau at exactly **2 048** — confirming both that the bound is real and that it matches the
+   constant's own arithmetic (256 KiB / 128 B), not just "some number less than 2 500."
+2. **Renderer page retention for cold (inactive) tabs (lever L-B)** — **answered, not fixed
+   (D21)**. This was already a considered P12 decision (D20/L-B), not an oversight; P13 re-examined
+   it rather than treating "handed to P13" as "still open." §2.2 requires pages to be released when
+   a tab is **closed**, which P13's F4/F5 fix (renderer runtime + page-store cleanup, verified by
+   `tests/ui/leaks.spec.ts`'s tab open/close symmetry scenario) makes actually true across all five
+   page stores, not just the grid. It says nothing about inactive-but-open tabs. The P12 measurement
+   above puts the whole 10-tab retained-bytes delta at ≈ 18–43 MB — roughly 2–4 MB per tab — against
+   a real risk to the ≤ 50 ms cached-tab-switch budget (§2.1) if a cold tab's pages were evicted and
+   had to be re-fetched on re-activation. Trading a hard interaction budget for single-digit
+   megabytes is the wrong side of that trade. Not implemented, on purpose, for the second time.
+3. **`src/engine/cache/pages.ts`'s `hits`/`misses` counters were lifetime-cumulative** —
+   **fixed (F20, D20)**. `clearPages()` now resets both counters to 0, so a hit rate read after
+   clearing reflects "since last clear" rather than the engine process's entire lifetime — the only
+   interpretation that matches what the Clear caches button in Settings → Cache appears to do.
+   `tests/ui/leaks.spec.ts`'s "clearing the cache resets the hit rate" scenario warms L2 to a real
+   (non-"—") hit rate, clicks Clear, and asserts the Settings → Cache hit rate field reads `—`
+   again.

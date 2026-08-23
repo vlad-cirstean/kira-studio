@@ -1,6 +1,7 @@
 import type { SourceText } from '@shared/domain/ddl';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { tabsState } from '../../state/tabs';
 
 export interface DdlViewRuntime {
@@ -11,6 +12,11 @@ export interface DdlViewRuntime {
 }
 
 export const runtime = reactive({} as Record<string, DdlViewRuntime>);
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 function defaultRuntime(): DdlViewRuntime {
   return { status: 'idle', error: null, source: null, ddl: null };

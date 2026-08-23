@@ -19,7 +19,7 @@ import {
   requestFingerprint,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
-import { type RunningQuery, runQuery } from './query';
+import { runQuery, type TrackQuery } from './query';
 
 export function quoteIdent(name: string): string {
   if (name.includes('\0')) throw new AdapterError('E_QUERY', 'identifier contains a NUL byte');
@@ -130,7 +130,7 @@ function computeEffectiveOrder(sort: SortSpec | null, target: ReadTarget): Effec
 export async function readPage(
   client: Client,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   target: ReadTarget,
   req: Omit<ReadRequest, 'path'>,
 ): Promise<TabularPage> {
@@ -319,7 +319,7 @@ export async function readPage(
 export async function countRows(
   client: Client,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   target: Pick<ReadTarget, 'qualifiedName'>,
   filter: string | null,
 ): Promise<{ value: number; exact: boolean }> {

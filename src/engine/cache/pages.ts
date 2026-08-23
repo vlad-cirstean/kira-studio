@@ -61,6 +61,10 @@ export function dropConnection(connectionId: string): number {
 
 export function clearPages(): void {
   store.clear();
+  // Hit rate is read as "since last clear" in two user-facing places (StatusBar, Settings →
+  // Cache) — a rate spanning a cache the user just emptied would be a stale, misleading number.
+  hits = 0;
+  misses = 0;
 }
 
 export function pageStats(): {

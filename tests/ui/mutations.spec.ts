@@ -120,6 +120,17 @@ async function editCell(page: Page, row: number, column: string, value: string):
   await input.press('Enter');
 }
 
+interface OpRecordLike {
+  id: string;
+  kind: string;
+  status: string;
+}
+
+async function countOps(page: Page): Promise<OpRecordLike[]> {
+  const all: OpRecordLike[] = await page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));
+  return all.filter((o) => o.kind === 'count');
+}
+
 test('mutations — edit, add, delete, preview, commit, discard, read-only guard', async ({
   kira,
 }) => {
@@ -205,6 +216,14 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await expect(deletedRow).toHaveClass(/pending-delete/);
 
   // --- scenario 6: commit sends the batch and reloads the tab ------------------------------
+  // Establish a known count first — F21/D18's stale marking has nothing to grey otherwise.
+  const countButton = page.locator('[data-testid="toolbar-count"]');
+  await countButton.click();
+  await expect(countButton).not.toHaveClass(/stale/, { timeout: 10_000 });
+  const countBeforeCommit = (await countButton.innerText()).trim();
+  expect(countBeforeCommit).toMatch(/^Σ \d/);
+  const opsBeforeCommit = await countOps(page);
+
   const deletedRowName = await cellText(page, 1, 'name');
   await editCell(page, 0, 'name', 'committed value');
   await page.click('[data-testid="toolbar-commit-changes"]');
@@ -215,6 +234,23 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
     .locator('[data-testid="grid-cell"][data-column="name"]')
     .allInnerTexts();
   expect(remainingNames).not.toContain(deletedRowName);
+
+  // §7/F21/D18: a local mutation greys the count instead of blanking it — same total, `stale`
+  // class, refresh codicon — and picking that up costs no new count op (it's an L3 cache hit,
+  // §7's "keep the number, grey it, let the user decide").
+  await expect(countButton).toHaveClass(/stale/, { timeout: 10_000 });
+  await expect(countButton.locator('.codicon-refresh')).toBeVisible();
+  expect((await countButton.innerText()).trim()).toBe(countBeforeCommit);
+  expect(await countOps(page)).toHaveLength(opsBeforeCommit.length);
+
+  // Clicking it through produces exactly one new count op and clears the stale mark.
+  await countButton.click();
+  await expect.poll(async () => (await countOps(page)).length).toBe(opsBeforeCommit.length + 1);
+  await expect(countButton).not.toHaveClass(/stale/, { timeout: 10_000 });
+  await expect(countButton.locator('.codicon-refresh')).toHaveCount(0);
+  // The delete actually shrank the table by one row — the refreshed total proves this was a
+  // real recount, not just a stale-flag flip.
+  expect((await countButton.innerText()).trim()).not.toBe(countBeforeCommit);
 
   // --- scenario 7: a read-only connection disables every mutation button ------------------
   const firstConnRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');

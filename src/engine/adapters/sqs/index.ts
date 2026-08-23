@@ -29,6 +29,9 @@ class SqsAdapter implements Adapter {
   readonly caps = sqsCaps;
 
   private client: SQSClient | null = null;
+  // D14: name -> URL, populated by listQueues (free — it already has every URL while paging) and
+  // by resolveQueueUrl on a miss; avoids a GetQueueUrl round trip on every read()/count() call.
+  private readonly queueUrls = new Map<string, string>();
 
   constructor(private readonly deps: AdapterDeps) {}
 
@@ -47,13 +50,24 @@ class SqsAdapter implements Adapter {
   async disconnect(): Promise<void> {
     this.client?.destroy();
     this.client = null;
+    this.queueUrls.clear();
   }
 
   async children(path: NodePath): Promise<TreeNode[]> {
     // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a 'queue'
     // node never has children (§5.1's flat "region -> queues" tree, no deeper level).
     if (path.segments.length > 0) return [];
-    return catalog.listQueues(this.requireClient());
+    const { nodes, urlByName } = await catalog.listQueues(this.requireClient());
+    for (const [name, url] of urlByName) this.queueUrls.set(name, url);
+    return nodes;
+  }
+
+  private async resolveQueueUrl(client: SQSClient, name: string): Promise<string> {
+    const cached = this.queueUrls.get(name);
+    if (cached) return cached;
+    const url = await catalog.resolveQueueUrl(client, name);
+    this.queueUrls.set(name, url);
+    return url;
   }
 
   async describe(): Promise<ObjectMeta> {
@@ -68,13 +82,13 @@ class SqsAdapter implements Adapter {
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
     const client = this.requireClient();
-    const queueUrl = await catalog.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
+    const queueUrl = await this.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
     return pollQueue(client, queueUrl, req, ctx);
   }
 
   async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
     const client = this.requireClient();
-    const queueUrl = await catalog.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
+    const queueUrl = await this.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
     return countQueue(client, queueUrl, ctx);
   }
 

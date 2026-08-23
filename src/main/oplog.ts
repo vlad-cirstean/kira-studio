@@ -11,9 +11,14 @@ interface InFlightOp {
   startedAt: string;
 }
 
+// D11: bounds the table at HARD_CAP_ROWS + PRUNE_EVERY_OPS instead of only at the next launch —
+// a counter is deterministic and testable, and adds no timer of its own to leak.
+const PRUNE_EVERY_OPS = 500;
+
 // Pure orchestration — subscribes to the engine's op:start/op:end events, calls repos/ops.ts
-// for the actual writes, forwards kira:op:update, and prunes retention once at startup. Never
-// touches Drizzle/op_log directly (that's repos/ops.ts's job).
+// for the actual writes, forwards kira:op:update, and prunes retention once at startup (D11:
+// and again every PRUNE_EVERY_OPS completed ops). Never touches Drizzle/op_log directly (that's
+// repos/ops.ts's job).
 export function wireOplog(
   engineHost: EngineHost,
   db: KiraDb,
@@ -23,6 +28,7 @@ export function wireOplog(
   void pruneOps(db, retentionDays);
 
   const inFlight = new Map<string, InFlightOp>();
+  let completedSincePrune = 0;
 
   engineHost.on(ENGINE_EVENT.opStart, async (payload) => {
     const parsed = opStartEventSchema.safeParse(payload);
@@ -81,5 +87,28 @@ export function wireOplog(
       command: evt.command,
       error: evt.error,
     });
+    completedSincePrune++;
+    if (completedSincePrune >= PRUNE_EVERY_OPS) {
+      completedSincePrune = 0;
+      void pruneOps(db, retentionDays);
+    }
+  });
+
+  // D10: the engine host has already rejected every pending IPC call by the time it fires
+  // `engine:down` (engine-host.ts's `exit` handler) — this finishes the op-log rows for whatever
+  // was still `running` at that moment with the same message, and drops them from `inFlight` so
+  // a crash mid-session cannot grow the map without bound.
+  engineHost.on('engine:down', () => {
+    const abandoned = [...inFlight.entries()];
+    inFlight.clear();
+    for (const [opId, record] of abandoned) {
+      void finishOp(db, opId, {
+        status: 'error',
+        durationMs: Date.now() - Date.parse(record.startedAt),
+        rows: null,
+        command: null,
+        error: 'engine process exited',
+      });
+    }
   });
 }

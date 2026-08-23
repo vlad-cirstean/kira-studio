@@ -42,6 +42,9 @@ export async function createWindow(db: KiraDb): Promise<BrowserWindow> {
   };
   win.on('resize', persistBounds);
   win.on('move', persistBounds);
+  // D8: deliberately not flushing the pending bounds write here — `before-quit` already holds
+  // for the renderer's own flush, and a synchronous setLayout here would race db.close().
+  win.on('closed', () => clearTimeout(timer));
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL);

@@ -32,6 +32,13 @@ export function dropForTab(tabId: string): void {
   drop(tabId);
 }
 
+/** D5: mirrors `views/grid/page.ts`'s `totalRetainedBytes()` — feeds `window.__kiraRetainedBytes`. */
+export function totalRetainedBytes(): number {
+  let total = 0;
+  for (const entry of pages.values()) total += entry.page.byteSize;
+  return total;
+}
+
 export interface KeyValueRow {
   field: string;
   value: string;

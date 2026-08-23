@@ -26,7 +26,7 @@ import { buildConnectionOptions, ConnectionSet } from './client';
 import * as consoleQuery from './console';
 import { buildDdl } from './ddl';
 import * as mutate from './mutate';
-import { type RunningQuery, runQuery } from './query';
+import { type RunningQuery, runQuery, type TrackQuery } from './query';
 import { countRows, readPage } from './read';
 
 function safeThreadId(threadId: number): number {
@@ -48,24 +48,32 @@ class MariaDbAdapter implements Adapter {
 
   async connect(cfg: ResolvedConnectionConfig, ctx: OpCtx): Promise<ConnectInfo> {
     const connectionSet = new ConnectionSet(cfg, this.deps.log);
-    const conn = await connectionSet.primary();
-    const exec = this.execFor(conn, ctx);
-    const rows = await exec<{ version: string; database: string | null; charset: string }>(
-      'SELECT VERSION() AS version, DATABASE() AS `database`, @@character_set_server AS charset',
-      [],
-    );
-    const row = rows[0];
-    if (!row) throw new AdapterError('E_CONNECT', 'connect probe returned no rows');
-
+    // P13 D1: assigned before anything is opened, not after the probe succeeds — the handle
+    // must be reachable by disconnect() from the instant connectionSet.primary() could have
+    // opened a socket, or a probe failure (or a dropped session mid-probe) leaks it (F1).
     this.connectionSet = connectionSet;
     this.cfg = cfg;
-    this.primaryDatabase = row.database ?? '';
-    this.readOnly = cfg.readOnly;
+    try {
+      const conn = await connectionSet.primary();
+      const exec = this.execFor(conn, ctx);
+      const rows = await exec<{ version: string; database: string | null; charset: string }>(
+        'SELECT VERSION() AS version, DATABASE() AS `database`, @@character_set_server AS charset',
+        [],
+      );
+      const row = rows[0];
+      if (!row) throw new AdapterError('E_CONNECT', 'connect probe returned no rows');
 
-    return {
-      serverVersion: `MariaDB ${row.version}`,
-      details: { database: row.database ?? '', charset: row.charset },
-    };
+      this.primaryDatabase = row.database ?? '';
+      this.readOnly = cfg.readOnly;
+
+      return {
+        serverVersion: `MariaDB ${row.version}`,
+        details: { database: row.database ?? '', charset: row.charset },
+      };
+    } catch (err) {
+      await this.disconnect();
+      throw err;
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -208,7 +216,7 @@ class MariaDbAdapter implements Adapter {
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
     const { conn, target } = await this.resolveReadTarget(req.path, ctx);
-    return readPage(conn, ctx, (q) => this.runningByOp.set(ctx.opId, q), target, {
+    return readPage(conn, ctx, this.trackerFor(ctx.opId), target, {
       projection: req.projection,
       filter: req.filter,
       sort: req.sort,
@@ -218,8 +226,11 @@ class MariaDbAdapter implements Adapter {
   }
 
   async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
-    const { conn, target } = await this.resolveReadTarget(req.path, ctx);
-    return countRows(conn, ctx, (q) => this.runningByOp.set(ctx.opId, q), target, req.filter);
+    // P13 D13: count() never reads columns/PK/indexes off the target, so it resolves only the
+    // qualified name — not the two catalog queries resolveReadTarget's full ReadTarget costs
+    // (listColumns + listIndexes), which read() genuinely needs and still runs unchanged.
+    const { conn, target } = await this.resolveCountTarget(req.path);
+    return countRows(conn, ctx, this.trackerFor(ctx.opId), target, req.filter);
   }
 
   private async resolveReadTarget(
@@ -245,6 +256,32 @@ class MariaDbAdapter implements Adapter {
     return { conn, target };
   }
 
+  // P13 D13: same path-shape validation as resolveReadTarget, no catalog round trip —
+  // countRows' parameter type is `Pick<ReadTarget, 'qualifiedName'>`, so nothing else it could
+  // return would ever be read.
+  private async resolveCountTarget(
+    path: NodePath,
+  ): Promise<{ conn: Connection; target: Pick<catalog.ReadTarget, 'qualifiedName'> }> {
+    const segments = path.segments;
+    const [databaseSegment, objectSegment] = segments;
+    if (
+      segments.length !== 2 ||
+      databaseSegment?.kind !== 'database' ||
+      !objectSegment ||
+      (objectSegment.kind !== 'table' && objectSegment.kind !== 'view')
+    ) {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `count requires a database/table path, got: ${encodePath(segments)}`,
+      );
+    }
+    const conn = await this.requireConnection(databaseSegment.name);
+    return {
+      conn,
+      target: { qualifiedName: { database: databaseSegment.name, table: objectSegment.name } },
+    };
+  }
+
   preview(plan: MutationPlan): string[] {
     return mutate.preview(plan);
   }
@@ -258,7 +295,7 @@ class MariaDbAdapter implements Adapter {
       );
     }
     const conn = await this.requireConnection(databaseSegment.name);
-    return mutate.mutate(conn, ctx, (q) => this.runningByOp.set(ctx.opId, q), this.readOnly, plan);
+    return mutate.mutate(conn, ctx, this.trackerFor(ctx.opId), this.readOnly, plan);
   }
 
   async execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]> {
@@ -266,12 +303,7 @@ class MariaDbAdapter implements Adapter {
     const conn = await this.requireConnection(
       databaseSegment?.kind === 'database' ? databaseSegment.name : null,
     );
-    return consoleQuery.execute(
-      conn,
-      ctx,
-      (q) => this.runningByOp.set(ctx.opId, q),
-      req.statements,
-    );
+    return consoleQuery.execute(conn, ctx, this.trackerFor(ctx.opId), req.statements);
   }
 
   async cancel(opId: string): Promise<boolean> {
@@ -324,8 +356,20 @@ class MariaDbAdapter implements Adapter {
   }
 
   private execFor(conn: Connection, ctx: OpCtx): QueryExecutor {
-    return (sql, params) =>
-      runQuery(conn, sql, params, ctx, (q) => this.runningByOp.set(ctx.opId, q));
+    return (sql, params) => runQuery(conn, sql, params, ctx, this.trackerFor(ctx.opId));
+  }
+
+  // P13 D3: registers the running query and hands back its own release. The identity check in
+  // the release closure is what makes a multi-statement op (mutate's transaction, console's
+  // "Run all") correct — an earlier statement settling after a later one has started must not
+  // unregister the later one, since both share this one opId.
+  private trackerFor(opId: string): TrackQuery {
+    return (q) => {
+      this.runningByOp.set(opId, q);
+      return () => {
+        if (this.runningByOp.get(opId) === q) this.runningByOp.delete(opId);
+      };
+    };
   }
 }
 

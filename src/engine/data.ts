@@ -71,7 +71,9 @@ export async function handleRead(
 export async function handleCount(payload: unknown): Promise<CountResponse> {
   const req: CountRequestWire = countRequestWireSchema.parse(payload);
 
-  const cached = cache.count(req.connectionId, req.path, req.filter);
+  // The renderer's explicit refresh affordance on a stale count (§7, P13 D18) asks for a fresh
+  // number — serving it the same stale cache entry it is asking to replace would be a no-op.
+  const cached = req.refresh ? undefined : cache.count(req.connectionId, req.path, req.filter);
   if (cached) {
     return {
       value: cached.value,
@@ -138,9 +140,10 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
     (ctx) => adapter.mutate(plan, ctx),
   );
 
-  // Same-process, not a round trip back through main (P5 D12) — mirrors DATA_OP.invalidate's
-  // existing handler exactly.
-  cache.dropTarget(req.connectionId, req.path);
+  // Same-process, not a round trip back through main (P5 D12). §7/P13 D18: a mutation drops the
+  // target's pages but only marks its counts stale — DATA_OP.invalidate's hard drop is reserved
+  // for the renderer's explicit ↻ Refresh.
+  cache.invalidateAfterMutation(req.connectionId, req.path);
   return { affectedRows: value.affectedRows };
 }
 

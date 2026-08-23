@@ -10,7 +10,7 @@ export function registerSettingsHandlers(deps: IpcDeps): void {
   ipcMain.handle(IPC.settingsSet, async (_event, patch: SettingsPatch) => {
     const merged = await setSettings(deps.db, patch);
     if (patch.cache?.l2BudgetMb !== undefined) {
-      await pushEngineConfig(deps.engineHost, deps.db);
+      await pushEngineConfig(deps.engineHost, deps.db, merged);
     }
     // Otherwise a settings change made through any path other than the renderer's own
     // patchSettings() wrapper (e.g. a direct IPC call) silently never reaches the renderer's

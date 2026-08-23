@@ -71,6 +71,8 @@ export interface CountRequestWire {
   connectionId: string;
   path: string;
   filter: string | null;
+  /** P13 D18: the renderer's explicit refresh affordance on a stale count — bypass the L3 hit. */
+  refresh?: boolean;
 }
 
 export const countRequestWireSchema = z.object({
@@ -79,16 +81,22 @@ export const countRequestWireSchema = z.object({
   connectionId: z.string(),
   path: z.string(),
   filter: z.string().max(4096).nullable(),
+  refresh: z.boolean().optional(),
 });
 
 export interface InvalidateRequestWire {
   connectionId: string;
   path: string;
+  /** P13 D18: 'all' (default) is the explicit ↻ Refresh — pages + counts, hard. 'pages' is the
+   *  post-mutation reload — pages only; counts are marked stale by cache.invalidateAfterMutation
+   *  instead, via DATA_OP.mutate, not this channel. */
+  scope?: 'all' | 'pages';
 }
 
 export const invalidateRequestWireSchema = z.object({
   connectionId: z.string(),
   path: z.string(),
+  scope: z.enum(['all', 'pages']).optional(),
 });
 
 export interface ReadResponse {

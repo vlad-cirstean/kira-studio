@@ -23,11 +23,18 @@ const deps: AdapterDeps = {
   },
 };
 
-function makeCtx(): OpCtx {
+// P13 D13/D3: recording variant — every statement handed to setCommand lands in `.commands`, so
+// tests can assert exactly how many round trips an operation issued without wiring a bespoke ctx
+// each time (most existing tests never read `.commands`, so this is a superset of the old no-op).
+function makeCtx(): OpCtx & { commands: string[] } {
+  const commands: string[] = [];
   return {
     opId: crypto.randomUUID(),
     signal: new AbortController().signal,
-    setCommand() {},
+    setCommand(text) {
+      commands.push(text);
+    },
+    commands,
   };
 }
 
@@ -330,6 +337,7 @@ describe('postgres adapter (§9.1)', () => {
         capturedOpId = ctx.opId;
         return runQuery(client, 'SELECT pg_sleep(30)', [], ctx, (q) => {
           tracked = q;
+          return () => {};
         });
       });
       // opPromise is asserted with `.rejects` further down, but that attaches its handler only
@@ -1464,6 +1472,121 @@ describe('postgres adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_CANCELLED' });
     } finally {
       await adapter.disconnect();
+    }
+  });
+
+  test('31. count issues one statement (F13, D13)', async () => {
+    const adapter = await createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const ctx = makeCtx();
+      const result = await adapter.count(
+        {
+          path: path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'table', name: 'order_items' },
+          ]),
+          filter: null,
+        },
+        ctx,
+      );
+      expect(result.exact).toBe(true);
+      // Was 4 before D13: getRelationInfo + listColumns + listIndexes + the count itself. Now
+      // just the count — countRows never reads what those three catalog queries returned.
+      expect(ctx.commands).toHaveLength(1);
+      expect(ctx.commands[0]).toMatch(/count\(/i);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('32. read still resolves the catalog (D13 boundary — P2 D10 unchanged)', async () => {
+    const adapter = await createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const ctx = makeCtx();
+      await readTabular(
+        adapter,
+        {
+          path: path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+            { kind: 'table', name: 'order_items' },
+          ]),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        ctx,
+      );
+      // D13 only touched count(); read()'s catalog resolution (relation info, columns, indexes)
+      // plus the data query itself is untouched, so this still issues more than one statement.
+      expect(ctx.commands.length).toBeGreaterThan(1);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('33. the running-query map does not grow (F3, D3)', async () => {
+    const adapter = await createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const target = path([
+        { kind: 'database', name: 'kira_test' },
+        { kind: 'schema', name: 'app' },
+        { kind: 'table', name: 'order_items' },
+      ]);
+      const opIds: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const ctx = makeCtx();
+        opIds.push(ctx.opId);
+        await readTabular(
+          adapter,
+          {
+            path: target,
+            projection: null,
+            filter: null,
+            sort: null,
+            pageSize: 10,
+            cursor: { mode: 'offset', offset: 0 },
+          },
+          ctx,
+        );
+      }
+      // Each read's release closure already ran (D3's finally) — every one of those opIds is
+      // gone from runningByOp, so cancelling any of them now is a no-op. Before D3 the tracker
+      // never released, so these would still be present and cancel() would (wrongly) return true.
+      for (const opId of opIds) {
+        expect(await adapter.cancel(opId)).toBe(false);
+      }
+      // The behaviour D3 must not break — test 7 above is the full server-asserted version of
+      // this: cancel() of a query that is genuinely still in flight returns true.
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('34. a failed connect leaves nothing open (F1, D1)', async () => {
+    const adapter = await createAdapter('postgres', deps);
+    const badConfig = { ...fixture.config, password: 'definitely-wrong' };
+    await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({ code: 'E_AUTH' });
+
+    // connect()'s catch already ran disconnect() internally (D1) — a second, explicit
+    // disconnect() must be a clean no-op, not throw or try to close an already-closed set.
+    await expect(adapter.disconnect()).resolves.toBeUndefined();
+
+    const side = new Client({ connectionString: fixture.uri });
+    await side.connect();
+    try {
+      const result = await side.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM pg_stat_activity WHERE application_name = 'kira-studio'`,
+      );
+      expect(result.rows[0]?.n).toBe('0');
+    } finally {
+      await side.end();
     }
   });
 });

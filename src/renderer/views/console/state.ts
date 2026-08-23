@@ -2,6 +2,7 @@ import type { Page } from '@shared/protocol/page';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
 import { drop as dropPage, setPage } from './resultPages';
 
@@ -13,6 +14,16 @@ export interface ConsoleViewRuntime {
 }
 
 export const runtime = reactive({} as Record<string, ConsoleViewRuntime>);
+
+// D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+// `dropAllPagesForTab` already frees this tab's entries in resultPages.ts's own `pages` map, but
+// `rt.results` holds a second, direct reference to those same Page objects (F5) — clearing it
+// before the record itself is dropped is what actually releases them.
+registerTabRuntimeCleanup((tabId) => {
+  const rt = runtime[tabId];
+  if (rt) rt.results = [];
+  delete runtime[tabId];
+});
 
 function defaultRuntime(): ConsoleViewRuntime {
   return { status: 'idle', error: null, opId: null, results: [] };

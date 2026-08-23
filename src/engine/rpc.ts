@@ -27,8 +27,15 @@ const handlers: Record<string, Handler> = {
   [DATA_OP.mutate]: handleMutate,
   [DATA_OP.execute]: handleExecute,
   [DATA_OP.invalidate]: async (payload) => {
-    const { connectionId, path } = invalidateRequestWireSchema.parse(payload);
-    cache.dropTarget(connectionId, path);
+    const { connectionId, path, scope } = invalidateRequestWireSchema.parse(payload);
+    // P13 D18: 'pages' is the post-mutation reload — the count's stale mark was already set by
+    // DATA_OP.mutate and must survive this call, or the stale-count UI never has a chance to
+    // render before it is erased.
+    if (scope === 'pages') {
+      cache.dropPagesOnly(connectionId, path);
+    } else {
+      cache.dropTarget(connectionId, path);
+    }
     return {};
   },
   [DATA_OP.cacheStats]: async () => cache.stats(),

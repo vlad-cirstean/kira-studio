@@ -4,7 +4,7 @@ import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import * as catalog from './catalog';
-import { type RunningQuery, runCommand, runQuery } from './query';
+import { runCommand, runQuery, type TrackQuery } from './query';
 import { quoteIdent } from './read';
 
 // Mirrors postgres/mutate.ts's renderer exactly — see its comments for the shared-shape rationale.
@@ -117,7 +117,7 @@ function assertAffectedExactlyOne(kind: string, n: number): void {
 export async function mutate(
   conn: Connection,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   readOnly: boolean,
   plan: MutationPlan,
 ): Promise<MutationResult> {

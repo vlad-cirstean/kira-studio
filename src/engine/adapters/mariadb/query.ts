@@ -6,6 +6,13 @@ export interface RunningQuery {
   threadId: number | null;
 }
 
+// P13 D3: the tracker registers a running query and hands back its own release, called once the
+// statement settles (resolve, reject, or abort) — the only way `runningByOp` shrinks other than
+// `cancel()`/`disconnect()`. The release closure itself does the identity check against what is
+// currently registered for the op, so a later statement in the same multi-statement op (mutate's
+// transaction, console's "Run all") is never unregistered by an earlier one settling after it.
+export type TrackQuery = (q: RunningQuery) => () => void;
+
 interface MariaDriverError {
   code?: string;
   errno?: number;
@@ -73,7 +80,7 @@ export async function runQuery<R = unknown>(
   sql: string,
   params: unknown[],
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   opts?: QueryOptions,
 ): Promise<R[]> {
   ctx.setCommand(
@@ -84,7 +91,7 @@ export async function runQuery<R = unknown>(
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
   }
 
-  track({ threadId: conn.threadId });
+  const release = track({ threadId: conn.threadId });
 
   const queryOptions: { sql: string; rowsAsArray?: boolean; typeCast?: typeof typeCastString } = {
     sql,
@@ -107,6 +114,7 @@ export async function runQuery<R = unknown>(
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -116,12 +124,14 @@ export async function runQuery<R = unknown>(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         resolve(rows as R[]);
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         reject(mapMariaError(err));
       });
   });
@@ -141,7 +151,7 @@ export async function runCommand(
   sql: string,
   params: unknown[],
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   opts?: CommandOptions,
 ): Promise<{ affectedRows: number }> {
   if (!opts?.suppressCommand) ctx.setCommand(sql);
@@ -150,7 +160,7 @@ export async function runCommand(
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
   }
 
-  track({ threadId: conn.threadId });
+  const release = track({ threadId: conn.threadId });
 
   return new Promise<{ affectedRows: number }>((resolve, reject) => {
     let settled = false;
@@ -158,6 +168,7 @@ export async function runCommand(
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -168,12 +179,14 @@ export async function runCommand(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         resolve({ affectedRows: result.affectedRows ?? 0 });
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         reject(mapMariaError(err));
       });
   });

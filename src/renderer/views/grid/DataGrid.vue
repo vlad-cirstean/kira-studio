@@ -162,6 +162,9 @@ onMounted(() => {
 onUnmounted(() => {
   resizeObserver?.disconnect();
   clearSelectedCellFor(props.tabId);
+  // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
+  // tab is gone — clearing it just stops the timer firing against an unmounted component.
+  if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
 });
 
 const rowRange = computed(() => {

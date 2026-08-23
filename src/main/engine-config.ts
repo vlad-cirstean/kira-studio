@@ -1,4 +1,5 @@
 import { ENGINE_OP } from '../shared/protocol/engine-ops';
+import type { Settings } from '../shared/settings';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
 import type { KiraDb } from './storage/db';
@@ -6,15 +7,21 @@ import { getAllSettings } from './storage/repos/settings';
 
 /**
  * Pushes engine-relevant settings (today: the L2 cache byte budget) into the engine process.
- * Called once from main/index.ts after startEngine(), and again from ipc/settings.ts after a
- * patch that changes cache.l2BudgetMb. Failures are logged, never thrown — a settings save
- * must not fail because the engine is mid-restart.
+ * Called once from main/index.ts after startEngine() (no `settings` argument — reads them),
+ * and again from ipc/settings.ts after a patch that changes cache.l2BudgetMb, where the caller
+ * is already holding the freshly-merged `Settings` from `setSettings` (D15: skips the redundant
+ * third read). Failures are logged, never thrown — a settings save must not fail because the
+ * engine is mid-restart.
  */
-export async function pushEngineConfig(engineHost: EngineHost, db: KiraDb): Promise<void> {
+export async function pushEngineConfig(
+  engineHost: EngineHost,
+  db: KiraDb,
+  settings?: Settings,
+): Promise<void> {
   try {
-    const settings = await getAllSettings(db);
+    const resolved = settings ?? (await getAllSettings(db));
     await engineHost.call(ENGINE_OP.configureCache, {
-      l2BudgetBytes: settings.cache.l2BudgetMb * 1024 * 1024,
+      l2BudgetBytes: resolved.cache.l2BudgetMb * 1024 * 1024,
     });
   } catch (err) {
     log(

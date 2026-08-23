@@ -2,6 +2,7 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './kvPage';
 
@@ -21,6 +22,11 @@ export interface KeyValueViewRuntime {
 const PAGE_SIZE = 100; // one of pageSizeSchema's fixed literals (D24) — mirrors documents/state.ts
 
 export const runtime = reactive({} as Record<string, KeyValueViewRuntime>);
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 function defaultRuntime(): KeyValueViewRuntime {
   return {

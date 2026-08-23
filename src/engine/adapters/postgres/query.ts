@@ -6,6 +6,13 @@ export interface RunningQuery {
   backendPid: number;
 }
 
+// P13 D3: the tracker registers a running query and hands back its own release, called once the
+// statement settles (resolve, reject, or abort) — the only way `runningByOp` shrinks other than
+// `cancel()`/`disconnect()`. The release closure itself does the identity check against what is
+// currently registered for the op, so a later statement in the same multi-statement op (mutate's
+// BEGIN/…/COMMIT, console's "Run all") is never unregistered by an earlier one settling after it.
+export type TrackQuery = (q: RunningQuery) => () => void;
+
 interface PgDriverError {
   code?: string;
   message?: string;
@@ -47,7 +54,7 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
   sql: string,
   params: unknown[],
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   opts?: QueryOptions,
 ): Promise<R[]> {
   // Before the statement is issued, not after (Adapter rule 3). The read path asks for the
@@ -62,7 +69,7 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
   }
 
   const backendPid = (client as unknown as { processID?: number }).processID;
-  if (typeof backendPid === 'number') track({ backendPid });
+  const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
 
   // pg's `types.getTypeParser` is honoured per-query (verified against pg/lib/result.js: the
   // Result is constructed with `this.types`, and each column parser comes from
@@ -100,6 +107,7 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release?.();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -109,12 +117,14 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         resolve(result.rows as R[]);
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         reject(mapPgError(err));
       });
   });
@@ -134,7 +144,7 @@ export async function runCommand(
   sql: string,
   params: unknown[],
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   opts?: CommandOptions,
 ): Promise<{ rowCount: number }> {
   if (!opts?.suppressCommand) ctx.setCommand(sql);
@@ -144,7 +154,7 @@ export async function runCommand(
   }
 
   const backendPid = (client as unknown as { processID?: number }).processID;
-  if (typeof backendPid === 'number') track({ backendPid });
+  const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
 
   return new Promise<{ rowCount: number }>((resolve, reject) => {
     let settled = false;
@@ -152,6 +162,7 @@ export async function runCommand(
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release?.();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -162,12 +173,14 @@ export async function runCommand(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         resolve({ rowCount: result.rowCount ?? 0 });
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         reject(mapPgError(err));
       });
   });

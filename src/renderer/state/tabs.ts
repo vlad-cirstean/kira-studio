@@ -33,16 +33,20 @@ import { dropForTab as dropStreamPagesForTab } from '../views/stream/streamPage'
 import { clearSelectedCellFor } from './cellSelection';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
+import { cleanupTabRuntime } from './tabRuntime';
 
 // Closing a tab must free whichever page store(s) it could have populated (§2.2) — a plain
 // no-op lookup miss for the stores a tab's own kind never touches, same discipline as calling
-// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind.
+// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind. D4: also frees
+// every view's per-tab runtime record via the leaf registry (state/tabRuntime.ts) — every call
+// site below that drops a tab's pages permanently closes that tab, so all of them need this.
 function dropAllPagesForTab(id: string): void {
   dropForTab(id);
   dropConsoleResultPagesForTab(id);
   dropDocumentPagesForTab(id);
   dropKeyValuePagesForTab(id);
   dropStreamPagesForTab(id);
+  cleanupTabRuntime(id);
 }
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
@@ -56,20 +60,31 @@ export const tabsState = reactive({
 });
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+// D17: the last serialisation actually written — a save whose snapshot is identical to this
+// (e.g. a scroll-offset patch that set a field to the value it already had) skips the IPC and
+// the write entirely, not just the debounce.
+let lastSavedSnapshot: string | null = null;
+
+function saveIfChanged(): void {
+  const snapshot = JSON.stringify(tabsState.tabs);
+  if (snapshot === lastSavedSnapshot) return;
+  lastSavedSnapshot = snapshot;
+  void control.tabsSave(tabsState.tabs);
+}
 
 function saveNow(): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  void control.tabsSave(tabsState.tabs);
+  saveIfChanged();
 }
 
 function saveDebounced(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    void control.tabsSave(tabsState.tabs);
+    saveIfChanged();
   }, 1000);
 }
 
@@ -84,6 +99,19 @@ control.onFlushBeforeClose(() => {
     saveTimer = null;
   }
   void control.tabsSave(tabsState.tabs).finally(() => control.appFlushed());
+});
+
+// D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
+// are already gone server-side — a tab this store still holds for it is a row that can never be
+// re-inserted (every later debounced save would throw FOREIGN KEY constraint failed and get
+// silently discarded, F7). Closing routes through the same closeTab() a manual close uses, so
+// pages (F5) and runtime (F4) are freed by one code path rather than a second one to keep in sync.
+control.onConnectionsChanged((records) => {
+  const liveIds = new Set(records.map((r) => r.id));
+  const stale = tabsState.tabs
+    .filter((t) => t.connectionId && !liveIds.has(t.connectionId))
+    .map((t) => t.id);
+  for (const id of stale) closeTab(id);
 });
 
 export async function hydrateTabs(): Promise<void> {
@@ -466,9 +494,19 @@ export function activatePrevTab(): void {
   stepTab(-1);
 }
 
+// D17: a patch that sets every field to the value it already had (DataGrid.vue's scroll-persist
+// timer is the common case) must not even schedule a save.
+function patchChanged<T extends object>(target: T, patch: Partial<T>): boolean {
+  for (const key of Object.keys(patch) as (keyof T)[]) {
+    if (!Object.is(target[key], patch[key])) return true;
+  }
+  return false;
+}
+
 export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (target?.kind !== 'data') return;
+  if (!patchChanged(target.state, patch)) return;
   Object.assign(target.state, patch);
   saveDebounced();
 }
@@ -476,6 +514,7 @@ export function patchDataTabState(id: string, patch: Partial<DataTabState>): voi
 export function patchConsoleTabState(id: string, patch: Partial<ConsoleTabState>): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (target?.kind !== 'console') return;
+  if (!patchChanged(target.state, patch)) return;
   Object.assign(target.state, patch);
   saveDebounced();
 }

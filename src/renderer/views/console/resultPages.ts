@@ -43,6 +43,13 @@ export function dropForTab(tabId: string): void {
   if (changed) pageVersion.n++;
 }
 
+/** D5: mirrors `views/grid/page.ts`'s `totalRetainedBytes()` — feeds `window.__kiraRetainedBytes`. */
+export function totalRetainedBytes(): number {
+  let total = 0;
+  for (const entry of pages.values()) total += entry.page.byteSize;
+  return total;
+}
+
 export function setVisibleWindow(key: string, startRow: number, endRow: number): void {
   const entry = pages.get(key);
   if (!entry) return;

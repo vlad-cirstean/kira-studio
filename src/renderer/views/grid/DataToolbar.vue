@@ -23,6 +23,7 @@ import {
   goPrev,
   goToPage,
   reload,
+  reloadAfterMutation,
   runCount,
   runtime,
   setPageSize,
@@ -161,7 +162,7 @@ async function onCommit(): Promise<void> {
   const t = tab.value;
   if (!t?.connectionId) return;
   await commitPending(t.connectionId, t.path, t.id);
-  await reload(t.id);
+  await reloadAfterMutation(t.id);
 }
 
 function onDiscard(): void {

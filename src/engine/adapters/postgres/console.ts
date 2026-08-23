@@ -7,7 +7,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapPgError, type RunningQuery } from './query';
+import { mapPgError, type TrackQuery } from './query';
 import { normalizeCellText, typeClassFor } from './read';
 
 interface RawField {
@@ -32,13 +32,13 @@ async function runRaw(
   sql: string,
   params: unknown[],
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
 ): Promise<RawResult> {
   if (ctx.signal.aborted) {
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
   }
   const backendPid = (client as unknown as { processID?: number }).processID;
-  if (typeof backendPid === 'number') track({ backendPid });
+  const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
 
   const config: QueryArrayConfig<unknown[]> = {
     text: sql,
@@ -52,6 +52,7 @@ async function runRaw(
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release?.();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -62,12 +63,14 @@ async function runRaw(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         resolve(result as RawResult);
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release?.();
         reject(mapPgError(err));
       });
   });
@@ -132,7 +135,7 @@ function buildPage(result: RawResult, typeNames: Map<number, string>): TabularPa
 async function lookupTypeNames(
   client: Client,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   oids: number[],
 ): Promise<Map<number, string>> {
   const result = await runRaw(
@@ -153,7 +156,7 @@ async function lookupTypeNames(
 export async function execute(
   client: Client,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   statements: string[],
 ): Promise<TabularPage[]> {
   if (statements.length === 0) throw new AdapterError('E_QUERY', 'no statements to execute');

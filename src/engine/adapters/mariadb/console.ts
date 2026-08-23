@@ -8,7 +8,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapMariaError, type RunningQuery, typeCastString } from './query';
+import { mapMariaError, type TrackQuery, typeCastString } from './query';
 
 // Wire-protocol type-name vocabulary (`FieldInfo.type`, e.g. 'TINY', 'VAR_STRING') — distinct
 // from read.ts's catalog-string vocabulary ('tinyint(1)', 'varchar(50)'); confirmed against
@@ -69,18 +69,19 @@ async function runRaw(
   conn: Connection,
   sql: string,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
 ): Promise<QueryResultShape> {
   if (ctx.signal.aborted) {
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
   }
-  track({ threadId: conn.threadId });
+  const release = track({ threadId: conn.threadId });
 
   return new Promise<QueryResultShape>((resolve, reject) => {
     let settled = false;
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
+      release();
       reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
     };
     ctx.signal.addEventListener('abort', onAbort, { once: true });
@@ -91,12 +92,14 @@ async function runRaw(
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         resolve(result as QueryResultShape);
       })
       .catch((err: unknown) => {
         if (settled) return;
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
+        release();
         reject(mapMariaError(err));
       });
   });
@@ -151,7 +154,7 @@ function buildPage(result: QueryResultShape): TabularPage {
 export async function execute(
   conn: Connection,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   statements: string[],
 ): Promise<TabularPage[]> {
   if (statements.length === 0) throw new AdapterError('E_QUERY', 'no statements to execute');

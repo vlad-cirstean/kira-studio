@@ -1,5 +1,6 @@
 import { cellText, isNull } from '@shared/protocol/page';
 import { reactive } from 'vue';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { getPage } from './page';
 
 export interface Match {
@@ -29,6 +30,9 @@ export const searchState = reactive({} as Record<string, { matches: Match[]; ind
 export function clearSearchState(tabId: string): void {
   delete searchState[tabId];
 }
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup(clearSearchState);
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

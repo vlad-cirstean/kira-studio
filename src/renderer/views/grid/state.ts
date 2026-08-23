@@ -6,6 +6,7 @@ import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { settingsState } from '../../state/settings';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDataTab, patchDataTabState, tabsState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
@@ -31,6 +32,12 @@ export interface DataViewRuntime {
 }
 
 export const runtime = reactive({} as Record<string, DataViewRuntime>);
+
+// D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
+// directly (reality 18), so it registers here instead.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 function defaultRuntime(): DataViewRuntime {
   return {
@@ -218,11 +225,29 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   }
 }
 
+// The explicit ↻ Refresh affordance — hard-drops both pages and the count (default `scope: 'all'`).
 export async function reload(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
   await load(tabId, { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize });
+}
+
+// D18: the post-commit reload. `handleMutate` has already dropped pages and marked the count
+// stale server-side (cache.invalidateAfterMutation) — invalidating with `scope: 'pages'` here
+// reloads the grid without erasing that stale mark a moment after it was set.
+export async function reloadAfterMutation(tabId: string): Promise<void> {
+  const tab = findDataTab(tabId);
+  if (!tab?.connectionId) return;
+  await data.invalidate(tab.connectionId, tab.path, 'pages');
+  await load(tabId, { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize });
+  // §7's "immediately marked stale" needs the toolbar's own `rt.count` mirror to pick up the
+  // server-side mark, which nothing else here does. `rt.count?.stale` is still false at this
+  // point, so runCount's own `refresh` flag stays false too — this reads the now-stale L3 entry
+  // (a cache hit, not a rescan; handleRead/handleCount's contract keeps a hit out of the op log)
+  // rather than forcing a real recount. Skipped when this tab never ran a count in the first
+  // place — nothing to grey, and nothing cached yet to read this cheaply.
+  if (runtime[tabId]?.count) await runCount(tabId);
 }
 
 export async function runCount(tabId: string): Promise<void> {
@@ -236,6 +261,8 @@ export async function runCount(tabId: string): Promise<void> {
       connectionId: tab.connectionId,
       path: tab.path,
       filter: tab.state.filter,
+      // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
+      refresh: rt.count?.stale === true,
     });
     rt.count = { value: response.value, exact: response.exact, stale: response.stale };
   } catch {

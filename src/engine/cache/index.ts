@@ -73,10 +73,24 @@ export const cache = {
     counts.putCount(connectionId, path, filter, value, exact);
     scheduleEmit();
   },
-  /** Refresh on one table: drops its pages and its counts. P5's mutation invalidation calls this. */
+  /** Explicit ↻ Refresh (DATA_OP.invalidate, scope 'all'): drops its pages and its counts hard. */
   dropTarget(connectionId: string, path: string): void {
     pages.dropTarget(connectionId, path);
     counts.dropCountTarget(connectionId, path);
+    scheduleEmit();
+  },
+  /**
+   * §7: a local mutation drops the target's pages (they may now be wrong) but only marks its
+   * counts stale — the pager keeps the last known total, greyed, until the user asks to refresh.
+   */
+  invalidateAfterMutation(connectionId: string, path: string): void {
+    pages.dropTarget(connectionId, path);
+    counts.markCountTargetStale(connectionId, path);
+    scheduleEmit();
+  },
+  /** DATA_OP.invalidate scope 'pages' — the post-mutation reload; leaves the stale count intact. */
+  dropPagesOnly(connectionId: string, path: string): void {
+    pages.dropTarget(connectionId, path);
     scheduleEmit();
   },
   /** Disconnect and connection-delete (§2.2: disconnecting releases all its cached pages). */

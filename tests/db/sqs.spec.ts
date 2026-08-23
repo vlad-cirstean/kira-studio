@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
+import { GetQueueUrlCommand, SQSClient } from '@aws-sdk/client-sqs';
 import type { NodePath } from '@shared/domain/tree';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
@@ -58,6 +59,35 @@ function rowAt(page: StreamPage, row: number): StreamRow {
     timestamp: isNull(page.timestamps, row) ? null : cellText(page.timestamps, row, decoder),
     body: cellText(page.bodies, row, decoder),
   };
+}
+
+/**
+ * P13 D14: counts `GetQueueUrlCommand`s actually sent, by wrapping the one `SQSClient.prototype
+ * .send` every adapter-created client shares — the queueUrls cache lives inside the adapter
+ * instance, so this is the only vantage point outside it that can see a cache hit vs. a miss.
+ */
+async function countGetQueueUrlCalls<T>(
+  fn: () => Promise<T>,
+): Promise<{ result: T; calls: number }> {
+  let calls = 0;
+  // send() is overloaded (promise vs. callback style) in a way TypeScript can't express as a
+  // single call-through signature — this spy only ever forwards to the real implementation, so
+  // the loose type is confined to this one wrapper.
+  // biome-ignore lint/suspicious/noExplicitAny: see above
+  const original = SQSClient.prototype.send as (...args: any[]) => unknown;
+  const spy = spyOn(SQSClient.prototype, 'send').mockImplementation(function (
+    this: SQSClient,
+    ...args: unknown[]
+  ) {
+    if (args[0] instanceof GetQueueUrlCommand) calls++;
+    return original.apply(this, args);
+  } as SQSClient['send']);
+  try {
+    const result = await fn();
+    return { result, calls };
+  } finally {
+    spy.mockRestore();
+  }
 }
 
 /** preview()/cancel() are synchronous — `.rejects` doesn't apply. */
@@ -318,6 +348,77 @@ describe('sqs adapter (§9.1, P10)', () => {
           ctx,
         ),
       ).rejects.toMatchObject({ code: 'E_CANCELLED' });
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('15. a second read/count on the same queue issues no second GetQueueUrl (F14/F22, D14)', async () => {
+    const adapter = await createAdapter('sqs', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const req = {
+        path: queuePath(ORDERS_QUEUE),
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 10,
+        cursor: { mode: 'offset' as const, offset: 0 },
+      };
+      const first = await countGetQueueUrlCalls(() => readStream(adapter, req, makeCtx()));
+      expect(first.calls).toBe(1); // cache miss — resolveQueueUrl falls back to GetQueueUrl
+
+      const second = await countGetQueueUrlCalls(() => readStream(adapter, req, makeCtx()));
+      expect(second.calls).toBe(0); // cache hit
+
+      const third = await countGetQueueUrlCalls(() =>
+        adapter.count({ path: queuePath(ORDERS_QUEUE), filter: null }, makeCtx()),
+      );
+      expect(third.calls).toBe(0); // count() shares the same cache
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('16. a disconnect/connect cycle re-resolves the queue URL', async () => {
+    const adapter = await createAdapter('sqs', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      await readStream(
+        adapter,
+        {
+          path: queuePath(ORDERS_QUEUE),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+    } finally {
+      await adapter.disconnect();
+    }
+
+    // disconnect() clears the cache (D14) — a fresh connect() must resolve it again, not reuse a
+    // URL cached against the now-destroyed client.
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const { calls } = await countGetQueueUrlCalls(() =>
+        readStream(
+          adapter,
+          {
+            path: queuePath(ORDERS_QUEUE),
+            projection: null,
+            filter: null,
+            sort: null,
+            pageSize: 10,
+            cursor: { mode: 'offset', offset: 0 },
+          },
+          makeCtx(),
+        ),
+      );
+      expect(calls).toBe(1);
     } finally {
       await adapter.disconnect();
     }

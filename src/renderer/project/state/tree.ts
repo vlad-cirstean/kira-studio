@@ -100,15 +100,20 @@ export async function saveFilters(
   treeState.filters[connectionId] = await control.filtersReplace(connectionId, inputs);
 }
 
-// Every expand() round-trips through kira:tree:children regardless of local state — main's L1
-// cache is what decides whether that is a real server call or a fast cache hit (D10). Trying
-// to be clever about it here would just duplicate that cache-aside logic and risk disagreeing
-// with it.
+// D25: skips the round trip when treeState.children[k] is already populated. This is not the
+// "being clever about whether main's L1 cache would be a hit" the comment used to warn against —
+// it decides nothing of the sort. It returns data the renderer already holds and is already
+// rendering. The tree's copy has exactly two real invalidation sources and both still run:
+// onConnectionMetadataInvalidated -> refreshExpanded (`initTreeSync` below, which passes
+// refresh: true and so bypasses this early return) and an explicit context-menu refresh. A
+// collapse never discards treeState.children[k], so re-expanding it was already a pure re-render
+// — this just makes that true in code, which is what the §2.1 tree-expand budget assumes.
 export async function expand(connectionId: string, path: string): Promise<void> {
   await loadFilters(connectionId);
   const k = rowKey(connectionId, path);
   treeState.expanded.add(k);
   if (treeState.loading.has(k)) return;
+  if (treeState.children[k]) return;
   await loadChildren(connectionId, path, false);
 }
 
@@ -164,12 +169,65 @@ export async function refreshAllConnections(): Promise<void> {
   }
 }
 
+// D6: purges every collection this module keys by connection identity. Driven off
+// onConnectionsChanged (below) rather than off deleteConnection() directly, so every deletion
+// path is covered — the context menu, a direct IPC call, a future bulk delete — the same
+// reasoning state/connections.ts:44-50 records for that channel.
+export function dropConnectionState(connectionId: string): void {
+  const prefix = `${connectionId}|`;
+  for (const k of Object.keys(treeState.children)) {
+    if (k.startsWith(prefix)) delete treeState.children[k];
+  }
+  for (const k of [...treeState.expanded]) {
+    if (k.startsWith(prefix)) treeState.expanded.delete(k);
+  }
+  for (const k of [...treeState.loading]) {
+    if (k.startsWith(prefix)) treeState.loading.delete(k);
+  }
+  for (const k of Object.keys(treeState.errors)) {
+    if (k.startsWith(prefix)) delete treeState.errors[k];
+  }
+  delete treeState.filters[connectionId];
+  for (const k of Object.keys(treeState.savedQueries)) {
+    if (k.startsWith(prefix)) delete treeState.savedQueries[k];
+  }
+  if (treeState.selected?.startsWith(prefix)) treeState.selected = null;
+  if (treeState.pendingScrollKey?.startsWith(prefix)) treeState.pendingScrollKey = null;
+}
+
+// Every connection id this module currently holds state for, gathered from the six collections'
+// own keys — `filters` is keyed directly by connectionId, the rest by rowKey (D6). Exported
+// only for the Playwright-only `window.__kiraTreeConnectionIds` hook (main.ts, D6's leak spec).
+export function knownConnectionIds(): Set<string> {
+  const ids = new Set<string>();
+  const addFromKey = (k: string): void => {
+    const i = k.indexOf('|');
+    ids.add(i >= 0 ? k.slice(0, i) : k);
+  };
+  for (const k of Object.keys(treeState.children)) addFromKey(k);
+  for (const k of treeState.expanded) addFromKey(k);
+  for (const k of treeState.loading) addFromKey(k);
+  for (const k of Object.keys(treeState.errors)) addFromKey(k);
+  for (const k of Object.keys(treeState.filters)) addFromKey(k);
+  for (const k of Object.keys(treeState.savedQueries)) addFromKey(k);
+  return ids;
+}
+
 let unsubscribeInvalidated: (() => void) | null = null;
+let unsubscribeConnectionsChanged: (() => void) | null = null;
 
 export function initTreeSync(): void {
   unsubscribeInvalidated?.();
   unsubscribeInvalidated = control.onConnectionMetadataInvalidated((connectionId) => {
     void refreshExpanded(connectionId);
+  });
+
+  unsubscribeConnectionsChanged?.();
+  unsubscribeConnectionsChanged = control.onConnectionsChanged((records) => {
+    const liveIds = new Set(records.map((r) => r.id));
+    for (const id of knownConnectionIds()) {
+      if (!liveIds.has(id)) dropConnectionState(id);
+    }
   });
 }
 

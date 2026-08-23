@@ -3,7 +3,31 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { dbPath } from './paths';
 
 type DatabaseSyncInstance = InstanceType<typeof import('node:sqlite').DatabaseSync>;
+type StatementSyncInstance = ReturnType<DatabaseSyncInstance['prepare']>;
 export type SqlParam = string | number | bigint | null | Uint8Array;
+
+// D16: fronts raw.prepare with a capped cache — node:sqlite's prepare() re-runs the SQL compiler
+// every call, and Drizzle emits a small, stable set of SQL strings, so a cache hit is the normal
+// case. The cap matters: repos/ops.ts's pruneOps generates a distinct SQL string per parameter
+// count (a fresh `notInArray` list), so an uncapped cache would itself be an unbounded map.
+// Eviction is insertion order (a `Map`'s own iteration order); dropped statements are just
+// recompiled on next use.
+const STMT_CACHE_MAX = 200;
+
+function createStatementCache(raw: DatabaseSyncInstance): (sql: string) => StatementSyncInstance {
+  const cache = new Map<string, StatementSyncInstance>();
+  return (sql: string): StatementSyncInstance => {
+    const cached = cache.get(sql);
+    if (cached) return cached;
+    const stmt = raw.prepare(sql);
+    cache.set(sql, stmt);
+    if (cache.size > STMT_CACHE_MAX) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    return stmt;
+  };
+}
 
 // `schema_version` (migrate.ts) and the startup PRAGMAs have no Drizzle-schema equivalent — they
 // keep talking to node:sqlite directly through this narrow raw handle instead of the query builder.
@@ -42,8 +66,10 @@ export async function openDb(): Promise<OpenedDb> {
   raw.exec('PRAGMA foreign_keys = ON');
   raw.exec('PRAGMA busy_timeout = 5000');
 
+  const prepare = createStatementCache(raw);
+
   const db = drizzle(async (sql, params, method) => {
-    const stmt = raw.prepare(sql);
+    const stmt = prepare(sql);
     if (method === 'run') {
       stmt.run(...(params as SqlParam[]));
       return { rows: [] };
@@ -62,10 +88,9 @@ export async function openDb(): Promise<OpenedDb> {
     db,
     raw: {
       exec: (sql) => raw.exec(sql),
-      get: (sql, params = []) =>
-        raw.prepare(sql).get(...params) as Record<string, unknown> | undefined,
+      get: (sql, params = []) => prepare(sql).get(...params) as Record<string, unknown> | undefined,
       run: (sql, params = []) => {
-        raw.prepare(sql).run(...params);
+        prepare(sql).run(...params);
       },
       transaction: (fn) => {
         raw.exec('BEGIN');

@@ -1,3 +1,4 @@
+import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
 import type { KiraApi } from '@shared/protocol/ipc';
 
 // Playwright's `page.evaluate()` callbacks run in the renderer's real global scope, so `window`
@@ -11,5 +12,13 @@ declare global {
     kira: KiraApi;
     /** Playwright-only hook (src/renderer/main.ts) — the exact §2.2 retained-bytes figure. */
     __kiraGridRetainedBytes?: () => number;
+    /** Playwright-only hook (src/renderer/main.ts, D5) — the sum across all five page stores. */
+    __kiraRetainedBytes?: () => number;
+    /** Playwright-only hook (src/renderer/main.ts) — drives `data.count()` directly. */
+    __kiraCount?: (req: CountRequestWire) => Promise<CountResponse>;
+    /** Playwright-only hook (src/renderer/main.ts) — reads L2/L3 cache stats directly. */
+    __kiraCacheStats?: () => Promise<CacheStats>;
+    /** Playwright-only hook (src/renderer/main.ts, D6) — the tree's live connection ids. */
+    __kiraTreeConnectionIds?: () => string[];
   }
 }

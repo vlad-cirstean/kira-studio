@@ -4,7 +4,7 @@ import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import * as catalog from './catalog';
-import { type RunningQuery, runCommand, runQuery } from './query';
+import { runCommand, runQuery, type TrackQuery } from './query';
 import { quoteIdent } from './read';
 
 // Renders one row-op's statement text. preview() (never executes, D6) inlines an escaped SQL
@@ -119,7 +119,7 @@ function assertAffectedExactlyOne(kind: string, n: number): void {
 export async function mutate(
   client: Client,
   ctx: OpCtx,
-  track: (q: RunningQuery) => void,
+  track: TrackQuery,
   readOnly: boolean,
   plan: MutationPlan,
 ): Promise<MutationResult> {

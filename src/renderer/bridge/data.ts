@@ -43,8 +43,12 @@ export const data = {
   count: (req: CountRequestWire): Promise<CountResponse> =>
     request(DATA_OP.count, plain(req), NO_TIMEOUT) as Promise<CountResponse>,
   prefetch: prefetchResponse,
-  invalidate: async (connectionId: string, path: string): Promise<void> => {
-    await request(DATA_OP.invalidate, { connectionId, path });
+  invalidate: async (
+    connectionId: string,
+    path: string,
+    scope?: 'all' | 'pages',
+  ): Promise<void> => {
+    await request(DATA_OP.invalidate, { connectionId, path, scope });
   },
   preview: (req: PreviewRequestWire): Promise<PreviewResponse> =>
     request(DATA_OP.preview, plain(req), NO_TIMEOUT) as Promise<PreviewResponse>,

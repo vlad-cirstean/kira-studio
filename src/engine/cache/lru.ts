@@ -13,8 +13,8 @@ interface Entry<V> {
 
 /**
  * Byte-budgeted LRU, insertion-order via a `Map` (JS `Map` iterates insertion order; `get`
- * re-inserts to touch — no linked list, no library). Backs L2 (§6b) and is generic enough that
- * L3 (§6c) could reuse it, though L3 is unbudgeted and small enough not to need it.
+ * re-inserts to touch — no linked list, no library). Backs L2 (§6b) and L3 (§6c, P13 D19) — L3
+ * uses a fixed nominal per-entry byte cost instead of a measured size.
  */
 export class ByteLru<V> {
   private budget: number;
@@ -69,6 +69,14 @@ export class ByteLru<V> {
     this.entries_.set(key, { value, bytes, at: Date.now(), meta });
     this.totalBytes += bytes;
     this.evictToBudget();
+  }
+
+  delete(key: string): boolean {
+    const entry = this.entries_.get(key);
+    if (!entry) return false;
+    this.entries_.delete(key);
+    this.totalBytes -= entry.bytes;
+    return true;
   }
 
   deleteWhere(pred: (meta: ByteLruEntryMeta) => boolean): number {
