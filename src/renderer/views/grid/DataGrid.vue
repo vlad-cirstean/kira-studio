@@ -795,7 +795,9 @@ async function onPaste(): Promise<void> {
 function scrollCellIntoView(row: number, displayCol: number): void {
   const el = containerRef.value;
   if (!el) return;
-  const rowTop = row * rowHeight.value;
+  // Every row's own `top` style is offset by one rowHeight for the header row above it (see the
+  // header-row/grid-row template bindings) — this has to match or the target lands one row short.
+  const rowTop = rowHeight.value + row * rowHeight.value;
   const rowBottom = rowTop + rowHeight.value;
   if (rowTop < el.scrollTop) el.scrollTop = rowTop;
   else if (rowBottom > el.scrollTop + el.clientHeight) el.scrollTop = rowBottom - el.clientHeight;
@@ -915,7 +917,12 @@ defineExpose({ scrollCellIntoView });
           @drop="onHeaderDrop($event, columnOrder[c])"
         >
           <span class="header-label">{{ columnOrder[c] }}</span>
-          <span v-if="keyLabelFor(c)" class="header-key mono">{{ keyLabelFor(c) }}</span>
+          <span
+            v-if="keyLabelFor(c)"
+            class="header-key mono"
+            :class="{ 'is-fk': keyLabelFor(c) === 'FK' }"
+            >{{ keyLabelFor(c) }}</span
+          >
           <span v-if="currentSortDirection(columnOrder[c])" class="sort-chevron">{{
             currentSortDirection(columnOrder[c]) === 'asc' ? '▲' : '▼'
           }}</span>
@@ -927,6 +934,7 @@ defineExpose({ scrollCellIntoView });
           />
           <span
             class="resize-handle"
+            draggable="false"
             @pointerdown="onResizeStart($event, columnOrder[c])"
             @pointermove="onResizeMove"
             @pointerup="onResizeEnd"
@@ -1101,11 +1109,15 @@ defineExpose({ scrollCellIntoView });
   white-space: nowrap;
 }
 
-/* FIX-8: PK/FK stated as a label, never inferred from colour alone (p-th's own .key). */
+/* FIX-8: PK/FK stated as a label, never inferred from colour alone (p-th's own .key). PK stays
+   the original warn/yellow; FK is the only one that reads as info/blue. */
 .header-key {
-  color: var(--kira-info);
+  color: var(--kira-warn);
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
+}
+.header-key.is-fk {
+  color: var(--kira-info);
 }
 
 .sort-chevron {
@@ -1302,6 +1314,13 @@ defineExpose({ scrollCellIntoView });
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   font: inherit;
+}
+
+/* An outline per input reads fine for the single active inline-edit cell, but every column of a
+   freshly-added row gets one at once — the row's own accent tint (.pending-insert above) is
+   already enough of a "this is new" signal without every cell boxed in blue too. */
+.insert-cell .cell-input {
+  outline: none;
 }
 
 .no-rows {

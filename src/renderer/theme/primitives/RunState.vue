@@ -25,6 +25,6 @@ const label = computed(() => {
     :class="{ 'is-running': status === 'running', 'is-error': status === 'error' }"
     :title="title"
   >
-    <span class="ring" />{{ label }}
+    {{ label }}<span class="ring" />
   </span>
 </template>

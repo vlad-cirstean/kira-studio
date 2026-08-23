@@ -118,7 +118,7 @@ const beautifyDisabledTitle = computed<string | undefined>(() =>
     : 'Indented and compact formatting apply to JSON and XML/HTML.',
 );
 const resetDisabledTitle = computed<string | undefined>(() =>
-  formatted.value === 'none' ? 'Already showing the stored value.' : undefined,
+  isDirty.value ? undefined : 'Already showing the stored value.',
 );
 
 function applyBeautify(mode: BeautifyMode): void {
@@ -271,7 +271,7 @@ const statusLine = computed(() => {
           icon="discard"
           :size="14"
           data-testid="cell-editor-beautify-reset"
-          :disabled="formatted === 'none'"
+          :disabled="!isDirty"
           :title="resetDisabledTitle"
           @click="resetBuffer"
         />
