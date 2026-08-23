@@ -11,6 +11,7 @@
     "esbuild"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
@@ -23,7 +24,8 @@
     "test:ui": "electron-vite build && playwright test",
     "test:db": "bun test tests/db",
     "package:mac": "electron-vite build && electron-builder --mac --arm64 --publish never",
-    "package:mac:dir": "electron-vite build && electron-builder --mac --arm64 --dir --publish never"
+    "package:mac:dir": "electron-vite build && electron-builder --mac --arm64 --dir --publish never",
+    "verify:packaging": "sh scripts/verify-packaging.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Kira Studio pre-commit — see docs/plans/P15-gh-tooling.md §3.
+# Installed by `bun install` (package.json "prepare" sets core.hooksPath).
+# Bypass for a work-in-progress commit with: git commit --no-verify
+set -e
+
+if [ ! -d node_modules ]; then
+  echo "pre-commit: node_modules is missing — run \`bun install\` first." >&2
+  exit 1
+fi
+
+bun run lint
+bun run typecheck

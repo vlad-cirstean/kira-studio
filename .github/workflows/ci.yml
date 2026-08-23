@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run build
+      - run: bun run verify:packaging
+
+  ui-smoke:
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run test:ui
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  package-smoke:
+    needs: checks
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run package:mac:dir
+      - name: Assert packaged bundle (docs/PACKAGING.md §4 items 1-3, 9)
+        run: |
+          set -eu
+          APP="dist/mac-arm64/Kira Studio.app"
+          test -d "$APP"
+          test -f "$APP/Contents/Resources/app.asar.unpacked/out/main/engine.js"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
+            = 'com.kirathecat.kira-studio'
+          codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
+          du -sh "$APP"
+      - run: bun run verify:packaging
