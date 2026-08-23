@@ -2,12 +2,17 @@
 import type { SortSpec } from '@shared/domain/queries';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
+import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import IdentifierField from '../../theme/primitives/IdentifierField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import {
+  orderByCandidates as buildOrderByCandidates,
+  whereCandidates as buildWhereCandidates,
+} from './filterCompletion';
 import { runtime, setFilter, setSort } from './state';
 
 const tab = computed(() => activeDataTab.value);
@@ -17,27 +22,21 @@ const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
 // already reported by DataView.vue's error strip, this just points at the field that caused it.
 const hasError = computed(() => rt.value?.status === 'error');
 
-// P18: identifier autocomplete for the WHERE/ORDER BY boxes — column names (already loaded for
-// the columns menu/header hover, no extra fetch) plus a small curated set of SQL keywords each
-// box actually uses. Kept as two separate lists rather than one shared "SQL keywords" bag: WHERE
-// and ORDER BY use disjoint vocabularies (BETWEEN/LIKE/NULL have no business in an ORDER BY,
-// ASC/DESC have none in a WHERE), and mixing them would just make both lists noisier.
-const columnNames = computed(() => rt.value?.meta?.columns.map((c) => c.name) ?? []);
-const WHERE_KEYWORDS = [
-  'AND',
-  'OR',
-  'NOT',
-  'NULL',
-  'IS NULL',
-  'IS NOT NULL',
-  'IN',
-  'LIKE',
-  'ILIKE',
-  'BETWEEN',
-  'EXISTS',
-];
-const whereCandidates = computed(() => [...columnNames.value, ...WHERE_KEYWORDS]);
-const orderByCandidates = computed(() => [...columnNames.value, 'ASC', 'DESC']);
+// Mirrors PreviewCommandPanel.vue's/ConsoleView.vue's own three-line dialect computed exactly —
+// undefined for every non-SQL connection kind, which filterCompletion.ts's dialect-conditional
+// vocabularies (ILIKE, NULLS FIRST/LAST) already treat as "the non-Postgres list".
+const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+  const record = tab.value?.connectionId
+    ? connectionsState.records.find((r) => r.id === tab.value?.connectionId)
+    : undefined;
+  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+});
+const whereCandidates = computed(() =>
+  tab.value ? buildWhereCandidates(tab.value.id, dialect.value) : [],
+);
+const orderByCandidates = computed(() =>
+  tab.value ? buildOrderByCandidates(tab.value.id, dialect.value) : [],
+);
 
 function sortToText(sort: SortSpec | null): string {
   if (!sort) return '';
@@ -110,7 +109,7 @@ async function onClear(): Promise<void> {
   recordHistory(null, null);
 }
 
-// IdentifierField's own @escape only ever fires once its suggestion dropdown is already closed
+// AutocompleteField's own @escape only ever fires once its suggestion dropdown is already closed
 // (an open one consumes Escape itself, to dismiss just the dropdown) — so by the time this runs,
 // focus is still genuinely on the field itself, and blurring the active element is exactly
 // blurring it.
@@ -156,7 +155,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </div>
     <div class="where-input">
-      <IdentifierField
+      <AutocompleteField
         v-model="whereText"
         prefix="WHERE"
         placeholder="status = 'paid'"
@@ -169,7 +168,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </div>
     <div class="orderby-input">
-      <IdentifierField
+      <AutocompleteField
         v-model="orderByText"
         prefix="ORDER BY"
         placeholder="placed_at DESC"

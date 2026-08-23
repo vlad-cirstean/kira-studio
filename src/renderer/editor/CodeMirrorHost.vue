@@ -2,7 +2,7 @@
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
@@ -15,6 +15,9 @@ const props = defineProps<{
   /** Only consulted when `language === 'sql'` (D17). */
   sqlDialect?: 'postgres' | 'mariadb';
   readOnly: boolean;
+  /** P18 D10: off everywhere by default. On only for the query console on a SQL connection — the
+   *  cell editor, DDL viewer, document editor and op-log detail rows must not sprout a popup. */
+  autocomplete?: boolean;
 }>();
 
 // Every prior use of this host is read-only (DDL, previews, op-log detail rows); the query
@@ -35,9 +38,21 @@ const rootRef = ref<HTMLElement | null>(null);
 let view: EditorView | null = null;
 const languageCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+const autocompleteCompartment = new Compartment();
 
 function resolveLanguage(): ReturnType<typeof languageExtension> {
   return languageExtension(props.language, props.sqlDialect);
+}
+
+// P18 D10: autocompletion() activates lang-sql's own keyword completion source (already
+// registered as language data — languages.ts is unchanged), plus completionKeymap's standard
+// Ctrl+Space/Tab-accept/Escape-dismiss bindings. completionKeymap is Prec.highest internally, so
+// splitting it into its own keymap.of() call (rather than one array with defaultKeymap) still
+// keeps its Escape/Enter ahead of any conflicting default when active — and lets this whole
+// extension be swapped for [] when `autocomplete` is false, which the always-on prior version
+// could not do.
+function resolveAutocomplete(): Extension[] {
+  return props.autocomplete ? [autocompletion(), keymap.of(completionKeymap)] : [];
 }
 
 onMounted(() => {
@@ -47,14 +62,8 @@ onMounted(() => {
       lineNumbers(),
       highlightSpecialChars(),
       EditorView.lineWrapping,
-      // P18: basic SQL keyword completion — lang-sql's own sql() extension (languages.ts) already
-      // registers a keyword completion source per dialect; this is the one thing that actually
-      // activates it (and any future language's own completions) in every CodeMirrorHost
-      // consumer (console, DDL, cell editor) — completionKeymap adds the standard
-      // Ctrl+Space/Tab-accept/Escape-dismiss bindings, kept ahead of defaultKeymap so its own
-      // Escape (dismiss the completion popup) takes priority over any conflicting default.
-      autocompletion(),
-      keymap.of([...completionKeymap, ...defaultKeymap]),
+      keymap.of(defaultKeymap),
+      autocompleteCompartment.of(resolveAutocomplete()),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
@@ -104,6 +113,14 @@ watch(
   (readOnly) => {
     if (!view) return;
     view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)) });
+  },
+);
+
+watch(
+  () => props.autocomplete,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: autocompleteCompartment.reconfigure(resolveAutocomplete()) });
   },
 );
 

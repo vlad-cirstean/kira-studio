@@ -173,6 +173,7 @@ const statusLine = computed(() => {
           language="sql"
           :sql-dialect="dialect"
           :read-only="false"
+          :autocomplete="dialect !== undefined"
           @update:doc="onDocChange"
           @update:cursor="cursorPos = $event"
         />

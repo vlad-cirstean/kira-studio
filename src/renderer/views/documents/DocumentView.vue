@@ -12,10 +12,10 @@ import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import IdentifierField from '../../theme/primitives/IdentifierField.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -26,6 +26,7 @@ import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import { documentRow, fieldNamesOnPage, isIdNull, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
 import { saveDocumentEdit, saveNewDocument } from './documentMutations';
+import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import ProjectionMenu from './ProjectionMenu.vue';
 import {
   goFirst,
@@ -112,32 +113,17 @@ function onSearchInput(): void {
   recordFilterHistory(searchText.value, props.tab.state.sort);
 }
 
-// P18: identifier autocomplete for the filter/sort boxes — field names already computed for the
-// Fields/projection menu (fieldNamesOnPage, no extra fetch), plus a small curated set of Mongo
-// query operators (filter box only — the sort box's own vocabulary is just 1/-1, handled as a
-// separate, tiny candidate list rather than folding into this one).
-const MONGO_OPERATORS = [
-  '$eq',
-  '$ne',
-  '$gt',
-  '$gte',
-  '$lt',
-  '$lte',
-  '$in',
-  '$nin',
-  '$exists',
-  '$regex',
-  '$and',
-  '$or',
-  '$not',
-];
+// P18 D9/D13: candidate lists computed here (not inside filterCompletion.ts, which is plain and
+// Vue-unaware) so `void pageVersion.n` — fieldNamesOnPage's own non-reactive-Map dependency,
+// same line projectionCountLabel below already carries — is what drives the recompute. Without
+// it the candidate list would freeze at whatever the first loaded page happened to contain.
 const filterCandidates = computed(() => {
   void pageVersion.n;
-  return [...fieldNamesOnPage(props.tab.id), ...MONGO_OPERATORS];
+  return mongoFilterCandidates(props.tab.id);
 });
 const sortCandidates = computed(() => {
   void pageVersion.n;
-  return fieldNamesOnPage(props.tab.id);
+  return mongoSortCandidates(props.tab.id);
 });
 
 // The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
@@ -610,7 +596,7 @@ onUnmounted(() => {
           />
         </div>
         <div class="filter-field">
-          <IdentifierField
+          <AutocompleteField
             v-model="searchText"
             placeholder="Filter (e.g. { name: 'a' })"
             data-testid="document-search"
@@ -620,7 +606,7 @@ onUnmounted(() => {
           />
         </div>
         <div class="sort-field">
-          <IdentifierField
+          <AutocompleteField
             v-model="sortText"
             prefix="SORT"
             placeholder="{ createdAt: -1, name: 1 }"

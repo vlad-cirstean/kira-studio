@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
+    "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.0",
     "@codemirror/lang-json": "6.0.2",
     "@codemirror/lang-sql": "6.10.0",
@@ -64,7 +65,6 @@
     "@aws-sdk/client-s3": "3.1116.0",
     "@aws-sdk/client-sqs": "3.1116.0",
     "@aws-sdk/credential-providers": "3.1116.0",
-    "@codemirror/autocomplete": "6.20.3",
     "bson": "6",
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",

@@ -3,6 +3,7 @@ import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import { openDataTab } from '../../state/tabs';
 import type { MenuItem } from '../../workbench/state/contextMenu';
+import { type Dialect, quoteIdent } from '../shared/sqlIdent';
 import {
   type RowSnapshot,
   rowsToCsv,
@@ -13,8 +14,6 @@ import {
 import { duplicateAsInsert, stageNull, toggleDelete } from './pendingChanges';
 import { setFilter, setProjection, setSort } from './state';
 
-type Dialect = 'postgres' | 'mariadb' | undefined;
-
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
 // discipline DataGrid.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
@@ -23,14 +22,6 @@ function qualifiedNameForPath(connectionId: string, path: string): string {
     .segments.filter((s) => QUALIFIED_KINDS.has(s.kind))
     .map((s) => s.name)
     .join('.');
-}
-
-// D5: builds "<col> = '<escaped>'" (Postgres) / "`<col>` = '<escaped>'" (MariaDB), or IS NULL —
-// the same trust boundary as the toolbar's own free-text WHERE box (never validated against the
-// column's type, generated as literal SQL text once).
-function quoteIdent(dialect: Dialect, name: string): string {
-  if (dialect === 'mariadb') return `\`${name.replace(/`/g, '``')}\``;
-  return `"${name.replace(/"/g, '""')}"`;
 }
 
 export interface FkNavContext {

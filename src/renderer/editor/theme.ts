@@ -44,6 +44,34 @@ export const kiraEditorTheme = EditorView.theme(
     '.cm-scroller::-webkit-scrollbar-thumb': {
       backgroundColor: 'var(--kira-scrollbar)',
     },
+    // P18 D12: every other CodeMirror surface in the app is themed from these tokens — an
+    // unthemed, library-default completion popup would be the only piece of un-themed chrome in
+    // the editor, and would ignore the Settings font entirely. Reuses primitives.css's own
+    // `.p-float` values (background/border/radius/shadow) so the popup matches every other
+    // floating panel in the app, not just other CodeMirror chrome.
+    '.cm-tooltip.cm-tooltip-autocomplete': {
+      backgroundColor: 'var(--kira-bg-elevated)',
+      border: 'var(--kira-border-width) solid var(--kira-border-strong)',
+      borderRadius: 'var(--kira-radius)',
+      boxShadow: 'var(--kira-shadow-dialog)',
+      overflow: 'hidden',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+      fontFamily: 'var(--kira-font-family)',
+      fontSize: 'var(--kira-t-sm)',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+      backgroundColor: 'var(--kira-select)',
+      color: 'var(--kira-fg)',
+    },
+    '.cm-completionDetail': {
+      color: 'var(--kira-fg-muted)',
+      fontStyle: 'normal',
+    },
+    '.cm-completionMatchedText': {
+      color: 'var(--kira-syntax-function)',
+      textDecoration: 'none',
+    },
   },
   { dark: true },
 );
