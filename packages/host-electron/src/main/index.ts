@@ -40,9 +40,15 @@ const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
 /** W13's build must place these two files here, both relative to the running `dist/electron/
  *  main.js` — the same kind of coordination point `html.ts`'s `WEBVIEW_ENTRY` names for the
- *  webview build. */
+ *  webview build. `dist/ui`'s own internal shape mirrors `packages/ui/vite.config.ts`'s Vite
+ *  `root` (`packages/`, the closest common ancestor of this file's own HTML entry and
+ *  `host-vscode`'s webview entry — a single Vite build cannot place an HTML entry outside its
+ *  root), so this file's built output lands at `dist/ui/host-electron/src/renderer/index.html`,
+ *  not `dist/ui/renderer/index.html`. */
 const PRELOAD_PATH = fileURLToPath(new URL("./preload.cjs", import.meta.url));
-const RENDERER_HTML_PATH = fileURLToPath(new URL("../ui/renderer/index.html", import.meta.url));
+const RENDERER_HTML_PATH = fileURLToPath(
+  new URL("../ui/host-electron/src/renderer/index.html", import.meta.url),
+);
 
 function readRawSettings(storage: ElectronStorage): Record<string, unknown> {
   const raw = storage.get<Record<string, unknown>>("global", SETTINGS_STORAGE_KEY) ?? {};

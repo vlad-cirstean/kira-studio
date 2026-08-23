@@ -188,6 +188,7 @@ kira-version-vscode/
 │   │       └── validate.ts         boundary validation; a schema mismatch fails loudly
 │   │
 │   ├── ui/                         Vue 3 app. Imports core + ipc only. Never `vscode`.
+│   │   ├── vite.config.ts          one build, two entries (webview + Electron renderer) (W13)
 │   │   └── src/
 │   │       ├── main.ts
 │   │       ├── App.vue

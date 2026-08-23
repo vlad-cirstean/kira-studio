@@ -20,6 +20,7 @@
     "gen:settings": "bun run scripts/gen-settings.ts",
     "check:theme-palettes": "bun run scripts/gen-theme-palettes.ts --check",
     "gen:theme-palettes": "bun run scripts/gen-theme-palettes.ts",
+    "build": "bun run scripts/build.ts",
     "test": "bun test packages tests/fixtures tests/integration tests/unit",
     "test:e2e": "playwright test",
     "test:perf": "bun run tests/perf/run.ts && bun run tests/perf/parserThroughput.ts && bun run tests/perf/historyPipeline.ts",
@@ -31,6 +32,7 @@
     "@types/bun": "1.4.0",
     "@types/node": "26.2.0",
     "playwright-core": "1.62.1",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
   }
 }
