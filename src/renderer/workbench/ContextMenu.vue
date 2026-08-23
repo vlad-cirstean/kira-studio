@@ -72,50 +72,61 @@ async function onItemClick(item: MenuItem): Promise<void> {
 
 <template>
   <Teleport to="body">
-    <div v-if="contextMenuState.open" ref="menuRef" class="context-menu" data-testid="context-menu" :style="style">
+    <div
+      v-if="contextMenuState.open"
+      ref="menuRef"
+      class="context-menu p-float"
+      data-testid="context-menu"
+      :style="style"
+    >
       <template v-for="(item, idx) in contextMenuState.items" :key="item.type === 'separator' ? `sep-${idx}` : item.id">
-        <div v-if="item.type === 'separator'" class="separator" />
+        <div v-if="item.type === 'separator'" class="p-sep" />
 
         <div
           v-else-if="item.type === 'item'"
-          class="row"
-          :class="{ disabled: item.disabled, danger: item.danger }"
+          class="p-row row"
+          :class="{ 'is-disabled': item.disabled, danger: item.danger }"
           :data-testid="`menu-item-${item.id}`"
           @mouseenter="onRowEnter(item)"
           @click="onItemClick(item)"
         >
-          <span class="check"><Codicon v-if="item.checked" name="check" :size="12" /></span>
-          <span v-if="item.swatch" class="swatch" :style="{ background: `var(--kira-conn-${item.swatch})` }" />
-          <Codicon v-else-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+          <span class="icon-box">
+            <span v-if="item.swatch" class="swatch" :style="{ background: `var(--kira-conn-${item.swatch})` }" />
+            <Codicon v-else-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+          </span>
           <span class="label">{{ item.label }}</span>
+          <span v-if="item.checked" class="icon-box"><Codicon name="check" :size="12" /></span>
         </div>
 
-        <div v-else class="row submenu-trigger" :data-testid="`menu-item-${item.id}`" @mouseenter="onRowEnter(item)">
-          <span class="check" />
-          <Codicon v-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+        <div v-else class="p-row row submenu-trigger" :data-testid="`menu-item-${item.id}`" @mouseenter="onRowEnter(item)">
+          <span class="icon-box">
+            <Codicon v-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+          </span>
           <span class="label">{{ item.label }}</span>
-          <Codicon name="chevron-right" :size="12" class="caret" />
+          <span class="icon-box"><Codicon name="chevron-right" :size="12" class="caret" /></span>
 
-          <div v-if="openSubmenuId === item.id" class="submenu" data-testid="context-submenu">
+          <div v-if="openSubmenuId === item.id" class="submenu p-float" data-testid="context-submenu">
             <template v-for="(sub, subIdx) in item.items" :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id">
-              <div v-if="sub.type === 'separator'" class="separator" />
+              <div v-if="sub.type === 'separator'" class="p-sep" />
               <div
                 v-else
-                class="row"
-                :class="{ disabled: sub.type === 'item' && sub.disabled }"
+                class="p-row row"
+                :class="{ 'is-disabled': sub.type === 'item' && sub.disabled }"
                 :data-testid="`menu-item-${sub.id}`"
                 @click="sub.type === 'item' && onItemClick(sub)"
               >
-                <span class="check">
-                  <Codicon v-if="sub.type === 'item' && sub.checked" name="check" :size="12" />
+                <span class="icon-box">
+                  <span
+                    v-if="sub.type === 'item' && sub.swatch"
+                    class="swatch"
+                    :style="{ background: `var(--kira-conn-${sub.swatch})` }"
+                  />
+                  <Codicon v-else-if="sub.icon" :name="sub.icon" :size="12" class="item-icon" />
                 </span>
-                <span
-                  v-if="sub.type === 'item' && sub.swatch"
-                  class="swatch"
-                  :style="{ background: `var(--kira-conn-${sub.swatch})` }"
-                />
-                <Codicon v-else-if="sub.icon" :name="sub.icon" :size="12" class="item-icon" />
                 <span class="label">{{ sub.label }}</span>
+                <span v-if="sub.type === 'item' && sub.checked" class="icon-box">
+                  <Codicon name="check" :size="12" />
+                </span>
               </div>
             </template>
           </div>
@@ -126,39 +137,34 @@ async function onItemClick(item: MenuItem): Promise<void> {
 </template>
 
 <style scoped>
+/* P16 design system: every floating surface is the same primitive (Menus.html) —
+   .p-float supplies bg-elevated / border-strong / radius / shadow. Its own
+   overflow: hidden is overridden here because a submenu pops out past this
+   surface's edge (left: 100%) and must not be clipped by it. */
 .context-menu {
   position: fixed;
   min-width: 180px;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
-  padding: 4px;
+  padding: var(--kira-s-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: visible;
   z-index: 200;
-  font-size: 12px;
 }
 
+/* Rows share the tree/operations-list row primitive (P8) so a menu row and a
+   tree row highlight identically. */
 .row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: var(--kira-radius-sm);
-  cursor: pointer;
   position: relative;
   white-space: nowrap;
 }
 
-.row:hover {
-  background: var(--kira-hover);
-}
-
-.row.disabled {
+.row.is-disabled {
   color: var(--kira-fg-disabled);
-  cursor: not-allowed;
+  cursor: default;
 }
 
-.row.disabled:hover {
+.row.is-disabled:hover {
   background: transparent;
 }
 
@@ -166,16 +172,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
   color: var(--kira-error);
 }
 
-.check {
-  width: 12px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .item-icon {
-  flex-shrink: 0;
   color: var(--kira-fg-muted);
 }
 
@@ -188,17 +185,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
 
 .label {
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .caret {
-  margin-left: 8px;
   color: var(--kira-fg-muted);
-}
-
-.separator {
-  height: 1px;
-  background: var(--kira-border);
-  margin: 4px 2px;
 }
 
 .submenu-trigger {
@@ -210,10 +202,9 @@ async function onItemClick(item: MenuItem): Promise<void> {
   left: 100%;
   top: -4px;
   min-width: 160px;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
-  padding: 4px;
+  padding: var(--kira-s-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 </style>

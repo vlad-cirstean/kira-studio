@@ -76,14 +76,14 @@ onUnmounted(() => {
       <div
         v-if="open"
         ref="popoverRef"
-        class="error-popover"
+        class="error-popover p-float"
         data-testid="error-popover"
         :style="style"
       >
         <div class="error-popover-body">{{ props.message }}</div>
-        <div class="error-popover-actions">
-          <button type="button" @click="copyText(props.message)">Copy</button>
-          <button type="button" @click="close">Close</button>
+        <div class="p-toolbar last error-popover-actions">
+          <button type="button" class="p-btn p-push" @click="copyText(props.message)">Copy</button>
+          <button type="button" class="p-btn" @click="close">Close</button>
         </div>
       </div>
     </Teleport>
@@ -100,14 +100,14 @@ onUnmounted(() => {
 .error-trigger {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--kira-s-2);
   min-width: 0;
   max-width: 100%;
   background: transparent;
   border: none;
   padding: 0;
   color: var(--kira-error);
-  font-size: 11px;
+  font-size: var(--kira-t-sm);
   cursor: pointer;
 }
 
@@ -125,15 +125,11 @@ onUnmounted(() => {
   max-height: 240px;
   display: flex;
   flex-direction: column;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
-  font-size: 12px;
+  font-size: var(--kira-t-md);
 }
 
 .error-popover-body {
-  padding: 8px;
+  padding: var(--kira-s-4);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -141,26 +137,11 @@ onUnmounted(() => {
   font-family: var(--kira-font-family);
 }
 
+/* Footer is the same 28px band used everywhere a toolbar sits at the edge of a
+   floating surface, with the border moved to the top since this one closes
+   the popover instead of opening it. */
 .error-popover-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 4px 8px;
   border-top: var(--kira-border-width) solid var(--kira-border);
   flex-shrink: 0;
-}
-
-.error-popover-actions button {
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  padding: 3px 8px;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.error-popover-actions button:hover {
-  background: var(--kira-hover);
 }
 </style>

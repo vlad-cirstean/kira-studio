@@ -56,22 +56,25 @@ function onKeydown(e: KeyboardEvent): void {
     data-testid="command-palette-backdrop"
     @click="closePalette"
   >
-    <div class="palette" data-testid="command-palette" @click.stop>
-      <input
-        ref="inputRef"
-        v-model="paletteState.query"
-        class="palette-input"
-        data-testid="command-palette-input"
-        type="text"
-        placeholder="Type a command…"
-        @keydown="onKeydown"
-      />
+    <div class="palette p-float" data-testid="command-palette" @click.stop>
+      <div class="palette-input-pad">
+        <div class="p-input ui md palette-input">
+          <input
+            ref="inputRef"
+            v-model="paletteState.query"
+            data-testid="command-palette-input"
+            type="text"
+            placeholder="Type a command…"
+            @keydown="onKeydown"
+          />
+        </div>
+      </div>
       <div class="palette-list">
         <div
           v-for="(command, i) in filtered"
           :key="command.id"
-          class="palette-item"
-          :class="{ active: i === activeIndex }"
+          class="p-row palette-item"
+          :class="{ 'is-selected': i === activeIndex }"
           data-testid="command-palette-item"
           :data-command-id="command.id"
           @mouseenter="activeIndex = i"
@@ -79,7 +82,7 @@ function onKeydown(e: KeyboardEvent): void {
         >
           {{ command.label }}
         </div>
-        <div v-if="filtered.length === 0" class="palette-empty">No matching commands</div>
+        <div v-if="filtered.length === 0" class="palette-empty dim">No matching commands</div>
       </div>
     </div>
   </div>
@@ -102,43 +105,38 @@ function onKeydown(e: KeyboardEvent): void {
   max-height: 360px;
   display: flex;
   flex-direction: column;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow);
-  overflow: hidden;
+}
+
+/* Command palette — Menus.html: one bordered p-input inset in its own padded
+   row, then the list below a hairline, rather than a borderless full-bleed
+   field. */
+.palette-input-pad {
+  flex-shrink: 0;
+  padding: var(--kira-s-3);
 }
 
 .palette-input {
-  padding: 10px 12px;
-  border: none;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  background: transparent;
-  color: var(--kira-fg);
-  font-size: 13px;
-  outline: none;
+  width: 100%;
 }
 
 .palette-list {
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--kira-s-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 
 .palette-item {
-  padding: 6px 10px;
-  border-radius: var(--kira-radius-sm);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.palette-item.active,
-.palette-item:hover {
-  background: var(--kira-hover);
+  white-space: nowrap;
 }
 
 .palette-empty {
-  padding: 8px 10px;
-  color: var(--kira-fg-muted);
-  font-size: 12px;
+  height: var(--kira-h-sm);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  font-size: var(--kira-t-md);
 }
 </style>
