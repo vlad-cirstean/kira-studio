@@ -9,6 +9,7 @@ import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { documentRow, isIdNull, pageVersion } from './docPage';
@@ -255,16 +256,15 @@ onUnmounted(() => {
 
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed. -->
       <template #toolbar-2>
-        <span class="p-input" style="flex: 1; min-width: 0">
-          <input
+        <div class="filter-field">
+          <TextField
             v-model="searchText"
-            type="text"
             placeholder="Filter (e.g. { name: 'a' })"
             data-testid="document-search"
             @keyup.enter="onSearchInput"
             @blur="onSearchInput"
           />
-        </span>
+        </div>
       </template>
 
       <template #strips>
@@ -368,6 +368,18 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so the permanent filter row's "grow to fill" sizing
+   moves onto this wrapper instead of a style attribute on the component tag itself. */
+.filter-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-field :deep(.p-input) {
+  width: 100%;
 }
 
 .list-body {

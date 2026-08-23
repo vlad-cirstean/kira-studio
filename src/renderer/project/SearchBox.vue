@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import Codicon from '../theme/Codicon.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
+import TextField from '../theme/primitives/TextField.vue';
 import { treeState } from './state/tree';
 </script>
 
 <template>
   <div class="search-box-row">
-    <div class="search-box p-input ui">
-      <span class="icon-box"><Codicon name="search" :size="12" class="search-icon" /></span>
-      <input
+    <div class="search-box">
+      <TextField
         v-model="treeState.search"
-        type="text"
+        ui
+        icon="search"
         placeholder="Search"
         data-testid="tree-search"
       />
@@ -35,15 +35,29 @@ import { treeState } from './state/tree';
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner
+   <input> (see TextField.vue's inheritAttrs:false), so the "grow to fill" sizing moves onto
+   this wrapper instead of a style/class attribute on the component tag itself (DocumentView.vue
+   precedent) — and the clear button, which used to be a third flex child inside the bordered
+   box, is now overlaid on top of it since TextField has no slot for trailing content. */
 .search-box {
+  width: 100%;
+  position: relative;
+}
+
+.search-box :deep(.p-input) {
   width: 100%;
 }
 
-.search-icon {
-  color: var(--kira-fg-muted);
+.search-box :deep(input) {
+  padding-right: var(--kira-s-6);
 }
 
 .clear-button {
+  position: absolute;
+  top: 50%;
+  right: var(--kira-s-1);
+  transform: translateY(-50%);
   flex-shrink: 0;
 }
 </style>

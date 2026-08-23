@@ -174,6 +174,11 @@ async function saveCurrent(): Promise<void> {
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">
       <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
+      <!-- Left as a raw .p-input-styled <input> rather than <TextField>: promptInput is a
+           template ref used imperatively (`promptInput.value?.focus()` above) to autofocus this
+           field when the prompt opens. TextField has no defineExpose, so a ref on it resolves to
+           the component instance, not the inner <input> — that focus() call would break
+           (rule 3: correctness over consistency). -->
       <span class="p-input md">
         <input
           ref="promptInput"

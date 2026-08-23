@@ -10,6 +10,7 @@ import Codicon from '../theme/Codicon.vue';
 import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
+import TextField from '../theme/primitives/TextField.vue';
 import { evaluate } from './filter';
 import { closeFiltersDialog, filtersDialogState, saveFilters, treeState } from './state/tree';
 
@@ -127,8 +128,8 @@ const connectionName = computed(
             <option value="hide">Hide</option>
             <option value="show">Show</option>
           </select>
-          <div class="p-input md pattern-input-wrap">
-            <input v-model="rule.pattern" type="text" class="pattern-input" placeholder="pg_*" />
+          <div class="pattern-input-wrap">
+            <TextField v-model="rule.pattern" class="pattern-input" placeholder="pg_*" />
           </div>
           <label class="regex-checkbox">
             <input v-model="rule.isRegex" type="checkbox" />
@@ -198,6 +199,10 @@ const connectionName = computed(
 .pattern-input-wrap {
   flex: 1;
   min-width: 100px;
+}
+
+.pattern-input-wrap :deep(.p-input) {
+  width: 100%;
 }
 
 .regex-checkbox {

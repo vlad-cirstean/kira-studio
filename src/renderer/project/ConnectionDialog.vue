@@ -14,6 +14,7 @@ import EngineIcon from '../theme/EngineIcon.vue';
 import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
+import TextField from '../theme/primitives/TextField.vue';
 import ColorPicker from './ColorPicker.vue';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
@@ -116,6 +117,23 @@ function setMode(mode: 'fields' | 'uri'): void {
   // must not linger — the backend also refuses to store/return `uri` outside URI mode, but
   // there is no reason to keep it around in the draft either.
   d.uri = null;
+}
+
+// TextField's modelValue is always a string; the port field's own type is number|null (D27's
+// per-kind default), so this mirrors what v-model.number did on the raw <input type="number">
+// (parse on the way in, fall back rather than write a non-numeric value into a numeric field).
+function setPort(value: string): void {
+  const d = draft.value;
+  if (!d) return;
+  const n = Number.parseFloat(value);
+  d.port = Number.isNaN(n) ? null : n;
+}
+
+function setUri(value: string): void {
+  const d = draft.value;
+  if (!d) return;
+  d.uri = value;
+  refreshUriNote();
 }
 
 function onKindChange(kind: ConnectionKind): void {
@@ -245,10 +263,14 @@ const preconnectText = computed({
 
     <template v-if="step === 'engine'">
       <div class="dialog-body-inner engine-body">
-        <div class="p-input ui md">
-          <span class="icon-box"><Codicon name="search" :size="14" /></span>
-          <input v-model="engineSearch" type="text" placeholder="Search engines" data-testid="connection-engine-search" />
-        </div>
+        <TextField
+          v-model="engineSearch"
+          icon="search"
+          ui
+          size="md"
+          placeholder="Search engines"
+          data-testid="connection-engine-search"
+        />
 
         <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
           <button
@@ -281,9 +303,7 @@ const preconnectText = computed({
           <div class="field-row">
             <div class="field name-field">
               <label>Name</label>
-              <div class="p-input md ui">
-                <input v-model="draft.name" type="text" data-testid="connection-name" />
-              </div>
+              <TextField v-model="draft.name" ui size="md" data-testid="connection-name" />
             </div>
             <div class="field color-field">
               <label>Color</label>
@@ -318,32 +338,57 @@ const preconnectText = computed({
             <div v-if="!isSqs" class="field-row">
               <div class="field">
                 <label>Host</label>
-                <div class="p-input md"><input v-model="draft.host" type="text" data-testid="connection-host" /></div>
+                <TextField
+                  :model-value="draft.host ?? ''"
+                  size="md"
+                  data-testid="connection-host"
+                  @update:model-value="draft.host = $event"
+                />
               </div>
               <div class="field port-field">
                 <label>Port</label>
-                <div class="p-input md"><input v-model.number="draft.port" type="number" data-testid="connection-port" /></div>
+                <TextField
+                  :model-value="draft.port != null ? String(draft.port) : ''"
+                  type="number"
+                  size="md"
+                  data-testid="connection-port"
+                  @update:model-value="setPort"
+                />
               </div>
             </div>
             <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
             <div class="field-row">
               <div class="field">
                 <label>{{ isSqs ? 'Region' : 'Database' }}</label>
-                <div class="p-input md"><input v-model="draft.database" type="text" data-testid="connection-database" /></div>
+                <TextField
+                  :model-value="draft.database ?? ''"
+                  size="md"
+                  data-testid="connection-database"
+                  @update:model-value="draft.database = $event"
+                />
               </div>
               <div class="field">
                 <label>{{ isSqs ? 'AWS profile (optional)' : 'User' }}</label>
-                <div class="p-input md"><input v-model="draft.username" type="text" data-testid="connection-username" /></div>
+                <TextField
+                  :model-value="draft.username ?? ''"
+                  size="md"
+                  data-testid="connection-username"
+                  @update:model-value="draft.username = $event"
+                />
               </div>
             </div>
             <div v-if="!isSqs" class="field">
               <label>Password</label>
-              <div class="p-input md password-row">
-                <input
-                  v-model="draft.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  data-testid="connection-password"
-                />
+              <div class="password-row">
+                <div class="password-input">
+                  <TextField
+                    :model-value="draft.password ?? ''"
+                    :type="showPassword ? 'text' : 'password'"
+                    size="md"
+                    data-testid="connection-password"
+                    @update:model-value="draft.password = $event"
+                  />
+                </div>
                 <IconButton
                   :icon="showPassword ? 'eye-closed' : 'eye'"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
@@ -355,16 +400,14 @@ const preconnectText = computed({
           <template v-else>
             <div class="field">
               <label>Connection URI</label>
-              <div class="p-input md">
-                <input
-                  v-model="draft.uri"
-                  type="text"
-                  class="mono"
-                  data-testid="connection-uri"
-                  @input="refreshUriNote"
-                  @blur="refreshUriNote"
-                />
-              </div>
+              <TextField
+                :model-value="draft.uri ?? ''"
+                size="md"
+                class="mono"
+                data-testid="connection-uri"
+                @update:model-value="setUri"
+                @blur="refreshUriNote"
+              />
             </div>
             <p class="mono uri-note">{{ uriNote }}</p>
           </template>
@@ -377,9 +420,7 @@ const preconnectText = computed({
 
           <div class="field">
             <label>Pre-connect command <span class="dim">— optional</span></label>
-            <div class="p-input md">
-              <input v-model="preconnectText" type="text" class="mono" data-testid="connection-preconnect" />
-            </div>
+            <TextField v-model="preconnectText" size="md" class="mono" data-testid="connection-preconnect" />
             <span class="helper-text">
               Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
             </span>
@@ -529,7 +570,21 @@ const preconnectText = computed({
 }
 
 .password-row {
+  display: flex;
+  align-items: center;
   gap: var(--kira-s-2);
+}
+
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so growing it to fill the row next to the show/hide
+   IconButton moves onto this wrapper instead of a style attribute on the component tag itself. */
+.password-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.password-input :deep(.p-input) {
+  width: 100%;
 }
 
 .segmented {

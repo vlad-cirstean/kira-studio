@@ -6,6 +6,7 @@ import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import FilterHistoryMenu from './FilterHistoryMenu.vue';
 import { runtime, setFilter, setSort } from './state';
 
@@ -75,19 +76,13 @@ async function onClear(): Promise<void> {
   recordHistory(null, null);
 }
 
-function onWhereKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-  else if (e.key === 'Escape') {
-    whereText.value = tab.value?.state.filter ?? '';
-    (e.target as HTMLInputElement).blur();
-  }
+function onWhereEscape(e: KeyboardEvent): void {
+  whereText.value = tab.value?.state.filter ?? '';
+  (e.target as HTMLInputElement).blur();
 }
-function onOrderByKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-  else if (e.key === 'Escape') {
-    orderByText.value = sortToText(tab.value?.state.sort ?? null);
-    (e.target as HTMLInputElement).blur();
-  }
+function onOrderByEscape(e: KeyboardEvent): void {
+  orderByText.value = sortToText(tab.value?.state.sort ?? null);
+  (e.target as HTMLInputElement).blur();
 }
 
 const historyOpen = ref(false);
@@ -119,30 +114,29 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
         @close="historyOpen = false"
       />
     </div>
-    <span class="p-input where-input" :class="{ 'is-error': hasError }">
-      <span class="dim prefix">WHERE</span>
-      <input
+    <div class="where-input">
+      <TextField
         v-model="whereText"
-        type="text"
-        class="mono"
+        prefix="WHERE"
         placeholder="status = 'paid'"
         data-testid="filter-where-input"
-        @keydown="onWhereKeydown"
+        :invalid="hasError"
+        @enter="applyWhere"
+        @keydown.esc="onWhereEscape"
         @blur="applyWhere"
       />
-    </span>
-    <span class="p-input orderby-input">
-      <span class="dim prefix">ORDER BY</span>
-      <input
+    </div>
+    <div class="orderby-input">
+      <TextField
         v-model="orderByText"
-        type="text"
-        class="mono"
+        prefix="ORDER BY"
         placeholder="placed_at DESC"
         data-testid="filter-orderby-input"
-        @keydown="onOrderByKeydown"
+        @enter="applyOrderBy"
+        @keydown.esc="onOrderByEscape"
         @blur="applyOrderBy"
       />
-    </span>
+    </div>
     <span v-if="isStructuredSort" class="p-chip info" title="Sort came from clicking a column header">
       <Codicon name="sort-precedence" :size="11" />from header
     </span>
@@ -151,8 +145,11 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 </template>
 
 <style scoped>
-/* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths and
-   the WHERE/ORDER BY prefixes live here. */
+/* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths
+   live here. TextField's root <span class="p-input"> only receives fallthrough attrs on its
+   inner <input> (see TextField.vue's inheritAttrs:false), so each field's width lives on this
+   wrapper instead of a class/style on the <TextField> tag itself (DocumentView.vue's same
+   `.filter-field` precedent). */
 .history-anchor {
   position: relative;
 }
@@ -162,8 +159,8 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   min-width: 0;
 }
 
-.where-input.is-error {
-  border-color: var(--kira-error);
+.where-input :deep(.p-input) {
+  width: 100%;
 }
 
 .orderby-input {
@@ -171,8 +168,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   flex-shrink: 0;
 }
 
-.prefix {
-  flex-shrink: 0;
-  font-family: -apple-system, 'SF Pro Text', system-ui, 'Segoe UI', sans-serif;
+.orderby-input :deep(.p-input) {
+  width: 100%;
 }
 </style>

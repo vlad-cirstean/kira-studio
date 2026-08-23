@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import Codicon from '../../theme/Codicon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import { getPage } from './page';
 import { clearSearchState, runSearch, type SearchHandle, searchState } from './search';
 
@@ -105,9 +106,18 @@ onUnmounted(() => {
     <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
       <Codicon name="search" :size="14" />
     </span>
-    <span class="p-input search-input" :class="{ 'is-error': errorMessage }">
-      <input v-model="query" type="text" class="mono" placeholder="Find" data-testid="search-input" />
-    </span>
+    <div class="search-input">
+      <TextField
+        v-model="query"
+        placeholder="Find"
+        data-testid="search-input"
+        :invalid="!!errorMessage"
+      />
+    </div>
+    <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
+         single-value picker — <Segmented> only models "exactly one option selected", so it
+         can't represent this without changing behaviour. Left as the hand-rolled .p-seg group
+         (rule 3: correctness over consistency). -->
     <span class="p-seg">
       <span
         :class="{ on: matchCase }"
@@ -169,13 +179,17 @@ onUnmounted(() => {
   border-bottom: none;
 }
 
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so the fixed width lives on this wrapper instead of
+   a class/style on the <TextField> tag itself (DocumentView.vue's same `.filter-field`
+   precedent). */
 .search-input {
   width: 200px;
   flex-shrink: 0;
 }
 
-.search-input.is-error {
-  border-color: var(--kira-error);
+.search-input :deep(.p-input) {
+  width: 100%;
 }
 
 .search-count {

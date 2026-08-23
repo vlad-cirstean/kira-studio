@@ -6,6 +6,7 @@ import { findConsoleTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { setText } from './state';
 
@@ -27,11 +28,17 @@ const textPrompt = ref<{
   value: string;
   resolve: (v: string | null) => void;
 } | null>(null);
-const promptInput = ref<HTMLInputElement | null>(null);
+// Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
+// read as a type-only use of the TextField import above — it's a real component, bound as a value
+// by the template below.
+const promptInput = ref<{ $el: HTMLElement } | null>(null);
 function promptText(title: string, initial: string): Promise<string | null> {
   return new Promise((resolve) => {
     textPrompt.value = { title, value: initial, resolve };
-    void nextTick(() => promptInput.value?.focus());
+    // TextField wraps the real <input> inside its own root <span> (P4) and isn't defineExpose'd,
+    // so the focus target is reached the same way any plain DOM query would find it — via the
+    // component's $el, which Vue always exposes on a template ref regardless of defineExpose.
+    void nextTick(() => promptInput.value?.$el.querySelector('input')?.focus());
   });
 }
 function submitPrompt(): void {
@@ -122,16 +129,14 @@ async function saveCurrent(): Promise<void> {
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">
       <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <span class="p-input md">
-        <input
-          ref="promptInput"
-          v-model="textPrompt.value"
-          type="text"
-          data-testid="text-prompt-input"
-          @keydown.enter="submitPrompt"
-          @keydown.escape="cancelPrompt"
-        />
-      </span>
+      <TextField
+        ref="promptInput"
+        v-model="textPrompt.value"
+        size="md"
+        data-testid="text-prompt-input"
+        @enter="submitPrompt"
+        @keydown.escape="cancelPrompt"
+      />
       <div class="prompt-actions">
         <Button kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </Button>
         <Button kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">

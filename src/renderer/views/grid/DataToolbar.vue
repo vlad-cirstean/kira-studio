@@ -6,6 +6,7 @@ import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { getPage } from './page';
@@ -73,9 +74,6 @@ const pageInputValue = ref(String(pageDisplay.value));
 watch(pageDisplay, (v) => {
   pageInputValue.value = String(v);
 });
-function onPageInput(e: Event): void {
-  pageInputValue.value = (e.target as HTMLInputElement).value;
-}
 const pageCount = computed(() => {
   const count = rt.value?.count;
   const size = tab.value?.state.pageSize;
@@ -246,16 +244,15 @@ function onDiscard(): void {
       />
       <span class="page-label p-sm muted">
         page
-        <span class="p-input page-input">
-          <input
+        <div class="page-input">
+          <TextField
+            v-model="pageInputValue"
             type="number"
             min="1"
             data-testid="pager-page-input"
-            :value="pageInputValue"
-            @input="onPageInput"
             @change="onJump"
           />
-        </span>
+        </div>
         <template v-if="pageCount"> of {{ pageCount }}</template>
       </span>
       <IconButton
@@ -276,6 +273,10 @@ function onDiscard(): void {
       />
     </div>
 
+    <!-- Left as the hand-rolled .p-seg group rather than <Segmented>: tabs.spec.ts/leaks.spec.ts
+         assert `toHaveClass(/active/)` on these buttons, and Segmented.vue (off-limits to edit)
+         only ever applies `.on` — swapping components here would silently break those tests
+         (rule 3: correctness over consistency). -->
     <div class="p-seg" data-testid="page-size-picker">
       <button
         v-for="size in PAGE_SIZES"
@@ -409,12 +410,20 @@ function onDiscard(): void {
   white-space: nowrap;
 }
 
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so the fixed width and centred text live on this
+   wrapper/its :deep() descendants instead of a class/style on the <TextField> tag itself
+   (DocumentView.vue's same `.filter-field` precedent). */
 .page-input {
   width: 46px;
+}
+
+.page-input :deep(.p-input) {
+  width: 100%;
   padding: 0 var(--kira-s-2);
 }
 
-.page-input input {
+.page-input :deep(input) {
   text-align: center;
 }
 

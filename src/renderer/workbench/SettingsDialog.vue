@@ -7,6 +7,7 @@ import { patchSettings, settingsState } from '../state/settings';
 import Codicon from '../theme/Codicon.vue';
 import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import TextField from '../theme/primitives/TextField.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 // SettingsDialog.html's "Connection colours" swatch row (D18/tokens.css's --kira-conn-*) —
@@ -136,14 +137,13 @@ async function onClearCaches(): Promise<void> {
             <div class="sec-label first">Typography</div>
             <label class="field">
               <span>Data font</span>
-              <div class="p-input md">
-                <input
-                  type="text"
-                  list="kira-font-families"
-                  :value="settingsState.appearance.fontFamily"
-                  @input="onFontFamilyChange"
-                />
-              </div>
+              <TextField
+                type="text"
+                size="md"
+                list="kira-font-families"
+                :model-value="settingsState.appearance.fontFamily"
+                @input="onFontFamilyChange"
+              />
               <datalist id="kira-font-families">
                 <option value="'SF Mono', Menlo, monospace" />
                 <option value="Menlo, monospace" />
@@ -155,12 +155,13 @@ async function onClearCaches(): Promise<void> {
 
             <label class="field">
               <span>Data font size</span>
-              <div class="p-input md size-input">
-                <input
+              <div class="size-input">
+                <TextField
                   type="number"
                   min="9"
                   max="24"
-                  :value="settingsState.appearance.fontSize"
+                  size="md"
+                  :model-value="String(settingsState.appearance.fontSize)"
                   @change="onFontSizeChange"
                 />
               </div>
@@ -259,28 +260,23 @@ async function onClearCaches(): Promise<void> {
           <template v-else-if="activeSection === 'Cache'">
             <label class="field">
               <span>Result page cache budget (MB)</span>
-              <div class="p-input md">
-                <input
-                  type="number"
-                  min="8"
-                  max="1024"
-                  data-testid="settings-cache-budget"
-                  :value="settingsState.cache.l2BudgetMb"
-                  @change="onCacheBudgetChange"
-                />
-              </div>
+              <TextField
+                type="number"
+                min="8"
+                max="1024"
+                size="md"
+                data-testid="settings-cache-budget"
+                :model-value="String(settingsState.cache.l2BudgetMb)"
+                @change="onCacheBudgetChange"
+              />
             </label>
             <label class="field">
               <span>Current usage</span>
-              <div class="p-input md">
-                <input type="text" :value="cacheSizeLabel" disabled />
-              </div>
+              <TextField type="text" size="md" :model-value="cacheSizeLabel" disabled />
             </label>
             <label class="field">
               <span>Hit rate</span>
-              <div class="p-input md">
-                <input type="text" :value="hitRateLabel" disabled />
-              </div>
+              <TextField type="text" size="md" :model-value="hitRateLabel" disabled />
             </label>
             <Button
               kind="dialog"
@@ -295,29 +291,27 @@ async function onClearCaches(): Promise<void> {
           <template v-else>
             <label class="field">
               <span>Engine memory cap (MB)</span>
-              <div class="p-input md">
-                <input
-                  type="number"
-                  min="256"
-                  max="4096"
-                  data-testid="settings-engine-memory-cap"
-                  :value="settingsState.advanced.engineMemoryCapMb"
-                  @change="onEngineMemoryCapChange"
-                />
-              </div>
+              <TextField
+                type="number"
+                min="256"
+                max="4096"
+                size="md"
+                data-testid="settings-engine-memory-cap"
+                :model-value="String(settingsState.advanced.engineMemoryCapMb)"
+                @change="onEngineMemoryCapChange"
+              />
             </label>
             <label class="field">
               <span>Operation log retention (days)</span>
-              <div class="p-input md">
-                <input
-                  type="number"
-                  min="1"
-                  max="365"
-                  data-testid="settings-oplog-retention"
-                  :value="settingsState.advanced.opLogRetentionDays"
-                  @change="onOpLogRetentionChange"
-                />
-              </div>
+              <TextField
+                type="number"
+                min="1"
+                max="365"
+                size="md"
+                data-testid="settings-oplog-retention"
+                :model-value="String(settingsState.advanced.opLogRetentionDays)"
+                @change="onOpLogRetentionChange"
+              />
             </label>
             <p class="muted-note">Takes effect after restart.</p>
           </template>
@@ -424,6 +418,10 @@ async function onClearCaches(): Promise<void> {
 
 .size-input {
   width: 96px;
+}
+
+.size-input :deep(.p-input) {
+  width: 100%;
 }
 
 .segmented {

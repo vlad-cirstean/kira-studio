@@ -10,6 +10,8 @@ import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Segmented from '../../theme/primitives/Segmented.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
@@ -22,6 +24,12 @@ interface OpsListItem {
 }
 
 const expandedId = ref<string | null>(null);
+
+const statusFilterOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'running', label: 'Running' },
+  { value: 'error', label: 'Errors' },
+] as const;
 
 function toggleExpanded(record: OpRecord): void {
   expandedId.value = expandedId.value === record.id ? null : record.id;
@@ -147,14 +155,14 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   <div class="ops-panel">
     <div class="ops-header">
       <div class="filter-input">
-        <Codicon name="filter" :size="12" />
-        <input v-model="opsState.filterText" type="text" placeholder="Filter" data-testid="ops-filter" />
+        <TextField
+          v-model="opsState.filterText"
+          icon="filter"
+          placeholder="Filter"
+          data-testid="ops-filter"
+        />
       </div>
-      <div class="segmented">
-        <button type="button" :class="{ active: opsState.statusFilter === 'all' }" @click="opsState.statusFilter = 'all'">All</button>
-        <button type="button" :class="{ active: opsState.statusFilter === 'running' }" @click="opsState.statusFilter = 'running'">Running</button>
-        <button type="button" :class="{ active: opsState.statusFilter === 'error' }" @click="opsState.statusFilter = 'error'">Errors</button>
-      </div>
+      <Segmented v-model="opsState.statusFilter" :options="statusFilterOptions" />
       <span class="running-count">{{ runningCount }} running</span>
       <button
         type="button"
@@ -266,41 +274,15 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so the fixed-width sizing moves onto this wrapper
+   instead of a style/class attribute on the component tag itself (DocumentView.vue precedent). */
 .filter-input {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   flex: 0 0 160px;
-  color: var(--kira-fg-muted);
 }
 
-.filter-input input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg);
-  font-size: 11px;
-  outline: none;
-}
-
-.segmented {
-  display: flex;
-  gap: 2px;
-}
-
-.segmented button {
-  padding: 2px 6px;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.segmented button.active {
-  background: var(--kira-select);
-  color: var(--kira-fg);
+.filter-input :deep(.p-input) {
+  width: 100%;
 }
 
 .running-count {
