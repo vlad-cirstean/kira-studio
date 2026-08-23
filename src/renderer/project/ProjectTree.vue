@@ -2,6 +2,10 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
 import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
+import { reload as reloadDocumentTab } from '../views/documents/state';
+import { reload as reloadDataTab } from '../views/grid/state';
+import { reload as reloadKeyValueTab } from '../views/keyvalue/state';
+import { reload as reloadStreamTab } from '../views/stream/state';
 import { openContextMenu } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -63,21 +67,28 @@ function onToggle(row: TreeRowVm): void {
   else void expand(row.connectionId, row.path);
 }
 
+// Task 62: double-clicking a tree row that already has an open tab for the same
+// (connectionId, path) used to just refocus it — no refetch. A freshly created tab is about to
+// fetch on mount anyway, so only the reused case needs an explicit reload here.
 function onOpen(row: TreeRowVm): void {
   if (OPENABLE_KINDS.has(row.kind)) {
-    openDataTab(row.connectionId, row.path);
+    const { id, reused } = openDataTab(row.connectionId, row.path);
+    if (reused) void reloadDataTab(id);
     return;
   }
   if (DOCUMENT_OPENABLE_KINDS.has(row.kind)) {
-    openDocumentTab(row.connectionId, row.path);
+    const { id, reused } = openDocumentTab(row.connectionId, row.path);
+    if (reused) void reloadDocumentTab(id);
     return;
   }
   if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
-    openKeyValueTab(row.connectionId, row.path);
+    const { id, reused } = openKeyValueTab(row.connectionId, row.path);
+    if (reused) void reloadKeyValueTab(id);
     return;
   }
   if (STREAM_OPENABLE_KINDS.has(row.kind)) {
-    openStreamTab(row.connectionId, row.path);
+    const { id, reused } = openStreamTab(row.connectionId, row.path);
+    if (reused) void reloadStreamTab(id);
     return;
   }
   // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue

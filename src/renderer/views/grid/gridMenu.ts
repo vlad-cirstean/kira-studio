@@ -72,7 +72,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
     ctx.rowValues,
   );
   if (filter === null) return;
-  const tabId = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
+  const { id: tabId } = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
   void setFilter(tabId, filter);
 }
 

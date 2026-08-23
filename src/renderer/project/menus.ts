@@ -341,7 +341,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       // Opens (or reuses) the table's data tab and runs Σ on it — never a bare count with
       // nowhere to show the answer.
       run: () => {
-        const tabId = openDataTab(row.connectionId, row.path);
+        const { id: tabId } = openDataTab(row.connectionId, row.path);
         void runCount(tabId);
       },
     },
@@ -407,7 +407,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Count documents',
       icon: 'symbol-numeric',
       run: () => {
-        const tabId = openDocumentTab(row.connectionId, row.path);
+        const { id: tabId } = openDocumentTab(row.connectionId, row.path);
         void runDocumentCount(tabId);
       },
     },
@@ -521,7 +521,7 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
     id: `saved-filter-${entry.id}`,
     label: entry.name,
     run: async () => {
-      const tabId = openDataTab(row.connectionId, row.path);
+      const { id: tabId } = openDataTab(row.connectionId, row.path);
       await setFilter(tabId, entry.body.where);
       await setSort(tabId, entry.body.orderBy);
       await control.queriesTouch(entry.id);
@@ -556,7 +556,7 @@ function targetTabFor(row: TreeRowVm): string {
   if (active && active.connectionId === row.connectionId && active.path === tablePath) {
     return active.id;
   }
-  return openDataTab(row.connectionId, tablePath);
+  return openDataTab(row.connectionId, tablePath).id;
 }
 
 function columnMenu(row: TreeRowVm): MenuItem[] {
