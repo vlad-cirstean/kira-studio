@@ -900,6 +900,25 @@ describe('mariadb adapter (§9.1)', () => {
         await sideConn.end();
       }
 
+      // 1b. Constraints (P19 D11): one added information_schema query, on the definition path
+      // only — MariaDB has no `pg_get_constraintdef`-style builtin to reuse the way Postgres does.
+      const orderItems = await adapter.definition(
+        path([
+          { kind: 'database', name: 'kira_test' },
+          { kind: 'table', name: 'order_items' },
+        ]),
+        makeCtx(),
+      );
+      const pk = orderItems.constraints.find((c) => c.type === 'primaryKey');
+      expect(pk).toBeDefined();
+      const foreignKeys = orderItems.constraints.filter((c) => c.type === 'foreignKey');
+      expect(foreignKeys).toHaveLength(2);
+      expect(foreignKeys.map((c) => c.definition).join(' ')).toContain('REFERENCES orders');
+      expect(foreignKeys.map((c) => c.definition).join(' ')).toContain('REFERENCES products');
+      const check = orderItems.constraints.find((c) => c.type === 'check');
+      expect(check?.name).toBe('order_items_quantity_positive');
+      expect(check?.definition).toContain('quantity');
+
       // 3. View.
       const orderSummary = await adapter.definition(
         path([

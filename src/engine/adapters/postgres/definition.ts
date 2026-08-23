@@ -1,4 +1,4 @@
-import type { ObjectDefinition } from '../../../shared/domain/definition';
+import type { ConstraintMeta, ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
 import { getRelationInfo, type QueryExecutor } from './catalog';
@@ -35,7 +35,16 @@ interface ColumnDdlRow {
 interface ConstraintRow {
   name: string;
   def: string;
+  contype: string; // 'p' | 'u' | 'c' | 'f' | 'x'
 }
+
+const CONSTRAINT_TYPE: Record<string, ConstraintMeta['type']> = {
+  p: 'primaryKey',
+  u: 'unique',
+  c: 'check',
+  f: 'foreignKey',
+  x: 'exclusion',
+};
 
 interface IndexDdlRow {
   def: string;
@@ -107,6 +116,7 @@ export async function buildDefinition(
   const keyword = RELATION_KEYWORD[object.kind];
   const statements: string[] = [];
   const notes: string[] = [COMPOSED_SCOPE_NOTE];
+  let constraintMetas: ConstraintMeta[] = [];
 
   if (object.kind === 'table') {
     const columns = await exec<ColumnDdlRow>(
@@ -124,13 +134,21 @@ export async function buildDefinition(
     );
     // Sequential — not Promise.all: the same single-Client rule describe() documents.
     const constraints = await exec<ConstraintRow>(
-      `SELECT format('%I', con.conname) AS name, pg_get_constraintdef(con.oid, true) AS def
+      `SELECT format('%I', con.conname) AS name, pg_get_constraintdef(con.oid, true) AS def,
+              con.contype::text AS contype
        FROM pg_constraint con
        WHERE con.conrelid = $1::oid AND con.contype IN ('p','u','c','f','x')
        ORDER BY CASE con.contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 WHEN 'c' THEN 2
                                  WHEN 'x' THEN 3 ELSE 4 END, con.conname`,
       [oid],
     );
+    // Reuses the same pg_constraint rows the DDL statements below compose from (D11) — zero
+    // extra round trips. The engine's own constraintdef text is rendered verbatim (D11).
+    constraintMetas = constraints.map((c) => ({
+      name: c.name,
+      type: CONSTRAINT_TYPE[c.contype] ?? 'check',
+      definition: c.def,
+    }));
     const indexes = await exec<IndexDdlRow>(
       `SELECT pg_get_indexdef(ix.indexrelid) AS def, i.relname AS name
        FROM pg_index ix JOIN pg_class i ON i.oid = ix.indexrelid
@@ -223,7 +241,7 @@ export async function buildDefinition(
     language: 'sql',
     origin: 'composed',
     notes,
-    constraints: [],
+    constraints: constraintMetas,
     documentSchema: null,
     generatedAt: new Date().toISOString(),
   };

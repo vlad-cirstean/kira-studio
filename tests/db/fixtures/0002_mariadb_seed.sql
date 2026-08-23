@@ -218,6 +218,7 @@ CREATE TABLE order_items (
   quantity   INT NOT NULL DEFAULT 1,
   CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id),
   CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id),
+  CONSTRAINT order_items_quantity_positive CHECK (quantity > 0),
   -- A second index besides the PK, so scenario 5's "one index per created index" has more than
   -- the implicit one to assert against.
   UNIQUE KEY order_items_order_product_idx (order_id, product_id)

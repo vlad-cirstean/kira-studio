@@ -885,6 +885,19 @@ describe('postgres adapter (§9.1)', () => {
       const orderItemsCreateTable = orderItems.statements.find((s) => s.startsWith('CREATE TABLE'));
       expect(orderItemsCreateTable).toMatch(/^CREATE TABLE app\.order_items \(/);
 
+      // 1b. Constraints (P19 D11): reused from the same pg_constraint query the DDL statements
+      // above compose from — no extra round trip.
+      const pk = orderItems.constraints.find((c) => c.type === 'primaryKey');
+      expect(pk).toBeDefined();
+      expect(pk?.definition).toContain('PRIMARY KEY');
+      const foreignKeys = orderItems.constraints.filter((c) => c.type === 'foreignKey');
+      expect(foreignKeys).toHaveLength(2);
+      expect(foreignKeys.map((c) => c.definition).join(' ')).toContain('REFERENCES app.orders');
+      expect(foreignKeys.map((c) => c.definition).join(' ')).toContain('REFERENCES app.products');
+      const check = orderItems.constraints.find((c) => c.type === 'check');
+      expect(check?.name).toBe('order_items_quantity_positive');
+      expect(check?.definition).toContain('quantity');
+
       // 2. Quoting.
       const weird = await adapter.definition(
         path([

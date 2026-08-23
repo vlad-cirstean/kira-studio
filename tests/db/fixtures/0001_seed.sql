@@ -243,7 +243,8 @@ CREATE TABLE app.order_items (
   id         serial PRIMARY KEY,
   order_id   int NOT NULL REFERENCES app.orders (id),
   product_id int NOT NULL REFERENCES app.products (id),
-  quantity   int NOT NULL DEFAULT 1
+  quantity   int NOT NULL DEFAULT 1,
+  CONSTRAINT order_items_quantity_positive CHECK (quantity > 0)
 );
 
 -- A second index on order_items besides its PK, so scenario 5's "one index per created index"
