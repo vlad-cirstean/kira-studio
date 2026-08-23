@@ -24,12 +24,19 @@ export const cacheSettingsSchema = z.object({
 });
 export type CacheSettings = z.infer<typeof cacheSettingsSchema>;
 
-// `.default(...)` on both new sections is load-bearing: a P1-era kira.sqlite has a settings
-// row with no `data`/`cache` keys, and that row must still parse on the first P2 launch.
+export const advancedSettingsSchema = z.object({
+  engineMemoryCapMb: z.number().int().min(256).max(4096),
+  opLogRetentionDays: z.number().int().min(1).max(365),
+});
+export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
+
+// `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
+// row with no `data`/`cache`/`advanced` keys, and that row must still parse on next launch.
 export const settingsSchema = z.object({
   appearance: appearanceSettingsSchema,
   data: dataSettingsSchema.default({ defaultPageSize: 100, prefetch: true, countOnOpen: false }),
   cache: cacheSettingsSchema.default({ l2BudgetMb: 64 }),
+  advanced: advancedSettingsSchema.default({ engineMemoryCapMb: 512, opLogRetentionDays: 30 }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -37,6 +44,7 @@ export const settingsPatchSchema = z.object({
   appearance: appearanceSettingsSchema.partial().optional(),
   data: dataSettingsSchema.partial().optional(),
   cache: cacheSettingsSchema.partial().optional(),
+  advanced: advancedSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -53,5 +61,9 @@ export const defaultSettings: Settings = {
   },
   cache: {
     l2BudgetMb: 64,
+  },
+  advanced: {
+    engineMemoryCapMb: 512,
+    opLogRetentionDays: 30,
   },
 };

@@ -1,6 +1,8 @@
 {
   "name": "kira-studio",
   "version": "0.1.0",
+  "description": "A visual database client (DataGrip/DBeaver class) for macOS, covering MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, and S3.",
+  "author": "kirathecat",
   "private": true,
   "main": "out/main/index.js",
   "trustedDependencies": [
@@ -18,7 +20,9 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck:db": "tsgo --noEmit -p tests/db/tsconfig.json",
     "test:ui": "electron-vite build && playwright test",
-    "test:db": "bun test tests/db"
+    "test:db": "bun test tests/db",
+    "package:mac": "electron-vite build && electron-builder --mac --arm64 --publish never",
+    "package:mac:dir": "electron-vite build && electron-builder --mac --arm64 --dir --publish never"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
@@ -41,6 +45,7 @@
     "@vscode/codicons": "0.0.46-24",
     "bun-types": "1.4.0",
     "electron": "43.4.1",
+    "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "tailwindcss": "4.3.3",
     "testcontainers": "12.1.0",

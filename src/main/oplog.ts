@@ -18,8 +18,9 @@ export function wireOplog(
   engineHost: EngineHost,
   db: KiraDb,
   broadcast: (record: OpRecord) => void,
+  retentionDays: number,
 ): void {
-  void pruneOps(db);
+  void pruneOps(db, retentionDays);
 
   const inFlight = new Map<string, InFlightOp>();
 

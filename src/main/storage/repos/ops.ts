@@ -4,7 +4,6 @@ import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { opLog } from '../schema/ops';
 
-const RETENTION_DAYS = 30;
 const HARD_CAP_ROWS = 20_000;
 
 export interface AppendOpInput {
@@ -77,8 +76,8 @@ export async function recentOps(db: KiraDb, limit: number): Promise<OpRecord[]> 
   return out;
 }
 
-export async function pruneOps(db: KiraDb): Promise<void> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+export async function pruneOps(db: KiraDb, retentionDays: number): Promise<void> {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
   await db.delete(opLog).where(lt(opLog.startedAt, cutoff));
 
   const keep = await db

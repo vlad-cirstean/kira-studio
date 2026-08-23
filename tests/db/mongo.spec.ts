@@ -72,7 +72,7 @@ afterAll(async () => {
 
 describe('mongo adapter (§9.1, P8)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toMatch(/^MongoDB \d/);
     await adapter.disconnect();
@@ -83,7 +83,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('2. auth failure', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     const badConfig = { ...fixture.config, password: 'definitely-wrong' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_AUTH',
@@ -91,7 +91,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('3. tree enumeration', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const roots = await adapter.children(path([]), makeCtx());
@@ -134,7 +134,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('5. children of a leaf', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(
@@ -152,7 +152,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('6. describe', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const meta = await adapter.describe(
@@ -176,7 +176,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('7. ddl is unsupported', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -194,7 +194,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('8. read: first page, _id keyset', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readDocument(
@@ -222,7 +222,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('9. read: keyset forward and backward', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -287,7 +287,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('10. read: skip/limit fallback for a non-_id sort', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -331,7 +331,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('11. read: filter', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readDocument(
@@ -357,7 +357,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('12. count: estimate vs exact', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -375,7 +375,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('13. preview: exact text, never executes', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -408,7 +408,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('14. mutate: whole-document replace via $document', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -468,7 +468,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('15. mutate: delete', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -512,7 +512,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('16. mutate: insert is unsupported', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -531,7 +531,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('17. mutate: read-only connection is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect({ ...fixture.config, readOnly: true }, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -550,7 +550,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('18. mutate: no matching document is E_QUERY', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -567,7 +567,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('19. execute: console statements, including a status page', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -601,7 +601,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('20. execute: unsupported method is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -619,7 +619,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('21. execute: an already-cancelled signal rejects before running anything', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();
@@ -640,7 +640,7 @@ describe('mongo adapter (§9.1, P8)', () => {
   });
 
   test('22. cancel, asserted server-side via killOp', async () => {
-    const adapter = createAdapter('mongodb', deps);
+    const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     const side = new MongoClient(fixture.rootUri);
     await side.connect();

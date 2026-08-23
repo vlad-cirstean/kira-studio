@@ -66,7 +66,7 @@ afterAll(async () => {
 
 describe('mariadb adapter (§9.1)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toMatch(/^MariaDB 11\./);
 
@@ -96,7 +96,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('2. auth failure', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     const badConfig = { ...fixture.config, password: 'definitely-wrong' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_AUTH',
@@ -104,7 +104,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('3. tree enumeration', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const roots = await adapter.children(path([]), makeCtx());
@@ -150,7 +150,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('4. quoting', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const dbChildren = await adapter.children(
@@ -184,7 +184,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('5. describe', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const orderItems = await adapter.describe(
@@ -239,7 +239,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('6. row estimate', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const dbChildren = await adapter.children(
@@ -389,7 +389,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('9. children of a leaf', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(
@@ -406,7 +406,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('10. read: first page', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readTabular(
@@ -434,7 +434,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('11. read: deep page by offset', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -468,7 +468,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('12. read: keyset forward and backward', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -541,7 +541,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('13. read: no keyset without a tiebreaker', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       // order_summary is a view with no unique key of its own.
@@ -591,7 +591,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('14. read: projection', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -634,7 +634,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('15. read: filter and sort', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -705,7 +705,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('16. read: fidelity', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readTabular(
@@ -770,7 +770,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('17. count', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const bigRowsCount = await adapter.count(
@@ -803,7 +803,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('18. read cannot write', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeConn = await createConnection({
       host: fixture.config.host ?? undefined,
@@ -847,7 +847,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('19. ddl', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     let wideTableDdl: Awaited<ReturnType<Adapter['ddl']>>;
     try {
@@ -958,7 +958,7 @@ describe('mariadb adapter (§9.1)', () => {
         await roundTripConn.end();
       }
 
-      const sourceAdapter = createAdapter('mariadb', deps);
+      const sourceAdapter = await createAdapter('mariadb', deps);
       await sourceAdapter.connect(fixture.config, makeCtx());
       let original: Awaited<ReturnType<Adapter['describe']>>;
       try {
@@ -973,7 +973,7 @@ describe('mariadb adapter (§9.1)', () => {
         await sourceAdapter.disconnect();
       }
 
-      const copyAdapter = createAdapter('mariadb', deps);
+      const copyAdapter = await createAdapter('mariadb', deps);
       await copyAdapter.connect(
         { ...fixture.config, username: 'root', password: 'kira', database: 'kira_ddl_roundtrip' },
         makeCtx(),
@@ -1032,7 +1032,7 @@ describe('mariadb adapter (§9.1)', () => {
     ]);
 
   test('20. preview: exact text, never executes', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1073,7 +1073,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('21. mutate: update lands in the op log', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -1125,7 +1125,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('22. mutate: unknown column is E_NOT_FOUND', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1141,7 +1141,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('23. mutate: read-only connection is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect({ ...fixture.config, readOnly: true }, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1163,7 +1163,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('24. mutate: a row-count conflict rolls back the whole batch', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1195,7 +1195,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('25. mutate: delete + update + insert, one transaction', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -1259,7 +1259,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('26. mutate: no primary key is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeConn = await createConnection({
       host: fixture.config.host ?? undefined,
@@ -1289,7 +1289,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('27. execute: one page per statement, including a non-row-returning one', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeConn = await createConnection({
       host: fixture.config.host ?? undefined,
@@ -1353,7 +1353,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('28. execute: a failing statement rejects the whole call — earlier statements already landed', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeConn = await createConnection({
       host: fixture.config.host ?? undefined,
@@ -1393,7 +1393,7 @@ describe('mariadb adapter (§9.1)', () => {
   });
 
   test('29. execute: an already-cancelled signal rejects before running anything', async () => {
-    const adapter = createAdapter('mariadb', deps);
+    const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();

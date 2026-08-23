@@ -84,7 +84,7 @@ afterAll(async () => {
 
 describe('sqs adapter (§9.1, P10)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toBe('Amazon SQS');
     await adapter.disconnect();
@@ -95,7 +95,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('2. an unparseable URI is rejected at connect time', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     const badConfig = { ...fixture.config, uri: 'not a valid uri at all' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_QUERY',
@@ -115,7 +115,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('4. tree enumeration: root is a flat queue list', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const root = await adapter.children(path([]), makeCtx());
@@ -127,7 +127,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('5. children of a leaf (queue)', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(queuePath(ORDERS_QUEUE), makeCtx());
@@ -138,7 +138,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('6. describe/ddl are unsupported', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
@@ -153,7 +153,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('7. read: polls messages off a queue, batch pagination', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readStream(
@@ -188,7 +188,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('8. read: repeated small polls eventually see every message', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const req = {
@@ -212,7 +212,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('9. read: an empty queue returns an empty page, not an error', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readStream(
@@ -235,7 +235,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('10. read: a nonexistent queue is E_QUERY, not E_NOT_FOUND', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -258,7 +258,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('11. count: approximate, never exact (D6/D11)', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const result = await adapter.count({ path: queuePath(EMPTY_QUEUE), filter: null }, makeCtx());
@@ -269,7 +269,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('12. preview/mutate/execute are unsupported — read-only, no console (D13)', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expectSyncThrow(
@@ -288,7 +288,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('13. cancel is a permanent no-op (D14)', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expect(await adapter.cancel(crypto.randomUUID())).toBe(false);
@@ -298,7 +298,7 @@ describe('sqs adapter (§9.1, P10)', () => {
   });
 
   test('14. read: an already-cancelled signal rejects before running anything', async () => {
-    const adapter = createAdapter('sqs', deps);
+    const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();

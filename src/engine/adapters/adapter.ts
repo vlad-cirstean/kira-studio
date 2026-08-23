@@ -124,8 +124,6 @@ export interface AdapterDeps {
   log(level: 'info' | 'warn' | 'error', message: string): void;
 }
 
-export type AdapterFactory = (deps: AdapterDeps) => Adapter;
-
 /**
  * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5,
  * `execute` in P5.5 — all above, nothing pending. A later phase that widens `Adapter` again does

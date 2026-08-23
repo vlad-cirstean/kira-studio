@@ -1,0 +1,33 @@
+# electron-builder.yml — unsigned (ad-hoc) local macOS build, arm64 only.
+appId: com.kirathecat.kira-studio          # §3 "bundle ID com.kirathecat.kira-studio"
+productName: Kira Studio                    # matches app.setName() in src/main/index.ts
+copyright: Copyright © 2026 kirathecat
+directories:
+  output: dist                              # already gitignored (line 83)
+files:
+  - out/**/*                                # electron-vite's build output; `main` points into it
+  - package.json
+  - '!**/*.map'
+asar: true
+# out/main/engine.js is loaded via `utilityProcess.fork()` (main/engine-host.ts) — a forked entry
+# point can't be exec'd from inside the asar archive, so it must be unpacked (P12 plan §5 checklist
+# item 3).
+asarUnpack:
+  - out/main/engine.js
+npmRebuild: false                           # no native production dependency exists (D14)
+electronLanguages:
+  - en                                      # dark-mode-only, English-only v1; trims .lproj weight
+mac:
+  category: public.app-category.developer-tools
+  identity: '-'                             # ad-hoc — NOT null (D12)
+  hardenedRuntime: false                    # ad-hoc + hardened runtime ⇒ library-validation failure (D12)
+  minimumSystemVersion: '13.0'              # §3 "macOS 13+"
+  darkModeSupport: true                     # §1 "Dark mode only"
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+dmg:
+  writeUpdateInfo: false                    # no auto-update in v1 (§1/§3); P15's call, not P12's
+artifactName: ${productName}-${version}-${arch}.${ext}

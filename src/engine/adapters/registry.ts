@@ -1,29 +1,26 @@
 import type { ConnectionKind } from '../../shared/domain/connection';
-import type { Adapter, AdapterDeps, AdapterFactory } from './adapter';
+import type { Adapter, AdapterDeps } from './adapter';
 import { AdapterError } from './errors';
-import { createKafkaAdapter } from './kafka';
-import { createMariaDbAdapter } from './mariadb';
-import { createMongoAdapter } from './mongo';
-import { createPostgresAdapter } from './postgres';
-import { createRedisAdapter } from './redis';
-import { createSqsAdapter } from './sqs';
 
-// Explicit object literal, not dynamic import — a v1 with seven adapters is not big enough to
-// justify lazy loading, and electron-vite's externalizeDepsPlugin keeps the drivers out of
-// the renderer/main bundle regardless.
-const factories: Partial<Record<ConnectionKind, AdapterFactory>> = {
-  postgres: createPostgresAdapter,
-  mariadb: createMariaDbAdapter,
-  mongodb: createMongoAdapter,
-  redis: createRedisAdapter,
-  kafka: createKafkaAdapter,
-  sqs: createSqsAdapter,
+// Lazy per-kind dynamic imports, not static top-of-file ones — each adapter's directory imports
+// its own driver at module scope (kafkajs, mongodb, @aws-sdk/client-sqs, mariadb, ...), so
+// loading all six eagerly meant every driver was resident in the engine process from boot,
+// including for a session with a single Postgres connection (measured: >100MB of the engine's
+// baseline RSS — P12 memory.spec.ts's lever L-A, docs/PERF.md). This is the only importer of
+// these directories, so deferring the import here is enough to defer the driver too.
+const loaders: Partial<Record<ConnectionKind, (deps: AdapterDeps) => Promise<Adapter>>> = {
+  postgres: async (deps) => (await import('./postgres')).createPostgresAdapter(deps),
+  mariadb: async (deps) => (await import('./mariadb')).createMariaDbAdapter(deps),
+  mongodb: async (deps) => (await import('./mongo')).createMongoAdapter(deps),
+  redis: async (deps) => (await import('./redis')).createRedisAdapter(deps),
+  kafka: async (deps) => (await import('./kafka')).createKafkaAdapter(deps),
+  sqs: async (deps) => (await import('./sqs')).createSqsAdapter(deps),
 };
 
-export function createAdapter(kind: ConnectionKind, deps: AdapterDeps): Adapter {
-  const factory = factories[kind];
-  if (!factory) {
+export async function createAdapter(kind: ConnectionKind, deps: AdapterDeps): Promise<Adapter> {
+  const loader = loaders[kind];
+  if (!loader) {
     throw new AdapterError('E_UNSUPPORTED', `${kind} connections are not supported yet`);
   }
-  return factory(deps);
+  return loader(deps);
 }

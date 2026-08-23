@@ -25,6 +25,7 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.appearance, settings.appearance);
   Object.assign(settingsState.data, settings.data);
   Object.assign(settingsState.cache, settings.cache);
+  Object.assign(settingsState.advanced, settings.advanced);
   applyAppearance();
 }
 
@@ -42,10 +43,12 @@ export async function patchSettings(patch: SettingsPatch): Promise<void> {
   if (patch.appearance) Object.assign(settingsState.appearance, patch.appearance);
   if (patch.data) Object.assign(settingsState.data, patch.data);
   if (patch.cache) Object.assign(settingsState.cache, patch.cache);
+  if (patch.advanced) Object.assign(settingsState.advanced, patch.advanced);
   applyAppearance();
   const updated = await control.settingsSet(patch);
   Object.assign(settingsState.appearance, updated.appearance);
   Object.assign(settingsState.data, updated.data);
   Object.assign(settingsState.cache, updated.cache);
+  Object.assign(settingsState.advanced, updated.advanced);
   applyAppearance();
 }

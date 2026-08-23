@@ -29,7 +29,7 @@ class EngineHostError extends Error {
   }
 }
 
-export function startEngine(): EngineHost {
+export function startEngine(opts: { maxOldSpaceMb: number }): EngineHost {
   let alive = true;
   let nextId = 1;
   const pending = new Map<number, PendingCall>();
@@ -38,7 +38,7 @@ export function startEngine(): EngineHost {
   const child: UtilityProcess = utilityProcess.fork(join(__dirname, 'engine.js'), [], {
     serviceName: 'kira-engine',
     stdio: 'pipe',
-    execArgv: ['--max-old-space-size=512'],
+    execArgv: [`--max-old-space-size=${opts.maxOldSpaceMb}`],
   });
 
   child.stdout?.on('data', (chunk: Buffer) => log('info', 'engine', chunk.toString().trimEnd()));

@@ -41,7 +41,7 @@ async function handleConnect(payload: unknown) {
     deleteLiveAdapter(config.id);
   }
 
-  const adapter = createAdapter(config.kind, deps);
+  const adapter = await createAdapter(config.kind, deps);
   const { value } = await runOp({ connectionId: config.id, kind: 'connect' }, (ctx) =>
     adapter.connect(config, ctx),
   );
@@ -102,7 +102,7 @@ async function handleDdl(payload: unknown) {
 
 async function handleTest(payload: unknown) {
   const { config } = engineOpPayloadSchema[ENGINE_OP.test].parse(payload);
-  const adapter = createAdapter(config.kind, deps);
+  const adapter = await createAdapter(config.kind, deps);
   try {
     const { value } = await runOp({ connectionId: null, kind: 'test' }, (ctx) =>
       adapter.connect(config, ctx),

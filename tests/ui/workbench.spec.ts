@@ -58,3 +58,25 @@ test('settings dialog appearance font size persists across relaunch', async ({ r
     )
     .toBe('16px');
 });
+
+test('settings dialog Advanced section persists across relaunch', async ({ relaunch }) => {
+  let { window } = await relaunch();
+
+  await window.click('[data-testid="open-settings"]');
+  await expect(window.locator('[data-testid="settings-dialog"]')).toBeVisible();
+  await window.click('[data-testid="settings-section-Advanced"]');
+
+  await window.fill('[data-testid="settings-engine-memory-cap"]', '768');
+  await window.locator('[data-testid="settings-engine-memory-cap"]').dispatchEvent('change');
+  await window.fill('[data-testid="settings-oplog-retention"]', '45');
+  await window.locator('[data-testid="settings-oplog-retention"]').dispatchEvent('change');
+
+  await window.click('[data-testid="settings-close"]');
+  await window.waitForTimeout(PERSIST_SETTLE_MS);
+  ({ window } = await relaunch());
+
+  await window.click('[data-testid="open-settings"]');
+  await window.click('[data-testid="settings-section-Advanced"]');
+  await expect(window.locator('[data-testid="settings-engine-memory-cap"]')).toHaveValue('768');
+  await expect(window.locator('[data-testid="settings-oplog-retention"]')).toHaveValue('45');
+});

@@ -68,7 +68,7 @@ afterAll(async () => {
 
 describe('postgres adapter (§9.1)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toMatch(/^PostgreSQL 17/);
 
@@ -87,7 +87,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('2. auth failure', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     const badConfig = { ...fixture.config, password: 'definitely-wrong' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_AUTH',
@@ -95,7 +95,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('3. tree enumeration', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const roots = await adapter.children(path([]), makeCtx());
@@ -143,7 +143,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('4. quoting', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const appChildren = await adapter.children(
@@ -182,7 +182,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('5. describe', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const orderItems = await adapter.describe(
@@ -228,7 +228,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('6. row estimate', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const appChildren = await adapter.children(
@@ -374,7 +374,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('9. children of a leaf', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(
@@ -392,7 +392,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('10. read: first page', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readTabular(
@@ -421,7 +421,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('11. read: deep page by offset', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -456,7 +456,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('12. read: keyset forward and backward', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -530,7 +530,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('13. read: no keyset without a tiebreaker', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       // order_summary is a view with no unique key of its own.
@@ -582,7 +582,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('14. read: projection', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -626,7 +626,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('15. read: filter and sort', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const target = path([
@@ -684,7 +684,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('16. read: fidelity', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readTabular(
@@ -751,7 +751,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('17. count', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const bigRowsCount = await adapter.count(
@@ -786,7 +786,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('18. read cannot write', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeClient = new Client({ connectionString: fixture.uri });
     await probeClient.connect();
@@ -825,12 +825,12 @@ describe('postgres adapter (§9.1)', () => {
     }
   });
 
-  test('19. unsupported kind', () => {
+  test('19. unsupported kind', async () => {
     // P10 gave kafka and sqs real adapters — s3 is the only kind left with no factory in the
     // registry, so it is the still-unsupported kind this test now targets.
-    expect(() => createAdapter('s3', deps)).toThrow(AdapterError);
+    await expect(createAdapter('s3', deps)).rejects.toThrow(AdapterError);
     try {
-      createAdapter('s3', deps);
+      await createAdapter('s3', deps);
       throw new Error('expected createAdapter to throw');
     } catch (err) {
       expect(err).toBeInstanceOf(AdapterError);
@@ -839,7 +839,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('20. ddl', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       // 1. Shape.
@@ -973,7 +973,7 @@ describe('postgres adapter (§9.1)', () => {
     // the original. A second database (not a scratch schema) is what keeps the qualified names
     // ddl() emitted valid verbatim, with no string rewriting in the test (D17).
     async function roundTrip(objectName: string): Promise<void> {
-      const sourceAdapter = createAdapter('postgres', deps);
+      const sourceAdapter = await createAdapter('postgres', deps);
       await sourceAdapter.connect(fixture.config, makeCtx());
       let original: Awaited<ReturnType<Adapter['describe']>>;
       let def: Awaited<ReturnType<Adapter['ddl']>>;
@@ -1029,7 +1029,7 @@ describe('postgres adapter (§9.1)', () => {
           await roundTripClient.end();
         }
 
-        const copyAdapter = createAdapter('postgres', deps);
+        const copyAdapter = await createAdapter('postgres', deps);
         await copyAdapter.connect({ ...fixture.config, database: 'kira_ddl_roundtrip' }, makeCtx());
         let copy: Awaited<ReturnType<Adapter['describe']>>;
         try {
@@ -1093,7 +1093,7 @@ describe('postgres adapter (§9.1)', () => {
     ]);
 
   test('21. preview: exact text, never executes', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1134,7 +1134,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('22. mutate: update lands in the op log', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -1186,7 +1186,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('23. mutate: unknown column is E_NOT_FOUND', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1202,7 +1202,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('24. mutate: read-only connection is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect({ ...fixture.config, readOnly: true }, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1224,7 +1224,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('25. mutate: a row-count conflict rolls back the whole batch', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -1256,7 +1256,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('26. mutate: delete + update + insert, one transaction', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -1320,7 +1320,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('27. mutate: no primary key is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeClient = new Client({ connectionString: fixture.uri });
     await probeClient.connect();
@@ -1346,7 +1346,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('28. execute: one page per statement, including a non-row-returning one', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeClient = new Client({ connectionString: fixture.uri });
     await probeClient.connect();
@@ -1412,7 +1412,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('29. execute: a failing statement rejects the whole call — earlier statements already landed', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     const probeClient = new Client({ connectionString: fixture.uri });
     await probeClient.connect();
@@ -1450,7 +1450,7 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('30. execute: an already-cancelled signal rejects before running anything', async () => {
-    const adapter = createAdapter('postgres', deps);
+    const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();

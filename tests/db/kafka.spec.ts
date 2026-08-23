@@ -84,7 +84,7 @@ afterAll(async () => {
 
 describe('kafka adapter (§9.1, P10)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toBe('Kafka');
     expect(info.details?.cluster).toBeTruthy();
@@ -108,7 +108,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('3. tree enumeration: root is topics + consumer groups, siblings', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const root = await adapter.children(path([]), makeCtx());
@@ -126,7 +126,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('4. tree enumeration: partitions nest under a topic, not consumer groups', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const partitions = await adapter.children(topicPath(ORDERS_TOPIC), makeCtx());
@@ -139,7 +139,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('5. children of a leaf (partition / consumer group)', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const partitionChildren = await adapter.children(
@@ -162,7 +162,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('6. describe/ddl are unsupported', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
@@ -177,7 +177,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('7. read: browses a topic across partitions, offsetWindow pagination', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const req = {
@@ -213,7 +213,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('8. read: a smaller page size pages forward with a token', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const req = {
@@ -245,7 +245,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('9. read: an empty topic returns a terminal empty page', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readStream(
@@ -268,7 +268,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('10. read: forward-only — a "before" cursor is E_UNSUPPORTED', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -293,7 +293,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   // admin.fetchTopicOffsets() retries a genuinely-missing topic with kafkajs's default backoff
   // (5 retries, up to ~9s total) before finally rejecting — longer than bun's 5s test default.
   test('11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -316,7 +316,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   }, 20_000);
 
   test('12. count: exact via high/low watermark subtraction', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expect(
@@ -331,7 +331,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('13. preview/mutate/execute are unsupported — read-only, no console (D13)', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expectSyncThrow(
@@ -350,7 +350,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('14. cancel is a permanent no-op (D6/D14)', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expect(await adapter.cancel(crypto.randomUUID())).toBe(false);
@@ -360,7 +360,7 @@ describe('kafka adapter (§9.1, P10)', () => {
   });
 
   test('15. read: an already-cancelled signal aborts the browse', async () => {
-    const adapter = createAdapter('kafka', deps);
+    const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();

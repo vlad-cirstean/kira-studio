@@ -32,6 +32,7 @@ export async function getAllSettings(db: KiraDb): Promise<Settings> {
     appearance: sectionFromStore(stored, 'appearance', defaultSettings.appearance),
     data: sectionFromStore(stored, 'data', defaultSettings.data),
     cache: sectionFromStore(stored, 'cache', defaultSettings.cache),
+    advanced: sectionFromStore(stored, 'advanced', defaultSettings.advanced),
   };
   // A hand-edited or stale-shape row must fail loudly here, not propagate `undefined`s into the UI.
   return settingsSchema.parse(candidate);
@@ -44,6 +45,7 @@ export async function setSettings(db: KiraDb, patch: SettingsPatch): Promise<Set
     appearance: { ...current.appearance, ...validPatch.appearance },
     data: { ...current.data, ...validPatch.data },
     cache: { ...current.cache, ...validPatch.cache },
+    advanced: { ...current.advanced, ...validPatch.advanced },
   };
 
   await db.transaction(async (tx) => {

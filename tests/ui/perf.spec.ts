@@ -7,8 +7,11 @@ import {
   startPostgres,
 } from './support/pg';
 
-// A tripwire, not a benchmark (§2.1's real measurement is P12's job — this only catches "someone
-// made the grid re-render every row per frame" in an instrumented, unoptimised Playwright build).
+// A tripwire, not a benchmark. §2.1's real interaction-budget measurements live in
+// budgets.spec.ts, §2.2's total-RSS budget in memory.spec.ts, and cold start in startup.spec.ts
+// (all P12) — this spec's four assertions (rAF tripwire, DOM cell bound, retained-bytes
+// open/close symmetry, L2-usage-vs-budget) are cheap, single-container, and kept unchanged
+// alongside them (P12 D7).
 test.describe.configure({ timeout: 180_000 });
 
 let pg: PgFixture | null = null;

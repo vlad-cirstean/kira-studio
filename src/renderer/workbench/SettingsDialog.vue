@@ -88,6 +88,18 @@ function onCacheBudgetChange(e: Event): void {
   void patchSettings({ cache: { l2BudgetMb: value } });
 }
 
+function onEngineMemoryCapChange(e: Event): void {
+  const value = Number((e.target as HTMLInputElement).value);
+  if (!Number.isFinite(value) || value < 256 || value > 4096) return;
+  void patchSettings({ advanced: { engineMemoryCapMb: value } });
+}
+
+function onOpLogRetentionChange(e: Event): void {
+  const value = Number((e.target as HTMLInputElement).value);
+  if (!Number.isFinite(value) || value < 1 || value > 365) return;
+  void patchSettings({ advanced: { opLogRetentionDays: value } });
+}
+
 const hitRateLabel = computed(() => {
   const stats = cacheStatsState.stats;
   if (!stats) return '—';
@@ -250,14 +262,28 @@ async function onClearCaches(): Promise<void> {
 
           <template v-else>
             <label class="field">
-              <span>Engine memory cap</span>
-              <input type="text" value="512 MB" disabled />
+              <span>Engine memory cap (MB)</span>
+              <input
+                type="number"
+                min="256"
+                max="4096"
+                data-testid="settings-engine-memory-cap"
+                :value="settingsState.advanced.engineMemoryCapMb"
+                @change="onEngineMemoryCapChange"
+              />
             </label>
             <label class="field">
-              <span>Operation log retention</span>
-              <input type="text" value="30 days" disabled />
+              <span>Operation log retention (days)</span>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                data-testid="settings-oplog-retention"
+                :value="settingsState.advanced.opLogRetentionDays"
+                @change="onOpLogRetentionChange"
+              />
             </label>
-            <p class="muted-note">Available once data views land.</p>
+            <p class="muted-note">Takes effect after restart.</p>
           </template>
         </section>
       </div>

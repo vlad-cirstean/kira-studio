@@ -11,6 +11,7 @@ import { wireOplog } from './oplog';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
+import { getAllSettings } from './storage/repos/settings';
 import { createTreeService } from './tree-service';
 import { createWindow } from './window';
 
@@ -59,8 +60,9 @@ async function main(): Promise<void> {
   ensureLayout();
   const { db, raw, close } = await openDb();
   migrate(raw);
+  const settings = await getAllSettings(db);
 
-  const engineHost = startEngine();
+  const engineHost = startEngine({ maxOldSpaceMb: settings.advanced.engineMemoryCapMb });
   const connections = createConnectionsService(db, engineHost);
   const tree = createTreeService(db, engineHost, connections);
   void pushEngineConfig(engineHost, db);
@@ -74,7 +76,12 @@ async function main(): Promise<void> {
   // per-connection error states so the tree/status bar reflect it too (no auto-respawn).
   engineHost.on('engine:down', () => connections.markAllErrored('engine process exited'));
 
-  wireOplog(engineHost, db, (record) => broadcast(IPC.opUpdate, record));
+  wireOplog(
+    engineHost,
+    db,
+    (record) => broadcast(IPC.opUpdate, record),
+    settings.advanced.opLogRetentionDays,
+  );
 
   registerIpc({ db, engineHost, connections, tree });
 

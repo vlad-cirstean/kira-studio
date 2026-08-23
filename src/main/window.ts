@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
+import { log } from './log';
 import type { KiraDb } from './storage/db';
 import { getAllLayout, setLayout } from './storage/repos/layout';
 
@@ -25,6 +26,12 @@ export async function createWindow(db: KiraDb): Promise<BrowserWindow> {
   });
 
   win.once('ready-to-show', () => win.show());
+  // D9: the cold-start budget's in-app measurement point — process.uptime() at the moment the
+  // renderer has finished loading, read back by tests/ui/support/measure.ts and, packaged, by a
+  // human grepping ~/.kira-studio/logs (docs/PERF.md).
+  win.webContents.once('did-finish-load', () => {
+    log('info', 'startup', `did-finish-load at uptime ${Math.round(process.uptime() * 1000)}ms`);
+  });
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const persistBounds = (): void => {

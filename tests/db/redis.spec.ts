@@ -100,7 +100,7 @@ afterAll(async () => {
 
 describe('redis adapter (§9.1, P9)', () => {
   test('1. connect / disconnect', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
     expect(info.serverVersion).toMatch(/^Redis \d/);
     await adapter.disconnect();
@@ -111,7 +111,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('2. auth failure', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     const badConfig = { ...fixture.config, password: 'definitely-wrong' };
     await expect(adapter.connect(badConfig, makeCtx())).rejects.toMatchObject({
       code: 'E_AUTH',
@@ -119,7 +119,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('3. tree enumeration: dbs, namespaces, keys', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const dbs = await adapter.children(path([]), makeCtx());
@@ -173,7 +173,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('5. children of a leaf', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const children = await adapter.children(
@@ -190,7 +190,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('6. describe/ddl are unsupported', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(keyPath('counter'), makeCtx())).rejects.toMatchObject({
@@ -205,7 +205,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('7. read: string', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readKeyValue(
@@ -231,7 +231,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('8. read: hash', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readKeyValue(
@@ -257,7 +257,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('9. read: set', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readKeyValue(
@@ -282,7 +282,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('10. read: zset', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readKeyValue(
@@ -307,7 +307,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('11. read: list, genuine offset pagination', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const req = {
@@ -346,7 +346,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('12. read: stream, forward cursor pagination', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const req = {
@@ -389,7 +389,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('13. read: cursor pagination is forward-only for hash/set/zset too', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -412,7 +412,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('14. read: TTL and memory metadata', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const page = await readKeyValue(
@@ -439,7 +439,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('15. read: a vanished/nonexistent key is E_QUERY, not E_NOT_FOUND', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -462,7 +462,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('16. count: exact via O(1) type-length commands', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expect(await adapter.count({ path: keyPath('counter'), filter: null }, makeCtx())).toEqual({
@@ -495,7 +495,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('17. preview/mutate are unsupported — read-only in v1 (D2)', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const plan: MutationPlan = {
@@ -512,7 +512,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('18. execute: generic command dispatch, both reply shapes', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       let loggedCommand = '';
@@ -553,7 +553,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('19. execute: an unknown command is E_QUERY', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(
@@ -571,7 +571,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('20. execute: an already-cancelled signal rejects before running anything', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       const controller = new AbortController();
@@ -592,7 +592,7 @@ describe('redis adapter (§9.1, P9)', () => {
   });
 
   test('21. cancel is a permanent no-op (D7/D8)', async () => {
-    const adapter = createAdapter('redis', deps);
+    const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       expect(await adapter.cancel(crypto.randomUUID())).toBe(false);
