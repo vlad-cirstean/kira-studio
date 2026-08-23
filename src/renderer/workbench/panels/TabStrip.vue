@@ -27,7 +27,9 @@ function iconFor(tab: TabRecord): string {
   if (tab.kind === 'ddl') return 'file-code';
   if (tab.kind === 'console') return 'terminal';
   if (tab.kind === 'document') return 'json';
-  if (tab.kind === 'keyvalue') return 'symbol-key';
+  // P17: a 'keyvalue' tab is a redis key OR an s3 object — pathTail's own node kind (already
+  // computed below for the table/view/matview fallback) tells them apart with no extra state.
+  if (tab.kind === 'keyvalue') return pathTail(tab.path)?.kind === 'object' ? 'file' : 'symbol-key';
   if (tab.kind === 'stream') return 'broadcast';
   const tail = pathTail(tab.path);
   const KIND_ICON: Record<string, string> = {

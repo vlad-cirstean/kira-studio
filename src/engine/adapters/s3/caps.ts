@@ -13,7 +13,11 @@ export const s3Caps: Caps = {
   ddl: false,
   projection: false,
   serverFilter: false,
-  exactCount: false, // ListObjectsV2 has no total-count operation, only paged listings
+  // count() (s3/read.ts's countObject) answers a single object's own field count via HeadObject,
+  // which is always exact — the same per-item-exact resolution redis/caps.ts makes for its own
+  // per-key counts, not the db-wide "how many keys total" question ListObjectsV2 would need to
+  // answer approximately (and which this phase's read-only object browsing never asks).
+  exactCount: true,
   pagination: 'token', // ListObjectsV2's own ContinuationToken
   foreignKeys: false,
   canInsert: false,

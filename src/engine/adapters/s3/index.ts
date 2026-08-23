@@ -33,29 +33,38 @@ class S3Adapter implements Adapter {
   readonly caps = s3Caps;
 
   private client: S3Client | null = null;
+  // SPEC §6's options_json `bucket` field — set, this scopes the whole tree to one bucket (see
+  // catalog.ts's listBuckets), for credentials that can only ever see that one bucket.
+  private scopedBucket: string | null = null;
 
   constructor(private readonly deps: AdapterDeps) {}
 
   async connect(cfg: ResolvedConnectionConfig): Promise<ConnectInfo> {
     const { client } = connectS3(cfg, this.deps.log);
+    const bucket = cfg.options.bucket;
+    const scopedBucket = typeof bucket === 'string' && bucket !== '' ? bucket : null;
     try {
-      await catalog.listBuckets(client);
+      await catalog.listBuckets(client, scopedBucket ?? undefined);
     } catch (err) {
       client.destroy();
       throw mapS3Error(err);
     }
     this.client = client;
+    this.scopedBucket = scopedBucket;
     return { serverVersion: 'Amazon S3' };
   }
 
   async disconnect(): Promise<void> {
     this.client?.destroy();
     this.client = null;
+    this.scopedBucket = null;
   }
 
   async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
     const segments = path.segments;
-    if (segments.length === 0) return catalog.listBuckets(this.requireClient());
+    if (segments.length === 0) {
+      return catalog.listBuckets(this.requireClient(), this.scopedBucket ?? undefined);
+    }
 
     const [bucketSegment, ...rest] = segments;
     if (bucketSegment.kind !== 'bucket') {

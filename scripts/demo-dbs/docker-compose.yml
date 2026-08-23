@@ -101,15 +101,16 @@ services:
       timeout: 5s
       retries: 30
 
-  # sqs://test:test@us-east-1?endpoint=http://localhost:4566 (LocalStack's fixed dummy keys)
-  # SQS only — same image/mode as @testcontainers/localstack's harness (tests/db/support/sqs.ts).
+  # sqs://test:test@us-east-1?endpoint=http://localhost:4566 (LocalStack's fixed dummy keys) —
+  # one LocalStack instance serves both SQS and S3 (P17), same image/mode as
+  # @testcontainers/localstack's own harnesses (tests/db/support/sqs.ts, tests/db/support/s3.ts).
   sqs:
     image: localstack/localstack:3
     container_name: kira-sqs
     ports:
       - "4566:4566"
     environment:
-      SERVICES: sqs
+      SERVICES: sqs,s3
       PERSISTENCE: 1
     volumes:
       - kira-sqs-data:/var/lib/localstack

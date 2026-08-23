@@ -1,4 +1,9 @@
-import { ListBucketsCommand, ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
+import {
+  HeadBucketCommand,
+  ListBucketsCommand,
+  ListObjectsV2Command,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
@@ -9,7 +14,27 @@ import { mapS3Error } from './errors';
 // a call degrades to "not everything shown yet under this prefix" rather than an unbounded crawl.
 const MAX_LIST_ROUNDS = 20;
 
-export async function listBuckets(client: S3Client): Promise<TreeNode[]> {
+// `scopedBucket` (SPEC §6's options_json `bucket` field) is the escape hatch for a very common
+// IAM shape: credentials scoped to exactly one bucket, which commonly deny `s3:ListAllMyBuckets`
+// outright (a permission ListBucketsCommand needs but a single-bucket policy has no reason to
+// grant). HeadBucketCommand only needs access to that one bucket, so a scoped connection never
+// calls ListBuckets at all — the root "listing" is just that one bucket, existence-checked.
+export async function listBuckets(client: S3Client, scopedBucket?: string): Promise<TreeNode[]> {
+  if (scopedBucket) {
+    try {
+      await client.send(new HeadBucketCommand({ Bucket: scopedBucket }));
+    } catch (err) {
+      throw mapS3Error(err);
+    }
+    return [
+      {
+        kind: 'bucket',
+        name: scopedBucket,
+        path: encodePath([{ kind: 'bucket', name: scopedBucket }]),
+        hasChildren: true,
+      },
+    ];
+  }
   let buckets: { Name?: string }[];
   try {
     const res = await client.send(new ListBucketsCommand({}));
@@ -86,7 +111,12 @@ export async function listPrefixChildren(
       const segment = obj.Key.slice(prefix.length);
       objectNodes.push({
         kind: 'object',
-        name: segment,
+        // The full key verbatim, not just this local segment — same split as redis/catalog.ts's
+        // namespaceNodes (local segment) vs. keyNodes (full key, P9 D3): every intermediate
+        // "folder" node here carries just its own segment, but the leaf carries the identifier a
+        // consumer actually needs (KeyValueView.vue's header/tab title, TabStrip.vue's tab label —
+        // both read straight off pathTail(path).name with no S3-specific reconstruction).
+        name: obj.Key,
         path: encodePath([...ancestor, { kind: 'object', name: segment }]),
         hasChildren: false,
       });

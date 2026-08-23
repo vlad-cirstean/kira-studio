@@ -31,4 +31,8 @@ echo "==> SQS (LocalStack)"
 docker exec -i kira-sqs bash < "${SCRIPT_DIR}/sqs/seed.sh"
 
 echo
+echo "==> S3 (LocalStack — same container as SQS)"
+docker exec -i kira-sqs bash < "${SCRIPT_DIR}/s3/seed.sh"
+
+echo
 echo "All seeds complete."

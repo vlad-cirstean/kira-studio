@@ -222,9 +222,13 @@ Migrations are forward-only numbered SQL files applied on startup. Table access 
 `settings`, `ui_layout` and `connections` is parsed through a **Zod** schema before use, so a
 hand-edited or stale-shape row fails loudly instead of propagating `undefined`s into the UI.
 
-S3 connections reuse the existing `connections` columns: `host`/`port`/`database` are unused, the AWS
-**named profile** goes in `username`, bucket/region/prefix defaults live in `options_json`, and static
-keys (accepted only in URI mode, per the SQS policy in §5.1) go in `uri`.
+S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
+repurposing exactly (D8/D9): `host`/`port` are unused, `database` holds the **AWS region**, the
+AWS **named profile** goes in `username`, and static keys (accepted only in URI mode, per the SQS
+policy in §5.1) go in `uri`. `options_json` holds two independent overrides: `endpoint` (a
+non-AWS S3-compatible target — LocalStack, MinIO) and `bucket` (scopes the whole tree to one
+bucket via `HeadBucketCommand` instead of `ListBucketsCommand`, for IAM credentials that can only
+ever see that one bucket and commonly deny `s3:ListAllMyBuckets` outright).
 
 ---
 

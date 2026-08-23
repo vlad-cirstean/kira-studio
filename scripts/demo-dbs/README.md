@@ -1,14 +1,15 @@
 # Kira Studio — local database fixtures
 
-Spins up all six of Kira Studio's supported engines (PostgreSQL, MariaDB, MongoDB, Redis, Kafka,
-SQS) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The four relational/document/
-key-value stores get a full schema, foreign keys, indexes, and ~20k rows of seed data; Kafka and SQS
-get a handful of topics/queues with a small message backlog — enough to exercise every tree view
-without waiting on a multi-minute seed.
+Spins up all seven of Kira Studio's supported engines (PostgreSQL, MariaDB, MongoDB, Redis, Kafka,
+SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The four relational/
+document/key-value stores get a full schema, foreign keys, indexes, and ~20k rows of seed data;
+Kafka/SQS/S3 get a handful of topics/queues/buckets with a small backlog — enough to exercise
+every tree view without waiting on a multi-minute seed.
 
-Kafka and SQS use the same images/modes as the `@testcontainers/kafka` / `@testcontainers/localstack`
-harness under `bun run test:db` (confluentinc/cp-kafka in KRaft mode; localstack/localstack with only
-`SERVICES=sqs`) — see `tests/db/support/kafka.ts` and `tests/db/support/sqs.ts`.
+Kafka uses the same image/mode as the `@testcontainers/kafka` harness under `bun run test:db`
+(confluentinc/cp-kafka in KRaft mode) — see `tests/db/support/kafka.ts`. SQS and S3 share one
+LocalStack container (`SERVICES=sqs,s3`), same as `@testcontainers/localstack`'s own harnesses —
+see `tests/db/support/sqs.ts` and `tests/db/support/s3.ts`.
 
 ## Requirements
 
@@ -48,6 +49,7 @@ and SQS it appends another batch of messages rather than resetting (see the Mode
 | Redis    | localhost | 6379 | — | — | db 0 |
 | Kafka    | localhost | 9092 | — | — | — |
 | SQS (LocalStack) | — (URI mode) | — | `test` | `test` | region `us-east-1` |
+| S3 (LocalStack)  | — (URI mode) | — | `test` | `test` | region `us-east-1` |
 
 Connection strings:
 
@@ -61,12 +63,13 @@ redis://localhost:6379/0
 Kafka has no auth — in Kira Studio's connection dialog, Fields mode with host `localhost` and port
 `9092` is enough.
 
-SQS always needs a real region plus an endpoint override to redirect the AWS SDK at LocalStack
-instead of real AWS, so it only works in URI mode (`options.endpoint`, set via the URI's query
-string — see `src/shared/domain/uri.ts`):
+SQS and S3 both always need a real region plus an endpoint override to redirect the AWS SDK at
+LocalStack instead of real AWS, so they only work in URI mode (`options.endpoint`, set via the
+URI's query string — see `src/shared/domain/uri.ts`):
 
 ```sh
 sqs://test:test@us-east-1?endpoint=http://localhost:4566
+s3://test:test@us-east-1?endpoint=http://localhost:4566
 ```
 
 ## Model
@@ -101,16 +104,21 @@ either.
 SQS gets three queues: `orders-queue` (5 messages), `drain-queue` (7 messages, a second queue so
 polling one doesn't race the other's `VisibilityTimeout`), and `empty-queue` (0 messages).
 
-Unlike the relational/document seeds, the Kafka and SQS seeds are **not** idempotent in the same
-way — topics/queues are created with `--if-not-exists`/reused, but re-running `seed.sh` appends
-another batch of messages on top of whatever's already there (a topic/queue has no primary key to
-upsert against). Use `down -v` + `up -d` + `seed.sh` for a clean slate.
+S3 gets two buckets: `kira-demo-bucket` (three objects at different nesting depths — a root-level
+`readme.txt`, `reports/notes.txt`, and `reports/2024/summary.json` — so the tree's '/'-splitting
+has more than one level to prove out) and `kira-empty-bucket` (0 objects).
+
+Unlike the relational/document seeds, the Kafka/SQS/S3 seeds are **not** idempotent in the same
+way — topics/queues are created with `--if-not-exists`/reused and S3 objects are simply
+overwritten in place, but re-running `seed.sh` appends another batch of messages to Kafka/SQS on
+top of whatever's already there (a topic/queue has no primary key to upsert against). Use
+`down -v` + `up -d` + `seed.sh` for a clean slate.
 
 ## Files
 
 ```
 scripts/demo-dbs/
-├── docker-compose.yml        # all six services
+├── docker-compose.yml        # all seven services (sqs + s3 share one LocalStack container)
 ├── seed.sh                   # run every seed
 ├── README.md
 ├── postgres/
@@ -126,8 +134,10 @@ scripts/demo-dbs/
 │   └── seed.lua              # 20k-key seed (all data types)
 ├── kafka/
 │   └── seed.sh               # topics + keyed messages + a registered consumer group
-└── sqs/
-    └── seed.sh               # queues + messages, via LocalStack's `awslocal` CLI
+├── sqs/
+│   └── seed.sh               # queues + messages, via LocalStack's `awslocal` CLI
+└── s3/
+    └── seed.sh               # buckets + nested objects, via LocalStack's `awslocal` CLI
 ```
 
 ## Reset everything

@@ -157,15 +157,29 @@ const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.r
 // materially bigger job than a single SET, so the action stays disabled with an explanatory
 // tooltip for those types rather than attempting a lossy whole-key replace.
 const editableType = computed(() => page.value?.redisType === 'string');
+// "Connection is read-only" only actually explains the disabled state when the connection's own
+// readOnly toggle is the reason — an adapter that structurally can't write at all (S3, this
+// phase) would show the same tooltip on a control that toggle could never turn back on.
+function writeDisabledReason(capFlag: boolean | undefined): string {
+  return capFlag === false ? 'Not supported for this connection type' : 'Connection is read-only';
+}
 const editTitle = computed(() => {
-  if (!canUpdate.value) return 'Connection is read-only';
+  if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate);
   if (!editableType.value) return 'Only string values are editable in this version';
   return 'Edit value';
 });
-const addTitle = computed(() => (canInsert.value ? 'Add a new key' : 'Connection is read-only'));
-const deleteTitle = computed(() =>
-  canDelete.value ? 'Delete this key' : 'Connection is read-only',
+const addTitle = computed(() =>
+  canInsert.value ? 'Add a new key' : writeDisabledReason(caps.value?.canInsert),
 );
+const deleteTitle = computed(() =>
+  canDelete.value ? 'Delete this key' : writeDisabledReason(caps.value?.canDelete),
+);
+
+// The S3 object page's field/value listing is always exactly and only what read.ts pushed —
+// there is never a second page to fetch (readObject's own doc comment: "there is nothing to
+// paginate") — so the pager/page-size controls below would just be permanently-disabled dead
+// chrome for it, the same call StreamView.vue's isBatch makes for SQS's own non-paginating mode.
+const isSingleObjectPage = computed(() => page.value?.redisType === 'object');
 
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
 // immediately on Save (no staged/pending edit set — mirrors documentMutations.ts). -----------
@@ -385,13 +399,18 @@ onUnmounted(() => {
       <template #badges>
         <template v-if="page">
           <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
-          <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
-               vanish should look like one (see the mockup's KeyValue.html). -->
-          <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
-            <Codicon name="history" :size="11" />
-            {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
-          </span>
-          <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
+          <!-- TTL/memory are Redis-only concepts (always null for an S3 object — read.ts never
+               computes either) — showing "no expiry"/"unknown" for every object would just be
+               two permanently-meaningless badges, not real information. -->
+          <template v-if="!isSingleObjectPage">
+            <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
+                 vanish should look like one (see the mockup's KeyValue.html). -->
+            <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
+              <Codicon name="history" :size="11" />
+              {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
+            </span>
+            <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
+          </template>
           <span v-if="connRecord" class="p-badge">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</span>
         </template>
       </template>
@@ -399,7 +418,12 @@ onUnmounted(() => {
       <template #toolbar>
         <div class="sep" />
         <div class="group">
+          <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
+               "there is nothing to paginate") — hidden rather than shown permanently disabled,
+               same call StreamView.vue's isBatch makes for SQS. The status text stays: it's the
+               only place the Count button's result (below) ever gets shown, for every engine. -->
           <IconButton
+            v-if="!isSingleObjectPage"
             icon="arrow-left"
             :size="13"
             data-testid="keyvalue-prev"
@@ -409,6 +433,7 @@ onUnmounted(() => {
           />
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <IconButton
+            v-if="!isSingleObjectPage"
             icon="arrow-right"
             :size="13"
             data-testid="keyvalue-next"
@@ -418,22 +443,24 @@ onUnmounted(() => {
           />
         </div>
 
-        <div class="sep" />
+        <template v-if="!isSingleObjectPage">
+          <div class="sep" />
 
-        <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
-             DataToolbar.vue's own page-size segmented control occupies. -->
-        <div class="p-seg" data-testid="keyvalue-page-size-picker">
-          <button
-            v-for="size in PAGE_SIZES"
-            :key="size"
-            type="button"
-            :class="{ active: tab.state.pageSize === size }"
-            :data-testid="`keyvalue-page-size-${size}`"
-            @click="onPageSize(size)"
-          >
-            {{ PAGE_SIZE_LABEL[size] }}
-          </button>
-        </div>
+          <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
+               DataToolbar.vue's own page-size segmented control occupies. -->
+          <div class="p-seg" data-testid="keyvalue-page-size-picker">
+            <button
+              v-for="size in PAGE_SIZES"
+              :key="size"
+              type="button"
+              :class="{ active: tab.state.pageSize === size }"
+              :data-testid="`keyvalue-page-size-${size}`"
+              @click="onPageSize(size)"
+            >
+              {{ PAGE_SIZE_LABEL[size] }}
+            </button>
+          </div>
+        </template>
 
         <div class="sep" />
 

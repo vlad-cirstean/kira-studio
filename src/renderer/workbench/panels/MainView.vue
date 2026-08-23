@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
 import { connectionsState, openCreateDialog } from '../../state/connections';
 import {
@@ -29,7 +30,10 @@ function connectionFor(entry: RecentTableEntry) {
 
 function iconFor(entry: RecentTableEntry): string {
   if (entry.kind === 'document') return 'json';
-  if (entry.kind === 'keyvalue') return 'symbol-key';
+  // P17: a 'keyvalue' entry is a redis key OR an s3 object — same pathTail-kind check
+  // TabStrip.vue's own iconFor makes for the live tab icon.
+  if (entry.kind === 'keyvalue')
+    return pathTail(entry.path)?.kind === 'object' ? 'file' : 'symbol-key';
   if (entry.kind === 'stream') return 'broadcast';
   return 'table';
 }

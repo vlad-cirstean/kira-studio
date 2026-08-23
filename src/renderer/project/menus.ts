@@ -72,9 +72,14 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'collection':
       return collectionMenu(row);
     case 'namespace':
+    case 'prefix':
       return namespaceMenu(row);
     case 'key':
       return keyMenu(row);
+    case 'bucket':
+      return containerMenu(row);
+    case 'object':
+      return objectMenu(row);
     case 'topic':
     case 'queue':
       return streamNodeMenu(row);
@@ -414,7 +419,8 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P9's namespace level: a plain ':'-delimited container, no console-default/filters affordance
+// P9's namespace level (redis's ':'-delimited container) and P17's S3 prefix ("folder") level:
+// same shape either way — a plain intermediate container, no console-default/filters affordance
 // (those are SQL-specific) — minimal, per the read-only scope decision (D2/D14).
 function namespaceMenu(row: TreeRowVm): MenuItem[] {
   return [
@@ -454,6 +460,41 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-keyvalue-new-tab',
       label: 'Open in new tab',
       icon: 'symbol-key',
+      run: () => {
+        openKeyValueTab(row.connectionId, row.path, { newTab: true });
+      },
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      run: () => copyText(row.name),
+    },
+  ];
+}
+
+// P17's S3 object leaf: same shape as keyMenu (open/open-in-new-tab/copy-name, no edit/delete —
+// caps.canUpdate/canDelete are both false for S3 this phase). No separate "copy qualified name"
+// either, for the same reason keyMenu skips it: an object node's `name` is already the full S3
+// key verbatim (s3/catalog.ts, mirroring keyMenu's own key-name reasoning), so it would just
+// duplicate "Copy name".
+function objectMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'open-keyvalue',
+      label: 'Open',
+      icon: nodeIcon(row.kind),
+      run: () => {
+        openKeyValueTab(row.connectionId, row.path);
+      },
+    },
+    {
+      type: 'item',
+      id: 'open-keyvalue-new-tab',
+      label: 'Open in new tab',
+      icon: nodeIcon(row.kind),
       run: () => {
         openKeyValueTab(row.connectionId, row.path, { newTab: true });
       },
