@@ -20,6 +20,10 @@
   --kira-warn: #cca700;
   --kira-ok: #23d18b;
   --kira-info: #3794ff;
+  /* Custom chevron-down for .p-select (primitives.css), replacing the OS-native dropdown arrow.
+     Colour is baked into the SVG (var() inside a data-URI isn't reliably resolved by the CSS
+     paint pipeline), matched by hand to --kira-fg-muted above. */
+  --kira-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%239d9d9d' d='M4.427 6.427a.75.75 0 0 1 1.06-.06L8 8.522l2.513-2.155a.75.75 0 1 1 .974 1.14l-3 2.572a.75.75 0 0 1-.974 0l-3-2.572a.75.75 0 0 1-.086-1.08z'/%3E%3C/svg%3E");
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
      Radius tier system (VS Code Modern UI, docs/design/vscode-modern-ui): sm for interactive

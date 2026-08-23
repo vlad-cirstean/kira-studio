@@ -10,7 +10,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import { type BeautifyMode, beautify } from './beautify';
-import { describeValue, detectFormat, type FormatGuess } from './detect';
+import { describeTimestamp, describeValue, detectFormat, type FormatGuess } from './detect';
 import {
   CELL_FORMATS,
   type CellFormat,
@@ -193,7 +193,9 @@ const targetLabel = computed(() => {
 
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
-// "X (manual)" segment here would just repeat what's a few pixels to the right.
+// "X (manual)" segment here would just repeat what's a few pixels to the right. A decoded
+// timestamp reading runs its own row below (timestampReading) rather than sharing this badge —
+// it was crowding out the byte count and truncation/beautify notes that live here.
 const statusLine = computed(() => {
   const c = cell.value;
   if (!c) return '';
@@ -206,6 +208,14 @@ const statusLine = computed(() => {
   if (isTruncatedValue.value) parts.push('showing the first 64 KB');
   if (beautifyFailure.value) parts.push(beautifyFailure.value);
   return parts.join(' · ');
+});
+
+// Local first, then UTC (as asked) — its own row under the header rather than squeezed into the
+// status badge alongside the byte count.
+const timestampReading = computed(() => {
+  const c = cell.value;
+  if (!c || c.value === null) return null;
+  return describeTimestamp(effectiveFormat.value, c.value);
 });
 </script>
 
@@ -287,6 +297,14 @@ const statusLine = computed(() => {
       </template>
     </ViewHeader>
 
+    <!-- Local first, then UTC (own row — too long to share the header's status badge). -->
+    <div v-if="timestampReading" class="p-strip note timestamp-row" data-testid="cell-editor-timestamp">
+      <Codicon name="clock" :size="13" />
+      <span data-testid="cell-editor-timestamp-local">{{ timestampReading.local }}</span>
+      <span class="ts-sep">·</span>
+      <span data-testid="cell-editor-timestamp-utc">{{ timestampReading.utc }}</span>
+    </div>
+
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
          (onEditorKeydown) stages without needing to move focus away; neither is on CodeMirrorHost
          itself, since its own keymap only binds plain Enter (for newlines) and lets everything
@@ -332,16 +350,27 @@ const statusLine = computed(() => {
   color: var(--kira-fg-disabled);
 }
 
-/* the relocated statusLine (bytes / decoded reading — e.g. a timestamp's UTC + local translation
-   / truncation note / beautify failure) now lives in the header as a badge — LAW: no editor
-   status line, everything it used to say already exists in the view header. Widened from 220px:
-   the UTC+local timestamp reading runs longer than the old "N bytes" case this width was sized
-   for; still truncates with an ellipsis (title carries the full text) rather than growing
-   unbounded and pushing the trailing read-only chip around. */
+/* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation
+   note / beautify failure) now lives in the header as a badge — LAW: no editor status line,
+   everything it used to say already exists in the view header. Still truncates with an ellipsis
+   (title carries the full text) rather than growing unbounded and pushing the trailing
+   read-only chip around. */
 .status-badge {
-  max-width: 340px;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Local first, then UTC — its own row so the (fairly long) pair of translations don't crowd the
+   header's badges. Reuses .p-strip.note's subtle info-row look rather than inventing a new one. */
+.timestamp-row {
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-2) var(--kira-s-4);
+}
+
+.ts-sep {
+  opacity: 0.5;
 }
 
 .editor-body {

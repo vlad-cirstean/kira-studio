@@ -360,22 +360,40 @@ function pad(n: number, len = 2): string {
   return String(n).padStart(len, '0');
 }
 
+const MONTH_ABBR = [
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+];
+
+/** A decoded timestamp reading, local first (D15 revised — its own row, not the status badge). */
+export interface TimestampReading {
+  local: string;
+  utc: string;
+}
+
 // No query, no round trip: the local half is read straight from the runtime's own timezone
 // (Intl/Date already know it), so this is pure client-side math against a value already sitting
-// in the buffer — never something that needs asking the server.
-function formatUtcAndLocal(d: Date): string {
-  const utc = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
-  const local = new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZoneName: 'short',
-  }).format(d);
-  return `${utc} · ${local} local`;
+// in the buffer — never something that needs asking the server. Only the zone abbreviation
+// (e.g. "GMT+2") comes from Intl; the digits themselves use the Date object's own local getters
+// so both halves are built the same way, just against UTC vs. local getters.
+function formatUtcAndLocal(d: Date): TimestampReading {
+  const utc = `${MONTH_ABBR[d.getUTCMonth()]} ${pad(d.getUTCDate())} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  const zoneName =
+    new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(d)
+      .find((p) => p.type === 'timeZoneName')?.value ?? '';
+  const local = `${MONTH_ABBR[d.getMonth()]} ${pad(d.getDate())} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${zoneName}`;
+  return { local, utc };
 }
 
 // Matches detectIso8601's own ISO8601_RE offset group exactly (the minutes half is optional) —
@@ -408,21 +426,31 @@ function parseIso8601(t: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** D15's one-line reading, or null when the format implies no decoding. Must never throw. */
-export function describeValue(format: CellFormat, text: string): string | null {
+// D15 revised: a decoded timestamp gets its own row under the header (too long to share the
+// status badge with the byte count) — CellEditorView calls this separately from describeValue.
+export function describeTimestamp(format: CellFormat, text: string): TimestampReading | null {
   const t = text.trim();
   try {
     if (format === 'epochSeconds' || format === 'epochMillis') {
       const n = Number(t);
       if (!Number.isFinite(n)) return null;
       const d = new Date(format === 'epochSeconds' ? n * 1000 : n);
-      if (Number.isNaN(d.getTime())) return null;
-      return formatUtcAndLocal(d);
+      return Number.isNaN(d.getTime()) ? null : formatUtcAndLocal(d);
     }
     if (format === 'iso8601') {
       const d = parseIso8601(t);
       return d ? formatUtcAndLocal(d) : null;
     }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** D15's one-line reading, or null when the format implies no decoding. Must never throw. */
+export function describeValue(format: CellFormat, text: string): string | null {
+  const t = text.trim();
+  try {
     if (format === 'base64') {
       const isUrlSafe = !BASE64_STD_RE.test(t) && BASE64_URL_RE.test(t);
       const bytes = atob(base64ToStd(t, isUrlSafe)).length;

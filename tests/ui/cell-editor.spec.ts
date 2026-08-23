@@ -250,10 +250,16 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await scrollColumnIntoView(page, 'ts_a');
   await selectCell(page, 0, 'ts_a');
   await expect(panel).toHaveAttribute('data-detected', 'iso8601');
-  // Task #72: an iso8601-detected value's status badge now reads out the UTC and local-timezone
-  // translation of the timestamp, not just its byte count.
-  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('UTC');
-  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('local');
+  // Task #72/#77: an iso8601-detected value gets its own row (under the header, local first)
+  // reading out the UTC and local-timezone translation of the timestamp, with letter month
+  // abbreviations (e.g. JAN) rather than numeric ones.
+  await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('UTC');
+  await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText(
+    /[A-Z]{3} \d{2} \d{4}/,
+  );
+  await expect(page.locator('[data-testid="cell-editor-timestamp-local"]')).not.toContainText(
+    'UTC',
+  );
   await scrollColumnIntoView(page, 'bytea_a');
   await selectCell(page, 0, 'bytea_a');
   await expect(panel).toHaveAttribute('data-detected', 'hex');

@@ -164,6 +164,47 @@
   color: var(--kira-fg-disabled);
 }
 
+/* Hide the OS-native up/down spinner — .p-input .stepper below draws the app's own. */
+.p-input input[type="number"] {
+  -moz-appearance: textfield;
+}
+.p-input input[type="number"]::-webkit-inner-spin-button,
+.p-input input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.p-input.has-stepper input {
+  padding-right: var(--kira-s-1);
+}
+.p-input .stepper {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  flex-shrink: 0;
+  margin: 2px 0;
+  border-left: var(--kira-border-width) solid var(--kira-border);
+}
+.p-input .step-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  line-height: 0;
+}
+.p-input .step-btn:hover {
+  color: var(--kira-fg);
+  background: var(--kira-hover);
+}
+.p-input .step-btn:active {
+  background: var(--kira-select);
+}
+
 /* ---------- P5 select ---------- */
 .p-select {
   height: var(--kira-h-sm);
@@ -176,13 +217,28 @@
   font-size: var(--kira-t-sm);
   cursor: pointer;
   flex-shrink: 0;
+  appearance: none;
+  background-image: var(--kira-select-arrow);
+  background-repeat: no-repeat;
+  background-position: right var(--kira-s-2) center;
+  padding-right: calc(var(--kira-s-2) + 14px);
 }
 .p-select.bordered {
   height: var(--kira-h-md);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  background: var(--kira-bg-input);
+  background-color: var(--kira-bg-input);
   color: var(--kira-fg);
   padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
+  padding-right: calc(var(--kira-s-2) + 14px);
+}
+.p-select:focus-visible {
+  border-color: var(--kira-focus);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -2px;
+}
+.p-select:disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
 }
 
 /* ---------- P6 segmented ---------- */
