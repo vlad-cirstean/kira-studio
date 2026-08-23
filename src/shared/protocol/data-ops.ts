@@ -16,6 +16,8 @@ export const DATA_OP = {
   preview: 'data:preview',
   /** P5: adapter.mutate(), then a same-process cache.dropTarget() on success. */
   mutate: 'data:mutate',
+  /** P5.5 §8.14: adapter.execute() — one op-log row for the whole statement batch. */
+  execute: 'data:execute',
   cacheStats: 'cache:stats',
   cacheClear: 'cache:clear',
 } as const;
@@ -141,6 +143,26 @@ export const mutateRequestWireSchema = z.object({
 
 export interface MutateResponse {
   affectedRows: number;
+}
+
+export interface ExecuteRequestWire {
+  opId: string;
+  tabId: string | null;
+  connectionId: string;
+  path: string;
+  statements: string[];
+}
+
+export const executeRequestWireSchema = z.object({
+  opId: z.string(),
+  tabId: z.string().nullable(),
+  connectionId: z.string(),
+  path: z.string(),
+  statements: z.array(z.string()).min(1),
+});
+
+export interface ExecuteResponse {
+  pages: Page[];
 }
 
 export const cacheStatsSchema = z.object({

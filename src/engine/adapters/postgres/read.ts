@@ -47,7 +47,8 @@ export function typeClassFor(dataType: string): TypeClass {
 
 // bytea in text mode arrives as `\x…` (the `hex` bytea_output default since Postgres 9.0) —
 // normalised to the app-wide `0x…` binary convention (D3, mirrored by MariaDB's blob handling).
-function normalizeCellText(value: string, typeClass: TypeClass): string {
+// Exported so postgres/console.ts (P5.5) reuses the exact same normalisation for query results.
+export function normalizeCellText(value: string, typeClass: TypeClass): string {
   if (typeClass === 'binary' && value.startsWith('\\x')) return `0x${value.slice(2)}`;
   return value;
 }

@@ -244,6 +244,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     'copy-name',
     'copy-uri',
     'filters',
+    'open-console',
     'color',
     'readonly',
     '--separator--',
@@ -252,11 +253,11 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, DB_PATH);
-  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters']);
+  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters', 'open-console']);
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, APP_PATH);
-  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters']);
+  expect(await menuItemIds(page)).toEqual(['refresh', 'copy-name', 'filters', 'open-console']);
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, WIDE_TABLE_PATH);
@@ -264,6 +265,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     'open-data',
     'open-data-new-tab',
     'open-ddl',
+    'open-console',
     'refresh',
     'copy-name',
     'copy-qualified-name',

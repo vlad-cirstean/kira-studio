@@ -1,6 +1,6 @@
 import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
-import type { SavedQuery } from '@shared/domain/queries';
+import type { SavedFilterQuery } from '@shared/domain/queries';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -39,7 +39,7 @@ export const treeState = reactive({
   /** Set by revealPath(); ProjectTree.vue watches it to scroll the row into view (Step 7b). */
   pendingScrollKey: null as string | null,
   /** Populated on demand for the tree's "Saved filters ▸" submenu (Step 13). */
-  savedQueries: {} as Record<string, SavedQuery[]>,
+  savedQueries: {} as Record<string, SavedFilterQuery[]>,
 });
 
 export function selectRow(key: string): void {

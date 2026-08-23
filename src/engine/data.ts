@@ -4,6 +4,9 @@ import {
   type CountRequestWire,
   type CountResponse,
   countRequestWireSchema,
+  type ExecuteRequestWire,
+  type ExecuteResponse,
+  executeRequestWireSchema,
   type MutateRequestWire,
   type MutateResponse,
   mutateRequestWireSchema,
@@ -139,4 +142,26 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
   // existing handler exactly.
   cache.dropTarget(req.connectionId, req.path);
   return { affectedRows: value.affectedRows };
+}
+
+// §8.14: no cache interaction at all — console results never populate L2 (they are not a table
+// page) and running a statement here does not auto-invalidate any data tab's cache (the adapter
+// has no reliable way to know which table free-form SQL touched); the user's own ↻ still works.
+export async function handleExecute(payload: unknown): Promise<ExecuteResponse> {
+  const req: ExecuteRequestWire = executeRequestWireSchema.parse(payload);
+  const adapter = getLiveAdapter(req.connectionId);
+  if (!adapter) {
+    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+  }
+
+  const path = decodePath(req.connectionId, req.path);
+  const { value: pages } = await runOp(
+    { connectionId: req.connectionId, kind: 'execute', opId: req.opId, tabId: req.tabId },
+    async (ctx) => {
+      const pages = await adapter.execute({ path, statements: req.statements }, ctx);
+      ctx.setRows(pages.reduce((sum, p) => sum + p.rowCount, 0));
+      return pages;
+    },
+  );
+  return { pages };
 }

@@ -1,5 +1,6 @@
 import type { Caps } from '../../shared/caps';
 import type { ConnectionKind } from '../../shared/domain/connection';
+import type { ConsoleRequest } from '../../shared/domain/console';
 import type { SourceText } from '../../shared/domain/ddl';
 import type { MutationPlan, MutationResult } from '../../shared/domain/mutations';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
@@ -108,6 +109,15 @@ export interface Adapter {
    * one op-log row. Throws `E_UNSUPPORTED` if the connection is read-only. Gated by `caps.writable`.
    */
   mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>;
+
+  /**
+   * §8.14's query console: runs every statement in `req.statements` in order over one
+   * connection, one op-log row for the whole batch (`ctx.setCommand()` called once, P5 D9's
+   * precedent). All-or-nothing — a mid-batch failure rejects the call with `AdapterError`; there
+   * is no partial-results-with-per-statement-error shape. One `Page` per statement, in order.
+   * Gated by `caps.sql`.
+   */
+  execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>;
 }
 
 export interface AdapterDeps {
@@ -117,11 +127,7 @@ export interface AdapterDeps {
 export type AdapterFactory = (deps: AdapterDeps) => Adapter;
 
 /**
- * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5 (both
- * above). Each later phase adds exactly these members. Do not add them early; do not change the
- * signatures without amending docs/plans/P1-connections-and-tree.md §4b.
- *
- * | Phase | Added to `Adapter`                                                              | Gated by         |
- * |-------|----------------------------------------------------------------------------------|------------------|
- * | P5.5  | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>`                         | `caps.sql`       |
+ * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5,
+ * `execute` in P5.5 — all above, nothing pending. A later phase that widens `Adapter` again does
+ * so by amending docs/plans/P1-connections-and-tree.md §4b first, same discipline as this line.
  */

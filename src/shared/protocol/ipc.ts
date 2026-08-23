@@ -2,7 +2,15 @@ import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../dom
 import type { ConnectionFilter, ConnectionFilterInput } from '../domain/connection-filter';
 import type { SourceText } from '../domain/ddl';
 import type { OpRecord } from '../domain/ops';
-import type { FilterBody, FilterHistoryEntry, SavedQuery, SortSpec } from '../domain/queries';
+import type {
+  ConsoleBody,
+  FilterBody,
+  FilterHistoryEntry,
+  SavedConsoleQuery,
+  SavedFilterQuery,
+  SavedQuery,
+  SortSpec,
+} from '../domain/queries';
 import type { TabRecord } from '../domain/tabs';
 import type { ObjectMeta, TreeNode } from '../domain/tree';
 import type { Layout, LayoutPatch } from '../layout';
@@ -48,6 +56,8 @@ export const IPC = {
 
   queriesList: 'kira:queries:list',
   queriesSave: 'kira:queries:save',
+  queriesListConsole: 'kira:queries:listConsole',
+  queriesSaveConsole: 'kira:queries:saveConsole',
   queriesUpdate: 'kira:queries:update',
   queriesDelete: 'kira:queries:delete',
   queriesTouch: 'kira:queries:touch',
@@ -153,14 +163,22 @@ export interface KiraApi {
   tabsList(): Promise<TabRecord[]>;
   tabsSave(args: { tabs: TabRecord[] }): Promise<void>;
 
-  queriesList(args: { connectionId: string; path: string }): Promise<SavedQuery[]>;
+  queriesList(args: { connectionId: string; path: string }): Promise<SavedFilterQuery[]>;
   queriesSave(args: {
     connectionId: string;
     path: string;
     name: string;
     body: FilterBody;
     pinned: boolean;
-  }): Promise<SavedQuery>;
+  }): Promise<SavedFilterQuery>;
+  queriesListConsole(args: { connectionId: string; path: string }): Promise<SavedConsoleQuery[]>;
+  queriesSaveConsole(args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: ConsoleBody;
+    pinned: boolean;
+  }): Promise<SavedConsoleQuery>;
   queriesUpdate(args: { id: string; name?: string; pinned?: boolean }): Promise<SavedQuery>;
   queriesDelete(args: { id: string }): Promise<void>;
   queriesTouch(args: { id: string }): Promise<void>;

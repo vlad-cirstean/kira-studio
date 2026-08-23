@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
+import type { SavedConsoleQuery } from '@shared/domain/queries';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import { findDataTab } from '../../state/tabs';
+import { findConsoleTab } from '../../state/tabs';
+import { setText } from './state';
 
+// A lean sibling of grid/FilterHistoryMenu.vue: saved-only (§8.14 gives the console no run
+// history, only saved_queries), scoped to one tab's own connectionId/path.
 const props = defineProps<{ tabId: string }>();
-const emit = defineEmits<{ apply: [where: string | null, orderBy: SortSpec | null]; close: [] }>();
+const emit = defineEmits<{ close: [] }>();
 
 function tab() {
-  return findDataTab(props.tabId);
+  return findConsoleTab(props.tabId);
 }
 
-const saved = ref<SavedFilterQuery[]>([]);
-const history = ref<FilterHistoryEntry[]>([]);
+const saved = ref<SavedConsoleQuery[]>([]);
 
-// Electron's renderer does not implement window.prompt() (only alert/confirm are backed by a
-// native dialog) — calling it throws rather than showing anything. This is the in-app substitute,
-// shared by saveCurrent() and rename() below.
+// Electron's renderer has no window.prompt() — same in-app substitute as FilterHistoryMenu.vue.
 const textPrompt = ref<{
   title: string;
   value: string;
@@ -45,50 +45,27 @@ function cancelPrompt(): void {
 async function reload(): Promise<void> {
   const t = tab();
   if (!t?.connectionId) return;
-  const [savedList, historyList] = await Promise.all([
-    control.queriesList(t.connectionId, t.path),
-    control.queriesHistoryList(t.connectionId, t.path, 20),
-  ]);
-  saved.value = savedList;
-  history.value = historyList;
+  saved.value = await control.queriesListConsole(t.connectionId, t.path);
 }
 onMounted(reload);
 
-function sortLabel(orderBy: SortSpec | null): string | null {
-  if (!orderBy) return null;
-  if (orderBy.kind === 'text') return orderBy.text;
-  return orderBy.terms.map((t) => `${t.column} ${t.direction.toUpperCase()}`).join(', ');
-}
-
-function summarize(where: string | null, orderBy: SortSpec | null): string {
-  const parts: string[] = [];
-  if (where) parts.push(`WHERE ${where}`);
-  const orderText = sortLabel(orderBy);
-  if (orderText) parts.push(`ORDER BY ${orderText}`);
-  return parts.length > 0 ? parts.join(' / ') : '(no filter)';
-}
-
-async function applySaved(entry: SavedFilterQuery): Promise<void> {
-  emit('apply', entry.body.where, entry.body.orderBy);
-  await control.queriesTouch(entry.id);
-  emit('close');
-}
-function applyHistoryEntry(entry: FilterHistoryEntry): void {
-  emit('apply', entry.where, entry.orderBy);
+function apply(entry: SavedConsoleQuery): void {
+  setText(props.tabId, entry.body.text);
+  void control.queriesTouch(entry.id);
   emit('close');
 }
 
-async function togglePin(entry: SavedFilterQuery): Promise<void> {
+async function togglePin(entry: SavedConsoleQuery): Promise<void> {
   await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
   await reload();
 }
-async function rename(entry: SavedFilterQuery): Promise<void> {
-  const name = await promptText('Rename saved filter', entry.name);
+async function rename(entry: SavedConsoleQuery): Promise<void> {
+  const name = await promptText('Rename saved query', entry.name);
   if (!name || name.trim() === '') return;
   await control.queriesUpdate(entry.id, { name: name.trim() });
   await reload();
 }
-async function remove(entry: SavedFilterQuery): Promise<void> {
+async function remove(entry: SavedConsoleQuery): Promise<void> {
   await control.queriesDelete(entry.id);
   await reload();
 }
@@ -96,13 +73,13 @@ async function remove(entry: SavedFilterQuery): Promise<void> {
 async function saveCurrent(): Promise<void> {
   const t = tab();
   if (!t?.connectionId) return;
-  const name = await promptText('Name this filter', '');
+  const name = await promptText('Name this query', '');
   if (!name || name.trim() === '') return;
-  await control.queriesSave({
+  await control.queriesSaveConsole({
     connectionId: t.connectionId,
     path: t.path,
     name: name.trim(),
-    body: { where: t.state.filter, orderBy: t.state.sort },
+    body: { text: t.state.text },
     pinned: false,
   });
   await reload();
@@ -110,16 +87,16 @@ async function saveCurrent(): Promise<void> {
 </script>
 
 <template>
-  <div class="menu-backdrop" data-testid="filter-history-backdrop" @click="emit('close')">
-    <div class="filter-history" data-testid="filter-history" @click.stop>
-      <div class="section-label">Saved</div>
-      <div v-if="saved.length === 0" class="empty-row">No saved filters</div>
+  <div class="menu-backdrop" data-testid="console-saved-backdrop" @click="emit('close')">
+    <div class="saved-menu" data-testid="console-saved-menu" @click.stop>
+      <div class="section-label">Saved queries</div>
+      <div v-if="saved.length === 0" class="empty-row">No saved queries</div>
       <div
         v-for="entry in saved"
         :key="entry.id"
         class="entry-row"
-        data-testid="saved-entry"
-        @click="applySaved(entry)"
+        data-testid="console-saved-entry"
+        @click="apply(entry)"
       >
         <button
           type="button"
@@ -137,20 +114,8 @@ async function saveCurrent(): Promise<void> {
         </span>
       </div>
 
-      <div class="section-label">Recent</div>
-      <div v-if="history.length === 0" class="empty-row">No history yet</div>
-      <div
-        v-for="entry in history"
-        :key="entry.id"
-        class="entry-row"
-        data-testid="history-entry"
-        @click="applyHistoryEntry(entry)"
-      >
-        <span class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
-      </div>
-
-      <button type="button" class="save-current" data-testid="save-current-filter" @click="saveCurrent">
-        Save current filter…
+      <button type="button" class="save-current" data-testid="console-save-current" @click="saveCurrent">
+        Save current query…
       </button>
     </div>
 
@@ -183,7 +148,7 @@ async function saveCurrent(): Promise<void> {
   z-index: 20;
 }
 
-.filter-history {
+.saved-menu {
   position: absolute;
   top: 32px;
   left: 8px;

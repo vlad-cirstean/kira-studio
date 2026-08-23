@@ -320,6 +320,9 @@ describe('mariadb adapter (§9.1)', () => {
           mutate() {
             throw new Error('not used by this test');
           },
+          execute() {
+            throw new Error('not used by this test');
+          },
           async cancel() {
             if (!tracked || tracked.threadId === null) return false;
             const cancelClient = await createConnection({
@@ -1262,6 +1265,124 @@ describe('mariadb adapter (§9.1)', () => {
     } finally {
       await probeConn.query('DROP TABLE IF EXISTS no_pk_probe');
       await probeConn.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('27. execute: one page per statement, including a non-row-returning one', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const probeConn = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+      database: 'kira_test',
+    });
+    try {
+      await probeConn.query(
+        'CREATE TABLE IF NOT EXISTS console_probe (id INT PRIMARY KEY, name VARCHAR(50))',
+      );
+      await probeConn.query(`INSERT INTO console_probe (id, name) VALUES (1, 'row 1')`);
+
+      let loggedCommand = '';
+      const ctx: OpCtx = {
+        opId: crypto.randomUUID(),
+        signal: new AbortController().signal,
+        setCommand(text) {
+          loggedCommand = text;
+        },
+      };
+      const statements = [
+        'SELECT id, name FROM console_probe ORDER BY id',
+        `INSERT INTO console_probe (id, name) VALUES (2, 'row 2')`,
+      ];
+      const pages = await adapter.execute(
+        { path: path([{ kind: 'database', name: 'kira_test' }]), statements },
+        ctx,
+      );
+
+      // One op-log row for the whole batch (P5 D9's precedent), not one per statement.
+      expect(loggedCommand).toBe(statements.join(';\n'));
+
+      expect(pages).toHaveLength(2);
+      expect(pages[0].rowCount).toBe(1);
+      const nameCol = pages[0].columns.findIndex((c) => c.name === 'name');
+      expect(cellAt(pages[0], nameCol, 0)).toBe('row 1');
+
+      // A non-row-returning statement synthesizes a single-column/single-row status page.
+      expect(pages[1].columns).toEqual([
+        {
+          name: 'status',
+          dataType: 'text',
+          typeClass: 'text',
+          nullable: false,
+          isPrimaryKey: false,
+        },
+      ]);
+      expect(pages[1].rowCount).toBe(1);
+      expect(cellAt(pages[1], 0, 0)).toBe('1 row(s) affected');
+    } finally {
+      await probeConn.query('DROP TABLE IF EXISTS console_probe');
+      await probeConn.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('28. execute: a failing statement rejects the whole call — earlier statements already landed', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const probeConn = await createConnection({
+      host: fixture.config.host ?? undefined,
+      port: fixture.config.port ?? undefined,
+      user: 'root',
+      password: 'kira',
+      database: 'kira_test',
+    });
+    try {
+      await probeConn.query(
+        'CREATE TABLE IF NOT EXISTS console_probe (id INT PRIMARY KEY, name VARCHAR(50))',
+      );
+
+      // execute() is one op-log row and one success/failure outcome per call (all-or-nothing at
+      // the call level), never a per-statement transaction — a statement that already committed
+      // before the failure stays committed.
+      await expect(
+        adapter.execute(
+          {
+            path: path([{ kind: 'database', name: 'kira_test' }]),
+            statements: [
+              `INSERT INTO console_probe (id, name) VALUES (3, 'landed before the failure')`,
+              'SELECT * FROM does_not_exist',
+            ],
+          },
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_QUERY' });
+
+      const rows = await probeConn.query('SELECT name FROM console_probe WHERE id = 3');
+      expect(rows[0]?.name).toBe('landed before the failure');
+    } finally {
+      await probeConn.query('DROP TABLE IF EXISTS console_probe');
+      await probeConn.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('29. execute: an already-cancelled signal rejects before running anything', async () => {
+    const adapter = createAdapter('mariadb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const ctx: OpCtx = { opId: crypto.randomUUID(), signal: controller.signal, setCommand() {} };
+      await expect(
+        adapter.execute(
+          { path: path([{ kind: 'database', name: 'kira_test' }]), statements: ['SELECT 1'] },
+          ctx,
+        ),
+      ).rejects.toMatchObject({ code: 'E_CANCELLED' });
+    } finally {
       await adapter.disconnect();
     }
   });

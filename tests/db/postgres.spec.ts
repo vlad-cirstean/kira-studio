@@ -304,6 +304,9 @@ describe('postgres adapter (§9.1)', () => {
           mutate() {
             throw new Error('not used by this test');
           },
+          execute() {
+            throw new Error('not used by this test');
+          },
           async cancel() {
             if (!tracked) return false;
             const cancelClient = new Client({ connectionString: fixture.uri });
@@ -1318,6 +1321,124 @@ describe('postgres adapter (§9.1)', () => {
     } finally {
       await probeClient.query('DROP TABLE IF EXISTS app.no_pk_probe');
       await probeClient.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('28. execute: one page per statement, including a non-row-returning one', async () => {
+    const adapter = createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const probeClient = new Client({ connectionString: fixture.uri });
+    await probeClient.connect();
+    try {
+      await probeClient.query(
+        'CREATE TABLE IF NOT EXISTS app.console_probe (id int primary key, name text)',
+      );
+      await probeClient.query(`INSERT INTO app.console_probe (id, name) VALUES (1, 'row 1')`);
+
+      let loggedCommand = '';
+      const ctx: OpCtx = {
+        opId: crypto.randomUUID(),
+        signal: new AbortController().signal,
+        setCommand(text) {
+          loggedCommand = text;
+        },
+      };
+      const statements = [
+        'SELECT id, name FROM app.console_probe ORDER BY id',
+        `INSERT INTO app.console_probe (id, name) VALUES (2, 'row 2')`,
+      ];
+      const pages = await adapter.execute(
+        {
+          path: path([
+            { kind: 'database', name: 'kira_test' },
+            { kind: 'schema', name: 'app' },
+          ]),
+          statements,
+        },
+        ctx,
+      );
+
+      // One op-log row for the whole batch (P5 D9's precedent), not one per statement.
+      expect(loggedCommand).toBe(statements.join(';\n'));
+
+      expect(pages).toHaveLength(2);
+      expect(pages[0].rowCount).toBe(1);
+      const nameCol = pages[0].columns.findIndex((c) => c.name === 'name');
+      expect(cellAt(pages[0], nameCol, 0)).toBe('row 1');
+
+      // A non-row-returning statement synthesizes a single-column/single-row status page —
+      // an approximation of Postgres's own command-complete tag (console.ts's documented scope).
+      expect(pages[1].columns).toEqual([
+        {
+          name: 'status',
+          dataType: 'text',
+          typeClass: 'text',
+          nullable: false,
+          isPrimaryKey: false,
+        },
+      ]);
+      expect(pages[1].rowCount).toBe(1);
+      expect(cellAt(pages[1], 0, 0)).toBe('INSERT 1');
+    } finally {
+      await probeClient.query('DROP TABLE IF EXISTS app.console_probe');
+      await probeClient.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('29. execute: a failing statement rejects the whole call — earlier statements already landed', async () => {
+    const adapter = createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const probeClient = new Client({ connectionString: fixture.uri });
+    await probeClient.connect();
+    try {
+      await probeClient.query(
+        'CREATE TABLE IF NOT EXISTS app.console_probe (id int primary key, name text)',
+      );
+
+      // execute() is one op-log row and one success/failure outcome per call (all-or-nothing at
+      // the call level), never a per-statement transaction — a statement that already committed
+      // before the failure stays committed, same as running each one by hand in psql.
+      await expect(
+        adapter.execute(
+          {
+            path: path([
+              { kind: 'database', name: 'kira_test' },
+              { kind: 'schema', name: 'app' },
+            ]),
+            statements: [
+              `INSERT INTO app.console_probe (id, name) VALUES (3, 'landed before the failure')`,
+              'SELECT * FROM app.does_not_exist',
+            ],
+          },
+          makeCtx(),
+        ),
+      ).rejects.toMatchObject({ code: 'E_QUERY' });
+
+      const rows = await probeClient.query('SELECT name FROM app.console_probe WHERE id = 3');
+      expect(rows.rows[0]?.name).toBe('landed before the failure');
+    } finally {
+      await probeClient.query('DROP TABLE IF EXISTS app.console_probe');
+      await probeClient.end();
+      await adapter.disconnect();
+    }
+  });
+
+  test('30. execute: an already-cancelled signal rejects before running anything', async () => {
+    const adapter = createAdapter('postgres', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const ctx: OpCtx = { opId: crypto.randomUUID(), signal: controller.signal, setCommand() {} };
+      await expect(
+        adapter.execute(
+          { path: path([{ kind: 'database', name: 'kira_test' }]), statements: ['SELECT 1'] },
+          ctx,
+        ),
+      ).rejects.toMatchObject({ code: 'E_CANCELLED' });
+    } finally {
       await adapter.disconnect();
     }
   });

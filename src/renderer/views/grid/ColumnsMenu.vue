@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import { computed, ref } from 'vue';
-import { tabsState } from '../../state/tabs';
+import { findDataTab } from '../../state/tabs';
 import { runtime, setProjection } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
@@ -11,7 +11,7 @@ const meta = computed(() => runtime[props.tabId]?.meta ?? null);
 const columnNames = computed(() => meta.value?.columns.map((c) => c.name) ?? []);
 
 function currentProjection(): string[] | null {
-  return tabsState.tabs.find((t) => t.id === props.tabId)?.state.projection ?? null;
+  return findDataTab(props.tabId)?.state.projection ?? null;
 }
 
 const selected = ref<Set<string>>(new Set(currentProjection() ?? columnNames.value));

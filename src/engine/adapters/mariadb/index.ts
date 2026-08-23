@@ -1,4 +1,5 @@
 import { type Connection, createConnection } from 'mariadb';
+import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { SourceText } from '../../../shared/domain/ddl';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
@@ -22,6 +23,7 @@ import { mariadbCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
+import * as consoleQuery from './console';
 import { buildDdl } from './ddl';
 import * as mutate from './mutate';
 import { type RunningQuery, runQuery } from './query';
@@ -257,6 +259,19 @@ class MariaDbAdapter implements Adapter {
     }
     const conn = await this.requireConnection(databaseSegment.name);
     return mutate.mutate(conn, ctx, (q) => this.runningByOp.set(ctx.opId, q), this.readOnly, plan);
+  }
+
+  async execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]> {
+    const [databaseSegment] = req.path.segments;
+    const conn = await this.requireConnection(
+      databaseSegment?.kind === 'database' ? databaseSegment.name : null,
+    );
+    return consoleQuery.execute(
+      conn,
+      ctx,
+      (q) => this.runningByOp.set(ctx.opId, q),
+      req.statements,
+    );
   }
 
   async cancel(opId: string): Promise<boolean> {

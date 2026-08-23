@@ -44,7 +44,9 @@ const ALWAYS_BINARY_TYPES = new Set(['GEOMETRY', 'BIT']);
 // binary when the column's own collation is the binary collation (a BINARY/VARBINARY/BLOB column,
 // not a TEXT/CHAR/VARCHAR one) — the driver's Collation table names it 'BINARY' (uppercase), so
 // this compares case-insensitively rather than assuming a casing.
-const typeCastString: TypeCastFunction = (field: FieldInfo, _next: TypeCastNextFunction) => {
+// Exported so mariadb/console.ts (P5.5) can reuse the exact same binary/text decoding — the
+// query console needs the identical hex-normalisation discipline the read path already has.
+export const typeCastString: TypeCastFunction = (field: FieldInfo, _next: TypeCastNextFunction) => {
   const isBinaryString =
     (field.type === 'VAR_STRING' || field.type === 'STRING' || BLOB_FAMILY_TYPES.has(field.type)) &&
     field.collation?.name?.toUpperCase() === 'BINARY';

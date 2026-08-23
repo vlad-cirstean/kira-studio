@@ -1,7 +1,11 @@
 import { and, desc, eq } from 'drizzle-orm';
 import {
+  type ConsoleBody,
+  consoleBodySchema,
   type FilterBody,
   filterBodySchema,
+  type SavedConsoleQuery,
+  type SavedFilterQuery,
   type SavedQuery,
   savedQuerySchema,
 } from '../../../shared/domain/queries';
@@ -41,11 +45,12 @@ function parseSavedQueryRow(row: SavedQueryRow): SavedQuery | null {
   return parsed.data;
 }
 
-export async function listSavedFilters(
+async function listByKind<K extends SavedQuery['kind']>(
   db: KiraDb,
   connectionId: string,
   path: string,
-): Promise<SavedQuery[]> {
+  kind: K,
+): Promise<Extract<SavedQuery, { kind: K }>[]> {
   const rows = await db
     .select()
     .from(savedQueries)
@@ -53,21 +58,44 @@ export async function listSavedFilters(
       and(
         eq(savedQueries.connectionId, connectionId),
         eq(savedQueries.path, path),
-        eq(savedQueries.kind, 'filter'),
+        eq(savedQueries.kind, kind),
       ),
     )
     .orderBy(desc(savedQueries.pinned), desc(savedQueries.usedAt), savedQueries.name);
-  const out: SavedQuery[] = [];
+  const out: Extract<SavedQuery, { kind: K }>[] = [];
   for (const row of rows) {
     const parsed = parseSavedQueryRow(row);
-    if (parsed) out.push(parsed);
+    if (parsed && parsed.kind === kind) out.push(parsed as Extract<SavedQuery, { kind: K }>);
   }
   return out;
 }
 
-export async function saveFilter(
+export async function listSavedFilters(
   db: KiraDb,
-  input: { connectionId: string; path: string; name: string; body: FilterBody; pinned: boolean },
+  connectionId: string,
+  path: string,
+): Promise<SavedFilterQuery[]> {
+  return listByKind(db, connectionId, path, 'filter');
+}
+
+export async function listSavedConsoleQueries(
+  db: KiraDb,
+  connectionId: string,
+  path: string,
+): Promise<SavedConsoleQuery[]> {
+  return listByKind(db, connectionId, path, 'console');
+}
+
+async function insertSavedQuery(
+  db: KiraDb,
+  input: {
+    connectionId: string;
+    path: string;
+    name: string;
+    kind: SavedQuery['kind'];
+    body: string;
+    pinned: boolean;
+  },
 ): Promise<SavedQuery> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -76,19 +104,49 @@ export async function saveFilter(
     connectionId: input.connectionId,
     path: input.path,
     name: input.name,
-    kind: 'filter',
-    body: JSON.stringify(filterBodySchema.parse(input.body)),
+    kind: input.kind,
+    body: input.body,
     pinned: input.pinned,
     createdAt: now,
     usedAt: now,
   });
   const row = (await db.select().from(savedQueries).where(eq(savedQueries.id, id)))[0];
   const parsed = row ? parseSavedQueryRow(row) : null;
-  if (!parsed) throw new Error('saveFilter: freshly inserted row failed to parse');
+  if (!parsed) throw new Error('insertSavedQuery: freshly inserted row failed to parse');
   return parsed;
 }
 
-export async function updateSavedFilter(
+export async function saveFilter(
+  db: KiraDb,
+  input: { connectionId: string; path: string; name: string; body: FilterBody; pinned: boolean },
+): Promise<SavedFilterQuery> {
+  const saved = await insertSavedQuery(db, {
+    ...input,
+    kind: 'filter',
+    body: JSON.stringify(filterBodySchema.parse(input.body)),
+  });
+  if (saved.kind !== 'filter') throw new Error('saveFilter: inserted row is not kind filter');
+  return saved;
+}
+
+export async function saveConsoleQuery(
+  db: KiraDb,
+  input: { connectionId: string; path: string; name: string; body: ConsoleBody; pinned: boolean },
+): Promise<SavedConsoleQuery> {
+  const saved = await insertSavedQuery(db, {
+    ...input,
+    kind: 'console',
+    body: JSON.stringify(consoleBodySchema.parse(input.body)),
+  });
+  if (saved.kind !== 'console') {
+    throw new Error('saveConsoleQuery: inserted row is not kind console');
+  }
+  return saved;
+}
+
+// Kind-agnostic: `id` alone identifies the row, and neither op touches `body`/`kind` — one
+// implementation serves both saved filters (§8.5) and saved console queries (§8.14).
+export async function updateSavedQuery(
   db: KiraDb,
   id: string,
   patch: { name?: string; pinned?: boolean },
@@ -102,15 +160,15 @@ export async function updateSavedFilter(
     .where(eq(savedQueries.id, id));
   const row = (await db.select().from(savedQueries).where(eq(savedQueries.id, id)))[0];
   const parsed = row ? parseSavedQueryRow(row) : null;
-  if (!parsed) throw new Error(`updateSavedFilter: row ${id} not found after update`);
+  if (!parsed) throw new Error(`updateSavedQuery: row ${id} not found after update`);
   return parsed;
 }
 
-export async function deleteSavedFilter(db: KiraDb, id: string): Promise<void> {
+export async function deleteSavedQuery(db: KiraDb, id: string): Promise<void> {
   await db.delete(savedQueries).where(eq(savedQueries.id, id));
 }
 
-export async function touchSavedFilter(db: KiraDb, id: string): Promise<void> {
+export async function touchSavedQuery(db: KiraDb, id: string): Promise<void> {
   await db
     .update(savedQueries)
     .set({ usedAt: new Date().toISOString() })

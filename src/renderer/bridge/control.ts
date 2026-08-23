@@ -5,7 +5,15 @@ import type {
 } from '@shared/domain/connection';
 import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
 import type { OpRecord } from '@shared/domain/ops';
-import type { FilterBody, FilterHistoryEntry, SavedQuery, SortSpec } from '@shared/domain/queries';
+import type {
+  ConsoleBody,
+  FilterBody,
+  FilterHistoryEntry,
+  SavedConsoleQuery,
+  SavedFilterQuery,
+  SavedQuery,
+  SortSpec,
+} from '@shared/domain/queries';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { Layout, LayoutPatch } from '@shared/layout';
 import type {
@@ -97,7 +105,7 @@ export const control = {
   tabsList: (): Promise<TabRecord[]> => kira.tabsList(),
   tabsSave: (tabs: TabRecord[]): Promise<void> => kira.tabsSave(plain({ tabs })),
 
-  queriesList: (connectionId: string, path: string): Promise<SavedQuery[]> =>
+  queriesList: (connectionId: string, path: string): Promise<SavedFilterQuery[]> =>
     kira.queriesList({ connectionId, path }),
   queriesSave: (args: {
     connectionId: string;
@@ -105,7 +113,16 @@ export const control = {
     name: string;
     body: FilterBody;
     pinned: boolean;
-  }): Promise<SavedQuery> => kira.queriesSave(plain(args)),
+  }): Promise<SavedFilterQuery> => kira.queriesSave(plain(args)),
+  queriesListConsole: (connectionId: string, path: string): Promise<SavedConsoleQuery[]> =>
+    kira.queriesListConsole({ connectionId, path }),
+  queriesSaveConsole: (args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: ConsoleBody;
+    pinned: boolean;
+  }): Promise<SavedConsoleQuery> => kira.queriesSaveConsole(plain(args)),
   queriesUpdate: (id: string, patch: { name?: string; pinned?: boolean }): Promise<SavedQuery> =>
     kira.queriesUpdate(plain({ id, ...patch })),
   queriesDelete: (id: string): Promise<void> => kira.queriesDelete({ id }),

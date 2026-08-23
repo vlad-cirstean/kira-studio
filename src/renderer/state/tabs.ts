@@ -1,14 +1,18 @@
 import {
+  asConsoleTab,
   asDataTab,
+  type ConsoleTabRecord,
+  type ConsoleTabState,
   type DataTabRecord,
   type DataTabState,
+  defaultConsoleTabState,
   defaultDataTabState,
   defaultDdlTabState,
   type TabRecord,
 } from '@shared/domain/tabs';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
-import { drop as dropPage } from '../views/grid/page';
+import { dropForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { settingsState } from './settings';
@@ -134,6 +138,28 @@ export function openDdlTab(connectionId: string, path: string): string {
   return id;
 }
 
+// Opens a new 'console' tab — always a fresh one, never reused by (connectionId, path): unlike
+// data/ddl, a console is a scratch work surface (like a SQL client's "New Query"), so the same
+// target routinely wants several independent consoles open at once.
+export function openConsoleTab(connectionId: string, path: string): string {
+  const id = crypto.randomUUID();
+  const record: TabRecord = {
+    id,
+    connectionId,
+    path,
+    kind: 'console',
+    state: defaultConsoleTabState(),
+    order: tabsState.tabs.length,
+    active: true,
+  };
+  deactivateAll();
+  tabsState.tabs.push(record);
+  tabsState.activeId = id;
+  tabsState.hydrated.add(id);
+  saveNow();
+  return id;
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
@@ -151,15 +177,25 @@ export function duplicateTab(id: string): string {
           order: tabsState.tabs.length,
           active: true,
         }
-      : {
-          id: newId,
-          connectionId: source.connectionId,
-          path: source.path,
-          kind: 'ddl',
-          state: defaultDdlTabState(),
-          order: tabsState.tabs.length,
-          active: true,
-        };
+      : source.kind === 'ddl'
+        ? {
+            id: newId,
+            connectionId: source.connectionId,
+            path: source.path,
+            kind: 'ddl',
+            state: defaultDdlTabState(),
+            order: tabsState.tabs.length,
+            active: true,
+          }
+        : {
+            id: newId,
+            connectionId: source.connectionId,
+            path: source.path,
+            kind: 'console',
+            state: defaultConsoleTabState(),
+            order: tabsState.tabs.length,
+            active: true,
+          };
   deactivateAll();
   tabsState.tabs.push(record);
   tabsState.activeId = newId;
@@ -174,7 +210,7 @@ export function closeTab(id: string): void {
   const wasActive = tabsState.tabs[idx].active;
   tabsState.tabs.splice(idx, 1);
   tabsState.hydrated.delete(id);
-  dropPage(id); // §2.2: closing a tab frees its cached page immediately.
+  dropForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   clearSelectedCellFor(id);
   clearPending(id);
 
@@ -194,7 +230,7 @@ export function closeOthers(id: string): void {
   for (const t of tabsState.tabs) {
     if (t.id !== id) {
       tabsState.hydrated.delete(t.id);
-      dropPage(t.id);
+      dropForTab(t.id);
       clearSelectedCellFor(t.id);
       clearPending(t.id);
     }
@@ -210,7 +246,7 @@ export function closeToTheRight(id: string): void {
   if (idx < 0) return;
   for (const t of tabsState.tabs.slice(idx + 1)) {
     tabsState.hydrated.delete(t.id);
-    dropPage(t.id);
+    dropForTab(t.id);
     clearSelectedCellFor(t.id);
     clearPending(t.id);
   }
@@ -225,7 +261,7 @@ export function closeToTheRight(id: string): void {
 export function closeAll(): void {
   for (const t of tabsState.tabs) {
     tabsState.hydrated.delete(t.id);
-    dropPage(t.id);
+    dropForTab(t.id);
     clearSelectedCellFor(t.id);
     clearPending(t.id);
   }
@@ -245,6 +281,13 @@ export function activateTab(id: string): void {
 export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (target?.kind !== 'data') return;
+  Object.assign(target.state, patch);
+  saveDebounced();
+}
+
+export function patchConsoleTabState(id: string, patch: Partial<ConsoleTabState>): void {
+  const target = tabsState.tabs.find((t) => t.id === id);
+  if (target?.kind !== 'console') return;
   Object.assign(target.state, patch);
   saveDebounced();
 }
@@ -270,6 +313,10 @@ export const activeTab = computed<TabRecord | null>(
 
 export function findDataTab(id: string): DataTabRecord | null {
   return asDataTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findConsoleTab(id: string): ConsoleTabRecord | null {
+  return asConsoleTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));

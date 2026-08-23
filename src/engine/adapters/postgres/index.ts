@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { SourceText } from '../../../shared/domain/ddl';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
@@ -22,6 +23,7 @@ import { postgresCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildClientConfig, ClientSet } from './client';
+import * as consoleQuery from './console';
 import { buildDdl } from './ddl';
 import * as mutate from './mutate';
 import { type RunningQuery, runQuery } from './query';
@@ -274,6 +276,19 @@ class PostgresAdapter implements Adapter {
       (q) => this.runningByOp.set(ctx.opId, q),
       this.readOnly,
       plan,
+    );
+  }
+
+  async execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]> {
+    const [databaseSegment] = req.path.segments;
+    const client = await this.requireClient(
+      databaseSegment?.kind === 'database' ? databaseSegment.name : null,
+    );
+    return consoleQuery.execute(
+      client,
+      ctx,
+      (q) => this.runningByOp.set(ctx.opId, q),
+      req.statements,
     );
   }
 

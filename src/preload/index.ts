@@ -7,8 +7,11 @@ import type {
 import type { ConnectionFilter, ConnectionFilterInput } from '../shared/domain/connection-filter';
 import type { OpRecord } from '../shared/domain/ops';
 import type {
+  ConsoleBody,
   FilterBody,
   FilterHistoryEntry,
+  SavedConsoleQuery,
+  SavedFilterQuery,
   SavedQuery,
   SortSpec,
 } from '../shared/domain/queries';
@@ -125,14 +128,23 @@ const kiraApi: KiraApi = {
   tabsSave: (args: { tabs: TabRecord[] }) => ipcRenderer.invoke(IPC.tabsSave, args),
 
   queriesList: (args: { connectionId: string; path: string }) =>
-    ipcRenderer.invoke(IPC.queriesList, args) as Promise<SavedQuery[]>,
+    ipcRenderer.invoke(IPC.queriesList, args) as Promise<SavedFilterQuery[]>,
   queriesSave: (args: {
     connectionId: string;
     path: string;
     name: string;
     body: FilterBody;
     pinned: boolean;
-  }) => ipcRenderer.invoke(IPC.queriesSave, args) as Promise<SavedQuery>,
+  }) => ipcRenderer.invoke(IPC.queriesSave, args) as Promise<SavedFilterQuery>,
+  queriesListConsole: (args: { connectionId: string; path: string }) =>
+    ipcRenderer.invoke(IPC.queriesListConsole, args) as Promise<SavedConsoleQuery[]>,
+  queriesSaveConsole: (args: {
+    connectionId: string;
+    path: string;
+    name: string;
+    body: ConsoleBody;
+    pinned: boolean;
+  }) => ipcRenderer.invoke(IPC.queriesSaveConsole, args) as Promise<SavedConsoleQuery>,
   queriesUpdate: (args: { id: string; name?: string; pinned?: boolean }) =>
     ipcRenderer.invoke(IPC.queriesUpdate, args) as Promise<SavedQuery>,
   queriesDelete: (args: { id: string }) => ipcRenderer.invoke(IPC.queriesDelete, args),

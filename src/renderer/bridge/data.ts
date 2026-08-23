@@ -3,6 +3,8 @@ import {
   type CountRequestWire,
   type CountResponse,
   DATA_OP,
+  type ExecuteRequestWire,
+  type ExecuteResponse,
   type MutateRequestWire,
   type MutateResponse,
   PORT_EVENT,
@@ -48,6 +50,11 @@ export const data = {
     request(DATA_OP.preview, plain(req), NO_TIMEOUT) as Promise<PreviewResponse>,
   mutate: (req: MutateRequestWire): Promise<MutateResponse> =>
     request(DATA_OP.mutate, plain(req), NO_TIMEOUT) as Promise<MutateResponse>,
+  execute: async (req: ExecuteRequestWire): Promise<ExecuteResponse> => {
+    const response = (await request(DATA_OP.execute, plain(req), NO_TIMEOUT)) as ExecuteResponse;
+    for (const page of response.pages) assertPageStructure(page);
+    return response;
+  },
   clearCaches: async (): Promise<void> => {
     await request(DATA_OP.cacheClear);
   },

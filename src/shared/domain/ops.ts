@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// P5.5 adds 'execute' — do not add that member now.
 export const opKindSchema = z.enum([
   'connect',
   'disconnect',
@@ -11,6 +10,7 @@ export const opKindSchema = z.enum([
   'read',
   'count',
   'mutate',
+  'execute',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

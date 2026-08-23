@@ -1,7 +1,14 @@
 import type { PingPayload, PortRequest, PortResponse } from '../shared/port';
 import { DATA_OP, invalidateRequestWireSchema } from '../shared/protocol/data-ops';
 import { cache } from './cache';
-import { handleCount, handleMutate, handlePrefetch, handlePreview, handleRead } from './data';
+import {
+  handleCount,
+  handleExecute,
+  handleMutate,
+  handlePrefetch,
+  handlePreview,
+  handleRead,
+} from './data';
 
 type Handler = (payload: unknown) => Promise<unknown>;
 
@@ -18,6 +25,7 @@ const handlers: Record<string, Handler> = {
   [DATA_OP.prefetch]: handlePrefetch,
   [DATA_OP.preview]: handlePreview,
   [DATA_OP.mutate]: handleMutate,
+  [DATA_OP.execute]: handleExecute,
   [DATA_OP.invalidate]: async (payload) => {
     const { connectionId, path } = invalidateRequestWireSchema.parse(payload);
     cache.dropTarget(connectionId, path);

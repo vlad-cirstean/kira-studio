@@ -63,6 +63,13 @@ defineExpose({ scrollToIndex });
 
 <template>
   <div ref="containerRef" class="virtual-list" data-testid="virtual-list" @scroll="onScroll">
+    <!-- Sticky, not fixed: it stays in normal flow (so scrollTop-based indexing below is only
+         off by its own height, well inside the default overscan) while visually pinning during
+         vertical scroll — the console result grid's header row (§8.14) is the only caller that
+         passes this slot; the two pre-existing single-column callers render nothing here. -->
+    <div v-if="$slots.header" class="virtual-list-header">
+      <slot name="header" />
+    </div>
     <div :style="{ height: `${topSpacer}px` }" />
     <template v-for="row in visible" :key="row.index">
       <slot :item="row.item" :index="row.index" />
@@ -74,7 +81,12 @@ defineExpose({ scrollToIndex });
 <style scoped>
 .virtual-list {
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
+}
+
+.virtual-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 </style>

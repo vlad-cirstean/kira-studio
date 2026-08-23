@@ -21,8 +21,7 @@ export const sortSpecSchema = z.discriminatedUnion('kind', [
 ]);
 export type SortSpec = z.infer<typeof sortSpecSchema>;
 
-// P5.5 adds 'console'.
-export const savedQueryKindSchema = z.enum(['filter']);
+export const savedQueryKindSchema = z.enum(['filter', 'console']);
 export type SavedQueryKind = z.infer<typeof savedQueryKindSchema>;
 
 export const filterBodySchema = z.object({
@@ -31,18 +30,29 @@ export const filterBodySchema = z.object({
 });
 export type FilterBody = z.infer<typeof filterBodySchema>;
 
-export const savedQuerySchema = z.object({
+// §8.14: "Console contents are saved to saved_queries" — just the script text, no result state.
+export const consoleBodySchema = z.object({
+  text: z.string(),
+});
+export type ConsoleBody = z.infer<typeof consoleBodySchema>;
+
+const savedQueryBase = {
   id: z.string(),
   connectionId: z.string(),
   path: z.string(),
   name: z.string().trim().min(1).max(120),
-  kind: savedQueryKindSchema,
-  body: filterBodySchema,
   pinned: z.boolean(),
   createdAt: z.string(),
   usedAt: z.string().nullable(),
-});
+};
+
+export const savedQuerySchema = z.discriminatedUnion('kind', [
+  z.object({ ...savedQueryBase, kind: z.literal('filter'), body: filterBodySchema }),
+  z.object({ ...savedQueryBase, kind: z.literal('console'), body: consoleBodySchema }),
+]);
 export type SavedQuery = z.infer<typeof savedQuerySchema>;
+export type SavedFilterQuery = Extract<SavedQuery, { kind: 'filter' }>;
+export type SavedConsoleQuery = Extract<SavedQuery, { kind: 'console' }>;
 
 export const filterHistoryEntrySchema = z.object({
   id: z.string(),

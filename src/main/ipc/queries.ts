@@ -1,13 +1,15 @@
 import { z } from 'zod';
-import { filterBodySchema, sortSpecSchema } from '../../shared/domain/queries';
+import { consoleBodySchema, filterBodySchema, sortSpecSchema } from '../../shared/domain/queries';
 import { IPC } from '../../shared/protocol/ipc';
 import { listFilterHistory, recordFilterUse } from '../storage/repos/filter-history';
 import {
-  deleteSavedFilter,
+  deleteSavedQuery,
+  listSavedConsoleQueries,
   listSavedFilters,
+  saveConsoleQuery,
   saveFilter,
-  touchSavedFilter,
-  updateSavedFilter,
+  touchSavedQuery,
+  updateSavedQuery,
 } from '../storage/repos/saved-queries';
 import type { IpcDeps } from './deps';
 import { handle } from './errors';
@@ -18,6 +20,13 @@ const saveArgsSchema = z.object({
   path: z.string(),
   name: z.string(),
   body: filterBodySchema,
+  pinned: z.boolean(),
+});
+const saveConsoleArgsSchema = z.object({
+  connectionId: z.string(),
+  path: z.string(),
+  name: z.string(),
+  body: consoleBodySchema,
   pinned: z.boolean(),
 });
 const updateArgsSchema = z.object({
@@ -47,17 +56,25 @@ export function registerQueriesHandlers(deps: IpcDeps): void {
     const args = saveArgsSchema.parse(payload);
     return saveFilter(deps.db, args);
   });
+  handle(IPC.queriesListConsole, (_event, payload) => {
+    const { connectionId, path } = listArgsSchema.parse(payload);
+    return listSavedConsoleQueries(deps.db, connectionId, path);
+  });
+  handle(IPC.queriesSaveConsole, (_event, payload) => {
+    const args = saveConsoleArgsSchema.parse(payload);
+    return saveConsoleQuery(deps.db, args);
+  });
   handle(IPC.queriesUpdate, (_event, payload) => {
     const { id, ...patch } = updateArgsSchema.parse(payload);
-    return updateSavedFilter(deps.db, id, patch);
+    return updateSavedQuery(deps.db, id, patch);
   });
   handle(IPC.queriesDelete, async (_event, payload) => {
     const { id } = idArgsSchema.parse(payload);
-    await deleteSavedFilter(deps.db, id);
+    await deleteSavedQuery(deps.db, id);
   });
   handle(IPC.queriesTouch, async (_event, payload) => {
     const { id } = idArgsSchema.parse(payload);
-    await touchSavedFilter(deps.db, id);
+    await touchSavedQuery(deps.db, id);
   });
   handle(IPC.queriesHistoryList, (_event, payload) => {
     const { connectionId, path, limit } = historyListArgsSchema.parse(payload);

@@ -13,7 +13,7 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
-import { activeTab, findDataTab, openDataTab, openDdlTab } from '../state/tabs';
+import { activeTab, findDataTab, openConsoleTab, openDataTab, openDdlTab } from '../state/tabs';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
 import {
@@ -62,6 +62,23 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
   }
 }
 
+// D5: offered only when the connection's caps say so, same discipline as "Open DDL" — shared by
+// all three menu builders below rather than repeated per-row-kind gating logic.
+function consoleMenuItem(row: TreeRowVm): MenuItem[] {
+  if (connectionsState.states[row.connectionId]?.caps?.sql !== true) return [];
+  return [
+    {
+      type: 'item',
+      id: 'open-console',
+      label: 'Open query console',
+      icon: 'terminal',
+      run: () => {
+        openConsoleTab(row.connectionId, row.path);
+      },
+    },
+  ];
+}
+
 function connectionMenu(row: TreeRowVm): MenuItem[] {
   const status = connectionsState.states[row.connectionId]?.status ?? 'disconnected';
   const record = connectionsState.records.find((r) => r.id === row.connectionId);
@@ -102,7 +119,9 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'duplicate',
       label: 'Duplicate',
       icon: 'copy',
-      run: () => duplicateConnection(row.connectionId),
+      run: async () => {
+        await duplicateConnection(row.connectionId);
+      },
     },
     {
       type: 'item',
@@ -134,6 +153,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       icon: 'filter',
       run: () => openFiltersDialog(row.connectionId),
     },
+    ...consoleMenuItem(row),
     {
       type: 'submenu',
       id: 'color',
@@ -204,6 +224,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       icon: 'filter',
       run: () => openFiltersDialog(row.connectionId),
     },
+    ...consoleMenuItem(row),
   ];
 }
 
@@ -242,6 +263,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
           },
         ]
       : []),
+    ...consoleMenuItem(row),
     {
       type: 'item',
       id: 'refresh',
