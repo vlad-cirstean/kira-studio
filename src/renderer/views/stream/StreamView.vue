@@ -120,32 +120,35 @@ function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void
   openContextMenu(e, streamMenu(key, body));
 }
 
-// Item 6: publishes into cellSelection.ts's shared slot (the same one DataGrid.vue uses) so
-// CellEditorView.vue can show the clicked row's body, read-only — a synthetic single-column
-// ColumnDescriptor stands in for the grid's real per-table columns, since a stream row has no
-// catalog-described schema at all (§8.9 has no column navigation for streams).
+// Row click alone (gutter, empty row background) just selects the row for highlighting/delete-
+// eligibility — it does not touch the cell editor. Publishing there is per-column, via
+// onCellClick below.
 function onRowClick(i: number): void {
   selectRow(props.tab.id, i);
-  const row = rowAt(i);
-  if (!row) {
-    publishSelectedCell(null);
-    return;
-  }
+}
+
+// Item 6 (widened, task #75): publishes into cellSelection.ts's shared slot (the same one
+// DataGrid.vue uses) so CellEditorView.vue can show whichever column of the clicked row was
+// actually clicked, read-only — not just the body. A synthetic single-column ColumnDescriptor
+// stands in for the grid's real per-table columns, since a stream row has no catalog-described
+// schema at all (§8.9 has no column navigation for streams).
+function onCellClick(i: number, name: string, value: string | null, truncated = false): void {
+  selectRow(props.tab.id, i);
   const selected: SelectedCell = {
     tabId: props.tab.id,
     connectionId: props.tab.connectionId,
     path: props.tab.path,
     columnIndex: 0,
     column: {
-      name: 'body',
+      name,
       dataType: 'text',
       typeClass: 'text',
-      nullable: false,
+      nullable: value === null,
       isPrimaryKey: false,
     },
     row: i,
-    value: row.body,
-    truncated: row.isTruncated,
+    value,
+    truncated,
     // Always true here (unlike the grid's real per-table computation, state.ts's own doc comment)
     // — "no primary key" would misleadingly suggest the grid's editability story applies to a
     // stream row at all, when this panel is read-only for every row regardless (CellEditorView.vue
@@ -700,19 +703,40 @@ onUnmounted(() => {
                 :class="cellClass({ isNull: rowAt(i)?.key === null })"
                 :style="{ width: `${widthFor('key')}px` }"
                 data-testid="stream-key"
+                @click.stop="onCellClick(i, 'key', rowAt(i)?.key ?? null)"
               >
                 {{ rowAt(i)?.key ?? '(none)' }}
               </div>
-              <div class="p-td" :style="{ width: `${widthFor('timestamp')}px` }" data-testid="stream-timestamp">
+              <div
+                class="p-td"
+                :style="{ width: `${widthFor('timestamp')}px` }"
+                data-testid="stream-timestamp"
+                @click.stop="onCellClick(i, 'timestamp', rowAt(i)?.timestamp ?? null)"
+              >
                 {{ rowAt(i)?.timestamp ?? '' }}
               </div>
-              <div class="p-td" :style="{ width: `${widthFor('headers')}px` }" data-testid="stream-headers">
+              <div
+                class="p-td"
+                :style="{ width: `${widthFor('headers')}px` }"
+                data-testid="stream-headers"
+                @click.stop="onCellClick(i, 'headers', rowAt(i)?.headers ?? null)"
+              >
                 {{ rowAt(i)?.headers }}
               </div>
-              <div class="p-td" :style="{ width: `${widthFor('attrs')}px` }" data-testid="stream-attrs">
+              <div
+                class="p-td"
+                :style="{ width: `${widthFor('attrs')}px` }"
+                data-testid="stream-attrs"
+                @click.stop="onCellClick(i, 'attrs', rowAt(i)?.attrs ?? null)"
+              >
                 {{ rowAt(i)?.attrs }}
               </div>
-              <div class="p-td msg-body" style="flex: 1" data-testid="stream-body">
+              <div
+                class="p-td msg-body"
+                style="flex: 1"
+                data-testid="stream-body"
+                @click.stop="onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated)"
+              >
                 {{ rowAt(i)?.body }}
                 <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" title="body truncated"
                   >(truncated)</span
