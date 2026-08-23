@@ -17,6 +17,7 @@ import {
   tabsState,
 } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import { openContextMenu } from '../state/contextMenu';
 
 // The tabstrip's own "New console" button (Empty.html/FirstRun.html: it stays visible even
@@ -148,15 +149,14 @@ const tabs = computed(() => tabsState.tabs);
        tab appears. -->
   <div v-else class="tab-strip is-empty" data-testid="tab-strip-empty">
     <span class="p-sm dim empty-label">No tabs open</span>
-    <button
-      type="button"
-      class="p-iconbtn p-push"
+    <IconButton
+      icon="add"
+      :size="14"
+      class="p-push"
       title="New console"
       :disabled="!firstConnectedId"
       @click="onNewConsole"
-    >
-      <Codicon name="add" :size="14" />
-    </button>
+    />
   </div>
 </template>
 

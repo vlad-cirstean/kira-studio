@@ -6,6 +6,8 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { keyValueMenu } from './keyValueMenu';
@@ -147,14 +149,14 @@ onUnmounted(() => {
 <template>
   <div class="keyvalue-view" data-testid="keyvalue-view" :data-path="tab.path">
     <div v-if="needsReconnect" class="p-empty" data-testid="keyvalue-reconnect">
-      <button
-        type="button"
-        class="p-dlgbtn primary"
+      <Button
+        variant="primary"
+        kind="dialog"
         data-testid="keyvalue-reconnect-load"
         @click="onReconnectAndLoad"
       >
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <ViewChrome
       v-else
@@ -187,36 +189,29 @@ onUnmounted(() => {
       <template #toolbar>
         <div class="sep" />
         <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
+          <IconButton
+            icon="arrow-left"
+            :size="13"
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
             title="Previous page"
             @click="goPrev(tab.id)"
-          >
-            <Codicon name="arrow-left" :size="13" />
-          </button>
+          />
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
-          <button
-            type="button"
-            class="p-iconbtn"
+          <IconButton
+            icon="arrow-right"
+            :size="13"
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
             title="Next page"
             @click="goNext(tab.id)"
-          >
-            <Codicon name="arrow-right" :size="13" />
-          </button>
-          <button
-            type="button"
-            class="p-btn"
+          />
+          <Button
+            icon="symbol-number"
             data-testid="keyvalue-count"
             title="Exact count"
             @click="runCount(tab.id)"
-          >
-            <span class="icon-box"><Codicon name="symbol-number" :size="13" /></span>Exact count
-          </button>
+          >Exact count</Button>
         </div>
       </template>
 

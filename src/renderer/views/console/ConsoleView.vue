@@ -7,7 +7,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -96,14 +96,14 @@ const statusLine = computed(() => {
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="console-reconnect">
-      <button
-        type="button"
-        class="p-dlgbtn primary"
+      <Button
+        kind="dialog"
+        variant="primary"
         data-testid="console-reconnect-load"
         @click="onReconnectAndLoad"
       >
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <ViewChrome
       v-else
@@ -122,36 +122,34 @@ const statusLine = computed(() => {
            permanently disabled here (reserved slot, same as DdlToolbar's Stop): Run/Run all are
            the console's two start verbs, and neither one is "refresh". -->
       <template #toolbar>
-        <button
-          type="button"
-          class="p-btn primary"
+        <Button
+          icon="play"
+          variant="primary"
           data-testid="console-run-statement"
           :disabled="running"
           title="Run the statement under the cursor"
           @click="runStatement"
         >
-          <span class="icon-box"><Codicon name="play" :size="13" /></span>Run
-        </button>
-        <button
-          type="button"
-          class="p-btn"
+          Run
+        </Button>
+        <Button
+          icon="run-all"
           data-testid="console-run-all"
           :disabled="running"
           title="Run every statement in the editor"
           @click="runAll"
         >
-          <span class="icon-box"><Codicon name="run-all" :size="13" /></span>Run all
-        </button>
+          Run all
+        </Button>
         <div class="sep"></div>
-        <button
-          type="button"
-          class="p-btn"
+        <Button
+          icon="bookmark"
           data-testid="console-saved-toggle"
           title="Saved queries"
           @click="savedMenuOpen = !savedMenuOpen"
         >
-          <span class="icon-box"><Codicon name="bookmark" :size="13" /></span>Saved queries
-        </button>
+          Saved queries
+        </Button>
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->

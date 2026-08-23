@@ -4,6 +4,8 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { findDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 
 const props = defineProps<{ tabId: string }>();
@@ -152,15 +154,13 @@ async function saveCurrent(): Promise<void> {
       <span v-else class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
     </template>
     <template #entry-actions="{ entry }">
-      <button
+      <IconButton
         v-if="isSaved(entry)"
-        type="button"
-        class="p-iconbtn"
+        icon="edit"
+        :size="12"
         title="Rename"
         @click.stop="rename(entry)"
-      >
-        <Codicon name="edit" :size="12" />
-      </button>
+      />
     </template>
     <template #footer>
       <div class="p-sep" />
@@ -185,12 +185,10 @@ async function saveCurrent(): Promise<void> {
         />
       </span>
       <div class="prompt-actions">
-        <button type="button" class="p-dlgbtn" data-testid="text-prompt-cancel" @click="cancelPrompt">
-          Cancel
-        </button>
-        <button type="button" class="p-dlgbtn primary" data-testid="text-prompt-ok" @click="submitPrompt">
+        <Button kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </Button>
+        <Button kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
           OK
-        </button>
+        </Button>
       </div>
     </div>
   </div>

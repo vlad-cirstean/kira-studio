@@ -6,6 +6,7 @@ import type { EditorLanguageId } from '../../editor/languages';
 import { cellKey, cellSelectionState } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import EmptyState from '../../workbench/panels/EmptyState.vue';
 import { toggleCellEditorPanel } from '../../workbench/state/layout';
@@ -211,38 +212,32 @@ const statusLine = computed(() => {
           <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
         </select>
 
-        <button
-          type="button"
-          class="p-iconbtn"
-          :class="{ 'is-active': formatted === 'indented' }"
+        <IconButton
+          icon="list-tree"
+          :size="14"
+          :active="formatted === 'indented'"
           data-testid="cell-editor-beautify-indented"
           :disabled="!canBeautify(effectiveFormat)"
           :title="beautifyDisabledTitle"
           @click="applyBeautify('indented')"
-        >
-          <Codicon name="list-tree" :size="14" />
-        </button>
-        <button
-          type="button"
-          class="p-iconbtn"
-          :class="{ 'is-active': formatted === 'compact' }"
+        />
+        <IconButton
+          icon="list-flat"
+          :size="14"
+          :active="formatted === 'compact'"
           data-testid="cell-editor-beautify-compact"
           :disabled="!canBeautify(effectiveFormat)"
           :title="beautifyDisabledTitle"
           @click="applyBeautify('compact')"
-        >
-          <Codicon name="list-flat" :size="14" />
-        </button>
-        <button
-          type="button"
-          class="p-iconbtn"
+        />
+        <IconButton
+          icon="discard"
+          :size="14"
           data-testid="cell-editor-beautify-reset"
           :disabled="formatted === 'none'"
           :title="resetDisabledTitle"
           @click="resetBuffer"
-        >
-          <Codicon name="discard" :size="14" />
-        </button>
+        />
       </span>
 
       <template #trailing>
@@ -251,15 +246,13 @@ const statusLine = computed(() => {
           {{ readOnlyChipText }}
         </span>
 
-        <button
-          type="button"
-          class="p-iconbtn"
+        <IconButton
+          icon="chevron-down"
+          :size="14"
           data-testid="cell-editor-collapse"
           title="Hide cell editor"
           @click="toggleCellEditorPanel"
-        >
-          <Codicon name="chevron-down" :size="14" />
-        </button>
+        />
       </template>
     </ViewHeader>
 

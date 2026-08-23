@@ -2,6 +2,7 @@
 import type { Caps } from '@shared/caps';
 import { computed, ref } from 'vue';
 import { findDataTab } from '../../state/tabs';
+import Button from '../../theme/primitives/Button.vue';
 import Popover from '../../theme/primitives/Popover.vue';
 import { runtime, setProjection } from './state';
 
@@ -45,12 +46,8 @@ function close(): void {
   >
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
-        <button type="button" class="p-btn" data-testid="columns-select-all" @click="selectAll">
-          All
-        </button>
-        <button type="button" class="p-btn" data-testid="columns-select-none" @click="selectNone">
-          None
-        </button>
+        <Button data-testid="columns-select-all" @click="selectAll"> All </Button>
+        <Button data-testid="columns-select-none" @click="selectNone"> None </Button>
       </div>
       <div v-if="!meta" class="columns-menu-loading p-sm muted">Loading columns…</div>
       <div v-else class="columns-menu-list">

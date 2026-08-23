@@ -5,6 +5,7 @@ import { data } from '../bridge/data';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
 import Codicon from '../theme/Codicon.vue';
+import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
@@ -281,14 +282,14 @@ async function onClearCaches(): Promise<void> {
                 <input type="text" :value="hitRateLabel" disabled />
               </div>
             </label>
-            <button
-              type="button"
-              class="p-dlgbtn action-button"
+            <Button
+              kind="dialog"
+              class="action-button"
               data-testid="settings-clear-caches"
               @click="onClearCaches"
             >
               Clear caches
-            </button>
+            </Button>
           </template>
 
           <template v-else>
@@ -325,9 +326,15 @@ async function onClearCaches(): Promise<void> {
 
     <template #footer>
       <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
-      <button type="button" class="p-dlgbtn primary footer-close" data-testid="settings-close" @click="emit('close')">
+      <Button
+        kind="dialog"
+        variant="primary"
+        class="footer-close"
+        data-testid="settings-close"
+        @click="emit('close')"
+      >
         Done
-      </button>
+      </Button>
     </template>
   </DialogFrame>
 </template>

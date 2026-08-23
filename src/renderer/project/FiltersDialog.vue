@@ -7,7 +7,9 @@ import type {
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
+import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import IconButton from '../theme/primitives/IconButton.vue';
 import { evaluate } from './filter';
 import { closeFiltersDialog, filtersDialogState, saveFilters, treeState } from './state/tree';
 
@@ -132,17 +134,12 @@ const connectionName = computed(
             <input v-model="rule.isRegex" type="checkbox" />
             Regex
           </label>
-          <button type="button" class="p-iconbtn" aria-label="Delete rule" @click="removeRule(index)">
-            <Codicon name="trash" :size="14" />
-          </button>
+          <IconButton icon="trash" aria-label="Delete rule" @click="removeRule(index)" />
           <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
         </div>
       </div>
 
-      <button type="button" class="p-btn add-rule" @click="addRule">
-        <span class="icon-box"><Codicon name="add" :size="12" /></span>
-        Add rule
-      </button>
+      <Button icon="add" class="add-rule" @click="addRule">Add rule</Button>
 
       <div class="p-strip note preview-strip">
         <span class="icon-box"><Codicon name="info" :size="14" /></span>
@@ -156,8 +153,8 @@ const connectionName = computed(
     <template #footer>
       <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="footer-actions p-push">
-        <button type="button" class="p-dlgbtn" @click="closeFiltersDialog">Cancel</button>
-        <button type="button" class="p-dlgbtn primary" @click="onSave">Save filters</button>
+        <Button kind="dialog" @click="closeFiltersDialog">Cancel</Button>
+        <Button kind="dialog" variant="primary" @click="onSave">Save filters</Button>
       </span>
     </template>
   </DialogFrame>

@@ -5,6 +5,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
@@ -95,9 +96,9 @@ function onCloseSearch(): void {
       <FilterToolbar />
     </div>
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="reconnect-panel">
-      <button type="button" class="p-dlgbtn primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
+      <Button kind="dialog" variant="primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <template v-else>
       <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button

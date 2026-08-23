@@ -4,6 +4,8 @@ import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { getPage } from './page';
@@ -195,27 +197,21 @@ function onDiscard(): void {
     <!-- LAW 01/10: Refresh, then Stop (always present, greyed when idle), then the run-state
          ring beside them — never a bar across the top of the view (DataView.vue). -->
     <div class="group">
-      <button
-        type="button"
-        class="p-iconbtn"
+      <IconButton
+        icon="refresh"
         title="Refresh"
         data-testid="toolbar-refresh"
         :disabled="!!rt?.opId"
         @click="onRefresh"
-      >
-        <Codicon name="refresh" :size="14" />
-      </button>
-      <button
-        type="button"
-        class="p-iconbtn"
+      />
+      <IconButton
+        icon="debug-stop"
         :class="{ 'is-live': !!rt?.opId }"
         title="Stop"
         data-testid="toolbar-stop"
         :disabled="!rt?.opId"
         @click="onStop"
-      >
-        <Codicon name="debug-stop" :size="14" />
-      </button>
+      />
       <span
         class="p-run-state"
         :class="{ 'is-running': rt?.status === 'loading', 'is-error': rt?.status === 'error' }"
@@ -232,26 +228,22 @@ function onDiscard(): void {
     <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
          has no notion of "row 1–200" to display without the count query having already run). -->
     <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
-      <button
-        type="button"
-        class="p-iconbtn"
+      <IconButton
+        icon="chevron-left"
+        :size="12"
         title="First page"
         data-testid="pager-first"
         :disabled="tab.state.pageIndex === 0"
         @click="onFirst"
-      >
-        <Codicon name="chevron-left" :size="12" />|
-      </button>
-      <button
-        type="button"
-        class="p-iconbtn"
+      />
+      <IconButton
+        icon="chevron-left"
+        :size="12"
         title="Previous page"
         data-testid="pager-prev"
         :disabled="tab.state.pageIndex === 0"
         @click="onPrev"
-      >
-        <Codicon name="chevron-left" :size="12" />
-      </button>
+      />
       <span class="page-label p-sm muted">
         page
         <span class="p-input page-input">
@@ -266,26 +258,22 @@ function onDiscard(): void {
         </span>
         <template v-if="pageCount"> of {{ pageCount }}</template>
       </span>
-      <button
-        type="button"
-        class="p-iconbtn"
+      <IconButton
+        icon="chevron-right"
+        :size="12"
         title="Next page"
         data-testid="pager-next"
         :disabled="!rt?.hasMore"
         @click="onNext"
-      >
-        <Codicon name="chevron-right" :size="12" />
-      </button>
-      <button
-        type="button"
-        class="p-iconbtn"
+      />
+      <IconButton
+        icon="chevron-right"
+        :size="12"
         :title="pageCount ? 'Last page' : 'Count rows first'"
         data-testid="pager-last"
         :disabled="!pageCount"
         @click="onLast"
-      >
-        |<Codicon name="chevron-right" :size="12" />
-      </button>
+      />
     </div>
 
     <div class="p-seg" data-testid="page-size-picker">
@@ -304,9 +292,8 @@ function onDiscard(): void {
     <div class="sep" />
 
     <div class="group">
-      <button
-        type="button"
-        class="p-btn count-button"
+      <Button
+        class="count-button"
         data-testid="toolbar-count"
         :class="{ stale: rt?.count?.stale }"
         title="Count all"
@@ -317,14 +304,17 @@ function onDiscard(): void {
           <Codicon v-if="rt.count.stale" name="refresh" :size="11" />
         </span>
         <span v-else>Σ count all</span>
-      </button>
+      </Button>
 
       <div class="columns-anchor">
-        <button type="button" class="p-btn" data-testid="toolbar-columns" @click="columnsOpen = !columnsOpen">
-          <span class="icon-box"><Codicon name="list-selection" :size="14" /></span>
+        <Button
+          icon="list-selection"
+          data-testid="toolbar-columns"
+          :count="columnCountLabel ?? undefined"
+          @click="columnsOpen = !columnsOpen"
+        >
           Columns
-          <span v-if="columnCountLabel" class="p-count">{{ columnCountLabel }}</span>
-        </button>
+        </Button>
         <ColumnsMenu
           v-if="columnsOpen"
           :tab-id="tab.id"
@@ -334,17 +324,15 @@ function onDiscard(): void {
       </div>
 
       <div class="preview-anchor">
-        <button
-          type="button"
-          class="p-btn"
+        <Button
+          icon="code"
           data-testid="toolbar-preview-command"
           :disabled="!isWritable"
           :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
           @click="previewOpen = !previewOpen"
         >
-          <span class="icon-box"><Codicon name="code" :size="14" /></span>
           Preview SQL
-        </button>
+        </Button>
         <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
       </div>
     </div>
@@ -352,65 +340,55 @@ function onDiscard(): void {
     <div class="sep" />
 
     <div class="group">
-      <button
-        type="button"
-        class="p-btn"
+      <Button
+        icon="add"
         data-testid="toolbar-add-row"
         :disabled="!isWritable"
         :title="isWritable ? 'Add a row' : 'Connection is read-only'"
         @click="onAddRow"
       >
-        <span class="icon-box"><Codicon name="add" :size="14" /></span>
         Add row
-      </button>
-      <button
-        type="button"
-        class="p-btn"
+      </Button>
+      <Button
+        icon="trash"
         data-testid="toolbar-delete-row"
         :disabled="!isWritable"
         :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
         @click="onDeleteRow"
       >
-        <span class="icon-box"><Codicon name="trash" :size="14" /></span>
         Delete row
-      </button>
-      <button
-        type="button"
-        class="p-iconbtn"
+      </Button>
+      <IconButton
+        icon="search"
         title="Search this page"
         data-testid="toolbar-search"
         @click="onToggleSearch"
-      >
-        <Codicon name="search" :size="14" />
-      </button>
+      />
     </div>
 
     <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
          accent-filled control on the whole screen. -->
     <div v-if="tabHasPending" class="group p-push">
       <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
-      <button
-        type="button"
-        class="p-btn"
+      <Button
+        icon="discard"
         data-testid="toolbar-discard-changes"
         :disabled="!isWritable"
         title="Discard pending changes"
         @click="onDiscard"
       >
-        <span class="icon-box"><Codicon name="discard" :size="14" /></span>
         Revert
-      </button>
-      <button
-        type="button"
-        class="p-btn primary"
+      </Button>
+      <Button
+        icon="save"
+        variant="primary"
         data-testid="toolbar-commit-changes"
         :disabled="!isWritable"
         title="Commit pending changes"
         @click="onCommit"
       >
-        <span class="icon-box"><Codicon name="save" :size="14" /></span>
         Commit
-      </button>
+      </Button>
     </div>
   </div>
 </template>

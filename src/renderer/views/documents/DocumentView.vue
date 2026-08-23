@@ -7,6 +7,8 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { documentRow, isIdNull, pageVersion } from './docPage';
@@ -172,14 +174,14 @@ onUnmounted(() => {
 <template>
   <div class="document-view" data-testid="document-view" :data-path="tab.path">
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="document-reconnect">
-      <button
-        type="button"
-        class="p-dlgbtn primary"
+      <Button
+        variant="primary"
+        kind="dialog"
         data-testid="document-reconnect-load"
         @click="onReconnectAndLoad"
       >
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <ViewChrome
       v-else
@@ -202,16 +204,14 @@ onUnmounted(() => {
       <template #toolbar>
         <div class="sep"></div>
         <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
+          <IconButton
+            icon="arrow-left"
+            :size="13"
             data-testid="document-prev"
             :disabled="!rt?.prevToken"
             title="Previous page"
             @click="goPrev(tab.id)"
-          >
-            <Codicon name="arrow-left" :size="13" />
-          </button>
+          />
           <span class="mono p-sm">{{ rt?.rowCount ?? 0 }} loaded</span>
           <template v-if="rt?.count">
             <span class="p-sm dim">of</span>
@@ -219,46 +219,37 @@ onUnmounted(() => {
               >{{ rt.count.exact ? '' : '≈ ' }}{{ rt.count.value.toLocaleString() }}</span
             >
           </template>
-          <button
-            type="button"
-            class="p-iconbtn"
+          <IconButton
+            icon="arrow-right"
+            :size="13"
             data-testid="document-next"
             :disabled="!rt?.hasMore"
             title="Next page"
             @click="goNext(tab.id)"
-          >
-            <Codicon name="arrow-right" :size="13" />
-          </button>
-          <button
-            type="button"
-            class="p-btn"
+          />
+          <Button
+            icon="symbol-number"
             data-testid="document-count"
             title="Run an exact countDocuments() — the estimate above is metadata"
             @click="runCount(tab.id)"
-          >
-            <span class="icon-box"><Codicon name="symbol-number" :size="13" /></span>Exact count
-          </button>
+          >Exact count</Button>
         </div>
         <div class="sep"></div>
         <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
+          <IconButton
+            icon="expand-all"
+            :size="13"
             title="Expand all"
             data-testid="document-expand-all"
             @click="onExpandAll"
-          >
-            <Codicon name="expand-all" :size="13" />
-          </button>
-          <button
-            type="button"
-            class="p-iconbtn"
+          />
+          <IconButton
+            icon="collapse-all"
+            :size="13"
             title="Collapse all"
             data-testid="document-collapse-all"
             @click="onCollapseAll"
-          >
-            <Codicon name="collapse-all" :size="13" />
-          </button>
+          />
         </div>
       </template>
 
@@ -313,16 +304,14 @@ onUnmounted(() => {
               <span class="doc-preview">{{ previewLine(rowAt(i)?.body ?? '') }}</span>
               <div class="doc-row-actions">
                 <span v-if="editingId === rowAt(i)?.id" class="p-chip warn">editing</span>
-                <button
-                  type="button"
-                  class="p-iconbtn"
-                  :class="{ 'is-active': editingId === rowAt(i)?.id }"
+                <IconButton
+                  icon="edit"
+                  :size="12"
+                  :active="editingId === rowAt(i)?.id"
                   data-testid="document-edit"
                   title="Edit"
                   @click="rowAt(i) && startEdit(rowAt(i)!.id, rowAt(i)!.body)"
-                >
-                  <Codicon name="edit" :size="12" />
-                </button>
+                />
               </div>
             </div>
             <!-- The editor is the same code surface DDL and the console views use — the only
@@ -331,22 +320,19 @@ onUnmounted(() => {
               <template v-if="editingId === rowAt(i)?.id">
                 <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
                 <div class="edit-actions">
-                  <button
-                    type="button"
-                    class="p-btn primary"
+                  <Button
+                    variant="primary"
                     data-testid="document-edit-save"
                     @click="commitEdit"
                   >
                     Save
-                  </button>
-                  <button
-                    type="button"
-                    class="p-btn"
+                  </Button>
+                  <Button
                     data-testid="document-edit-cancel"
                     @click="cancelEdit"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </template>
               <CodeMirrorHost

@@ -11,7 +11,9 @@ import { control } from '../bridge/control';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
+import Button from '../theme/primitives/Button.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import IconButton from '../theme/primitives/IconButton.vue';
 import ColorPicker from './ColorPicker.vue';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
@@ -222,15 +224,7 @@ const preconnectText = computed({
           <span class="step"><span class="n">2</span>Details</span>
         </span>
       </span>
-      <button
-        v-if="isEdit"
-        type="button"
-        class="p-btn"
-        @click="step = 'details'"
-      >
-        <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
-        Back
-      </button>
+      <Button v-if="isEdit" icon="chevron-left" @click="step = 'details'">Back</Button>
     </template>
     <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
          is identity here, not a control (changed via "Change engine" back to step 1). -->
@@ -239,10 +233,14 @@ const preconnectText = computed({
         <EngineIcon :kind="draft.kind" :size="16" />
       </span>
       <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
-      <button type="button" class="p-btn p-push" title="Pick a different engine" @click="step = 'engine'">
-        <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
+      <Button
+        icon="chevron-left"
+        class="p-push"
+        title="Pick a different engine"
+        @click="step = 'engine'"
+      >
         Change engine
-      </button>
+      </Button>
     </template>
 
     <template v-if="step === 'engine'">
@@ -346,14 +344,11 @@ const preconnectText = computed({
                   :type="showPassword ? 'text' : 'password'"
                   data-testid="connection-password"
                 />
-                <button
-                  type="button"
-                  class="p-iconbtn"
+                <IconButton
+                  :icon="showPassword ? 'eye-closed' : 'eye'"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
-                >
-                  <Codicon :name="showPassword ? 'eye-closed' : 'eye'" :size="14" />
-                </button>
+                />
               </div>
             </div>
           </template>
@@ -417,26 +412,20 @@ const preconnectText = computed({
     </template>
 
     <template v-if="step === 'engine'" #footer>
-      <button type="button" class="p-dlgbtn" @click="pasteUri">
-        <span class="icon-box"><Codicon name="code" :size="14" /></span>
-        Paste a URI
-      </button>
+      <Button kind="dialog" icon="code" @click="pasteUri">Paste a URI</Button>
       <span class="footer-actions p-push">
-        <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">
-          Cancel
-        </button>
-        <button type="button" class="p-dlgbtn primary" @click="continueToDetails">
+        <Button kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</Button>
+        <Button kind="dialog" variant="primary" @click="continueToDetails">
           Continue
           <span class="icon-box"><Codicon name="chevron-right" :size="14" /></span>
-        </button>
+        </Button>
       </span>
     </template>
     <template v-else #footer>
       <div class="test-area">
-        <button type="button" class="p-dlgbtn" data-testid="connection-test" @click="onTest">
-          <span class="icon-box"><Codicon name="plug" :size="14" /></span>
+        <Button kind="dialog" icon="plug" data-testid="connection-test" @click="onTest">
           Test connection
-        </button>
+        </Button>
         <span
           v-if="testState.status !== 'idle'"
           class="test-chip p-chip"
@@ -453,16 +442,16 @@ const preconnectText = computed({
         </span>
       </div>
       <div class="footer-actions">
-        <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
-        <button
-          type="button"
-          class="p-dlgbtn primary"
+        <Button kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</Button>
+        <Button
+          kind="dialog"
+          variant="primary"
           data-testid="connection-save"
           :disabled="!isValid"
           @click="onSave"
         >
           Save
-        </button>
+        </Button>
       </div>
     </template>
   </DialogFrame>

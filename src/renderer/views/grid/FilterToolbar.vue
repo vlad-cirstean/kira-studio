@@ -4,6 +4,8 @@ import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import FilterHistoryMenu from './FilterHistoryMenu.vue';
 import { runtime, setFilter, setSort } from './state';
 
@@ -104,15 +106,12 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
        a close button that would make the grid change height under you. -->
   <div v-if="tab" class="filter-toolbar p-toolbar" data-testid="filter-toolbar">
     <div class="history-anchor">
-      <button
-        type="button"
-        class="p-iconbtn"
+      <IconButton
+        icon="history"
         title="Saved &amp; recent filters"
         data-testid="filter-history-button"
         @click="historyOpen = !historyOpen"
-      >
-        <Codicon name="history" :size="14" />
-      </button>
+      />
       <FilterHistoryMenu
         v-if="historyOpen"
         :tab-id="tab.id"
@@ -147,9 +146,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
     <span v-if="isStructuredSort" class="p-chip info" title="Sort came from clicking a column header">
       <Codicon name="sort-precedence" :size="11" />from header
     </span>
-    <button type="button" class="p-btn" title="Empty both fields and refetch" @click="onClear">
-      Clear
-    </button>
+    <Button title="Empty both fields and refetch" @click="onClear"> Clear </Button>
   </div>
 </template>
 

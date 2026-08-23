@@ -6,6 +6,8 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { goNext, load, poll, reload, runCount, runtime, stop } from './state';
@@ -127,14 +129,14 @@ onUnmounted(() => {
     <div v-if="needsReconnect" class="p-empty" data-testid="stream-reconnect">
       <Codicon name="debug-disconnect" :size="24" class="big" />
       <span class="label">Not connected</span>
-      <button
-        type="button"
-        class="p-dlgbtn primary"
+      <Button
+        variant="primary"
+        kind="dialog"
         data-testid="stream-reconnect-load"
         @click="onReconnectAndLoad"
       >
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <ViewChrome
       v-else
@@ -161,37 +163,32 @@ onUnmounted(() => {
       </template>
 
       <template #toolbar>
-        <button
-          type="button"
-          class="p-iconbtn"
+        <IconButton
+          icon="symbol-number"
+          :size="13"
           data-testid="stream-count"
           title="Count"
           @click="runCount(tab.id)"
-        >
-          <Codicon name="symbol-number" :size="13" />
-        </button>
-        <button
+        />
+        <Button
           v-if="isBatch"
-          type="button"
-          class="p-btn is-active"
+          icon="arrow-swap"
+          active
           data-testid="stream-poll"
           title="Poll for messages"
           @click="onPoll"
         >
-          <span class="icon-box"><Codicon name="arrow-swap" :size="13" /></span>
           Poll
-        </button>
-        <button
+        </Button>
+        <IconButton
           v-else
-          type="button"
-          class="p-iconbtn"
+          icon="arrow-right"
+          :size="13"
           data-testid="stream-next"
           :disabled="!rt?.hasMore"
           title="Next page"
           @click="goNext(tab.id)"
-        >
-          <Codicon name="arrow-right" :size="13" />
-        </button>
+        />
       </template>
 
       <!-- The one destructive truth of this view, stated once at the top. -->

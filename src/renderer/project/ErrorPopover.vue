@@ -5,6 +5,7 @@
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
 import Codicon from '../theme/Codicon.vue';
+import Button from '../theme/primitives/Button.vue';
 
 const props = defineProps<{ message: string }>();
 
@@ -82,8 +83,8 @@ onUnmounted(() => {
       >
         <div class="error-popover-body">{{ props.message }}</div>
         <div class="p-toolbar last error-popover-actions">
-          <button type="button" class="p-btn p-push" @click="copyText(props.message)">Copy</button>
-          <button type="button" class="p-btn" @click="close">Close</button>
+          <Button class="p-push" @click="copyText(props.message)">Copy</Button>
+          <Button @click="close">Close</Button>
         </div>
       </div>
     </Teleport>

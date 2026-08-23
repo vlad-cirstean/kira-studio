@@ -3,6 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { useRunState } from '../../state/runState';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import RunState from '../../theme/primitives/RunState.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 
@@ -55,12 +56,8 @@ const runState = useRunState(() => props.tab.id);
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connection?.color ? `var(--kira-conn-${connection.color})` : undefined }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
     <div class="group">
-      <button type="button" class="p-iconbtn" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')">
-        <span class="icon-box"><svg class="icon" viewBox="0 0 16 16" width="13" height="13"><path d="M13 8A5 5 0 1 1 11.2 4.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 2.5V6H9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
-      </button>
-      <button type="button" class="p-iconbtn" title="Stop" :data-testid="stopTestid" :disabled="!canStop" @click="emit('stop')">
-        <span class="icon-box"><svg class="icon" viewBox="0 0 16 16" width="13" height="13"><rect x="4" y="4" width="8" height="8" rx="1.2" fill="currentColor"/></svg></span>
-      </button>
+      <IconButton icon="refresh" :size="13" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
+      <IconButton icon="debug-stop" :size="13" title="Stop" :data-testid="stopTestid" :disabled="!canStop" @click="emit('stop')" />
       <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
     </div>
     <slot name="toolbar" />

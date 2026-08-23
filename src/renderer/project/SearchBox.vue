@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Codicon from '../theme/Codicon.vue';
+import IconButton from '../theme/primitives/IconButton.vue';
 import { treeState } from './state/tree';
 </script>
 
@@ -13,15 +14,14 @@ import { treeState } from './state/tree';
         placeholder="Search"
         data-testid="tree-search"
       />
-      <button
+      <IconButton
         v-if="treeState.search"
-        type="button"
-        class="p-iconbtn clear-button"
+        icon="close"
+        :size="12"
+        class="clear-button"
         aria-label="Clear search"
         @click="treeState.search = ''"
-      >
-        <Codicon name="close" :size="12" />
-      </button>
+      />
     </div>
   </div>
 </template>

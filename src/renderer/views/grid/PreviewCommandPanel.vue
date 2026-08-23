@@ -4,6 +4,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import Popover from '../../theme/primitives/Popover.vue';
 import { previewPending } from './pendingChanges';
 
@@ -55,15 +56,13 @@ function close(): void {
       <div class="preview-panel-header p-panel-head">
         <span class="icon-box"><Codicon name="code" :size="14" /></span>
         <span>Preview SQL</span>
-        <button
-          type="button"
-          class="p-iconbtn p-push"
+        <IconButton
+          icon="close"
+          class="p-push"
           title="Close"
           data-testid="preview-command-close"
           @click="close"
-        >
-          <Codicon name="close" :size="14" />
-        </button>
+        />
       </div>
       <div v-if="loading" class="preview-panel-loading p-sm muted">Loading…</div>
       <div v-else-if="error" class="preview-panel-error p-sm" data-testid="preview-command-error">

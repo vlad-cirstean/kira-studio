@@ -9,6 +9,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated, openConsoleTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Button from '../../theme/primitives/Button.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { load, runtime } from './state';
 
@@ -111,14 +112,13 @@ const breadcrumb = computed(() => {
     data-read-only-reason="ddl-not-editable"
   >
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="ddl-reconnect">
-      <button
-        type="button"
-        class="p-dlgbtn"
+      <Button
+        kind="dialog"
         data-testid="ddl-reconnect-load"
         @click="onReconnectAndLoad"
       >
         Reconnect &amp; load
-      </button>
+      </Button>
     </div>
     <!-- Column/index/constraint counts and the Definition/Columns/Indexes/Constraints segmented
          view from the mockup need structured catalog data this tab doesn't fetch (only the raw
@@ -148,20 +148,17 @@ const breadcrumb = computed(() => {
            exist. -->
       <template #toolbar-end>
         <div class="sep" />
-        <button type="button" class="p-btn" title="Copy DDL to clipboard" data-testid="ddl-copy" @click="onCopy">
-          <span class="icon-box"><Codicon name="copy" :size="14" /></span>
+        <Button icon="copy" title="Copy DDL to clipboard" data-testid="ddl-copy" @click="onCopy">
           Copy
-        </button>
-        <button
-          type="button"
-          class="p-btn"
+        </Button>
+        <Button
+          icon="terminal"
           title="Open query console here"
           data-testid="ddl-open-console"
           @click="onOpenConsole"
         >
-          <span class="icon-box"><Codicon name="terminal" :size="14" /></span>
           Open in console
-        </button>
+        </Button>
       </template>
 
       <template #strips>

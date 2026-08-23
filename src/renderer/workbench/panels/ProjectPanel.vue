@@ -4,22 +4,22 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SearchBox from '../../project/SearchBox.vue';
 import { connectionsState, openCreateDialog } from '../../state/connections';
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 </script>
 
 <template>
   <div class="flex h-full flex-col">
     <div class="p-panel-head">
       <span>Connections</span>
-      <button
-        type="button"
-        class="p-iconbtn p-push"
+      <IconButton
+        icon="add"
+        :size="14"
+        class="p-push"
         aria-label="Add connection"
         title="New connection"
         data-testid="add-connection"
         @click="openCreateDialog"
-      >
-        <Codicon name="add" :size="14" />
-      </button>
+      />
     </div>
     <template v-if="connectionsState.records.length > 0">
       <SearchBox />

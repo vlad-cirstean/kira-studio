@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import { getPage } from './page';
 import { clearSearchState, runSearch, type SearchHandle, searchState } from './search';
 
@@ -147,18 +148,12 @@ onUnmounted(() => {
         <template v-else-if="scanning">{{ foundSoFar }}…</template>
         <template v-else>0 of 0</template>
       </span>
-      <button type="button" class="p-iconbtn" title="Previous match" data-testid="search-prev" @click="goPrev">
-        <Codicon name="chevron-up" :size="12" />
-      </button>
-      <button type="button" class="p-iconbtn" title="Next match" data-testid="search-next" @click="goNext">
-        <Codicon name="chevron-down" :size="12" />
-      </button>
+      <IconButton icon="chevron-up" :size="12" title="Previous match" data-testid="search-prev" @click="goPrev" />
+      <IconButton icon="chevron-down" :size="12" title="Next match" data-testid="search-next" @click="goNext" />
       <div class="sep" />
       <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
     </template>
-    <button type="button" class="p-iconbtn p-push" title="Close" data-testid="search-close" @click="close">
-      <Codicon name="close" :size="14" />
-    </button>
+    <IconButton icon="close" class="p-push" title="Close" data-testid="search-close" @click="close" />
   </div>
 </template>
 

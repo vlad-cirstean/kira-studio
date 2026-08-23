@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import Popover from '../../theme/primitives/Popover.vue';
 
 // Shared popover shell for grid/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
@@ -74,9 +75,7 @@ defineSlots<{
         <slot name="entry" :entry="entry" />
         <span class="entry-actions">
           <slot name="entry-actions" :entry="entry" />
-          <button type="button" class="p-iconbtn" title="Delete" @click.stop="emit('delete', entry)">
-            <Codicon name="trash" :size="12" />
-          </button>
+          <IconButton icon="trash" :size="12" title="Delete" @click.stop="emit('delete', entry)" />
         </span>
       </div>
 
