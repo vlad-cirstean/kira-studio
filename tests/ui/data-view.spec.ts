@@ -151,6 +151,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     {

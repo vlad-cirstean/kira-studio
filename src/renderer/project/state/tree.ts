@@ -4,7 +4,7 @@ import type { SavedFilterQuery } from '@shared/domain/queries';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { connectionsState } from '../../state/connections';
+import { connectConnection, connectionsState } from '../../state/connections';
 import { evaluate } from '../filter';
 
 export interface TreeRowVm {
@@ -109,10 +109,22 @@ export async function saveFilters(
 // collapse never discards treeState.children[k], so re-expanding it was already a pure re-render
 // — this just makes that true in code, which is what the §2.1 tree-expand budget assumes.
 export async function expand(connectionId: string, path: string): Promise<void> {
-  await loadFilters(connectionId);
   const k = rowKey(connectionId, path);
-  treeState.expanded.add(k);
   if (treeState.loading.has(k)) return;
+  // Expanding a disconnected connection's node connects it first, rather than surfacing
+  // E_DISCONNECTED — the twisty is the primary way users browse, so it shouldn't require a
+  // separate explicit Connect click first.
+  if (connectionsState.states[connectionId]?.status !== 'connected') {
+    treeState.loading.add(k);
+    try {
+      await connectConnection(connectionId);
+    } finally {
+      treeState.loading.delete(k);
+    }
+  }
+  if (connectionsState.states[connectionId]?.status !== 'connected') return;
+  await loadFilters(connectionId);
+  treeState.expanded.add(k);
   if (treeState.children[k]) return;
   await loadChildren(connectionId, path, false);
 }

@@ -101,6 +101,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: cfg.host,

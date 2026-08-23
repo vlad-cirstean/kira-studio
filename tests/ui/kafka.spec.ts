@@ -103,6 +103,7 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: cfg.host,

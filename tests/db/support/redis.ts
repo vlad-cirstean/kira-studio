@@ -1,6 +1,6 @@
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
 import { Redis } from 'ioredis';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { seedRedis } from '../fixtures/0004_redis_seed';
 import { resolveDockerHost } from './docker';
 
@@ -8,7 +8,6 @@ resolveDockerHost();
 
 const IMAGE = 'redis:7';
 const PASSWORD = 'kira';
-const REDIS_PORT = 6379;
 const STARTUP_TIMEOUT_MS = 60_000;
 // Two logical dbs so scenario 3 (tree enumeration) sees more than one non-empty entry from
 // `INFO keyspace` — a fixed 0-15 sweep would pass even if listDatabases() only ever looked at
@@ -17,7 +16,7 @@ const PRIMARY_DB_INDEX = 0;
 const SECONDARY_DB_INDEX = 1;
 
 export interface RedisFixture {
-  container: StartedTestContainer;
+  container: StartedRedisContainer;
   config: ResolvedConnectionConfig; // ready to hand to the adapter
   host: string;
   port: number;
@@ -33,15 +32,13 @@ export function startRedis(): Promise<RedisFixture> {
 }
 
 async function start(): Promise<RedisFixture> {
-  const container = await new GenericContainer(IMAGE)
-    .withCommand(['redis-server', '--requirepass', PASSWORD])
-    .withExposedPorts(REDIS_PORT)
-    .withWaitStrategy(Wait.forLogMessage(/Ready to accept connections/))
+  const container = await new RedisContainer(IMAGE)
+    .withPassword(PASSWORD)
     .withStartupTimeout(STARTUP_TIMEOUT_MS)
     .start();
 
   const host = container.getHost();
-  const port = container.getMappedPort(REDIS_PORT);
+  const port = container.getPort();
 
   const primary = new Redis({ host, port, password: PASSWORD, db: PRIMARY_DB_INDEX });
   const secondary = new Redis({ host, port, password: PASSWORD, db: SECONDARY_DB_INDEX });

@@ -157,7 +157,7 @@ async function onClearCaches(): Promise<void> {
                 type="text"
                 list="kira-font-families"
                 :value="settingsState.appearance.fontFamily"
-                @change="onFontFamilyChange"
+                @input="onFontFamilyChange"
               />
               <datalist id="kira-font-families">
                 <option value="'SF Mono', Menlo, monospace" />

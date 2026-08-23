@@ -103,6 +103,7 @@ async function createConnection(page: Page, name: string, color: ConnectionColor
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     {

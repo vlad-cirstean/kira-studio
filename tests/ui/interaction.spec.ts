@@ -148,6 +148,7 @@ async function createConnection(
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     { cfg, opts },

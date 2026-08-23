@@ -105,6 +105,7 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 b
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     {

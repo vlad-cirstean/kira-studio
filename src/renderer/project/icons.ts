@@ -1,3 +1,4 @@
+import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind } from '@shared/domain/tree';
 
 const KIND_ICON: Record<NodeKind, string> = {
@@ -22,6 +23,23 @@ const KIND_ICON: Record<NodeKind, string> = {
 
 export function nodeIcon(kind: NodeKind): string {
   return KIND_ICON[kind];
+}
+
+// Misc-fixes: the icon picker in ConnectionDialog.vue's new connection-kind chooser. No brand
+// logos in the codicon set, so these are picked for shape distinctiveness rather than any
+// per-vendor identity — not to be confused with KIND_ICON above, which is per tree-node-kind.
+const CONNECTION_KIND_ICON: Record<ConnectionKind, string> = {
+  postgres: 'database',
+  mariadb: 'server-environment',
+  mongodb: 'json',
+  redis: 'symbol-key',
+  kafka: 'broadcast',
+  sqs: 'inbox',
+  s3: 'archive',
+};
+
+export function connectionKindIcon(kind: ConnectionKind): string {
+  return CONNECTION_KIND_ICON[kind];
 }
 
 export function columnTypeIcon(dataType: string): string {

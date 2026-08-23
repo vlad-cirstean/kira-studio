@@ -209,7 +209,7 @@ function kvRowAt(row: number) {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--kira-font-family-mono, monospace);
+  font-family: var(--kira-font-family);
 }
 
 .kv-field {

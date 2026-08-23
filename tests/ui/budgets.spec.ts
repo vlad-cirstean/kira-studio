@@ -145,6 +145,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     {

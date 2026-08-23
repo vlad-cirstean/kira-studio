@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Client } from 'pg';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { resolveDockerHost } from './docker';
 
 resolveDockerHost();
@@ -10,13 +10,12 @@ resolveDockerHost();
 const IMAGE = 'postgres:17-alpine';
 const PASSWORD = 'kira';
 const DATABASE = 'kira_test';
-const PG_PORT = 5432;
 const STARTUP_TIMEOUT_MS = 120_000;
 const BIG_ROWS = 1_000_000;
 const SEED_SQL_PATH = resolve(__dirname, '../fixtures/0001_seed.sql');
 
 export interface PgFixture {
-  container: StartedTestContainer;
+  container: StartedPostgreSqlContainer;
   config: ResolvedConnectionConfig; // ready to hand to the adapter
   uri: string;
   stop(): Promise<void>;
@@ -32,18 +31,19 @@ export function startPostgres(opts?: { seedBigTable?: boolean }): Promise<PgFixt
 }
 
 async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
-  const container = await new GenericContainer(IMAGE)
-    .withEnvironment({ POSTGRES_PASSWORD: PASSWORD, POSTGRES_DB: DATABASE })
-    .withExposedPorts(PG_PORT)
-    // The image emits this log line once during its own init phase and once for real — waiting
-    // for only the first occurrence gets you a "connection refused" a moment later. This is the
-    // classic Postgres/Testcontainers flake; waiting for it twice is the fix.
-    .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
+  // @testcontainers/postgresql's own wait strategy (Wait.forAll([forHealthCheck(),
+  // forListeningPorts()]), with a pg_isready-based healthcheck it installs automatically) solves
+  // the classic Postgres double-boot-during-init flake by polling the real server rather than
+  // matching a log line twice — no manual Wait.forLogMessage(..., 2) needed here anymore.
+  const container = await new PostgreSqlContainer(IMAGE)
+    .withDatabase(DATABASE)
+    .withUsername('postgres')
+    .withPassword(PASSWORD)
     .withStartupTimeout(STARTUP_TIMEOUT_MS)
     .start();
 
   const host = container.getHost();
-  const port = container.getMappedPort(PG_PORT);
+  const port = container.getPort();
   const uri = `postgres://postgres:${PASSWORD}@${host}:${port}/${DATABASE}`;
 
   const seedClient = new Client({ connectionString: uri });

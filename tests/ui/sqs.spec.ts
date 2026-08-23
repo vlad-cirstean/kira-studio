@@ -94,6 +94,7 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
         uri: c.uri,
         options: c.options,
         preconnect: null,
+        preconnectSidecar: false,
       }),
     { uri: cfg.uri, options: cfg.options },
   );

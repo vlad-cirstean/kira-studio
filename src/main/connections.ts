@@ -104,15 +104,18 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     );
   }
 
-  // Private — never returned over IPC (D9). `preconnect` is stripped from the engine-bound config
-  // (D13): the engine has no use for a shell string and must never be handed one.
-  async function resolve(
-    id: string,
-  ): Promise<{ config: ResolvedConnectionConfig; preconnect: string | null }> {
+  // Private — never returned over IPC (D9). `preconnect`/`preconnectSidecar` are stripped from
+  // the engine-bound config (D13): the engine has no use for a shell string or main's own
+  // arm()/monitor decision.
+  async function resolve(id: string): Promise<{
+    config: ResolvedConnectionConfig;
+    preconnect: string | null;
+    preconnectSidecar: boolean;
+  }> {
     const summary = await getConnection(db, id);
     if (!summary) throw new Error(`connection ${id} not found`);
     const password = await secrets.get(id);
-    const { preconnect: script, ...fields } = summary;
+    const { preconnect: script, preconnectSidecar, ...fields } = summary;
     return {
       config: {
         ...fields,
@@ -120,6 +123,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         uri: summary.uri ? injectUriPassword(summary.uri, password) : summary.uri,
       },
       preconnect: script,
+      preconnectSidecar,
     };
   }
 
@@ -128,11 +132,13 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
   function resolveFromInput(input: ConnectionInput): {
     config: ResolvedConnectionConfig;
     preconnect: string | null;
+    preconnectSidecar: boolean;
   } {
-    const { preconnect: script, ...fields } = input;
+    const { preconnect: script, preconnectSidecar, ...fields } = input;
     return {
       config: { ...fields, id: 'test', sortOrder: 0, createdAt: '', updatedAt: '' },
       preconnect: script,
+      preconnectSidecar,
     };
   }
 
@@ -167,21 +173,22 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     });
     let started = false;
     try {
-      const { config, preconnect: script } = await resolve(id);
-      let sidecar = false;
+      const { config, preconnect: script, preconnectSidecar } = await resolve(id);
       if (script) {
-        const startResult = await preconnect.start(id, script);
+        await preconnect.start(id, script);
         started = true;
-        sidecar = startResult.kind === 'sidecar';
       }
       const result = await engineHost.call<{ serverVersion: string; caps: Caps }>(
         ENGINE_OP.connect,
         { config },
         20_000,
       );
-      if (sidecar) {
-        // May synchronously flip this connection to 'error' via the onExit handler above, if
-        // the script already died between start() resolving and this call (D7).
+      if (preconnectSidecar) {
+        // Misc-fixes: the explicit checkbox overrides D5's settle-window auto-detection — always
+        // arm() here regardless of whether start() actually settled as a sidecar. A no-op if the
+        // script already exited (nothing left in the supervisor's map to arm). May synchronously
+        // flip this connection to 'error' via the onExit handler above, if the script already
+        // died between start() resolving and this call (D7).
         preconnect.arm(id);
       }
       const afterArm = stateOf(id);

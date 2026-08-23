@@ -344,6 +344,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 .ops-row {
   height: 20px;
   cursor: pointer;
+  user-select: text;
 }
 
 .ops-row:hover {

@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import { MariaDbContainer, type StartedMariaDbContainer } from '@testcontainers/mariadb';
 import { createConnection, importFile } from 'mariadb';
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { Wait } from 'testcontainers';
 import { resolveDockerHost } from './docker';
 
 resolveDockerHost();
@@ -12,13 +13,12 @@ const DATABASE = 'kira_test';
 const ANALYTICS_DATABASE = 'kira_analytics';
 const USERNAME = 'kira';
 const PASSWORD = 'kira';
-const MARIADB_PORT = 3306;
 const STARTUP_TIMEOUT_MS = 120_000;
 const BIG_ROWS = 1_000_000;
 const SEED_SQL_PATH = resolve(__dirname, '../fixtures/0002_mariadb_seed.sql');
 
 export interface MariaFixture {
-  container: StartedTestContainer;
+  container: StartedMariaDbContainer;
   config: ResolvedConnectionConfig; // ready to hand to the adapter
   uri: string;
   stop(): Promise<void>;
@@ -33,14 +33,14 @@ export function startMariadb(opts?: { seedBigTable?: boolean }): Promise<MariaFi
 }
 
 async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
-  const container = await new GenericContainer(IMAGE)
-    .withEnvironment({
-      MARIADB_ROOT_PASSWORD: ROOT_PASSWORD,
-      MARIADB_DATABASE: DATABASE,
-      MARIADB_USER: USERNAME,
-      MARIADB_PASSWORD: PASSWORD,
-    })
-    .withExposedPorts(MARIADB_PORT)
+  // Unlike @testcontainers/postgresql, @testcontainers/mariadb sets no wait strategy or
+  // healthcheck of its own (as of 12.1.0) — it only wires up the env vars/getters, so the
+  // double-boot-during-init wait strategy below is still ours to provide.
+  const container = await new MariaDbContainer(IMAGE)
+    .withDatabase(DATABASE)
+    .withUsername(USERNAME)
+    .withUserPassword(PASSWORD)
+    .withRootPassword(ROOT_PASSWORD)
     // performance_schema is off by default on MariaDB (unlike MySQL) — scenario 1 needs
     // performance_schema.SESSION_CONNECT_ATTRS to assert that a disconnected session's connect
     // attributes are gone.
@@ -60,7 +60,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     .start();
 
   const host = container.getHost();
-  const port = container.getMappedPort(MARIADB_PORT);
+  const port = container.getPort();
   const uri = `mariadb://${USERNAME}:${PASSWORD}@${host}:${port}/${DATABASE}`;
 
   // Seeded as root (CREATE/GRANT need it); the returned config connects as the unprivileged

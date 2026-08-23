@@ -61,6 +61,13 @@ const connectionFieldsSchema = z.object({
   // rather than an options_json key — options round-trips through the connection URI and the
   // Copy URI menu item, and a shell command must never be settable by pasting a URI.
   preconnect: z.string().trim().min(1).max(2000).nullable().default(null),
+  // Misc-fixes: overrides P11/D5's settle-window auto-detection with an explicit per-connection
+  // choice. false (default) = "run each time it tries to connect" — a fresh instance is spawned
+  // on every connect attempt and its exit is never monitored, whether or not it happens to still
+  // be alive at the settle window. true = "run once, and disconnect the db when it dies" — always
+  // arm() once the adapter connects, regardless of what the settle-window race resolved to (a
+  // no-op if the script already exited, since there's nothing left to monitor).
+  preconnectSidecar: z.boolean().default(false),
 });
 
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {

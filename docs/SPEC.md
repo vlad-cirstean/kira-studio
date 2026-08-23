@@ -2,7 +2,7 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P15 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Status: **P0–P16 implemented** on the v1 feature branch — see §10's phasing table for the record.
 > Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
 > shipped.
 
@@ -517,6 +517,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P13 Nonfunctional checks** | Sweep for memory leaks, storage leaks, inefficient/redundant DB interaction, and insufficient caching across the whole codebase; fix everything found | P12 measured against budgets and only pulled the levers its numbers justified — several items were deliberately left open for a dedicated sweep (`docs/PERF.md` §4); this phase closes them before the surface is described in docs |
 | **P14 Docs** | Descriptions in every expected in-repo location plus the main repository README — full functionality, install and dev-setup instructions | Written once the app's behavior and nonfunctional characteristics are final, so nothing documented here needs revisiting |
 | **P15 GH tooling** | Pre-commit hook; GitHub Actions CI (macOS-only); tag-triggered unsigned macOS binary build; auto-update configuration verified | Last, since CI and release tooling should target a finished, documented build rather than a moving one |
+| **P16 Misc fixes** | Explicit per-connection preconnect-mode checkbox (overrides P11's settle-window auto-detection); connection-kind icon picker; click-to-open connection-error popover; `scripts/demo-dbs/` full six-engine coverage; two font-family bugs; testcontainers preset packages for Postgres/MariaDB/Redis | Not a planned deliverable — a batch of user-directed fixes surfaced after P15 shipped, grouped into one phase rather than reopening P1/P9/P10/P11/P14 |
 
 ---
 

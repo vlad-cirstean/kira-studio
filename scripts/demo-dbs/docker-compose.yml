@@ -1,4 +1,5 @@
 services:
+  # postgresql://kira:kira@localhost:5432/kira
   postgres:
     image: postgres:16-alpine
     container_name: kira-postgres
@@ -17,6 +18,7 @@ services:
       timeout: 5s
       retries: 20
 
+  # mariadb://kira:kira@localhost:3306/kira (root password: root)
   mariadb:
     image: mariadb:11
     container_name: kira-mariadb
@@ -36,6 +38,7 @@ services:
       timeout: 5s
       retries: 20
 
+  # mongodb://localhost:27017/kira (no auth)
   mongo:
     image: mongo:7
     container_name: kira-mongo
@@ -52,6 +55,7 @@ services:
       timeout: 5s
       retries: 20
 
+  # redis://localhost:6379/0 (no auth; appendonly persistence)
   redis:
     image: redis:7-alpine
     container_name: kira-redis
@@ -66,8 +70,59 @@ services:
       timeout: 5s
       retries: 20
 
+  # localhost:9092 (no auth, PLAINTEXT)
+  # Single-node KRaft broker (no ZooKeeper) — same image/mode as @testcontainers/kafka's harness
+  # (tests/db/support/kafka.ts, P10's D15): apache/kafka's listener never opens under a plain
+  # Compose bootstrap either, so this stays on confluentinc/cp-kafka.
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kira-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Fixed, arbitrary base64 UUID — a KRaft cluster ID, not a secret; every demo run just needs
+      # the same one so a restarted broker recognizes its own persisted log dir.
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kira-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # sqs://test:test@us-east-1?endpoint=http://localhost:4566 (LocalStack's fixed dummy keys)
+  # SQS only — same image/mode as @testcontainers/localstack's harness (tests/db/support/sqs.ts).
+  sqs:
+    image: localstack/localstack:3
+    container_name: kira-sqs
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: sqs
+      PERSISTENCE: 1
+    volumes:
+      - kira-sqs-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -sf http://localhost:4566/_localstack/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
 volumes:
   kira-pg-data:
   kira-mariadb-data:
   kira-mongo-data:
   kira-redis-data:
+  kira-kafka-data:
+  kira-sqs-data:

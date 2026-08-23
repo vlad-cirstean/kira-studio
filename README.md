@@ -191,7 +191,7 @@ See [`docs/SPEC.md`](docs/SPEC.md) §11 for the full directory breakdown.
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
-- [`docs/plans/`](docs/plans/) — one implementation plan per phase, P0 through P15.
+- [`docs/plans/`](docs/plans/) — one implementation plan per phase, P0 through P16.
 - [`docs/design/vscode-modern-ui/`](docs/design/vscode-modern-ui/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.

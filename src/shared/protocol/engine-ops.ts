@@ -30,12 +30,17 @@ export const ENGINE_EVENT = {
 // `preconnect` is stripped (P11/D13): it is a shell command with no meaning to the engine, and
 // the engine is the one process boundary in this architecture treated as expendable/untrusted-ish
 // (§4) — it has no business holding a string whose only purpose is to be executed.
-export type ResolvedConnectionConfig = Omit<ConnectionSummary, 'preconnect'> & {
+// `preconnectSidecar` is stripped for the same reason — it only governs main's own arm()/monitor
+// decision (src/main/connections.ts's doConnect) and has no meaning once the engine has the config.
+export type ResolvedConnectionConfig = Omit<
+  ConnectionSummary,
+  'preconnect' | 'preconnectSidecar'
+> & {
   password: string | null;
 };
 
 export const resolvedConnectionConfigSchema: z.ZodType<ResolvedConnectionConfig> =
-  connectionSummarySchema.omit({ preconnect: true }).extend({
+  connectionSummarySchema.omit({ preconnect: true, preconnectSidecar: true }).extend({
     password: z.string().nullable(),
   });
 

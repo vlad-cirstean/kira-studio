@@ -23,4 +23,12 @@ echo "==> Redis"
 docker exec -i kira-redis redis-cli EVAL "$(cat "${SCRIPT_DIR}/redis/seed.lua")" 0
 
 echo
+echo "==> Kafka"
+docker exec -i kira-kafka bash < "${SCRIPT_DIR}/kafka/seed.sh"
+
+echo
+echo "==> SQS (LocalStack)"
+docker exec -i kira-sqs bash < "${SCRIPT_DIR}/sqs/seed.sh"
+
+echo
 echo "All seeds complete."

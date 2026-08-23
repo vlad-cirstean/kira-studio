@@ -11,6 +11,7 @@ import { control } from '../bridge/control';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
 import ColorPicker from './ColorPicker.vue';
+import { connectionKindIcon } from './icons';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
@@ -200,23 +201,27 @@ const preconnectText = computed({
         </div>
         <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
 
-        <label class="field">
+        <div class="field">
           <span>Kind</span>
-          <select
-            :value="draft.kind"
-            data-testid="connection-kind"
-            @change="onKindChange(($event.target as HTMLSelectElement).value as ConnectionKind)"
-          >
-            <option
+          <div class="kind-picker" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
+            <button
               v-for="kind in kinds"
               :key="kind"
-              :value="kind"
+              type="button"
+              class="kind-btn"
+              :class="{ selected: draft.kind === kind }"
               :disabled="!SUPPORTED_KINDS.has(kind)"
+              role="radio"
+              :aria-checked="draft.kind === kind"
+              :title="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
+              :data-testid="`connection-kind-${kind}`"
+              @click="onKindChange(kind)"
             >
-              {{ KIND_LABEL[kind] }}{{ SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported' }}
-            </option>
-          </select>
-        </label>
+              <Codicon :name="connectionKindIcon(kind)" :size="16" />
+              <span class="kind-label">{{ KIND_LABEL[kind] }}</span>
+            </button>
+          </div>
+        </div>
 
         <div class="field">
           <span>Mode</span>
@@ -309,8 +314,7 @@ const preconnectText = computed({
             data-testid="connection-preconnect"
           />
           <span class="helper-text">
-            Runs in your shell before connecting — e.g. a port-forward. The connection drops if it
-            exits.
+            Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
           </span>
           <span v-if="preconnectText" class="preconnect-warning" data-testid="connection-preconnect-warning">
             This command runs on your machine with your permissions every time this connection
@@ -318,6 +322,21 @@ const preconnectText = computed({
           </span>
         </label>
         <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
+
+        <label v-if="preconnectText" class="field checkbox">
+          <input
+            v-model="draft.preconnectSidecar"
+            type="checkbox"
+            data-testid="connection-preconnect-sidecar"
+          />
+          <span>Keep it running, disconnect if it dies</span>
+          <span class="helper-text">
+            On: the command stays alive for the whole session — e.g. a port-forward — and this
+            connection drops the moment it exits. Off (default): a fresh instance runs each time
+            you connect, and its exit is never monitored — the right choice for a one-off prep
+            script.
+          </span>
+        </label>
 
         <p class="credential-warning">
           Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
@@ -503,6 +522,40 @@ const preconnectText = computed({
 .segmented button.active {
   background: var(--kira-select);
   color: var(--kira-fg);
+}
+
+.kind-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.kind-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.kind-btn.selected {
+  background: var(--kira-select);
+  border-color: var(--kira-focus);
+  color: var(--kira-fg);
+}
+
+.kind-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kind-label {
+  white-space: nowrap;
 }
 
 .uri-note {

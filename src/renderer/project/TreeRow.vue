@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import Codicon from '../theme/Codicon.vue';
+import ErrorPopover from './ErrorPopover.vue';
 import { columnTypeIcon, nodeIcon } from './icons';
 import type { TreeRowVm } from './state/tree';
 
@@ -92,7 +93,7 @@ function onContextMenu(e: MouseEvent): void {
       <span v-for="badge in row.badges" :key="badge" class="badge">{{ badge }}</span>
     </span>
 
-    <span v-if="row.error" class="row-error">{{ row.error }}</span>
+    <ErrorPopover v-if="row.error" :message="row.error" />
     <span v-else-if="row.detail" class="detail">{{ row.detail }}</span>
   </div>
 </template>
@@ -231,11 +232,4 @@ function onContextMenu(e: MouseEvent): void {
   font-size: 11px;
 }
 
-.row-error {
-  margin-left: auto;
-  color: var(--kira-error);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 </style>

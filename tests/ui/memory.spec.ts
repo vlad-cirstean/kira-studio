@@ -153,6 +153,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: pgCfg.host,
@@ -178,6 +179,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: pgCfg.host,
@@ -203,6 +205,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: mariaCfg.host,
@@ -228,6 +231,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: mongoCfg.host,
@@ -253,6 +257,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: redisCfg.host,

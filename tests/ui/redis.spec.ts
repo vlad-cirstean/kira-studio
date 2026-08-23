@@ -105,6 +105,7 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
         uri: null,
         options: {},
         preconnect: null,
+        preconnectSidecar: false,
       }),
     {
       host: cfg.host,

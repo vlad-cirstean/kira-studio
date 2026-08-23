@@ -155,6 +155,7 @@ test.describe('preconnect — sidecar lifecycle against a live connection', () =
           uri: null,
           options: {},
           preconnect: `echo $$ > ${c.pidFile}; touch ${c.markerFile}; sleep 600`,
+          preconnectSidecar: true,
         }),
       {
         host: cfg.host,
@@ -235,6 +236,7 @@ test.describe('preconnect — sidecar lifecycle against a live connection', () =
           uri: null,
           options: {},
           preconnect: `touch ${c.marker2File}`,
+          preconnectSidecar: false,
         }),
       {
         host: cfg.host,

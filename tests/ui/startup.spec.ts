@@ -45,6 +45,7 @@ test('cold start — restored session (5 connections, 10 tabs)', async ({
             uri: null,
             options: {},
             preconnect: null,
+            preconnectSidecar: false,
           })
           .then((c) => c.id),
       i,

@@ -31,6 +31,9 @@
         "@tailwindcss/vite": "4.3.3",
         "@testcontainers/kafka": "12.1.0",
         "@testcontainers/localstack": "12.1.0",
+        "@testcontainers/mariadb": "12.1.0",
+        "@testcontainers/postgresql": "12.1.0",
+        "@testcontainers/redis": "12.1.0",
         "@types/node": "26.2.0",
         "@types/pg": "8.23.1",
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -411,6 +414,12 @@
     "@testcontainers/kafka": ["@testcontainers/kafka@12.1.0", "", { "dependencies": { "compare-versions": "^6.1.1", "testcontainers": "^12.1.0" } }, "sha512-hllpKME5id18IIhwvzibVp+CG7eEvrrzlTZ0HHai5HzXpZe1/fqHWN40GZAWssuowpmVgBDbIwcwhuDdmWFr8A=="],
 
     "@testcontainers/localstack": ["@testcontainers/localstack@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-nemXUXGpb0SwY4ZntJMGo/0pv8/1Wdlmv8DwFX8ucxzzvXR+gr5eNaq+gGtKBqgIL7q3hsCubxE6eOeVy2BgRw=="],
+
+    "@testcontainers/mariadb": ["@testcontainers/mariadb@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-Py/NPQnOyRXdaRybdxe8D6JdmRXit2hhVVr/EwBoSuGNfm0Ew407N8ocWAAEB0vi8dirvwy/v+9/rczWigOaxQ=="],
+
+    "@testcontainers/postgresql": ["@testcontainers/postgresql@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-Pjf2VSVNirEPfz36nidyrVAnZvc2YhajOznY4VgyEsvfTd5qiMNOuPq96drREvxAUtXl5SFLX7vXj7sSq4aTcA=="],
+
+    "@testcontainers/redis": ["@testcontainers/redis@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-WRiS1Lhc+e/DHXDnCmMZtm8Wv64zYlRGNV04rvtn8kxIS2aVz5lgsP+Su/cfBzHJ0/vwdVKW+YJ3nUrXYbQxqw=="],
 
     "@types/cacheable-request": ["@types/cacheable-request@6.0.3", "", { "dependencies": { "@types/http-cache-semantics": "*", "@types/keyv": "^3.1.4", "@types/node": "*", "@types/responselike": "^1.0.0" } }, "sha512-IQ3EbTzGxIigb1I3qPZc1rWJnH0BmSKv5QYTalEwweFvyBDLSAe24zP0le/hyi7ecGfZVlIVAg4BZqb8WBwKqw=="],
 

@@ -176,6 +176,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
           uri: null,
           options: {},
           preconnect: null,
+          preconnectSidecar: false,
         })
         .then((c) => c.id),
     {
