@@ -159,7 +159,7 @@ kira-version-vscode/
 │   │       ├── ports/              processRunner.ts fileWatcher.ts workspaceRoots.ts storage.ts
 │   │       │                       secrets.ts clipboard.ts externalOpener.ts dialogs.ts
 │   │       │                       notifications.ts editorIntegration.ts theme.ts logger.ts
-│   │       │                       index.ts
+│   │       │                       disposable.ts testFakes.ts index.ts
 │   │       └── util/               nulSplit.ts result.ts assert.ts
 │   │
 │   ├── git/                        the only package that knows git exists

@@ -44,6 +44,29 @@ export type { RefKind, RefRecord, RefTrack } from "./model/ref.ts";
 export type { HeadState, RepoIdentity } from "./model/repo.ts";
 export type { StashEntry } from "./model/stash.ts";
 export type {
+  FileStatusCode,
+  IgnoredStatusEntry,
+  OrdinaryStatusEntry,
+  RenamedStatusEntry,
+  StatusBranchInfo,
+  StatusEntry,
+  StatusResult,
+  UntrackedStatusEntry,
+} from "./model/status.ts";
+export type { Dialogs, PickFolderOptions } from "./ports/dialogs.ts";
+export type { Disposable } from "./ports/disposable.ts";
+export type { FileWatchEvent, FileWatcher, FileWatchOptions } from "./ports/fileWatcher.ts";
+export type { Logger, LogLevel } from "./ports/logger.ts";
+export type {
+  ProcessExit,
+  ProcessRunner,
+  SpawnedProcess,
+  SpawnRequest,
+} from "./ports/processRunner.ts";
+export type { Storage, StorageScope } from "./ports/storage.ts";
+export type { Theme, ThemeKind } from "./ports/theme.ts";
+export type { RepoCandidate, WorkspaceRoots } from "./ports/workspaceRoots.ts";
+export type {
   CoerceProblem,
   CoerceResult,
   HostKind,
@@ -60,22 +83,6 @@ export {
   SETTINGS,
   toVsCodeConfiguration,
 } from "./settings/schema.ts";
-export type {
-  FileStatusCode,
-  IgnoredStatusEntry,
-  OrdinaryStatusEntry,
-  RenamedStatusEntry,
-  StatusBranchInfo,
-  StatusEntry,
-  StatusResult,
-  UntrackedStatusEntry,
-} from "./model/status.ts";
-export type {
-  ProcessExit,
-  ProcessRunner,
-  SpawnedProcess,
-  SpawnRequest,
-} from "./ports/processRunner.ts";
 export type { AppendResult, CommitStoreStats, PackedCommitChunk } from "./store/commitStore.ts";
 export { CommitStore, packedTransferList } from "./store/commitStore.ts";
 export { StringInterner, SubjectBuffer } from "./store/intern.ts";
