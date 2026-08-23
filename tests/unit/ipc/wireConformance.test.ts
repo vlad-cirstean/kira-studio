@@ -13,9 +13,14 @@
 import { describe, expect, test } from "bun:test";
 import type { DecorationRef as CoreDecorationRef } from "../../../packages/core/src/model/commit.ts";
 import type { HeadState as CoreHeadState } from "../../../packages/core/src/model/repo.ts";
+import {
+  type Settings as CoreSettings,
+  defaultSettings,
+} from "../../../packages/core/src/settings/schema.ts";
 import type {
   DecorationRef as WireDecorationRef,
   HeadState as WireHeadState,
+  SettingsSnapshot as WireSettingsSnapshot,
 } from "../../../packages/ipc/src/contract.ts";
 
 /** Never called — its only job is to make the assignments inside it part of the compiled
@@ -49,5 +54,15 @@ describe("ipc wire conformance", () => {
     const tag: CoreDecorationRef = { kind: "tag", name: "v1" };
     const wire: WireDecorationRef = tag;
     expect(wire).toEqual(tag);
+  });
+
+  test("SettingsSnapshot: core's generated Settings and ipc's wire copy are assignable both ways", () => {
+    assertBothWays<WireSettingsSnapshot, CoreSettings>(
+      (core) => core,
+      (wire) => wire,
+    );
+    const settings: CoreSettings = defaultSettings();
+    const wire: WireSettingsSnapshot = settings;
+    expect(wire).toEqual(settings);
   });
 });

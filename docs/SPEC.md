@@ -136,7 +136,8 @@ kira-version-vscode/
 ├── scripts/
 │   ├── build.ts                    bundles hosts + ui via bun build / vite
 │   ├── package-vsix.ts             build then `vsce package --no-dependencies`
-│   └── gen-theme-palettes.ts       derives Electron palettes from VS Code theme JSON (§3.4)
+│   ├── gen-theme-palettes.ts       derives Electron palettes from VS Code theme JSON (§3.4)
+│   └── gen-settings.ts             writes contributes.configuration from core's settings schema (D25)
 │
 ├── packages/
 │   ├── core/                       pure domain. No I/O, no DOM, no git, no framework.
@@ -154,6 +155,7 @@ kira-version-vscode/
 │   │       │                       gitArgs.ts translate a query into git log arguments
 │   │       ├── preflight/          checkout.ts stashPop.ts reset.ts revert.ts push.ts tag.ts
 │   │       │                       types.ts   Hazard / Plan / Resolution unions
+│   │       ├── settings/           schema.ts  SETTINGS, coerceSettings, toVsCodeConfiguration (D25)
 │   │       ├── ports/              processRunner.ts fileWatcher.ts workspaceRoots.ts storage.ts
 │   │       │                       secrets.ts clipboard.ts externalOpener.ts dialogs.ts
 │   │       │                       notifications.ts editorIntegration.ts theme.ts logger.ts

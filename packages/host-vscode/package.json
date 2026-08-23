@@ -13,5 +13,44 @@
   },
   "devDependencies": {
     "@types/vscode": "1.134.0"
+  },
+  "contributes": {
+    "configuration": {
+      "properties": {
+        "kiraVersion.git.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the git executable. Empty uses the host's own discovery (VS Code's git.path setting, then PATH) — see §4.2."
+        },
+        "kiraVersion.graph.pageSize": {
+          "type": "number",
+          "default": 5000,
+          "description": "How many commits a single Load more page fetches.",
+          "minimum": 100,
+          "maximum": 50000
+        },
+        "kiraVersion.graph.scope": {
+          "type": "string",
+          "default": "all",
+          "description": "Whether the graph shows every ref (\"all\") or only the current HEAD's ancestry.",
+          "enum": [
+            "all",
+            "head"
+          ]
+        },
+        "kiraVersion.log.level": {
+          "type": "string",
+          "default": "info",
+          "description": "Verbosity of kira-version's own diagnostic log.",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ]
+        }
+      }
+    }
   }
 }

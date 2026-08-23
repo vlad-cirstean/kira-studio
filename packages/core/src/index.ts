@@ -44,6 +44,23 @@ export type { RefKind, RefRecord, RefTrack } from "./model/ref.ts";
 export type { HeadState, RepoIdentity } from "./model/repo.ts";
 export type { StashEntry } from "./model/stash.ts";
 export type {
+  CoerceProblem,
+  CoerceResult,
+  HostKind,
+  SettingDef,
+  SettingKey,
+  Settings,
+  SettingType,
+  SettingValue,
+  VsCodeConfigurationSchema,
+} from "./settings/schema.ts";
+export {
+  coerceSettings,
+  defaultSettings,
+  SETTINGS,
+  toVsCodeConfiguration,
+} from "./settings/schema.ts";
+export type {
   FileStatusCode,
   IgnoredStatusEntry,
   OrdinaryStatusEntry,
