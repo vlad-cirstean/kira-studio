@@ -1,5 +1,6 @@
 import { InMemoryViewStateStore, mount, type TokenMap, TokenReader } from "@kira-version/ui";
 import { createMockBridge } from "./mockBridge.ts";
+import { loadScenario } from "./scenarios/index.ts";
 import { applyThemeKind, isThemeKind, type ThemeKind } from "./themeSwitcher.ts";
 
 declare global {
@@ -37,4 +38,21 @@ if (!container) {
 }
 
 const transport = createMockBridge(scenarioName);
-mount(container, { transport, viewState: new InMemoryViewStateStore(), host: "harness" });
+
+// There is no repo-picker UI yet (P4+) — `App.vue`'s own `bootstrap()` only opens a repo
+// automatically when `viewState.read()` returns a persisted, non-null `repoId`. Pre-seeding it
+// here (via `setRaw`, the store's documented test-only injection hook) exploits that existing
+// logic to get every scenario auto-loading on mount.
+const viewState = new InMemoryViewStateStore();
+let repoId: string | null = null;
+try {
+  const scenario = loadScenario(scenarioName);
+  if (scenario.repoOpen.kind === "ok") repoId = scenario.repoOpen.repo.repoId;
+} catch {
+  // An unimplemented scenario stub (dirty/conflicted, see their own files) throws on any
+  // property access by design — leave repoId null and let bootstrap() run without opening a
+  // repo, rather than crash the page before the shell itself has a chance to render.
+}
+viewState.setRaw({ version: 1, repoId, loadedRows: 0, detailOpen: true });
+
+mount(container, { transport, viewState, host: "harness" });

@@ -1,79 +1,254 @@
+import { CommitStore, defaultSettings } from "@kira-version/core";
 import type {
-  EventKey,
-  EventPayload,
-  ParamsOf,
-  RequestKey,
-  ResultOf,
+  MessageChannelLike,
+  RequestHandler,
+  ServerHandlers,
+  SettingsSnapshot,
   StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
+  StreamHandler,
   Transport,
 } from "@kira-version/ipc";
+import { CONTRACT_VERSION, createRpcClient, createRpcServer } from "@kira-version/ipc";
 import { loadScenario } from "./scenarios/index.ts";
-
-const SHA_BYTES = 20;
-
-function shaBufferForCount(count: number): ArrayBuffer {
-  const buffer = new ArrayBuffer(count * SHA_BYTES);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < view.length; i++) view[i] = i % 256;
-  return buffer;
-}
+import type { Scenario } from "./scenarios/types.ts";
 
 /**
- * Implements the ipc Transport against the active scenario's fixture data. P0 does not
- * parse real git output — that is packages/git's job from P1+ — so this returns plausible,
- * contract-shaped data. The stream mechanism chunks realistically so the UI's streaming
- * path is exercised rather than bypassed (§8.4).
+ * Wires a real `createRpcServer`/`createRpcClient` pair over an in-memory channel to a
+ * hand-written `ServerHandlers` (P3 W14) — not `@kira-version/git`'s `createRepoHandlers`,
+ * which `biome.json`'s `noRestrictedImports` override forbids `apps/harness/**` from
+ * importing (grouped with `packages/ui`'s own "core + ipc only" restriction, B3, §3.1). The
+ * handlers below are this file's own translation from a `Scenario`'s fixture data to the same
+ * wire shapes `packages/git/src/rpcHandlers.ts` produces, mirroring `RepoService.streamGraph`'s
+ * cache-then-fresh-page split conceptually rather than by shared code — there is a real repo
+ * fixture (`Scenario.commits`) but no real git process behind it.
  */
-export function createMockBridge(scenarioName: string): Transport {
-  const scenario = loadScenario(scenarioName);
+
+/** How many rows one `graph.stream` chunk carries, whether replayed from the mock's own
+ *  `CommitStore` (`source: "cache"`) or newly "read" out of `Scenario.commits`
+ *  (`source: "git"`) — the same constant `RepoService.CHUNK_ROWS` uses, kept independent since
+ *  the harness may not import `@kira-version/git`. */
+const CHUNK_ROWS = 500;
+
+/** How many commits one simulated "page" adds — `defaultSettings()`'s own
+ *  `kiraVersion.graph.pageSize`, so `hugeRepo`'s `graph.loadMore` genuinely needs more than one
+ *  call to reach exhaustion, matching what a real host would do with the same setting. */
+const PAGE_SIZE = defaultSettings()["kiraVersion.graph.pageSize"];
+
+function toSettingsSnapshot(): SettingsSnapshot {
+  const settings = defaultSettings();
+  return {
+    "kiraVersion.git.path": settings["kiraVersion.git.path"],
+    "kiraVersion.graph.pageSize": settings["kiraVersion.graph.pageSize"],
+    "kiraVersion.graph.scope": settings["kiraVersion.graph.scope"],
+    "kiraVersion.log.level": settings["kiraVersion.log.level"],
+    "kiraVersion.theme.kind": settings["kiraVersion.theme.kind"],
+  };
+}
+
+/** A harness-local copy of `packages/ipc/src/rpc.test.ts`'s own `createInMemoryChannelPair` —
+ *  a real in-memory pipe using `structuredClone` (with transfer support) so posting on one end
+ *  synchronously invokes the other, mimicking real `postMessage`/transfer-detach semantics
+ *  closely enough that `createRpcClient`/`createRpcServer` cannot tell this from a real host
+ *  channel. */
+function createInMemoryChannelPair(): readonly [MessageChannelLike, MessageChannelLike] {
+  let handlerA: ((message: unknown) => void) | undefined;
+  let handlerB: ((message: unknown) => void) | undefined;
+  let closedA = false;
+  let closedB = false;
+
+  const a: MessageChannelLike = {
+    post(message, transfer) {
+      if (closedA) return;
+      const cloned = transfer
+        ? structuredClone(message, { transfer: transfer as ArrayBuffer[] })
+        : structuredClone(message);
+      handlerB?.(cloned);
+    },
+    onMessage(handler) {
+      handlerA = handler;
+      return () => {
+        if (handlerA === handler) handlerA = undefined;
+      };
+    },
+    close() {
+      closedA = true;
+    },
+  };
+  const b: MessageChannelLike = {
+    post(message, transfer) {
+      if (closedB) return;
+      const cloned = transfer
+        ? structuredClone(message, { transfer: transfer as ArrayBuffer[] })
+        : structuredClone(message);
+      handlerA?.(cloned);
+    },
+    onMessage(handler) {
+      handlerB = handler;
+      return () => {
+        if (handlerB === handler) handlerB = undefined;
+      };
+    },
+    close() {
+      closedB = true;
+    },
+  };
+  return [a, b];
+}
+
+interface RepoSession {
+  readonly repoId: string;
+  readonly commits: Scenario["commits"];
+  readonly store: CommitStore;
+  dictionaryCursor: number;
+  nextSeq: number;
+}
+
+function createSession(repoId: string, commits: Scenario["commits"]): RepoSession {
+  return { repoId, commits, store: new CommitStore(), dictionaryCursor: 0, nextSeq: 0 };
+}
+
+function requireSession(sessions: Map<string, RepoSession>, repoId: string): RepoSession {
+  const session = sessions.get(repoId);
+  if (!session) throw new Error(`mock bridge: no open repo '${repoId}'`);
+  return session;
+}
+
+/** Appends exactly one page's worth of `session.commits` into `session.store`, or none if the
+ *  scenario's fixture is already fully loaded — the mock's stand-in for `RepoService`'s
+ *  "read one page from git into the store". */
+function readPageIntoStore(session: RepoSession): void {
+  const loaded = session.store.rowCount;
+  const count = Math.min(PAGE_SIZE, session.commits.length - loaded);
+  if (count <= 0) return;
+  session.store.appendPage(session.commits.slice(loaded, loaded + count));
+}
+
+async function emitRange(
+  session: RepoSession,
+  from: number,
+  to: number,
+  source: "git" | "cache",
+  emit: (chunk: StreamChunkOf<"graph.stream">) => Promise<void>,
+): Promise<void> {
+  const commits = session.store.packSlice(from, to, session.dictionaryCursor);
+  session.dictionaryCursor += commits.dictionary.length;
+  const remaining = session.commits.length - session.store.rowCount;
+  await emit({
+    repoId: session.repoId,
+    seq: session.nextSeq++,
+    from,
+    to,
+    source,
+    remaining,
+    exhausted: remaining === 0,
+    commits,
+  });
+}
+
+function createHandlers(scenario: Scenario): ServerHandlers {
+  const sessions = new Map<string, RepoSession>();
+  let activeRepoId: string | null = null;
+
+  const appInit: RequestHandler<"app.init"> = async () => ({
+    host: "harness",
+    contractVersion: CONTRACT_VERSION,
+    settings: toSettingsSnapshot(),
+    git: scenario.git,
+  });
+
+  const repoList: RequestHandler<"repo.list"> = async () => ({
+    candidates: [],
+    activeRepoId,
+  });
+
+  const repoPick: RequestHandler<"repo.pick"> = async () => ({ path: null });
+
+  // Ignores `path` deliberately: the mock has exactly one repo per scenario (`Scenario`'s own
+  // doc comment), so there is nothing to branch on — every call returns the same fixed outcome.
+  const repoOpen: RequestHandler<"repo.open"> = async () => {
+    if (scenario.repoOpen.kind === "ok") {
+      const { repoId } = scenario.repoOpen.repo;
+      if (!sessions.has(repoId)) sessions.set(repoId, createSession(repoId, scenario.commits));
+      activeRepoId = repoId;
+    }
+    return scenario.repoOpen;
+  };
+
+  const repoClose: RequestHandler<"repo.close"> = async ({ repoId }) => {
+    sessions.delete(repoId);
+    if (activeRepoId === repoId) activeRepoId = null;
+    return {};
+  };
+
+  const graphStatus: RequestHandler<"graph.status"> = async ({ repoId }) => {
+    const session = requireSession(sessions, repoId);
+    const remaining = session.commits.length - session.store.rowCount;
+    return { loaded: session.store.rowCount, remaining, exhausted: remaining === 0 };
+  };
+
+  const graphLoadMore: RequestHandler<"graph.loadMore"> = async ({ repoId, pages }) => {
+    const session = requireSession(sessions, repoId);
+    if (session.store.rowCount >= session.commits.length) return { started: false };
+    for (let i = 0; i < (pages ?? 1); i++) readPageIntoStore(session);
+    return { started: true };
+  };
+
+  // Mirrors `RepoService.streamGraph`'s cache-then-fresh-page split (see this file's own doc
+  // comment): replay whatever this session's store already holds in `CHUNK_ROWS` chunks
+  // (`source: "cache"`), then — only on this repo's very first stream, exactly as the real
+  // service does — pull one page out of the scenario's fixture and stream the rows that adds.
+  const graphStream: StreamHandler<"graph.stream"> = async ({ repoId, resumeThroughRow }, ctx) => {
+    const session = requireSession(sessions, repoId);
+    let cursor = Math.min(resumeThroughRow ?? 0, session.store.rowCount);
+    const cachedThrough = session.store.rowCount;
+
+    while (cursor < cachedThrough) {
+      if (ctx.signal.aborted) return;
+      const to = Math.min(cursor + CHUNK_ROWS, cachedThrough);
+      await emitRange(session, cursor, to, "cache", ctx.emit);
+      cursor = to;
+    }
+    if (ctx.signal.aborted) return;
+
+    if (cachedThrough === 0 && session.store.rowCount < session.commits.length) {
+      readPageIntoStore(session);
+    }
+
+    while (cursor < session.store.rowCount) {
+      if (ctx.signal.aborted) return;
+      const to = Math.min(cursor + CHUNK_ROWS, session.store.rowCount);
+      await emitRange(session, cursor, to, "git", ctx.emit);
+      cursor = to;
+    }
+  };
 
   return {
-    async request<K extends RequestKey>(method: K, _params: ParamsOf<K>): Promise<ResultOf<K>> {
-      if (method === "repo.open") {
-        return scenario.repoOpen as ResultOf<K>;
-      }
-      if (method === "graph.query") {
-        return { totalCount: scenario.commitCount, hasMore: false } as ResultOf<K>;
-      }
-      throw new Error(`mock bridge: unhandled request '${method}'`);
+    requests: {
+      "app.init": appInit,
+      "repo.list": repoList,
+      "repo.pick": repoPick,
+      "repo.open": repoOpen,
+      "repo.close": repoClose,
+      "graph.status": graphStatus,
+      "graph.loadMore": graphLoadMore,
     },
-
-    on<K extends EventKey>(_method: K, _handler: (payload: EventPayload<K>) => void): () => void {
-      // P0's placeholder shell never triggers repo.changed; registering the handler at all
-      // proves the interface shape is implementable. Unsubscribe is a no-op.
-      return () => {};
+    streams: {
+      "graph.stream": graphStream,
     },
+  };
+}
 
-    async stream<K extends StreamKey>(
-      method: K,
-      params: StreamParamsOf<K>,
-      onChunk: (chunk: StreamChunkOf<K>) => void,
-      signal?: AbortSignal,
-    ): Promise<void> {
-      if (method !== "graph.stream") {
-        throw new Error(`mock bridge: unhandled stream '${method}'`);
-      }
-      const { pageSize } = params as StreamParamsOf<"graph.stream">;
-      let offset = 0;
-      while (offset < scenario.commitCount) {
-        if (signal?.aborted) return;
-        const count = Math.min(pageSize, scenario.commitCount - offset);
-        const chunk = {
-          repoId: scenario.repoOpen.repoId,
-          rowOffset: offset,
-          count,
-          shaBuffer: shaBufferForCount(count),
-        } satisfies StreamChunkOf<"graph.stream">;
-        onChunk(chunk as StreamChunkOf<K>);
-        offset += count;
-        // Yield to the event loop between chunks so this behaves like a real paged stream
-        // rather than a single synchronous burst.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
+export function createMockBridge(scenarioName: string): Transport {
+  const scenario = loadScenario(scenarioName);
+  const [serverChannel, clientChannel] = createInMemoryChannelPair();
+  const server = createRpcServer(serverChannel, createHandlers(scenario));
+  const client = createRpcClient(clientChannel);
+
+  return {
+    ...client,
+    dispose(): void {
+      client.dispose();
+      server.dispose();
     },
-
-    dispose(): void {},
   };
 }
