@@ -32,6 +32,11 @@ const APP_PATH = `${DB_PATH}/schema:app`;
 // Same target mutations.spec.ts uses and for the same reason: a genuine 2-column primary key,
 // no inbound FK, three known rows — a clean surface for selection/copy/paste/menu scenarios.
 const COMPOSITE_PATH = `${APP_PATH}/table:composite_pk`;
+// P7: the regions -> customers -> orders -> order_items <- products graph plus employees'
+// self-referencing FK — see 0001_seed.sql's own comment for why this shape exists.
+const EMPLOYEES_PATH = `${APP_PATH}/table:employees`;
+const ORDERS_PATH = `${APP_PATH}/table:orders`;
+const ORDER_ITEMS_PATH = `${APP_PATH}/table:order_items`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
@@ -154,6 +159,18 @@ function gridCell(page: Page, row: number, column: string): Locator {
 
 async function cellText(page: Page, row: number, column: string): Promise<string> {
   return (await gridCell(page, row, column)).innerText();
+}
+
+function cellNavButton(page: Page, row: number, column: string): Locator {
+  return gridCell(page, row, column).locator('[data-testid="cell-nav-button"]');
+}
+
+// P7 D6: a cell's nav button only appears while its .grid-cell carries .selected (pure-CSS
+// hover/selection gate, D5) — select it first the same way a real user's click would, then act
+// on the now-visible button.
+async function clickCellNav(page: Page, row: number, column: string): Promise<void> {
+  await gridCell(page, row, column).click();
+  await cellNavButton(page, row, column).click();
 }
 
 function gutterCell(page: Page, row: number): Locator {
@@ -611,4 +628,100 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   await expect(activeConsole.locator('[data-testid="console-result-grid"]')).toHaveCount(2, {
     timeout: 10_000,
   });
+
+  // =============================================================================================
+  // P7 D1/D6/D7: PK/FK cell nav button — an outbound FK cell jumps straight to the referenced
+  // row; a PK cell with exactly one referencing table jumps straight to it too (D6: single
+  // candidate navigates immediately, no popup). Both spawn a *new*, pre-filtered tab.
+  // =============================================================================================
+  const ordersRow = await findRow(page, ORDERS_PATH);
+  await ordersRow.dblclick();
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'customer_id')).toBeVisible();
+  expect(await cellText(page, 0, 'customer_id')).toBe('1');
+
+  let tabCount = await page.locator('[data-testid="tab"]').count();
+  await clickCellNav(page, 0, 'customer_id');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'name')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+  expect(await cellText(page, 0, 'name')).toBe('Acme Co');
+
+  // customers.id is referenced by exactly one table (orders.customer_id) — a "pk"-kind button,
+  // single candidate, direct nav to the filtered referencing rows.
+  await expect(cellNavButton(page, 0, 'id')).toHaveAttribute('data-nav-kind', 'pk');
+  tabCount = await page.locator('[data-testid="tab"]').count();
+  await clickCellNav(page, 0, 'id');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'customer_id')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+  expect(await cellText(page, 0, 'customer_id')).toBe('1');
+
+  // =============================================================================================
+  // P7: self-referencing FK — employees.manager_id -> employees.id. Ada (id 1) has no manager
+  // (NULL): her manager_id cell renders no nav button at all (P7 D2: a missing/NULL source value
+  // means there's no row to jump to). Her id cell's "Referenced by" is a single candidate
+  // (employees itself) that opens a *new* tab on the same table, filtered to her direct reports.
+  // =============================================================================================
+  const employeesRow = await findRow(page, EMPLOYEES_PATH);
+  await employeesRow.dblclick();
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'manager_id')).toBeVisible();
+  expect(await cellText(page, 0, 'name')).toBe('Ada');
+  await expect(gridCell(page, 0, 'manager_id').locator('.cell-null')).toHaveText('NULL');
+  await gridCell(page, 0, 'manager_id').click();
+  await expect(cellNavButton(page, 0, 'manager_id')).toHaveCount(0);
+
+  tabCount = await page.locator('[data-testid="tab"]').count();
+  await clickCellNav(page, 0, 'id');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
+  await expect(grid).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(2, { timeout: 10_000 });
+  const reportNames = [await cellText(page, 0, 'name'), await cellText(page, 1, 'name')].sort();
+  expect(reportNames).toEqual(['Alan', 'Grace']);
+
+  // Row 0 here (either direct report — both have manager_id 1) has a nav button on its
+  // manager_id cell, and the right-click cell menu offers the same navigation as a "Go to
+  // referenced row" item (P7 D3: the button and the menu share one function, so they can never
+  // disagree about what's navigable).
+  await rightClick(gridCell(page, 0, 'manager_id'));
+  const fkMenuIds = await menuItemIds(page);
+  expect(fkMenuIds.some((id) => id.startsWith('go-to-referenced-'))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  // =============================================================================================
+  // P7: a row with two independent outbound FKs (order_items.order_id -> orders,
+  // order_items.product_id -> products) gets two independent nav buttons, each targeting its own
+  // table — the two never share or overwrite each other's target.
+  // =============================================================================================
+  const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
+  await orderItemsRow.dblclick();
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'order_id')).toBeVisible();
+  await expect(headerCell(page, 'product_id')).toBeVisible();
+  expect(await cellText(page, 0, 'order_id')).toBe('1');
+  expect(await cellText(page, 0, 'product_id')).toBe('1');
+
+  tabCount = await page.locator('[data-testid="tab"]').count();
+  await clickCellNav(page, 0, 'product_id');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'price')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+  expect(await cellText(page, 0, 'name')).toBe('Widget');
+
+  const orderItemsRowAgain = await findRow(page, ORDER_ITEMS_PATH);
+  await orderItemsRowAgain.dblclick();
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'order_id')).toBeVisible();
+  tabCount = await page.locator('[data-testid="tab"]').count();
+  await clickCellNav(page, 0, 'order_id');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'ordered_at')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+  expect(await cellText(page, 0, 'customer_id')).toBe('1');
 });

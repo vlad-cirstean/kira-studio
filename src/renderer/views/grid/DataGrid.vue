@@ -11,7 +11,8 @@ import {
 import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
-import { openContextMenu } from '../../workbench/state/contextMenu';
+import Codicon from '../../theme/Codicon.vue';
+import { type MenuItem, openContextMenu } from '../../workbench/state/contextMenu';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
   alignmentFor,
@@ -21,7 +22,7 @@ import {
   resolveColumnOrder,
   visibleColumnRange,
 } from './columns';
-import { cellMenu, headerMenu, rowMenu } from './gridMenu';
+import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './gridMenu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
   addInsertRow,
@@ -519,6 +520,48 @@ function rowSnapshot(row: number): RowSnapshot {
   return { columns: [...columnOrder.value], values };
 }
 
+// P7 D3/D5/D7: the single source of truth for a cell's nav affordance — both the button's
+// v-if/icon and its click handler read this, so they can never disagree about what's showing.
+// 'fk' wins over 'pk' when a cell is somehow both (D7); null while editing (D8), before meta has
+// loaded, or when there's nothing navigable.
+function cellNavEntry(
+  row: number,
+  displayCol: number,
+): { kind: 'fk' | 'pk'; items: MenuItem[] } | null {
+  if (isEditing(row, displayCol)) return null;
+  const name = columnOrder.value[displayCol];
+  const meta = rt()?.meta ?? null;
+  const t = tab();
+  if (!name || !meta || !t?.connectionId) return null;
+  const fkCtx = {
+    connectionId: t.connectionId,
+    dialect: dialect.value,
+    rowValues: rowSnapshot(row).values,
+  };
+  const fkItems = foreignKeyNavItems(name, meta, fkCtx).filter(
+    (i) => i.type === 'item' && !i.disabled,
+  );
+  if (fkItems.length) return { kind: 'fk', items: fkItems };
+  const refItems = referencedByItems(name, meta, fkCtx).filter(
+    (i) => i.type === 'item' && !i.disabled,
+  );
+  if (refItems.length) return { kind: 'pk', items: refItems };
+  return null;
+}
+
+// D6: exactly one candidate navigates immediately; more than one opens the same ContextMenu
+// popup the right-click cell menu uses, anchored at the click.
+function onCellNavClick(row: number, displayCol: number, e: MouseEvent): void {
+  const entry = cellNavEntry(row, displayCol);
+  if (!entry) return;
+  if (entry.items.length === 1) {
+    const only = entry.items[0];
+    if (only?.type === 'item') void only.run();
+    return;
+  }
+  openContextMenu(e, entry.items);
+}
+
 // The loaded page's values only for one column (§8.5's own scope boundary) — used by the header
 // menu's "Copy column values".
 function columnValuesFor(displayCol: number): string[] {
@@ -564,6 +607,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
   if (runtimeEntry) runtimeEntry.selection = { kind: 'cell', row, col: displayCol };
   const dc = displayCell(row, displayCol);
   const name = columnOrder.value[displayCol];
+  const t = tab();
   openContextMenu(
     e,
     cellMenu({
@@ -576,6 +620,9 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       canEdit: canEditTable.value,
       isDeleted: isDeleted(row),
       startEdit: () => startEdit(row, displayCol),
+      meta: rt()?.meta ?? null,
+      connectionId: t?.connectionId ?? '',
+      rowValues: rowSnapshot(row).values,
     }),
   );
 }
@@ -884,6 +931,17 @@ defineExpose({ scrollCellIntoView });
               >…</span
             >
           </template>
+          <button
+            v-if="cellNavEntry(r, c)"
+            type="button"
+            class="cell-nav-btn"
+            data-testid="cell-nav-button"
+            :data-nav-kind="cellNavEntry(r, c)?.kind"
+            :aria-label="cellNavEntry(r, c)?.kind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
+            @click.stop="onCellNavClick(r, c, $event)"
+          >
+            <Codicon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="12" />
+          </button>
         </div>
       </div>
 
@@ -1079,6 +1137,37 @@ defineExpose({ scrollCellIntoView });
 
 .grid-cell.pending-edit {
   background: color-mix(in srgb, var(--kira-accent) 18%, transparent);
+}
+
+/* P7 D5/D8: pure-CSS hover/selection affordance, no JS-tracked hover state — mirrors
+   .header-select-zone/.resize-handle's own absolute-inside-absolute precedent above. */
+.cell-nav-btn {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-elevated);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.cell-nav-btn:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+
+.grid-cell:hover .cell-nav-btn,
+.grid-cell.selected .cell-nav-btn {
+  display: flex;
 }
 
 .grid-row.pending-delete {
