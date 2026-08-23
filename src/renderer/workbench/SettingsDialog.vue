@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RowDensity } from '@shared/settings';
+import type { RowDensity, SettingsPatch } from '@shared/settings';
 import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
 import { cacheStatsState } from '../state/cacheStats';
@@ -10,24 +10,28 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import TextField from '../theme/primitives/TextField.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
-// SettingsDialog.html's "Connection colours" swatch row (D18/tokens.css's --kira-conn-*) —
-// display only here; a colour is assigned per connection, in ConnectionDialog.vue/ColorPicker.vue.
-const CONN_COLORS = [
-  'red',
-  'orange',
-  'amber',
-  'olive',
-  'green',
-  'teal',
-  'cyan',
-  'blue',
-  'indigo',
-  'violet',
-  'magenta',
-  'grey',
-] as const;
 
 const emit = defineEmits<{ close: [] }>();
+
+// Cancel reverts to whatever was in effect when the dialog opened — every field otherwise
+// applies immediately (the footer says so), so "cancel" needs a baseline to patch back to
+// rather than an unsaved draft to simply discard.
+// JSON round-trip rather than structuredClone(): settingsState is a Vue reactive proxy, and
+// structuredClone's algorithm throws on a Proxy in this Electron/Chromium build rather than
+// transparently cloning the plain data underneath it.
+const initialSettings: SettingsPatch = JSON.parse(
+  JSON.stringify({
+    appearance: settingsState.appearance,
+    data: settingsState.data,
+    cache: settingsState.cache,
+    advanced: settingsState.advanced,
+  }),
+);
+
+async function onCancel(): Promise<void> {
+  await patchSettings(initialSettings);
+  emit('close');
+}
 
 const sections = ['Appearance', 'Data', 'Cache', 'Advanced'] as const;
 type Section = (typeof sections)[number];
@@ -142,7 +146,7 @@ async function onClearCaches(): Promise<void> {
                 size="md"
                 list="kira-font-families"
                 :model-value="settingsState.appearance.fontFamily"
-                @input="onFontFamilyChange"
+                @change="onFontFamilyChange"
               />
               <datalist id="kira-font-families">
                 <option value="'SF Mono', Menlo, monospace" />
@@ -204,24 +208,6 @@ async function onClearCaches(): Promise<void> {
                   <span class="row-preview-cell row-preview-grow">amari.osei@example.com</span>
                 </div>
               </div>
-            </div>
-
-            <div class="sec-label">Connection colours</div>
-            <div class="field">
-              <span>Palette</span>
-              <div class="swatches">
-                <span
-                  v-for="color in CONN_COLORS"
-                  :key="color"
-                  class="sw"
-                  :style="{ background: `var(--kira-conn-${color})` }"
-                />
-              </div>
-              <span class="helper-text">
-                The twelve colours a connection can be given. Assigned per connection, in its
-                dialog or from its context menu. Where it shows: the group rail in the tree, the
-                rail on a tab, the cap on the view's toolbar, and the dot on an operations row.
-              </span>
             </div>
           </template>
 
@@ -320,15 +306,17 @@ async function onClearCaches(): Promise<void> {
 
     <template #footer>
       <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
-      <Button
-        kind="dialog"
-        variant="primary"
-        class="footer-close"
-        data-testid="settings-close"
-        @click="emit('close')"
-      >
-        Done
-      </Button>
+      <span class="footer-actions">
+        <Button kind="dialog" data-testid="settings-cancel" @click="onCancel">Cancel</Button>
+        <Button
+          kind="dialog"
+          variant="primary"
+          data-testid="settings-close"
+          @click="emit('close')"
+        >
+          Done
+        </Button>
+      </span>
     </template>
   </DialogFrame>
 </template>
@@ -522,22 +510,9 @@ async function onClearCaches(): Promise<void> {
   flex: 1;
 }
 
-/* SettingsDialog.html's swatch row — display only, twelve hues at one lightness/chroma */
-.swatches {
+.footer-actions {
   display: flex;
-  gap: var(--kira-s-2);
-  align-items: center;
-  height: var(--kira-h-md);
-}
-
-.sw {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.footer-close {
+  gap: var(--kira-s-3);
   margin-left: auto;
 }
 </style>

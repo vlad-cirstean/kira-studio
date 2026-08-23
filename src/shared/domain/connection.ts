@@ -23,6 +23,7 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
 };
 
 export const connectionColorSchema = z.enum([
+  'none',
   'red',
   'orange',
   'amber',
@@ -35,7 +36,9 @@ export const connectionColorSchema = z.enum([
   'violet',
   'magenta',
   'grey',
-]); // D18; matches --kira-conn-* in tokens.css
+]); // D18; matches --kira-conn-* in tokens.css. 'none' is a real, stored value (the P16 design
+// system's default — "no colour is the default, the rail slot stays reserved either way") rather
+// than the field being nullable, so no DB/schema change is needed to add it.
 export type ConnectionColor = z.infer<typeof connectionColorSchema>;
 
 export const connectionModeSchema = z.enum(['fields', 'uri']);

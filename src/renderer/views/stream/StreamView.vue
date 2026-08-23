@@ -6,6 +6,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
@@ -41,10 +42,8 @@ const connectionRecord = computed(() =>
     ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
     : undefined,
 );
-const iconColor = computed(() =>
-  connectionRecord.value?.color
-    ? `var(--kira-conn-${connectionRecord.value.color})`
-    : 'var(--kira-fg-muted)',
+const iconColor = computed(
+  () => connColorVar(connectionRecord.value?.color) ?? 'var(--kira-fg-muted)',
 );
 
 const pathPrefix = computed(() =>

@@ -115,35 +115,32 @@ onUnmounted(() => {
       />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
-         single-value picker — <Segmented> only models "exactly one option selected", so it
-         can't represent this without changing behaviour. Left as the hand-rolled .p-seg group
-         (rule 3: correctness over consistency). -->
-    <span class="p-seg">
-      <span
-        :class="{ on: matchCase }"
+         single-value picker, so each is its own icon button rather than a <Segmented> (which
+         only models "exactly one option selected") — the same three codicons VS Code's own
+         find widget uses for this. -->
+    <div class="group">
+      <IconButton
+        icon="case-sensitive"
+        :active="matchCase"
         title="Match case"
         data-testid="search-match-case"
         @click="matchCase = !matchCase"
-      >
-        Case
-      </span>
-      <span
-        :class="{ on: wholeWord }"
+      />
+      <IconButton
+        icon="whole-word"
+        :active="wholeWord"
         title="Whole word"
         data-testid="search-whole-word"
         @click="wholeWord = !wholeWord"
-      >
-        Word
-      </span>
-      <span
-        :class="{ on: regex }"
+      />
+      <IconButton
+        icon="regex"
+        :active="regex"
         title="Regular expression"
         data-testid="search-regex"
         @click="regex = !regex"
-      >
-        Regex
-      </span>
-    </span>
+      />
+    </div>
 
     <div class="sep" />
 
@@ -169,14 +166,7 @@ onUnmounted(() => {
 
 <style scoped>
 .search-toolbar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
   background: var(--kira-bg-elevated);
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  border-bottom: none;
 }
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>

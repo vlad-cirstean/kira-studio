@@ -7,6 +7,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -65,9 +66,7 @@ const connectionColor = computed(() => {
   return connectionsState.records.find((r) => r.id === id)?.color;
 });
 
-const iconColor = computed(() =>
-  connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : 'var(--kira-fg-muted)',
-);
+const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--kira-fg-muted)');
 
 // The view-head's breadcrumb prefix ("connection / database / "): derived from the already
 // loaded connection record and the tab's own path, purely for display — no new state.

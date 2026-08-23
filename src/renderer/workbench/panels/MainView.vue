@@ -11,6 +11,7 @@ import {
   recentTablesState,
 } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import ConsoleTabView from '../../views/console/ConsoleView.vue';
 import DdlTabView from '../../views/ddl/DdlView.vue';
 import DocumentTabView from '../../views/documents/DocumentView.vue';
@@ -35,8 +36,7 @@ function iconFor(entry: RecentTableEntry): string {
 
 function iconColorFor(entry: RecentTableEntry): string {
   if (entry.kind === 'document') {
-    const color = connectionFor(entry)?.color;
-    return color ? `var(--kira-conn-${color})` : 'var(--kira-fg-muted)';
+    return connColorVar(connectionFor(entry)?.color) ?? 'var(--kira-fg-muted)';
   }
   return 'var(--kira-info)';
 }
@@ -116,7 +116,7 @@ function openRecent(entry: RecentTableEntry): void {
           >
             <span
               class="rail-dot"
-              :style="{ background: connectionFor(entry)?.color ? `var(--kira-conn-${connectionFor(entry)?.color})` : 'none' }"
+              :style="{ background: connColorVar(connectionFor(entry)?.color) ?? 'none' }"
             />
             <span class="icon-box" :style="{ color: iconColorFor(entry) }">
               <Codicon :name="iconFor(entry)" :size="13" />

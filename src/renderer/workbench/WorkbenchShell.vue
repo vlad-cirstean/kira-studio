@@ -139,7 +139,7 @@ const gridStyle = computed(() => ({
 }
 
 .tab-strip {
-  height: 32px;
+  height: var(--kira-h-lg);
   flex-shrink: 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);

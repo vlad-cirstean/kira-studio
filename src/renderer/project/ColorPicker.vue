@@ -15,9 +15,10 @@ const colors = connectionColorSchema.options;
       :key="color"
       type="button"
       class="swatch"
-      :class="{ selected: modelValue === color }"
-      :style="{ background: `var(--kira-conn-${color})` }"
-      :aria-label="color"
+      :class="{ selected: modelValue === color, none: color === 'none' }"
+      :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+      :title="color === 'none' ? 'No colour' : color"
+      :aria-label="color === 'none' ? 'No colour' : color"
       role="radio"
       :aria-checked="modelValue === color"
       :data-testid="`color-${color}`"
@@ -51,5 +52,12 @@ const colors = connectionColorSchema.options;
 .swatch.selected {
   outline: 2px solid var(--kira-fg);
   outline-offset: 2px;
+}
+
+/* 'no colour' is a hollow ring rather than a hue, same visual as the tree/tab/toolbar rail's own
+   .p-conn-dot.none — never a 13th hue standing in for "nothing chosen". */
+.swatch.none {
+  border: 1.5px solid var(--kira-fg-disabled);
+  background: transparent;
 }
 </style>

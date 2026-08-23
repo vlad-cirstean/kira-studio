@@ -10,6 +10,7 @@ import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import Segmented from '../../theme/primitives/Segmented.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
@@ -212,7 +213,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
                 <span
                   v-if="connectionFor(item.record)"
                   class="chip"
-                  :style="{ background: `var(--kira-conn-${connectionFor(item.record)?.color})` }"
+                  :style="{ background: connColorVar(connectionFor(item.record)?.color) ?? 'none' }"
                 />
                 <span class="truncate">{{ connectionFor(item.record)?.name ?? '—' }}</span>
               </span>

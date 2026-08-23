@@ -5,6 +5,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
@@ -37,7 +38,7 @@ const rt = computed(() => runtime[props.tab.id]);
 const railStyle = computed(() => {
   const id = props.tab.connectionId;
   const color = id ? connectionsState.records.find((r) => r.id === id)?.color : undefined;
-  return { '--kira-rail': color ? `var(--kira-conn-${color})` : undefined };
+  return { '--kira-rail': connColorVar(color) };
 });
 
 async function onReconnectAndLoad(): Promise<void> {
@@ -94,6 +95,15 @@ function onCloseSearch(): void {
       <div class="p-toolbar-rail" :style="railStyle" />
       <DataToolbar />
       <FilterToolbar />
+      <!-- Below the filter row, not floating over the grid it searches — the "docks at the
+           bottom of the result" placement from Toolbars.html overlapped the last visible row,
+           which read as a bug rather than a search bar. -->
+      <SearchToolbar
+        v-if="rt?.searchOpen"
+        :tab-id="tab.id"
+        @go-to-match="onGoToMatch"
+        @close="onCloseSearch"
+      />
     </div>
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="reconnect-panel">
       <Button kind="dialog" variant="primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
@@ -115,12 +125,6 @@ function onCloseSearch(): void {
       </div>
       <div class="grid-area">
         <DataGrid ref="dataGridRef" :tab-id="tab.id" />
-        <SearchToolbar
-          v-if="rt?.searchOpen"
-          :tab-id="tab.id"
-          @go-to-match="onGoToMatch"
-          @close="onCloseSearch"
-        />
       </div>
     </template>
   </div>

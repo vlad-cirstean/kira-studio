@@ -34,6 +34,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // --- create through the dialog (fields mode) -------------------------------------------
   await page.click('[data-testid="add-connection"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'Test PG');
   await page.fill('[data-testid="connection-host"]', '127.0.0.1');
   await page.fill('[data-testid="connection-port"]', '5432');
@@ -85,6 +86,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
 
   // --- URI mode with an embedded password: stored URI is passwordless, reveal() has it ----
   await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'URI Connection');
   await page.click('[data-testid="mode-uri"]');
   await page.fill(

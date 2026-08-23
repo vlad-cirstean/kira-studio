@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import Codicon from '../theme/Codicon.vue';
+import { connColorVar } from '../theme/connColor';
 import { closeContextMenu, contextMenuState, type MenuItem } from './state/contextMenu';
 
 const SUBMENU_OPEN_DELAY_MS = 150;
@@ -91,7 +92,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
           @click="onItemClick(item)"
         >
           <span class="icon-box">
-            <span v-if="item.swatch" class="swatch" :style="{ background: `var(--kira-conn-${item.swatch})` }" />
+            <span
+              v-if="item.swatch"
+              class="swatch"
+              :class="{ none: item.swatch === 'none' }"
+              :style="{ background: connColorVar(item.swatch) }"
+            />
             <Codicon v-else-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
           </span>
           <span class="label">{{ item.label }}</span>
@@ -119,7 +125,8 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   <span
                     v-if="sub.type === 'item' && sub.swatch"
                     class="swatch"
-                    :style="{ background: `var(--kira-conn-${sub.swatch})` }"
+                    :class="{ none: sub.swatch === 'none' }"
+                    :style="{ background: connColorVar(sub.swatch) }"
                   />
                   <Codicon v-else-if="sub.icon" :name="sub.icon" :size="12" class="item-icon" />
                 </span>
@@ -181,6 +188,10 @@ async function onItemClick(item: MenuItem): Promise<void> {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.swatch.none {
+  border: 1.5px solid var(--kira-fg-disabled);
 }
 
 .label {

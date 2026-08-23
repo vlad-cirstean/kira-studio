@@ -146,6 +146,7 @@ async function createConnection(
 ): Promise<string> {
   await page.click('[data-testid="add-connection"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', opts.name);
   await page.fill('[data-testid="connection-host"]', cfg.host ?? '');
   await page.fill('[data-testid="connection-port"]', String(cfg.port ?? ''));

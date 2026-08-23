@@ -3,6 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { useRunState } from '../../state/runState';
+import { connColorVar } from '../../theme/connColor';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import RunState from '../../theme/primitives/RunState.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
@@ -44,6 +45,7 @@ const runState = useRunState(() => props.tab.id);
     :path="path"
     :name="name"
     :conn-color="connection?.color ?? null"
+    :conn-kind="connection?.kind"
     :target-testid="targetTestid"
     :name-testid="nameTestid"
   >
@@ -53,7 +55,7 @@ const runState = useRunState(() => props.tab.id);
     </template>
   </ViewHeader>
 
-  <div class="p-toolbar-rail" :style="{ '--kira-rail': connection?.color ? `var(--kira-conn-${connection.color})` : undefined }" />
+  <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connection?.color) }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
     <div class="group">
       <IconButton icon="refresh" :size="13" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />

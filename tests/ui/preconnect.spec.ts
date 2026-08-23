@@ -42,6 +42,7 @@ test('preconnect — dialog field, persistence, and failure before connect', asy
   // --- the field is visible in both fields and URI mode -------------------------------------
   await page.click('[data-testid="add-connection"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await page.click('[data-testid="connection-kind-postgres"]');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toHaveCount(0);
   await page.click('[data-testid="mode-uri"]');
@@ -52,6 +53,7 @@ test('preconnect — dialog field, persistence, and failure before connect', asy
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
   await page.click('[data-testid="add-connection"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await page.click('[data-testid="connection-kind-postgres"]');
 
   // --- typing a command shows the warning, saving persists it, editing shows it again --------
   await page.fill('[data-testid="connection-name"]', 'Preconnect Test');

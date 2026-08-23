@@ -3,8 +3,6 @@ import type { DataTabState } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
@@ -293,29 +291,27 @@ function onDiscard(): void {
     <div class="sep" />
 
     <div class="group">
-      <Button
-        class="count-button"
+      <IconButton
+        icon="symbol-number"
         data-testid="toolbar-count"
-        :class="{ stale: rt?.count?.stale }"
-        title="Count all"
+        :count="rt?.count ? `${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}` : undefined"
+        :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
+        :title="
+          rt?.count
+            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
+            : 'Count all rows'
+        "
         @click="onCount"
-      >
-        <span v-if="rt?.count">
-          Σ {{ rt.count.value.toLocaleString() }}<span v-if="!rt.count.exact">~</span>
-          <Codicon v-if="rt.count.stale" name="refresh" :size="11" />
-        </span>
-        <span v-else>Σ count all</span>
-      </Button>
+      />
 
       <div class="columns-anchor">
-        <Button
+        <IconButton
           icon="list-selection"
           data-testid="toolbar-columns"
           :count="columnCountLabel ?? undefined"
+          title="Columns"
           @click="columnsOpen = !columnsOpen"
-        >
-          Columns
-        </Button>
+        />
         <ColumnsMenu
           v-if="columnsOpen"
           :tab-id="tab.id"
@@ -325,15 +321,13 @@ function onDiscard(): void {
       </div>
 
       <div class="preview-anchor">
-        <Button
-          icon="code"
+        <IconButton
+          icon="eye"
           data-testid="toolbar-preview-command"
           :disabled="!isWritable"
           :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
           @click="previewOpen = !previewOpen"
-        >
-          Preview SQL
-        </Button>
+        />
         <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
       </div>
     </div>
@@ -341,24 +335,20 @@ function onDiscard(): void {
     <div class="sep" />
 
     <div class="group">
-      <Button
+      <IconButton
         icon="add"
         data-testid="toolbar-add-row"
         :disabled="!isWritable"
         :title="isWritable ? 'Add a row' : 'Connection is read-only'"
         @click="onAddRow"
-      >
-        Add row
-      </Button>
-      <Button
+      />
+      <IconButton
         icon="trash"
         data-testid="toolbar-delete-row"
         :disabled="!isWritable"
         :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
         @click="onDeleteRow"
-      >
-        Delete row
-      </Button>
+      />
       <IconButton
         icon="search"
         title="Search this page"
@@ -371,25 +361,21 @@ function onDiscard(): void {
          accent-filled control on the whole screen. -->
     <div v-if="tabHasPending" class="group p-push">
       <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
-      <Button
+      <IconButton
         icon="discard"
         data-testid="toolbar-discard-changes"
         :disabled="!isWritable"
         title="Discard pending changes"
         @click="onDiscard"
-      >
-        Revert
-      </Button>
-      <Button
+      />
+      <IconButton
         icon="save"
-        variant="primary"
+        tone="primary"
         data-testid="toolbar-commit-changes"
         :disabled="!isWritable"
         title="Commit pending changes"
         @click="onCommit"
-      >
-        Commit
-      </Button>
+      />
     </div>
   </div>
 </template>
@@ -432,10 +418,6 @@ function onDiscard(): void {
 .p-seg > button.active {
   background: var(--kira-bg-input);
   color: var(--kira-fg);
-}
-
-.count-button.stale {
-  color: var(--kira-warn);
 }
 
 .p-iconbtn.is-live {

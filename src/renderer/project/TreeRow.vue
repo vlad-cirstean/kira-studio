@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import { connectionsState } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
+import { connColorVar } from '../theme/connColor';
+import EngineIcon from '../theme/EngineIcon.vue';
 import ErrorPopover from './ErrorPopover.vue';
 import { columnTypeIcon, nodeIcon } from './icons';
 import type { TreeRowVm } from './state/tree';
@@ -81,7 +83,7 @@ function onContextMenu(e: MouseEvent): void {
     @dblclick="onDblClick"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <div class="p-tree-rail" :style="{ '--kira-rail': railColor ? `var(--kira-conn-${railColor})` : undefined }" />
+    <div class="p-tree-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
 
     <button
       type="button"
@@ -97,7 +99,10 @@ function onContextMenu(e: MouseEvent): void {
     <span v-if="row.kind === 'connection'" class="icon-box">
       <span class="status-dot" :data-status="row.status" :title="statusTitle" />
     </span>
-    <Codicon v-else :name="icon" :size="14" class="node-icon" />
+    <span v-if="connectionKind" class="icon-box">
+      <EngineIcon :kind="connectionKind" :size="14" />
+    </span>
+    <Codicon v-else-if="row.kind !== 'connection'" :name="icon" :size="14" class="node-icon" />
 
     <span class="label" :title="row.name">
       <template v-for="(part, i) in parts" :key="i">
@@ -106,8 +111,7 @@ function onContextMenu(e: MouseEvent): void {
       </template>
     </span>
 
-    <span v-if="connectionKind" class="p-badge p-push">{{ connectionKind }}</span>
-    <span v-else-if="row.badges?.length" class="badges">
+    <span v-if="row.badges?.length" class="badges">
       <span v-for="badge in row.badges" :key="badge" class="badge">{{ badge }}</span>
     </span>
 

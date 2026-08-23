@@ -61,10 +61,10 @@ const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
 
 // P16 design system: NewConnection.html (step 1, pick the engine) and ConnectionDialog.html
 // (step 2, only that engine's fields) are two mockups for this one dialog — both steps live
-// here. The fields step stays the default entry (unchanged from before the redesign) and the
-// engine grid is reached through "Change engine"; the kind is settled there, not by a dropdown
-// on step 2.
-const step = ref<'engine' | 'details'>('details');
+// here. A brand-new connection starts at the engine picker (FirstRun.html's "one door, no
+// vestibule" — nothing is assumed until an engine is chosen); editing an existing one starts
+// on its fields directly, reaching the picker only through "Change engine".
+const step = ref<'engine' | 'details'>(isEdit.value ? 'details' : 'engine');
 const engineSearch = ref('');
 
 const showPassword = ref(false);

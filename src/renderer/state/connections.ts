@@ -54,7 +54,7 @@ export function defaultDraft(): ConnectionInput {
   return {
     name: '',
     kind: 'postgres',
-    color: 'blue',
+    color: 'none',
     mode: 'fields',
     readOnly: false,
     host: '',

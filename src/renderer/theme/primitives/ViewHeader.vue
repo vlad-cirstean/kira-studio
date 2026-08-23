@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { ConnectionColor } from '@shared/domain/connection';
+import type { ConnectionColor, ConnectionKind } from '@shared/domain/connection';
 import { computed } from 'vue';
 import Codicon from '../Codicon.vue';
+import { connColorVar } from '../connColor';
+import EngineIcon from '../EngineIcon.vue';
 
 // P16 design system: "every non-grid view opens with this" 28px identity band — a connection
 // dot, an icon, a target (optional dimmed path prefix + name), then badges, then a trailing
@@ -13,6 +15,9 @@ const props = defineProps<{
   path?: string;
   name: string;
   connColor?: ConnectionColor | null;
+  /** The connection's engine — every data view's target starts with this, ahead of the
+   * view-specific object icon, so which vendor a tab belongs to is never a guess. */
+  connKind?: ConnectionKind;
   // Per-view data-testid hooks: several views assert on the target text via a Playwright
   // data-testid that predates this shared component. targetTestid covers the whole
   // path+name span (most views); nameTestid scopes to just the name when a view's test
@@ -21,14 +26,16 @@ const props = defineProps<{
   nameTestid?: string;
 }>();
 
-const railStyle = computed(() => ({
-  '--kira-rail': props.connColor ? `var(--kira-conn-${props.connColor})` : undefined,
-}));
+const railStyle = computed(() => ({ '--kira-rail': connColorVar(props.connColor) }));
+const isNoColor = computed(() => !props.connColor || props.connColor === 'none');
 </script>
 
 <template>
   <div class="p-view-head">
-    <span v-if="connColor !== undefined" class="p-conn-dot" :class="{ none: !connColor }" :style="railStyle" />
+    <span v-if="connColor !== undefined" class="p-conn-dot" :class="{ none: isNoColor }" :style="railStyle" />
+    <span v-if="connKind" class="icon-box">
+      <EngineIcon :kind="connKind" :size="14" />
+    </span>
     <span class="icon-box" :style="iconColor ? { color: iconColor } : undefined">
       <Codicon :name="icon" :size="14" />
     </span>

@@ -6,6 +6,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
@@ -50,9 +51,7 @@ const connRecord = computed(() =>
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
 const connColor = computed(() => connRecord.value?.color);
-const iconColor = computed(() =>
-  connColor.value ? `var(--kira-conn-${connColor.value})` : 'var(--kira-info)',
-);
+const iconColor = computed(() => connColorVar(connColor.value) ?? 'var(--kira-info)');
 
 // The view header's breadcrumb: "connection / dbN / ". Redis's tree always roots a key's path
 // at its `database` segment (see redis/catalog.ts), so this reads existing path structure —
@@ -121,11 +120,13 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+// "row(s)" doesn't fit a keyspace — these are keys/fields, not table rows — and cursor-based
+// pagination (the SCAN family) has no absolute "1-14 of 14" range to show, so this mirrors
+// DocumentView's own "N loaded / of ~ total" pattern instead of Main.html's literal range.
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
-  const parts: string[] = [];
-  parts.push(`${r.rowCount} row${r.rowCount === 1 ? '' : 's'} on this page`);
+  const parts: string[] = [`${r.rowCount.toLocaleString()} loaded`];
   if (r.count) {
     parts.push(`${r.count.exact ? '' : '~'}${r.count.value.toLocaleString()} total`);
   }

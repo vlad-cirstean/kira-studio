@@ -17,6 +17,7 @@ import {
   tabsState,
 } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import { connColorVar } from '../../theme/connColor';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import { openContextMenu } from '../state/contextMenu';
 
@@ -125,7 +126,7 @@ const tabs = computed(() => tabsState.tabs);
       :data-tab-kind="tab.kind"
       :data-active="tab.active"
       :data-color="colorFor(tab)"
-      :style="{ '--kira-rail': colorFor(tab) ? `var(--kira-conn-${colorFor(tab)})` : undefined }"
+      :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
       @click="onClick(tab)"
       @auxclick.middle="onMiddleClick(tab)"
       @contextmenu.prevent="onContextMenu($event, tab)"
@@ -169,16 +170,23 @@ const tabs = computed(() => tabsState.tabs);
   padding: 2px 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
+  /* Scrolls with too many tabs open, but stays a tab strip, not a scroll pane — no visible
+     scrollbar (still scrollable via trackpad/shift-wheel/drag). */
+  scrollbar-width: none;
+}
+
+.tab-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--kira-s-2);
   flex-shrink: 0;
-  height: 24px;
+  height: var(--kira-h-md);
   max-width: 220px;
-  padding: 0 8px 0 6px;
+  padding: 0 var(--kira-s-3);
   border: var(--kira-border-width) solid transparent;
   border-radius: var(--kira-radius-sm);
   background: transparent;

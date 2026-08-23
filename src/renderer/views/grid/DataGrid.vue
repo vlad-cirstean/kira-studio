@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import {
   clearSelectedCellFor,
@@ -79,6 +79,19 @@ const totalWidth = computed(() => offsets.value[offsets.value.length - 1] ?? 0);
 
 const pending = computed(() => pendingFor(props.tabId));
 const insertRows = computed(() => pending.value?.inserts ?? []);
+
+// "Add row" appends a synthetic row past the last real one, out of view whenever the page is
+// more than a screenful — scroll it into view the same way search's goToMatch does, rather than
+// leaving the user to notice a new row was added below the fold.
+watch(
+  () => insertRows.value.length,
+  (count, previousCount) => {
+    if (count > previousCount) {
+      const newRowIndex = (page.value?.rowCount ?? 0) + count - 1;
+      void nextTick(() => scrollCellIntoView(newRowIndex, 0));
+    }
+  },
+);
 
 const hasPrimaryKey = computed(() => page.value?.columns.some((c) => c.isPrimaryKey) ?? false);
 
@@ -941,6 +954,7 @@ defineExpose({ scrollCellIntoView });
             'search-match-current': isCurrentSearchMatch(r, c),
             'pending-edit': displayCell(r, c).staged,
             fk: isForeignKeyDisplayCol(c) && !displayCell(r, c).isNull,
+            'has-nav': !!cellNavEntry(r, c),
           }"
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
@@ -1179,6 +1193,12 @@ defineExpose({ scrollCellIntoView });
 
 .grid-cell.fk {
   color: var(--kira-info);
+}
+
+/* The nav button only shows on hover/selected, but the text always truncates before its slot —
+   otherwise it's only "over the text" once you're already hovering to click it. */
+.grid-cell.has-nav {
+  padding-right: calc(var(--kira-s-4) + 18px);
 }
 
 .grid-cell.selected {
