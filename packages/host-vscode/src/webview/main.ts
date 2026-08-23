@@ -23,6 +23,8 @@ declare function acquireVsCodeApi<T = unknown>(): {
 interface Bootstrap {
   readonly host: "vscode";
   readonly contractVersion: number;
+  /** `KIRA_REPO`, forwarded through `html.ts`'s bootstrap island — dev/e2e only, see there. */
+  readonly repo: string | null;
 }
 
 function readBootstrap(): Bootstrap {
@@ -70,9 +72,19 @@ if (!container) throw new Error("webview: #app container missing from html.ts's 
 
 const vscodeApi = acquireVsCodeApi();
 const bootstrap = readBootstrap();
+const viewState = new VsCodeApiViewStateStore(vscodeApi);
+
+// There is no repo-picker UI yet (P4+), so on a genuinely first-ever resolve (no state
+// `setState` has ever recorded for this view) `KIRA_REPO` is the only way to get a repo open —
+// mirrors `apps/harness/src/main.ts`'s own `setRaw` seeding. A *later* resolve (the webview is
+// destroyed and recreated on every hide/reveal, §2.1) must never re-seed over real persisted
+// state — that would defeat the rehydration this same state exists to prove.
+if (bootstrap.repo && !viewState.read()) {
+  viewState.write({ version: 1, repoId: bootstrap.repo, loadedRows: 0, detailOpen: true });
+}
 
 mount(container, {
   transport: createRpcClient(createVsCodeChannel(vscodeApi)),
-  viewState: new VsCodeApiViewStateStore(vscodeApi),
+  viewState,
   host: bootstrap.host,
 });

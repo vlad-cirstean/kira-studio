@@ -83,7 +83,16 @@ export function renderHtml(opts: RenderHtmlOptions): string {
   const distUi = vscode.Uri.joinPath(extensionUri, "..", "..", "dist", "ui");
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
-  const bootstrap = { host: "vscode" as const, contractVersion: CONTRACT_VERSION };
+  // `KIRA_REPO` (`packages/host-electron/src/main/index.ts`'s own doc comment): the same
+  // dev/e2e-only convenience, extended here since P3 has no repo-picker UI on this host either.
+  // Electron carries it through `loadFile`'s `query` option because its HTML is a static file
+  // (W13); this host already rebuilds its document — and this bootstrap island — on every
+  // resolve, so the env var travels through the island instead.
+  const bootstrap = {
+    host: "vscode" as const,
+    contractVersion: CONTRACT_VERSION,
+    repo: process.env["KIRA_REPO"] ?? null,
+  };
 
   const styleLinks = assets.styleUris
     .map((uri) => `<link rel="stylesheet" href="${uri.toString()}">`)

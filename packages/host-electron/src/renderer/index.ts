@@ -117,15 +117,23 @@ window.kiraBridge.onPort(async () => {
   const { settings } = await transport.request("app.init", {});
   watchThemeKind(transport, settings);
 
-  mount(container, {
-    transport,
-    // P3 has no scenario where this window is unmounted and remounted within a session — a
-    // `BrowserWindow` is not hidden/recreated the way a VS Code webview is — so there is
-    // nothing real to rehydrate yet. A `Storage`-backed store (docs/plans/P3.md's W9 text:
-    // "an Electron one over the Storage port through the bridge") is the natural next step
-    // once a reload or relaunch flow gives it something to prove; mirrors host-vscode's own
-    // Storage-port omission (W10).
-    viewState: new InMemoryViewStateStore(),
-    host: "electron",
-  });
+  // P3 has no scenario where this window is unmounted and remounted within a session — a
+  // `BrowserWindow` is not hidden/recreated the way a VS Code webview is — so there is
+  // nothing real to rehydrate yet. A `Storage`-backed store (docs/plans/P3.md's W9 text:
+  // "an Electron one over the Storage port through the bridge") is the natural next step
+  // once a reload or relaunch flow gives it something to prove; mirrors host-vscode's own
+  // Storage-port omission (W10).
+  const viewState = new InMemoryViewStateStore();
+
+  // `main/index.ts`'s `KIRA_REPO` dev/e2e hook (W15): when set, main appends `?repo=<path>` to
+  // this static HTML's own URL via `loadFile`'s `query` option. Pre-seeding the same
+  // `PersistedViewState` shape the harness's `main.ts` uses exploits `App.vue`'s existing
+  // `bootstrap()` logic to auto-open it — there is no repo-picker UI yet (P4+) to do this any
+  // other way.
+  const initialRepoPath = new URLSearchParams(location.search).get("repo");
+  if (initialRepoPath) {
+    viewState.setRaw({ version: 1, repoId: initialRepoPath, loadedRows: 0, detailOpen: true });
+  }
+
+  mount(container, { transport, viewState, host: "electron" });
 });

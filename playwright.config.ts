@@ -50,6 +50,13 @@ export default defineConfig({
       testMatch: "vscode/**/*.spec.ts",
     },
   ],
+  // Stays at the config root rather than under the `harness` project: `@playwright/test@1.62.1`
+  // (the version this repo pins) only declares `webServer` on the top-level `TestConfig`, not on
+  // `TestProject` — confirmed by reading its own shipped `types/test.d.ts`, which has no
+  // `webServer` member on any project-shaped interface. It only ever starts a server the
+  // `electron`/`vscode` projects don't reach (neither loads `http://localhost:5173`), so this is
+  // the closest correct equivalent to W15's "move it under harness" instruction until a
+  // Playwright version that supports per-project `webServer` is pinned.
   webServer: {
     command: "bun run --filter '@kira-version/harness' dev",
     url: "http://localhost:5173",

@@ -169,11 +169,22 @@ export function renderPalettesCss(
   palettes: Readonly<Record<ThemeKindKey, Readonly<Record<string, string>>>>,
   vsCodeVersion: string,
 ): string {
+  // `renderer/index.ts` stamps the resolved kind as a class on `<body>` (matching the classes
+  // real VS Code itself stamps there, per `vscode-tokens.css`'s own comment) — but every
+  // `--kv-*` consumer in `vscode-tokens.css` reads its `--vscode-*` source through a `var()`
+  // written on `:root`. CSS custom-property substitution resolves a `var()` using the value
+  // visible *at the element carrying the declaration*, then that one resolved value is what
+  // inherits down — so a `--vscode-editor-background` declared only on `body` is invisible to
+  // `:root`'s own `--kv-app-bg: var(--vscode-editor-background, #1e1e1e)`, which freezes to the
+  // fallback regardless of body's class (confirmed the hard way: P3 W15's electron e2e spec
+  // read a fallback colour under both a real light and a real dark body class until this
+  // selector changed). `:root:has(body.vscode-dark)` puts the declaration back on `:root` — the
+  // element every `--kv-*` var() actually reads from — while keying off the same body class.
   const SELECTORS: Record<ThemeKindKey, string> = {
-    dark: "body.vscode-dark",
-    light: "body.vscode-light",
-    "high-contrast": "body.vscode-high-contrast",
-    "high-contrast-light": "body.vscode-high-contrast-light",
+    dark: ":root:has(body.vscode-dark)",
+    light: ":root:has(body.vscode-light)",
+    "high-contrast": ":root:has(body.vscode-high-contrast)",
+    "high-contrast-light": ":root:has(body.vscode-high-contrast-light)",
   };
 
   const blocks = (Object.keys(THEME_FILES) as ThemeKindKey[]).map((kind) => {

@@ -13,6 +13,7 @@
  * them live (docs/plans/P3.md's W11 text: "the settings *UI* has no phase yet and is not
  * invented here").
  */
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { coerceSettings, SETTINGS, type SettingKey, type Settings } from "@kira-version/core";
@@ -48,6 +49,18 @@ const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 const PRELOAD_PATH = fileURLToPath(new URL("./preload.cjs", import.meta.url));
 const RENDERER_HTML_PATH = fileURLToPath(
   new URL("../ui/host-electron/src/renderer/index.html", import.meta.url),
+);
+/** `scripts/gen-theme-palettes.ts`'s output (W12) — a plain source-tree CSS file, not something
+ *  Vite bundles: `renderer/index.html` is static per build (W13), but this file is meant to be
+ *  regenerated (and picked up) without a rebuild whenever a developer reruns `gen:theme-palettes`
+ *  against a newer VS Code, so it is read from disk at startup instead. It genuinely may not
+ *  exist — the generator itself only ever produces it against a real VS Code install (its own
+ *  `--check` mode already tolerates that absence, see there) — in which case `vscode-tokens.css`'s
+ *  own `var(--vscode-*, fallback)` chain is exactly what carries the window through with no
+ *  palette override at all, not a bug to route around here.
+ */
+const PALETTE_CSS_PATH = fileURLToPath(
+  new URL("../../packages/host-electron/src/theme/palettes.generated.css", import.meta.url),
 );
 
 function readRawSettings(storage: ElectronStorage): Record<string, unknown> {
@@ -179,6 +192,9 @@ async function main(): Promise<void> {
 
   window.webContents.once("did-finish-load", () => {
     if (!window) return;
+    if (existsSync(PALETTE_CSS_PATH)) {
+      void window.webContents.insertCSS(readFileSync(PALETTE_CSS_PATH, "utf8"));
+    }
     const { port1, port2 } = new MessageChannelMain();
     const channel = createMainChannel(port1);
     const handlers = createRepoHandlers({
@@ -195,7 +211,16 @@ async function main(): Promise<void> {
     window.once("closed", () => server.dispose());
   });
 
-  await window.loadFile(RENDERER_HTML_PATH);
+  // Dev/e2e convenience, not a feature: there is no repo-picker UI yet (P4+), so without this
+  // the window has nothing to show. `renderer/index.html` is a static file (W13), so the value
+  // travels the same way the harness's own `?scenario=` does — a query string on `loadFile` —
+  // rather than needing a fourth `contextBridge` member (W11's `kiraBridge` is deliberately
+  // exactly three) or a change to W1's sealed contract.
+  const initialRepoPath = process.env["KIRA_REPO"];
+  await window.loadFile(
+    RENDERER_HTML_PATH,
+    initialRepoPath ? { query: { repo: initialRepoPath } } : undefined,
+  );
 }
 
 void main();
