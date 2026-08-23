@@ -13,11 +13,23 @@ import {
   closeTab,
   closeToTheRight,
   duplicateTab,
+  openConsoleTab,
   tabsState,
 } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { openContextMenu } from '../state/contextMenu';
-import EmptyState from './EmptyState.vue';
+
+// The tabstrip's own "New console" button (Empty.html/FirstRun.html: it stays visible even
+// with no tabs open) targets the first connected connection — there is no active tab to infer
+// one from once every tab has closed.
+const firstConnectedId = computed(
+  () =>
+    connectionsState.records.find((r) => connectionsState.states[r.id]?.status === 'connected')?.id,
+);
+
+function onNewConsole(): void {
+  if (firstConnectedId.value) openConsoleTab(firstConnectedId.value, '');
+}
 
 function colorFor(tab: TabRecord): string | undefined {
   return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;
@@ -112,11 +124,12 @@ const tabs = computed(() => tabsState.tabs);
       :data-tab-kind="tab.kind"
       :data-active="tab.active"
       :data-color="colorFor(tab)"
-      :style="{ '--tab-color': `var(--kira-conn-${colorFor(tab)})` }"
+      :style="{ '--kira-rail': colorFor(tab) ? `var(--kira-conn-${colorFor(tab)})` : undefined }"
       @click="onClick(tab)"
       @auxclick.middle="onMiddleClick(tab)"
       @contextmenu.prevent="onContextMenu($event, tab)"
     >
+      <span class="p-tab-rail" />
       <Codicon :name="iconFor(tab)" :size="13" class="tab-icon" />
       <span class="tab-title">{{ tabTitle(tab) }}</span>
       <span
@@ -130,7 +143,21 @@ const tabs = computed(() => tabsState.tabs);
       </span>
     </button>
   </div>
-  <EmptyState v-else icon="list-flat" label="No tabs open" />
+  <!-- Empty.html: with no tab open the strip is not hidden — it keeps its height and shows
+       the one control that still applies, so the layout does not jump the moment the first
+       tab appears. -->
+  <div v-else class="tab-strip is-empty" data-testid="tab-strip-empty">
+    <span class="p-sm dim empty-label">No tabs open</span>
+    <button
+      type="button"
+      class="p-iconbtn p-push"
+      title="New console"
+      :disabled="!firstConnectedId"
+      @click="onNewConsole"
+    >
+      <Codicon name="add" :size="14" />
+    </button>
+  </div>
 </template>
 
 <style scoped>
@@ -163,7 +190,7 @@ const tabs = computed(() => tabsState.tabs);
 .tab.active {
   background: var(--kira-bg-elevated);
   color: var(--kira-fg);
-  border-color: var(--tab-color, var(--kira-border));
+  border-color: var(--kira-border-strong);
 }
 
 .tab:hover:not(.active) {
@@ -199,5 +226,13 @@ const tabs = computed(() => tabsState.tabs);
 
 .tab-close:hover {
   background: var(--kira-hover);
+}
+
+.tab-strip.is-empty {
+  padding: 0 var(--kira-s-2);
+}
+
+.empty-label {
+  padding-left: var(--kira-s-2);
 }
 </style>

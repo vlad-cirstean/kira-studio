@@ -4,20 +4,21 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SearchBox from '../../project/SearchBox.vue';
 import { connectionsState, openCreateDialog } from '../../state/connections';
 import Codicon from '../../theme/Codicon.vue';
-import EmptyState from './EmptyState.vue';
 </script>
 
 <template>
   <div class="flex h-full flex-col">
-    <div class="border-border flex items-center justify-between border-b px-2 py-1 text-xs">
-      <span>Project</span>
+    <div class="p-panel-head">
+      <span>Connections</span>
       <button
         type="button"
+        class="p-iconbtn p-push"
         aria-label="Add connection"
+        title="New connection"
         data-testid="add-connection"
         @click="openCreateDialog"
       >
-        <Codicon name="add" />
+        <Codicon name="add" :size="14" />
       </button>
     </div>
     <template v-if="connectionsState.records.length > 0">
@@ -26,24 +27,30 @@ import EmptyState from './EmptyState.vue';
         <ProjectTree />
       </div>
     </template>
-    <div v-else class="min-h-0 flex-1">
-      <EmptyState icon="database" label="No connections">
-        <button type="button" class="new-connection-link" @click="openCreateDialog">
-          New connection
-        </button>
-      </EmptyState>
+    <!-- FirstRun.html's side-empty: says what the panel is for, nothing more — the headline
+         already lives on the main start page, so it is not repeated here. -->
+    <div v-else class="side-empty">
+      <span class="dim"><Codicon name="database" :size="24" /></span>
+      <span class="p-xs dim side-empty-text">Everything you connect to<br />shows up here.</span>
     </div>
     <FiltersDialog />
   </div>
 </template>
 
 <style scoped>
-.new-connection-link {
-  background: transparent;
-  border: none;
-  color: var(--kira-accent);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0;
+.side-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kira-s-4);
+  padding: var(--kira-s-6);
+  text-align: center;
+}
+
+.side-empty-text {
+  line-height: 1.5;
 }
 </style>

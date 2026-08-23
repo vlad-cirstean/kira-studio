@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { connectionsState } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
 import ErrorPopover from './ErrorPopover.vue';
 import { columnTypeIcon, nodeIcon } from './icons';
@@ -21,6 +22,21 @@ const icon = computed(() => {
 const statusTitle = computed(() => {
   if (props.row.kind !== 'connection') return undefined;
   return props.row.statusDetail ?? undefined;
+});
+
+// P16 design system LAW: the connection colour is a 2px rail running the length
+// of the connection's whole group in the tree, not a badge on one row — so it
+// is looked up per-row from the connection record (row.color is only ever set
+// on the connection row itself) and drawn at every depth.
+const railColor = computed(
+  () => connectionsState.records.find((r) => r.id === props.row.connectionId)?.color,
+);
+
+// The connection row's own kind ("postgres", "mongodb", ...), shown as a badge
+// instead of a second icon — the state dot already occupies the icon-box slot.
+const connectionKind = computed(() => {
+  if (props.row.kind !== 'connection') return undefined;
+  return connectionsState.records.find((r) => r.id === props.row.connectionId)?.kind;
 });
 
 function highlightParts(): { text: string; hit: boolean }[] {
@@ -65,7 +81,7 @@ function onContextMenu(e: MouseEvent): void {
     @dblclick="onDblClick"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <div v-if="row.depth === 0" class="color-rail" :style="{ background: `var(--kira-conn-${row.color})` }" />
+    <div class="p-tree-rail" :style="{ '--kira-rail': railColor ? `var(--kira-conn-${railColor})` : undefined }" />
 
     <button
       type="button"
@@ -78,9 +94,10 @@ function onContextMenu(e: MouseEvent): void {
       <Codicon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
     </button>
 
-    <span v-if="row.kind === 'connection'" class="status-dot" :data-status="row.status" :title="statusTitle" />
-
-    <Codicon :name="icon" :size="14" class="node-icon" />
+    <span v-if="row.kind === 'connection'" class="icon-box">
+      <span class="status-dot" :data-status="row.status" :title="statusTitle" />
+    </span>
+    <Codicon v-else :name="icon" :size="14" class="node-icon" />
 
     <span class="label" :title="row.name">
       <template v-for="(part, i) in parts" :key="i">
@@ -89,7 +106,8 @@ function onContextMenu(e: MouseEvent): void {
       </template>
     </span>
 
-    <span v-if="row.badges?.length" class="badges">
+    <span v-if="connectionKind" class="p-badge p-push">{{ connectionKind }}</span>
+    <span v-else-if="row.badges?.length" class="badges">
       <span v-for="badge in row.badges" :key="badge" class="badge">{{ badge }}</span>
     </span>
 
@@ -103,12 +121,12 @@ function onContextMenu(e: MouseEvent): void {
   height: var(--kira-row-height);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-right: 8px;
+  gap: var(--kira-s-2);
+  padding-right: var(--kira-s-4);
   position: relative;
   cursor: default;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--kira-t-md);
   user-select: none;
 }
 
@@ -118,14 +136,6 @@ function onContextMenu(e: MouseEvent): void {
 
 .tree-row.selected {
   background: var(--kira-select);
-}
-
-.color-rail {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
 }
 
 .twisty {

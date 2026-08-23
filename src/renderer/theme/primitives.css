@@ -1,0 +1,640 @@
+/* P16 design system (docs/design/kira-design-system) translated into reusable
+   classes on the real token set (tokens.css), so every view consumes the same
+   thirteen primitives and composition laws instead of redefining its own
+   button/input/row/toolbar. Ported 1:1 from parts/_style.css's P1-P12 and its
+   named LAWs — see that file for the rationale behind each measurement. */
+
+.mono {
+  font-family: var(--kira-font-family);
+}
+.muted {
+  color: var(--kira-fg-muted);
+}
+.dim {
+  color: var(--kira-fg-disabled);
+}
+.p-sm {
+  font-size: var(--kira-t-sm);
+}
+.p-xs {
+  font-size: var(--kira-t-xs);
+}
+.p-push {
+  margin-left: auto;
+}
+.icon-box {
+  width: var(--kira-icon-box);
+  height: var(--kira-icon-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ---------- P1 icon button ---------- */
+.p-iconbtn {
+  height: var(--kira-h-sm);
+  width: var(--kira-h-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.p-iconbtn:hover,
+.p-iconbtn.is-hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+.p-iconbtn.is-active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+.p-iconbtn:disabled,
+.p-iconbtn.is-disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+
+/* ---------- P2 text button ---------- */
+.p-btn {
+  height: var(--kira-h-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.p-btn:hover,
+.p-btn.is-hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+.p-btn.is-active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+.p-btn.primary {
+  background: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+.p-btn:disabled,
+.p-btn.is-disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+
+/* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
+.p-dlgbtn {
+  height: var(--kira-h-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-5);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+}
+.p-dlgbtn.primary {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+.p-dlgbtn:disabled,
+.p-dlgbtn.is-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- P4 input ---------- */
+.p-input {
+  height: var(--kira-h-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-sm);
+}
+.p-input.md {
+  height: var(--kira-h-md);
+}
+.p-input.ui {
+  font-family: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+}
+.p-input:focus-within,
+.p-input.is-focus {
+  border-color: var(--kira-focus);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -2px;
+}
+.p-input input {
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+  flex: 1;
+}
+.p-input .ph,
+.p-input input::placeholder {
+  color: var(--kira-fg-disabled);
+}
+
+/* ---------- P5 select ---------- */
+.p-select {
+  height: var(--kira-h-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.p-select.bordered {
+  height: var(--kira-h-md);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
+}
+
+/* ---------- P6 segmented ---------- */
+.p-seg {
+  display: inline-flex;
+  height: var(--kira-h-sm);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.p-seg.md {
+  height: var(--kira-h-md);
+}
+.p-seg > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--kira-s-3);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  border: none;
+  background: none;
+}
+.p-seg > * + * {
+  border-left: var(--kira-border-width) solid var(--kira-border-strong);
+}
+.p-seg > .on {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+
+/* ---------- P7 tab ---------- */
+.p-tab {
+  height: var(--kira-h-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid transparent;
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  max-width: 210px;
+  flex-shrink: 0;
+}
+.p-tab.is-active {
+  background: var(--kira-bg-elevated);
+  border-color: var(--kira-border-strong);
+  color: var(--kira-fg);
+}
+
+/* ---------- P8 row ---------- */
+.p-row {
+  height: var(--kira-h-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-md);
+  cursor: pointer;
+}
+.p-row:hover,
+.p-row.is-hover {
+  background: var(--kira-hover);
+}
+.p-row.is-selected {
+  background: var(--kira-select);
+}
+
+/* ---------- P9 badge / count / chip ---------- */
+.p-badge {
+  height: var(--kira-h-xs);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg-muted);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.p-count {
+  min-width: var(--kira-h-xs);
+  height: var(--kira-h-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: var(--kira-radius-pill);
+  background: var(--kira-badge);
+  color: #f0f0f0;
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+}
+.p-chip {
+  height: var(--kira-h-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-pill);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.p-chip.warn {
+  background: rgba(204, 167, 0, 0.16);
+  color: var(--kira-warn);
+}
+.p-chip.err {
+  background: rgba(241, 76, 76, 0.16);
+  color: var(--kira-error);
+}
+.p-chip.ok {
+  background: rgba(35, 209, 139, 0.14);
+  color: var(--kira-ok);
+}
+.p-chip.info {
+  background: rgba(55, 148, 255, 0.16);
+  color: var(--kira-info);
+}
+
+/* ---------- P10 status-bar item ---------- */
+.p-status {
+  height: var(--kira-h-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.p-status.is-on {
+  background: var(--kira-bg-input);
+}
+.p-status:hover,
+.p-status.is-hover {
+  background: var(--kira-hover);
+}
+
+/* ---------- P11 floating surface (menu / dialog / popover) ---------- */
+.p-float {
+  background: var(--kira-bg-elevated);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius);
+  box-shadow: var(--kira-shadow-dialog);
+  overflow: hidden;
+}
+.p-menu-label {
+  height: var(--kira-h-xs);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.p-sep {
+  height: var(--kira-border-width);
+  background: var(--kira-border-strong);
+  margin: var(--kira-s-2) 0;
+}
+
+/* ---------- P12 panel ---------- */
+.p-panel {
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  background: var(--kira-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.p-panel-head {
+  height: var(--kira-h-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- LAW: a toolbar is 28px, holds only h-sm controls ---------- */
+.p-toolbar {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-toolbar.last {
+  border-bottom: none;
+}
+.p-toolbar .group {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  min-width: 0;
+}
+.p-toolbar .sep {
+  width: var(--kira-border-width);
+  height: 14px;
+  background: var(--kira-border-strong);
+  margin: 0 var(--kira-s-1);
+  flex-shrink: 0;
+}
+
+/* ---------- LAW: connection colour is a 2px rail — tree, tab, toolbar cap.
+   Nothing else: no tint, no background, no full border. No colour assigned
+   is the default; the slot stays reserved either way so nothing shifts when
+   a colour is set. Consumers set --kira-rail to a `var(--kira-conn-*)` (or
+   leave it unset for "no colour"). ---------- */
+.p-toolbar-rail {
+  height: 2px;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-conn-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-conn-dot.none {
+  background: none;
+  border: 1px solid var(--kira-fg-disabled);
+}
+.p-tab-rail {
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-tree-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-rail, transparent);
+}
+
+/* ---------- view header — every non-grid view opens with this ---------- */
+.p-view-head {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-view-target {
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.p-view-target .path {
+  color: var(--kira-fg-disabled);
+}
+
+/* ---------- LAW: work-in-progress is a ring + elapsed time in the toolbar
+   that started the work, not a bar across the top of the view. Idle keeps
+   the same slot as a static ring holding the last duration, so the toolbar
+   never reflows when work starts. ---------- */
+.p-run-state {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+}
+.p-run-state .ring {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid var(--kira-border-strong);
+}
+.p-run-state.is-running {
+  color: var(--kira-info);
+}
+.p-run-state.is-running .ring {
+  border-color: var(--kira-accent) transparent var(--kira-accent) var(--kira-accent);
+  animation: p-spin 0.7s linear infinite;
+}
+.p-run-state.is-error {
+  color: var(--kira-error);
+}
+.p-run-state.is-error .ring {
+  border-color: var(--kira-error);
+}
+@keyframes p-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- strips: error / warning / note ---------- */
+.p-strip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-3) var(--kira-s-4);
+  font-size: var(--kira-t-sm);
+  line-height: 1.45;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-strip.err {
+  background: rgba(241, 76, 76, 0.1);
+  color: #f3a3a3;
+}
+.p-strip.warn {
+  background: rgba(204, 167, 0, 0.1);
+  color: #d9c47a;
+}
+.p-strip.note {
+  background: rgba(55, 148, 255, 0.08);
+  color: #a8c8ee;
+}
+.p-strip .strip-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ---------- tabular body shared by grid / kv / stream / console ---------- */
+.p-thead {
+  height: var(--kira-h-md);
+  flex-shrink: 0;
+  display: flex;
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+}
+.p-th {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-4);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.p-th .name {
+  color: var(--kira-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-th .key {
+  color: var(--kira-warn);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-xs);
+}
+.p-td {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-4);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.p-td.gutter {
+  justify-content: flex-end;
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  background: var(--kira-bg-elevated);
+  border-right-color: var(--kira-border-strong);
+  position: relative;
+}
+.p-td.null {
+  color: var(--kira-fg-disabled);
+  font-style: italic;
+}
+.p-td.num {
+  justify-content: flex-end;
+}
+.p-td.sel {
+  background: var(--kira-select);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -1px;
+}
+.p-td.edited {
+  color: var(--kira-warn);
+}
+.p-td.fk {
+  color: var(--kira-info);
+}
+
+/* ---------- status bar — toggles live on the RIGHT, icon-only ---------- */
+.p-statusbar {
+  height: var(--kira-statusbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--kira-s-3);
+}
+.p-statusbar .side {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-1);
+}
+.p-sb-toggles {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-1);
+  margin-left: var(--kira-s-2);
+  padding-left: var(--kira-s-2);
+  border-left: var(--kira-border-width) solid var(--kira-border-strong);
+}
+
+/* ---------- empty state ---------- */
+.p-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kira-s-4);
+  color: var(--kira-fg-disabled);
+}
+.p-empty .big {
+  width: 24px;
+  height: 24px;
+}
+.p-empty .label {
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg-muted);
+}

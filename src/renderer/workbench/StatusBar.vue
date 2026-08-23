@@ -28,12 +28,12 @@ const cacheSizeLabel = computed(() => {
 </script>
 
 <template>
-  <div class="status-bar" :style="{ height: 'var(--kira-statusbar-h)' }">
+  <div class="p-statusbar" :style="{ color: 'var(--kira-fg-muted)' }">
     <div class="side">
       <button
         type="button"
-        class="toggle-button"
-        :class="{ active: layoutState.panel.project.visible }"
+        class="p-status"
+        :class="{ 'is-on': layoutState.panel.project.visible }"
         data-testid="toggle-project-panel"
         @click="toggleProjectPanel"
       >
@@ -42,8 +42,8 @@ const cacheSizeLabel = computed(() => {
       </button>
       <button
         type="button"
-        class="toggle-button"
-        :class="{ active: layoutState.panel.cellEditor.visible }"
+        class="p-status"
+        :class="{ 'is-on': layoutState.panel.cellEditor.visible }"
         data-testid="toggle-cell-editor-panel"
         @click="toggleCellEditorPanel"
       >
@@ -52,8 +52,8 @@ const cacheSizeLabel = computed(() => {
       </button>
       <button
         type="button"
-        class="toggle-button"
-        :class="{ active: layoutState.panel.operations.visible }"
+        class="p-status"
+        :class="{ 'is-on': layoutState.panel.operations.visible }"
         data-testid="toggle-operations-panel"
         @click="toggleOperationsPanel"
       >
@@ -62,10 +62,10 @@ const cacheSizeLabel = computed(() => {
       </button>
     </div>
 
-    <div class="side">
+    <div class="side p-sb-toggles">
       <span
         v-if="cacheSizeLabel"
-        class="cache-indicator"
+        class="p-status"
         data-testid="cache-size"
         :title="cacheTitle"
       >
@@ -73,7 +73,7 @@ const cacheSizeLabel = computed(() => {
         {{ cacheSizeLabel }}
       </span>
       <span
-        class="engine-indicator"
+        class="p-status"
         data-testid="engine-status"
         :data-status="engineState.status"
         :title="engineState.lastPingMs !== null ? `${engineState.lastPingMs} ms` : undefined"
@@ -87,7 +87,7 @@ const cacheSizeLabel = computed(() => {
       </span>
       <button
         type="button"
-        class="toggle-button"
+        class="p-status"
         data-testid="open-settings"
         aria-label="Settings"
         @click="settingsOpen = true"
@@ -101,61 +101,3 @@ const cacheSizeLabel = computed(() => {
     <SettingsDialog v-if="settingsOpen" @close="settingsOpen = false" />
   </Teleport>
 </template>
-
-<style scoped>
-.status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-  font-size: 11px;
-  color: var(--kira-fg-muted);
-}
-
-.side {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.engine-indicator,
-.cache-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.toggle-button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 6px;
-  height: 18px;
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.toggle-button:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.toggle-button.active {
-  color: var(--kira-fg);
-}
-
-.toggle-button.active::after {
-  content: '';
-  position: absolute;
-  left: 5px;
-  right: 5px;
-  bottom: 0;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--kira-accent);
-}
-</style>

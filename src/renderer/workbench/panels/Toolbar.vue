@@ -7,30 +7,28 @@ import DataToolbar from '../../views/grid/DataToolbar.vue';
 import FilterToolbar from '../../views/grid/FilterToolbar.vue';
 import EmptyState from './EmptyState.vue';
 
-// §8.12: the connection's colour on the toolbar band, the second of three places it appears
-// (the tree rail and the tab are the other two).
+// P16 design system LAW: the connection colour reaches the view as a 2px rail
+// capping the toolbar that acts on it — not a tint or a border around the
+// whole band (the tree rail and the tab rail are the other two places it
+// appears). No colour assigned leaves the rail slot unpainted rather than
+// unrendered, so the toolbar never shifts when a colour is set.
 const color = computed(() => {
   const tab = activeTab.value;
   if (!tab?.connectionId) return undefined;
   return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;
 });
 
-const tintStyle = computed(() =>
-  color.value
-    ? {
-        borderLeft: `3px solid var(--kira-conn-${color.value})`,
-        background: `color-mix(in srgb, var(--kira-conn-${color.value}) 6%, transparent)`,
-      }
-    : {},
-);
+const railStyle = computed(() => ({
+  '--kira-rail': color.value ? `var(--kira-conn-${color.value})` : undefined,
+}));
 </script>
 
 <template>
   <div
     v-if="activeTab && (activeTab.kind === 'data' || activeTab.kind === 'ddl')"
     class="toolbar-band"
-    :style="tintStyle"
   >
+    <div class="p-toolbar-rail" :style="railStyle" />
     <template v-if="activeTab.kind === 'data'">
       <DataToolbar />
       <FilterToolbar />

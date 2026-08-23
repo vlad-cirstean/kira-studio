@@ -40,19 +40,45 @@
   --kira-font-size: 12px;
   --kira-row-height: 28px; /* comfortable; compact = 22px */
 
-  /* §8.12 connection color palette. */
-  --kira-conn-red: #c75450;
-  --kira-conn-orange: #cc7832;
-  --kira-conn-amber: #bfa23a;
-  --kira-conn-olive: #91a93e;
-  --kira-conn-green: #499c54;
-  --kira-conn-teal: #2aa198;
-  --kira-conn-cyan: #3592c4;
-  --kira-conn-blue: #4b7bec;
-  --kira-conn-indigo: #6c71c4;
-  --kira-conn-violet: #9876aa;
-  --kira-conn-magenta: #c066b0;
-  --kira-conn-grey: #6e7681;
+  /* P16 design system (docs/design/kira-design-system): one type scale, one space
+     scale, one control-height scale, shared verbatim by every primitive in
+     primitives.css instead of each component inventing its own. --kira-t-md tracks
+     the user's Appearance font-size setting; the other three steps are fixed
+     offsets from it so the scale never falls out of sync with that setting. */
+  --kira-t-xs: 10px;
+  --kira-t-sm: 11px;
+  --kira-t-md: var(--kira-font-size);
+  --kira-t-lg: 13px;
+  --kira-t-xl: 20px;
+
+  --kira-s-1: 2px;
+  --kira-s-2: 4px;
+  --kira-s-3: 6px;
+  --kira-s-4: 8px;
+  --kira-s-5: 12px;
+  --kira-s-6: 16px;
+
+  --kira-h-xs: 18px;
+  --kira-h-sm: 22px;
+  --kira-h-md: 26px;
+  --kira-h-lg: 30px;
+  --kira-icon-box: 16px;
+
+  /* §8.12 connection color palette — softened to oklch(0.72 0.09 h): one lightness
+     and one chroma for all eleven hues plus a near-neutral grey, so no connection
+     shouts louder than another (P16 design system). */
+  --kira-conn-red: #d78e88;
+  --kira-conn-orange: #d1966d;
+  --kira-conn-amber: #bca260;
+  --kira-conn-olive: #9fad6b;
+  --kira-conn-green: #7db485;
+  --kira-conn-teal: #5fb7a5;
+  --kira-conn-cyan: #58b4c4;
+  --kira-conn-blue: #7ba8dc;
+  --kira-conn-indigo: #979fdd;
+  --kira-conn-violet: #b296d2;
+  --kira-conn-magenta: #cb8eb6;
+  --kira-conn-grey: #9fa5ac;
 
   /* Syntax tokens for CodeMirror (§3's editor surfaces: DDL, cell editor, document view,
      command preview, console). Dark Modern's default token colours. */

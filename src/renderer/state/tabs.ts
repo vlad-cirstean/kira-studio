@@ -59,6 +59,29 @@ export const tabsState = reactive({
   hydrated: new Set<string>(),
 });
 
+export interface RecentTableEntry {
+  connectionId: string;
+  path: string;
+  kind: 'data' | 'document' | 'keyvalue' | 'stream';
+  openedAt: number;
+}
+
+const RECENT_TABLES_LIMIT = 20;
+
+// P16 design system's Empty.html "Recent tables" list — in-memory only, like tabsState.hydrated
+// above: it resets on relaunch rather than adding a new storage table for tab-open history.
+export const recentTablesState = reactive({
+  entries: [] as RecentTableEntry[],
+});
+
+function recordRecent(connectionId: string, path: string, kind: RecentTableEntry['kind']): void {
+  const withoutThis = recentTablesState.entries.filter(
+    (e) => !(e.connectionId === connectionId && e.path === path && e.kind === kind),
+  );
+  withoutThis.unshift({ connectionId, path, kind, openedAt: Date.now() });
+  recentTablesState.entries = withoutThis.slice(0, RECENT_TABLES_LIMIT);
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 // D17: the last serialisation actually written — a save whose snapshot is identical to this
 // (e.g. a scroll-offset patch that set a field to the value it already had) skips the IPC and
@@ -160,6 +183,7 @@ export function openDataTab(
   tabsState.activeId = id;
   // Opened from a live connection — nothing to reconnect.
   tabsState.hydrated.add(id);
+  recordRecent(connectionId, path, 'data');
   saveNow();
   return id;
 }
@@ -252,6 +276,7 @@ export function openDocumentTab(
   tabsState.tabs.push(record);
   tabsState.activeId = id;
   tabsState.hydrated.add(id);
+  recordRecent(connectionId, path, 'document');
   saveNow();
   return id;
 }
@@ -287,6 +312,7 @@ export function openKeyValueTab(
   tabsState.tabs.push(record);
   tabsState.activeId = id;
   tabsState.hydrated.add(id);
+  recordRecent(connectionId, path, 'keyvalue');
   saveNow();
   return id;
 }
@@ -322,6 +348,7 @@ export function openStreamTab(
   tabsState.tabs.push(record);
   tabsState.activeId = id;
   tabsState.hydrated.add(id);
+  recordRecent(connectionId, path, 'stream');
   saveNow();
   return id;
 }

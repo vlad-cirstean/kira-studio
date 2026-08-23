@@ -5,9 +5,9 @@ defineProps<{ icon: string; label: string }>();
 </script>
 
 <template>
-  <div class="text-muted flex h-full flex-col items-center justify-center gap-2">
-    <Codicon :name="icon" :size="24" />
-    <span>{{ label }}</span>
+  <div class="p-empty">
+    <Codicon :name="icon" :size="24" class="big" />
+    <span class="label">{{ label }}</span>
     <slot />
   </div>
 </template>

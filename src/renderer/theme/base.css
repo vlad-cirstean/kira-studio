@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@vscode/codicons/dist/codicon.css";
 @import "./tokens.css";
+@import "./primitives.css";
 
 /* Maps the token set into Tailwind v4's CSS-first config, so utilities like
    `bg-chrome` / `text-muted` exist alongside the raw custom properties. */

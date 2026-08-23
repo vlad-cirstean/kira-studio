@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { connectionsState } from '../state/connections';
-import { activeTab } from '../state/tabs';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
@@ -20,17 +18,6 @@ import {
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const cellVisible = computed(() => layoutState.panel.cellEditor.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
-
-// §8.12: the connection colour on the editor area's outer border, matching the mockup's
-// Main.dc vs MainNoColor treatment (no colour assigned -> plain border).
-const editorAreaColor = computed(() => {
-  const tab = activeTab.value;
-  if (!tab?.connectionId) return undefined;
-  return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;
-});
-const editorAreaStyle = computed(() =>
-  editorAreaColor.value ? { borderColor: `var(--kira-conn-${editorAreaColor.value})` } : {},
-);
 
 const gridStyle = computed(() => ({
   '--project-w': projectVisible.value ? `${layoutState.panel.project.width}px` : '0px',
@@ -62,7 +49,7 @@ const gridStyle = computed(() => ({
       @resize="setProjectWidth"
     />
 
-    <div class="editor-area" style="grid-area: main" :style="editorAreaStyle">
+    <div class="editor-area" style="grid-area: main">
       <div class="tab-strip" data-testid="tab-strip"><TabStrip /></div>
       <div class="toolbar" data-testid="toolbar"><Toolbar /></div>
       <div class="main-view" data-testid="main-view"><MainView /></div>
