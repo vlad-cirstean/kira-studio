@@ -1,0 +1,189 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref, watch } from 'vue';
+import Codicon from '../../theme/Codicon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
+import TextField from '../../theme/primitives/TextField.vue';
+import { getPage } from './docPage';
+import { clearSearchState, runSearch, type SearchHandle, searchState } from './docSearch';
+
+// Mirrors views/grid/SearchToolbar.vue almost exactly — the only real difference is that a match
+// is `{row, start, end}` rather than `{row, col, start, end}`, since a document has no columns.
+const props = defineProps<{ tabId: string }>();
+
+const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
+const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
+
+const query = ref('');
+const matchCase = ref(false);
+const wholeWord = ref(false);
+const regex = ref(false);
+const errorMessage = ref<string | null>(null);
+const scanning = ref(false);
+const foundSoFar = ref(0);
+
+let handle: SearchHandle | null = null;
+
+const entry = computed(() => searchState[props.tabId]);
+
+function startSearch(): void {
+  handle?.cancel();
+  errorMessage.value = null;
+  if (query.value === '') {
+    clearSearchState(props.tabId);
+    return;
+  }
+  scanning.value = true;
+  foundSoFar.value = 0;
+  try {
+    handle = runSearch(
+      props.tabId,
+      {
+        text: query.value,
+        matchCase: matchCase.value,
+        wholeWord: wholeWord.value,
+        regex: regex.value,
+      },
+      (found) => {
+        foundSoFar.value = found;
+      },
+    );
+  } catch (err) {
+    // An invalid regex is reported inline, never thrown into an unhandled rejection (D28).
+    errorMessage.value = err instanceof Error ? err.message : String(err);
+    scanning.value = false;
+    return;
+  }
+  handle.done.then((matches) => {
+    scanning.value = false;
+    searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
+    if (matches.length > 0) emit('goToMatch', matches[0].row);
+  });
+}
+
+watch([query, matchCase, wholeWord, regex], startSearch);
+
+function goNext(): void {
+  const e = entry.value;
+  if (!e || e.matches.length === 0) return;
+  e.index = (e.index + 1) % e.matches.length;
+  emit('goToMatch', e.matches[e.index].row);
+}
+function goPrev(): void {
+  const e = entry.value;
+  if (!e || e.matches.length === 0) return;
+  e.index = (e.index - 1 + e.matches.length) % e.matches.length;
+  emit('goToMatch', e.matches[e.index].row);
+}
+
+function close(): void {
+  handle?.cancel();
+  clearSearchState(props.tabId);
+  emit('close');
+}
+
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') {
+    close();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (e.shiftKey) goPrev();
+    else goNext();
+  }
+}
+
+onUnmounted(() => {
+  handle?.cancel();
+  clearSearchState(props.tabId);
+});
+</script>
+
+<template>
+  <!-- Same placement rule as the grid's search toolbar (LAW 03): docks below the toolbar row
+       it belongs to, right above the list it searches, never floating over it. -->
+  <div class="search-toolbar p-toolbar" data-testid="document-search-toolbar" @keydown="onKeydown">
+    <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
+      <Codicon name="search" :size="14" />
+    </span>
+    <div class="search-input">
+      <TextField
+        v-model="query"
+        placeholder="Find"
+        data-testid="document-search-input"
+        :invalid="!!errorMessage"
+      />
+    </div>
+    <div class="group">
+      <IconButton
+        icon="case-sensitive"
+        :active="matchCase"
+        title="Match case"
+        data-testid="document-search-match-case"
+        @click="matchCase = !matchCase"
+      />
+      <IconButton
+        icon="whole-word"
+        :active="wholeWord"
+        title="Whole word"
+        data-testid="document-search-whole-word"
+        @click="wholeWord = !wholeWord"
+      />
+      <IconButton
+        icon="regex"
+        :active="regex"
+        title="Regular expression"
+        data-testid="document-search-regex"
+        @click="regex = !regex"
+      />
+    </div>
+
+    <div class="sep" />
+
+    <span v-if="errorMessage" class="p-sm search-error" data-testid="document-search-error">{{
+      errorMessage
+    }}</span>
+    <template v-else>
+      <span class="p-sm muted search-count" data-testid="document-search-count">
+        <template v-if="entry && entry.matches.length > 0">
+          <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
+        </template>
+        <template v-else-if="scanning">{{ foundSoFar }}…</template>
+        <template v-else>0 of 0</template>
+      </span>
+      <IconButton icon="chevron-up" :size="12" title="Previous match" data-testid="document-search-prev" @click="goPrev" />
+      <IconButton icon="chevron-down" :size="12" title="Next match" data-testid="document-search-next" @click="goNext" />
+      <div class="sep" />
+      <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded documents</span>
+    </template>
+    <IconButton icon="close" class="p-push" title="Close" data-testid="document-search-close" @click="close" />
+  </div>
+</template>
+
+<style scoped>
+.search-toolbar {
+  background: var(--kira-bg-elevated);
+}
+
+/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
+   (see TextField.vue's inheritAttrs:false), so the fixed width lives on this wrapper instead of
+   a class/style on the <TextField> tag itself (DocumentView.vue's same `.filter-field`
+   precedent, SearchToolbar.vue's identical note). */
+.search-input {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.search-input :deep(.p-input) {
+  width: 100%;
+}
+
+.search-count {
+  white-space: nowrap;
+}
+
+.search-error {
+  color: var(--kira-error);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

@@ -103,7 +103,12 @@ describe('kafka adapter (§9.1, P10)', () => {
     expect(kafkaCaps.sql).toBe(false);
     expect(kafkaCaps.exactCount).toBe(true);
     expect(kafkaCaps.pagination).toBe('offsetWindow');
-    expect(kafkaCaps.writable).toBe(false);
+    // A topic's log is immutable — canUpdate/canDelete stay false permanently, but
+    // kafka/produce.ts's producer().send() lands a real canInsert (this session's addition).
+    expect(kafkaCaps.canInsert).toBe(true);
+    expect(kafkaCaps.canUpdate).toBe(false);
+    expect(kafkaCaps.canDelete).toBe(false);
+    expect(kafkaCaps.writable).toBe(true);
     expect(kafkaCaps.cancel).toBe(true);
   });
 
@@ -330,16 +335,23 @@ describe('kafka adapter (§9.1, P10)', () => {
     }
   });
 
-  test('13. preview/mutate/execute are unsupported — read-only, no console (D13)', async () => {
+  test('13. preview/mutate: update/delete/execute stay unsupported (D13, canUpdate/canDelete false)', async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
+      // A topic's log is immutable — there is no per-message update or delete in the Kafka API,
+      // only retention/compaction at the topic level (kafkaCaps's own comment). Only `insert`
+      // (produce) is supported now; see test 16 for that path actually working end to end.
       expectSyncThrow(
-        () => adapter.preview({ path: topicPath(ORDERS_TOPIC), ops: [] }),
+        () =>
+          adapter.preview({ path: topicPath(ORDERS_TOPIC), ops: [{ kind: 'delete', key: {} }] }),
         'E_UNSUPPORTED',
       );
       await expect(
-        adapter.mutate({ path: topicPath(ORDERS_TOPIC), ops: [] }, makeCtx()),
+        adapter.mutate(
+          { path: topicPath(ORDERS_TOPIC), ops: [{ kind: 'update', key: {}, changes: {} }] },
+          makeCtx(),
+        ),
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
       await expect(
         adapter.execute({ path: topicPath(ORDERS_TOPIC), statements: ['x'] }, makeCtx()),
@@ -380,6 +392,47 @@ describe('kafka adapter (§9.1, P10)', () => {
           ctx,
         ),
       ).rejects.toMatchObject({ code: 'E_CANCELLED' });
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('16. mutate: producing a message actually appears in a fresh browse (canInsert)', async () => {
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // EMPTY_TOPIC (not ORDERS_TOPIC) so this doesn't perturb the message-count assumptions
+      // tests 7/8/12 make about ORDERS_TOPIC's seeded contents.
+      const result = await adapter.mutate(
+        {
+          path: topicPath(EMPTY_TOPIC),
+          ops: [
+            {
+              kind: 'insert',
+              values: { $key: 'produced-key', $body: JSON.stringify({ seq: 999 }), $headers: null },
+            },
+          ],
+        },
+        makeCtx(),
+      );
+      expect(result.affectedRows).toBe(1);
+
+      const page = await readStream(
+        adapter,
+        {
+          path: topicPath(EMPTY_TOPIC),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page.rowCount).toBe(1);
+      const row = rowAt(page, 0);
+      expect(row.key).toBe('produced-key');
+      expect(JSON.parse(row.body)).toEqual({ seq: 999 });
     } finally {
       await adapter.disconnect();
     }

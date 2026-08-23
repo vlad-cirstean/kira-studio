@@ -1,6 +1,6 @@
 import type { SQSClient } from '@aws-sdk/client-sqs';
 import type { SourceText } from '../../../shared/domain/ddl';
-import type { MutationResult } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
   type NodePath,
@@ -22,6 +22,7 @@ import { sqsCaps } from './caps';
 import * as catalog from './catalog';
 import { connectSqs } from './client';
 import { mapSqsError } from './errors';
+import * as mutate from './mutate';
 import { countQueue, pollQueue } from './read';
 
 class SqsAdapter implements Adapter {
@@ -29,9 +30,13 @@ class SqsAdapter implements Adapter {
   readonly caps = sqsCaps;
 
   private client: SQSClient | null = null;
+  private readOnly = false;
   // D14: name -> URL, populated by listQueues (free — it already has every URL while paging) and
   // by resolveQueueUrl on a miss; avoids a GetQueueUrl round trip on every read()/count() call.
   private readonly queueUrls = new Map<string, string>();
+  // D-delete: MessageId -> ReceiptHandle, populated by pollQueue (read.ts) as messages arrive and
+  // consumed by mutate() below — see mutate.ts's doc comment for why this never crosses the wire.
+  private readonly receiptHandles = new Map<string, string>();
 
   constructor(private readonly deps: AdapterDeps) {}
 
@@ -44,6 +49,7 @@ class SqsAdapter implements Adapter {
       throw mapSqsError(err);
     }
     this.client = client;
+    this.readOnly = cfg.readOnly;
     return { serverVersion: 'Amazon SQS' };
   }
 
@@ -51,6 +57,7 @@ class SqsAdapter implements Adapter {
     this.client?.destroy();
     this.client = null;
     this.queueUrls.clear();
+    this.receiptHandles.clear();
   }
 
   async children(path: NodePath): Promise<TreeNode[]> {
@@ -83,7 +90,7 @@ class SqsAdapter implements Adapter {
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
     const client = this.requireClient();
     const queueUrl = await this.resolveQueueUrl(client, this.resolveQueueTarget(req.path));
-    return pollQueue(client, queueUrl, req, ctx);
+    return pollQueue(client, queueUrl, req, ctx, this.receiptHandles);
   }
 
   async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
@@ -92,13 +99,24 @@ class SqsAdapter implements Adapter {
     return countQueue(client, queueUrl, ctx);
   }
 
-  preview(): string[] {
-    // caps.writable === false — read-only in v1 (P10's ground rules); no producer UI in scope.
-    throw new AdapterError('E_UNSUPPORTED', 'sqs connections are read-only in this version');
+  preview(plan: MutationPlan): string[] {
+    const queueName = this.resolveQueueTarget(plan.path);
+    return mutate.preview(plan, queueName);
   }
 
-  async mutate(): Promise<MutationResult> {
-    throw new AdapterError('E_UNSUPPORTED', 'sqs connections are read-only in this version');
+  async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
+    const client = this.requireClient();
+    const queueName = this.resolveQueueTarget(plan.path);
+    const queueUrl = await this.resolveQueueUrl(client, queueName);
+    return mutate.mutateQueue(
+      client,
+      queueUrl,
+      queueName,
+      this.readOnly,
+      plan,
+      this.receiptHandles,
+      ctx,
+    );
   }
 
   async execute(): Promise<Page[]> {

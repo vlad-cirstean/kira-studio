@@ -1,6 +1,6 @@
 import type { Admin, Kafka } from 'kafkajs';
 import type { SourceText } from '../../../shared/domain/ddl';
-import type { MutationResult } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
   type NodePath,
@@ -22,6 +22,7 @@ import { kafkaCaps } from './caps';
 import * as catalog from './catalog';
 import { connectKafka } from './client';
 import { mapKafkaError } from './errors';
+import * as producer from './produce';
 import { countTopic, readTopic } from './read';
 
 class KafkaAdapter implements Adapter {
@@ -30,6 +31,7 @@ class KafkaAdapter implements Adapter {
 
   private kafka: Kafka | null = null;
   private admin: Admin | null = null;
+  private readOnly = false;
 
   constructor(private readonly deps: AdapterDeps) {}
 
@@ -45,6 +47,7 @@ class KafkaAdapter implements Adapter {
 
     this.kafka = kafka;
     this.admin = admin;
+    this.readOnly = cfg.readOnly;
 
     return {
       serverVersion: 'Kafka',
@@ -95,13 +98,14 @@ class KafkaAdapter implements Adapter {
     return countTopic(this.requireAdmin(), topic, ctx);
   }
 
-  preview(): string[] {
-    // caps.writable === false — read-only in v1 (P10's ground rules); no producer UI in scope.
-    throw new AdapterError('E_UNSUPPORTED', 'kafka connections are read-only in this version');
+  preview(plan: MutationPlan): string[] {
+    const topic = this.resolveTopicTarget(plan.path);
+    return producer.preview(plan, topic);
   }
 
-  async mutate(): Promise<MutationResult> {
-    throw new AdapterError('E_UNSUPPORTED', 'kafka connections are read-only in this version');
+  async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
+    const topic = this.resolveTopicTarget(plan.path);
+    return producer.produce(this.requireKafka(), topic, this.readOnly, plan, ctx);
   }
 
   async execute(): Promise<Page[]> {

@@ -268,7 +268,7 @@ export function openDocumentTab(
     connectionId,
     path,
     kind: 'document',
-    state: defaultDocumentTabState(),
+    state: defaultDocumentTabState(settingsState.data.defaultPageSize),
     order: tabsState.tabs.length,
     active: true,
   };
@@ -304,7 +304,7 @@ export function openKeyValueTab(
     connectionId,
     path,
     kind: 'keyvalue',
-    state: defaultKeyValueTabState(),
+    state: defaultKeyValueTabState(settingsState.data.defaultPageSize),
     order: tabsState.tabs.length,
     active: true,
   };
@@ -340,7 +340,7 @@ export function openStreamTab(
     connectionId,
     path,
     kind: 'stream',
-    state: defaultStreamTabState(),
+    state: defaultStreamTabState(settingsState.data.defaultPageSize),
     order: tabsState.tabs.length,
     active: true,
   };
@@ -386,7 +386,7 @@ export function duplicateTab(id: string): string {
       connectionId: source.connectionId,
       path: source.path,
       kind: 'document',
-      state: defaultDocumentTabState(),
+      state: defaultDocumentTabState(source.state.pageSize),
       order: tabsState.tabs.length,
       active: true,
     };
@@ -396,7 +396,7 @@ export function duplicateTab(id: string): string {
       connectionId: source.connectionId,
       path: source.path,
       kind: 'keyvalue',
-      state: defaultKeyValueTabState(),
+      state: defaultKeyValueTabState(source.state.pageSize),
       order: tabsState.tabs.length,
       active: true,
     };
@@ -406,7 +406,7 @@ export function duplicateTab(id: string): string {
       connectionId: source.connectionId,
       path: source.path,
       kind: 'stream',
-      state: defaultStreamTabState(),
+      state: defaultStreamTabState(source.state.pageSize),
       order: tabsState.tabs.length,
       active: true,
     };

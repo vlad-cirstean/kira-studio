@@ -55,7 +55,11 @@ function renderOpText(op: MutationRowOp, collectionName: string): string {
   if (op.kind === 'delete') {
     return `db.${collectionName}.deleteOne({_id: ...})`;
   }
-  throw new AdapterError('E_UNSUPPORTED', 'insert is not supported for documents in P8');
+  const doc = op.values[DOCUMENT_SENTINEL];
+  if (typeof doc !== 'string') {
+    throw new AdapterError('E_UNSUPPORTED', 'document mutation requires a $document body');
+  }
+  return `db.${collectionName}.insertOne(${doc})`;
 }
 
 // Synchronous (Adapter rule 3's discipline): no network, no catalog lookup.
@@ -124,7 +128,29 @@ export async function mutate(
         }
         affectedRows += result.deletedCount;
       } else {
-        throw new AdapterError('E_UNSUPPORTED', 'insert is not supported for documents in P8');
+        // op.kind === 'insert': the same '$document' sentinel the update branch uses, holding
+        // the new document's full EJSON body rather than a replacement for an existing one — no
+        // `key` to parse, since insertOne() assigns a fresh ObjectId when the body omits `_id`.
+        const bodyText = op.values[DOCUMENT_SENTINEL];
+        if (typeof bodyText !== 'string') {
+          throw new AdapterError('E_UNSUPPORTED', 'document mutation requires a $document body');
+        }
+        let parsed: unknown;
+        try {
+          parsed = EJSON.parse(bodyText);
+        } catch {
+          throw new AdapterError('E_QUERY', 'malformed document JSON');
+        }
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new AdapterError('E_QUERY', 'document must be a JSON object');
+        }
+        // insertOne() has no AbortSignal support in the driver (same gap replaceOne/deleteOne
+        // have above) — `comment` still tags it for D7's killOp fallback.
+        const result = await collection.insertOne(parsed as Document, { comment: ctx.opId });
+        if (!result.acknowledged) {
+          throw new AdapterError('E_QUERY', 'insert was not acknowledged by the server');
+        }
+        affectedRows += 1;
       }
     }
   } catch (err) {

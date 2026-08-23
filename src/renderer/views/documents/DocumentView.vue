@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import type { DocumentTabRecord } from '@shared/domain/tabs';
+import type { SortSpec } from '@shared/domain/queries';
+import type { DocumentTabRecord, DocumentTabState } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import type { ColumnDescriptor } from '@shared/protocol/page';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
+import { clearSelectedCellFor, publishSelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
@@ -16,9 +19,11 @@ import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
-import { documentRow, isIdNull, pageVersion } from './docPage';
+import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
+import { documentRow, fieldNamesOnPage, isIdNull, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
-import { saveDocumentEdit } from './documentMutations';
+import { saveDocumentEdit, saveNewDocument } from './documentMutations';
+import ProjectionMenu from './ProjectionMenu.vue';
 import {
   goNext,
   goPrev,
@@ -26,8 +31,11 @@ import {
   reload,
   runCount,
   runtime,
+  selectRow,
   setAllExpanded,
+  setPageSize,
   setSearch,
+  setSort,
   stop,
   toggleExpanded,
 } from './state';
@@ -56,6 +64,13 @@ async function onReconnectAndLoad(): Promise<void> {
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
+
+// DataToolbar.vue's own gate, narrowed to the one flag this view's Add-document button reads
+// (§0 note: "A renderer gating a single action ... reads the matching flag instead of `writable`").
+const caps = computed(() => {
+  const connectionId = props.tab.connectionId;
+  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+});
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
@@ -88,6 +103,103 @@ const searchText = ref(props.tab.state.search);
 
 function onSearchInput(): void {
   setSearch(props.tab.id, searchText.value);
+}
+
+// The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
+// read.ts explicitly rejects a `{kind:'text'}` sort (a free-text expression has no server-side
+// meaning here) — so this box parses straight into the structured form itself, never the text
+// variant, mirroring how clicking a grid column header builds structured terms.
+const sortText = ref(sortSpecToText(props.tab.state.sort));
+
+function sortSpecToText(sort: SortSpec | null): string {
+  if (sort?.kind !== 'structured') return '';
+  return sort.terms.map((t) => `${t.column} ${t.direction.toUpperCase()}`).join(', ');
+}
+
+function parseSortText(text: string): SortSpec | null {
+  const terms = text
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .map((part) => {
+      const [column, dirRaw] = part.split(/\s+/);
+      const direction: 'asc' | 'desc' = dirRaw?.toLowerCase() === 'desc' ? 'desc' : 'asc';
+      return { column, direction };
+    })
+    .filter((t) => t.column !== '');
+  return terms.length > 0 ? { kind: 'structured', terms } : null;
+}
+
+function onSortInput(): void {
+  setSort(props.tab.id, parseSortText(sortText.value));
+}
+
+const PAGE_SIZES: DocumentTabState['pageSize'][] = [10, 100, 1000, 10000];
+const PAGE_SIZE_LABEL: Record<DocumentTabState['pageSize'], string> = {
+  10: '10',
+  100: '100',
+  1000: '1k',
+  10000: '10k',
+};
+
+function onPageSize(size: DocumentTabState['pageSize']): void {
+  setPageSize(props.tab.id, size);
+}
+
+const projectionOpen = ref(false);
+
+// P16 design system's p-badge on the Columns button (DataToolbar.vue's own `columnCountLabel`
+// precedent) — narrowed to "fields seen so far" since a document collection has no fixed total.
+const projectionCountLabel = computed(() => {
+  void pageVersion.n;
+  const total = fieldNamesOnPage(props.tab.id).length;
+  if (total === 0) return null;
+  const projection = props.tab.state.projection;
+  return `${projection ? projection.length : total} / ${total}`;
+});
+
+const creatingNew = ref(false);
+const newDraft = ref('');
+
+function onAddDocument(): void {
+  creatingNew.value = true;
+  newDraft.value = '{\n  \n}';
+}
+
+function cancelCreate(): void {
+  creatingNew.value = false;
+  newDraft.value = '';
+}
+
+async function commitCreate(): Promise<void> {
+  await saveNewDocument(props.tab.id, newDraft.value);
+  creatingNew.value = false;
+  newDraft.value = '';
+}
+
+function onToggleSearch(): void {
+  const r = runtime[props.tab.id];
+  if (r) r.searchOpen = !r.searchOpen;
+}
+
+function onCloseSearch(): void {
+  const r = runtime[props.tab.id];
+  if (r) r.searchOpen = false;
+}
+
+const listBodyRef = ref<HTMLElement | null>(null);
+
+// A search match names a row index into the currently loaded page (docSearch.ts) — jumping to it
+// expands that document (if it wasn't already) and scrolls it into view, the closest document
+// equivalent of DataGrid.vue's scrollCellIntoView.
+function onGoToMatch(row: number): void {
+  const doc = rowAt(row);
+  if (!doc) return;
+  if (!isExpanded(doc.id)) toggleExpanded(props.tab.id, doc.id);
+  void nextTick(() => {
+    const el = listBodyRef.value?.querySelector(`[data-id="${CSS.escape(doc.id)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  });
 }
 
 const rowIndices = computed(() => {
@@ -160,6 +272,49 @@ function onCollapseAll(): void {
   setAllExpanded(props.tab.id, allIds.value, false);
 }
 
+function onRowClick(i: number): void {
+  selectRow(props.tab.id, i);
+}
+
+// Publishes the cell editor's target (cellSelection.ts's "P8/P10 publish into the same slot" —
+// this is P8's). A clicked document publishes its full EJSON body rather than one field within
+// it: DocumentView.vue already renders the whole body as one unit (the preview line, the expanded
+// CodeMirror host), so the document itself is the natural grain to hand the cell editor, and it's
+// the one place a truncated body's full 64 KB is worth seeing formatted. `column` is synthetic —
+// a document has no ColumnDescriptor of its own — built with `typeClass: 'json'` so the cell
+// editor's format detector opens it pretty-printed by default, and `isPrimaryKey: true` since
+// `_id` is exactly that.
+watch(
+  [() => rt.value?.selectedRow, () => pageVersion.n, () => props.tab.id],
+  () => {
+    const row = rt.value?.selectedRow;
+    const doc = row === null || row === undefined ? null : rowAt(row);
+    if (row === null || row === undefined || !doc) {
+      publishSelectedCell(null);
+      return;
+    }
+    const column: ColumnDescriptor = {
+      name: 'document',
+      dataType: 'document',
+      typeClass: 'json',
+      nullable: false,
+      isPrimaryKey: true,
+    };
+    publishSelectedCell({
+      tabId: props.tab.id,
+      connectionId: props.tab.connectionId,
+      path: props.tab.path,
+      columnIndex: 0,
+      column,
+      row,
+      value: doc.body,
+      truncated: doc.isTruncated,
+      hasPrimaryKey: true,
+    });
+  },
+  { immediate: true },
+);
+
 let unregisterCommand: (() => void) | null = null;
 
 onMounted(() => {
@@ -169,8 +324,12 @@ onMounted(() => {
   unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
 });
 
+// The tab-id guard inside clearSelectedCellFor is load-bearing here too (DataGrid.vue's own
+// note): MainView.vue keys DocumentView by tab id, so switching tabs unmounts one document view
+// and mounts another in an order this can't rely on.
 onUnmounted(() => {
   unregisterCommand?.();
+  clearSelectedCellFor(props.tab.id);
 });
 </script>
 
@@ -250,9 +409,60 @@ onUnmounted(() => {
             @click="onCollapseAll"
           />
         </div>
+        <div class="sep"></div>
+        <!-- Left as the hand-rolled .p-seg group, same as DataToolbar.vue's own page-size picker
+             (and for the same reason — tests assert `active` directly on these buttons). -->
+        <div class="p-seg" data-testid="document-page-size-picker">
+          <button
+            v-for="size in PAGE_SIZES"
+            :key="size"
+            type="button"
+            :class="{ active: tab.state.pageSize === size }"
+            :data-testid="`document-page-size-${size}`"
+            @click="onPageSize(size)"
+          >
+            {{ PAGE_SIZE_LABEL[size] }}
+          </button>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
+          <IconButton
+            icon="add"
+            :size="13"
+            data-testid="document-add"
+            :disabled="!caps?.canInsert"
+            :title="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
+            @click="onAddDocument"
+          />
+          <div class="projection-anchor">
+            <IconButton
+              icon="list-selection"
+              data-testid="document-toolbar-projection"
+              :count="projectionCountLabel ?? undefined"
+              title="Fields"
+              @click="projectionOpen = !projectionOpen"
+            />
+            <ProjectionMenu
+              v-if="projectionOpen"
+              :tab-id="tab.id"
+              :caps="caps"
+              @close="projectionOpen = false"
+            />
+          </div>
+          <IconButton
+            icon="search"
+            :active="rt?.searchOpen"
+            title="Search this page"
+            data-testid="document-toolbar-search"
+            @click="onToggleSearch"
+          />
+        </div>
       </template>
 
-      <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed. -->
+      <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
+           SORT box beside it (read.ts's structured-sort-only rule, see sortSpecToText/
+           parseSortText above), FilterToolbar.vue's ORDER BY box narrowed to the one form Mongo
+           can actually execute. -->
       <template #toolbar-2>
         <div class="filter-field">
           <TextField
@@ -263,27 +473,60 @@ onUnmounted(() => {
             @blur="onSearchInput"
           />
         </div>
+        <div class="sort-field">
+          <TextField
+            v-model="sortText"
+            prefix="SORT"
+            placeholder="name ASC, price DESC"
+            data-testid="document-sort"
+            @keyup.enter="onSortInput"
+            @blur="onSortInput"
+          />
+        </div>
       </template>
 
       <template #strips>
         <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
         </Strip>
+        <!-- Below the filter/sort row, above the list it searches — SearchToolbar.vue's own
+             "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
+        <DocumentSearchToolbar
+          v-if="rt?.searchOpen"
+          :tab-id="tab.id"
+          @go-to-match="onGoToMatch"
+          @close="onCloseSearch"
+        />
       </template>
 
-      <div class="list-body" data-testid="document-list">
+      <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
+        <CodeMirrorHost v-model:doc="newDraft" language="json" :read-only="false" />
+        <div class="edit-actions">
+          <Button variant="primary" data-testid="document-new-save" @click="commitCreate">
+            Save
+          </Button>
+          <Button data-testid="document-new-cancel" @click="cancelCreate"> Cancel </Button>
+        </div>
+      </div>
+
+      <div ref="listBodyRef" class="list-body" data-testid="document-list">
         <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No documents' : ''" />
         <template v-else>
           <div
             v-for="i in rowIndices"
             :key="rowAt(i)?.id ?? i"
             class="doc-row"
-            :class="{ open: isExpanded(rowAt(i)?.id ?? '') }"
+            :class="{ open: isExpanded(rowAt(i)?.id ?? ''), selected: rt?.selectedRow === i }"
             data-testid="document-row"
             :data-id="rowAt(i)?.id"
             @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.id, rowAt(i)!.body)"
           >
-            <div class="doc-head">
+            <!-- Publishes the whole document to the cell editor (see the `watch` above). The
+                 expand toggle and Edit button below are nested inside this same click target —
+                 clicking either also reselects the row, which is harmless (selecting the row you
+                 just expanded/started editing is never wrong) so there is no need to stop
+                 propagation out of either. -->
+            <div class="doc-head" @click="onRowClick(i)">
               <button
                 type="button"
                 class="expand-toggle"
@@ -371,6 +614,38 @@ onUnmounted(() => {
   width: 100%;
 }
 
+/* FilterToolbar.vue's orderby-input precedent: a fixed width beside the filter field that grows
+   to fill, same TextField inheritAttrs:false reasoning as `.filter-field` above. */
+.sort-field {
+  width: 230px;
+  flex-shrink: 0;
+}
+
+.sort-field :deep(.p-input) {
+  width: 100%;
+}
+
+.projection-anchor {
+  position: relative;
+}
+
+/* .p-seg's own primitive only paints `.on` (see primitives.css) — kept as `active` because
+   tests/ui assert on it directly (DataToolbar.vue's identical page-size picker and its own
+   comment on why this stays hand-rolled rather than <Segmented>). */
+.p-seg > button.active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+
+.new-doc-panel {
+  height: 220px;
+  flex-shrink: 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-elevated);
+  display: flex;
+  flex-direction: column;
+}
+
 .list-body {
   flex: 1;
   min-height: 0;
@@ -396,6 +671,13 @@ onUnmounted(() => {
 
 .doc-row.open > .doc-head {
   background: var(--kira-bg-elevated);
+}
+
+/* The row currently published to the cell editor (this view's `watch` above) — a left rail,
+   never a full-row tint, so it stays legible under `.open`'s own background and a search match's
+   highlight at the same time. */
+.doc-row.selected > .doc-head {
+  box-shadow: inset 2px 0 0 var(--kira-accent);
 }
 
 .expand-toggle {

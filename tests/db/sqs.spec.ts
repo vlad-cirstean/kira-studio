@@ -140,7 +140,12 @@ describe('sqs adapter (§9.1, P10)', () => {
     expect(sqsCaps.sql).toBe(false);
     expect(sqsCaps.exactCount).toBe(false);
     expect(sqsCaps.pagination).toBe('batch');
-    expect(sqsCaps.writable).toBe(false);
+    // sqs/mutate.ts's SendMessage/DeleteMessage land both canInsert and canDelete (this session's
+    // addition) — there is still no canUpdate: a delivered message can't be edited in place.
+    expect(sqsCaps.canInsert).toBe(true);
+    expect(sqsCaps.canUpdate).toBe(false);
+    expect(sqsCaps.canDelete).toBe(true);
+    expect(sqsCaps.writable).toBe(true);
     expect(sqsCaps.cancel).toBe(true);
   });
 
@@ -298,16 +303,25 @@ describe('sqs adapter (§9.1, P10)', () => {
     }
   });
 
-  test('12. preview/mutate/execute are unsupported — read-only, no console (D13)', async () => {
+  test('12. preview/mutate: update/execute stay unsupported (D13, no canUpdate)', async () => {
     const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
+      // A delivered message can't be edited in place, only replaced by delete+resend
+      // (sqsCaps's own comment) — insert/delete are covered end to end by test 17.
       expectSyncThrow(
-        () => adapter.preview({ path: queuePath(ORDERS_QUEUE), ops: [] }),
+        () =>
+          adapter.preview({
+            path: queuePath(ORDERS_QUEUE),
+            ops: [{ kind: 'update', key: {}, changes: {} }],
+          }),
         'E_UNSUPPORTED',
       );
       await expect(
-        adapter.mutate({ path: queuePath(ORDERS_QUEUE), ops: [] }, makeCtx()),
+        adapter.mutate(
+          { path: queuePath(ORDERS_QUEUE), ops: [{ kind: 'update', key: {}, changes: {} }] },
+          makeCtx(),
+        ),
       ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
       await expect(
         adapter.execute({ path: queuePath(ORDERS_QUEUE), statements: ['x'] }, makeCtx()),
@@ -419,6 +433,50 @@ describe('sqs adapter (§9.1, P10)', () => {
         ),
       );
       expect(calls).toBe(1);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('17. mutate: sending then deleting a message round-trips through the queue (canInsert/canDelete)', async () => {
+    const adapter = await createAdapter('sqs', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // EMPTY_QUEUE (not ORDERS_QUEUE) so this doesn't perturb any other test's assumptions.
+      const sendResult = await adapter.mutate(
+        { path: queuePath(EMPTY_QUEUE), ops: [{ kind: 'insert', values: { $body: 'hello' } }] },
+        makeCtx(),
+      );
+      expect(sendResult.affectedRows).toBe(1);
+
+      const page = await readStream(
+        adapter,
+        {
+          path: queuePath(EMPTY_QUEUE),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page.rowCount).toBe(1);
+      const row = rowAt(page, 0);
+      expect(row.body).toBe('hello');
+      expect(row.key).toBeTruthy(); // MessageId — echoed back as the delete key below
+
+      // The receipt handle this delete needs lives only in this adapter instance's in-memory map
+      // (mutate.ts's own doc comment) — populated by the readStream poll just above, on the same
+      // `adapter`, never round-tripped through the wire.
+      const deleteResult = await adapter.mutate(
+        {
+          path: queuePath(EMPTY_QUEUE),
+          ops: [{ kind: 'delete', key: { messageId: row.key as string } }],
+        },
+        makeCtx(),
+      );
+      expect(deleteResult.affectedRows).toBe(1);
     } finally {
       await adapter.disconnect();
     }

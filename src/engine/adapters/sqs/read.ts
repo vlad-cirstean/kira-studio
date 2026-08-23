@@ -16,7 +16,18 @@ import { mapSqsError } from './errors';
 const RECEIVE_LIMIT = 10; // ReceiveMessage's own hard per-call cap on MaxNumberOfMessages
 const WAIT_TIME_SECONDS = 1; // short poll per call; looped rather than one long wait
 
-function pushMessage(builder: ReturnType<typeof createStreamPageBuilder>, message: Message): void {
+// D-delete: a session-local bound on the adapter's receiptHandles map (SqsAdapter owns the actual
+// Map instance; this module only ever adds to it) — a receipt handle is only useful for as long
+// as the message it names is still in flight, so unbounded growth across many polls would just be
+// a slow leak of tokens nothing will ever look up again. Evicting the oldest entry first (Map
+// preserves insertion order) is a reasonable approximation of "least likely to still be wanted".
+const RECEIPT_HANDLE_CAP = 5000;
+
+function pushMessage(
+  builder: ReturnType<typeof createStreamPageBuilder>,
+  message: Message,
+  receiptHandles?: Map<string, string>,
+): void {
   const attrs = message.Attributes ?? {};
   const sentTimestamp = attrs.SentTimestamp ? Number(attrs.SentTimestamp) : null;
   builder.push({
@@ -26,6 +37,13 @@ function pushMessage(builder: ReturnType<typeof createStreamPageBuilder>, messag
     timestamp: sentTimestamp !== null ? new Date(sentTimestamp).toISOString() : null,
     body: message.Body ?? '',
   });
+  if (receiptHandles && message.MessageId && message.ReceiptHandle) {
+    receiptHandles.set(message.MessageId, message.ReceiptHandle);
+    if (receiptHandles.size > RECEIPT_HANDLE_CAP) {
+      const oldest = receiptHandles.keys().next().value;
+      if (oldest !== undefined) receiptHandles.delete(oldest);
+    }
+  }
 }
 
 function position(pageSize: number): PagePosition {
@@ -63,6 +81,7 @@ export async function pollQueue(
   queueUrl: string,
   req: Omit<ReadRequest, 'path'>,
   ctx: OpCtx,
+  receiptHandles?: Map<string, string>,
 ): Promise<StreamPage> {
   const visibilityTimeoutSeconds = await fetchVisibilityTimeout(client, queueUrl);
   const builder = createStreamPageBuilder({ visibilityTimeoutSeconds });
@@ -88,7 +107,7 @@ export async function pollQueue(
       throw mapSqsError(err);
     }
     const messages = result.Messages ?? [];
-    for (const message of messages) pushMessage(builder, message);
+    for (const message of messages) pushMessage(builder, message, receiptHandles);
     collected += messages.length;
     if (messages.length < batchLimit) break; // short of a full batch — queue is likely drained
   }

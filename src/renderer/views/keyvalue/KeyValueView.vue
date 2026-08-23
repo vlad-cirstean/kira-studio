@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { KeyValueTabRecord } from '@shared/domain/tabs';
+import type { KeyValueTabRecord, KeyValueTabState } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted } from 'vue';
+import type { ColumnDescriptor } from '@shared/protocol/page';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
+import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
@@ -10,13 +12,18 @@ import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import Popover from '../../theme/primitives/Popover.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import Strip from '../../theme/primitives/Strip.vue';
+import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
+import KeyValueSearchToolbar from './KeyValueSearchToolbar.vue';
 import { keyValueMenu } from './keyValueMenu';
+import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
-import { goNext, goPrev, load, reload, runCount, runtime, stop } from './state';
+import { searchState } from './kvSearch';
+import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DdlView.vue/DocumentView.vue.
 const props = defineProps<{ tab: KeyValueTabRecord }>();
@@ -44,6 +51,11 @@ const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
 
 const targetTail = computed(() => pathTail(props.tab.path));
+// The full redis key name (namespace-joined, e.g. "user:1:profile") — the path's own 'key'
+// segment always carries it verbatim (redis/catalog.ts), regardless of how many ':'-namespace
+// segments precede it in the tree. Every mutation below (edit/delete) targets this, never a
+// row's own `field`.
+const keyName = computed(() => targetTail.value?.name ?? '');
 
 const connRecord = computed(() =>
   props.tab.connectionId
@@ -114,9 +126,203 @@ function memoryText(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+// --- page size (mirrors views/grid/DataToolbar.vue's hand-rolled .p-seg group — left inline
+// here for the same reason DataToolbar's own comment gives: tests assert on the `active` class
+// directly, so this stays a per-view control rather than a shared component). ---------------
+const PAGE_SIZES: KeyValueTabState['pageSize'][] = [10, 100, 1000, 10000];
+const PAGE_SIZE_LABEL: Record<KeyValueTabState['pageSize'], string> = {
+  10: '10',
+  100: '100',
+  1000: '1k',
+  10000: '10k',
+};
+function onPageSize(size: KeyValueTabState['pageSize']): void {
+  void setPageSize(props.tab.id, size);
+}
+
+// --- write gating: the granular caps (§ caps.ts's canInsert/canUpdate/canDelete), narrowed by
+// the connection record's own readOnly flag — the same two-part gate DataToolbar's isWritable
+// applies, just per-action instead of one coarse boolean. ------------------------------------
+const caps = computed(() =>
+  props.tab.connectionId ? (connectionsState.states[props.tab.connectionId]?.caps ?? null) : null,
+);
+const canUpdate = computed(() => !!caps.value?.canUpdate && !connRecord.value?.readOnly);
+const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
+const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
+
+// Edit is scoped to string-type keys in this version (redis/mutate.ts's assertEditableType) —
+// a hash/list/set/zset/stream needs its own per-element mutation (HSET/LSET/SADD.../XADD), a
+// materially bigger job than a single SET, so the action stays disabled with an explanatory
+// tooltip for those types rather than attempting a lossy whole-key replace.
+const editableType = computed(() => page.value?.redisType === 'string');
+const editTitle = computed(() => {
+  if (!canUpdate.value) return 'Connection is read-only';
+  if (!editableType.value) return 'Only string values are editable in this version';
+  return 'Edit value';
+});
+const addTitle = computed(() => (canInsert.value ? 'Add a new key' : 'Connection is read-only'));
+const deleteTitle = computed(() =>
+  canDelete.value ? 'Delete this key' : 'Connection is read-only',
+);
+
+// --- edit popover: a single TextField pre-filled with the current string value, mutating
+// immediately on Save (no staged/pending edit set — mirrors documentMutations.ts). -----------
+const editOpen = ref(false);
+const editDraft = ref('');
+const editSaving = ref(false);
+const editError = ref<string | null>(null);
+
+function openEdit(): void {
+  if (!canUpdate.value || !editableType.value) return;
+  addOpen.value = false;
+  editDraft.value = rowAt(0)?.value ?? '';
+  editError.value = null;
+  editOpen.value = true;
+}
+function closeEdit(): void {
+  editOpen.value = false;
+  editError.value = null;
+}
+async function saveEdit(): Promise<void> {
+  if (!keyName.value) return;
+  editSaving.value = true;
+  editError.value = null;
+  try {
+    await saveValueEdit(props.tab.id, keyName.value, editDraft.value);
+    editOpen.value = false;
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    editSaving.value = false;
+  }
+}
+
+// --- delete: type-agnostic (DEL works for any of the six types) — confirmed inline, mirrors
+// documentMenu.ts's window.confirm() precedent for a destructive, un-staged action. -----------
+async function onDeleteKey(): Promise<void> {
+  if (!canDelete.value || !keyName.value) return;
+  if (!window.confirm(`Delete key "${keyName.value}"? This removes the entire key.`)) return;
+  await deleteKey(props.tab.id, keyName.value);
+}
+
+// --- add key popover: name + initial value, string-typed only (same D2 as edit). On success
+// the new key opens in its own tab — this tab is still showing a different, still-live key. ---
+const addOpen = ref(false);
+const addName = ref('');
+const addValue = ref('');
+const addSaving = ref(false);
+const addError = ref<string | null>(null);
+
+function openAdd(): void {
+  if (!canInsert.value) return;
+  addName.value = '';
+  addValue.value = '';
+  addError.value = null;
+  addOpen.value = true;
+}
+function closeAdd(): void {
+  addOpen.value = false;
+  addError.value = null;
+}
+async function submitAdd(): Promise<void> {
+  const name = addName.value.trim();
+  if (!name) {
+    addError.value = 'Key name is required';
+    return;
+  }
+  addSaving.value = true;
+  addError.value = null;
+  try {
+    await addKey(props.tab.id, name, addValue.value);
+    addOpen.value = false;
+  } catch (err) {
+    addError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    addSaving.value = false;
+  }
+}
+
 function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
   e.preventDefault();
-  openContextMenu(e, keyValueMenu(field, value));
+  const p = page.value;
+  if (!p) return;
+  openContextMenu(
+    e,
+    keyValueMenu({
+      field,
+      value,
+      redisType: p.redisType,
+      canUpdate: canUpdate.value,
+      canDelete: canDelete.value,
+      onEdit: () => {
+        editDraft.value = value;
+        editError.value = null;
+        editOpen.value = true;
+      },
+      onDelete: () => void onDeleteKey(),
+    }),
+  );
+}
+
+// §11's cell-editor seam (state/cellSelection.ts): clicking a row previews its value read-only
+// in the cell editor panel, regardless of type — a hash/list/etc. row is still viewable there
+// even though only a string key's row is *editable* via the popover above. `hasPrimaryKey: true`
+// because a redis key is always addressable by name (unlike a PK-less SQL table).
+function onRowClick(i: number): void {
+  const row = rowAt(i);
+  const p = page.value;
+  if (!row || !p) return;
+  const column: ColumnDescriptor = {
+    name: p.redisType === 'string' ? 'value' : row.field,
+    dataType: `redis ${p.redisType}`,
+    typeClass: 'text',
+    nullable: false,
+    isPrimaryKey: false,
+  };
+  const selected: SelectedCell = {
+    tabId: props.tab.id,
+    connectionId: props.tab.connectionId,
+    path: props.tab.path,
+    columnIndex: 1, // the page's own `values` column (`fields` is 0) — KeyValuePage's fixed pair
+    column,
+    row: i,
+    value: row.value,
+    truncated: row.isTruncated,
+    hasPrimaryKey: true,
+  };
+  publishSelectedCell(selected);
+}
+
+// --- search: filters the already-loaded page only, never a new query (mirrors
+// views/grid/search.ts's discipline exactly — see kvSearch.ts). ------------------------------
+function onToggleSearch(): void {
+  const r = rt.value;
+  if (r) r.searchOpen = !r.searchOpen;
+}
+function onCloseSearch(): void {
+  const r = rt.value;
+  if (r) r.searchOpen = false;
+}
+
+const tbodyRef = ref<HTMLElement | null>(null);
+function onGoToMatch(row: number): void {
+  tbodyRef.value?.querySelector(`[data-row="${row}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+// Rebuilt only when the search result changes (a completed scan or prev/next), not per row.
+const matchIndex = computed(() => {
+  const entry = searchState[props.tab.id];
+  if (!entry) return null;
+  const set = new Set<string>();
+  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
+  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
+});
+function isSearchMatch(row: number, col: 'field' | 'value'): boolean {
+  return matchIndex.value?.set.has(`${row}:${col}`) ?? false;
+}
+function isCurrentSearchMatch(row: number, col: 'field' | 'value'): boolean {
+  const current = matchIndex.value?.current;
+  return !!current && current.row === row && current.col === col;
 }
 
 function onStop(): void {
@@ -213,6 +419,109 @@ onUnmounted(() => {
             @click="runCount(tab.id)"
           >Exact count</Button>
         </div>
+
+        <div class="p-seg" data-testid="keyvalue-page-size-picker">
+          <button
+            v-for="size in PAGE_SIZES"
+            :key="size"
+            type="button"
+            :class="{ active: tab.state.pageSize === size }"
+            :data-testid="`keyvalue-page-size-${size}`"
+            @click="onPageSize(size)"
+          >
+            {{ PAGE_SIZE_LABEL[size] }}
+          </button>
+        </div>
+
+        <div class="sep" />
+
+        <div class="group">
+          <div class="edit-anchor">
+            <IconButton
+              icon="edit"
+              data-testid="keyvalue-edit"
+              :disabled="!canUpdate || !editableType"
+              :title="editTitle"
+              @click="openEdit"
+            />
+            <Popover v-if="editOpen" test-id="keyvalue-edit-popover" :width="320" @close="closeEdit">
+              <div class="popover-form">
+                <div class="popover-title p-sm muted">Edit value</div>
+                <TextField
+                  v-model="editDraft"
+                  data-testid="keyvalue-edit-input"
+                  @keydown.enter="saveEdit"
+                  @keydown.escape="closeEdit"
+                />
+                <div v-if="editError" class="p-xs popover-error" data-testid="keyvalue-edit-error">
+                  {{ editError }}
+                </div>
+                <div class="popover-actions">
+                  <Button kind="dialog" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
+                  <Button
+                    kind="dialog"
+                    variant="primary"
+                    data-testid="keyvalue-edit-save"
+                    :disabled="editSaving"
+                    @click="saveEdit"
+                  >Save</Button>
+                </div>
+              </div>
+            </Popover>
+          </div>
+
+          <IconButton
+            icon="trash"
+            data-testid="keyvalue-delete"
+            :disabled="!canDelete"
+            :title="deleteTitle"
+            @click="onDeleteKey"
+          />
+
+          <div class="add-anchor">
+            <IconButton
+              icon="add"
+              data-testid="keyvalue-add"
+              :disabled="!canInsert"
+              :title="addTitle"
+              @click="openAdd"
+            />
+            <Popover v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
+              <div class="popover-form">
+                <div class="popover-title p-sm muted">Add key (string value)</div>
+                <TextField v-model="addName" placeholder="Key name" data-testid="keyvalue-add-name" />
+                <TextField
+                  v-model="addValue"
+                  placeholder="Initial value"
+                  data-testid="keyvalue-add-value"
+                  @keydown.enter="submitAdd"
+                  @keydown.escape="closeAdd"
+                />
+                <div v-if="addError" class="p-xs popover-error" data-testid="keyvalue-add-error">
+                  {{ addError }}
+                </div>
+                <div class="popover-actions">
+                  <Button kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
+                  <Button
+                    kind="dialog"
+                    variant="primary"
+                    data-testid="keyvalue-add-save"
+                    :disabled="addSaving"
+                    @click="submitAdd"
+                  >Save</Button>
+                </div>
+              </div>
+            </Popover>
+          </div>
+
+          <IconButton
+            icon="search"
+            :active="!!rt?.searchOpen"
+            title="Search this page"
+            data-testid="keyvalue-search"
+            @click="onToggleSearch"
+          />
+        </div>
       </template>
 
       <template #strips>
@@ -220,6 +529,13 @@ onUnmounted(() => {
           {{ rt.error.message }}
         </Strip>
       </template>
+
+      <KeyValueSearchToolbar
+        v-if="rt?.searchOpen"
+        :tab-id="tab.id"
+        @go-to-match="onGoToMatch"
+        @close="onCloseSearch"
+      />
 
       <div class="p-panel table-panel">
         <div class="p-thead">
@@ -233,7 +549,7 @@ onUnmounted(() => {
             <span class="name">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
           </div>
         </div>
-        <div class="tbody" data-testid="keyvalue-list">
+        <div class="tbody" ref="tbodyRef" data-testid="keyvalue-list">
           <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No data' : ''" />
           <template v-else>
             <div
@@ -241,13 +557,31 @@ onUnmounted(() => {
               :key="i"
               class="kv-row"
               data-testid="keyvalue-row"
+              :data-row="i"
+              @click="onRowClick(i)"
               @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.field, rowAt(i)!.value)"
             >
               <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
-              <div class="p-td kv-col-field" :title="rowAt(i)?.field" data-testid="keyvalue-field">
+              <div
+                class="p-td kv-col-field"
+                :class="{
+                  'search-match': isSearchMatch(i, 'field'),
+                  'search-match-current': isCurrentSearchMatch(i, 'field'),
+                }"
+                :title="rowAt(i)?.field"
+                data-testid="keyvalue-field"
+              >
                 {{ rowAt(i)?.field }}
               </div>
-              <div class="p-td kv-col-value" :title="rowAt(i)?.value" data-testid="keyvalue-value">
+              <div
+                class="p-td kv-col-value"
+                :class="{
+                  'search-match': isSearchMatch(i, 'value'),
+                  'search-match-current': isCurrentSearchMatch(i, 'value'),
+                }"
+                :title="rowAt(i)?.value"
+                data-testid="keyvalue-value"
+              >
                 {{ rowAt(i)?.value }}
                 <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" title="value truncated"
                   >truncated</span
@@ -302,6 +636,7 @@ onUnmounted(() => {
 .kv-row {
   height: var(--kira-row-height);
   display: flex;
+  cursor: pointer;
 }
 
 .kv-row:hover {
@@ -313,5 +648,47 @@ onUnmounted(() => {
   flex-shrink: 0;
   background: var(--kira-bg-input);
   color: var(--kira-fg-disabled);
+}
+
+.search-match {
+  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+}
+
+.search-match-current {
+  background: var(--kira-warn);
+  color: var(--kira-bg);
+}
+
+/* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
+   the `active` class name to match DataToolbar.vue's own precedent (tests/ui assert on it). */
+.p-seg > button.active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+
+.edit-anchor,
+.add-anchor {
+  position: relative;
+}
+
+.popover-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-3);
+}
+
+.popover-title {
+  padding: 0;
+}
+
+.popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kira-s-2);
+}
+
+.popover-error {
+  color: var(--kira-error);
 }
 </style>

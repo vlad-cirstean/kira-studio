@@ -1,4 +1,5 @@
 import type { Admin, IHeaders, Kafka } from 'kafkajs';
+import { parseKafkaStreamFilter } from '../../../shared/domain/streamFilter';
 import {
   createStreamPageBuilder,
   type PagePosition,
@@ -45,7 +46,20 @@ function finishPosition(
   };
 }
 
-async function freshWindows(admin: Admin, topic: string, ctx: OpCtx): Promise<PartitionWindow[]> {
+// D-filter: `rawFilter` is StreamView.vue's JSON-encoded KafkaStreamFilter (offset/partition/
+// timestamp), carried through the generic `filter` field — only ever consulted for a *fresh*
+// browse (a token-continued page's windows were already resolved once, per the D7 comment on
+// PartitionWindow, and re-applying the filter there would just be wrong once the user has paged
+// partway through). `partition` narrows which partitions this browse even considers; `timestampMs`
+// (if set) wins over `offset` and reseeds via kafkajs's own `fetchTopicOffsetsByTimestamp` — the
+// exact API this adapter would otherwise have needed a consumer-side `seek`/`offsetsForTimes`
+// dance for.
+async function freshWindows(
+  admin: Admin,
+  topic: string,
+  rawFilter: string | null,
+  ctx: OpCtx,
+): Promise<PartitionWindow[]> {
   let offsets: { partition: number; high: string; low: string }[];
   try {
     offsets = await admin.fetchTopicOffsets(topic);
@@ -53,7 +67,54 @@ async function freshWindows(admin: Admin, topic: string, ctx: OpCtx): Promise<Pa
     throw mapKafkaError(err);
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
-  return offsets.map((o) => ({ partition: o.partition, next: o.low, end: o.high }));
+
+  let filter: ReturnType<typeof parseKafkaStreamFilter>;
+  try {
+    filter = parseKafkaStreamFilter(rawFilter);
+  } catch {
+    throw new AdapterError('E_QUERY', 'malformed stream filter');
+  }
+
+  let selected = offsets;
+  if (filter.partition !== null) {
+    selected = selected.filter((o) => o.partition === filter.partition);
+    if (selected.length === 0) {
+      throw new AdapterError('E_QUERY', `topic ${topic} has no partition ${filter.partition}`);
+    }
+  }
+
+  const start = new Map(selected.map((o): [number, string] => [o.partition, o.low]));
+  if (filter.timestampMs !== null) {
+    let byTimestamp: { partition: number; offset: string }[];
+    try {
+      byTimestamp = await admin.fetchTopicOffsetsByTimestamp(topic, filter.timestampMs);
+    } catch (err) {
+      throw mapKafkaError(err);
+    }
+    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    for (const entry of byTimestamp) {
+      if (start.has(entry.partition)) start.set(entry.partition, entry.offset);
+    }
+  } else if (filter.offset !== null) {
+    let requested: bigint;
+    try {
+      requested = BigInt(filter.offset);
+    } catch {
+      throw new AdapterError('E_QUERY', `malformed offset filter: "${filter.offset}"`);
+    }
+    for (const o of selected) {
+      const lo = BigInt(o.low);
+      const hi = BigInt(o.high);
+      const clamped = requested < lo ? o.low : requested > hi ? o.high : requested.toString();
+      start.set(o.partition, clamped);
+    }
+  }
+
+  return selected.map((o) => ({
+    partition: o.partition,
+    next: start.get(o.partition) ?? o.low,
+    end: o.high,
+  }));
 }
 
 // D6/D7: a new short-lived, unique-groupId consumer per read() call. It never commits offsets,
@@ -75,11 +136,11 @@ export async function readTopic(
       'kafka offset-window pagination is forward-only; there is no previous page',
     );
   }
-  const fingerprint = requestFingerprint({ topic, pageSize: req.pageSize });
+  const fingerprint = requestFingerprint({ topic, pageSize: req.pageSize, filter: req.filter });
   const windows =
     req.cursor.mode === 'after'
       ? (JSON.parse(decodePageToken(req.cursor.token, fingerprint)[0]) as PartitionWindow[])
-      : await freshWindows(admin, topic, ctx);
+      : await freshWindows(admin, topic, req.filter, ctx);
 
   const remaining = windows.filter((w) => BigInt(w.next) < BigInt(w.end));
   if (remaining.length === 0) {

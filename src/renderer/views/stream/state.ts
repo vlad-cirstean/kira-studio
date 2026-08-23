@@ -1,9 +1,13 @@
+import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
+import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
+import { connectionsState } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findStreamTab, unmarkHydrated } from '../../state/tabs';
+import { findStreamTab, patchStreamTabState, unmarkHydrated } from '../../state/tabs';
+import { recordStreamFilterUse } from './streamFilterHistory';
 import { setPage } from './streamPage';
 
 // Mirrors views/keyvalue/state.ts's KeyValueViewRuntime shape, minus pageIndex (StreamTabState
@@ -21,9 +25,12 @@ export interface StreamViewRuntime {
   nextToken: string | null;
   visibilityTimeoutSeconds: number | null;
   polled: boolean;
+  /** Mirrors grid/state.ts's own field — a runtime UI flag, never session state (item 5). */
+  searchOpen: boolean;
+  /** The row last clicked, for the cell-editor preview (item 6) and — for SQS — Delete message's
+   *  target; `null` once the page reloads out from under it (see streamPage.ts's pageVersion). */
+  selectedRow: number | null;
 }
-
-const PAGE_SIZE = 100; // one of pageSizeSchema's fixed literals (D24) — mirrors keyvalue/state.ts
 
 export const runtime = reactive({} as Record<string, StreamViewRuntime>);
 
@@ -43,6 +50,8 @@ function defaultRuntime(): StreamViewRuntime {
     nextToken: null,
     visibilityTimeoutSeconds: null,
     polled: false,
+    searchOpen: false,
+    selectedRow: null,
   };
 }
 
@@ -64,6 +73,15 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   rt.error = null;
   rt.polled = true;
 
+  // Kafka-only (item 2); always null for SQS, since StreamView.vue never lets an SQS tab's three
+  // filter fields become non-null in the first place — encodeKafkaStreamFilter itself would still
+  // collapse them to null even if it did.
+  const filter = encodeKafkaStreamFilter({
+    offset: tab.state.offsetFilter,
+    partition: tab.state.partitionFilter === null ? null : Number(tab.state.partitionFilter),
+    timestampMs: tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter),
+  });
+
   try {
     const response = await data.read({
       opId,
@@ -71,9 +89,9 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
       connectionId: tab.connectionId,
       path: tab.path,
       projection: null,
-      filter: null,
+      filter,
       sort: null,
-      pageSize: PAGE_SIZE,
+      pageSize: tab.state.pageSize,
       cursor: effectiveCursor,
     });
     if (rt.opId !== opId) return;
@@ -88,6 +106,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.hasMore = response.page.position.hasMore;
     rt.nextToken = response.page.position.nextToken;
     rt.visibilityTimeoutSeconds = response.page.visibilityTimeoutSeconds;
+    rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
@@ -148,4 +167,53 @@ export async function goNext(tabId: string): Promise<void> {
   const rt = runtime[tabId];
   if (!rt?.nextToken) return;
   await load(tabId, { mode: 'after', token: rt.nextToken });
+}
+
+// Item 1: mirrors grid/state.ts's/keyvalue/state.ts's own setPageSize — reset whatever
+// continuation token was held for the old size (never valid against a different one), persist the
+// new size, and start over from the top. SQS's `batch` pagination has no continuation to reset and
+// is never auto-loaded (D10/D12) — changing the size there just takes effect on the next Poll.
+export async function setPageSize(tabId: string, pageSize: PageSize): Promise<void> {
+  const tab = findStreamTab(tabId);
+  if (!tab) return;
+  const rt = ensureRuntime(tabId);
+  rt.nextToken = null;
+  patchStreamTabState(tabId, { pageSize });
+  const caps = tab.connectionId ? connectionsState.states[tab.connectionId]?.caps : null;
+  if (caps?.pagination === 'batch') return;
+  if (!rt.polled) return; // mirrors onMounted's own guard — never auto-load before the first view
+  await load(tabId, { mode: 'offset', offset: 0 });
+}
+
+export interface StreamFilterInput {
+  offset: string | null;
+  partition: string | null;
+  timestamp: string | null;
+}
+
+// Item 2 — Kafka-only (StreamView.vue only renders the filter row, and thus only ever calls this,
+// when connection.kind === 'kafka'). Mirrors grid/state.ts's setFilter: reset the continuation
+// token, persist, record it in the (session-only) filter history, and restart the browse fresh —
+// a filter changes which messages a *new* browse would see, so continuing an old token under it
+// would silently ignore it.
+export async function applyStreamFilter(tabId: string, filter: StreamFilterInput): Promise<void> {
+  const tab = findStreamTab(tabId);
+  if (!tab?.connectionId) return;
+  const rt = ensureRuntime(tabId);
+  rt.nextToken = null;
+  patchStreamTabState(tabId, {
+    offsetFilter: filter.offset,
+    partitionFilter: filter.partition,
+    timestampFilter: filter.timestamp,
+  });
+  recordStreamFilterUse(tab.connectionId, tab.path, filter);
+  await load(tabId, { mode: 'offset', offset: 0 });
+}
+
+// Item 6: the row last clicked — StreamView.vue pairs this with cellSelection.ts's
+// publishSelectedCell(). Kept here (rather than only local component state) so SQS's Delete
+// message toolbar action, which lives beside the row list but isn't itself a per-row control, can
+// read the same target.
+export function selectRow(tabId: string, row: number | null): void {
+  ensureRuntime(tabId).selectedRow = row;
 }

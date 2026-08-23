@@ -1,3 +1,4 @@
+import type { KeyValueTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -6,8 +7,9 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './kvPage';
 
-// Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no search box
-// (§8.8 names no per-key filter), no expand/collapse memory (the view is read-only, P9's D2).
+// Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
+// memory (still no nesting to remember — a redis key's rows are always flat). `searchOpen`
+// mirrors grid/state.ts's own field — search toggles a per-tab UI flag, not session state.
 export interface KeyValueViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
@@ -17,9 +19,8 @@ export interface KeyValueViewRuntime {
   hasMore: boolean;
   nextToken: string | null;
   prevToken: string | null;
+  searchOpen: boolean;
 }
-
-const PAGE_SIZE = 100; // one of pageSizeSchema's fixed literals (D24) — mirrors documents/state.ts
 
 export const runtime = reactive({} as Record<string, KeyValueViewRuntime>);
 
@@ -38,6 +39,7 @@ function defaultRuntime(): KeyValueViewRuntime {
     hasMore: false,
     nextToken: null,
     prevToken: null,
+    searchOpen: false,
   };
 }
 
@@ -54,7 +56,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const rt = ensureRuntime(tabId);
   const effectiveCursor: PageCursor = cursor ?? {
     mode: 'offset',
-    offset: tab.state.pageIndex * PAGE_SIZE,
+    offset: tab.state.pageIndex * tab.state.pageSize,
   };
   const opId = crypto.randomUUID();
   rt.status = 'loading';
@@ -70,7 +72,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
       projection: null,
       filter: null,
       sort: null,
-      pageSize: PAGE_SIZE,
+      pageSize: tab.state.pageSize,
       cursor: effectiveCursor,
     });
     if (rt.opId !== opId) return;
@@ -143,7 +145,7 @@ export async function goNext(tabId: string): Promise<void> {
   const nextIndex = tab.state.pageIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
-    : { mode: 'offset', offset: nextIndex * PAGE_SIZE };
+    : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
   patchKeyValueTabState(tabId, { pageIndex: nextIndex });
   await load(tabId, cursor);
 }
@@ -155,7 +157,21 @@ export async function goPrev(tabId: string): Promise<void> {
   const prevIndex = Math.max(0, tab.state.pageIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: prevIndex * PAGE_SIZE };
+    : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
   patchKeyValueTabState(tabId, { pageIndex: prevIndex });
   await load(tabId, cursor);
+}
+
+// Mirrors grid/state.ts's setPageSize: resets to the first page and clears whatever cursor
+// tokens were held for the old page size (a SCAN cursor from a 100-sized page is not valid
+// against a 1000-sized one).
+export async function setPageSize(
+  tabId: string,
+  pageSize: KeyValueTabState['pageSize'],
+): Promise<void> {
+  const rt = ensureRuntime(tabId);
+  rt.nextToken = null;
+  rt.prevToken = null;
+  patchKeyValueTabState(tabId, { pageSize, pageIndex: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 });
 }

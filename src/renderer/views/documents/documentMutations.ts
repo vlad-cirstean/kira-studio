@@ -26,6 +26,22 @@ export async function saveDocumentEdit(
   await reload(tabId);
 }
 
+export async function saveNewDocument(tabId: string, bodyEjson: string): Promise<void> {
+  const tab = findDocumentTab(tabId);
+  if (!tab?.connectionId) return;
+  await data.mutate({
+    opId: crypto.randomUUID(),
+    tabId,
+    connectionId: tab.connectionId,
+    path: tab.path,
+    // The same '$document' sentinel saveDocumentEdit uses above, on the insert variant of
+    // MutationRowOp (mongo/mutate.ts's insertOne branch) — no `key`, since a new document has no
+    // existing `_id` to address by; the server assigns one when the body omits it.
+    ops: [{ kind: 'insert', values: { $document: bodyEjson } }],
+  });
+  await reload(tabId);
+}
+
 export async function deleteDocument(tabId: string, id: string): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab?.connectionId) return;

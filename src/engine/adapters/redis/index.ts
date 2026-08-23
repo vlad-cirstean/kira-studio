@@ -1,6 +1,6 @@
 import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { SourceText } from '../../../shared/domain/ddl';
-import type { MutationResult } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
   encodePath,
   type NodePath,
@@ -23,6 +23,7 @@ import * as catalog from './catalog';
 import { connectRedis, type DbConnectionSet } from './client';
 import * as consoleQuery from './console';
 import { mapRedisError } from './errors';
+import * as mutateOps from './mutate';
 import { countKey, readKey } from './read';
 
 class RedisAdapter implements Adapter {
@@ -31,6 +32,7 @@ class RedisAdapter implements Adapter {
 
   private set: DbConnectionSet | null = null;
   private defaultDbIndex = 0;
+  private readOnly = false;
 
   constructor(private readonly deps: AdapterDeps) {}
 
@@ -47,6 +49,7 @@ class RedisAdapter implements Adapter {
 
     this.set = set;
     this.defaultDbIndex = defaultDbIndex;
+    this.readOnly = cfg.readOnly;
     const version = /redis_version:([^\r\n]+)/.exec(serverInfo)?.[1] ?? 'unknown';
 
     return {
@@ -107,14 +110,24 @@ class RedisAdapter implements Adapter {
     return countKey(conn, key, ctx);
   }
 
-  preview(): string[] {
-    // caps.writable === false — the view is read-only in v1 (P9's D2); writes stay reachable
-    // only through the console's raw commands.
-    throw new AdapterError('E_UNSUPPORTED', 'redis connections are read-only in this version');
+  preview(plan: MutationPlan): string[] {
+    return mutateOps.preview(plan);
   }
 
-  async mutate(): Promise<MutationResult> {
-    throw new AdapterError('E_UNSUPPORTED', 'redis connections are read-only in this version');
+  // SET/DEL only (D2's follow-up): edit is scoped to string-type keys (mutate.ts's
+  // assertEditableType), delete is type-agnostic. `plan.path` only ever resolves to a database —
+  // never a specific key, since a mutation plan's own `ops` name their target key via the
+  // `_key` sentinel (mutate.ts) — so this only needs to pick the right per-db-index connection.
+  async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
+    const [databaseSegment] = plan.path.segments;
+    if (databaseSegment?.kind !== 'database') {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `unexpected root path segment kind: ${databaseSegment?.kind}`,
+      );
+    }
+    const conn = await this.requireSet().get(catalog.dbIndexFromName(databaseSegment.name));
+    return mutateOps.mutate(conn, ctx, this.readOnly, plan);
   }
 
   async execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]> {

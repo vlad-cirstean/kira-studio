@@ -1,7 +1,8 @@
 import type { Caps } from '../../../shared/caps';
 
 // §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, no DDL, a
-// shell-style console (§8.14). Read-only in v1 (P9's D2) — `writable: false`.
+// shell-style console (§8.14). Writable as of this phase — string-only edit/insert plus
+// type-agnostic delete (see the canInsert/canUpdate/canDelete comment below).
 export const redisCaps: Caps = {
   tabular: false,
   documents: false,
@@ -18,14 +19,15 @@ export const redisCaps: Caps = {
   exactCount: true,
   pagination: 'cursor',
   foreignKeys: false,
-  // index.ts's preview()/mutate() unconditionally throw E_UNSUPPORTED today — no write path
-  // exists at all. Once SET/DEL land, Redis has no real insert/update distinction (SET on a
-  // missing key creates it, on an existing key overwrites it), so canInsert and canUpdate should
-  // flip together.
-  canInsert: false,
-  canUpdate: false,
-  canDelete: false,
-  writable: false,
+  // index.ts's mutate() now backs all three: `insert` (SET ... NX, a brand-new key, string-typed
+  // only), `update` (a plain SET, also string-typed only — mutate.ts's assertEditableType), and
+  // `delete` (DEL, type-agnostic). Editing/creating a hash/list/set/zset/stream element needs its
+  // own per-type semantics (HSET a field, LSET an index, SADD/SREM, ZADD, XADD) — a materially
+  // bigger job, out of scope for this version; the UI disables Edit/Add for those cases.
+  canInsert: true,
+  canUpdate: true,
+  canDelete: true,
+  writable: true,
   transactions: false,
   cancel: true, // ctx.signal between bounded SCAN-family rounds is fully effective (D7/D8)
 };

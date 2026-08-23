@@ -1,3 +1,5 @@
+import type { SortSpec } from '@shared/domain/queries';
+import type { DocumentTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -6,9 +8,11 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDocumentTab, patchDocumentTabState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './docPage';
 
-// Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count), narrowed to what a
-// document page actually varies on: no projection, no sort, no column widths — §8.7 gives
-// documents one search box, not the grid's full toolbar.
+// Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
+// pageSize now live on DocumentTabState (mirroring DataTabState) rather than being grid-only, so
+// `searchOpen` (DataView.vue's precedent) and `selectedRow` (the row published to the cell editor,
+// DataGrid.vue's `selection` precedent, narrowed to a single row index since a document has no
+// columns to select within) are the only view-local runtime this adds.
 export interface DocumentViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
@@ -18,9 +22,9 @@ export interface DocumentViewRuntime {
   hasMore: boolean;
   nextToken: string | null;
   prevToken: string | null;
+  searchOpen: boolean;
+  selectedRow: number | null;
 }
-
-const PAGE_SIZE = 100;
 
 export const runtime = reactive({} as Record<string, DocumentViewRuntime>);
 
@@ -39,6 +43,8 @@ function defaultRuntime(): DocumentViewRuntime {
     hasMore: false,
     nextToken: null,
     prevToken: null,
+    searchOpen: false,
+    selectedRow: null,
   };
 }
 
@@ -65,10 +71,10 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
-      projection: null,
+      projection: tab.state.projection,
       filter: tab.state.search.trim() === '' ? null : tab.state.search,
-      sort: null,
-      pageSize: PAGE_SIZE,
+      sort: tab.state.sort,
+      pageSize: tab.state.pageSize,
       cursor: effectiveCursor,
     });
     if (rt.opId !== opId) return;
@@ -151,6 +157,31 @@ export async function goPrev(tabId: string): Promise<void> {
 export function setSearch(tabId: string, text: string): void {
   patchDocumentTabState(tabId, { search: text });
   void load(tabId);
+}
+
+// Mirrors views/grid/state.ts's setProjection/setSort/setPageSize — a document tab has no
+// pageIndex to reset (it pages by cursor token, not an offset counter), so each of these is just
+// "patch the tab's own state, then reload from the top" (setSearch's exact precedent above).
+export function setProjection(tabId: string, projection: string[] | null): void {
+  patchDocumentTabState(tabId, { projection });
+  void load(tabId);
+}
+
+export function setSort(tabId: string, sort: SortSpec | null): void {
+  patchDocumentTabState(tabId, { sort });
+  void load(tabId);
+}
+
+export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize']): void {
+  patchDocumentTabState(tabId, { pageSize });
+  void load(tabId);
+}
+
+// The row published to the cell editor (§0 note: cellSelection.ts's "P8/P10 publish into the
+// same slot"). A plain runtime field, not tab-persisted state — the same reasoning as the grid's
+// own `selection`, which also never round-trips through tabs.save.
+export function selectRow(tabId: string, row: number | null): void {
+  ensureRuntime(tabId).selectedRow = row;
 }
 
 export function toggleExpanded(tabId: string, id: string): void {

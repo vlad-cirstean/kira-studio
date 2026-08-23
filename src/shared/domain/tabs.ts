@@ -43,21 +43,34 @@ export const consoleTabStateSchema = z.object({
 });
 export type ConsoleTabState = z.infer<typeof consoleTabStateSchema>;
 
-// Only per-_id expand/collapse memory and the search text are session state (§8.7) — the loaded
-// documents themselves are runtime-only, like the grid's own rows, and never round-trip through
-// `tabs.save`.
+// Per-_id expand/collapse memory, the search text, and (mirroring DataTabState) the sort,
+// projection and pageSize the toolbar's own controls set are session state (§8.7) — the loaded
+// documents themselves stay runtime-only, like the grid's own rows, and never round-trip through
+// `tabs.save`. `.default()` on the three added fields keeps a tab saved before they existed
+// parsing successfully on restore, rather than being dropped by tabRecordSchema's safeParse.
 export const documentTabStateSchema = z.object({
   expanded: z.record(z.string(), z.boolean()),
   search: z.string(),
+  sort: sortSpecSchema.nullable().default(null),
+  projection: z.array(z.string()).nullable().default(null),
+  pageSize: pageSizeSchema.default(100),
 });
 export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
 
-// Read-only view (P9's D2) — no edit/expand memory to persist, unlike documentTabStateSchema.
 // `pageIndex` is the offset-strategy fallback's own position (mirrors DataTabState's field,
 // grid/state.ts's goNext/goPrev) — needed because a redis list key's pagination has no id/cursor
-// token to advance by (P9's read.ts uses plain LRANGE offsets for lists).
+// token to advance by (P9's read.ts uses plain LRANGE offsets for lists). `pageSize` mirrors
+// DataTabState's own field (same `pageSizeSchema` literal set — the wire request already accepts
+// it for every engine, so this is pure renderer state). Edits/deletes/inserts mutate immediately
+// (documentMutations.ts's precedent, extended to keyvalue) rather than staging anything, so
+// there is still no edit/expand memory to persist beyond these two fields.
 export const keyValueTabStateSchema = z.object({
   pageIndex: z.number().int().min(0),
+  // `.default(100)` (unlike DataTabState's required field): a keyvalue tab saved before this
+  // field existed has no `pageSize` in its stored JSON at all, and storage/repos/tabs.ts drops a
+  // tab row outright on a failed parse — this keeps every already-saved tab restorable instead
+  // of silently discarding it.
+  pageSize: pageSizeSchema.default(100),
 });
 export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 
@@ -67,7 +80,22 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // batch strategy has no position at all (D11). Whether the user has clicked Poll yet (SQS's D10
 // gate) is runtime-only state — like `status` in views/keyvalue/state.ts's runtime — since a
 // restored tab has no loaded page to show either way, so nothing belongs in session state here.
-export const streamTabStateSchema = z.object({});
+// `pageSize` mirrors DataTabState/KeyValueTabState/DocumentTabState's own field (`.default(100)`
+// for the same already-saved-tab-restores discipline as keyValueTabStateSchema's own comment).
+// The three filter fields are Kafka-only positioning knobs (SQS shows none of them — no matching
+// concept, per its own read.ts): `offsetFilter`/`partitionFilter` restrict a fresh browse's
+// starting windows (kafka/read.ts), `timestampFilter` seeks via kafkajs's
+// `fetchTopicOffsetsByTimestamp` — all three persisted per tab like DataTabState's own `filter`,
+// but kept structured (three independent strings) rather than one WHERE-style free-text field,
+// since Kafka has no predicate language to parse. Recent-filter *history* is deliberately NOT
+// here (views/stream/streamFilterHistory.ts) — same discipline as the SQL grid's own filter
+// history, kept out of `tabs.state_json`/SQLite entirely (session-only, never round-trips).
+export const streamTabStateSchema = z.object({
+  pageSize: pageSizeSchema.default(100),
+  offsetFilter: z.string().nullable().default(null),
+  partitionFilter: z.string().nullable().default(null),
+  timestampFilter: z.string().nullable().default(null),
+});
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
 const tabRecordBase = {
@@ -136,16 +164,16 @@ export function defaultConsoleTabState(): ConsoleTabState {
   return { text: '' };
 }
 
-export function defaultDocumentTabState(): DocumentTabState {
-  return { expanded: {}, search: '' };
+export function defaultDocumentTabState(pageSize: PageSize = 100): DocumentTabState {
+  return { expanded: {}, search: '', sort: null, projection: null, pageSize };
 }
 
-export function defaultKeyValueTabState(): KeyValueTabState {
-  return { pageIndex: 0 };
+export function defaultKeyValueTabState(pageSize: PageSize = 100): KeyValueTabState {
+  return { pageIndex: 0, pageSize };
 }
 
-export function defaultStreamTabState(): StreamTabState {
-  return {};
+export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState {
+  return { pageSize, offsetFilter: null, partitionFilter: null, timestampFilter: null };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

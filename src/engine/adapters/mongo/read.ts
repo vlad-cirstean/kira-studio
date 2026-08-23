@@ -84,6 +84,15 @@ export async function readPage(
 
   const limit = safeInt(req.pageSize + 1, 'page size'); // D24's +1 probe, mirroring the SQL adapters
   const findOptions: FindOptions & Abortable = { limit, signal: ctx.signal, comment: ctx.opId };
+  // `req.projection` is the generic `ReadRequest` field every adapter shares (Adapter rule 7's
+  // relational precedent) — Mongo's own shape for "return a field subset" is a `find()` options
+  // projection document, `{ field: 1, ... }`. `_id` is never listed here even when the caller
+  // omitted it from the picker: an inclusion projection returns `_id` by default unless it is
+  // explicitly excluded (`_id: 0`), and this adapter never sends that exclusion, so the document's
+  // identity always survives regardless of which fields the UI's picker has checked.
+  if (req.projection && req.projection.length > 0) {
+    findOptions.projection = Object.fromEntries(req.projection.map((field) => [field, 1]));
+  }
   if (idOnlySort) {
     findOptions.sort = { _id: scanDirection };
   } else if (sortTerms.length > 0) {
