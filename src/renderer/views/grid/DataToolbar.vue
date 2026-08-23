@@ -291,7 +291,6 @@ function onDiscard(): void {
       <IconButton
         icon="symbol-number"
         data-testid="toolbar-count"
-        :count="rt?.count ? `${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}` : undefined"
         :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
         :title="
           rt?.count
@@ -305,8 +304,7 @@ function onDiscard(): void {
         <IconButton
           icon="list-selection"
           data-testid="toolbar-columns"
-          :count="columnCountLabel ?? undefined"
-          title="Columns"
+          :title="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
           @click="columnsOpen = !columnsOpen"
         />
         <ColumnsMenu

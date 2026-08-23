@@ -412,12 +412,12 @@ onUnmounted(() => {
             title="Next page"
             @click="goNext(tab.id)"
           />
-          <Button
+          <IconButton
             icon="symbol-number"
             data-testid="keyvalue-count"
             title="Exact count"
             @click="runCount(tab.id)"
-          >Exact count</Button>
+          />
         </div>
 
         <div class="sep" />

@@ -417,18 +417,17 @@ onUnmounted(() => {
         <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
              the exact count, the fields/projection menu, and expand/collapse-all. -->
         <div class="group">
-          <Button
+          <IconButton
             icon="symbol-number"
             data-testid="document-count"
             title="Run an exact countDocuments() — the estimate above is metadata"
             @click="runCount(tab.id)"
-          >Exact count</Button>
+          />
           <div class="projection-anchor">
             <IconButton
               icon="list-selection"
               data-testid="document-toolbar-projection"
-              :count="projectionCountLabel ?? undefined"
-              title="Fields"
+              :title="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
               @click="projectionOpen = !projectionOpen"
             />
             <ProjectionMenu
