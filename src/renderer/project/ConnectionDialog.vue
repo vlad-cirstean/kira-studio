@@ -6,11 +6,12 @@ import {
   DEFAULT_PORT,
 } from '@shared/domain/connection';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
+import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import ColorPicker from './ColorPicker.vue';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
@@ -70,36 +71,6 @@ const testState = ref<{ status: 'idle' | 'testing' | 'ok' | 'error'; message?: s
 });
 const fieldErrors = ref<Record<string, string>>({});
 
-const dialogRef = ref<HTMLElement | null>(null);
-
-function focusable(): HTMLElement[] {
-  if (!dialogRef.value) return [];
-  return Array.from(
-    dialogRef.value.querySelectorAll<HTMLElement>(
-      'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => !el.hasAttribute('disabled'));
-}
-
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    closeDialog();
-    return;
-  }
-  if (e.key !== 'Tab') return;
-  const items = focusable();
-  if (items.length === 0) return;
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-}
-
 function refreshUriNote(): void {
   const d = draft.value;
   if (!d) return;
@@ -110,11 +81,8 @@ function refreshUriNote(): void {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown);
-  dialogRef.value?.focus();
   if (draft.value?.mode === 'uri') refreshUriNote();
 });
-onUnmounted(() => document.removeEventListener('keydown', onKeydown));
 
 function setMode(mode: 'fields' | 'uri'): void {
   const d = draft.value;
@@ -228,119 +196,90 @@ const preconnectText = computed({
 </script>
 
 <template>
-  <div v-if="draft" class="scrim" data-testid="connection-dialog" @click.self="closeDialog">
-    <div
-      ref="dialogRef"
-      class="dialog"
-      :class="{ 'is-engine-step': step === 'engine' }"
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-    >
-      <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-      <template v-if="step === 'engine'">
-        <div class="dialog-title">
-          <span class="icon-box muted"><Codicon name="database" :size="14" /></span>
-          <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
-          <span class="title-mid p-push">
-            <span v-if="!isEdit" class="steps">
-              <span class="step on"><span class="n">1</span>Engine</span>
-              <span class="dim">›</span>
-              <span class="step"><span class="n">2</span>Details</span>
-            </span>
-          </span>
-          <button
-            v-if="isEdit"
-            type="button"
-            class="p-btn"
-            @click="step = 'details'"
-          >
-            <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
-            Back
-          </button>
-          <button
-            type="button"
-            class="title-close"
-            aria-label="Close"
-            data-testid="connection-dialog-close"
-            @click="closeDialog"
-          >
-            <Codicon name="close" :size="14" />
-          </button>
+  <DialogFrame
+    v-if="draft"
+    :title="
+      step === 'engine'
+        ? isEdit
+          ? 'Change engine'
+          : 'New connection'
+        : `${isEdit ? 'Edit' : 'New'} ${KIND_LABEL[draft.kind]} connection`
+    "
+    :width="step === 'engine' ? 620 : 560"
+    max-height="80vh"
+    test-id="connection-dialog"
+    close-test-id="connection-dialog-close"
+    @close="closeDialog"
+  >
+    <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
+    <template v-if="step === 'engine'" #header>
+      <span class="icon-box muted"><Codicon name="database" :size="14" /></span>
+      <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
+      <span class="title-mid p-push">
+        <span v-if="!isEdit" class="steps">
+          <span class="step on"><span class="n">1</span>Engine</span>
+          <span class="dim">›</span>
+          <span class="step"><span class="n">2</span>Details</span>
+        </span>
+      </span>
+      <button
+        v-if="isEdit"
+        type="button"
+        class="p-btn"
+        @click="step = 'details'"
+      >
+        <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
+        Back
+      </button>
+    </template>
+    <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
+         is identity here, not a control (changed via "Change engine" back to step 1). -->
+    <template v-else #header>
+      <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
+        <EngineIcon :kind="draft.kind" :size="16" />
+      </span>
+      <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
+      <button type="button" class="p-btn p-push" title="Pick a different engine" @click="step = 'engine'">
+        <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
+        Change engine
+      </button>
+    </template>
+
+    <template v-if="step === 'engine'">
+      <div class="dialog-body-inner engine-body">
+        <div class="p-input ui md">
+          <span class="icon-box"><Codicon name="search" :size="14" /></span>
+          <input v-model="engineSearch" type="text" placeholder="Search engines" data-testid="connection-engine-search" />
         </div>
 
-        <div class="dialog-body engine-body">
-          <div class="p-input ui md">
-            <span class="icon-box"><Codicon name="search" :size="14" /></span>
-            <input v-model="engineSearch" type="text" placeholder="Search engines" data-testid="connection-engine-search" />
-          </div>
-
-          <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
-            <button
-              v-for="kind in filteredKinds"
-              :key="kind"
-              type="button"
-              class="kind"
-              :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
-              :disabled="!SUPPORTED_KINDS.has(kind)"
-              role="radio"
-              :aria-checked="draft.kind === kind"
-              :title="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
-              :data-testid="`connection-kind-${kind}`"
-              @click="pickKind(kind)"
+        <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
+          <button
+            v-for="kind in filteredKinds"
+            :key="kind"
+            type="button"
+            class="kind"
+            :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
+            :disabled="!SUPPORTED_KINDS.has(kind)"
+            role="radio"
+            :aria-checked="draft.kind === kind"
+            :title="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
+            :data-testid="`connection-kind-${kind}`"
+            @click="pickKind(kind)"
+          >
+            <span
+              class="kind-ic"
+              :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
             >
-              <span
-                class="kind-ic"
-                :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
-              >
-                <EngineIcon :kind="kind" :size="22" />
-              </span>
-              <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
-              <span class="kind-sub">{{ SUPPORTED_KINDS.has(kind) ? KIND_SUB[kind] : 'Not supported yet' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="dialog-footer">
-          <button type="button" class="p-dlgbtn" @click="pasteUri">
-            <span class="icon-box"><Codicon name="code" :size="14" /></span>
-            Paste a URI
-          </button>
-          <span class="footer-actions p-push">
-            <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">
-              Cancel
-            </button>
-            <button type="button" class="p-dlgbtn primary" @click="continueToDetails">
-              Continue
-              <span class="icon-box"><Codicon name="chevron-right" :size="14" /></span>
-            </button>
-          </span>
-        </div>
-      </template>
-
-      <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
-           is identity here, not a control (changed via "Change engine" back to step 1). -->
-      <template v-else>
-        <div class="dialog-title">
-          <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
-            <EngineIcon :kind="draft.kind" :size="16" />
-          </span>
-          <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
-          <button type="button" class="p-btn p-push" title="Pick a different engine" @click="step = 'engine'">
-            <span class="icon-box"><Codicon name="chevron-left" :size="14" /></span>
-            Change engine
-          </button>
-          <button
-            type="button"
-            class="title-close"
-            aria-label="Close"
-            data-testid="connection-dialog-close"
-            @click="closeDialog"
-          >
-            <Codicon name="close" :size="14" />
+              <EngineIcon :kind="kind" :size="22" />
+            </span>
+            <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
+            <span class="kind-sub">{{ SUPPORTED_KINDS.has(kind) ? KIND_SUB[kind] : 'Not supported yet' }}</span>
           </button>
         </div>
-        <div class="dialog-body">
+      </div>
+    </template>
+    <template v-else>
+      <div class="dialog-body-inner">
           <div class="field-row">
             <div class="field name-field">
               <label>Name</label>
@@ -474,86 +413,62 @@ const preconnectText = computed({
           <p class="credential-warning">
             Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
           </p>
-        </div>
+      </div>
+    </template>
 
-        <div class="dialog-footer">
-          <div class="test-area">
-            <button type="button" class="p-dlgbtn" data-testid="connection-test" @click="onTest">
-              <span class="icon-box"><Codicon name="plug" :size="14" /></span>
-              Test connection
-            </button>
-            <span
-              v-if="testState.status !== 'idle'"
-              class="test-chip p-chip"
-              :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
-              data-testid="connection-test-result"
-            >
-              {{
-                testState.status === 'testing'
-                  ? 'Testing…'
-                  : testState.status === 'ok'
-                    ? `OK — ${testState.message}`
-                    : testState.message
-              }}
-            </span>
-          </div>
-          <div class="footer-actions">
-            <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
-            <button
-              type="button"
-              class="p-dlgbtn primary"
-              data-testid="connection-save"
-              :disabled="!isValid"
-              @click="onSave"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </template>
-    </div>
-  </div>
+    <template v-if="step === 'engine'" #footer>
+      <button type="button" class="p-dlgbtn" @click="pasteUri">
+        <span class="icon-box"><Codicon name="code" :size="14" /></span>
+        Paste a URI
+      </button>
+      <span class="footer-actions p-push">
+        <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">
+          Cancel
+        </button>
+        <button type="button" class="p-dlgbtn primary" @click="continueToDetails">
+          Continue
+          <span class="icon-box"><Codicon name="chevron-right" :size="14" /></span>
+        </button>
+      </span>
+    </template>
+    <template v-else #footer>
+      <div class="test-area">
+        <button type="button" class="p-dlgbtn" data-testid="connection-test" @click="onTest">
+          <span class="icon-box"><Codicon name="plug" :size="14" /></span>
+          Test connection
+        </button>
+        <span
+          v-if="testState.status !== 'idle'"
+          class="test-chip p-chip"
+          :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
+          data-testid="connection-test-result"
+        >
+          {{
+            testState.status === 'testing'
+              ? 'Testing…'
+              : testState.status === 'ok'
+                ? `OK — ${testState.message}`
+                : testState.message
+          }}
+        </span>
+      </div>
+      <div class="footer-actions">
+        <button type="button" class="p-dlgbtn" data-testid="connection-cancel" @click="closeDialog">Cancel</button>
+        <button
+          type="button"
+          class="p-dlgbtn primary"
+          data-testid="connection-save"
+          :disabled="!isValid"
+          @click="onSave"
+        >
+          Save
+        </button>
+      </div>
+    </template>
+  </DialogFrame>
 </template>
 
 <style scoped>
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog {
-  width: 560px;
-  max-height: 80vh;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-lg);
-  box-shadow: var(--kira-shadow-dialog);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dialog.is-engine-step {
-  width: 620px;
-}
-
-.dialog-title {
-  height: var(--kira-h-lg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-lg);
-  color: var(--kira-fg);
-}
-
 .title-mid {
   display: flex;
   min-width: 0;
@@ -564,28 +479,7 @@ const preconnectText = computed({
   flex-shrink: 0;
 }
 
-.title-close {
-  width: var(--kira-h-sm);
-  height: var(--kira-h-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--kira-radius-sm);
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.title-close:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.dialog-body {
-  flex: 1;
-  overflow: auto;
+.dialog-body-inner {
   padding: var(--kira-s-5);
   display: flex;
   flex-direction: column;
@@ -701,16 +595,6 @@ const preconnectText = computed({
 .preconnect-warning {
   color: var(--kira-warn);
   font-size: var(--kira-t-xs);
-}
-
-.dialog-footer {
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  height: 46px;
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-5);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
 }
 
 .test-area {

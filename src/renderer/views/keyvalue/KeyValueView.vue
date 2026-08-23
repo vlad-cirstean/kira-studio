@@ -6,6 +6,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { keyValueMenu } from './keyValueMenu';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
@@ -47,9 +48,9 @@ const connRecord = computed(() =>
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
 const connColor = computed(() => connRecord.value?.color);
-const railStyle = computed(() => ({
-  '--kira-rail': connColor.value ? `var(--kira-conn-${connColor.value})` : undefined,
-}));
+const iconColor = computed(() =>
+  connColor.value ? `var(--kira-conn-${connColor.value})` : 'var(--kira-info)',
+);
 
 // The view header's breadcrumb: "connection / dbN / ". Redis's tree always roots a key's path
 // at its `database` segment (see redis/catalog.ts), so this reads existing path structure —
@@ -65,6 +66,12 @@ const dbLabel = computed(() => {
     return null;
   }
 });
+
+const pathPrefix = computed(() =>
+  dbLabel.value
+    ? `${connRecord.value?.name ? `${connRecord.value.name} / ` : ''}${dbLabel.value} / `
+    : '',
+);
 
 const page = computed(() => {
   void pageVersion.n;
@@ -149,26 +156,21 @@ onUnmounted(() => {
         Reconnect &amp; load
       </button>
     </div>
-    <template v-else>
-      <div class="p-view-head">
-        <span
-          class="p-conn-dot"
-          :class="{ none: !connColor }"
-          :style="railStyle"
-          title="Connection colour"
-        />
-        <span
-          class="icon-box"
-          :style="{ color: connColor ? `var(--kira-conn-${connColor})` : 'var(--kira-info)' }"
-        >
-          <Codicon name="key" :size="13" />
-        </span>
-        <span class="p-view-target" data-testid="keyvalue-target">
-          <span v-if="dbLabel" class="path"
-            >{{ connRecord?.name ? `${connRecord.name} / ` : '' }}{{ dbLabel }} / </span
-          >
-          <span class="mono">{{ targetTail?.name ?? tab.path }}</span>
-        </span>
+    <ViewChrome
+      v-else
+      :tab="tab"
+      icon="key"
+      :icon-color="iconColor"
+      :path="pathPrefix"
+      :name="targetTail?.name ?? tab.path"
+      target-testid="keyvalue-target"
+      refresh-testid="keyvalue-refresh"
+      stop-testid="keyvalue-stop"
+      :can-stop="running"
+      @refresh="reload(tab.id)"
+      @stop="onStop"
+    >
+      <template #badges>
         <template v-if="page">
           <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
           <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
@@ -180,44 +182,9 @@ onUnmounted(() => {
           <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
           <span v-if="connRecord" class="p-badge">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</span>
         </template>
-      </div>
+      </template>
 
-      <!-- LAW: the connection's colour caps the toolbar as a 2px rail, never a tint on the
-           whole view. No colour assigned still reserves the slot, so nothing shifts. -->
-      <div class="p-toolbar-rail" :style="railStyle" />
-      <div class="p-toolbar">
-        <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
-            data-testid="keyvalue-refresh"
-            title="Refresh"
-            @click="reload(tab.id)"
-          >
-            <Codicon name="refresh" :size="13" />
-          </button>
-          <!-- LAW: Stop always follows Refresh, disabled when idle — cancelling lives in one
-               place instead of only appearing once work starts. -->
-          <button
-            type="button"
-            class="p-iconbtn"
-            data-testid="keyvalue-stop"
-            :disabled="!running"
-            title="Stop"
-            @click="onStop"
-          >
-            <Codicon name="debug-stop" :size="13" />
-          </button>
-          <!-- LAW: work-in-progress is a ring in the toolbar, not a bar across the view. Idle
-               keeps the same slot as a still ring. -->
-          <span
-            class="p-run-state"
-            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
-            :title="running ? 'Loading…' : rt?.status === 'error' ? 'Last run failed' : 'Idle'"
-          >
-            <span class="ring" />
-          </span>
-        </div>
+      <template #toolbar>
         <div class="sep" />
         <div class="group">
           <button
@@ -251,11 +218,13 @@ onUnmounted(() => {
             <span class="icon-box"><Codicon name="symbol-number" :size="13" /></span>Exact count
           </button>
         </div>
-      </div>
+      </template>
 
-      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="keyvalue-error">
-        {{ rt.error.message }}
-      </div>
+      <template #strips>
+        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="keyvalue-error">
+          {{ rt.error.message }}
+        </div>
+      </template>
 
       <div class="p-panel table-panel">
         <div class="p-thead">
@@ -295,7 +264,7 @@ onUnmounted(() => {
           </template>
         </div>
       </div>
-    </template>
+    </ViewChrome>
   </div>
 </template>
 

@@ -5,7 +5,6 @@ import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
-import Toolbar from './panels/Toolbar.vue';
 import Splitter from './Splitter.vue';
 import StatusBar from './StatusBar.vue';
 import {
@@ -51,7 +50,6 @@ const gridStyle = computed(() => ({
 
     <div class="editor-area" style="grid-area: main">
       <div class="tab-strip" data-testid="tab-strip"><TabStrip /></div>
-      <div class="toolbar" data-testid="toolbar"><Toolbar /></div>
       <div class="main-view" data-testid="main-view"><MainView /></div>
     </div>
 
@@ -145,11 +143,6 @@ const gridStyle = computed(() => ({
   flex-shrink: 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);
-}
-
-.toolbar {
-  flex-shrink: 0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .main-view {

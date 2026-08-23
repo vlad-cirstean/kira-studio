@@ -19,6 +19,12 @@ const props = defineProps<{
   name: string;
   canRefresh?: boolean;
   canStop?: boolean;
+  // Forwarded to ViewHeader — see its own props for what each targets. refreshTestid/stopTestid
+  // cover the two built-in buttons below, which predate this component and had per-view names.
+  targetTestid?: string;
+  nameTestid?: string;
+  refreshTestid?: string;
+  stopTestid?: string;
 }>();
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
@@ -31,7 +37,15 @@ const runState = useRunState(() => props.tab.id);
 </script>
 
 <template>
-  <ViewHeader :icon="icon" :icon-color="iconColor" :path="path" :name="name" :conn-color="connection?.color ?? null">
+  <ViewHeader
+    :icon="icon"
+    :icon-color="iconColor"
+    :path="path"
+    :name="name"
+    :conn-color="connection?.color ?? null"
+    :target-testid="targetTestid"
+    :name-testid="nameTestid"
+  >
     <slot name="badges" />
     <template #trailing>
       <slot name="head-trailing" />
@@ -41,10 +55,10 @@ const runState = useRunState(() => props.tab.id);
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connection?.color ? `var(--kira-conn-${connection.color})` : undefined }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
     <div class="group">
-      <button type="button" class="p-iconbtn" title="Refresh" :disabled="canRefresh === false" @click="emit('refresh')">
+      <button type="button" class="p-iconbtn" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')">
         <span class="icon-box"><svg class="icon" viewBox="0 0 16 16" width="13" height="13"><path d="M13 8A5 5 0 1 1 11.2 4.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 2.5V6H9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
       </button>
-      <button type="button" class="p-iconbtn" title="Stop" :disabled="!canStop" @click="emit('stop')">
+      <button type="button" class="p-iconbtn" title="Stop" :data-testid="stopTestid" :disabled="!canStop" @click="emit('stop')">
         <span class="icon-box"><svg class="icon" viewBox="0 0 16 16" width="13" height="13"><rect x="4" y="4" width="8" height="8" rx="1.2" fill="currentColor"/></svg></span>
       </button>
       <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />

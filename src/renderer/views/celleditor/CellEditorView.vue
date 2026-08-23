@@ -6,6 +6,7 @@ import type { EditorLanguageId } from '../../editor/languages';
 import { cellKey, cellSelectionState } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
 import Codicon from '../../theme/Codicon.vue';
+import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import EmptyState from '../../workbench/panels/EmptyState.vue';
 import { toggleCellEditorPanel } from '../../workbench/state/layout';
 import { type BeautifyMode, beautify } from './beautify';
@@ -183,12 +184,14 @@ const statusLine = computed(() => {
     :data-formatted="formatted"
   >
     <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
-         badges, then this panel's own controls, then the trailing group pushed to the edge. -->
-    <div class="p-view-head">
-      <span class="icon-box"><Codicon name="symbol-string" :size="12" /></span>
-      <span class="p-view-target" data-testid="cell-editor-target"
-        >{{ targetLabel }}<span class="path"> · row {{ cell.row + 1 }}</span></span
-      >
+         badges, then this panel's own controls, then the trailing group pushed to the edge.
+         ViewHeader's target has no separate prefix/suffix slot, so the row number rides along in
+         `name` itself (cell-editor-target's toContainText assertions don't care about styling). -->
+    <ViewHeader
+      icon="symbol-string"
+      :name="`${targetLabel} · row ${cell.row + 1}`"
+      target-testid="cell-editor-target"
+    >
       <span class="p-badge">{{ cell.column.dataType }}</span>
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
@@ -242,7 +245,7 @@ const statusLine = computed(() => {
         </button>
       </span>
 
-      <span class="p-push trailing-group">
+      <template #trailing>
         <span v-if="readOnlyReason" class="p-chip warn" :title="readOnlyChipTitle">
           <Codicon name="lock" :size="12" />
           {{ readOnlyChipText }}
@@ -257,8 +260,8 @@ const statusLine = computed(() => {
         >
           <Codicon name="chevron-down" :size="14" />
         </button>
-      </span>
-    </div>
+      </template>
+    </ViewHeader>
 
     <div class="editor-body">
       <CodeMirrorHost :doc="doc" :language="language" :sql-dialect="sqlDialect" :read-only="true" />
@@ -281,14 +284,6 @@ const statusLine = computed(() => {
   align-items: center;
   gap: var(--kira-s-3);
   margin-left: var(--kira-s-4);
-  flex-shrink: 0;
-}
-
-/* read-only reason + collapse: pushed to the header's trailing edge via .p-push */
-.trailing-group {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
   flex-shrink: 0;
 }
 

@@ -2,6 +2,7 @@
 import type { Caps } from '@shared/caps';
 import { computed, ref } from 'vue';
 import { findDataTab } from '../../state/tabs';
+import Popover from '../../theme/primitives/Popover.vue';
 import { runtime, setProjection } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
@@ -35,8 +36,14 @@ function close(): void {
 </script>
 
 <template>
-  <div class="menu-backdrop" data-testid="columns-menu-backdrop" @click="close">
-    <div class="columns-menu p-float" data-testid="columns-menu" @click.stop>
+  <Popover
+    anchor="right"
+    :width="200"
+    test-id="columns-menu"
+    backdrop-test-id="columns-menu-backdrop"
+    @close="close"
+  >
+    <div class="columns-menu-inner">
       <div class="columns-menu-header">
         <button type="button" class="p-btn" data-testid="columns-select-all" @click="selectAll">
           All
@@ -62,21 +69,11 @@ function close(): void {
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
-  </div>
+  </Popover>
 </template>
 
 <style scoped>
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-
-.columns-menu {
-  position: absolute;
-  top: 32px;
-  right: 8px;
-  min-width: 200px;
+.columns-menu-inner {
   max-height: 320px;
   display: flex;
   flex-direction: column;

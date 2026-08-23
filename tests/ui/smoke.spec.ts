@@ -9,14 +9,10 @@ test('workbench launches with all chrome regions and a healthy engine', async ({
   expect(app.windows().length).toBe(1);
   expect(await app.evaluate(({ app: electronApp }) => electronApp.getName())).toBe('Kira Studio');
 
-  const alwaysPresent = [
-    'project-panel',
-    'tab-strip',
-    'toolbar',
-    'main-view',
-    'cell-editor',
-    'status-bar',
-  ];
+  // 'toolbar' is intentionally not a fixed shell region any more (P16 design system LAW 09):
+  // each view now renders its own toolbar, so with no connections/tabs (this fixture's fresh
+  // KIRA_HOME) there is none — only the tab strip and its own "no tabs" affordance remain.
+  const alwaysPresent = ['project-panel', 'tab-strip', 'main-view', 'cell-editor', 'status-bar'];
   for (const testid of alwaysPresent) {
     await expect(window.locator(`[data-testid="${testid}"]`)).toBeVisible();
   }

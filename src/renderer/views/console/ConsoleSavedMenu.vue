@@ -4,10 +4,12 @@ import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { findConsoleTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import SavedListMenu from '../shared/SavedListMenu.vue';
 import { setText } from './state';
 
 // A lean sibling of grid/FilterHistoryMenu.vue: saved-only (§8.14 gives the console no run
-// history, only saved_queries), scoped to one tab's own connectionId/path.
+// history, only saved_queries), scoped to one tab's own connectionId/path. Both share the same
+// popover shell/list layout via views/shared/SavedListMenu.vue.
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -88,129 +90,61 @@ async function saveCurrent(): Promise<void> {
 </script>
 
 <template>
-  <div class="menu-backdrop" data-testid="console-saved-backdrop" @click="emit('close')">
-    <!-- Same P11/P8 shape as grid/FilterHistoryMenu.vue's own saved list (its own comment calls
-         this component a lean sibling of that one) — one p-float, a p-menu-label, p-row entries,
-         a p-sep, then the "save current" row. -->
-    <div class="saved-menu p-float" data-testid="console-saved-menu" @click.stop>
-      <div class="p-menu-label">Saved queries</div>
-      <div v-if="saved.length === 0" class="empty-row p-sm dim">No saved queries</div>
-      <div
-        v-for="entry in saved"
-        :key="entry.id"
-        class="entry-row p-row"
-        data-testid="console-saved-entry"
-        @click="apply(entry)"
-      >
-        <button
-          type="button"
-          class="pin-button"
-          :class="{ pinned: entry.pinned }"
-          title="Pin"
-          @click.stop="togglePin(entry)"
-        >
-          <Codicon :name="entry.pinned ? 'star-full' : 'star-empty'" :size="12" />
-        </button>
-        <span class="entry-name">{{ entry.name }}</span>
-        <span class="entry-actions">
-          <button type="button" class="p-iconbtn" title="Rename" @click.stop="rename(entry)">
-            <Codicon name="edit" :size="12" />
-          </button>
-          <button type="button" class="p-iconbtn" title="Delete" @click.stop="remove(entry)">
-            <Codicon name="trash" :size="12" />
-          </button>
-        </span>
-      </div>
-
-      <div class="p-sep"></div>
+  <SavedListMenu
+    title="Saved queries"
+    :saved="saved"
+    panel-test-id="console-saved-menu"
+    backdrop-test-id="console-saved-backdrop"
+    saved-entry-test-id="console-saved-entry"
+    empty-saved-text="No saved queries"
+    @apply="apply"
+    @toggle-pin="togglePin"
+    @delete="remove"
+    @close="emit('close')"
+  >
+    <template #entry="{ entry }">
+      <span class="entry-name">{{ entry.name }}</span>
+    </template>
+    <template #entry-actions="{ entry }">
+      <button type="button" class="p-iconbtn" title="Rename" @click.stop="rename(entry)">
+        <Codicon name="edit" :size="12" />
+      </button>
+    </template>
+    <template #footer>
+      <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="console-save-current" @click="saveCurrent">
         <span class="icon-box"><Codicon name="add" :size="12" /></span>
         Save current query…
       </button>
-    </div>
+    </template>
+  </SavedListMenu>
 
-    <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
-      <div class="prompt-box p-float">
-        <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-        <span class="p-input md">
-          <input
-            ref="promptInput"
-            v-model="textPrompt.value"
-            type="text"
-            data-testid="text-prompt-input"
-            @keydown.enter="submitPrompt"
-            @keydown.escape="cancelPrompt"
-          />
-        </span>
-        <div class="prompt-actions">
-          <button type="button" class="p-dlgbtn" data-testid="text-prompt-cancel" @click="cancelPrompt">
-            Cancel
-          </button>
-          <button type="button" class="p-dlgbtn primary" data-testid="text-prompt-ok" @click="submitPrompt">
-            OK
-          </button>
-        </div>
+  <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
+    <div class="prompt-box p-float">
+      <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
+      <span class="p-input md">
+        <input
+          ref="promptInput"
+          v-model="textPrompt.value"
+          type="text"
+          data-testid="text-prompt-input"
+          @keydown.enter="submitPrompt"
+          @keydown.escape="cancelPrompt"
+        />
+      </span>
+      <div class="prompt-actions">
+        <button type="button" class="p-dlgbtn" data-testid="text-prompt-cancel" @click="cancelPrompt">
+          Cancel
+        </button>
+        <button type="button" class="p-dlgbtn primary" data-testid="text-prompt-ok" @click="submitPrompt">
+          OK
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-
-/* P11 floating surface (the same shape grid/FilterHistoryMenu.vue uses for its own saved list):
-   bg-elevated, border-strong, radius and the one dialog shadow all come from .p-float — this
-   just positions it as a popover under the toolbar's "Saved queries" button. */
-.saved-menu {
-  position: absolute;
-  top: 32px;
-  left: 8px;
-  width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.empty-row {
-  padding: var(--kira-s-2) var(--kira-s-3);
-}
-
-/* Entry rows are the shared .p-row (P8) — the same 22px row the tree and the command palette
-   use, so a saved-query row highlights identically. Only the pin/action icons are local. */
-.entry-row {
-  cursor: pointer;
-}
-
-.entry-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pin-button {
-  display: flex;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-disabled);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.pin-button.pinned {
-  color: var(--kira-warn);
-}
-
-.entry-actions {
-  display: flex;
-  gap: var(--kira-s-1);
-  flex-shrink: 0;
-}
-
 .save-current {
   width: 100%;
   color: var(--kira-accent);

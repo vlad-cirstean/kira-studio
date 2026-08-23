@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { RowDensity } from '@shared/settings';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
 import Codicon from '../theme/Codicon.vue';
+import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 // SettingsDialog.html's "Connection colours" swatch row (D18/tokens.css's --kira-conn-*) —
@@ -29,45 +30,6 @@ const emit = defineEmits<{ close: [] }>();
 const sections = ['Appearance', 'Data', 'Cache', 'Advanced'] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
-
-const dialogRef = ref<HTMLElement | null>(null);
-
-function focusable(): HTMLElement[] {
-  if (!dialogRef.value) return [];
-  return Array.from(
-    dialogRef.value.querySelectorAll<HTMLElement>(
-      'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => !el.hasAttribute('disabled'));
-}
-
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    emit('close');
-    return;
-  }
-  if (e.key !== 'Tab') return;
-  const items = focusable();
-  if (items.length === 0) return;
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', onKeydown);
-  dialogRef.value?.focus();
-});
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown);
-});
 
 function onFontFamilyChange(e: Event): void {
   void patchSettings({ appearance: { fontFamily: (e.target as HTMLInputElement).value } });
@@ -140,37 +102,35 @@ async function onClearCaches(): Promise<void> {
 </script>
 
 <template>
-  <div class="scrim" data-testid="settings-dialog" @click.self="emit('close')">
-    <div ref="dialogRef" class="dialog" role="dialog" aria-modal="true" tabindex="-1">
-      <div class="dialog-title">
-        <span class="icon-box muted"><Codicon name="gear" :size="14" /></span>
-        <span>Settings</span>
-        <button
-          type="button"
-          class="title-close"
-          aria-label="Close"
-          data-testid="settings-dialog-close"
-          @click="emit('close')"
-        >
-          <Codicon name="close" :size="14" />
-        </button>
-      </div>
-      <div class="dialog-body">
-        <nav class="section-list">
-          <button
-            v-for="section in sections"
-            :key="section"
-            type="button"
-            class="section-item"
-            :class="{ active: activeSection === section }"
-            :data-testid="`settings-section-${section}`"
-            @click="activeSection = section"
-          >
-            {{ section }}
-          </button>
-        </nav>
+  <DialogFrame
+    title="Settings"
+    :width="780"
+    :height="560"
+    test-id="settings-dialog"
+    close-test-id="settings-dialog-close"
+    @close="emit('close')"
+  >
+    <template #header>
+      <span class="icon-box muted"><Codicon name="gear" :size="14" /></span>
+      <span>Settings</span>
+    </template>
 
-        <section class="section-pane">
+    <div class="dialog-body-inner">
+      <nav class="section-list">
+        <button
+          v-for="section in sections"
+          :key="section"
+          type="button"
+          class="section-item"
+          :class="{ active: activeSection === section }"
+          :data-testid="`settings-section-${section}`"
+          @click="activeSection = section"
+        >
+          {{ section }}
+        </button>
+      </nav>
+
+      <section class="section-pane">
           <template v-if="activeSection === 'Appearance'">
             <div class="sec-label first">Typography</div>
             <label class="field">
@@ -360,76 +320,21 @@ async function onClearCaches(): Promise<void> {
             </label>
             <p class="muted-note">Takes effect after restart.</p>
           </template>
-        </section>
-      </div>
-
-      <div class="dialog-footer">
-        <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
-        <button type="button" class="p-dlgbtn primary footer-close" data-testid="settings-close" @click="emit('close')">
-          Done
-        </button>
-      </div>
+      </section>
     </div>
-  </div>
+
+    <template #footer>
+      <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
+      <button type="button" class="p-dlgbtn primary footer-close" data-testid="settings-close" @click="emit('close')">
+        Done
+      </button>
+    </template>
+  </DialogFrame>
 </template>
 
 <style scoped>
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog {
-  width: 780px;
-  height: 560px;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-lg);
-  box-shadow: var(--kira-shadow-dialog);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dialog-title {
-  height: var(--kira-h-lg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-lg);
-  color: var(--kira-fg);
-}
-
-.title-close {
-  width: var(--kira-h-sm);
-  height: var(--kira-h-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--kira-radius-sm);
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.title-close:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.dialog-body {
-  flex: 1;
+.dialog-body-inner {
+  height: 100%;
   display: flex;
   min-height: 0;
 }
@@ -625,16 +530,6 @@ async function onClearCaches(): Promise<void> {
   height: 16px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-.dialog-footer {
-  height: 46px;
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-5);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 
 .footer-close {

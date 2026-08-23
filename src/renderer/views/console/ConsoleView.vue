@@ -8,6 +8,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { resultPageKey, run, runtime, setText, stop } from './state';
@@ -43,18 +44,6 @@ const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   const record = connectionsState.records.find((r) => r.id === props.tab.connectionId);
   return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
 });
-
-// P16 design system LAW: the connection colour reaches the console as a 2px rail — a dot in the
-// view header, a cap on the toolbar — never a tint. Derived the same way Toolbar.vue's own
-// railStyle is; no colour assigned leaves the rail slot unpainted rather than unrendered (the
-// Console.html mockup is deliberately set on a connection with no colour to prove this).
-const connectionColor = computed(() => {
-  if (!props.tab.connectionId) return undefined;
-  return connectionsState.records.find((r) => r.id === props.tab.connectionId)?.color;
-});
-const railStyle = computed(() => ({
-  '--kira-rail': connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : undefined,
-}));
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
@@ -116,98 +105,65 @@ const statusLine = computed(() => {
         Reconnect &amp; load
       </button>
     </div>
-    <template v-else>
-      <!-- view header — every non-grid view opens with this: a rail dot (reserved even with no
-           colour), the view's icon, and its target. The console's search_path/schema control
-           and the "writes go to production" chip from Console.html both need tracked data this
-           app does not have yet (no per-console schema, no per-connection write-warning flag) —
-           skipped rather than faked. -->
-      <div class="p-view-head">
-        <span
-          class="p-conn-dot"
-          :class="{ none: !connectionColor }"
-          :style="railStyle"
-          title="Connection colour"
-        />
-        <span class="icon-box"><Codicon name="terminal" :size="14" /></span>
-        <span class="p-view-target" data-testid="console-target">{{
-          targetTail?.name ?? tab.path ?? 'Console'
-        }}</span>
-      </div>
-
-      <!-- LAW 07 — the connection colour caps the toolbar, not the panel, and stays a 2px slot
-           even with no colour assigned (this tab's own connection has none, same as the
-           mockup). -->
-      <div class="p-toolbar-rail" :style="railStyle" />
-      <div class="p-toolbar">
-        <div class="group">
-          <button
-            type="button"
-            class="p-btn primary"
-            data-testid="console-run-statement"
-            :disabled="running"
-            title="Run the statement under the cursor"
-            @click="runStatement"
-          >
-            <span class="icon-box"><Codicon name="play" :size="13" /></span>Run
-          </button>
-          <button
-            type="button"
-            class="p-btn"
-            data-testid="console-run-all"
-            :disabled="running"
-            title="Run every statement in the editor"
-            @click="runAll"
-          >
-            <span class="icon-box"><Codicon name="run-all" :size="13" /></span>Run all
-          </button>
-          <!-- "Stop always follows Refresh, disabled when idle" — cancelling lives in one place
-               instead of appearing only once work starts. -->
-          <button
-            type="button"
-            class="p-iconbtn"
-            style="color: var(--kira-error)"
-            data-testid="console-stop"
-            title="Stop"
-            :disabled="!running"
-            @click="onStop"
-          >
-            <Codicon name="debug-stop" :size="13" />
-          </button>
-          <!-- LAW 12 — work-in-progress is a ring in the toolbar next to the button that started
-               it, not a bar across the view. The mockup's live elapsed time ("1.8 s") needs a
-               per-run start timestamp this app does not track (ConsoleViewRuntime has no
-               startedAt/durationMs field) — showing status text here instead of a fabricated
-               duration. -->
-          <span
-            class="p-run-state"
-            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
-          >
-            <span class="ring" />{{ running ? 'Running…' : statusLine || 'Idle' }}
-          </span>
-        </div>
+    <ViewChrome
+      v-else
+      :tab="tab"
+      icon="terminal"
+      :name="targetTail?.name ?? tab.path ?? 'Console'"
+      target-testid="console-target"
+      stop-testid="console-stop"
+      :can-refresh="false"
+      :can-stop="running"
+      @stop="onStop"
+    >
+      <!-- The console's search_path/schema control and the "writes go to production" chip from
+           Console.html both need tracked data this app does not have yet (no per-console
+           schema, no per-connection write-warning flag) — skipped rather than faked. Refresh is
+           permanently disabled here (reserved slot, same as DdlToolbar's Stop): Run/Run all are
+           the console's two start verbs, and neither one is "refresh". -->
+      <template #toolbar>
+        <button
+          type="button"
+          class="p-btn primary"
+          data-testid="console-run-statement"
+          :disabled="running"
+          title="Run the statement under the cursor"
+          @click="runStatement"
+        >
+          <span class="icon-box"><Codicon name="play" :size="13" /></span>Run
+        </button>
+        <button
+          type="button"
+          class="p-btn"
+          data-testid="console-run-all"
+          :disabled="running"
+          title="Run every statement in the editor"
+          @click="runAll"
+        >
+          <span class="icon-box"><Codicon name="run-all" :size="13" /></span>Run all
+        </button>
         <div class="sep"></div>
-        <div class="group">
-          <button
-            type="button"
-            class="p-btn"
-            data-testid="console-saved-toggle"
-            title="Saved queries"
-            @click="savedMenuOpen = !savedMenuOpen"
-          >
-            <span class="icon-box"><Codicon name="bookmark" :size="13" /></span>Saved queries
-          </button>
-        </div>
+        <button
+          type="button"
+          class="p-btn"
+          data-testid="console-saved-toggle"
+          title="Saved queries"
+          @click="savedMenuOpen = !savedMenuOpen"
+        >
+          <span class="icon-box"><Codicon name="bookmark" :size="13" /></span>Saved queries
+        </button>
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
-      </div>
+      </template>
+
+      <template #strips>
+        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="console-error">
+          {{ rt.error.message }}
+        </div>
+      </template>
 
       <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
-
-      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="console-error">
-        {{ rt.error.message }}
-      </div>
 
       <div class="editor-body">
         <CodeMirrorHost
@@ -237,7 +193,7 @@ const statusLine = computed(() => {
       </div>
 
       <div class="status-line" data-testid="console-status">{{ statusLine }}</div>
-    </template>
+    </ViewChrome>
   </div>
 </template>
 

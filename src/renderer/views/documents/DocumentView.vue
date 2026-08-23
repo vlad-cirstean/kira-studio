@@ -7,6 +7,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { documentRow, isIdNull, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
@@ -60,10 +61,6 @@ const connectionColor = computed(() => {
   if (!id) return undefined;
   return connectionsState.records.find((r) => r.id === id)?.color;
 });
-
-const railStyle = computed(() => ({
-  '--kira-rail': connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : undefined,
-}));
 
 const iconColor = computed(() =>
   connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : 'var(--kira-fg-muted)',
@@ -158,17 +155,6 @@ function onCollapseAll(): void {
   setAllExpanded(props.tab.id, allIds.value, false);
 }
 
-const statusLine = computed(() => {
-  const r = rt.value;
-  if (!r) return '';
-  const parts: string[] = [];
-  parts.push(`${r.rowCount} document${r.rowCount === 1 ? '' : 's'} on this page`);
-  if (r.count) {
-    parts.push(`${r.count.exact ? '' : '~'}${r.count.value.toLocaleString()} total`);
-  }
-  return parts.join(' · ');
-});
-
 let unregisterCommand: (() => void) | null = null;
 
 onMounted(() => {
@@ -195,55 +181,25 @@ onUnmounted(() => {
         Reconnect &amp; load
       </button>
     </div>
-    <template v-else>
-      <!-- The view header is the same 28px object as a toolbar: it carries identity instead of
-           actions, so documents / key-value / stream / DDL all open the same way. -->
-      <div class="p-view-head">
-        <span class="p-conn-dot" :style="railStyle" title="Connection colour"></span>
-        <span class="icon-box" :style="{ color: iconColor }">
-          <Codicon name="json" :size="13" />
-        </span>
-        <span class="p-view-target" data-testid="document-target">
-          <span class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
-        </span>
+    <ViewChrome
+      v-else
+      :tab="tab"
+      icon="json"
+      :icon-color="iconColor"
+      :path="pathPrefix"
+      :name="targetTail?.name ?? tab.path"
+      target-testid="document-target"
+      refresh-testid="document-refresh"
+      stop-testid="document-stop"
+      :can-stop="running"
+      @refresh="reload(tab.id)"
+      @stop="onStop"
+    >
+      <template #badges>
         <span class="p-badge">collection</span>
-      </div>
+      </template>
 
-      <!-- LAW 07 — the connection's colour caps the toolbar, not the panel. With no colour the
-           slot is still 2px, so nothing shifts. -->
-      <div class="p-toolbar-rail" :style="railStyle"></div>
-      <div class="p-toolbar">
-        <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
-            title="Refresh"
-            data-testid="document-refresh"
-            @click="reload(tab.id)"
-          >
-            <Codicon name="refresh" :size="13" />
-          </button>
-          <!-- Stop always follows Refresh, disabled when idle — cancelling lives in one place
-               instead of appearing only once work starts. -->
-          <button
-            type="button"
-            class="p-iconbtn"
-            data-testid="document-stop"
-            :disabled="!running"
-            :title="running ? 'Stop' : 'Nothing running'"
-            @click="onStop"
-          >
-            <Codicon name="debug-stop" :size="13" />
-          </button>
-          <!-- Work-in-progress is this ring, not a bar across the view. -->
-          <span
-            class="p-run-state"
-            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
-            :title="statusLine"
-          >
-            <span class="ring"></span>
-          </span>
-        </div>
+      <template #toolbar>
         <div class="sep"></div>
         <div class="group">
           <button
@@ -304,10 +260,10 @@ onUnmounted(() => {
             <Codicon name="collapse-all" :size="13" />
           </button>
         </div>
-      </div>
+      </template>
 
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed. -->
-      <div class="p-toolbar last">
+      <template #toolbar-2>
         <span class="p-input" style="flex: 1; min-width: 0">
           <input
             v-model="searchText"
@@ -318,11 +274,13 @@ onUnmounted(() => {
             @blur="onSearchInput"
           />
         </span>
-      </div>
+      </template>
 
-      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="document-error">
-        {{ rt.error.message }}
-      </div>
+      <template #strips>
+        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="document-error">
+          {{ rt.error.message }}
+        </div>
+      </template>
 
       <div class="list-body" data-testid="document-list">
         <div v-if="!rt || rt.rowCount === 0" class="p-empty">
@@ -407,7 +365,7 @@ onUnmounted(() => {
           </div>
         </template>
       </div>
-    </template>
+    </ViewChrome>
   </div>
 </template>
 

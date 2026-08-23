@@ -4,6 +4,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import Popover from '../../theme/primitives/Popover.vue';
 import { previewPending } from './pendingChanges';
 
 const props = defineProps<{ tabId: string }>();
@@ -43,8 +44,14 @@ function close(): void {
 </script>
 
 <template>
-  <div class="menu-backdrop" data-testid="preview-command-backdrop" @click="close">
-    <div class="preview-panel p-float" data-testid="preview-command-panel" @click.stop>
+  <Popover
+    anchor="right"
+    :width="480"
+    test-id="preview-command-panel"
+    backdrop-test-id="preview-command-backdrop"
+    @close="close"
+  >
+    <div class="preview-panel-inner">
       <div class="preview-panel-header p-panel-head">
         <span class="icon-box"><Codicon name="code" :size="14" /></span>
         <span>Preview SQL</span>
@@ -69,21 +76,11 @@ function close(): void {
         <CodeMirrorHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>
     </div>
-  </div>
+  </Popover>
 </template>
 
 <style scoped>
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-
-.preview-panel {
-  position: absolute;
-  top: 32px;
-  right: 8px;
-  width: 480px;
+.preview-panel-inner {
   max-height: 360px;
   display: flex;
   flex-direction: column;

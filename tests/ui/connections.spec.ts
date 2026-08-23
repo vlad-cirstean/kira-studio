@@ -48,7 +48,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
 
   const row = await connectionRow(page, 'Test PG');
   await expect(row).toBeVisible();
-  await expect(row.locator('.color-rail')).toHaveAttribute('style', /--kira-conn-green/);
+  await expect(row.locator('.p-tree-rail')).toHaveAttribute('style', /--kira-conn-green/);
   await expect(row.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
   await page.waitForTimeout(PERSIST_SETTLE_MS);
@@ -110,7 +110,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="menu-item-edit"]');
   await page.click('[data-testid="color-red"]');
   await page.click('[data-testid="connection-save"]');
-  await expect((await connectionRow(page, 'Test PG')).locator('.color-rail')).toHaveAttribute(
+  await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
     'style',
     /--kira-conn-red/,
   );
@@ -118,14 +118,14 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await (await connectionRow(page, 'Test PG')).click({ button: 'right' });
   await page.hover('[data-testid="menu-item-color"]');
   await page.click('[data-testid="menu-item-color-teal"]');
-  await expect((await connectionRow(page, 'Test PG')).locator('.color-rail')).toHaveAttribute(
+  await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
     'style',
     /--kira-conn-teal/,
   );
 
   await page.waitForTimeout(PERSIST_SETTLE_MS);
   ({ window: page } = await relaunch());
-  await expect((await connectionRow(page, 'Test PG')).locator('.color-rail')).toHaveAttribute(
+  await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
     'style',
     /--kira-conn-teal/,
   );

@@ -13,6 +13,12 @@ const props = defineProps<{
   path?: string;
   name: string;
   connColor?: ConnectionColor | null;
+  // Per-view data-testid hooks: several views assert on the target text via a Playwright
+  // data-testid that predates this shared component. targetTestid covers the whole
+  // path+name span (most views); nameTestid scopes to just the name when a view's test
+  // asserts on the name alone, excluding a non-empty path prefix (e.g. StreamView).
+  targetTestid?: string;
+  nameTestid?: string;
 }>();
 
 const railStyle = computed(() => ({
@@ -26,8 +32,10 @@ const railStyle = computed(() => ({
     <span class="icon-box" :style="iconColor ? { color: iconColor } : undefined">
       <Codicon :name="icon" :size="14" />
     </span>
-    <span class="p-view-target">
-      <span v-if="path" class="path">{{ path }}</span>{{ name }}
+    <span class="p-view-target" :data-testid="targetTestid">
+      <span v-if="path" class="path">{{ path }}</span
+      ><span v-if="nameTestid" :data-testid="nameTestid">{{ name }}</span
+      ><template v-else>{{ name }}</template>
     </span>
     <slot />
     <span class="p-push" style="display: flex; align-items: center; gap: var(--kira-s-2)">

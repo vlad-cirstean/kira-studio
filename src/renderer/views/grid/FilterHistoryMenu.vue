@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { findDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import SavedListMenu from '../shared/SavedListMenu.vue';
 
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ apply: [where: string | null, orderBy: SortSpec | null]; close: [] }>();
@@ -14,6 +15,14 @@ function tab() {
 
 const saved = ref<SavedFilterQuery[]>([]);
 const history = ref<FilterHistoryEntry[]>([]);
+
+// SavedListMenu's generic Entry parameter is inferred from these two props together — giving
+// both the exact same literal union type here (rather than leaving them as the distinct
+// SavedFilterQuery[]/FilterHistoryEntry[] the refs above carry) avoids Vue's generic-component
+// inference picking one prop's type and rejecting the other's.
+type Entry = SavedFilterQuery | FilterHistoryEntry;
+const savedEntries = computed<Entry[]>(() => saved.value);
+const historyEntries = computed<Entry[]>(() => history.value);
 
 // Electron's renderer does not implement window.prompt() (only alert/confirm are backed by a
 // native dialog) — calling it throws rather than showing anything. This is the in-app substitute,
@@ -69,17 +78,28 @@ function summarize(where: string | null, orderBy: SortSpec | null): string {
   return parts.length > 0 ? parts.join(' / ') : '(no filter)';
 }
 
-async function applySaved(entry: SavedFilterQuery): Promise<void> {
-  emit('apply', entry.body.where, entry.body.orderBy);
-  await control.queriesTouch(entry.id);
-  emit('close');
+// SavedListMenu's `apply` fires for both saved and recent rows (its Entry type parameter, here
+// inferred as `SavedFilterQuery | FilterHistoryEntry`, doesn't distinguish them) — branch on the
+// one field that does: only saved entries carry a `body`.
+function isSaved(entry: SavedFilterQuery | FilterHistoryEntry): entry is SavedFilterQuery {
+  return 'body' in entry;
 }
-function applyHistoryEntry(entry: FilterHistoryEntry): void {
-  emit('apply', entry.where, entry.orderBy);
+
+async function applyEntry(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+  if (isSaved(entry)) {
+    emit('apply', entry.body.where, entry.body.orderBy);
+    await control.queriesTouch(entry.id);
+  } else {
+    emit('apply', entry.where, entry.orderBy);
+  }
   emit('close');
 }
 
-async function togglePin(entry: SavedFilterQuery): Promise<void> {
+// togglePin/remove are only wired to the saved section's own controls (SavedListMenu never
+// renders them for a `recent` row) — the Entry-typed parameter is still checked defensively so
+// a `history`-only entry, which has no `id` valid for these calls, can never reach the IPC.
+async function togglePin(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+  if (!isSaved(entry)) return;
   await control.queriesUpdate(entry.id, { pinned: !entry.pinned });
   await reload();
 }
@@ -89,7 +109,8 @@ async function rename(entry: SavedFilterQuery): Promise<void> {
   await control.queriesUpdate(entry.id, { name: name.trim() });
   await reload();
 }
-async function remove(entry: SavedFilterQuery): Promise<void> {
+async function remove(entry: SavedFilterQuery | FilterHistoryEntry): Promise<void> {
+  if (!isSaved(entry)) return;
   await control.queriesDelete(entry.id);
   await reload();
 }
@@ -111,134 +132,71 @@ async function saveCurrent(): Promise<void> {
 </script>
 
 <template>
-  <div class="menu-backdrop" data-testid="filter-history-backdrop" @click="emit('close')">
-    <div class="filter-history p-float" data-testid="filter-history" @click.stop>
-      <div class="p-menu-label">Saved</div>
-      <div v-if="saved.length === 0" class="empty-row p-sm dim">No saved filters</div>
-      <div
-        v-for="entry in saved"
-        :key="entry.id"
-        class="entry-row p-row"
-        data-testid="saved-entry"
-        @click="applySaved(entry)"
+  <SavedListMenu
+    title="Saved"
+    :saved="savedEntries"
+    :recent="historyEntries"
+    panel-test-id="filter-history"
+    backdrop-test-id="filter-history-backdrop"
+    saved-entry-test-id="saved-entry"
+    recent-entry-test-id="history-entry"
+    empty-saved-text="No saved filters"
+    empty-recent-text="No history yet"
+    @apply="applyEntry"
+    @toggle-pin="togglePin"
+    @delete="remove"
+    @close="emit('close')"
+  >
+    <template #entry="{ entry }">
+      <span v-if="isSaved(entry)" class="entry-name">{{ entry.name }}</span>
+      <span v-else class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
+    </template>
+    <template #entry-actions="{ entry }">
+      <button
+        v-if="isSaved(entry)"
+        type="button"
+        class="p-iconbtn"
+        title="Rename"
+        @click.stop="rename(entry)"
       >
-        <button
-          type="button"
-          class="pin-button"
-          :class="{ pinned: entry.pinned }"
-          title="Pin"
-          @click.stop="togglePin(entry)"
-        >
-          <Codicon :name="entry.pinned ? 'star-full' : 'star-empty'" :size="12" />
-        </button>
-        <span class="entry-name">{{ entry.name }}</span>
-        <span class="entry-actions">
-          <button type="button" class="p-iconbtn" title="Rename" @click.stop="rename(entry)">
-            <Codicon name="edit" :size="12" />
-          </button>
-          <button type="button" class="p-iconbtn" title="Delete" @click.stop="remove(entry)">
-            <Codicon name="trash" :size="12" />
-          </button>
-        </span>
-      </div>
-
-      <div class="p-sep" />
-      <div class="p-menu-label">Recent</div>
-      <div v-if="history.length === 0" class="empty-row p-sm dim">No history yet</div>
-      <div
-        v-for="entry in history"
-        :key="entry.id"
-        class="entry-row p-row"
-        data-testid="history-entry"
-        @click="applyHistoryEntry(entry)"
-      >
-        <span class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
-      </div>
-
+        <Codicon name="edit" :size="12" />
+      </button>
+    </template>
+    <template #footer>
       <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
         <span class="icon-box"><Codicon name="add" :size="12" /></span>
         Save current filter…
       </button>
-    </div>
+    </template>
+  </SavedListMenu>
 
-    <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
-      <div class="prompt-box p-float">
-        <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-        <span class="p-input md">
-          <input
-            ref="promptInput"
-            v-model="textPrompt.value"
-            type="text"
-            data-testid="text-prompt-input"
-            @keydown.enter="submitPrompt"
-            @keydown.escape="cancelPrompt"
-          />
-        </span>
-        <div class="prompt-actions">
-          <button type="button" class="p-dlgbtn" data-testid="text-prompt-cancel" @click="cancelPrompt">
-            Cancel
-          </button>
-          <button type="button" class="p-dlgbtn primary" data-testid="text-prompt-ok" @click="submitPrompt">
-            OK
-          </button>
-        </div>
+  <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
+    <div class="prompt-box p-float">
+      <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
+      <span class="p-input md">
+        <input
+          ref="promptInput"
+          v-model="textPrompt.value"
+          type="text"
+          data-testid="text-prompt-input"
+          @keydown.enter="submitPrompt"
+          @keydown.escape="cancelPrompt"
+        />
+      </span>
+      <div class="prompt-actions">
+        <button type="button" class="p-dlgbtn" data-testid="text-prompt-cancel" @click="cancelPrompt">
+          Cancel
+        </button>
+        <button type="button" class="p-dlgbtn primary" data-testid="text-prompt-ok" @click="submitPrompt">
+          OK
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-
-.filter-history {
-  position: absolute;
-  top: 32px;
-  left: 8px;
-  width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.empty-row {
-  padding: var(--kira-s-2) var(--kira-s-3);
-}
-
-.entry-row {
-  cursor: pointer;
-}
-
-.entry-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pin-button {
-  display: flex;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-disabled);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.pin-button.pinned {
-  color: var(--kira-warn);
-}
-
-.entry-actions {
-  display: flex;
-  gap: var(--kira-s-1);
-  flex-shrink: 0;
-}
-
 .save-current {
   width: 100%;
   color: var(--kira-accent);

@@ -7,6 +7,7 @@ import type {
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import Codicon from '../theme/Codicon.vue';
+import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import { evaluate } from './filter';
 import { closeFiltersDialog, filtersDialogState, saveFilters, treeState } from './state/tree';
 
@@ -92,134 +93,78 @@ const connectionName = computed(
 </script>
 
 <template>
-  <div v-if="filtersDialogState.open" class="scrim" data-testid="filters-dialog" @click.self="closeFiltersDialog">
-    <div class="dialog" role="dialog" aria-modal="true">
-      <div class="dialog-title">
-        <span class="icon-box muted"><Codicon name="filter" :size="14" /></span>
-        <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
-        <button
-          type="button"
-          class="title-close"
-          aria-label="Close"
-          data-testid="filters-dialog-close"
-          @click="closeFiltersDialog"
-        >
-          <Codicon name="close" :size="14" />
-        </button>
-      </div>
-      <div class="dialog-body">
-        <!-- Rules run top to bottom, last match wins — the preview strip below is the running
-             answer to "what will the tree actually show", so nobody has to evaluate the order
-             by hand. -->
-        <span class="help">
-          Rules run top to bottom; the last matching rule wins. This never changes what a query
-          returns — only what is listed on the left.
-        </span>
+  <DialogFrame
+    v-if="filtersDialogState.open"
+    title="Tree filters"
+    :width="560"
+    max-height="70vh"
+    test-id="filters-dialog"
+    close-test-id="filters-dialog-close"
+    @close="closeFiltersDialog"
+  >
+    <template #header>
+      <span class="icon-box muted"><Codicon name="filter" :size="14" /></span>
+      <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
+    </template>
 
-        <div class="rule-list">
-          <div v-for="(rule, index) in draft" :key="index" class="rule-row">
-            <select v-model="rule.nodeKind" class="p-select bordered">
-              <option v-for="(label, kind) in NODE_KIND_LABEL" :key="kind" :value="kind">{{ label }}</option>
-            </select>
-            <select v-model="rule.action" class="p-select bordered">
-              <option value="hide">Hide</option>
-              <option value="show">Show</option>
-            </select>
-            <div class="p-input md pattern-input-wrap">
-              <input v-model="rule.pattern" type="text" class="pattern-input" placeholder="pg_*" />
-            </div>
-            <label class="regex-checkbox">
-              <input v-model="rule.isRegex" type="checkbox" />
-              Regex
-            </label>
-            <button type="button" class="p-iconbtn" aria-label="Delete rule" @click="removeRule(index)">
-              <Codicon name="trash" :size="14" />
-            </button>
-            <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
+    <div class="dialog-body-inner">
+      <!-- Rules run top to bottom, last match wins — the preview strip below is the running
+           answer to "what will the tree actually show", so nobody has to evaluate the order
+           by hand. -->
+      <span class="help">
+        Rules run top to bottom; the last matching rule wins. This never changes what a query
+        returns — only what is listed on the left.
+      </span>
+
+      <div class="rule-list">
+        <div v-for="(rule, index) in draft" :key="index" class="rule-row">
+          <select v-model="rule.nodeKind" class="p-select bordered">
+            <option v-for="(label, kind) in NODE_KIND_LABEL" :key="kind" :value="kind">{{ label }}</option>
+          </select>
+          <select v-model="rule.action" class="p-select bordered">
+            <option value="hide">Hide</option>
+            <option value="show">Show</option>
+          </select>
+          <div class="p-input md pattern-input-wrap">
+            <input v-model="rule.pattern" type="text" class="pattern-input" placeholder="pg_*" />
           </div>
-        </div>
-
-        <button type="button" class="p-btn add-rule" @click="addRule">
-          <span class="icon-box"><Codicon name="add" :size="12" /></span>
-          Add rule
-        </button>
-
-        <div class="p-strip note preview-strip">
-          <span class="icon-box"><Codicon name="info" :size="14" /></span>
-          <span>
-            Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
-            is deleted — removing a rule brings it straight back.
-          </span>
+          <label class="regex-checkbox">
+            <input v-model="rule.isRegex" type="checkbox" />
+            Regex
+          </label>
+          <button type="button" class="p-iconbtn" aria-label="Delete rule" @click="removeRule(index)">
+            <Codicon name="trash" :size="14" />
+          </button>
+          <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
         </div>
       </div>
-      <div class="dialog-footer">
-        <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
-        <span class="footer-actions p-push">
-          <button type="button" class="p-dlgbtn" @click="closeFiltersDialog">Cancel</button>
-          <button type="button" class="p-dlgbtn primary" @click="onSave">Save filters</button>
+
+      <button type="button" class="p-btn add-rule" @click="addRule">
+        <span class="icon-box"><Codicon name="add" :size="12" /></span>
+        Add rule
+      </button>
+
+      <div class="p-strip note preview-strip">
+        <span class="icon-box"><Codicon name="info" :size="14" /></span>
+        <span>
+          Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
+          is deleted — removing a rule brings it straight back.
         </span>
       </div>
     </div>
-  </div>
+
+    <template #footer>
+      <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+      <span class="footer-actions p-push">
+        <button type="button" class="p-dlgbtn" @click="closeFiltersDialog">Cancel</button>
+        <button type="button" class="p-dlgbtn primary" @click="onSave">Save filters</button>
+      </span>
+    </template>
+  </DialogFrame>
 </template>
 
 <style scoped>
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog {
-  width: 560px;
-  max-height: 70vh;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-lg);
-  box-shadow: var(--kira-shadow-dialog);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dialog-title {
-  height: var(--kira-h-lg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-lg);
-  color: var(--kira-fg);
-}
-
-.title-close {
-  width: var(--kira-h-sm);
-  height: var(--kira-h-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--kira-radius-sm);
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.title-close:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.dialog-body {
-  flex: 1;
-  overflow: auto;
+.dialog-body-inner {
   padding: var(--kira-s-5);
   display: flex;
   flex-direction: column;
@@ -294,16 +239,6 @@ const connectionName = computed(
   align-self: stretch;
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius-sm);
-}
-
-.dialog-footer {
-  height: 46px;
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-5);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 
 .footer-actions {

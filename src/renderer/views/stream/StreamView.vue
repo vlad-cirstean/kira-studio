@@ -6,6 +6,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { goNext, load, poll, reload, runCount, runtime, stop } from './state';
 import { streamMenu } from './streamMenu';
@@ -38,11 +39,15 @@ const connectionRecord = computed(() =>
     ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
     : undefined,
 );
-const railStyle = computed(() => ({
-  '--kira-rail': connectionRecord.value?.color
+const iconColor = computed(() =>
+  connectionRecord.value?.color
     ? `var(--kira-conn-${connectionRecord.value.color})`
-    : undefined,
-}));
+    : 'var(--kira-fg-muted)',
+);
+
+const pathPrefix = computed(() =>
+  connectionRecord.value ? `${connectionRecord.value.name} / ` : '',
+);
 
 // D10/D12: SQS's 'batch' pagination is never auto-loaded — the user must click Poll, because
 // every poll consumes messages from the queue (subject to VisibilityTimeout) rather than
@@ -131,97 +136,66 @@ onUnmounted(() => {
         Reconnect &amp; load
       </button>
     </div>
-    <template v-else>
-      <!-- LAW: the view header is 28px, and the connection colour appears here only as a dot
-           (never a tint) — the rail below caps the toolbar instead, per Toolbar.vue. -->
-      <div class="p-view-head">
-        <span class="p-conn-dot" :class="{ none: !connectionRecord?.color }" :style="railStyle" title="Connection colour" />
-        <span class="icon-box" :style="{ color: connectionRecord?.color ? `var(--kira-conn-${connectionRecord?.color})` : 'var(--kira-fg-muted)' }">
-          <Codicon name="broadcast" :size="14" />
-        </span>
-        <span class="p-view-target">
-          <span v-if="connectionRecord" class="path">{{ connectionRecord.name }} / </span>
-          <span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span>
-        </span>
+    <ViewChrome
+      v-else
+      :tab="tab"
+      icon="broadcast"
+      :icon-color="iconColor"
+      :path="pathPrefix"
+      :name="targetTail?.name ?? tab.path"
+      name-testid="stream-target"
+      refresh-testid="stream-refresh"
+      stop-testid="stream-stop"
+      :can-stop="running"
+      @refresh="reload(tab.id)"
+      @stop="onStop"
+    >
+      <template #head-trailing>
         <span
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
-          class="p-badge p-push"
+          class="p-badge"
           data-testid="stream-visibility-timeout"
         >
           visibility {{ page.visibilityTimeoutSeconds }}s
         </span>
-      </div>
+      </template>
 
-      <!-- LAW: the connection colour caps the toolbar as a 2px rail, never the whole panel. -->
-      <div class="p-toolbar-rail" :style="railStyle" />
-      <div class="p-toolbar">
-        <div class="group">
-          <button
-            type="button"
-            class="p-iconbtn"
-            data-testid="stream-refresh"
-            title="Refresh"
-            @click="reload(tab.id)"
-          >
-            <Codicon name="refresh" :size="13" />
-          </button>
-          <button
-            type="button"
-            class="p-iconbtn"
-            data-testid="stream-count"
-            title="Count"
-            @click="runCount(tab.id)"
-          >
-            <Codicon name="symbol-number" :size="13" />
-          </button>
-          <button
-            v-if="isBatch"
-            type="button"
-            class="p-btn is-active"
-            data-testid="stream-poll"
-            title="Poll for messages"
-            @click="onPoll"
-          >
-            <span class="icon-box"><Codicon name="arrow-swap" :size="13" /></span>
-            Poll
-          </button>
-          <button
-            v-else
-            type="button"
-            class="p-iconbtn"
-            data-testid="stream-next"
-            :disabled="!rt?.hasMore"
-            title="Next page"
-            @click="goNext(tab.id)"
-          >
-            <Codicon name="arrow-right" :size="13" />
-          </button>
-          <!-- LAW: Stop always follows the verb that started the work, disabled when idle — never
-               its own separate control elsewhere. -->
-          <button
-            v-if="running"
-            type="button"
-            class="p-iconbtn"
-            data-testid="stream-stop"
-            title="Stop"
-            style="color: var(--kira-error)"
-            @click="onStop"
-          >
-            <Codicon name="debug-stop" :size="13" />
-          </button>
-          <!-- LAW: work-in-progress is a ring in the toolbar next to the verb that started it,
-               never a bar across the top of the view. -->
-          <span
-            class="p-run-state"
-            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
-            :title="running ? 'Loading' : rt?.status === 'error' ? 'Last run failed' : undefined"
-          >
-            <span class="ring" />
-          </span>
-        </div>
-      </div>
+      <template #toolbar>
+        <button
+          type="button"
+          class="p-iconbtn"
+          data-testid="stream-count"
+          title="Count"
+          @click="runCount(tab.id)"
+        >
+          <Codicon name="symbol-number" :size="13" />
+        </button>
+        <button
+          v-if="isBatch"
+          type="button"
+          class="p-btn is-active"
+          data-testid="stream-poll"
+          title="Poll for messages"
+          @click="onPoll"
+        >
+          <span class="icon-box"><Codicon name="arrow-swap" :size="13" /></span>
+          Poll
+        </button>
+        <button
+          v-else
+          type="button"
+          class="p-iconbtn"
+          data-testid="stream-next"
+          :disabled="!rt?.hasMore"
+          title="Next page"
+          @click="goNext(tab.id)"
+        >
+          <Codicon name="arrow-right" :size="13" />
+        </button>
+      </template>
 
       <!-- The one destructive truth of this view, stated once at the top. -->
+      <template #strips>
       <div v-if="isBatch" class="p-strip warn" data-testid="stream-poll-warning">
         <span class="icon-box"><Codicon name="warning" :size="13" /></span>
         <span
@@ -234,6 +208,7 @@ onUnmounted(() => {
         <span class="icon-box"><Codicon name="error" :size="13" /></span>
         <span>{{ rt.error.message }}</span>
       </div>
+      </template>
 
       <div class="list-body" data-testid="stream-list">
         <div v-if="isBatch && !rt?.polled" class="p-empty no-rows">
@@ -291,7 +266,7 @@ onUnmounted(() => {
       </div>
 
       <div class="status-line" data-testid="stream-status">{{ statusLine }}</div>
-    </template>
+    </ViewChrome>
   </div>
 </template>
 

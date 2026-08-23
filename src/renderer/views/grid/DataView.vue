@@ -6,6 +6,8 @@ import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import DataGrid from './DataGrid.vue';
+import DataToolbar from './DataToolbar.vue';
+import FilterToolbar from './FilterToolbar.vue';
 import SearchToolbar from './SearchToolbar.vue';
 import { cancelPrefetch, load, reload, runtime } from './state';
 
@@ -26,6 +28,16 @@ const needsReconnect = computed(
 );
 
 const rt = computed(() => runtime[props.tab.id]);
+
+// P16 design system LAW: the connection colour caps the toolbar as a 2px rail, never a tint on
+// the whole view. Moved here from the shell-level Toolbar.vue this component's toolbars used to
+// be rendered by (see DataToolbar.vue/FilterToolbar.vue — they render their own .p-toolbar bands
+// unchanged, only who mounts them changed).
+const railStyle = computed(() => {
+  const id = props.tab.connectionId;
+  const color = id ? connectionsState.records.find((r) => r.id === id)?.color : undefined;
+  return { '--kira-rail': color ? `var(--kira-conn-${color})` : undefined };
+});
 
 async function onReconnectAndLoad(): Promise<void> {
   if (!props.tab.connectionId) return;
@@ -74,6 +86,14 @@ function onCloseSearch(): void {
 
 <template>
   <div class="data-view">
+    <!-- The grid has no view-head (Main.html opens straight on its toolbar) — DataToolbar and
+         FilterToolbar render their own .p-toolbar bands unchanged; this is just their new host,
+         moved from the shell-level Toolbar.vue so every view's chrome lives inside the view. -->
+    <div class="toolbar-band" :style="railStyle">
+      <div class="p-toolbar-rail" :style="railStyle" />
+      <DataToolbar />
+      <FilterToolbar />
+    </div>
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="reconnect-panel">
       <button type="button" class="p-dlgbtn primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
         Reconnect &amp; load
@@ -111,6 +131,11 @@ function onCloseSearch(): void {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.toolbar-band {
+  min-height: 32px;
+  flex-shrink: 0;
 }
 
 .reconnect-panel {

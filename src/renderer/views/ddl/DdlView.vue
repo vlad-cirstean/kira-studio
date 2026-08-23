@@ -3,11 +3,13 @@ import { ddlText } from '@shared/domain/ddl';
 import type { DdlTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted } from 'vue';
+import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
-import { isHydrated, markHydrated } from '../../state/tabs';
+import { isHydrated, markHydrated, openConsoleTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { load, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab — same discipline as
@@ -26,6 +28,7 @@ const needsReconnect = computed(
 );
 
 const rt = computed(() => runtime[props.tab.id]);
+const loading = computed(() => rt.value?.status === 'loading');
 
 async function onReconnectAndLoad(): Promise<void> {
   if (!props.tab.connectionId) return;
@@ -36,16 +39,27 @@ async function onReconnectAndLoad(): Promise<void> {
   await load(props.tab.id);
 }
 
+function onRefresh(): void {
+  void load(props.tab.id, { refresh: true });
+}
+
+// "Open query console" mirrors project/menus.ts's own consoleMenuItem: the tab's own connection
+// and path, handed straight to openConsoleTab, no new capability involved.
+function onOpenConsole(): void {
+  if (props.tab.connectionId) openConsoleTab(props.tab.connectionId, props.tab.path);
+}
+
+function onCopy(): void {
+  if (ddl.value) copyText(ddlText(ddl.value));
+}
+
 let unregisterCommand: (() => void) | null = null;
 
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
-  unregisterCommand = registerCommand(
-    'view.refresh',
-    () => void load(props.tab.id, { refresh: true }),
-  );
+  unregisterCommand = registerCommand('view.refresh', onRefresh);
 });
 
 onUnmounted(() => {
@@ -74,11 +88,6 @@ const originPhrase = computed(() =>
 const connectionRecord = computed(() =>
   connectionsState.records.find((r) => r.id === props.tab.connectionId),
 );
-const railColor = computed(() => connectionRecord.value?.color);
-const railStyle = computed(() => ({
-  '--kira-rail': railColor.value ? `var(--kira-conn-${railColor.value})` : undefined,
-}));
-
 // Produced locally from the path — the same discipline DataGrid.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.
@@ -111,48 +120,69 @@ const breadcrumb = computed(() => {
         Reconnect &amp; load
       </button>
     </div>
-    <template v-else>
-      <!-- LAW — every non-grid view opens with a p-view-head: connection dot, identity, kind,
-           and (since a DDL tab is always read-only) the reason stated as a fact, not a disabled
-           control. Column/index/constraint counts and the Definition/Columns/Indexes/Constraints
-           segmented view from the mockup need structured catalog data this tab doesn't fetch
-           (only the raw statement text) — skipped rather than faked. -->
-      <div class="p-view-head">
-        <span
-          class="p-conn-dot"
-          :class="{ none: !railColor }"
-          :style="railStyle"
-          title="Connection colour"
-        />
-        <span class="icon-box"><Codicon name="code" :size="14" /></span>
-        <span class="p-view-target" data-testid="ddl-target">
-          <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
-        </span>
+    <!-- Column/index/constraint counts and the Definition/Columns/Indexes/Constraints segmented
+         view from the mockup need structured catalog data this tab doesn't fetch (only the raw
+         statement text) — skipped rather than faked. -->
+    <ViewChrome
+      v-else
+      :tab="tab"
+      icon="code"
+      :path="breadcrumb"
+      :name="targetLabel"
+      target-testid="ddl-target"
+      refresh-testid="ddl-refresh"
+      :can-refresh="!loading"
+      :can-stop="false"
+      @refresh="onRefresh"
+    >
+      <template #badges>
         <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
         <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
           <Codicon name="lock" :size="11" />
           read-only — {{ originPhrase }}
         </span>
-      </div>
+      </template>
 
-      <!-- LAW — work-in-progress is a ring + elapsed time in the toolbar that started it
-           (DdlToolbar.vue's p-run-state), never a bar across the view. -->
-      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="ddl-error">
-        <span class="icon-box"><Codicon name="error" :size="14" /></span>
-        <span class="err-message">{{ rt.error }}</span>
-      </div>
-      <div v-if="ddl && ddl.notes.length > 0" class="p-strip note" data-testid="ddl-notes">
-        <span class="icon-box"><Codicon name="info" :size="14" /></span>
-        <ul class="notes-list">
-          <li v-for="(note, i) in ddl.notes" :key="i">{{ note }}</li>
-        </ul>
-      </div>
+      <!-- Stop is permanently disabled: this load has no cancellation to offer (state.ts tracks
+           no op-id for it) — the slot stays reserved rather than wired to a stop that doesn't
+           exist. -->
+      <template #toolbar-end>
+        <div class="sep" />
+        <button type="button" class="p-btn" title="Copy DDL to clipboard" data-testid="ddl-copy" @click="onCopy">
+          <span class="icon-box"><Codicon name="copy" :size="14" /></span>
+          Copy
+        </button>
+        <button
+          type="button"
+          class="p-btn"
+          title="Open query console here"
+          data-testid="ddl-open-console"
+          @click="onOpenConsole"
+        >
+          <span class="icon-box"><Codicon name="terminal" :size="14" /></span>
+          Open in console
+        </button>
+      </template>
+
+      <template #strips>
+        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="ddl-error">
+          <span class="icon-box"><Codicon name="error" :size="14" /></span>
+          <span class="err-message">{{ rt.error }}</span>
+        </div>
+        <div v-if="ddl && ddl.notes.length > 0" class="p-strip note" data-testid="ddl-notes">
+          <span class="icon-box"><Codicon name="info" :size="14" /></span>
+          <ul class="notes-list">
+            <li v-for="(note, i) in ddl.notes" :key="i">{{ note }}</li>
+          </ul>
+        </div>
+      </template>
+
       <div class="editor-body">
         <CodeMirrorHost :doc="document" language="sql" :sql-dialect="dialect" :read-only="true" />
       </div>
       <!-- LAW — there is no editor status line: identity moved to the view header above,
            duration to the toolbar's run-state, and this tab has no pending edits to report. -->
-    </template>
+    </ViewChrome>
   </div>
 </template>
 
