@@ -1,8 +1,14 @@
-export { BridgeClient } from "./bridge/client.ts";
 export type { ConnectionState } from "./bridge/client.ts";
-export { ACTION_ICONS } from "./icons/index.ts";
+export { BridgeClient } from "./bridge/client.ts";
 export type { IconAction } from "./icons/index.ts";
+export { ACTION_ICONS } from "./icons/index.ts";
+export type { MountHandle, MountOptions } from "./main.ts";
 export { mount } from "./main.ts";
-export type { MountHandle } from "./main.ts";
-export { TokenReader } from "./theme/readTokens.ts";
+export type { ChunkSource } from "./state/graphView.ts";
+export { GraphViewState } from "./state/graphView.ts";
+export { RepoState } from "./state/repo.ts";
+export { SettingsState } from "./state/settings.ts";
+export type { PersistedViewState, ViewStateStore } from "./state/viewState.ts";
+export { InMemoryViewStateStore, parsePersistedViewState } from "./state/viewState.ts";
 export type { TokenChangeListener, TokenMap, TokenName } from "./theme/readTokens.ts";
+export { TokenReader } from "./theme/readTokens.ts";

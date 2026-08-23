@@ -8,7 +8,8 @@
   "references": [
     { "path": "../packages/core" },
     { "path": "../packages/git" },
-    { "path": "../packages/ipc" }
+    { "path": "../packages/ipc" },
+    { "path": "../packages/ui" }
   ],
   "include": ["**/*.ts"]
 }

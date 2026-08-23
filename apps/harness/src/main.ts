@@ -1,4 +1,4 @@
-import { mount, type TokenMap, TokenReader } from "@kira-version/ui";
+import { InMemoryViewStateStore, mount, type TokenMap, TokenReader } from "@kira-version/ui";
 import { createMockBridge } from "./mockBridge.ts";
 import { applyThemeKind, isThemeKind, type ThemeKind } from "./themeSwitcher.ts";
 
@@ -37,4 +37,4 @@ if (!container) {
 }
 
 const transport = createMockBridge(scenarioName);
-mount(container, transport);
+mount(container, { transport, viewState: new InMemoryViewStateStore(), host: "harness" });

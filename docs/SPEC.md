@@ -193,6 +193,7 @@ kira-version-vscode/
 │   │       ├── App.vue
 │   │       ├── bridge/             client.ts   typed client over the ipc contract
 │   │       ├── state/              repo.ts graphView.ts selection.ts search.ts settings.ts
+│   │       │                       viewState.ts    persisted view state (§2.1, §5.4)
 │   │       ├── graph/              GraphCanvas.vue  canvas element + lifecycle
 │   │       │                       renderer.ts      draws lanes/edges/nodes from typed arrays
 │   │       │                       hitTest.ts       arithmetic row/lane hit testing
