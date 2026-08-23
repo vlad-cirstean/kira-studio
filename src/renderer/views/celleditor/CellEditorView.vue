@@ -182,81 +182,87 @@ const statusLine = computed(() => {
     :data-read-only-reason="readOnlyReason"
     :data-formatted="formatted"
   >
-    <div class="header">
-      <span class="target-group">
-        <span class="target" data-testid="cell-editor-target">{{ targetLabel }} · row {{ cell.row + 1 }}</span>
-        <span class="type-pill">{{ cell.column.dataType }}</span>
+    <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
+         badges, then this panel's own controls, then the trailing group pushed to the edge. -->
+    <div class="p-view-head">
+      <span class="icon-box"><Codicon name="symbol-string" :size="12" /></span>
+      <span class="p-view-target" data-testid="cell-editor-target"
+        >{{ targetLabel }}<span class="path"> · row {{ cell.row + 1 }}</span></span
+      >
+      <span class="p-badge">{{ cell.column.dataType }}</span>
+      <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
+      <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
+      <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
+      <span class="p-badge status-badge" data-testid="cell-editor-status">{{ statusLine }}</span>
+
+      <span class="format-group">
+        <select
+          class="p-select bordered format-select"
+          data-testid="cell-editor-format"
+          :disabled="isNullValue"
+          :value="override ?? 'auto'"
+          :title="detectedReason"
+          @change="onFormatSelect"
+        >
+          <option value="auto">Auto — {{ FORMAT_LABEL[detectedFormat] }}</option>
+          <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
+        </select>
+
+        <button
+          type="button"
+          class="p-iconbtn"
+          :class="{ 'is-active': formatted === 'indented' }"
+          data-testid="cell-editor-beautify-indented"
+          :disabled="!canBeautify(effectiveFormat)"
+          :title="beautifyDisabledTitle"
+          @click="applyBeautify('indented')"
+        >
+          <Codicon name="list-tree" :size="14" />
+        </button>
+        <button
+          type="button"
+          class="p-iconbtn"
+          :class="{ 'is-active': formatted === 'compact' }"
+          data-testid="cell-editor-beautify-compact"
+          :disabled="!canBeautify(effectiveFormat)"
+          :title="beautifyDisabledTitle"
+          @click="applyBeautify('compact')"
+        >
+          <Codicon name="list-flat" :size="14" />
+        </button>
+        <button
+          type="button"
+          class="p-iconbtn"
+          data-testid="cell-editor-beautify-reset"
+          :disabled="formatted === 'none'"
+          :title="resetDisabledTitle"
+          @click="resetBuffer"
+        >
+          <Codicon name="discard" :size="14" />
+        </button>
       </span>
-      <span v-if="isNullValue" class="badge" data-testid="cell-editor-badge-null">NULL</span>
-      <span v-if="isEmptyValue" class="badge" data-testid="cell-editor-badge-empty">empty</span>
-      <span v-if="isTruncatedValue" class="badge" data-testid="cell-editor-badge-truncated">truncated</span>
 
-      <span class="spacer" />
+      <span class="p-push trailing-group">
+        <span v-if="readOnlyReason" class="p-chip warn" :title="readOnlyChipTitle">
+          <Codicon name="lock" :size="12" />
+          {{ readOnlyChipText }}
+        </span>
 
-      <select
-        class="format-select"
-        data-testid="cell-editor-format"
-        :disabled="isNullValue"
-        :value="override ?? 'auto'"
-        :title="detectedReason"
-        @change="onFormatSelect"
-      >
-        <option value="auto">Auto — {{ FORMAT_LABEL[detectedFormat] }}</option>
-        <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
-      </select>
-
-      <button
-        type="button"
-        class="icon-button"
-        data-testid="cell-editor-beautify-indented"
-        :disabled="!canBeautify(effectiveFormat)"
-        :title="beautifyDisabledTitle"
-        @click="applyBeautify('indented')"
-      >
-        <Codicon name="list-tree" :size="14" />
-      </button>
-      <button
-        type="button"
-        class="icon-button"
-        data-testid="cell-editor-beautify-compact"
-        :disabled="!canBeautify(effectiveFormat)"
-        :title="beautifyDisabledTitle"
-        @click="applyBeautify('compact')"
-      >
-        <Codicon name="list-flat" :size="14" />
-      </button>
-      <button
-        type="button"
-        class="icon-button"
-        data-testid="cell-editor-beautify-reset"
-        :disabled="formatted === 'none'"
-        :title="resetDisabledTitle"
-        @click="resetBuffer"
-      >
-        <Codicon name="discard" :size="14" />
-      </button>
-
-      <span v-if="readOnlyReason" class="read-only-chip" :title="readOnlyChipTitle">
-        <Codicon name="lock" :size="12" />
-        {{ readOnlyChipText }}
+        <button
+          type="button"
+          class="p-iconbtn"
+          data-testid="cell-editor-collapse"
+          title="Hide cell editor"
+          @click="toggleCellEditorPanel"
+        >
+          <Codicon name="chevron-down" :size="14" />
+        </button>
       </span>
-
-      <button
-        type="button"
-        class="icon-button"
-        data-testid="cell-editor-collapse"
-        title="Hide cell editor"
-        @click="toggleCellEditorPanel"
-      >
-        <Codicon name="chevron-down" :size="14" />
-      </button>
     </div>
 
     <div class="editor-body">
       <CodeMirrorHost :doc="doc" :language="language" :sql-dialect="sqlDialect" :read-only="true" />
     </div>
-
-    <div class="status-line" data-testid="cell-editor-status">{{ statusLine }}</div>
   </div>
 </template>
 
@@ -268,63 +274,25 @@ const statusLine = computed(() => {
   min-height: 0;
 }
 
-.header {
+/* the format select + beautify/reset trio: this panel's own controls, set off from the
+   identity badges with the standard s-4 gutter (mirrors CellEditor.html's inline group) */
+.format-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
+  gap: var(--kira-s-3);
+  margin-left: var(--kira-s-4);
   flex-shrink: 0;
 }
 
-.target-group {
+/* read-only reason + collapse: pushed to the header's trailing edge via .p-push */
+.trailing-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  min-width: 32px;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.type-pill {
-  padding: 1px 5px;
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  font-weight: 400;
-  font-size: 10px;
+  gap: var(--kira-s-3);
   flex-shrink: 0;
-}
-
-.badge {
-  padding: 1px 6px;
-  border-radius: var(--kira-radius-pill);
-  background: var(--kira-badge);
-  color: var(--kira-fg);
-  font-size: 10px;
-  flex-shrink: 0;
-}
-
-.spacer {
-  flex: 1;
 }
 
 .format-select {
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  padding: 2px 4px;
-  font-size: 11px;
   max-width: 160px;
 }
 
@@ -332,56 +300,17 @@ const statusLine = computed(() => {
   color: var(--kira-fg-disabled);
 }
 
-.icon-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: transparent;
-  border: none;
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.icon-button:disabled {
-  color: var(--kira-fg-disabled);
-  cursor: default;
-}
-
-.read-only-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: var(--kira-radius-pill);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  flex-shrink: 0;
-  white-space: nowrap;
+/* the relocated statusLine (detected format / bytes / decoded reading / truncation note /
+   beautify failure) now lives in the header as a badge — LAW: no editor status line, everything
+   it used to say already exists in the view header. */
+.status-badge {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .editor-body {
   flex: 1;
   min-height: 0;
-}
-
-.status-line {
-  padding: 3px 8px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>
