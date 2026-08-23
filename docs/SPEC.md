@@ -185,6 +185,8 @@ kira-version-vscode/
 │   │       ├── contract.ts         request/response/event/stream type map, versioned
 │   │       ├── transport.ts        Transport interface both hosts implement
 │   │       ├── codec.ts            encode/decode incl. ArrayBuffer transfer lists
+│   │       ├── rpc.ts              the one generic endpoint: correlation, stream credits,
+│   │       │                       cancellation, version validation (P3 W2)
 │   │       └── validate.ts         boundary validation; a schema mismatch fails loudly
 │   │
 │   ├── ui/                         Vue 3 app. Imports core + ipc only. Never `vscode`.
