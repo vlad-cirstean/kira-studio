@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { cellSelectionState } from '../state/cellSelection';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
@@ -15,7 +16,11 @@ import {
 } from './state/layout';
 
 const projectVisible = computed(() => layoutState.panel.project.visible);
-const cellVisible = computed(() => layoutState.panel.cellEditor.visible);
+// Driven entirely by selection now, not a manual flag (D2): the panel exists to show a currently
+// selected cell, so it only makes sense to be on screen while one is selected. There's no longer
+// a toggle to disagree with this, so the old `layoutState.panel.cellEditor.visible` flag was
+// removed rather than kept alongside as a second, now-unreachable gate.
+const cellVisible = computed(() => cellSelectionState.current !== null);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
 
 const gridStyle = computed(() => ({

@@ -21,6 +21,13 @@ export interface SelectedCell {
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
    *  page has one is grid-only knowledge and `views/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;
+  /** Set only by a publisher that can genuinely stage a write for this exact cell (today, only
+   *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`). `undefined`
+   *  means "this view never lets the panel edit its cells" — the panel forces read-only whenever
+   *  this is absent, regardless of `readOnlyReasonFor()`, so a future publisher (Document/
+   *  KeyValue/Stream/Console) that never sets it keeps its cells read-only in the panel by
+   *  default rather than needing to opt out. */
+  onEdit?: (newValue: string) => void;
 }
 
 export const cellSelectionState = reactive<{ current: SelectedCell | null }>({ current: null });

@@ -30,7 +30,6 @@ export async function getAllLayout(db: KiraDb): Promise<Layout> {
         height: pick(stored, 'panel.operations.height', defaultLayout.panel.operations.height),
       },
       cellEditor: {
-        visible: pick(stored, 'panel.cellEditor.visible', defaultLayout.panel.cellEditor.visible),
         height: pick(stored, 'panel.cellEditor.height', defaultLayout.panel.cellEditor.height),
       },
     },
@@ -48,7 +47,6 @@ function flatten(layout: Layout): [string, unknown][] {
     ['panel.project.width', layout.panel.project.width],
     ['panel.operations.visible', layout.panel.operations.visible],
     ['panel.operations.height', layout.panel.operations.height],
-    ['panel.cellEditor.visible', layout.panel.cellEditor.visible],
     ['panel.cellEditor.height', layout.panel.cellEditor.height],
     ['window.bounds', layout.window.bounds],
   ];

@@ -52,10 +52,6 @@ export function toggleOperationsPanel(): void {
   patchLayout({ panel: { operations: { visible: !layoutState.panel.operations.visible } } });
 }
 
-export function toggleCellEditorPanel(): void {
-  patchLayout({ panel: { cellEditor: { visible: !layoutState.panel.cellEditor.visible } } });
-}
-
 export function setProjectWidth(width: number): void {
   patchLayout({ panel: { project: { width } } });
 }

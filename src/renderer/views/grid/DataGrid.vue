@@ -365,16 +365,26 @@ watch(
       return;
     }
     const view = cell(props.tabId, target.row, pageCol);
+    const column = p.columns[pageCol];
+    const targetRow = target.row;
     const selected: SelectedCell = {
       tabId: props.tabId,
       connectionId: t.connectionId,
       path: t.path,
       columnIndex: pageCol,
-      column: p.columns[pageCol],
-      row: target.row,
+      column,
+      row: targetRow,
       value: view.isNull ? null : view.text,
       truncated: view.truncated,
       hasPrimaryKey: hasPrimaryKey.value,
+      // Same eligibility as the grid's own inline (double-click) edit (D2/D6): writable
+      // connection, a primary key to identify the row, and the row isn't already staged for
+      // delete. Stages into the exact same pending-change set `stageEdit` already feeds, so the
+      // panel's save and the grid's own inline edit can never disagree about a cell's value.
+      onEdit:
+        canEditTable.value && !isDeleted(targetRow)
+          ? (newValue: string) => stageEdit(props.tabId, targetRow, column.name, newValue)
+          : undefined,
     };
     publishSelectedCell(selected);
   },
@@ -1093,7 +1103,7 @@ defineExpose({ scrollCellIntoView });
 
 /* FIX-8: PK/FK stated as a label, never inferred from colour alone (p-th's own .key). */
 .header-key {
-  color: var(--kira-warn);
+  color: var(--kira-info);
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
 }

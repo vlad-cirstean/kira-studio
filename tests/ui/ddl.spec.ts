@@ -302,7 +302,9 @@ test('DDL tab — open, notes, read-only, cache and ops, session restore', async
   await expect(dataTab).toHaveAttribute('data-tab-kind', 'data');
   const dataTabId = (await dataTab.getAttribute('data-tab-id')) as string;
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
-  await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
+  // No cell is selected in this freshly-opened grid, so the cell editor panel — now driven
+  // entirely by selection, not a persistent manual-toggle flag — hasn't mounted at all.
+  await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
 
   const currentDdlTab = page.locator('[data-testid="tab"][data-tab-kind="ddl"]').first();
   const currentDdlTabId = (await currentDdlTab.getAttribute('data-tab-id')) as string;
@@ -314,7 +316,9 @@ test('DDL tab — open, notes, read-only, cache and ops, session restore', async
   await page.locator(`[data-testid="tab"][data-tab-id="${dataTabId}"]`).click();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="ddl-view"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
+  // No cell is selected in this freshly-opened grid, so the cell editor panel — now driven
+  // entirely by selection, not a persistent manual-toggle flag — hasn't mounted at all.
+  await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
 
   await currentDdlTab.click();
   await expect(page.locator('[data-testid="ddl-view"]')).toBeVisible();

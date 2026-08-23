@@ -13,10 +13,14 @@ test('workbench launches with all chrome regions and a healthy engine', async ({
   // each view now renders its own toolbar, so with no connections/tabs (this fixture's fresh
   // KIRA_HOME) there is none — the tab strip stays mounted but empty, and MainView's own
   // FirstRun screen is what actually carries the "what do I do now" messaging.
-  const alwaysPresent = ['project-panel', 'tab-strip', 'main-view', 'cell-editor', 'status-bar'];
+  const alwaysPresent = ['project-panel', 'tab-strip', 'main-view', 'status-bar'];
   for (const testid of alwaysPresent) {
     await expect(window.locator(`[data-testid="${testid}"]`)).toBeVisible();
   }
+
+  // The cell editor panel is driven by cell selection, not a fixed shell region — with no
+  // connections/tabs open yet, nothing is selected, so it starts hidden.
+  await expect(window.locator('[data-testid="cell-editor"]')).toHaveCount(0);
 
   // Operations panel starts hidden (defaultLayout.panel.operations.visible === false).
   await expect(window.locator('[data-testid="operations-panel"]')).toHaveCount(0);

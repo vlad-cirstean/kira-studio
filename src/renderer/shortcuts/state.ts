@@ -2,11 +2,7 @@ import { reactive } from 'vue';
 import { openCreateDialog } from '../state/connections';
 import { settingsOpen } from '../state/settings';
 import { activateNextTab, activatePrevTab, closeTab, tabsState } from '../state/tabs';
-import {
-  toggleCellEditorPanel,
-  toggleOperationsPanel,
-  toggleProjectPanel,
-} from '../workbench/state/layout';
+import { toggleOperationsPanel, toggleProjectPanel } from '../workbench/state/layout';
 import { runCommand } from './commands';
 
 export interface PaletteCommand {
@@ -24,7 +20,6 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
-  { id: 'toggle-cell-editor-panel', label: 'Toggle cell editor panel', run: toggleCellEditorPanel },
   { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
   { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },

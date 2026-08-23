@@ -395,8 +395,11 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   });
   await expect(panel).toHaveAttribute('data-cell-key', `${tabId}:2:sample`);
 
+  // A row selection carries no single cell to show — the panel now auto-hides entirely rather
+  // than staying mounted with a "no cell selected" placeholder (no more manual toggle to have
+  // pinned it open).
   await page.locator('[data-testid="grid-gutter-cell"]').first().click();
-  await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
 
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
@@ -406,20 +409,51 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page
     .locator('[data-testid="grid-header-cell"][data-column="kind"] .header-select-zone')
     .click();
-  await expect(page.locator('[data-testid="cell-editor-empty"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
 
-  // --- scenario 9: the panel itself stays read-only even for an editable cell --------------
-  // `formats` has a primary key and this connection is writable, so P5 makes this cell
-  // genuinely editable (in the grid) — the panel carries no read-only-reason attribute at all,
-  // but its own CodeMirrorHost is still hardcoded read-only (D4: editing happens in the grid,
-  // never in this panel).
+  // --- scenario 9: an editable cell is genuinely editable, and Save stages into the SAME
+  // pending-change set the grid's own inline (double-click) edit and the toolbar's Commit/
+  // Discard already operate on (P5's stage/preview/commit model — nothing here writes to the
+  // server directly). `formats` has a primary key and this connection is writable, so this
+  // cell carries no read-only-reason at all.
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
   await expect(panel).not.toHaveAttribute('data-read-only-reason');
+  const saveButton = page.locator('[data-testid="cell-editor-save"]');
+  await expect(saveButton).toBeVisible();
+  await expect(saveButton).toBeDisabled(); // nothing typed yet — no diff to stage
+
   const beforeType = await editorText(page);
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
-  await page.keyboard.type('ZZZZZ');
-  expect(await editorText(page)).toBe(beforeType);
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('"edited from the cell editor"');
+  expect(await editorText(page)).not.toBe(beforeType);
+  await expect(saveButton).toBeEnabled();
+
+  await saveButton.click();
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
+  ).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'sample')).toBe('"edited from the cell editor"');
+
+  // Discard before moving on: scenario 10 below asserts zero DB operations for everything the
+  // cell editor itself did, and a lingering pending edit has no business surviving into the
+  // read-only-connection scenario that follows.
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
+  ).not.toHaveClass(/pending-edit/);
+
+  // Ctrl+Enter is a shortcut for the same Save action, alongside the button.
+  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('"edited via ctrl-enter"');
+  await page.keyboard.press('Control+Enter');
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
+  ).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'sample')).toBe('"edited via ctrl-enter"');
+  await page.click('[data-testid="toolbar-discard-changes"]');
 
   // Collapse connection 1's root before creating connection 2 — every descendant row (database,
   // schema, table) shares the exact same `data-path` values connection 2 will render, and
@@ -476,17 +510,19 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   await page.screenshot({ path: 'test-results/screenshots/cell-editor.png' });
 
-  // --- scenario 12: panel toggle --------------------------------------------------------------
-  await page.click('[data-testid="toggle-cell-editor-panel"]');
+  // --- scenario 12: visibility follows selection — no manual toggle exists anymore ------------
+  await page.locator('[data-testid="grid-gutter-cell"]').first().click();
   await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
-  await page.click('[data-testid="toggle-cell-editor-panel"]');
+  await selectCell(page, 3, 'sample');
   await expect(page.locator('[data-testid="cell-editor"]')).toBeVisible();
   await expect(panel).toHaveAttribute('data-cell-key', `${tabId}:3:sample`);
 
-  await page.waitForTimeout(300); // layout.ts's 150ms write-debounce, so relaunch sees it
+  await page.waitForTimeout(300); // layout.ts's 150ms write-debounce, so relaunch sees any layout writes
   const relaunched = await relaunch();
   await relaunched.window.waitForSelector('[data-testid="status-bar"]');
-  await expect(relaunched.window.locator('[data-testid="cell-editor"]')).toBeVisible();
+  // Cell selection is session-only and never persisted (D3/D12) — a fresh window starts with
+  // nothing selected, so the panel starts hidden until the user clicks a cell again.
+  await expect(relaunched.window.locator('[data-testid="cell-editor"]')).toBeHidden();
 
   expect(consoleErrors).toEqual([]);
 });

@@ -242,10 +242,8 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   await page.click('[data-testid="toggle-operations-panel"]');
   await expect(page.locator('[data-testid="operations-panel"]')).toBeVisible();
 
-  // The cell editor panel is visible by default (§8's own layout default) and, combined with the
-  // operations panel this test needs open throughout, leaves too little vertical room for the
-  // console/grid editor area — close it since none of D1-D14 here exercise it.
-  await page.click('[data-testid="toggle-cell-editor-panel"]');
+  // The cell editor panel now only shows once a cell is actually selected (no more manual
+  // toggle) — with no grid open yet, nothing is selected, so it starts hidden on its own.
   await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
 
   const cfg = {
