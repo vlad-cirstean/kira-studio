@@ -44,6 +44,18 @@ const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
 });
 
+// P16 design system LAW: the connection colour reaches the console as a 2px rail — a dot in the
+// view header, a cap on the toolbar — never a tint. Derived the same way Toolbar.vue's own
+// railStyle is; no colour assigned leaves the rail slot unpainted rather than unrendered (the
+// Console.html mockup is deliberately set on a connection with no colour to prove this).
+const connectionColor = computed(() => {
+  if (!props.tab.connectionId) return undefined;
+  return connectionsState.records.find((r) => r.id === props.tab.connectionId)?.color;
+});
+const railStyle = computed(() => ({
+  '--kira-rail': connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : undefined,
+}));
+
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
 
@@ -95,59 +107,105 @@ const statusLine = computed(() => {
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="console-reconnect">
-      <button type="button" data-testid="console-reconnect-load" @click="onReconnectAndLoad">
+      <button
+        type="button"
+        class="p-dlgbtn primary"
+        data-testid="console-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <div class="header">
-        <span class="target" data-testid="console-target">{{
+      <!-- view header — every non-grid view opens with this: a rail dot (reserved even with no
+           colour), the view's icon, and its target. The console's search_path/schema control
+           and the "writes go to production" chip from Console.html both need tracked data this
+           app does not have yet (no per-console schema, no per-connection write-warning flag) —
+           skipped rather than faked. -->
+      <div class="p-view-head">
+        <span
+          class="p-conn-dot"
+          :class="{ none: !connectionColor }"
+          :style="railStyle"
+          title="Connection colour"
+        />
+        <span class="icon-box"><Codicon name="terminal" :size="14" /></span>
+        <span class="p-view-target" data-testid="console-target">{{
           targetTail?.name ?? tab.path ?? 'Console'
         }}</span>
-        <div class="toolbar">
+      </div>
+
+      <!-- LAW 07 — the connection colour caps the toolbar, not the panel, and stays a 2px slot
+           even with no colour assigned (this tab's own connection has none, same as the
+           mockup). -->
+      <div class="p-toolbar-rail" :style="railStyle" />
+      <div class="p-toolbar">
+        <div class="group">
           <button
             type="button"
+            class="p-btn primary"
             data-testid="console-run-statement"
             :disabled="running"
-            title="Run statement (the one under the cursor)"
+            title="Run the statement under the cursor"
             @click="runStatement"
           >
-            <Codicon name="play" :size="13" />
-            Run statement
+            <span class="icon-box"><Codicon name="play" :size="13" /></span>Run
           </button>
           <button
             type="button"
+            class="p-btn"
             data-testid="console-run-all"
             :disabled="running"
-            title="Run all statements"
+            title="Run every statement in the editor"
             @click="runAll"
           >
-            <Codicon name="run-all" :size="13" />
-            Run all
+            <span class="icon-box"><Codicon name="run-all" :size="13" /></span>Run all
           </button>
+          <!-- "Stop always follows Refresh, disabled when idle" — cancelling lives in one place
+               instead of appearing only once work starts. -->
           <button
-            v-if="running"
             type="button"
+            class="p-iconbtn"
+            style="color: var(--kira-error)"
             data-testid="console-stop"
             title="Stop"
+            :disabled="!running"
             @click="onStop"
           >
             <Codicon name="debug-stop" :size="13" />
           </button>
+          <!-- LAW 12 — work-in-progress is a ring in the toolbar next to the button that started
+               it, not a bar across the view. The mockup's live elapsed time ("1.8 s") needs a
+               per-run start timestamp this app does not track (ConsoleViewRuntime has no
+               startedAt/durationMs field) — showing status text here instead of a fabricated
+               duration. -->
+          <span
+            class="p-run-state"
+            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
+          >
+            <span class="ring" />{{ running ? 'Running…' : statusLine || 'Idle' }}
+          </span>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
           <button
             type="button"
+            class="p-btn"
             data-testid="console-saved-toggle"
             title="Saved queries"
             @click="savedMenuOpen = !savedMenuOpen"
           >
-            <Codicon name="bookmark" :size="13" />
+            <span class="icon-box"><Codicon name="bookmark" :size="13" /></span>Saved queries
           </button>
         </div>
+        <!-- The autocommit/transaction segmented control from Console.html needs a per-console
+             transaction-mode field that doesn't exist anywhere in tab or connection state —
+             skipped rather than wiring a control with nowhere to store its value. -->
       </div>
 
       <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
 
-      <div v-if="rt?.status === 'error' && rt.error" class="error-strip" data-testid="console-error">
+      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="console-error">
         {{ rt.error.message }}
       </div>
 
@@ -163,8 +221,15 @@ const statusLine = computed(() => {
       </div>
 
       <div v-if="rt && rt.results.length > 0" class="results-body" data-testid="console-results">
+        <!-- Console.html's Result/Messages/Plan segmented switcher and per-statement text/SELECT
+             badge assume one active result at a time; this view stacks every statement's page
+             instead (no "which statement produced this" or verb metadata is tracked per page),
+             so each panel keeps only what it actually has: its index and row count. -->
         <div v-for="(page, i) in rt.results" :key="i" class="result-panel">
-          <div class="result-label">Result {{ i + 1 }} · {{ page.rowCount }} row{{ page.rowCount === 1 ? '' : 's' }}</div>
+          <div class="result-head">
+            <span class="p-badge">Result {{ i + 1 }}</span>
+            <span class="p-sm muted">{{ page.rowCount }} row{{ page.rowCount === 1 ? '' : 's' }}</span>
+          </div>
           <div class="result-grid">
             <ConsoleResultGrid :page-key="resultPageKey(tab.id, i)" />
           </div>
@@ -191,78 +256,11 @@ const statusLine = computed(() => {
   justify-content: center;
 }
 
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.toolbar {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.toolbar button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.toolbar button:hover:not(:disabled) {
-  background: var(--kira-hover);
-}
-
-.toolbar button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+/* p-strip.err already carries the error's own look; only the parent's error message text needs
+   pre-wrap so a long adapter error still wraps instead of scrolling. */
+.p-strip.err {
   white-space: pre-wrap;
+  font-family: var(--kira-font-family);
 }
 
 .editor-body {
@@ -287,11 +285,18 @@ const statusLine = computed(() => {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.result-label {
+/* Console.html's own result-head: h-md, s-4 padding, border on both edges, elevated background —
+   not a shared primitive (the grid/kv/stream headers are p-thead), just this screen's chrome
+   for the strip that labels each stacked result. */
+.result-head {
+  height: var(--kira-h-md);
   flex-shrink: 0;
-  padding: 3px 8px;
-  font-size: 10px;
-  color: var(--kira-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  border-top: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-elevated);
 }
 
@@ -300,12 +305,15 @@ const statusLine = computed(() => {
   min-height: 0;
 }
 
+/* D: "there is no editor status line" law folds this into the toolbar's run-state above; kept
+   here (data-testid="console-status") only because it is still asserted on directly. */
 .status-line {
   flex-shrink: 0;
-  padding: 3px 8px;
+  padding: 0 var(--kira-s-4);
   border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  line-height: var(--kira-h-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

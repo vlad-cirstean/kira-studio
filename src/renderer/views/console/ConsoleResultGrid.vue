@@ -55,27 +55,27 @@ function kvRowAt(row: number) {
       :style="{ '--total-width': `${totalWidth}px` }"
     >
       <template #header>
-        <div class="row header-row" :style="{ height: `${rowHeight}px` }">
-          <div class="gutter-cell header-gutter" />
+        <div class="row header-row p-thead" :style="{ height: `${rowHeight}px` }">
+          <div class="gutter-cell header-gutter p-th" />
           <div
             v-for="col in page.columns"
             :key="col.name"
-            class="cell header-cell"
+            class="cell header-cell p-th"
             :class="{ 'align-right': alignmentFor(col) === 'right' }"
             :style="{ width: `${widths[col.name]}px` }"
-            :title="col.dataType"
           >
-            {{ col.name }}
+            <span class="name">{{ col.name }}</span>
+            <span class="p-badge" :title="col.dataType">{{ col.dataType }}</span>
           </div>
         </div>
       </template>
       <template #default="{ item: r }">
         <div class="row" data-testid="console-result-row" :style="{ height: `${rowHeight}px` }">
-          <div class="gutter-cell">{{ r + 1 }}</div>
+          <div class="gutter-cell p-td gutter">{{ r + 1 }}</div>
           <div
             v-for="(col, c) in page.columns"
             :key="col.name"
-            class="cell"
+            class="cell p-td"
             data-testid="console-result-cell"
             :data-null="cellAt(r, c).isNull"
             :class="{ 'align-right': alignmentFor(col) === 'right' }"
@@ -121,7 +121,7 @@ function kvRowAt(row: number) {
   height: 100%;
   min-height: 0;
   font-family: var(--kira-font-family);
-  font-size: var(--kira-font-size);
+  font-size: var(--kira-t-md);
 }
 
 .body {
@@ -134,40 +134,30 @@ function kvRowAt(row: number) {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* header-row also carries the shared .p-thead primitive (background, base border) — this just
+   pins the stronger border-strong colour Console.html's thead uses, since a same-specificity
+   scoped rule for .row would otherwise win over the global .p-thead one for that property. */
 .header-row {
-  background: var(--kira-bg-elevated);
   border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
-  font-weight: 600;
 }
 
+/* Width only: header cells add the shared .p-th primitive (data cells .p-td, gutter cells
+   .p-td.gutter — "tabular body shared by grid / kv / stream / console") for padding, colour,
+   border and font-size, so those aren't re-declared here. kv/doc rows below don't use those
+   primitives (their layout isn't a fixed-width column grid), so they keep their own rules. */
 .gutter-cell {
   flex-shrink: 0;
   width: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 8px;
-  color: var(--kira-fg-muted);
-  border-right: var(--kira-border-width) solid var(--kira-border);
 }
 
 .cell {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
-  border-right: var(--kira-border-width) solid var(--kira-border);
 }
 
 .cell.align-right {
   justify-content: flex-end;
-}
-
-.header-cell {
-  color: var(--kira-fg);
 }
 
 .cell-null {
@@ -187,20 +177,20 @@ function kvRowAt(row: number) {
   align-items: center;
   justify-content: center;
   color: var(--kira-fg-muted);
-  font-size: 12px;
+  font-size: var(--kira-t-sm);
 }
 
 .doc-body {
-  padding: 4px;
+  padding: var(--kira-s-2);
 }
 
 .doc-row {
-  padding: 6px 8px;
+  padding: var(--kira-s-3) var(--kira-s-4);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .doc-id {
-  font-size: 10px;
+  font-size: var(--kira-t-xs);
   color: var(--kira-fg-muted);
   margin-bottom: 2px;
 }
@@ -214,11 +204,18 @@ function kvRowAt(row: number) {
 
 .kv-field {
   width: 200px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-4);
   color: var(--kira-fg-muted);
+  text-overflow: ellipsis;
 }
 
 .kv-value {
   flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-4);
   white-space: pre-wrap;
   word-break: break-word;
 }
