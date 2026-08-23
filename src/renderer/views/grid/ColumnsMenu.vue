@@ -29,9 +29,23 @@ function selectNone(): void {
   selected.value = new Set();
 }
 
+// Order-independent: `selected` is a Set, so toggling a column off and back on again before
+// closing moves it to the end of iteration order without changing which columns are selected —
+// that must still compare equal to the projection already applied, or a no-op re-toggle would
+// re-run the query same as a real change would.
+function sameProjection(a: string[] | null, b: string[] | null): boolean {
+  if (a === null || b === null) return a === b;
+  if (a.length !== b.length) return false;
+  const setA = new Set(a);
+  return b.every((name) => setA.has(name));
+}
+
 function close(): void {
   const isEverything = selected.value.size === columnNames.value.length;
-  void setProjection(props.tabId, isEverything ? null : [...selected.value]);
+  const next = isEverything ? null : [...selected.value];
+  if (!sameProjection(next, currentProjection())) {
+    void setProjection(props.tabId, next);
+  }
   emit('close');
 }
 </script>

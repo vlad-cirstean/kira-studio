@@ -57,6 +57,14 @@
   color: var(--kira-fg-disabled);
   cursor: default;
 }
+/* A Stop button tints itself red exactly while there's a live op it could actually cancel
+   (DataToolbar.vue's original `.p-iconbtn.is-live`, ported here so ViewChrome.vue's shared
+   Stop — used by every non-grid view — gets the same cue instead of looking permanently
+   muted). `is-live` and `:disabled` are mutually exclusive by construction (both callers key
+   both off the same boolean), so there's no specificity fight between the two rules. */
+.p-iconbtn.is-live {
+  color: var(--kira-error);
+}
 
 /* ---------- P2 text button ---------- */
 .p-btn {

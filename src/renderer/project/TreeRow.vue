@@ -79,6 +79,7 @@ function onContextMenu(e: MouseEvent): void {
     :data-path="row.path"
     :data-kind="row.kind"
     :data-status="row.kind === 'connection' ? row.status : undefined"
+    :tabindex="selected ? 0 : -1"
     @click="onClick"
     @dblclick="onDblClick"
     @contextmenu.prevent.stop="onContextMenu"

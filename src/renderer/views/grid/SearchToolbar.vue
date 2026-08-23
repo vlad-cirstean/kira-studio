@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import Codicon from '../../theme/Codicon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -12,6 +12,14 @@ const props = defineProps<{ tabId: string }>();
 // keeps a hit count from ever being mistaken for a count over the whole table.
 const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
 const emit = defineEmits<{ goToMatch: [row: number, col: number]; close: [] }>();
+
+// Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
+// read as a type-only use of the TextField import above — it's a real component, bound as a
+// value by the template below. See ConsoleSavedMenu.vue's promptInput for the same pattern:
+// TextField wraps the real <input> inside its own root <span> (P4) and isn't defineExpose'd, so
+// the focus target is reached via the component's $el, which Vue always exposes on a template
+// ref regardless of defineExpose.
+const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 const query = ref('');
 const matchCase = ref(false);
@@ -93,6 +101,14 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+onMounted(() => {
+  // This component is mounted fresh each time `rt.searchOpen` flips true (DataView.vue's
+  // `v-if="rt?.searchOpen"`), so onMounted fires exactly when the toolbar opens — both from the
+  // toolbar button and from Cmd+F (view.find) — and is the right place to autofocus so typing can
+  // start immediately without an extra click into the field.
+  void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
+});
+
 onUnmounted(() => {
   handle?.cancel();
   clearSearchState(props.tabId);
@@ -108,6 +124,7 @@ onUnmounted(() => {
     </span>
     <div class="search-input">
       <TextField
+        ref="searchInput"
         v-model="query"
         placeholder="Find"
         data-testid="search-input"

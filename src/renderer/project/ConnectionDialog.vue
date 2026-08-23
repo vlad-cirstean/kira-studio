@@ -133,6 +133,13 @@ function setUri(value: string): void {
   const d = draft.value;
   if (!d) return;
   d.uri = value;
+  // options only used to sync from a parsed URI on the fields<->URI mode switch (see toggleMode
+  // above) — which never runs for a connection created directly in URI mode (SQS's only mode).
+  // Without this, an endpoint override in the URI's query string (e.g. SQS's LocalStack
+  // `?endpoint=...`) never reaches `draft.options`, so the resolved config falls through to
+  // real AWS instead. A URI that doesn't parse leaves `d.options` alone rather than clearing it.
+  const parsed = parseConnectionUri(value);
+  if (parsed) d.options = parsed.params;
   refreshUriNote();
 }
 

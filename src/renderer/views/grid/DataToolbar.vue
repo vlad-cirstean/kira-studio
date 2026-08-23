@@ -190,8 +190,10 @@ function onDiscard(): void {
 
 <template>
   <div v-if="tab" class="data-toolbar p-toolbar" data-testid="data-toolbar">
-    <!-- LAW 01/10: Refresh, then Stop (always present, greyed when idle), then the run-state
-         ring beside them — never a bar across the top of the view (DataView.vue). -->
+    <!-- LAW 01/10: Refresh, then Stop (always present, greyed when idle). The run-state ring
+         itself moved to the very end of this toolbar (below) — never a bar across the top of the
+         view (DataView.vue), and never a control whose changing width reflows anything to its
+         left. -->
     <div class="group">
       <IconButton
         icon="refresh"
@@ -208,15 +210,6 @@ function onDiscard(): void {
         :disabled="!rt?.opId"
         @click="onStop"
       />
-      <span
-        class="p-run-state"
-        :class="{ 'is-running': rt?.status === 'loading', 'is-error': rt?.status === 'error' }"
-        :title="rt?.status === 'error' ? rt?.error?.message : undefined"
-      >
-        <span class="ring" />
-        <template v-if="rt?.status === 'loading'">fetching…</template>
-        <template v-else-if="rt?.status === 'error'">query failed</template>
-      </span>
     </div>
 
     <div class="sep" />
@@ -357,9 +350,11 @@ function onDiscard(): void {
       />
     </div>
 
+    <span class="p-push" />
+
     <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
          accent-filled control on the whole screen. -->
-    <div v-if="tabHasPending" class="group p-push">
+    <div v-if="tabHasPending" class="group">
       <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
       <IconButton
         icon="discard"
@@ -377,6 +372,20 @@ function onDiscard(): void {
         @click="onCommit"
       />
     </div>
+
+    <!-- The run-state ring moved here, after the unconditional p-push above: its label's width
+         changes with status ('', 'fetching…', 'query failed'), and sitting at the very end of
+         the toolbar means that never reflows the pager/page-size/count/columns controls to its
+         left (the bug this fixes — see DataView.vue's own note on this LAW). -->
+    <span
+      class="p-run-state"
+      :class="{ 'is-running': rt?.status === 'loading', 'is-error': rt?.status === 'error' }"
+      :title="rt?.status === 'error' ? rt?.error?.message : undefined"
+    >
+      <span class="ring" />
+      <template v-if="rt?.status === 'loading'">fetching…</template>
+      <template v-else-if="rt?.status === 'error'">query failed</template>
+    </span>
   </div>
 </template>
 

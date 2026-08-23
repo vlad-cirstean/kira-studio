@@ -98,6 +98,13 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       return;
     }
     if (DISCONNECTED_CODES.has(code)) {
+      // unmarkHydrated swaps ViewChrome out for ReconnectGate immediately, but `status` still
+      // has to drop out of 'running' here — ConsoleView's `running`/`canStop` read it directly,
+      // and onReconnectAndLoad only ever calls markHydrated(), never touches `rt`. Left as
+      // 'running', the Stop button would come back permanently enabled (and, since it now tints
+      // red while live) permanently red the moment the tab reconnects, for as long as the tab
+      // stays open.
+      rt.status = 'idle';
       unmarkHydrated(tabId);
       return;
     }

@@ -59,14 +59,30 @@ const runState = useRunState(() => props.tab.id);
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
     <div class="group">
       <IconButton icon="refresh" :size="13" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
-      <IconButton icon="debug-stop" :size="13" title="Stop" :data-testid="stopTestid" :disabled="!canStop" @click="emit('stop')" />
-      <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
+      <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
+           is in flight (`is-live`, keyed off the same boolean that also drives `disabled`) — this
+           shared Stop never got that treatment, so every non-grid view's Stop looked identically
+           muted whether idle or running. `canStop` is exactly "there is a live op to cancel", the
+           same signal DataToolbar keys off, so it doubles as the is-live flag here too. -->
+      <IconButton
+        icon="debug-stop"
+        :size="13"
+        :class="{ 'is-live': !!canStop }"
+        title="Stop"
+        :data-testid="stopTestid"
+        :disabled="!canStop"
+        @click="emit('stop')"
+      />
     </div>
     <slot name="toolbar" />
     <span class="p-push" />
     <div class="group">
       <slot name="toolbar-end" />
     </div>
+    <!-- RunState sits last, after everything else in the toolbar (including toolbar-end): its
+         label's width changes as elapsed time ticks up, and it must never be able to reflow
+         controls to its left (see docs/design/kira-design-system LAW 12). -->
+    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
   </div>
   <div v-if="$slots['toolbar-2']" class="p-toolbar last">
     <slot name="toolbar-2" />

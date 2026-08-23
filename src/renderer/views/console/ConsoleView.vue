@@ -183,7 +183,12 @@ const statusLine = computed(() => {
             <span class="p-sm muted">{{ page.rowCount }} row{{ page.rowCount === 1 ? '' : 's' }}</span>
           </div>
           <div class="result-grid">
-            <ConsoleResultGrid :page-key="resultPageKey(tab.id, i)" />
+            <ConsoleResultGrid
+              :page-key="resultPageKey(tab.id, i)"
+              :tab-id="tab.id"
+              :connection-id="tab.connectionId"
+              :path="tab.path"
+            />
           </div>
         </div>
       </div>
