@@ -29,7 +29,11 @@
   --kira-radius: 6px;
   --kira-radius-lg: 8px;
   --kira-radius-pill: 10px;
-  --kira-gap: 4px;
+  /* Drives both the whitespace between workbench panels AND the splitter's own draggable track
+     width (WorkbenchShell.vue) — shrinking this fixes both "gap too big" and "resize bar too
+     thick" at once, since they were the same 4px measurement stacked three times (grid gap +
+     splitter track + grid gap) between any two panels. */
+  --kira-gap: 2px;
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
