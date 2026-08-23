@@ -78,7 +78,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   // collapse them to null even if it did.
   const filter = encodeKafkaStreamFilter({
     offset: tab.state.offsetFilter,
-    partition: tab.state.partitionFilter === null ? null : Number(tab.state.partitionFilter),
+    partitions: tab.state.partitions,
     timestampMs: tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter),
   });
 
@@ -187,7 +187,7 @@ export async function setPageSize(tabId: string, pageSize: PageSize): Promise<vo
 
 export interface StreamFilterInput {
   offset: string | null;
-  partition: string | null;
+  partitions: number[];
   timestamp: string | null;
 }
 
@@ -203,7 +203,7 @@ export async function applyStreamFilter(tabId: string, filter: StreamFilterInput
   rt.nextToken = null;
   patchStreamTabState(tabId, {
     offsetFilter: filter.offset,
-    partitionFilter: filter.partition,
+    partitions: filter.partitions,
     timestampFilter: filter.timestamp,
   });
   recordStreamFilterUse(tab.connectionId, tab.path, filter);

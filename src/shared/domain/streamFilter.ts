@@ -13,32 +13,33 @@ export interface KafkaStreamFilter {
    *  computed once, per kafka/read.ts's D7), applied to every included partition and clamped into
    *  that partition's own [low, high] watermark range. Ignored once `timestampMs` is also set. */
   offset: string | null;
-  /** Restrict a fresh browse to exactly one partition (this topic's other partitions are excluded
-   *  from the browse entirely, not merely hidden after the fact). */
-  partition: number | null;
+  /** Restrict a fresh browse to any of these partitions (this topic's other partitions are
+   *  excluded from the browse entirely, not merely hidden after the fact). Empty means "every
+   *  partition" — task #61 widened this from a single optional partition to a multiselect. */
+  partitions: number[];
   /** Epoch ms — seeks every included partition's starting offset via kafkajs's
    *  `admin.fetchTopicOffsetsByTimestamp` instead of the low watermark or `offset` above. */
   timestampMs: number | null;
 }
 
 export function isEmptyKafkaStreamFilter(filter: KafkaStreamFilter): boolean {
-  return filter.offset === null && filter.partition === null && filter.timestampMs === null;
+  return filter.offset === null && filter.partitions.length === 0 && filter.timestampMs === null;
 }
 
-/** `null` when every field is `null` — mirrors P2's "a no-op filter is dropped" discipline. */
+/** `null` when every field is `null`/empty — mirrors P2's "a no-op filter is dropped" discipline. */
 export function encodeKafkaStreamFilter(filter: KafkaStreamFilter): string | null {
   return isEmptyKafkaStreamFilter(filter) ? null : JSON.stringify(filter);
 }
 
 const kafkaStreamFilterSchema = z.object({
   offset: z.string().nullable(),
-  partition: z.number().int().nullable(),
+  partitions: z.array(z.number().int()).default([]),
   timestampMs: z.number().nullable(),
 });
 
 /** Throws (a plain `Error`, from `JSON.parse` or Zod) on malformed input — callers map that to
  *  `E_QUERY` rather than letting a malformed stream filter surface as an unhandled rejection. */
 export function parseKafkaStreamFilter(raw: string | null): KafkaStreamFilter {
-  if (raw === null) return { offset: null, partition: null, timestampMs: null };
+  if (raw === null) return { offset: null, partitions: [], timestampMs: null };
   return kafkaStreamFilterSchema.parse(JSON.parse(raw));
 }

@@ -24,15 +24,21 @@ export async function produceKafkaMessage(
   await reload(tabId);
 }
 
-export async function sendSqsMessage(tabId: string, body: string): Promise<void> {
+export async function sendSqsMessage(
+  tabId: string,
+  body: string,
+  headers: string | null,
+): Promise<void> {
   const tab = findStreamTab(tabId);
   if (!tab?.connectionId) return;
+  const values: Record<string, string | null> = { $body: body };
+  if (headers !== null) values.$headers = headers;
   await data.mutate({
     opId: crypto.randomUUID(),
     tabId,
     connectionId: tab.connectionId,
     path: tab.path,
-    ops: [{ kind: 'insert', values: { $body: body } }],
+    ops: [{ kind: 'insert', values }],
   });
   await reload(tabId);
 }

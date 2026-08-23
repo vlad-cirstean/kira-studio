@@ -1,4 +1,9 @@
-import { DeleteMessageCommand, SendMessageCommand, type SQSClient } from '@aws-sdk/client-sqs';
+import {
+  DeleteMessageCommand,
+  type MessageAttributeValue,
+  SendMessageCommand,
+  type SQSClient,
+} from '@aws-sdk/client-sqs';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
@@ -8,6 +13,41 @@ import { mapSqsError } from './errors';
 // message is expressed through the existing relational-shaped MutationRowOp's `values` rather
 // than widening the shared mutation schema.
 const BODY_FIELD = '$body';
+/** Task #61: mirrors kafka/produce.ts's own `$headers` sentinel exactly — JSON-encoded
+ *  `Record<string, string>`, mapped onto SendMessage's `MessageAttributes` shape below. Sent
+ *  attributes round-trip back through sqs/read.ts's `pushMessage`, which already reads
+ *  `message.MessageAttributes` into the row's `headers` column unchanged. */
+const HEADERS_FIELD = '$headers';
+
+function parseHeaders(raw: string | null | undefined): Record<string, string> | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new AdapterError('E_QUERY', 'malformed $headers JSON');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new AdapterError('E_QUERY', '$headers must be a JSON object of string values');
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof v !== 'string') throw new AdapterError('E_QUERY', `$headers.${k} must be a string`);
+    out[k] = v;
+  }
+  return out;
+}
+
+function toMessageAttributes(
+  headers: Record<string, string> | undefined,
+): Record<string, MessageAttributeValue> | undefined {
+  if (!headers) return undefined;
+  const out: Record<string, MessageAttributeValue> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    out[name] = { DataType: 'String', StringValue: value };
+  }
+  return out;
+}
 
 /** The delete key's field name — the row's `key` column is already the MessageId (read.ts's
  *  `pushMessage`), so the renderer echoes it back unchanged, mirroring mongo/mutate.ts's `_id`. */
@@ -57,9 +97,15 @@ export async function mutateQueue(
         if (typeof body !== 'string') {
           throw new AdapterError('E_QUERY', 'a new message requires a $body');
         }
-        await client.send(new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: body }), {
-          abortSignal: ctx.signal,
-        });
+        const headers = parseHeaders(op.values[HEADERS_FIELD]);
+        await client.send(
+          new SendMessageCommand({
+            QueueUrl: queueUrl,
+            MessageBody: body,
+            MessageAttributes: toMessageAttributes(headers),
+          }),
+          { abortSignal: ctx.signal },
+        );
         affectedRows++;
       } else if (op.kind === 'delete') {
         const messageId = op.key[ID_FIELD];

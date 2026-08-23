@@ -2,15 +2,17 @@
 import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
-import { isHydrated, markHydrated } from '../../state/tabs';
+import { isHydrated, markHydrated, patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import Popover from '../../theme/primitives/Popover.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -161,6 +163,12 @@ function onPoll(): void {
   void poll(props.tab.id);
 }
 
+// Item 2 (task #61): the bottom-of-view full-width status bar was redundant with the toolbar per
+// the user's own report — this computed and its text survive, just relocated inline into the
+// toolbar's first group (mirrors KeyValueView.vue's own prev/status/next arrangement) rather than
+// a separate row spanning the view's full width. Keeps the same `stream-status` testid/wording so
+// existing coverage (kafka.spec.ts's exact-count assertion, sqs.spec.ts's approximate-count one)
+// still holds.
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
@@ -192,17 +200,20 @@ function onPageSize(size: PageSize): void {
 // FilterToolbar.vue's own comment gives for needing `immediate: true` where it does have a watch
 // (that component isn't remounted per tab; this one is).
 const offsetText = ref(props.tab.state.offsetFilter ?? '');
-const partitionText = ref(props.tab.state.partitionFilter ?? '');
+// Item 1 (task #61): the partition filter widened from a single free-text field to a multiselect
+// — a plain array buffer, same "just opened"/"tab changed" reasoning as offsetText/timestampText
+// above (no watcher needed, MainView.vue keys this whole component by tab.id).
+const selectedPartitions = ref<number[]>([...props.tab.state.partitions]);
 const timestampText = ref(props.tab.state.timestampFilter ?? '');
 
 function currentFilterInput(): {
   offset: string | null;
-  partition: string | null;
+  partitions: number[];
   timestamp: string | null;
 } {
   return {
     offset: offsetText.value.trim() === '' ? null : offsetText.value.trim(),
-    partition: partitionText.value.trim() === '' ? null : partitionText.value.trim(),
+    partitions: [...selectedPartitions.value].sort((a, b) => a - b),
     timestamp: timestampText.value.trim() === '' ? null : timestampText.value.trim(),
   };
 }
@@ -213,23 +224,72 @@ async function onApplyFilter(): Promise<void> {
 
 async function onClearFilter(): Promise<void> {
   offsetText.value = '';
-  partitionText.value = '';
+  selectedPartitions.value = [];
   timestampText.value = '';
-  await applyStreamFilter(props.tab.id, { offset: null, partition: null, timestamp: null });
+  await applyStreamFilter(props.tab.id, { offset: null, partitions: [], timestamp: null });
 }
 
 function onApplyFromHistory(
   offset: string | null,
-  partition: string | null,
+  partitions: number[],
   timestamp: string | null,
 ): void {
   offsetText.value = offset ?? '';
-  partitionText.value = partition ?? '';
+  selectedPartitions.value = [...partitions];
   timestampText.value = timestamp ?? '';
-  void applyStreamFilter(props.tab.id, { offset, partition, timestamp });
+  void applyStreamFilter(props.tab.id, { offset, partitions, timestamp });
 }
 
+// Item 1's partition popover — a checkbox list anchored to a button (mirrors ColumnsMenu.vue's
+// own anchor+Popover pattern), rather than the old free-text field. `partitionOptions` is
+// (re)fetched every time the popover opens, via the same tree.children IPC ProjectTree.vue uses
+// (a topic's path already resolves to its partition list one level down, kafka/index.ts's
+// `children()`) — cheap enough for an on-demand round trip, and keeps the list honest if the
+// topic's partition count changed since the tab was opened.
 const filterHistoryOpen = ref(false);
+const partitionMenuOpen = ref(false);
+const partitionOptions = ref<number[]>([]);
+const partitionOptionsLoading = ref(false);
+
+async function loadPartitionOptions(): Promise<void> {
+  const connectionId = props.tab.connectionId;
+  if (!connectionId) return;
+  partitionOptionsLoading.value = true;
+  try {
+    const result = await control.treeChildren(connectionId, props.tab.path, false);
+    partitionOptions.value = result.nodes
+      .map((n) => Number(n.name))
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => a - b);
+  } catch {
+    partitionOptions.value = [];
+  } finally {
+    partitionOptionsLoading.value = false;
+  }
+}
+
+async function onTogglePartitionMenu(): Promise<void> {
+  partitionMenuOpen.value = !partitionMenuOpen.value;
+  if (partitionMenuOpen.value) await loadPartitionOptions();
+}
+
+function isPartitionSelected(p: number): boolean {
+  return selectedPartitions.value.includes(p);
+}
+
+function onTogglePartition(p: number): void {
+  const idx = selectedPartitions.value.indexOf(p);
+  if (idx >= 0) selectedPartitions.value.splice(idx, 1);
+  else selectedPartitions.value.push(p);
+  void onApplyFilter();
+}
+
+const partitionButtonLabel = computed(() => {
+  const n = selectedPartitions.value.length;
+  if (n === 0) return 'all partitions';
+  if (n === 1) return `partition ${selectedPartitions.value[0]}`;
+  return `${n} partitions`;
+});
 
 const hasSelectedRow = computed(
   () => rt.value?.selectedRow !== null && rt.value?.selectedRow !== undefined,
@@ -272,6 +332,40 @@ function onGoToMatch(row: number): void {
 function onCloseSearch(): void {
   const r = rt.value;
   if (r) r.searchOpen = false;
+}
+
+// Item 4: per-column resize for the four fixed-width columns (mirrors DataGrid.vue's own
+// resize-handle pattern) — the `body` column stays `flex: 1` and is never resizable. Defaults
+// match the previous hardcoded inline widths exactly, so a tab that never resized anything renders
+// identically to before.
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+  key: 160,
+  timestamp: 160,
+  headers: 140,
+  attrs: 140,
+};
+
+function widthFor(column: string): number {
+  return props.tab.state.columnWidths[column] ?? DEFAULT_COLUMN_WIDTHS[column] ?? 96;
+}
+
+let resizing: { column: string; startX: number; startWidth: number } | null = null;
+
+function onResizeStart(e: PointerEvent, column: string): void {
+  e.stopPropagation();
+  resizing = { column, startX: e.clientX, startWidth: widthFor(column) };
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+}
+function onResizeMove(e: PointerEvent): void {
+  if (!resizing) return;
+  const width = Math.max(40, resizing.startWidth + (e.clientX - resizing.startX));
+  patchStreamTabState(props.tab.id, {
+    columnWidths: { ...props.tab.state.columnWidths, [resizing.column]: width },
+  });
+}
+function onResizeEnd(e: PointerEvent): void {
+  resizing = null;
+  (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
 }
 
 let unregisterCommand: (() => void) | null = null;
@@ -323,6 +417,11 @@ onUnmounted(() => {
       </template>
 
       <template #toolbar>
+        <!-- Toolbar-consistency pass: a leading separator after ViewChrome's own built-in
+             refresh/stop group, matching every other view's #toolbar slot (KeyValueView.vue,
+             DocumentView.vue) and DataToolbar.vue's own canonical ordering. -->
+        <div class="sep" />
+
         <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
              in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
         <div class="group">
@@ -333,6 +432,7 @@ onUnmounted(() => {
             title="Count"
             @click="runCount(tab.id)"
           />
+          <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
           <Button
             v-if="isBatch"
             icon="arrow-swap"
@@ -426,15 +526,48 @@ onUnmounted(() => {
             @blur="onApplyFilter"
           />
         </div>
-        <div class="filter-field">
-          <TextField
-            v-model="partitionText"
-            prefix="partition"
-            placeholder="e.g. 0"
+        <div class="partition-anchor">
+          <Button
+            icon="filter"
             data-testid="stream-filter-partition"
-            @enter="onApplyFilter"
-            @blur="onApplyFilter"
-          />
+            title="Filter by partition"
+            @click="onTogglePartitionMenu"
+          >
+            {{ partitionButtonLabel }}
+          </Button>
+          <Popover
+            v-if="partitionMenuOpen"
+            anchor="left"
+            :width="200"
+            test-id="stream-partition-menu"
+            backdrop-test-id="stream-partition-menu-backdrop"
+            @close="partitionMenuOpen = false"
+          >
+            <div class="partition-menu">
+              <div v-if="partitionOptionsLoading" class="p-sm muted partition-menu-empty">
+                Loading…
+              </div>
+              <div
+                v-else-if="partitionOptions.length === 0"
+                class="p-sm muted partition-menu-empty"
+              >
+                No partitions
+              </div>
+              <label
+                v-for="p in partitionOptions"
+                :key="p"
+                class="partition-option"
+                :data-testid="`stream-filter-partition-option-${p}`"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isPartitionSelected(p)"
+                  @change="onTogglePartition(p)"
+                />
+                <span>partition {{ p }}</span>
+              </label>
+            </div>
+          </Popover>
         </div>
         <div class="filter-field">
           <TextField
@@ -488,10 +621,54 @@ onUnmounted(() => {
         <template v-else>
           <div class="p-thead">
             <div class="p-th gutter" style="width: 40px" />
-            <div class="p-th" style="width: 160px"><span class="name">key</span></div>
-            <div class="p-th" style="width: 160px"><span class="name">timestamp</span></div>
-            <div class="p-th" style="width: 140px"><span class="name">headers</span></div>
-            <div class="p-th" style="width: 140px"><span class="name">attrs</span></div>
+            <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
+              <span class="name">key</span>
+              <span
+                class="resize-handle"
+                draggable="false"
+                data-testid="stream-column-resize-key"
+                @pointerdown="onResizeStart($event, 'key')"
+                @pointermove="onResizeMove"
+                @pointerup="onResizeEnd"
+                @click.stop
+              />
+            </div>
+            <div class="p-th" :style="{ width: `${widthFor('timestamp')}px` }">
+              <span class="name">timestamp</span>
+              <span
+                class="resize-handle"
+                draggable="false"
+                data-testid="stream-column-resize-timestamp"
+                @pointerdown="onResizeStart($event, 'timestamp')"
+                @pointermove="onResizeMove"
+                @pointerup="onResizeEnd"
+                @click.stop
+              />
+            </div>
+            <div class="p-th" :style="{ width: `${widthFor('headers')}px` }">
+              <span class="name">headers</span>
+              <span
+                class="resize-handle"
+                draggable="false"
+                data-testid="stream-column-resize-headers"
+                @pointerdown="onResizeStart($event, 'headers')"
+                @pointermove="onResizeMove"
+                @pointerup="onResizeEnd"
+                @click.stop
+              />
+            </div>
+            <div class="p-th" :style="{ width: `${widthFor('attrs')}px` }">
+              <span class="name">attrs</span>
+              <span
+                class="resize-handle"
+                draggable="false"
+                data-testid="stream-column-resize-attrs"
+                @pointerdown="onResizeStart($event, 'attrs')"
+                @pointermove="onResizeMove"
+                @pointerup="onResizeEnd"
+                @click.stop
+              />
+            </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
           <div class="tbody-scroll" ref="scrollContainerRef">
@@ -513,18 +690,18 @@ onUnmounted(() => {
               <div
                 class="p-td"
                 :class="cellClass({ isNull: rowAt(i)?.key === null })"
-                style="width: 160px"
+                :style="{ width: `${widthFor('key')}px` }"
                 data-testid="stream-key"
               >
                 {{ rowAt(i)?.key ?? '(none)' }}
               </div>
-              <div class="p-td" style="width: 160px" data-testid="stream-timestamp">
+              <div class="p-td" :style="{ width: `${widthFor('timestamp')}px` }" data-testid="stream-timestamp">
                 {{ rowAt(i)?.timestamp ?? '' }}
               </div>
-              <div class="p-td" style="width: 140px" data-testid="stream-headers">
+              <div class="p-td" :style="{ width: `${widthFor('headers')}px` }" data-testid="stream-headers">
                 {{ rowAt(i)?.headers }}
               </div>
-              <div class="p-td" style="width: 140px" data-testid="stream-attrs">
+              <div class="p-td" :style="{ width: `${widthFor('attrs')}px` }" data-testid="stream-attrs">
                 {{ rowAt(i)?.attrs }}
               </div>
               <div class="p-td msg-body" style="flex: 1" data-testid="stream-body">
@@ -537,8 +714,6 @@ onUnmounted(() => {
           </div>
         </template>
       </div>
-
-      <div class="status-line" data-testid="stream-status">{{ statusLine }}</div>
     </ViewChrome>
 
     <StreamComposeMessage
@@ -613,20 +788,6 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.status-line {
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-4);
-  height: var(--kira-h-xs);
-  display: flex;
-  align-items: center;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
    the `active` class name because tests/ui assert on it directly (mirrors DataToolbar.vue). */
 .p-seg > button.active {
@@ -634,7 +795,8 @@ onUnmounted(() => {
   color: var(--kira-fg);
 }
 
-.history-anchor {
+.history-anchor,
+.partition-anchor {
   position: relative;
 }
 
@@ -645,5 +807,53 @@ onUnmounted(() => {
 
 .filter-field :deep(.p-input) {
   width: 100%;
+}
+
+/* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-Popover shape. */
+.partition-menu {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--kira-s-2);
+  gap: var(--kira-s-1);
+}
+
+.partition-menu-empty {
+  padding: var(--kira-s-2);
+}
+
+.partition-option {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-1) var(--kira-s-2);
+  border-radius: var(--kira-radius);
+  cursor: pointer;
+}
+
+.partition-option:hover {
+  background: var(--kira-hover);
+}
+
+/* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors
+   DataGrid.vue's own `.header-cell`/`.resize-handle` pair) — `.p-th` needs `position: relative`
+   as its positioning context, scoped here rather than in primitives.css since it's a stream-only
+   affordance (grid/keyvalue/console reuse `.p-th` too but never resize it this way). Unlike
+   DataGrid.vue's `.header-cell` (no overflow rule of its own), primitives.css's shared `.p-th`
+   sets `overflow: hidden` — `right: 0` (rather than DataGrid's `right: -2px`) keeps the whole
+   4px handle inside `.p-th`'s own box instead of half-clipped by that overflow. */
+.p-th {
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
 }
 </style>

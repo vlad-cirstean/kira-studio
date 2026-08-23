@@ -50,7 +50,7 @@ function finishPosition(
 // timestamp), carried through the generic `filter` field — only ever consulted for a *fresh*
 // browse (a token-continued page's windows were already resolved once, per the D7 comment on
 // PartitionWindow, and re-applying the filter there would just be wrong once the user has paged
-// partway through). `partition` narrows which partitions this browse even considers; `timestampMs`
+// partway through). `partitions` narrows which partitions this browse even considers; `timestampMs`
 // (if set) wins over `offset` and reseeds via kafkajs's own `fetchTopicOffsetsByTimestamp` — the
 // exact API this adapter would otherwise have needed a consumer-side `seek`/`offsetsForTimes`
 // dance for.
@@ -76,10 +76,16 @@ async function freshWindows(
   }
 
   let selected = offsets;
-  if (filter.partition !== null) {
-    selected = selected.filter((o) => o.partition === filter.partition);
+  if (filter.partitions.length > 0) {
+    // "any of these partitions" — a single entry narrows to exactly one, same as the old
+    // single-partition filter; more than one is a union, not an intersection.
+    const wanted = new Set(filter.partitions);
+    selected = selected.filter((o) => wanted.has(o.partition));
     if (selected.length === 0) {
-      throw new AdapterError('E_QUERY', `topic ${topic} has no partition ${filter.partition}`);
+      throw new AdapterError(
+        'E_QUERY',
+        `topic ${topic} has no partition(s) ${filter.partitions.join(', ')}`,
+      );
     }
   }
 

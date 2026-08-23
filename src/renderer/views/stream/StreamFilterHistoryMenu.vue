@@ -16,7 +16,7 @@ import {
 // SQLite table backing a "saved" tier the way the SQL grid has one).
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{
-  apply: [offset: string | null, partition: string | null, timestamp: string | null];
+  apply: [offset: string | null, partitions: number[], timestamp: string | null];
   close: [];
 }>();
 
@@ -41,13 +41,14 @@ const savedEntries = computed<StreamFilterHistoryEntry[]>(() => entries.value);
 function summarize(entry: StreamFilterHistoryEntry): string {
   const parts: string[] = [];
   if (entry.offset !== null) parts.push(`offset ${entry.offset}`);
-  if (entry.partition !== null) parts.push(`partition ${entry.partition}`);
+  if (entry.partitions.length === 1) parts.push(`partition ${entry.partitions[0]}`);
+  else if (entry.partitions.length > 1) parts.push(`partitions ${entry.partitions.join(', ')}`);
   if (entry.timestamp !== null) parts.push(`ts ${entry.timestamp}`);
   return parts.length > 0 ? parts.join(' · ') : '(empty filter)';
 }
 
 function apply(entry: StreamFilterHistoryEntry): void {
-  emit('apply', entry.offset, entry.partition, entry.timestamp);
+  emit('apply', entry.offset, entry.partitions, entry.timestamp);
   emit('close');
 }
 

@@ -8,9 +8,10 @@ import TextField from '../../theme/primitives/TextField.vue';
 import { produceKafkaMessage, sendSqsMessage } from './streamMutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
-// sentinel fields), SQS gets body only (SendMessage takes no key/headers on this app's model —
-// see sqs/mutate.ts's own scoping note). One popover, one shape switch, rather than two near-
-// identical components.
+// sentinel fields); SQS gets body/headers but no key (SendMessage has no key concept on this
+// app's model — see sqs/mutate.ts's own scoping note; task #61 added SQS's MessageAttributes
+// support, so headers is now shared by both kinds). One popover, one shape switch, rather than
+// two near-identical components.
 const props = defineProps<{ tabId: string; kind: 'kafka' | 'sqs' }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -35,7 +36,11 @@ async function submit(): Promise<void> {
         headers: headers.value.trim() === '' ? null : headers.value,
       });
     } else {
-      await sendSqsMessage(props.tabId, body.value);
+      await sendSqsMessage(
+        props.tabId,
+        body.value,
+        headers.value.trim() === '' ? null : headers.value,
+      );
     }
     emit('close');
   } catch (err) {
@@ -78,7 +83,7 @@ async function submit(): Promise<void> {
           />
         </label>
 
-        <label v-if="isKafka" class="field">
+        <label class="field">
           <span class="p-sm muted">Headers (optional JSON object)</span>
           <textarea
             v-model="headers"
