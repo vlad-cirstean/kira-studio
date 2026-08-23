@@ -57,6 +57,10 @@ const connectionFieldsSchema = z.object({
   password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
   uri: z.string().nullable(),
   options: z.record(z.string(), z.unknown()),
+  // P11: optional shell command run before connect (e.g. a port-forward). A first-class column
+  // rather than an options_json key — options round-trips through the connection URI and the
+  // Copy URI menu item, and a shell command must never be settable by pasting a URI.
+  preconnect: z.string().trim().min(1).max(2000).nullable().default(null),
 });
 
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {

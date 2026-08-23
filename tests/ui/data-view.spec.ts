@@ -150,6 +150,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
           password: cfg.password,
           uri: null,
           options: {},
+          preconnect: null,
         })
         .then((c) => c.id),
     {

@@ -102,6 +102,7 @@ test('mariadb — connect, tree, data tab, count, filter, cancel', async ({
         password: cfg.password,
         uri: null,
         options: {},
+        preconnect: null,
       }),
     {
       host: cfg.host,

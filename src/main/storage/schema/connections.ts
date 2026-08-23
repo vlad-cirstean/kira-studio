@@ -14,6 +14,7 @@ export const connections = sqliteTable('connections', {
   password: text('password'),
   uri: text('uri'),
   optionsJson: text('options_json'),
+  preconnect: text('preconnect'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),

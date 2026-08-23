@@ -161,6 +161,15 @@ const isValid = computed(() =>
 // SQS has no host/port at all (D — connection.ts's superRefine exception); fields mode instead
 // repurposes `database` for the AWS region and `username` for a named profile (S10's client.ts).
 const isSqs = computed(() => draft.value?.kind === 'sqs');
+
+// P11: '' <-> null bridging so an emptied field is "no script" rather than a schema violation
+// the user cannot see (min(1) on the underlying schema rejects '').
+const preconnectText = computed({
+  get: () => draft.value?.preconnect ?? '',
+  set: (value: string) => {
+    if (draft.value) draft.value.preconnect = value.trim() === '' ? null : value;
+  },
+});
 </script>
 
 <template>
@@ -290,6 +299,25 @@ const isSqs = computed(() => draft.value?.kind === 'sqs');
           <span>Read-only</span>
           <span class="helper-text">Blocks every mutation path for this connection.</span>
         </label>
+
+        <label class="field">
+          <span>Pre-connect command (optional)</span>
+          <input
+            v-model="preconnectText"
+            type="text"
+            class="mono"
+            data-testid="connection-preconnect"
+          />
+          <span class="helper-text">
+            Runs in your shell before connecting — e.g. a port-forward. The connection drops if it
+            exits.
+          </span>
+          <span v-if="preconnectText" class="preconnect-warning" data-testid="connection-preconnect-warning">
+            This command runs on your machine with your permissions every time this connection
+            connects.
+          </span>
+        </label>
+        <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
 
         <p class="credential-warning">
           Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
@@ -494,6 +522,11 @@ const isSqs = computed(() => draft.value?.kind === 'sqs');
 }
 
 .credential-warning {
+  color: var(--kira-warn);
+  font-size: 11px;
+}
+
+.preconnect-warning {
   color: var(--kira-warn);
   font-size: 11px;
 }

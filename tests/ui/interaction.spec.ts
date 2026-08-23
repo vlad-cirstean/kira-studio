@@ -147,6 +147,7 @@ async function createConnection(
           password: cfg.password,
           uri: null,
           options: {},
+          preconnect: null,
         })
         .then((c) => c.id),
     { cfg, opts },

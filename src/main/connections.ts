@@ -8,6 +8,7 @@ import { injectUriPassword, stripUriPassword } from '../shared/domain/uri';
 import { ENGINE_OP, type ResolvedConnectionConfig } from '../shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
+import { createPreconnectSupervisor, type PreconnectExit } from './preconnect';
 import type { KiraDb } from './storage/db';
 import {
   type ConnectionFields,
@@ -45,6 +46,8 @@ export interface ConnectionsService {
   onListChanged(cb: (records: ConnectionSummary[]) => void): () => void;
   /** Called when engine-host reports the engine process exited (D2/D11 gap coverage). */
   markAllErrored(reason: string): void;
+  /** Kills every live pre-connect process. Called from main/index.ts's before-quit. */
+  shutdown(): Promise<void>;
 }
 
 function extractFields(summary: ConnectionSummary): ConnectionFields {
@@ -64,6 +67,12 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
   const stateHandlers = new Set<(state: ConnectionState) => void>();
   const invalidatedHandlers = new Set<(connectionId: string) => void>();
   const listChangedHandlers = new Set<(records: ConnectionSummary[]) => void>();
+  const preconnect = createPreconnectSupervisor({
+    log: (level, message) => log(level, 'preconnect', message),
+  });
+  // D11: at most one in-flight connect() per connection, so two Connect clicks cannot race two
+  // pre-connect processes against each other.
+  const inFlightConnects = new Map<string, Promise<ConnectionState>>();
 
   function emitState(state: ConnectionState): void {
     states.set(state.connectionId, state);
@@ -95,28 +104,116 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     );
   }
 
-  // Private — never returned over IPC (D9).
-  async function resolve(id: string): Promise<ResolvedConnectionConfig> {
+  // Private — never returned over IPC (D9). `preconnect` is stripped from the engine-bound config
+  // (D13): the engine has no use for a shell string and must never be handed one.
+  async function resolve(
+    id: string,
+  ): Promise<{ config: ResolvedConnectionConfig; preconnect: string | null }> {
     const summary = await getConnection(db, id);
     if (!summary) throw new Error(`connection ${id} not found`);
     const password = await secrets.get(id);
+    const { preconnect: script, ...fields } = summary;
     return {
-      ...summary,
-      password,
-      uri: summary.uri ? injectUriPassword(summary.uri, password) : summary.uri,
+      config: {
+        ...fields,
+        password,
+        uri: summary.uri ? injectUriPassword(summary.uri, password) : summary.uri,
+      },
+      preconnect: script,
     };
   }
 
   // Same shape as `resolve`, but built from an unsaved draft (the dialog's "Test connection"
   // button tests the input as typed, not what is on disk).
-  function resolveFromInput(input: ConnectionInput): ResolvedConnectionConfig {
+  function resolveFromInput(input: ConnectionInput): {
+    config: ResolvedConnectionConfig;
+    preconnect: string | null;
+  } {
+    const { preconnect: script, ...fields } = input;
     return {
-      ...input,
-      id: 'test',
-      sortOrder: 0,
-      createdAt: '',
-      updatedAt: '',
+      config: { ...fields, id: 'test', sortOrder: 0, createdAt: '', updatedAt: '' },
+      preconnect: script,
     };
+  }
+
+  // Any exit while armed means the connection can no longer reach its target (a died port-
+  // forward, a died SSO session-keeper) — best-effort disconnect the adapter and surface why.
+  preconnect.onExit((exit: PreconnectExit) => {
+    void engineHost.call(ENGINE_OP.disconnect, { connectionId: exit.connectionId }).catch(() => {});
+    const detail = exit.signal
+      ? `(signal ${exit.signal})`
+      : `(exit ${exit.code === null ? 'unknown' : exit.code})`;
+    const tail = exit.lastStderr ? `: ${exit.lastStderr}` : '';
+    emitState({
+      connectionId: exit.connectionId,
+      status: 'error',
+      serverVersion: null,
+      error: `Pre-connect script exited ${detail}${tail} — connection dropped.`,
+      since: Date.now(),
+      caps: null,
+    });
+  });
+
+  async function doConnect(id: string): Promise<ConnectionState> {
+    const summary = await getConnection(db, id);
+    if (!summary) throw new Error(`connection ${id} not found`);
+    emitState({
+      connectionId: id,
+      status: 'connecting',
+      serverVersion: null,
+      error: null,
+      since: Date.now(),
+      caps: null,
+    });
+    let started = false;
+    try {
+      const { config, preconnect: script } = await resolve(id);
+      let sidecar = false;
+      if (script) {
+        const startResult = await preconnect.start(id, script);
+        started = true;
+        sidecar = startResult.kind === 'sidecar';
+      }
+      const result = await engineHost.call<{ serverVersion: string; caps: Caps }>(
+        ENGINE_OP.connect,
+        { config },
+        20_000,
+      );
+      if (sidecar) {
+        // May synchronously flip this connection to 'error' via the onExit handler above, if
+        // the script already died between start() resolving and this call (D7).
+        preconnect.arm(id);
+      }
+      const afterArm = stateOf(id);
+      if (afterArm.status === 'error') return afterArm;
+      const state: ConnectionState = {
+        connectionId: id,
+        status: 'connected',
+        serverVersion: result.serverVersion,
+        error: null,
+        since: Date.now(),
+        caps: result.caps,
+      };
+      emitState(state);
+      // D11 (Step 6a numbering): the whole connection's metadata is refreshed on every
+      // reconnect. A blunt delete alone would blank the tree, so the renderer re-fetches only
+      // the paths it currently has expanded once it sees the invalidation push.
+      await dropCached(db, id);
+      emitInvalidated(id);
+      return state;
+    } catch (err) {
+      if (started) await preconnect.stop(id);
+      const state: ConnectionState = {
+        connectionId: id,
+        status: 'error',
+        serverVersion: null,
+        error: err instanceof Error ? err.message : String(err),
+        since: Date.now(),
+        caps: null,
+      };
+      emitState(state);
+      return state;
+    }
   }
 
   return {
@@ -189,6 +286,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
       if (current.status === 'connected' || current.status === 'connecting') {
         await engineHost.call(ENGINE_OP.disconnect, { connectionId: id }).catch(() => {});
       }
+      await preconnect.stop(id);
       await deleteConnection(db, id); // cascades filters, metadata cache, saved queries
       await secrets.delete(id);
       states.delete(id);
@@ -208,62 +306,30 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     },
 
     async test(input) {
-      const cfg = resolveFromInput(input);
+      const { config, preconnect: script } = resolveFromInput(input);
       try {
-        return await engineHost.call<ConnectionTestResult>(ENGINE_OP.test, { config: cfg }, 20_000);
+        if (script) await preconnect.start(config.id, script);
+        return await engineHost.call<ConnectionTestResult>(ENGINE_OP.test, { config }, 20_000);
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      } finally {
+        // A test run is never armed and never leaves a process behind, however it ended.
+        await preconnect.stop(config.id);
       }
     },
 
     async connect(id) {
-      const summary = await getConnection(db, id);
-      if (!summary) throw new Error(`connection ${id} not found`);
-      emitState({
-        connectionId: id,
-        status: 'connecting',
-        serverVersion: null,
-        error: null,
-        since: Date.now(),
-        caps: null,
+      const existing = inFlightConnects.get(id);
+      if (existing) return existing;
+      const attempt = doConnect(id).finally(() => {
+        if (inFlightConnects.get(id) === attempt) inFlightConnects.delete(id);
       });
-      try {
-        const cfg = await resolve(id);
-        const result = await engineHost.call<{ serverVersion: string; caps: Caps }>(
-          ENGINE_OP.connect,
-          { config: cfg },
-          20_000,
-        );
-        const state: ConnectionState = {
-          connectionId: id,
-          status: 'connected',
-          serverVersion: result.serverVersion,
-          error: null,
-          since: Date.now(),
-          caps: result.caps,
-        };
-        emitState(state);
-        // D11: the whole connection's metadata is refreshed on every reconnect. A blunt
-        // delete alone would blank the tree, so the renderer re-fetches only the paths it
-        // currently has expanded once it sees the invalidation push.
-        await dropCached(db, id);
-        emitInvalidated(id);
-        return state;
-      } catch (err) {
-        const state: ConnectionState = {
-          connectionId: id,
-          status: 'error',
-          serverVersion: null,
-          error: err instanceof Error ? err.message : String(err),
-          since: Date.now(),
-          caps: null,
-        };
-        emitState(state);
-        return state;
-      }
+      inFlightConnects.set(id, attempt);
+      return attempt;
     },
 
     async disconnect(id) {
+      await preconnect.stop(id);
       await engineHost.call(ENGINE_OP.disconnect, { connectionId: id }).catch(() => {});
       // Cached metadata stays — §2.2: "metadata stays, it is on disk".
       const state: ConnectionState = {
@@ -297,9 +363,12 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     markAllErrored(reason) {
       for (const state of states.values()) {
         if (state.status === 'connected' || state.status === 'connecting') {
+          void preconnect.stop(state.connectionId);
           emitState({ ...state, status: 'error', error: reason, since: Date.now(), caps: null });
         }
       }
     },
+
+    shutdown: () => preconnect.stopAll(),
   };
 }

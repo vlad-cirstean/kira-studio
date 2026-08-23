@@ -64,6 +64,7 @@ export function defaultDraft(): ConnectionInput {
     password: null,
     uri: null,
     options: {},
+    preconnect: null,
   };
 }
 

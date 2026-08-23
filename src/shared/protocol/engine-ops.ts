@@ -27,12 +27,15 @@ export const ENGINE_EVENT = {
 // main → engine only, never renderer-visible: ConnectionSummary + the resolved password + the
 // URI with the password re-injected (D7). Declared here, not in domain/connection.ts, so it is
 // obvious that only the engine channel carries a secret.
-export type ResolvedConnectionConfig = ConnectionSummary & {
+// `preconnect` is stripped (P11/D13): it is a shell command with no meaning to the engine, and
+// the engine is the one process boundary in this architecture treated as expendable/untrusted-ish
+// (§4) — it has no business holding a string whose only purpose is to be executed.
+export type ResolvedConnectionConfig = Omit<ConnectionSummary, 'preconnect'> & {
   password: string | null;
 };
 
 export const resolvedConnectionConfigSchema: z.ZodType<ResolvedConnectionConfig> =
-  connectionSummarySchema.extend({
+  connectionSummarySchema.omit({ preconnect: true }).extend({
     password: z.string().nullable(),
   });
 

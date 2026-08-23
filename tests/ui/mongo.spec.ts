@@ -100,6 +100,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
         password: c.password,
         uri: null,
         options: {},
+        preconnect: null,
       }),
     {
       host: cfg.host,

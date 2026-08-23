@@ -102,6 +102,7 @@ async function createConnection(page: Page, name: string, color: ConnectionColor
           password: cfg.password,
           uri: null,
           options: {},
+          preconnect: null,
         })
         .then((c) => c.id),
     {

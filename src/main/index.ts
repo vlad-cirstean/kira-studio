@@ -105,7 +105,8 @@ async function main(): Promise<void> {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
-    void Promise.all(BrowserWindow.getAllWindows().map(requestFlush)).then(() => {
+    void Promise.all(BrowserWindow.getAllWindows().map(requestFlush)).then(async () => {
+      await connections.shutdown();
       engineHost.stop();
       close();
       app.quit();

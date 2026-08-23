@@ -101,6 +101,7 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 b
           password: cfg.password,
           uri: null,
           options: {},
+          preconnect: null,
         })
         .then((c) => c.id),
     {
