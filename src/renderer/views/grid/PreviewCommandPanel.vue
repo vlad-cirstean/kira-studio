@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
+import Codicon from '../../theme/Codicon.vue';
 import { previewPending } from './pendingChanges';
 
 const props = defineProps<{ tabId: string }>();
@@ -43,16 +44,25 @@ function close(): void {
 
 <template>
   <div class="menu-backdrop" data-testid="preview-command-backdrop" @click="close">
-    <div class="preview-panel" data-testid="preview-command-panel" @click.stop>
-      <div class="preview-panel-header">
-        Preview command
-        <button type="button" data-testid="preview-command-close" @click="close">×</button>
+    <div class="preview-panel p-float" data-testid="preview-command-panel" @click.stop>
+      <div class="preview-panel-header p-panel-head">
+        <span class="icon-box"><Codicon name="code" :size="14" /></span>
+        <span>Preview SQL</span>
+        <button
+          type="button"
+          class="p-iconbtn p-push"
+          title="Close"
+          data-testid="preview-command-close"
+          @click="close"
+        >
+          <Codicon name="close" :size="14" />
+        </button>
       </div>
-      <div v-if="loading" class="preview-panel-loading">Loading…</div>
-      <div v-else-if="error" class="preview-panel-error" data-testid="preview-command-error">
+      <div v-if="loading" class="preview-panel-loading p-sm muted">Loading…</div>
+      <div v-else-if="error" class="preview-panel-error p-sm" data-testid="preview-command-error">
         {{ error }}
       </div>
-      <div v-else-if="statements.length === 0" class="preview-panel-empty">
+      <div v-else-if="statements.length === 0" class="preview-panel-empty p-sm muted">
         No pending changes.
       </div>
       <div v-else class="preview-panel-body">
@@ -77,39 +87,20 @@ function close(): void {
   max-height: 360px;
   display: flex;
   flex-direction: column;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  font-size: 12px;
 }
 
 .preview-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-weight: 600;
-}
-
-.preview-panel-header button {
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .preview-panel-loading,
 .preview-panel-empty {
-  padding: 12px;
-  color: var(--kira-fg-muted);
+  padding: var(--kira-s-4);
 }
 
 .preview-panel-error {
-  padding: 12px;
+  padding: var(--kira-s-4);
   color: var(--kira-error);
 }
 

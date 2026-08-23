@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
+import Codicon from '../../theme/Codicon.vue';
 import DataGrid from './DataGrid.vue';
 import SearchToolbar from './SearchToolbar.vue';
 import { cancelPrefetch, load, reload, runtime } from './state';
@@ -74,19 +75,22 @@ function onCloseSearch(): void {
 <template>
   <div class="data-view">
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="reconnect-panel">
-      <button type="button" data-testid="reconnect-load" @click="onReconnectAndLoad">
+      <button type="button" class="p-dlgbtn primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <!-- A thin indeterminate bar, never a spinner that replaces the previous page (§8.5). -->
-      <div v-if="rt?.status === 'loading'" class="loading-bar" data-testid="loading-bar" />
+      <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
+           that started it (DataToolbar's p-run-state), never a bar across the top of the view —
+           §8.5's "never a spinner that replaces the previous page" still holds, it just no longer
+           needs a bar of its own to say so. -->
       <div
         v-if="rt?.status === 'error' && rt.error"
-        class="error-strip"
+        class="error-strip p-strip err"
         data-testid="error-strip"
       >
-        {{ rt.error.message }}
+        <span class="icon-box"><Codicon name="warning" :size="14" /></span>
+        <span>{{ rt.error.message }}</span>
       </div>
       <div class="grid-area">
         <DataGrid ref="dataGridRef" :tab-id="tab.id" />
@@ -116,45 +120,8 @@ function onCloseSearch(): void {
   justify-content: center;
 }
 
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.loading-bar {
-  height: 2px;
-  flex-shrink: 0;
-  background: linear-gradient(90deg, transparent, var(--kira-accent), transparent);
-  background-size: 200% 100%;
-  animation: loading-sweep 1.2s linear infinite;
-}
-
-@keyframes loading-sweep {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
 .error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
   font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
   white-space: pre-wrap;
 }
 

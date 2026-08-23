@@ -5,9 +5,14 @@ import { control } from '../../bridge/control';
 import { activeDataTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import FilterHistoryMenu from './FilterHistoryMenu.vue';
-import { setFilter, setSort } from './state';
+import { runtime, setFilter, setSort } from './state';
 
 const tab = computed(() => activeDataTab.value);
+const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
+
+// A query that failed is shown by the WHERE field turning error-red — the failure itself is
+// already reported by DataView.vue's error strip, this just points at the field that caused it.
+const hasError = computed(() => rt.value?.status === 'error');
 
 function sortToText(sort: SortSpec | null): string {
   if (!sort) return '';
@@ -55,6 +60,19 @@ async function applyOrderBy(): Promise<void> {
   recordHistory(t.state.filter, sort);
 }
 
+// README's "the filter row is permanent — Clear, never close": empties both fields and refetches,
+// using the same setFilter/setSort the blur handlers already call — there is no separate "hide
+// the row" affordance to build, since the row never goes away.
+async function onClear(): Promise<void> {
+  const t = tab.value;
+  if (!t) return;
+  whereText.value = '';
+  orderByText.value = '';
+  await setFilter(t.id, null);
+  await setSort(t.id, null);
+  recordHistory(null, null);
+}
+
 function onWhereKeydown(e: KeyboardEvent): void {
   if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
   else if (e.key === 'Escape') {
@@ -82,11 +100,14 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 </script>
 
 <template>
-  <div v-if="tab" class="filter-toolbar" data-testid="filter-toolbar">
+  <!-- LAW 02 / README: one row, two prefixed inputs, one verb — permanent, so Clear rather than
+       a close button that would make the grid change height under you. -->
+  <div v-if="tab" class="filter-toolbar p-toolbar" data-testid="filter-toolbar">
     <div class="history-anchor">
       <button
         type="button"
-        title="History"
+        class="p-iconbtn"
+        title="Saved &amp; recent filters"
         data-testid="filter-history-button"
         @click="historyOpen = !historyOpen"
       >
@@ -99,92 +120,62 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
         @close="historyOpen = false"
       />
     </div>
-    <input
-      v-model="whereText"
-      type="text"
-      class="filter-input mono"
-      placeholder="WHERE …"
-      data-testid="filter-where-input"
-      @keydown="onWhereKeydown"
-      @blur="applyWhere"
-    />
-    <div class="spacer" />
-    <span v-if="isStructuredSort" class="sort-marker" title="Set from a header click">⇅</span>
-    <input
-      v-model="orderByText"
-      type="text"
-      class="filter-input orderby mono"
-      placeholder="ORDER BY …"
-      data-testid="filter-orderby-input"
-      @keydown="onOrderByKeydown"
-      @blur="applyOrderBy"
-    />
+    <span class="p-input where-input" :class="{ 'is-error': hasError }">
+      <span class="dim prefix">WHERE</span>
+      <input
+        v-model="whereText"
+        type="text"
+        class="mono"
+        placeholder="status = 'paid'"
+        data-testid="filter-where-input"
+        @keydown="onWhereKeydown"
+        @blur="applyWhere"
+      />
+    </span>
+    <span class="p-input orderby-input">
+      <span class="dim prefix">ORDER BY</span>
+      <input
+        v-model="orderByText"
+        type="text"
+        class="mono"
+        placeholder="placed_at DESC"
+        data-testid="filter-orderby-input"
+        @keydown="onOrderByKeydown"
+        @blur="applyOrderBy"
+      />
+    </span>
+    <span v-if="isStructuredSort" class="p-chip info" title="Sort came from clicking a column header">
+      <Codicon name="sort-precedence" :size="11" />from header
+    </span>
+    <button type="button" class="p-btn" title="Empty both fields and refetch" @click="onClear">
+      Clear
+    </button>
   </div>
 </template>
 
 <style scoped>
-.filter-toolbar {
-  height: 26px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-}
-
+/* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths and
+   the WHERE/ORDER BY prefixes live here. */
 .history-anchor {
   position: relative;
 }
 
-.history-anchor > button {
-  display: flex;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: var(--kira-radius-sm);
-}
-
-.history-anchor > button:hover {
-  background: var(--kira-hover);
-}
-
-.filter-input {
-  background: transparent;
-  border: none;
-  color: var(--kira-fg);
-  font-size: 11px;
-  outline: none;
-  padding: 2px 4px;
+.where-input {
+  flex: 1;
   min-width: 0;
 }
 
-.filter-input:focus {
-  background: var(--kira-bg-input);
-  border-radius: var(--kira-radius-sm);
+.where-input.is-error {
+  border-color: var(--kira-error);
 }
 
-.filter-input:not(.orderby) {
-  flex: 1;
-}
-
-.orderby {
-  width: 200px;
-  text-align: right;
-}
-
-.spacer {
-  flex: 0 0 auto;
-}
-
-.sort-marker {
-  color: var(--kira-accent);
+.orderby-input {
+  width: 230px;
   flex-shrink: 0;
 }
 
-.mono {
-  font-family: var(--kira-font-family);
+.prefix {
+  flex-shrink: 0;
+  font-family: -apple-system, 'SF Pro Text', system-ui, 'Segoe UI', sans-serif;
 }
 </style>

@@ -118,6 +118,25 @@ function onToggleSearch(): void {
 
 const columnsOpen = ref(false);
 
+// P16 design system's p-badge on the Columns button: "selected / total" — both counts already
+// live on data this component reads anyway (the projection list and the describe-derived meta),
+// so this is a display-only derivation, not a new data source.
+const columnCountLabel = computed(() => {
+  const total = rt.value?.meta?.columns.length;
+  if (!total) return null;
+  const projection = tab.value?.state.projection;
+  return `${projection ? projection.length : total} / ${total}`;
+});
+
+// P16 design system's warn chip: "N rows edited" — the count is already tracked per-tab by
+// pendingChanges.ts (edits + deletes + inserts), just not summed anywhere for display yet.
+const pendingCount = computed(() => {
+  const t = tab.value;
+  const p = t ? pendingFor(t.id) : undefined;
+  if (!p) return 0;
+  return p.edits.size + p.deletes.size + p.inserts.length;
+});
+
 function onAddRow(): void {
   const t = tab.value;
   if (!t) return;
@@ -172,14 +191,50 @@ function onDiscard(): void {
 </script>
 
 <template>
-  <div v-if="tab" class="data-toolbar" data-testid="data-toolbar">
-    <button type="button" title="Refresh" data-testid="toolbar-refresh" @click="onRefresh">
-      <Codicon name="refresh" :size="14" />
-    </button>
-
-    <div class="pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
+  <div v-if="tab" class="data-toolbar p-toolbar" data-testid="data-toolbar">
+    <!-- LAW 01/10: Refresh, then Stop (always present, greyed when idle), then the run-state
+         ring beside them — never a bar across the top of the view (DataView.vue). -->
+    <div class="group">
       <button
         type="button"
+        class="p-iconbtn"
+        title="Refresh"
+        data-testid="toolbar-refresh"
+        :disabled="!!rt?.opId"
+        @click="onRefresh"
+      >
+        <Codicon name="refresh" :size="14" />
+      </button>
+      <button
+        type="button"
+        class="p-iconbtn"
+        :class="{ 'is-live': !!rt?.opId }"
+        title="Stop"
+        data-testid="toolbar-stop"
+        :disabled="!rt?.opId"
+        @click="onStop"
+      >
+        <Codicon name="debug-stop" :size="14" />
+      </button>
+      <span
+        class="p-run-state"
+        :class="{ 'is-running': rt?.status === 'loading', 'is-error': rt?.status === 'error' }"
+        :title="rt?.status === 'error' ? rt?.error?.message : undefined"
+      >
+        <span class="ring" />
+        <template v-if="rt?.status === 'loading'">fetching…</template>
+        <template v-else-if="rt?.status === 'error'">query failed</template>
+      </span>
+    </div>
+
+    <div class="sep" />
+
+    <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
+         has no notion of "row 1–200" to display without the count query having already run). -->
+    <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
+      <button
+        type="button"
+        class="p-iconbtn"
         title="First page"
         data-testid="pager-first"
         :disabled="tab.state.pageIndex === 0"
@@ -189,6 +244,7 @@ function onDiscard(): void {
       </button>
       <button
         type="button"
+        class="p-iconbtn"
         title="Previous page"
         data-testid="pager-prev"
         :disabled="tab.state.pageIndex === 0"
@@ -196,21 +252,23 @@ function onDiscard(): void {
       >
         <Codicon name="chevron-left" :size="12" />
       </button>
-      <span class="page-label">
+      <span class="page-label p-sm muted">
         page
-        <input
-          type="number"
-          min="1"
-          class="page-input"
-          data-testid="pager-page-input"
-          :value="pageInputValue"
-          @input="onPageInput"
-          @change="onJump"
-        />
+        <span class="p-input page-input">
+          <input
+            type="number"
+            min="1"
+            data-testid="pager-page-input"
+            :value="pageInputValue"
+            @input="onPageInput"
+            @change="onJump"
+          />
+        </span>
         <template v-if="pageCount"> of {{ pageCount }}</template>
       </span>
       <button
         type="button"
+        class="p-iconbtn"
         title="Next page"
         data-testid="pager-next"
         :disabled="!rt?.hasMore"
@@ -220,6 +278,7 @@ function onDiscard(): void {
       </button>
       <button
         type="button"
+        class="p-iconbtn"
         :title="pageCount ? 'Last page' : 'Count rows first'"
         data-testid="pager-last"
         :disabled="!pageCount"
@@ -229,7 +288,7 @@ function onDiscard(): void {
       </button>
     </div>
 
-    <div class="segmented" data-testid="page-size-picker">
+    <div class="p-seg" data-testid="page-size-picker">
       <button
         v-for="size in PAGE_SIZES"
         :key="size"
@@ -242,204 +301,158 @@ function onDiscard(): void {
       </button>
     </div>
 
-    <button
-      type="button"
-      class="count-button"
-      data-testid="toolbar-count"
-      :class="{ stale: rt?.count?.stale }"
-      title="Count all"
-      @click="onCount"
-    >
-      <span v-if="rt?.count">
-        Σ {{ rt.count.value.toLocaleString() }}<span v-if="!rt.count.exact">~</span>
-        <Codicon v-if="rt.count.stale" name="refresh" :size="11" />
-      </span>
-      <span v-else>Σ count all</span>
-    </button>
+    <div class="sep" />
 
-    <div class="columns-anchor">
-      <button type="button" data-testid="toolbar-columns" @click="columnsOpen = !columnsOpen">
-        columns ▾
-      </button>
-      <ColumnsMenu
-        v-if="columnsOpen"
-        :tab-id="tab.id"
-        :caps="caps"
-        @close="columnsOpen = false"
-      />
-    </div>
-
-    <button
-      type="button"
-      data-testid="toolbar-add-row"
-      :disabled="!isWritable"
-      :title="isWritable ? 'Add a row' : 'Connection is read-only'"
-      @click="onAddRow"
-    >
-      + row
-    </button>
-    <button
-      type="button"
-      data-testid="toolbar-delete-row"
-      :disabled="!isWritable"
-      :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
-      @click="onDeleteRow"
-    >
-      − row
-    </button>
-    <div class="preview-anchor">
+    <div class="group">
       <button
         type="button"
-        data-testid="toolbar-preview-command"
-        :disabled="!isWritable"
-        :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
-        @click="previewOpen = !previewOpen"
+        class="p-btn count-button"
+        data-testid="toolbar-count"
+        :class="{ stale: rt?.count?.stale }"
+        title="Count all"
+        @click="onCount"
       >
-        ⌘ preview command
+        <span v-if="rt?.count">
+          Σ {{ rt.count.value.toLocaleString() }}<span v-if="!rt.count.exact">~</span>
+          <Codicon v-if="rt.count.stale" name="refresh" :size="11" />
+        </span>
+        <span v-else>Σ count all</span>
       </button>
-      <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
+
+      <div class="columns-anchor">
+        <button type="button" class="p-btn" data-testid="toolbar-columns" @click="columnsOpen = !columnsOpen">
+          <span class="icon-box"><Codicon name="list-selection" :size="14" /></span>
+          Columns
+          <span v-if="columnCountLabel" class="p-count">{{ columnCountLabel }}</span>
+        </button>
+        <ColumnsMenu
+          v-if="columnsOpen"
+          :tab-id="tab.id"
+          :caps="caps"
+          @close="columnsOpen = false"
+        />
+      </div>
+
+      <div class="preview-anchor">
+        <button
+          type="button"
+          class="p-btn"
+          data-testid="toolbar-preview-command"
+          :disabled="!isWritable"
+          :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
+          @click="previewOpen = !previewOpen"
+        >
+          <span class="icon-box"><Codicon name="code" :size="14" /></span>
+          Preview SQL
+        </button>
+        <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
+      </div>
     </div>
-    <button
-      v-if="tabHasPending"
-      type="button"
-      data-testid="toolbar-commit-changes"
-      :disabled="!isWritable"
-      title="Commit pending changes"
-      @click="onCommit"
-    >
-      commit
-    </button>
-    <button
-      v-if="tabHasPending"
-      type="button"
-      data-testid="toolbar-discard-changes"
-      :disabled="!isWritable"
-      title="Discard pending changes"
-      @click="onDiscard"
-    >
-      discard
-    </button>
 
-    <button
-      type="button"
-      title="Search this page"
-      data-testid="toolbar-search"
-      @click="onToggleSearch"
-    >
-      <Codicon name="search" :size="14" />
-    </button>
+    <div class="sep" />
 
-    <button
-      type="button"
-      title="Stop"
-      data-testid="toolbar-stop"
-      :disabled="!rt?.opId"
-      @click="onStop"
-    >
-      <Codicon name="debug-stop" :size="14" />
-    </button>
+    <div class="group">
+      <button
+        type="button"
+        class="p-btn"
+        data-testid="toolbar-add-row"
+        :disabled="!isWritable"
+        :title="isWritable ? 'Add a row' : 'Connection is read-only'"
+        @click="onAddRow"
+      >
+        <span class="icon-box"><Codicon name="add" :size="14" /></span>
+        Add row
+      </button>
+      <button
+        type="button"
+        class="p-btn"
+        data-testid="toolbar-delete-row"
+        :disabled="!isWritable"
+        :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
+        @click="onDeleteRow"
+      >
+        <span class="icon-box"><Codicon name="trash" :size="14" /></span>
+        Delete row
+      </button>
+      <button
+        type="button"
+        class="p-iconbtn"
+        title="Search this page"
+        data-testid="toolbar-search"
+        @click="onToggleSearch"
+      >
+        <Codicon name="search" :size="14" />
+      </button>
+    </div>
+
+    <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
+         accent-filled control on the whole screen. -->
+    <div v-if="tabHasPending" class="group p-push">
+      <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
+      <button
+        type="button"
+        class="p-btn"
+        data-testid="toolbar-discard-changes"
+        :disabled="!isWritable"
+        title="Discard pending changes"
+        @click="onDiscard"
+      >
+        <span class="icon-box"><Codicon name="discard" :size="14" /></span>
+        Revert
+      </button>
+      <button
+        type="button"
+        class="p-btn primary"
+        data-testid="toolbar-commit-changes"
+        :disabled="!isWritable"
+        title="Commit pending changes"
+        @click="onCommit"
+      >
+        <span class="icon-box"><Codicon name="save" :size="14" /></span>
+        Commit
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.data-toolbar {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.data-toolbar > button {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 3px 5px;
-  border-radius: var(--kira-radius-sm);
-}
-
-.data-toolbar > button:hover:not(:disabled) {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.data-toolbar > button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
+/* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
+   p-seg, p-input, p-chip, p-count, p-run-state) — only the bits those primitives don't cover
+   (the pager's own layout, the page-jump input's width, live/stale colour states) live here. */
 
 .pager {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.pager button {
-  display: flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 3px 4px;
-  border-radius: var(--kira-radius-sm);
-  font-size: 10px;
-}
-
-.pager button:hover:not(:disabled) {
-  background: var(--kira-hover);
-}
-
-.pager button:disabled {
-  opacity: 0.4;
-  cursor: default;
+  gap: var(--kira-s-1);
 }
 
 .page-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: var(--kira-fg-muted);
+  gap: var(--kira-s-1);
   white-space: nowrap;
 }
 
 .page-input {
-  width: 40px;
+  width: 46px;
+  padding: 0 var(--kira-s-2);
+}
+
+.page-input input {
+  text-align: center;
+}
+
+/* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
+   the `active` class name because tests/ui assert on it directly. */
+.p-seg > button.active {
   background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  font-size: 11px;
-  padding: 1px 4px;
-}
-
-.segmented {
-  display: flex;
-  gap: 2px;
-}
-
-.segmented button {
-  padding: 2px 6px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.segmented button.active {
-  background: var(--kira-select);
   color: var(--kira-fg);
 }
 
 .count-button.stale {
   color: var(--kira-warn);
+}
+
+.p-iconbtn.is-live {
+  color: var(--kira-error);
 }
 
 .columns-anchor,

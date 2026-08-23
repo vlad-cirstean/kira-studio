@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
+import Codicon from '../../theme/Codicon.vue';
+import { getPage } from './page';
 import { clearSearchState, runSearch, type SearchHandle, searchState } from './search';
 
 const props = defineProps<{ tabId: string }>();
+
+// README: "search walks the loaded rows only and never issues a query" — this label is what
+// keeps a hit count from ever being mistaken for a count over the whole table.
+const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
 const emit = defineEmits<{ goToMatch: [row: number, col: number]; close: [] }>();
 
 const query = ref('');
@@ -92,128 +98,99 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="search-toolbar" data-testid="search-toolbar" @keydown="onKeydown">
-    <input
-      v-model="query"
-      type="text"
-      class="search-input"
-      placeholder="Find"
-      data-testid="search-input"
-    />
-    <button
-      type="button"
-      class="toggle"
-      :class="{ active: matchCase }"
-      title="Match case"
-      data-testid="search-match-case"
-      @click="matchCase = !matchCase"
-    >
-      Aa
-    </button>
-    <button
-      type="button"
-      class="toggle"
-      :class="{ active: wholeWord }"
-      title="Whole word"
-      data-testid="search-whole-word"
-      @click="wholeWord = !wholeWord"
-    >
-      ab
-    </button>
-    <button
-      type="button"
-      class="toggle"
-      :class="{ active: regex }"
-      title="Regular expression"
-      data-testid="search-regex"
-      @click="regex = !regex"
-    >
-      .*
-    </button>
-    <span v-if="errorMessage" class="search-error" data-testid="search-error">{{
+  <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
+       so it's obvious what's being searched — and it only ever walks the loaded rows. -->
+  <div class="search-toolbar p-toolbar" data-testid="search-toolbar" @keydown="onKeydown">
+    <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
+      <Codicon name="search" :size="14" />
+    </span>
+    <span class="p-input search-input" :class="{ 'is-error': errorMessage }">
+      <input v-model="query" type="text" class="mono" placeholder="Find" data-testid="search-input" />
+    </span>
+    <span class="p-seg">
+      <span
+        :class="{ on: matchCase }"
+        title="Match case"
+        data-testid="search-match-case"
+        @click="matchCase = !matchCase"
+      >
+        Case
+      </span>
+      <span
+        :class="{ on: wholeWord }"
+        title="Whole word"
+        data-testid="search-whole-word"
+        @click="wholeWord = !wholeWord"
+      >
+        Word
+      </span>
+      <span
+        :class="{ on: regex }"
+        title="Regular expression"
+        data-testid="search-regex"
+        @click="regex = !regex"
+      >
+        Regex
+      </span>
+    </span>
+
+    <div class="sep" />
+
+    <span v-if="errorMessage" class="p-sm search-error" data-testid="search-error">{{
       errorMessage
     }}</span>
-    <span v-else class="search-count" data-testid="search-count">
-      <template v-if="entry && entry.matches.length > 0">
-        {{ entry.index + 1 }} of {{ entry.matches.length }}
-      </template>
-      <template v-else-if="scanning"> {{ foundSoFar }}… </template>
-      <template v-else> 0 of 0 </template>
-    </span>
-    <button type="button" title="Previous match" data-testid="search-prev" @click="goPrev">
-      ˄
+    <template v-else>
+      <span class="p-sm muted search-count" data-testid="search-count">
+        <template v-if="entry && entry.matches.length > 0">
+          <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
+        </template>
+        <template v-else-if="scanning">{{ foundSoFar }}…</template>
+        <template v-else>0 of 0</template>
+      </span>
+      <button type="button" class="p-iconbtn" title="Previous match" data-testid="search-prev" @click="goPrev">
+        <Codicon name="chevron-up" :size="12" />
+      </button>
+      <button type="button" class="p-iconbtn" title="Next match" data-testid="search-next" @click="goNext">
+        <Codicon name="chevron-down" :size="12" />
+      </button>
+      <div class="sep" />
+      <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
+    </template>
+    <button type="button" class="p-iconbtn p-push" title="Close" data-testid="search-close" @click="close">
+      <Codicon name="close" :size="14" />
     </button>
-    <button type="button" title="Next match" data-testid="search-next" @click="goNext">˅</button>
-    <button type="button" title="Close" data-testid="search-close" @click="close">✕</button>
   </div>
 </template>
 
 <style scoped>
 .search-toolbar {
   position: absolute;
-  top: 8px;
-  right: 24px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
   background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  font-size: 11px;
+  border-top: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: none;
 }
 
 .search-input {
-  width: 160px;
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  padding: 2px 6px;
-  font-size: 11px;
+  width: 200px;
+  flex-shrink: 0;
 }
 
-.toggle {
-  background: transparent;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 1px 5px;
-  font-size: 10px;
-}
-
-.toggle.active {
-  background: var(--kira-select);
-  color: var(--kira-fg);
+.search-input.is-error {
+  border-color: var(--kira-error);
 }
 
 .search-count {
-  color: var(--kira-fg-muted);
   white-space: nowrap;
-  min-width: 48px;
-  text-align: center;
 }
 
 .search-error {
   color: var(--kira-error);
   white-space: nowrap;
-  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.search-toolbar button:not(.toggle) {
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.search-toolbar button:not(.toggle):hover {
-  color: var(--kira-fg);
 }
 </style>

@@ -81,6 +81,35 @@ const pending = computed(() => pendingFor(props.tabId));
 const insertRows = computed(() => pending.value?.inserts ?? []);
 
 const hasPrimaryKey = computed(() => page.value?.columns.some((c) => c.isPrimaryKey) ?? false);
+
+// FIX-8 (design system): "keys are labelled PK / FK, never inferred from colour alone" — the FK
+// side reads the same describe-derived `meta.foreignKeys` the cell-nav buttons already use, just
+// flattened once into a name set instead of walking every edge per cell.
+const foreignKeyColumnNames = computed(() => {
+  const names = new Set<string>();
+  for (const fk of runtime[props.tabId]?.meta?.foreignKeys ?? []) {
+    for (const c of fk.columns) names.add(c);
+  }
+  return names;
+});
+function keyLabelFor(displayCol: number): 'PK' | 'FK' | null {
+  const name = columnOrder.value[displayCol];
+  if (!name) return null;
+  if (columnByName.value.get(name)?.isPrimaryKey) return 'PK';
+  if (foreignKeyColumnNames.value.has(name)) return 'FK';
+  return null;
+}
+function isForeignKeyDisplayCol(displayCol: number): boolean {
+  const name = columnOrder.value[displayCol];
+  return !!name && foreignKeyColumnNames.value.has(name);
+}
+
+// The design's `.tr.dirty .td.gutter` rail: a row with a staged edit or delete, drawn once on
+// the gutter cell rather than re-deriving it per visible column.
+function isDirtyRow(row: number): boolean {
+  const p = pendingFor(props.tabId);
+  return !!p && (p.edits.has(row) || p.deletes.has(row));
+}
 const isWritable = computed(() => {
   const t = tab();
   if (!t?.connectionId) return false;
@@ -829,7 +858,10 @@ defineExpose({ scrollCellIntoView });
     @scroll="onScroll"
     @keydown="onKeydown"
   >
-    <div v-if="page && page.rowCount === 0" class="no-rows">No rows</div>
+    <div v-if="page && page.rowCount === 0" class="no-rows p-empty" data-testid="grid-no-rows">
+      <Codicon name="table" :size="24" class="big" />
+      <span class="label">No rows</span>
+    </div>
     <div
       v-else-if="page"
       class="grid-sizer"
@@ -855,6 +887,7 @@ defineExpose({ scrollCellIntoView });
           @drop="onHeaderDrop($event, columnOrder[c])"
         >
           <span class="header-label">{{ columnOrder[c] }}</span>
+          <span v-if="keyLabelFor(c)" class="header-key mono">{{ keyLabelFor(c) }}</span>
           <span v-if="currentSortDirection(columnOrder[c])" class="sort-chevron">{{
             currentSortDirection(columnOrder[c]) === 'asc' ? '▲' : '▼'
           }}</span>
@@ -886,6 +919,7 @@ defineExpose({ scrollCellIntoView });
         <div
           class="gutter-cell"
           data-testid="grid-gutter-cell"
+          :class="{ dirty: isDirtyRow(r) }"
           :style="{ width: `${GUTTER_WIDTH}px` }"
           @click="onGutterClick(r, $event)"
           @contextmenu.prevent="onGutterContextMenu(r, $event)"
@@ -906,6 +940,7 @@ defineExpose({ scrollCellIntoView });
             'search-match': isSearchMatch(r, c),
             'search-match-current': isCurrentSearchMatch(r, c),
             'pending-edit': displayCell(r, c).staged,
+            fk: isForeignKeyDisplayCol(c) && !displayCell(r, c).isNull,
           }"
           :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
           @click="onCellClick(r, c, $event)"
@@ -986,19 +1021,21 @@ defineExpose({ scrollCellIntoView });
   height: 100%;
   overflow: auto;
   outline: none;
-  font-size: 12px;
+  font-size: var(--kira-t-md);
 }
 
 .grid-sizer {
   position: relative;
 }
 
+/* P16 design system's .p-thead/.p-th, adapted for this grid's virtualised (position: absolute)
+   rows instead of the primitive's plain flex row — same tokens, same border-strong divider. */
 .header-row {
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
 .header-gutter {
@@ -1007,6 +1044,7 @@ defineExpose({ scrollCellIntoView });
   z-index: 3;
   height: 100%;
   background: var(--kira-bg-elevated);
+  border-right: var(--kira-border-width) solid var(--kira-border);
 }
 
 .header-cell {
@@ -1015,19 +1053,28 @@ defineExpose({ scrollCellIntoView });
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-4);
   box-sizing: border-box;
   border-right: var(--kira-border-width) solid var(--kira-border);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
   cursor: pointer;
   user-select: none;
-  font-weight: 600;
 }
 
 .header-label {
+  color: var(--kira-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* FIX-8: PK/FK stated as a label, never inferred from colour alone (p-th's own .key). */
+.header-key {
+  color: var(--kira-warn);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
 }
 
 .sort-chevron {
@@ -1065,11 +1112,10 @@ defineExpose({ scrollCellIntoView });
   right: 0;
 }
 
-.grid-row:nth-child(even) {
-  background: var(--kira-bg-elevated);
-}
-
-.grid-row:hover .grid-cell:not(.selected) {
+/* No zebra striping — the design's own _gridrows.html/_style.css draws no alternating row
+   colour, only the hover state below. */
+.grid-row:hover .grid-cell:not(.selected),
+.grid-row:hover .gutter-cell {
   background: var(--kira-hover);
 }
 
@@ -1081,12 +1127,30 @@ defineExpose({ scrollCellIntoView });
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 6px;
+  padding-right: var(--kira-s-4);
   box-sizing: border-box;
-  background: var(--kira-bg);
-  color: var(--kira-fg-muted);
-  font-size: 11px;
+  background: var(--kira-bg-elevated);
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  border-right: var(--kira-border-width) solid var(--kira-border-strong);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
   cursor: pointer;
+}
+
+/* README/FIX: a row with a staged edit or delete gets the same 2px warn rail the mockup's
+   .tr.dirty .td.gutter::before draws — never a background tint across the whole row. */
+.gutter-cell.dirty {
+  position: relative;
+}
+
+.gutter-cell.dirty::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-warn);
 }
 
 .grid-cell {
@@ -1095,12 +1159,13 @@ defineExpose({ scrollCellIntoView });
   height: 100%;
   display: flex;
   align-items: center;
-  padding: 0 6px;
+  padding: 0 var(--kira-s-4);
   box-sizing: border-box;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   border-right: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
   cursor: default;
   /* D1: guarantees the native role:'copy'/'paste' accelerators have nothing to act on while
      the grid has focus, so they never race the grid's own local Ctrl+C/Ctrl+V handler. */
@@ -1112,9 +1177,13 @@ defineExpose({ scrollCellIntoView });
   font-variant-numeric: tabular-nums;
 }
 
+.grid-cell.fk {
+  color: var(--kira-info);
+}
+
 .grid-cell.selected {
   background: var(--kira-select);
-  outline: 1px solid var(--kira-accent);
+  outline: var(--kira-border-width) solid var(--kira-focus);
   outline-offset: -1px;
 }
 
@@ -1138,8 +1207,11 @@ defineExpose({ scrollCellIntoView });
   flex-shrink: 0;
 }
 
+/* p-td.edited: the warn colour is the whole affordance, never a background tint (that's reserved
+   for selection/search) — a selected+edited cell still shows both, exactly like _gridrows.html's
+   "sel edited" row. */
 .grid-cell.pending-edit {
-  background: color-mix(in srgb, var(--kira-accent) 18%, transparent);
+  color: var(--kira-warn);
 }
 
 /* P7 D5/D8: pure-CSS hover/selection affordance, no JS-tracked hover state — mirrors
@@ -1198,9 +1270,5 @@ defineExpose({ scrollCellIntoView });
 .no-rows {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-fg-muted);
 }
 </style>

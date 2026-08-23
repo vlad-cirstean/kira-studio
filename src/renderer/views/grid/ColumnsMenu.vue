@@ -36,14 +36,18 @@ function close(): void {
 
 <template>
   <div class="menu-backdrop" data-testid="columns-menu-backdrop" @click="close">
-    <div class="columns-menu" data-testid="columns-menu" @click.stop>
+    <div class="columns-menu p-float" data-testid="columns-menu" @click.stop>
       <div class="columns-menu-header">
-        <button type="button" data-testid="columns-select-all" @click="selectAll">All</button>
-        <button type="button" data-testid="columns-select-none" @click="selectNone">None</button>
+        <button type="button" class="p-btn" data-testid="columns-select-all" @click="selectAll">
+          All
+        </button>
+        <button type="button" class="p-btn" data-testid="columns-select-none" @click="selectNone">
+          None
+        </button>
       </div>
-      <div v-if="!meta" class="columns-menu-loading">Loading columns…</div>
+      <div v-if="!meta" class="columns-menu-loading p-sm muted">Loading columns…</div>
       <div v-else class="columns-menu-list">
-        <label v-for="name in columnNames" :key="name" class="columns-menu-item">
+        <label v-for="name in columnNames" :key="name" class="columns-menu-item p-row">
           <input
             type="checkbox"
             :checked="selected.has(name)"
@@ -53,7 +57,8 @@ function close(): void {
           {{ name }}
         </label>
       </div>
-      <div class="columns-menu-footer" data-testid="columns-menu-footer">
+      <div class="p-sep" />
+      <div class="columns-menu-footer p-xs dim" data-testid="columns-menu-footer">
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
@@ -75,56 +80,29 @@ function close(): void {
   max-height: 320px;
   display: flex;
   flex-direction: column;
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  font-size: 12px;
 }
 
 .columns-menu-header {
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-2);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.columns-menu-header button {
-  background: transparent;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 2px 6px;
-  font-size: 11px;
-}
-
 .columns-menu-loading {
-  padding: 8px;
-  color: var(--kira-fg-muted);
+  padding: var(--kira-s-4);
 }
 
 .columns-menu-list {
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--kira-s-1);
 }
 
 .columns-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 4px;
   cursor: pointer;
 }
 
-.columns-menu-item:hover {
-  background: var(--kira-hover);
-}
-
 .columns-menu-footer {
-  padding: 4px 8px;
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  padding: 0 var(--kira-s-3) var(--kira-s-3);
 }
 </style>
