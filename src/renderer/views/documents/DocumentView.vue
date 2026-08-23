@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DocumentTabRecord } from '@shared/domain/tabs';
-import { pathTail } from '@shared/domain/tree';
+import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
@@ -50,6 +50,38 @@ const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
 
 const targetTail = computed(() => pathTail(props.tab.path));
+
+// P16 design system LAW: the connection colour reaches a view as a 2px rail (here: the
+// toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
+// No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
+// when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
+const connectionColor = computed(() => {
+  const id = props.tab.connectionId;
+  if (!id) return undefined;
+  return connectionsState.records.find((r) => r.id === id)?.color;
+});
+
+const railStyle = computed(() => ({
+  '--kira-rail': connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : undefined,
+}));
+
+const iconColor = computed(() =>
+  connectionColor.value ? `var(--kira-conn-${connectionColor.value})` : 'var(--kira-fg-muted)',
+);
+
+// The view-head's breadcrumb prefix ("connection / database / "): derived from the already
+// loaded connection record and the tab's own path, purely for display — no new state.
+const pathPrefix = computed(() => {
+  const connectionId = props.tab.connectionId;
+  if (!connectionId) return '';
+  const connectionName = connectionsState.records.find((r) => r.id === connectionId)?.name;
+  const segments = decodePath(connectionId, props.tab.path).segments;
+  const parts = [connectionName, ...segments.slice(0, -1).map((s) => s.name)].filter(
+    (p): p is string => !!p,
+  );
+  return parts.length ? `${parts.join(' / ')} / ` : '';
+});
+
 const searchText = ref(props.tab.state.search);
 
 function onSearchInput(): void {
@@ -154,42 +186,69 @@ onUnmounted(() => {
 <template>
   <div class="document-view" data-testid="document-view" :data-path="tab.path">
     <div v-if="needsReconnect" class="reconnect-panel" data-testid="document-reconnect">
-      <button type="button" data-testid="document-reconnect-load" @click="onReconnectAndLoad">
+      <button
+        type="button"
+        class="p-dlgbtn primary"
+        data-testid="document-reconnect-load"
+        @click="onReconnectAndLoad"
+      >
         Reconnect &amp; load
       </button>
     </div>
     <template v-else>
-      <div class="header">
-        <span class="target" data-testid="document-target">{{ targetTail?.name ?? tab.path }}</span>
-        <div class="toolbar">
-          <input
-            v-model="searchText"
-            type="text"
-            class="search-box"
-            placeholder="Filter (e.g. { name: 'a' })"
-            data-testid="document-search"
-            @keyup.enter="onSearchInput"
-            @blur="onSearchInput"
-          />
-          <button type="button" data-testid="document-refresh" title="Refresh" @click="reload(tab.id)">
+      <!-- The view header is the same 28px object as a toolbar: it carries identity instead of
+           actions, so documents / key-value / stream / DDL all open the same way. -->
+      <div class="p-view-head">
+        <span class="p-conn-dot" :style="railStyle" title="Connection colour"></span>
+        <span class="icon-box" :style="{ color: iconColor }">
+          <Codicon name="json" :size="13" />
+        </span>
+        <span class="p-view-target" data-testid="document-target">
+          <span class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
+        </span>
+        <span class="p-badge">collection</span>
+      </div>
+
+      <!-- LAW 07 — the connection's colour caps the toolbar, not the panel. With no colour the
+           slot is still 2px, so nothing shifts. -->
+      <div class="p-toolbar-rail" :style="railStyle"></div>
+      <div class="p-toolbar">
+        <div class="group">
+          <button
+            type="button"
+            class="p-iconbtn"
+            title="Refresh"
+            data-testid="document-refresh"
+            @click="reload(tab.id)"
+          >
             <Codicon name="refresh" :size="13" />
           </button>
-          <button type="button" data-testid="document-expand-all" title="Expand all" @click="onExpandAll">
-            <Codicon name="expand-all" :size="13" />
-          </button>
+          <!-- Stop always follows Refresh, disabled when idle — cancelling lives in one place
+               instead of appearing only once work starts. -->
           <button
             type="button"
-            data-testid="document-collapse-all"
-            title="Collapse all"
-            @click="onCollapseAll"
+            class="p-iconbtn"
+            data-testid="document-stop"
+            :disabled="!running"
+            :title="running ? 'Stop' : 'Nothing running'"
+            @click="onStop"
           >
-            <Codicon name="collapse-all" :size="13" />
+            <Codicon name="debug-stop" :size="13" />
           </button>
-          <button type="button" data-testid="document-count" title="Exact count" @click="runCount(tab.id)">
-            <Codicon name="symbol-number" :size="13" />
-          </button>
+          <!-- Work-in-progress is this ring, not a bar across the view. -->
+          <span
+            class="p-run-state"
+            :class="{ 'is-running': running, 'is-error': rt?.status === 'error' }"
+            :title="statusLine"
+          >
+            <span class="ring"></span>
+          </span>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
           <button
             type="button"
+            class="p-iconbtn"
             data-testid="document-prev"
             :disabled="!rt?.prevToken"
             title="Previous page"
@@ -197,8 +256,16 @@ onUnmounted(() => {
           >
             <Codicon name="arrow-left" :size="13" />
           </button>
+          <span class="mono p-sm">{{ rt?.rowCount ?? 0 }} loaded</span>
+          <template v-if="rt?.count">
+            <span class="p-sm dim">of</span>
+            <span class="mono p-sm muted"
+              >{{ rt.count.exact ? '' : '≈ ' }}{{ rt.count.value.toLocaleString() }}</span
+            >
+          </template>
           <button
             type="button"
+            class="p-iconbtn"
             data-testid="document-next"
             :disabled="!rt?.hasMore"
             title="Next page"
@@ -206,29 +273,72 @@ onUnmounted(() => {
           >
             <Codicon name="arrow-right" :size="13" />
           </button>
-          <button v-if="running" type="button" data-testid="document-stop" title="Stop" @click="onStop">
-            <Codicon name="debug-stop" :size="13" />
+          <button
+            type="button"
+            class="p-btn"
+            data-testid="document-count"
+            title="Run an exact countDocuments() — the estimate above is metadata"
+            @click="runCount(tab.id)"
+          >
+            <span class="icon-box"><Codicon name="symbol-number" :size="13" /></span>Exact count
+          </button>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
+          <button
+            type="button"
+            class="p-iconbtn"
+            title="Expand all"
+            data-testid="document-expand-all"
+            @click="onExpandAll"
+          >
+            <Codicon name="expand-all" :size="13" />
+          </button>
+          <button
+            type="button"
+            class="p-iconbtn"
+            title="Collapse all"
+            data-testid="document-collapse-all"
+            @click="onCollapseAll"
+          >
+            <Codicon name="collapse-all" :size="13" />
           </button>
         </div>
       </div>
 
-      <div v-if="rt?.status === 'loading'" class="loading-bar" data-testid="document-loading" />
-      <div v-if="rt?.status === 'error' && rt.error" class="error-strip" data-testid="document-error">
+      <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed. -->
+      <div class="p-toolbar last">
+        <span class="p-input" style="flex: 1; min-width: 0">
+          <input
+            v-model="searchText"
+            type="text"
+            placeholder="Filter (e.g. { name: 'a' })"
+            data-testid="document-search"
+            @keyup.enter="onSearchInput"
+            @blur="onSearchInput"
+          />
+        </span>
+      </div>
+
+      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="document-error">
         {{ rt.error.message }}
       </div>
 
       <div class="list-body" data-testid="document-list">
-        <div v-if="!rt || rt.rowCount === 0" class="no-rows">{{ rt ? 'No documents' : '' }}</div>
+        <div v-if="!rt || rt.rowCount === 0" class="p-empty">
+          <span v-if="rt" class="label">No documents</span>
+        </div>
         <template v-else>
           <div
             v-for="i in rowIndices"
             :key="rowAt(i)?.id ?? i"
             class="doc-row"
+            :class="{ open: isExpanded(rowAt(i)?.id ?? '') }"
             data-testid="document-row"
             :data-id="rowAt(i)?.id"
             @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.id, rowAt(i)!.body)"
           >
-            <div class="doc-row-header">
+            <div class="doc-head">
               <button
                 type="button"
                 class="expand-toggle"
@@ -242,12 +352,13 @@ onUnmounted(() => {
                 />
               </button>
               <span class="doc-id" data-testid="document-id">{{ rowAt(i)?.id }}</span>
-              <span v-if="!isExpanded(rowAt(i)?.id ?? '')" class="doc-preview">{{
-                previewLine(rowAt(i)?.body ?? '')
-              }}</span>
+              <span class="doc-preview">{{ previewLine(rowAt(i)?.body ?? '') }}</span>
               <div class="doc-row-actions">
+                <span v-if="editingId === rowAt(i)?.id" class="p-chip warn">editing</span>
                 <button
                   type="button"
+                  class="p-iconbtn"
+                  :class="{ 'is-active': editingId === rowAt(i)?.id }"
                   data-testid="document-edit"
                   title="Edit"
                   @click="rowAt(i) && startEdit(rowAt(i)!.id, rowAt(i)!.body)"
@@ -256,12 +367,26 @@ onUnmounted(() => {
                 </button>
               </div>
             </div>
+            <!-- The editor is the same code surface DDL and the console views use — the only
+                 difference is the language. -->
             <div v-if="isExpanded(rowAt(i)?.id ?? '')" class="doc-body" data-testid="document-body">
               <template v-if="editingId === rowAt(i)?.id">
                 <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
                 <div class="edit-actions">
-                  <button type="button" data-testid="document-edit-save" @click="commitEdit">Save</button>
-                  <button type="button" data-testid="document-edit-cancel" @click="cancelEdit">
+                  <button
+                    type="button"
+                    class="p-btn primary"
+                    data-testid="document-edit-save"
+                    @click="commitEdit"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    class="p-btn"
+                    data-testid="document-edit-cancel"
+                    @click="cancelEdit"
+                  >
                     Cancel
                   </button>
                 </div>
@@ -272,15 +397,16 @@ onUnmounted(() => {
                 language="json"
                 :read-only="true"
               />
-              <span v-if="rowAt(i)?.isTruncated" class="truncated-marker" title="value truncated"
-                >(truncated)</span
+              <span
+                v-if="rowAt(i)?.isTruncated"
+                class="p-badge truncated-marker"
+                title="value truncated"
+                >truncated</span
               >
             </div>
           </div>
         </template>
       </div>
-
-      <div class="status-line" data-testid="document-status">{{ statusLine }}</div>
     </template>
   </div>
 </template>
@@ -300,133 +426,31 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.reconnect-panel button {
-  padding: 6px 14px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.reconnect-panel button:hover {
-  background: var(--kira-hover);
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: 11px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.target {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg);
-  font-weight: 600;
-  min-width: 0;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.search-box {
-  width: 220px;
-  padding: 3px 6px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-}
-
-.toolbar button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-}
-
-.toolbar button:hover:not(:disabled) {
-  background: var(--kira-hover);
-}
-
-.toolbar button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.loading-bar {
-  height: 2px;
-  flex-shrink: 0;
-  background: linear-gradient(90deg, transparent, var(--kira-accent), transparent);
-  background-size: 200% 100%;
-  animation: loading-sweep 1.2s linear infinite;
-}
-
-@keyframes loading-sweep {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.error-strip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: var(--kira-font-family);
-  color: var(--kira-error);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  white-space: pre-wrap;
-}
-
 .list-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
-.no-rows {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-fg-muted);
-  font-size: 12px;
-}
-
 .doc-row {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.doc-row-header {
+.doc-head {
+  height: var(--kira-h-md);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  min-height: 28px;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  cursor: pointer;
+}
+
+.doc-head:hover {
+  background: var(--kira-hover);
+}
+
+.doc-row.open > .doc-head {
+  background: var(--kira-bg-elevated);
 }
 
 .expand-toggle {
@@ -438,14 +462,14 @@ onUnmounted(() => {
   border: none;
   color: var(--kira-fg-muted);
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
 }
 
 .doc-id {
   flex-shrink: 0;
   font-family: var(--kira-font-family);
-  font-size: 11px;
-  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -459,34 +483,21 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--kira-font-family);
-  font-size: 11px;
-  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
 }
 
 .doc-row-actions {
   flex-shrink: 0;
   display: flex;
-  gap: 2px;
-}
-
-.doc-row-actions button {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 2px;
-}
-
-.doc-row-actions button:hover {
-  color: var(--kira-fg);
+  gap: var(--kira-s-2);
 }
 
 .doc-body {
   height: 220px;
   border-top: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-elevated);
   display: flex;
   flex-direction: column;
 }
@@ -494,36 +505,14 @@ onUnmounted(() => {
 .edit-actions {
   flex-shrink: 0;
   display: flex;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) var(--kira-s-4);
   border-top: var(--kira-border-width) solid var(--kira-border);
-}
-
-.edit-actions button {
-  padding: 3px 10px;
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  cursor: pointer;
-  font-size: 11px;
 }
 
 .truncated-marker {
   flex-shrink: 0;
-  padding: 2px 8px;
-  font-size: 10px;
-  color: var(--kira-fg-muted);
-}
-
-.status-line {
-  flex-shrink: 0;
-  padding: 3px 8px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  align-self: flex-start;
+  margin: var(--kira-s-2) var(--kira-s-4);
 }
 </style>
