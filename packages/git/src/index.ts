@@ -72,5 +72,7 @@ export type {
   RepoServiceDeps,
 } from "./repoService.ts";
 export { CHUNK_ROWS, HIDDEN_EVICT_MS, RepoService } from "./repoService.ts";
+export type { RepoHandlersDeps, RepoServicePort } from "./rpcHandlers.ts";
+export { createRepoHandlers } from "./rpcHandlers.ts";
 export type { RepoWatcher, WatchRepoOptions, WatchSignal } from "./watcher.ts";
 export { watchRepo } from "./watcher.ts";
