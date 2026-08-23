@@ -40,7 +40,13 @@ import { runtime, setSort } from './state';
 const props = defineProps<{ tabId: string }>();
 
 const GUTTER_WIDTH = 56;
-const OVERSCAN_ROWS = 8;
+// Widened from 8: a fast fling scroll is compositor-driven (the browser moves the viewport
+// instantly, with no need to wait on the main thread), while the actual row DOM only updates
+// once this component's scroll handler runs and re-renders — under a big flick that gap can
+// briefly outrun a thin buffer, showing blank space where rows haven't caught up yet ("cells
+// disappear, then reappear once you stop"). A wider buffer gives the main thread more scrolled
+// distance to fall behind before that gap becomes visible.
+const OVERSCAN_ROWS = 20;
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
@@ -173,11 +179,27 @@ const viewportHeight = ref(0);
 const viewportWidth = ref(0);
 let resizeObserver: ResizeObserver | null = null;
 
-function onScroll(): void {
+function syncScrollState(): void {
   const el = containerRef.value;
   if (!el) return;
   scrollTop.value = el.scrollTop;
   scrollLeft.value = el.scrollLeft;
+}
+
+// A fling can fire many native `scroll` events within a single frame — updating scrollTop/Left
+// (and so re-rendering the visible row/column window) synchronously on every one of them is
+// wasted work that only makes it more likely the main thread falls behind the compositor-driven
+// scroll position. Coalescing to one update per animation frame keeps the re-render in step with
+// what's actually going to paint. The initial mount call bypasses this (calls syncScrollState
+// directly) so a restored scroll position renders its correct row window on the very first paint
+// rather than one frame late at scrollTop 0.
+let scrollRaf = 0;
+function onScroll(): void {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    syncScrollState();
+  });
 }
 
 onMounted(() => {
@@ -197,7 +219,7 @@ onMounted(() => {
     el.scrollTop = t.state.scrollTop;
     el.scrollLeft = t.state.scrollLeft;
   }
-  onScroll();
+  syncScrollState();
 });
 // The tab-id guard inside clearSelectedCellFor is load-bearing: MainView.vue keys DataView by
 // tab id, so switching tabs unmounts one grid and mounts another in an order that is not safe
@@ -205,6 +227,7 @@ onMounted(() => {
 // publication, and an early one is corrected by the new grid's `immediate` publish watch below.
 onUnmounted(() => {
   resizeObserver?.disconnect();
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
   clearSelectedCellFor(props.tabId);
   // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
   // tab is gone — clearing it just stops the timer firing against an unmounted component.
@@ -787,7 +810,9 @@ function scrollCellIntoView(row: number, displayCol: number): void {
   const colEnd = offsets.value[displayCol + 1] ?? colStart;
   if (colStart < el.scrollLeft) el.scrollLeft = colStart;
   else if (colEnd > el.scrollLeft + el.clientWidth) el.scrollLeft = colEnd - el.clientWidth;
-  onScroll();
+  // A one-shot programmatic jump (search/PK-FK nav/add-row), not a scroll gesture — update
+  // immediately rather than waiting a frame for onScroll's rAF coalescing.
+  syncScrollState();
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -1279,6 +1304,10 @@ defineExpose({ scrollCellIntoView });
   background: color-mix(in srgb, var(--kira-accent) 8%, transparent);
 }
 
+/* Transparent, not an opaque fill: this input always sits inside a .grid-cell that already
+   carries its own background (blue .selected for a normal edit, the accent-tinted row for an
+   insert) — an opaque --kira-bg-input here just blotted out that cell's own colour with plain
+   grey the instant you started typing. */
 .cell-input {
   width: 100%;
   height: 100%;
@@ -1287,7 +1316,7 @@ defineExpose({ scrollCellIntoView });
   border: none;
   outline: 1px solid var(--kira-accent);
   outline-offset: -1px;
-  background: var(--kira-bg-input);
+  background: transparent;
   color: var(--kira-fg);
   font: inherit;
 }
