@@ -2,6 +2,7 @@
   "name": "@kira-version/host-electron",
   "private": true,
   "type": "module",
+  "main": "../../dist/electron/main.js",
   "exports": {
     ".": "./src/index.ts"
   },

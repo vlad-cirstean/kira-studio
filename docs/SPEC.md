@@ -224,8 +224,10 @@ kira-version-vscode/
 │   └── host-electron/
 │       └── src/
 │           ├── main/               index.ts window.ts menu.ts recentRepos.ts
+│           │                       channel.ts  MessageChannelLike adapter over MessagePortMain
 │           ├── preload/            index.ts   contextBridge surface, nothing more
-│           ├── renderer/           index.html mounts packages/ui unchanged
+│           │                       kiraBridge.ts  the surface's testable logic, DI'd from index.ts
+│           ├── renderer/           index.html + index.ts; mounts packages/ui unchanged
 │           ├── theme/              palettes.generated.css  (from scripts/gen-theme-palettes.ts)
 │           └── ports/              one file per port in core/src/ports
 │
