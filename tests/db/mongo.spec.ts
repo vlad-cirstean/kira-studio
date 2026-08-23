@@ -126,7 +126,7 @@ describe('mongo adapter (§9.1, P8)', () => {
     expect(mongoCaps.tabular).toBe(false);
     expect(mongoCaps.documents).toBe(true);
     expect(mongoCaps.defaultPageKind).toBe('document');
-    expect(mongoCaps.definition).toBe(false);
+    expect(mongoCaps.definition).toBe(true);
     expect(mongoCaps.exactCount).toBe(false);
     expect(mongoCaps.pagination).toBe('cursor');
     expect(mongoCaps.cancel).toBe(true);
@@ -175,19 +175,51 @@ describe('mongo adapter (§9.1, P8)', () => {
     }
   });
 
-  test('7. definition is unsupported', async () => {
+  test('7. definition', async () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
+      // Plain collection: no creation options, no validator (P19 D12).
+      const widgets = await adapter.definition(
+        path([
+          { kind: 'database', name: MONGO_DATABASE },
+          { kind: 'collection', name: 'widgets' },
+        ]),
+        makeCtx(),
+      );
+      expect(widgets.kind).toBe('collection');
+      expect(widgets.language).toBe('json');
+      expect(widgets.origin).toBe('server');
+      expect(widgets.statements).toEqual(['{}']);
+      expect(widgets.notes.length).toBeGreaterThan(0);
+      expect(widgets.constraints).toEqual([]);
+      expect(widgets.documentSchema).toEqual({
+        validator: null,
+        isJsonSchema: false,
+        validationLevel: null,
+        validationAction: null,
+      });
+
+      // Validated collection: a real $jsonSchema, relaxed EJSON (not {"$numberInt":"0"}).
+      const validated = await adapter.definition(
+        path([
+          { kind: 'database', name: MONGO_DATABASE },
+          { kind: 'collection', name: 'validated_widgets' },
+        ]),
+        makeCtx(),
+      );
+      expect(validated.notes).toEqual([]);
+      expect(validated.statements[0]).toContain('validator');
+      expect(validated.documentSchema?.isJsonSchema).toBe(true);
+      expect(validated.documentSchema?.validationLevel).toBe('moderate');
+      expect(validated.documentSchema?.validationAction).toBe('warn');
+      const schema = JSON.parse(validated.documentSchema?.validator ?? 'null');
+      expect(schema.required).toEqual(['name', 'price']);
+      expect(schema.properties.price.minimum).toBe(0);
+
       await expect(
-        adapter.definition(
-          path([
-            { kind: 'database', name: MONGO_DATABASE },
-            { kind: 'collection', name: 'widgets' },
-          ]),
-          makeCtx(),
-        ),
-      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+        adapter.definition(path([{ kind: 'database', name: MONGO_DATABASE }]), makeCtx()),
+      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
     } finally {
       await adapter.disconnect();
     }

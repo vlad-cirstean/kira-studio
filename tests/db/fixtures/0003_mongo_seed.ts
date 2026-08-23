@@ -29,4 +29,21 @@ export async function seedMongo(db: Db): Promise<void> {
   await widgets.createIndex({ name: 1 }, { unique: true });
 
   await db.collection('empty_collection').createIndex({ _id: 1 });
+
+  // P19 D17: a validated collection so the definition view's Validation section has both a
+  // real $jsonSchema (rendered as a field table) and validationLevel/validationAction to show.
+  await db.createCollection('validated_widgets', {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['name', 'price'],
+        properties: {
+          name: { bsonType: 'string', description: 'must be a string and is required' },
+          price: { bsonType: 'number', minimum: 0, description: 'must be a positive number' },
+        },
+      },
+    },
+    validationLevel: 'moderate',
+    validationAction: 'warn',
+  });
 }

@@ -1,4 +1,4 @@
-import type { Db, MongoClient } from 'mongodb';
+import type { CollectionInfo, Db, Document, MongoClient } from 'mongodb';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import { mapMongoError } from './errors';
 
@@ -38,6 +38,17 @@ export async function listCollections(db: Db): Promise<TreeNode[]> {
         detail: c.type === 'view' ? 'view' : undefined,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    throw mapMongoError(err);
+  }
+}
+
+// The definition view's own lookup (P19 D12) — never called from the tree's listCollections,
+// which keeps `nameOnly: true` so a database expand costs nothing extra per collection.
+export async function collectionOptions(db: Db, collection: string): Promise<Document | undefined> {
+  try {
+    const [info] = await db.listCollections<CollectionInfo>({ name: collection }, {}).toArray();
+    return info?.options;
   } catch (err) {
     throw mapMongoError(err);
   }

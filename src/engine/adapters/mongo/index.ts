@@ -23,6 +23,7 @@ import { mongoCaps } from './caps';
 import * as catalog from './catalog';
 import { connectMongo } from './client';
 import * as consoleQuery from './console';
+import { buildDefinition } from './definition';
 import { mapMongoError } from './errors';
 import * as mutate from './mutate';
 import { countRows, readPage } from './read';
@@ -137,9 +138,21 @@ class MongoAdapter implements Adapter {
     };
   }
 
-  async definition(): Promise<ObjectDefinition> {
-    // caps.definition === false gates §8.10's "Open definition" menu item for mongodb — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for mongodb');
+  async definition(path: NodePath): Promise<ObjectDefinition> {
+    const segments = path.segments;
+    const [databaseSegment, objectSegment] = segments;
+    if (
+      segments.length !== 2 ||
+      databaseSegment?.kind !== 'database' ||
+      objectSegment?.kind !== 'collection'
+    ) {
+      throw new AdapterError(
+        'E_NOT_FOUND',
+        `definition requires a database/collection path, got depth ${segments.length}`,
+      );
+    }
+    const db = this.dbFor(databaseSegment.name);
+    return buildDefinition(db, segments, databaseSegment.name, objectSegment.name);
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
