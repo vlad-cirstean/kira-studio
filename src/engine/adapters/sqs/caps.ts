@@ -15,6 +15,13 @@ export const sqsCaps: Caps = {
   exactCount: false, // ApproximateNumberOfMessages only
   pagination: 'batch',
   foreignKeys: false,
+  // No producer/delete code exists yet — preview()/mutate() throw E_UNSUPPORTED. Unlike Kafka,
+  // SQS's deleteMessage is a real per-item operation (removes it from the queue via its receipt
+  // handle), so both canInsert (SendMessage) and canDelete apply once implemented; there is still
+  // no canUpdate — a delivered message can't be edited in place, only replaced by delete+resend.
+  canInsert: false,
+  canUpdate: false,
+  canDelete: false,
   writable: false,
   transactions: false,
   cancel: true, // the SDK's own abortSignal request option is fully effective (P10's D14)

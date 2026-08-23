@@ -18,6 +18,13 @@ export const redisCaps: Caps = {
   exactCount: true,
   pagination: 'cursor',
   foreignKeys: false,
+  // index.ts's preview()/mutate() unconditionally throw E_UNSUPPORTED today — no write path
+  // exists at all. Once SET/DEL land, Redis has no real insert/update distinction (SET on a
+  // missing key creates it, on an existing key overwrites it), so canInsert and canUpdate should
+  // flip together.
+  canInsert: false,
+  canUpdate: false,
+  canDelete: false,
   writable: false,
   transactions: false,
   cancel: true, // ctx.signal between bounded SCAN-family rounds is fully effective (D7/D8)

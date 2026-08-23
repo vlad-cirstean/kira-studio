@@ -15,6 +15,11 @@ export const mongoCaps: Caps = {
   exactCount: false,
   pagination: 'cursor',
   foreignKeys: false,
+  // mutate.ts implements update (replaceOne) and delete (deleteOne) today; insert throws
+  // 'insert is not supported for documents in P8' — flip canInsert once that lands.
+  canInsert: false,
+  canUpdate: true,
+  canDelete: true,
   writable: true,
   transactions: false,
   cancel: true,

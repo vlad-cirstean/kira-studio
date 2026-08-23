@@ -39,6 +39,17 @@ export interface Caps {
 
   // ---- graph + writes
   foreignKeys: boolean;
+  // `writable` is the coarse "this connection accepts mutate() at all" gate DataToolbar.vue's
+  // isWritable (and its equivalents) already read. The three flags below exist because that one
+  // boolean can't express an adapter that supports some mutation kinds but not others — e.g.
+  // Kafka can produce a new message (insert) but has no per-message update or delete at all (a
+  // topic's log is immutable; only retention/compaction remove messages), while SQS can send and
+  // delete a message but never update one in place. A renderer gating a single action (the Add
+  // button vs the Delete button) reads the matching flag instead of `writable`; `writable` stays
+  // `canInsert || canUpdate || canDelete` for the call sites that only need "is this read-only".
+  canInsert: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
   writable: boolean;
   transactions: boolean;
 
@@ -61,6 +72,9 @@ export const capsSchema = z.object({
   exactCount: z.boolean(),
   pagination: paginationStrategySchema,
   foreignKeys: z.boolean(),
+  canInsert: z.boolean(),
+  canUpdate: z.boolean(),
+  canDelete: z.boolean(),
   writable: z.boolean(),
   transactions: z.boolean(),
   cancel: z.boolean(),
