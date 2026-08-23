@@ -23,7 +23,7 @@
     "build": "bun run scripts/build.ts",
     "test": "bun test packages tests/fixtures tests/integration tests/unit",
     "test:e2e": "playwright test",
-    "test:perf": "bun run tests/perf/run.ts && bun run tests/perf/parserThroughput.ts && bun run tests/perf/historyPipeline.ts",
+    "test:perf": "bun run tests/perf/run.ts && bun run tests/perf/parserThroughput.ts && bun run tests/perf/historyPipeline.ts && bun run tests/perf/streamRoundTrip.ts",
     "dev:harness": "bun run --filter '@kira-version/harness' dev"
   },
   "devDependencies": {
