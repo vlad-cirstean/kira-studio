@@ -140,14 +140,22 @@ const statusLine = computed(() => {
           Run all
         </Button>
         <div class="sep"></div>
-        <Button
-          icon="bookmark"
-          data-testid="console-saved-toggle"
-          title="Saved queries"
-          @click="savedMenuOpen = !savedMenuOpen"
-        >
-          Saved queries
-        </Button>
+        <div class="saved-anchor">
+          <Button
+            icon="bookmark"
+            data-testid="console-saved-toggle"
+            title="Saved queries"
+            @click="savedMenuOpen = !savedMenuOpen"
+          >
+            Saved queries
+          </Button>
+          <!-- Popover.vue anchors itself to its own DOM parent (see its own comment) — this menu
+               used to render several levels away from its trigger button (a direct child of
+               ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
+               of the window instead of under "Saved queries" (task #58). Wrapping it here next to
+               its button, the same shape every other toolbar menu already uses, fixes that. -->
+          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
+        </div>
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
@@ -158,8 +166,6 @@ const statusLine = computed(() => {
           {{ rt.error.message }}
         </Strip>
       </template>
-
-      <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
 
       <div class="editor-body">
         <CodeMirrorHost
@@ -204,6 +210,10 @@ const statusLine = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.saved-anchor {
+  position: relative;
 }
 
 /* p-strip.err already carries the error's own look; only the parent's error message text needs

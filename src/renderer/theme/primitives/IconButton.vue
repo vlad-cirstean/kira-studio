@@ -47,5 +47,13 @@ withDefaults(
   min-width: 14px;
   font-size: 9px;
   padding: 0 3px;
+  /* Without this, a multi-word count (ColumnsMenu's "N / M" — the only current `:count` value
+     with a space in it) wraps across two lines: as an absolutely-positioned element offset only
+     by `right`, this badge's `width: auto` shrink-to-fits against the icon button's own ~22px
+     box, not the viewport, so "5 / 5" broke onto "5 /" + "5" and turned this fixed 14px-tall pill
+     into a taller, garbled shape overlapping the button's corner — the reported "Columns button
+     is vertical" bug. Every other `:count` consumer is a single unbroken token (e.g. "42",
+     "~1,234"), which never wrapped, so nowrap changes nothing for them. */
+  white-space: nowrap;
 }
 </style>
