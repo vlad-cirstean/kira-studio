@@ -8,6 +8,8 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import Button from '../../theme/primitives/Button.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -95,16 +97,12 @@ const statusLine = computed(() => {
 
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="console-reconnect">
-      <Button
-        kind="dialog"
-        variant="primary"
-        data-testid="console-reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      container-testid="console-reconnect"
+      button-testid="console-reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <ViewChrome
       v-else
       :tab="tab"
@@ -156,9 +154,9 @@ const statusLine = computed(() => {
       </template>
 
       <template #strips>
-        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="console-error">
+        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
           {{ rt.error.message }}
-        </div>
+        </Strip>
       </template>
 
       <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
@@ -201,13 +199,6 @@ const statusLine = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* p-strip.err already carries the error's own look; only the parent's error message text needs

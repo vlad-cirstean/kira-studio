@@ -8,7 +8,10 @@ import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { keyValueMenu } from './keyValueMenu';
@@ -149,16 +152,12 @@ onUnmounted(() => {
 
 <template>
   <div class="keyvalue-view" data-testid="keyvalue-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="p-empty" data-testid="keyvalue-reconnect">
-      <Button
-        variant="primary"
-        kind="dialog"
-        data-testid="keyvalue-reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      container-testid="keyvalue-reconnect"
+      button-testid="keyvalue-reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <ViewChrome
       v-else
       :tab="tab"
@@ -217,9 +216,9 @@ onUnmounted(() => {
       </template>
 
       <template #strips>
-        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="keyvalue-error">
+        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
           {{ rt.error.message }}
-        </div>
+        </Strip>
       </template>
 
       <div class="p-panel table-panel">
@@ -235,9 +234,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="tbody" data-testid="keyvalue-list">
-          <div v-if="!rt || rt.rowCount === 0" class="p-empty">
-            <span class="label">{{ rt ? 'No data' : '' }}</span>
-          </div>
+          <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No data' : ''" />
           <template v-else>
             <div
               v-for="i in rowIndices"

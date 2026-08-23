@@ -12,6 +12,7 @@ import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { type MenuItem, openContextMenu } from '../../workbench/state/contextMenu';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
@@ -871,10 +872,13 @@ defineExpose({ scrollCellIntoView });
     @scroll="onScroll"
     @keydown="onKeydown"
   >
-    <div v-if="page && page.rowCount === 0" class="no-rows p-empty" data-testid="grid-no-rows">
-      <Codicon name="table" :size="24" class="big" />
-      <span class="label">No rows</span>
-    </div>
+    <EmptyState
+      v-if="page && page.rowCount === 0"
+      class="no-rows"
+      icon="table"
+      label="No rows"
+      data-testid="grid-no-rows"
+    />
     <div
       v-else-if="page"
       class="grid-sizer"

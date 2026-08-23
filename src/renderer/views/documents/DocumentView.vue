@@ -9,7 +9,10 @@ import { isHydrated, markHydrated } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -173,16 +176,12 @@ onUnmounted(() => {
 
 <template>
   <div class="document-view" data-testid="document-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="document-reconnect">
-      <Button
-        variant="primary"
-        kind="dialog"
-        data-testid="document-reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      container-testid="document-reconnect"
+      button-testid="document-reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <ViewChrome
       v-else
       :tab="tab"
@@ -267,15 +266,13 @@ onUnmounted(() => {
       </template>
 
       <template #strips>
-        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="document-error">
+        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
-        </div>
+        </Strip>
       </template>
 
       <div class="list-body" data-testid="document-list">
-        <div v-if="!rt || rt.rowCount === 0" class="p-empty">
-          <span v-if="rt" class="label">No documents</span>
-        </div>
+        <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No documents' : ''" />
         <template v-else>
           <div
             v-for="i in rowIndices"
@@ -360,13 +357,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>

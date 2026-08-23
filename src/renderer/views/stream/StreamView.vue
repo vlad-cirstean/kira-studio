@@ -5,10 +5,12 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
 import Button from '../../theme/primitives/Button.vue';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import { goNext, load, poll, reload, runCount, runtime, stop } from './state';
@@ -125,18 +127,14 @@ onUnmounted(() => {
 
 <template>
   <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
-    <div v-if="needsReconnect" class="p-empty" data-testid="stream-reconnect">
-      <Codicon name="debug-disconnect" :size="24" class="big" />
-      <span class="label">Not connected</span>
-      <Button
-        variant="primary"
-        kind="dialog"
-        data-testid="stream-reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      icon="debug-disconnect"
+      label="Not connected"
+      container-testid="stream-reconnect"
+      button-testid="stream-reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <ViewChrome
       v-else
       :tab="tab"
@@ -192,29 +190,31 @@ onUnmounted(() => {
 
       <!-- The one destructive truth of this view, stated once at the top. -->
       <template #strips>
-      <div v-if="isBatch" class="p-strip warn" data-testid="stream-poll-warning">
-        <span class="icon-box"><Codicon name="warning" :size="13" /></span>
+      <Strip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
         <span
           >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
           above) — it does not browse a stable position.</span
         >
-      </div>
+      </Strip>
 
-      <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="stream-error">
-        <span class="icon-box"><Codicon name="error" :size="13" /></span>
+      <Strip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" :icon-size="13" data-testid="stream-error">
         <span>{{ rt.error.message }}</span>
-      </div>
+      </Strip>
       </template>
 
       <div class="list-body" data-testid="stream-list">
-        <div v-if="isBatch && !rt?.polled" class="p-empty no-rows">
-          <Codicon name="arrow-swap" :size="24" class="big" />
-          <span class="label">Click Poll to fetch messages</span>
-        </div>
-        <div v-else-if="!rt || rt.rowCount === 0" class="p-empty no-rows">
-          <Codicon name="inbox" :size="24" class="big" />
-          <span class="label">{{ rt ? 'No messages' : '' }}</span>
-        </div>
+        <EmptyState
+          v-if="isBatch && !rt?.polled"
+          class="no-rows"
+          icon="arrow-swap"
+          label="Click Poll to fetch messages"
+        />
+        <EmptyState
+          v-else-if="!rt || rt.rowCount === 0"
+          class="no-rows"
+          icon="inbox"
+          :label="rt ? 'No messages' : ''"
+        />
         <template v-else>
           <div class="p-thead">
             <div class="p-th gutter" style="width: 40px" />

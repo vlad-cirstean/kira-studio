@@ -10,6 +10,8 @@ import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated, openConsoleTab } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import Button from '../../theme/primitives/Button.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { load, runtime } from './state';
 
@@ -111,15 +113,13 @@ const breadcrumb = computed(() => {
     :data-source="rt?.source ?? ''"
     data-read-only-reason="ddl-not-editable"
   >
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="ddl-reconnect">
-      <Button
-        kind="dialog"
-        data-testid="ddl-reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      variant="default"
+      container-testid="ddl-reconnect"
+      button-testid="ddl-reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <!-- Column/index/constraint counts and the Definition/Columns/Indexes/Constraints segmented
          view from the mockup need structured catalog data this tab doesn't fetch (only the raw
          statement text) — skipped rather than faked. -->
@@ -162,10 +162,9 @@ const breadcrumb = computed(() => {
       </template>
 
       <template #strips>
-        <div v-if="rt?.status === 'error' && rt.error" class="p-strip err" data-testid="ddl-error">
-          <span class="icon-box"><Codicon name="error" :size="14" /></span>
+        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" data-testid="ddl-error">
           <span class="err-message">{{ rt.error }}</span>
-        </div>
+        </Strip>
         <div v-if="ddl && ddl.notes.length > 0" class="p-strip note" data-testid="ddl-notes">
           <span class="icon-box"><Codicon name="info" :size="14" /></span>
           <ul class="notes-list">
@@ -189,13 +188,6 @@ const breadcrumb = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .err-message {

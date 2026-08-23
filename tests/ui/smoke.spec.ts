@@ -11,7 +11,8 @@ test('workbench launches with all chrome regions and a healthy engine', async ({
 
   // 'toolbar' is intentionally not a fixed shell region any more (P16 design system LAW 09):
   // each view now renders its own toolbar, so with no connections/tabs (this fixture's fresh
-  // KIRA_HOME) there is none — only the tab strip and its own "no tabs" affordance remain.
+  // KIRA_HOME) there is none — the tab strip stays mounted but empty, and MainView's own
+  // FirstRun screen is what actually carries the "what do I do now" messaging.
   const alwaysPresent = ['project-panel', 'tab-strip', 'main-view', 'cell-editor', 'status-bar'];
   for (const testid of alwaysPresent) {
     await expect(window.locator(`[data-testid="${testid}"]`)).toBeVisible();

@@ -11,12 +11,12 @@ import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import Segmented from '../../theme/primitives/Segmented.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
-import EmptyState from './EmptyState.vue';
 
 interface OpsListItem {
   key: string;
@@ -414,8 +414,13 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   font-size: 11px;
 }
 
+/* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no
+   notion of a variable-height row — so a long command can't wrap into view. Horizontal scroll
+   (trackpad/shift-wheel/drag, same as the tab strip) is what actually lets you read all of it,
+   rather than clipping it exactly like the collapsed row it replaces. */
 .ops-detail-cm :deep(.cm-scroller) {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .ops-detail-cm :deep(.cm-content) {

@@ -5,9 +5,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
 import { connColorVar } from '../../theme/connColor';
-import Button from '../../theme/primitives/Button.vue';
+import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import Strip from '../../theme/primitives/Strip.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
@@ -149,24 +149,26 @@ function onCloseSearch(): void {
         @close="onCloseSearch"
       />
     </div>
-    <div v-if="needsReconnect" class="reconnect-panel" data-testid="reconnect-panel">
-      <Button kind="dialog" variant="primary" data-testid="reconnect-load" @click="onReconnectAndLoad">
-        Reconnect &amp; load
-      </Button>
-    </div>
+    <ReconnectGate
+      v-if="needsReconnect"
+      container-testid="reconnect-panel"
+      button-testid="reconnect-load"
+      @reconnect="onReconnectAndLoad"
+    />
     <template v-else>
       <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
            that started it (DataToolbar's p-run-state), never a bar across the top of the view —
            §8.5's "never a spinner that replaces the previous page" still holds, it just no longer
            needs a bar of its own to say so. -->
-      <div
+      <Strip
         v-if="rt?.status === 'error' && rt.error"
-        class="error-strip p-strip err"
+        tone="err"
+        icon="warning"
         data-testid="error-strip"
+        class="error-strip"
       >
-        <span class="icon-box"><Codicon name="warning" :size="14" /></span>
         <span>{{ rt.error.message }}</span>
-      </div>
+      </Strip>
       <div class="grid-area">
         <DataGrid ref="dataGridRef" :tab-id="tab.id" />
       </div>
@@ -185,13 +187,6 @@ function onCloseSearch(): void {
 .toolbar-band {
   min-height: 32px;
   flex-shrink: 0;
-}
-
-.reconnect-panel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .error-strip {

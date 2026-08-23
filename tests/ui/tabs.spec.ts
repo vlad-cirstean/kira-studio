@@ -221,8 +221,8 @@ test('tabs — independent state, context menu, colours, session restore', async
   await tabs.first().click({ button: 'right' });
   await page.click('[data-testid="menu-item-close-all"]');
   await expect(tabs).toHaveCount(0);
-  await expect(page.locator('[data-testid="tab-strip"]')).toContainText('No tabs open');
-  await expect(page.locator('[data-testid="main-view"]')).toContainText('No tab open');
+  await expect(page.locator('[data-testid="tab-strip-empty"]')).toBeVisible();
+  await expect(page.locator('[data-testid="main-view"]')).toContainText('Kira Studio');
 
   // --- colours: the tab and toolbar band both carry the connection colour token -----------
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
