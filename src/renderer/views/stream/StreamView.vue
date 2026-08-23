@@ -470,14 +470,22 @@ onUnmounted(() => {
         <div class="sep" />
 
         <div class="group">
-          <IconButton
-            v-if="canInsert"
-            icon="add"
-            :size="13"
-            data-testid="stream-add-message"
-            :title="isKafka ? 'Produce a message' : 'Send a message'"
-            @click="composeOpen = !composeOpen"
-          />
+          <div class="add-message-anchor">
+            <IconButton
+              v-if="canInsert"
+              icon="add"
+              :size="13"
+              data-testid="stream-add-message"
+              :title="isKafka ? 'Produce a message' : 'Send a message'"
+              @click="composeOpen = !composeOpen"
+            />
+            <StreamComposeMessage
+              v-if="composeOpen && (isKafka || isSqs)"
+              :tab-id="tab.id"
+              :kind="isKafka ? 'kafka' : 'sqs'"
+              @close="composeOpen = false"
+            />
+          </div>
           <IconButton
             v-if="isSqs && canDelete"
             icon="trash"
@@ -715,13 +723,6 @@ onUnmounted(() => {
         </template>
       </div>
     </ViewChrome>
-
-    <StreamComposeMessage
-      v-if="composeOpen && (isKafka || isSqs)"
-      :tab-id="tab.id"
-      :kind="isKafka ? 'kafka' : 'sqs'"
-      @close="composeOpen = false"
-    />
   </div>
 </template>
 
@@ -736,6 +737,13 @@ onUnmounted(() => {
 /* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */
 .path {
   color: var(--kira-fg-disabled);
+}
+
+/* Task #64: the compose-message popover was rendered as a sibling of ViewChrome, far from the
+   "Add message" button that opens it — Popover.vue anchors to its own DOM parent, so it needs to
+   be a sibling of the trigger, same wrapper shape as .columns-anchor/.add-anchor elsewhere. */
+.add-message-anchor {
+  position: relative;
 }
 
 /* tabular body shared shape (P16's .thead/.th/.td law) — .p-thead/.p-th/.p-td come from
