@@ -4,8 +4,8 @@ import { control } from '../bridge/control';
 
 // Moved here from renderer/workbench/state/settings.ts (D20) — P2 is the phase that both
 // touches every section of Settings and makes it cross-view: views/grid/ reads
-// data.defaultPageSize and data.prefetch, which a view reaching up into workbench/ would
-// invert §11's dependency direction.
+// data.defaultPageSize, which a view reaching up into workbench/ would invert §11's
+// dependency direction.
 export const settingsState = reactive<Settings>(structuredClone(defaultSettings));
 export const settingsOpen = ref(false);
 

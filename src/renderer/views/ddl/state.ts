@@ -42,7 +42,7 @@ function findTab(tabId: string) {
 
 // Deliberately simpler than the grid's load(): there is no op-id bookkeeping and no supersession
 // guard. The only two callers are the view's onMounted and the toolbar's Refresh — no pager, no
-// filter, no prefetch to race against.
+// filter to race against.
 export async function load(tabId: string, opts?: { refresh?: boolean }): Promise<void> {
   const tab = findTab(tabId);
   if (!tab?.connectionId) return;

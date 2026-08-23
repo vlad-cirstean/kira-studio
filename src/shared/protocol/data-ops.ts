@@ -9,7 +9,6 @@ import type { Page } from './page';
 export const DATA_OP = {
   read: 'data:read',
   count: 'data:count',
-  prefetch: 'data:prefetch',
   /** Drops L2 pages + the L3 count for one target. The ↻ button; P5's mutation hook (D13). */
   invalidate: 'data:invalidate',
   /** Never executes (P5 D6) — adapter.preview() renders literal SQL text for display only. */
@@ -110,11 +109,6 @@ export interface CountResponse {
   at: number;
   stale: boolean;
   source: 'cache' | 'server';
-}
-
-export interface PrefetchResponse {
-  warmed: boolean;
-  bytes: number;
 }
 
 export interface PreviewRequestWire {

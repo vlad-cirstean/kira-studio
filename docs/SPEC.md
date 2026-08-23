@@ -246,8 +246,10 @@ Invalidated by: manual refresh, any local mutation on the same target, disconnec
 *stale* (shown greyed with a refresh affordance) after any local mutation. Counts are only computed
 on explicit user request — never automatically, because they are the most expensive read in the app.
 
-**Prefetch.** After a page renders and the app is idle, the next page is fetched into L2 speculatively
-(cancellable, dropped if the user navigates away). This is what makes paging feel instant.
+**No speculative fetching.** A page is loaded only in direct response to a user action — Next/
+Previous, a filter/sort/projection change, Refresh, or the Count button. There is no background
+prefetch of the next page and no automatic count-on-open; both existed at one point and were
+removed by user request as unwanted background work rather than kept as an opt-out setting.
 
 **Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
 *Clear caches* action.
@@ -293,7 +295,8 @@ A visual mockup of this chrome (rounded-pill tabs, floating sidebar/editor/panel
 Modal, sectioned. v1 sections:
 - **Appearance** — one font family + size for the whole app (UI, grid and editors alike), row
   density.
-- **Data** — default page size, prefetch on/off, count-on-open (default off).
+- **Data** — default page size. (Prefetch and count-on-open toggles existed at one point; both
+  were removed as functionality per user request, not merely hidden here — see §7.)
 - **Cache** — L2 byte budget, hit-rate readout, clear caches.
 - **Advanced** — engine memory cap, op-log retention.
 

@@ -5,9 +5,8 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
-import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findDataTab, patchDataTabState, tabsState, unmarkHydrated } from '../../state/tabs';
+import { findDataTab, patchDataTabState, unmarkHydrated } from '../../state/tabs';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
 
@@ -82,79 +81,10 @@ async function loadMeta(tabId: string): Promise<void> {
 
 const DISCONNECTED_CODES = new Set(['E_NOT_FOUND', 'E_ENGINE_DOWN', 'E_CONNECT']);
 
-// Handles for the one pending prefetch per tab (§8's "prefetch the next page ahead of need").
-// Keyed by tabId since a prefetch is scoped to whatever page follows the tab's current one.
-const prefetchHandles = new Map<string, { idleId: number; opId: string | null }>();
-
-// Exported so DataView.vue's onUnmounted can cancel a still-pending prefetch when its tab is
-// switched away from (MainView.vue keys DataView by tab.id, so switching tabs unmounts it).
-export function cancelPrefetch(tabId: string): void {
-  const pending = prefetchHandles.get(tabId);
-  if (!pending) return;
-  if (pending.idleId) cancelIdleCallback(pending.idleId);
-  if (pending.opId) void control.opsCancel(pending.opId);
-  prefetchHandles.delete(tabId);
-}
-
-async function runPrefetch(tabId: string): Promise<void> {
-  const tab = findDataTab(tabId);
-  const rt = runtime[tabId];
-  if (!tab?.connectionId || !rt?.hasMore) return;
-
-  const nextIndex = tab.state.pageIndex + 1;
-  const cursor: PageCursor = rt.nextToken
-    ? { mode: 'after', token: rt.nextToken }
-    : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-  const opId = crypto.randomUUID();
-  prefetchHandles.set(tabId, { idleId: 0, opId });
-  try {
-    await data.prefetch({
-      opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
-      projection: tab.state.projection,
-      filter: tab.state.filter,
-      sort: tab.state.sort,
-      pageSize: tab.state.pageSize,
-      cursor,
-    });
-  } catch {
-    // Best-effort: the user never sees a failed prefetch — the real load simply won't hit cache.
-  } finally {
-    prefetchHandles.delete(tabId);
-  }
-}
-
-// Runs once a load settles on a page that has more rows — schedules a background fetch of the
-// next page during idle time so the eventual goNext() is a cache hit (D-prefetch). Gated on the
-// prefetch setting and on the tab still being the active one (no point warming a background tab).
-function schedulePrefetch(tabId: string): void {
-  cancelPrefetch(tabId);
-  if (!settingsState.data.prefetch) return;
-  if (tabId !== tabsState.activeId) return;
-  const tab = findDataTab(tabId);
-  const rt = runtime[tabId];
-  if (!tab?.connectionId || !rt?.hasMore) return;
-
-  const idleId = requestIdleCallback(
-    () => {
-      prefetchHandles.delete(tabId);
-      void runPrefetch(tabId);
-    },
-    { timeout: 250 },
-  );
-  prefetchHandles.set(tabId, { idleId, opId: null });
-}
-
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
-  // Evaluated before ensureRuntime() creates the entry — true only for this tab's very first
-  // load, which is when countOnOpen (§ settings) should trigger a background Σ.
-  const isFirstLoad = !runtime[tabId];
   const rt = ensureRuntime(tabId);
-  cancelPrefetch(tabId);
   // D3: a pending-change set is scoped to the page it was staged against — paging, filtering,
   // sorting or refreshing all replace that page, so whatever was staged no longer identifies
   // anything real and must not silently reappear against different rows.
@@ -202,8 +132,6 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     }
     rt.lastStrategy = strategy;
     if (!rt.meta) void loadMeta(tabId);
-    if (isFirstLoad && settingsState.data.countOnOpen) void runCount(tabId);
-    schedulePrefetch(tabId);
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;

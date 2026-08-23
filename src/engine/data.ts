@@ -10,7 +10,6 @@ import {
   type MutateRequestWire,
   type MutateResponse,
   mutateRequestWireSchema,
-  type PrefetchResponse,
   type PreviewRequestWire,
   type PreviewResponse,
   previewRequestWireSchema,
@@ -106,14 +105,6 @@ export async function handleCount(payload: unknown): Promise<CountResponse> {
 // D14: never ships bytes. Reuses handleRead's cache-aside logic entirely (a separate cache
 // probe here would double-count the miss in L2's hit/miss stats) and derives `warmed`/`bytes`
 // from whether the read actually hit the server.
-export async function handlePrefetch(payload: unknown): Promise<PrefetchResponse> {
-  const { response, page } = await handleRead(payload);
-  return {
-    warmed: response.source === 'server',
-    bytes: response.source === 'server' ? page.byteSize : 0,
-  };
-}
-
 // Never a database operation (P5 D9, same class as configureCache) — adapter.preview() is
 // synchronous and never touches the server, so this never reaches the op log.
 export async function handlePreview(payload: unknown): Promise<PreviewResponse> {

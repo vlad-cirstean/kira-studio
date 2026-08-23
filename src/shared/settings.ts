@@ -14,8 +14,6 @@ const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), 
 
 export const dataSettingsSchema = z.object({
   defaultPageSize: pageSizeSchema,
-  prefetch: z.boolean(),
-  countOnOpen: z.boolean(),
 });
 export type DataSettings = z.infer<typeof dataSettingsSchema>;
 
@@ -34,7 +32,7 @@ export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
 // row with no `data`/`cache`/`advanced` keys, and that row must still parse on next launch.
 export const settingsSchema = z.object({
   appearance: appearanceSettingsSchema,
-  data: dataSettingsSchema.default({ defaultPageSize: 100, prefetch: true, countOnOpen: false }),
+  data: dataSettingsSchema.default({ defaultPageSize: 100 }),
   cache: cacheSettingsSchema.default({ l2BudgetMb: 64 }),
   advanced: advancedSettingsSchema.default({ engineMemoryCapMb: 512, opLogRetentionDays: 30 }),
 });
@@ -56,8 +54,6 @@ export const defaultSettings: Settings = {
   },
   data: {
     defaultPageSize: 100,
-    prefetch: true,
-    countOnOpen: false,
   },
   cache: {
     l2BudgetMb: 64,

@@ -237,8 +237,6 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   if (!pg) throw new Error('postgres fixture did not start');
   const { app, window: page } = kira;
 
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
-
   await page.click('[data-testid="toggle-operations-panel"]');
   await expect(page.locator('[data-testid="operations-panel"]')).toBeVisible();
 

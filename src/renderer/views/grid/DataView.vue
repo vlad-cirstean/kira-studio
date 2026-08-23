@@ -13,7 +13,7 @@ import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
 import SearchToolbar from './SearchToolbar.vue';
-import { cancelPrefetch, load, reload, runtime } from './state';
+import { load, reload, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
@@ -103,10 +103,7 @@ onMounted(() => {
   ];
 });
 
-// This component is remounted per tab switch (see the note above) — its unmount is the natural
-// place to cancel whatever prefetch was pending for the tab being switched away from.
 onUnmounted(() => {
-  cancelPrefetch(props.tab.id);
   for (const off of unregisterCommands) off();
 });
 

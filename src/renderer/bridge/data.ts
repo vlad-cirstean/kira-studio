@@ -8,7 +8,6 @@ import {
   type MutateRequestWire,
   type MutateResponse,
   PORT_EVENT,
-  type PrefetchResponse,
   type PreviewRequestWire,
   type PreviewResponse,
   type ReadRequestWire,
@@ -34,15 +33,10 @@ async function readResponse(req: ReadRequestWire): Promise<ReadResponse> {
   return response;
 }
 
-async function prefetchResponse(req: ReadRequestWire): Promise<PrefetchResponse> {
-  return (await request(DATA_OP.prefetch, plain(req), NO_TIMEOUT)) as PrefetchResponse;
-}
-
 export const data = {
   read: readResponse,
   count: (req: CountRequestWire): Promise<CountResponse> =>
     request(DATA_OP.count, plain(req), NO_TIMEOUT) as Promise<CountResponse>,
-  prefetch: prefetchResponse,
   invalidate: async (
     connectionId: string,
     path: string,

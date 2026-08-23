@@ -62,14 +62,6 @@ function onDefaultPageSizeChange(e: Event): void {
   void patchSettings({ data: { defaultPageSize: pageSize } });
 }
 
-function onPrefetchChange(e: Event): void {
-  void patchSettings({ data: { prefetch: (e.target as HTMLInputElement).checked } });
-}
-
-function onCountOnOpenChange(e: Event): void {
-  void patchSettings({ data: { countOnOpen: (e.target as HTMLInputElement).checked } });
-}
-
 function onCacheBudgetChange(e: Event): void {
   const value = Number((e.target as HTMLInputElement).value);
   if (!Number.isFinite(value) || value < 8 || value > 1024) return;
@@ -222,24 +214,6 @@ async function onClearCaches(): Promise<void> {
               >
                 <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
               </select>
-            </label>
-            <label class="field checkbox">
-              <input
-                type="checkbox"
-                data-testid="settings-prefetch"
-                :checked="settingsState.data.prefetch"
-                @change="onPrefetchChange"
-              />
-              <span>Prefetch next page</span>
-            </label>
-            <label class="field checkbox">
-              <input
-                type="checkbox"
-                data-testid="settings-count-on-open"
-                :checked="settingsState.data.countOnOpen"
-                @change="onCountOnOpenChange"
-              />
-              <span>Count rows on tab open</span>
             </label>
           </template>
 

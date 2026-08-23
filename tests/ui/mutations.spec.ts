@@ -139,8 +139,6 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   if (!pg) throw new Error('postgres fixture did not start');
   const { window: page } = kira;
 
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
-
   const cfg = {
     host: pg.config.host,
     port: pg.config.port,
@@ -221,8 +219,9 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   const countButton = page.locator('[data-testid="toolbar-count"]');
   await countButton.click();
   await expect(countButton).not.toHaveClass(/stale/, { timeout: 10_000 });
-  const countBeforeCommit = (await countButton.innerText()).trim();
-  expect(countBeforeCommit).toMatch(/^Σ \d/);
+  // The count button is icon-only (no visible badge) — the number lives in its title tooltip.
+  const countBeforeCommit = await countButton.getAttribute('title');
+  expect(countBeforeCommit).toMatch(/Count all rows — Σ \d/);
   const opsBeforeCommit = await countOps(page);
 
   const deletedRowName = await cellText(page, 1, 'name');
@@ -241,7 +240,7 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   // §7's "keep the number, grey it, let the user decide").
   await expect(countButton).toHaveClass(/stale/, { timeout: 10_000 });
   await expect(countButton.locator('.codicon-refresh')).toBeVisible();
-  expect((await countButton.innerText()).trim()).toBe(countBeforeCommit);
+  expect(await countButton.getAttribute('title')).toBe(countBeforeCommit);
   expect(await countOps(page)).toHaveLength(opsBeforeCommit.length);
 
   // Clicking it through produces exactly one new count op and clears the stale mark.
@@ -251,7 +250,7 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await expect(countButton.locator('.codicon-refresh')).toHaveCount(0);
   // The delete actually shrank the table by one row — the refreshed total proves this was a
   // real recount, not just a stale-flag flip.
-  expect((await countButton.innerText()).trim()).not.toBe(countBeforeCommit);
+  expect(await countButton.getAttribute('title')).not.toBe(countBeforeCommit);
 
   // --- scenario 7: a read-only connection disables every mutation button ------------------
   const firstConnRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');

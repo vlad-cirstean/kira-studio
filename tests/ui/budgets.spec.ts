@@ -125,9 +125,6 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   if (!pg) throw new Error('postgres fixture did not start');
   const { window: page } = kira;
 
-  // No idle background op (prefetch) may perturb a sample.
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
-
   const connectionId = await page.evaluate(
     (cfg) =>
       window.kira

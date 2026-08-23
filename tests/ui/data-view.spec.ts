@@ -119,7 +119,7 @@ async function cellText(page: Page, row: number, column: string): Promise<string
   ).innerText();
 }
 
-test('data view — pagination, count, projection, sort, filter, search, stop, cache, prefetch', async ({
+test('data view — pagination, count, projection, sort, filter, search, stop, cache', async ({
   kira,
   relaunch,
   consoleErrors,
@@ -127,12 +127,6 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   test.setTimeout(300_000);
   if (!pg) throw new Error('postgres fixture did not start');
   const { window: page } = kira;
-
-  // Prefetch is turned off up front for every op-counting assertion below (pagination, cache,
-  // count, search all assert exact op-log deltas) — it is turned back on only for the dedicated
-  // prefetch scenario near the end, so a background prefetch never sneaks an extra `read` row
-  // into an unrelated assertion.
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
 
   const connectionId = await page.evaluate(
     (cfg) =>
@@ -205,15 +199,18 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('10');
 
   // Σ count all fills in "of 10000" pages at pageSize 10 (1,000,000 / 10); survives a page
-  // change; a Refresh recomputes it with exactly one new `count` op row.
+  // change; a Refresh recomputes it with exactly one new `count` op row. The count button is
+  // icon-only (no visible badge) — the number lives in its title tooltip instead.
   await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toContainText('1,000,000', {
-    timeout: 15_000,
-  });
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'title',
+    /1,000,000/,
+    { timeout: 15_000 },
+  );
   await expect(page.locator('[data-testid="pager"]')).toContainText('of 100000');
 
   await page.click('[data-testid="pager-next"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toContainText('1,000,000');
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute('title', /1,000,000/);
 
   const opsBeforeCountRefresh = await getOps(page, connectionId);
   await page.click('[data-testid="toolbar-refresh"]');
@@ -332,9 +329,8 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   // one-shot InitPlan regardless of row count, giving this filtered read a flat, deterministic
   // ~2s cost (Postgres/OS caches being warm from earlier reads would otherwise make a plain
   // 10 000-row read resolve too fast to reliably click Stop before it finishes). Applying the
-  // filter itself is what starts the slow read here — not a follow-up pager click — so there's
-  // no risk of the D-prefetch background fetch (§8) having already warmed the next page and
-  // turning the click into an instant cache hit. It goes first in an OR (not AND) with the real
+  // filter itself is what starts the slow read here — not a follow-up pager click. It goes
+  // first in an OR (not AND) with the real
   // predicate: pg_sleep() returns void, which is never NULL, so the left disjunct is always
   // false and the right one (`id > 0`, true for this table) alone decides the match — an AND
   // here would make the always-false left side veto every row.
@@ -373,27 +369,6 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   expect(ofKind(await getOps(page, connectionId), 'read')).toHaveLength(
     ofKind(opsBeforeRefresh, 'read').length + 1,
   );
-
-  // --- prefetch: on, ▶ once (miss + background prefetch), idle, ▶ again adds no new op -----
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: true } }));
-  await page.click('[data-testid="pager-first"]');
-  await page.click('[data-testid="pager-next"]');
-  await page.waitForTimeout(500); // let the idle-scheduled prefetch fire
-  const opsAfterFirstNext = ofKind(await getOps(page, connectionId), 'read');
-  // schedulePrefetch() already read the page one further ahead in the background (its op is
-  // opsAfterFirstNext[0], the most recent) — this second ► should be served from that cache
-  // entry rather than issuing the identical query again.
-  const prefetchedCommand = opsAfterFirstNext[0]?.command;
-  await page.click('[data-testid="pager-next"]');
-  await page.waitForTimeout(100);
-  const opsAfterSecondNext = ofKind(await getOps(page, connectionId), 'read');
-  // Don't assert on the raw op count here: schedulePrefetch() reruns after *every* successful
-  // load (cache hit or not), so this click's own landing may already have kicked off another
-  // background prefetch (for the page after this one) within the same 100ms window — that's
-  // expected, ongoing read-ahead, not a sign this click missed the cache. The real signal that
-  // this click hit the cache is that its own cursor wasn't queried a second time.
-  expect(opsAfterSecondNext.filter((o) => o.command === prefetchedCommand)).toHaveLength(1);
-  await page.evaluate(() => window.kira.settingsSet({ data: { prefetch: false } }));
 
   // --- NULL vs '' -------------------------------------------------------------------------
   await (await findRow(page, NULLS_PATH)).dblclick();
