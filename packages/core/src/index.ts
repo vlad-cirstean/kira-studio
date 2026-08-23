@@ -1,6 +1,6 @@
 export { advanceColorState, allocateColor, initialColorState } from "./graph/colors.ts";
-export { EdgeBuffer } from "./graph/edges.ts";
 export type { BuiltEdges } from "./graph/edges.ts";
+export { EdgeBuffer } from "./graph/edges.ts";
 export type { LaneAssignment } from "./graph/lanes.ts";
 export { assignLanes } from "./graph/lanes.ts";
 export type { LayoutAppendResult } from "./graph/layout.ts";
@@ -59,11 +59,11 @@ export type {
   SpawnedProcess,
   SpawnRequest,
 } from "./ports/processRunner.ts";
-export type { AppendResult, CommitStoreStats } from "./store/commitStore.ts";
-export { CommitStore } from "./store/commitStore.ts";
+export type { AppendResult, CommitStoreStats, PackedCommitChunk } from "./store/commitStore.ts";
+export { CommitStore, packedTransferList } from "./store/commitStore.ts";
 export { StringInterner, SubjectBuffer } from "./store/intern.ts";
 export type { ShaTableOptions } from "./store/shaTable.ts";
-export { ShaTable } from "./store/shaTable.ts";
+export { bytesToHex, hexToBytes, ShaTable } from "./store/shaTable.ts";
 export { AssertionError, assert, assertDefined, assertNever } from "./util/assert.ts";
 export type { RecordSplitterOptions } from "./util/nulSplit.ts";
 export {

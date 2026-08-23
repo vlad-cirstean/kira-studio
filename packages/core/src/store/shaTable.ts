@@ -14,7 +14,9 @@ import { assert } from "../util/assert.ts";
 
 const HEX_PATTERN = /^[0-9a-fA-F]+$/;
 
-function hexToBytes(hex: string, widthBytes: number): Uint8Array {
+/** Exported for `commitStore.ts`'s wire packing (W3): a pending parent is tracked there as hex,
+ *  and a packed chunk's parent shas travel as raw bytes, so both directions need this pair. */
+export function hexToBytes(hex: string, widthBytes: number): Uint8Array {
   assert(
     hex.length === widthBytes * 2,
     `ShaTable: expected a ${widthBytes * 2}-character hex sha, got ${hex.length} characters ` +
@@ -30,7 +32,7 @@ function hexToBytes(hex: string, widthBytes: number): Uint8Array {
 
 const HEX_CHARS = "0123456789abcdef";
 
-function bytesToHex(bytes: Uint8Array): string {
+export function bytesToHex(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i++) {
     const byte = bytes[i] as number;
@@ -133,8 +135,26 @@ export class ShaTable {
       );
       this.#widthBytes = this.#requestedWidthBytes ?? (detected as 20 | 32);
     }
+    return this.appendBytes(hexToBytes(hex, this.#widthBytes));
+  }
+
+  /** As `append`, but from raw bytes rather than hex — the wire-format path (W3), where a
+   *  packed chunk's shas already arrive as binary and re-stringifying them to hex first would
+   *  be pure waste. Width is detected from `bytes.length` the same way `append` detects it from
+   *  hex length. */
+  appendBytes(bytes: Uint8Array): number {
+    if (this.#widthBytes === undefined) {
+      assert(
+        bytes.length === 20 || bytes.length === 32,
+        `ShaTable: unrecognised sha byte width ${bytes.length} (expected 20 or 32)`,
+      );
+      this.#widthBytes = this.#requestedWidthBytes ?? (bytes.length as 20 | 32);
+    }
     const width = this.#widthBytes;
-    const bytes = hexToBytes(hex, width);
+    assert(
+      bytes.length === width,
+      `ShaTable.appendBytes: expected ${width}-byte shas, got ${bytes.length}`,
+    );
 
     const row = this.#count;
     const requiredBytes = (row + 1) * width;
@@ -157,6 +177,17 @@ export class ShaTable {
   /** A subarray view into the flat buffer — never a copy. */
   bytesAt(row: number): Uint8Array {
     return this.#rowBytes(row);
+  }
+
+  /** A subarray view over rows `[from, to)` — never a copy; the wire-packing path (W3) copies
+   *  it into a fresh, transferable buffer itself. */
+  rangeView(from: number, to: number): Uint8Array {
+    assert(
+      from >= 0 && to <= this.#count && from <= to,
+      `ShaTable.rangeView(${from}, ${to}): out of range (${this.#count} entries)`,
+    );
+    const width = this.widthBytes;
+    return this.#bytes.subarray(from * width, to * width);
   }
 
   rowOfHex(hex: string): number {

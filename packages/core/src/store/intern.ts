@@ -50,6 +50,16 @@ export class StringInterner {
     return this.#byteLength;
   }
 
+  /** Every string interned since id `base`, in id order — the wire format's dictionary delta
+   *  (W3): a packed chunk carries only the strings the receiver doesn't already have. */
+  valuesFrom(base: number): readonly string[] {
+    assert(
+      base >= 0 && base <= this.#values.length,
+      `StringInterner.valuesFrom(${base}): out of range for ${this.#values.length} strings`,
+    );
+    return this.#values.slice(base);
+  }
+
   clear(): void {
     this.#idOf.clear();
     this.#values.length = 0;
@@ -130,6 +140,27 @@ export class SubjectBuffer {
   /** Actual allocated bytes: the encoded-subject buffer plus the offset index. */
   get byteLength(): number {
     return this.#bytes.byteLength + this.#offsets.byteLength;
+  }
+
+  /** Bytes and chunk-relative offsets for rows `[from, to)` — the wire format's per-chunk
+   *  subject columns (W3). Subjects are appended contiguously in row order, so this is one
+   *  contiguous slice rather than `to - from` individual re-encodes; `bytes` is a view into the
+   *  live buffer, not a copy, and the offsets are rebased to start at 0 for the slice. */
+  rangeBytes(
+    from: number,
+    to: number,
+  ): { readonly bytes: Uint8Array; readonly offsets: Uint32Array } {
+    assert(
+      from >= 0 && to <= this.#count && from <= to,
+      `SubjectBuffer.rangeBytes(${from}, ${to}): out of range (${this.#count} entries)`,
+    );
+    const start = this.#offsets[from] as number;
+    const end = this.#offsets[to] as number;
+    const offsets = new Uint32Array(to - from + 1);
+    for (let i = 0; i <= to - from; i++) {
+      offsets[i] = (this.#offsets[from + i] as number) - start;
+    }
+    return { bytes: this.#bytes.subarray(start, end), offsets };
   }
 
   clear(): void {

@@ -6,11 +6,12 @@
  */
 import type { LayoutInput } from "../graph/types.ts";
 import type { CommitIdentity, CommitRecord, DecorationRef } from "../model/commit.ts";
-import { assert } from "../util/assert.ts";
+import { assert, assertDefined } from "../util/assert.ts";
 import { StringInterner, SubjectBuffer } from "./intern.ts";
-import { ShaTable } from "./shaTable.ts";
+import { bytesToHex, hexToBytes, ShaTable } from "./shaTable.ts";
 
 const UINT32_MAX = 0xffffffff;
+const textDecoder = new TextDecoder("utf-8", { fatal: false });
 
 /** Clamps a commit timestamp into `Uint32Array` range (1970 .. ~2106). Clock-skewed or
  *  imported histories do produce dates outside that range; clamping costs one comparison and
@@ -89,6 +90,50 @@ export interface AppendResult {
   /** Slots in the parent column that changed from unresolved to a real row because this batch
    *  supplied the parent — feeds the layout's incremental patch pass (W9). */
   readonly resolvedParentSlots: Uint32Array;
+}
+
+/**
+ * The wire shape `packSlice`/`appendPacked` trade (P3 W3, §3's ipc→core boundary): every field
+ * is a plain `ArrayBuffer` rather than a typed array so it survives a structural copy into
+ * `packages/ipc`'s own declaration of the same shape (core and ipc may not import each other —
+ * see `docs/plans/P3.md`'s "ipc → core boundary" section) without either side importing the
+ * other's typed-array element type.
+ *
+ * Parents travel as shas (`parentShas`), not row indices — see the plan's W3 for why. The
+ * dictionary is a delta: `dictionary` holds only the strings interned since `dictionaryBase`,
+ * and `appendPacked` throws if the receiver's interner isn't at exactly that size, since a
+ * mismatch means a chunk arrived out of order or was dropped.
+ */
+export interface PackedCommitChunk {
+  readonly from: number;
+  readonly to: number;
+  readonly shaWidthBytes: number;
+  readonly shas: ArrayBuffer;
+  readonly parentOffsets: ArrayBuffer;
+  readonly parentShas: ArrayBuffer;
+  readonly identityIds: ArrayBuffer;
+  readonly times: ArrayBuffer;
+  readonly subjectBytes: ArrayBuffer;
+  readonly subjectOffsets: ArrayBuffer;
+  readonly dictionaryBase: number;
+  readonly dictionary: readonly string[];
+  readonly decorations: readonly (readonly [row: number, refs: readonly DecorationRef[]])[];
+}
+
+/** Every distinct `ArrayBuffer` backing `chunk`'s fields, exactly once — mirrors
+ *  `graph/layout.ts`'s `layoutTransferList` and its reason: a buffer listed twice throws at
+ *  `postMessage`, a buffer omitted is silently cloned. */
+export function packedTransferList(chunk: PackedCommitChunk): ArrayBuffer[] {
+  const buffers = new Set<ArrayBuffer>([
+    chunk.shas,
+    chunk.parentOffsets,
+    chunk.parentShas,
+    chunk.identityIds,
+    chunk.times,
+    chunk.subjectBytes,
+    chunk.subjectOffsets,
+  ]);
+  return [...buffers];
 }
 
 export interface CommitStoreStats {
@@ -297,6 +342,167 @@ export class CommitStore {
       parentRows: this.#parentRows.view(),
       resolvedParentSlots,
     };
+  }
+
+  /**
+   * Packs rows `[from, to)` into the wire format (P3 W3): the dictionary carries only strings
+   * interned since `dictionaryBase`, so the caller (`RepoService`, W7) is responsible for
+   * tracking what the receiver has already been sent and passing that boundary back in on the
+   * next call.
+   */
+  packSlice(from: number, to: number, dictionaryBase: number): PackedCommitChunk {
+    assert(
+      from >= 0 && to <= this.#rowCount && from <= to,
+      `CommitStore.packSlice(${from}, ${to}): out of range for ${this.#rowCount} rows`,
+    );
+    assert(
+      dictionaryBase >= 0 && dictionaryBase <= this.#interner.size,
+      `CommitStore.packSlice: dictionaryBase ${dictionaryBase} out of range for ` +
+        `${this.#interner.size} interned strings`,
+    );
+
+    const count = to - from;
+    const shaWidthBytes = this.#rowCount > 0 ? this.#shas.widthBytes : 20;
+
+    const shas = new Uint8Array(count * shaWidthBytes);
+    if (count > 0) shas.set(this.#shas.rangeView(from, to));
+
+    const globalParentStart = this.#parentOffsets.get(from);
+    const globalParentEnd = this.#parentOffsets.get(to);
+    const parentOffsets = new Uint32Array(count + 1);
+    for (let i = 0; i <= count; i++) {
+      parentOffsets[i] = this.#parentOffsets.get(from + i) - globalParentStart;
+    }
+
+    const parentShas = new Uint8Array((globalParentEnd - globalParentStart) * shaWidthBytes);
+    for (let slot = globalParentStart; slot < globalParentEnd; slot++) {
+      const parentRow = this.#parentRows.get(slot);
+      const bytes =
+        parentRow === UNRESOLVED_PARENT_ROW
+          ? hexToBytes(
+              assertDefined(
+                this.#pendingParents.get(slot),
+                `unreachable: unresolved parent slot ${slot} missing from pending map`,
+              ),
+              shaWidthBytes,
+            )
+          : this.#shas.bytesAt(parentRow);
+      parentShas.set(bytes, (slot - globalParentStart) * shaWidthBytes);
+    }
+
+    const identityIds = new Uint32Array(count * 4);
+    const times = new Uint32Array(count * 2);
+    const decorations: [number, readonly DecorationRef[]][] = [];
+    for (let i = 0; i < count; i++) {
+      const row = from + i;
+      identityIds[i * 4 + 0] = this.#authorName.get(row);
+      identityIds[i * 4 + 1] = this.#authorEmail.get(row);
+      identityIds[i * 4 + 2] = this.#committerName.get(row);
+      identityIds[i * 4 + 3] = this.#committerEmail.get(row);
+      times[i * 2 + 0] = this.#authorTime.get(row);
+      times[i * 2 + 1] = this.#committerTime.get(row);
+      const refs = this.#decorations.get(row);
+      if (refs !== undefined) decorations.push([i, refs]);
+    }
+
+    const subjectRange = this.#subjects.rangeBytes(from, to);
+    const subjectBytes = new Uint8Array(subjectRange.bytes.length);
+    subjectBytes.set(subjectRange.bytes);
+
+    return {
+      from,
+      to,
+      shaWidthBytes,
+      shas: shas.buffer as ArrayBuffer,
+      parentOffsets: parentOffsets.buffer as ArrayBuffer,
+      parentShas: parentShas.buffer as ArrayBuffer,
+      identityIds: identityIds.buffer as ArrayBuffer,
+      times: times.buffer as ArrayBuffer,
+      subjectBytes: subjectBytes.buffer as ArrayBuffer,
+      subjectOffsets: subjectRange.offsets.buffer as ArrayBuffer,
+      dictionaryBase,
+      dictionary: this.#interner.valuesFrom(dictionaryBase),
+      decorations,
+    };
+  }
+
+  /**
+   * Applies a wire chunk in place of the record-by-record `appendPage` path — the receiving
+   * side of `packSlice`. Throws if the chunk doesn't start exactly where this store's rows end,
+   * or if `dictionaryBase` doesn't match the interner's current size: both mean a chunk arrived
+   * out of order or one was dropped, and applying it anyway would silently misattribute
+   * dictionary ids to the wrong strings.
+   */
+  appendPacked(chunk: PackedCommitChunk): AppendResult {
+    assert(
+      chunk.from === this.#rowCount,
+      `CommitStore.appendPacked: chunk starts at row ${chunk.from} but the store has ` +
+        `${this.#rowCount} rows — chunks must be applied in order`,
+    );
+    assert(
+      chunk.dictionaryBase === this.#interner.size,
+      `CommitStore.appendPacked: chunk's dictionaryBase (${chunk.dictionaryBase}) does not ` +
+        `match the store's interner size (${this.#interner.size}) — chunks arrived out of ` +
+        "order or one was dropped",
+    );
+
+    for (const value of chunk.dictionary) this.#interner.intern(value);
+
+    const from = this.#rowCount;
+    const count = chunk.to - chunk.from;
+    const shas = new Uint8Array(chunk.shas);
+    const parentOffsets = new Uint32Array(chunk.parentOffsets);
+    const parentShas = new Uint8Array(chunk.parentShas);
+    const identityIds = new Uint32Array(chunk.identityIds);
+    const times = new Uint32Array(chunk.times);
+    const subjectBytes = new Uint8Array(chunk.subjectBytes);
+    const subjectOffsets = new Uint32Array(chunk.subjectOffsets);
+    const decorationByRow = new Map(chunk.decorations);
+
+    for (let i = 0; i < count; i++) {
+      const row = from + i;
+      const shaSlice = shas.subarray(i * chunk.shaWidthBytes, (i + 1) * chunk.shaWidthBytes);
+      const shaRow = this.#shas.appendBytes(shaSlice);
+      assert(
+        shaRow === row,
+        `CommitStore.appendPacked: sha table row ${shaRow} does not match store row ${row}`,
+      );
+
+      this.#authorName.push(identityIds[i * 4 + 0] as number);
+      this.#authorEmail.push(identityIds[i * 4 + 1] as number);
+      this.#committerName.push(identityIds[i * 4 + 2] as number);
+      this.#committerEmail.push(identityIds[i * 4 + 3] as number);
+      this.#authorTime.push(times[i * 2 + 0] as number);
+      this.#committerTime.push(times[i * 2 + 1] as number);
+
+      const subjectStart = subjectOffsets[i] as number;
+      const subjectEnd = subjectOffsets[i + 1] as number;
+      const subjectRow = this.#subjects.append(
+        textDecoder.decode(subjectBytes.subarray(subjectStart, subjectEnd)),
+      );
+      assert(subjectRow === row, "unreachable: subjects appended in the same order as rows");
+
+      const decoration = decorationByRow.get(i);
+      if (decoration !== undefined && decoration.length > 0) this.#decorations.set(row, decoration);
+
+      const parentStart = parentOffsets[i] as number;
+      const parentEnd = parentOffsets[i + 1] as number;
+      for (let p = parentStart; p < parentEnd; p++) {
+        const parentShaSlice = parentShas.subarray(
+          p * chunk.shaWidthBytes,
+          (p + 1) * chunk.shaWidthBytes,
+        );
+        const parentRow = this.#shas.rowOfBytes(parentShaSlice);
+        const slot = this.#parentRows.push(parentRow === -1 ? UNRESOLVED_PARENT_ROW : parentRow);
+        if (parentRow === -1) this.#pendingParents.set(slot, bytesToHex(parentShaSlice));
+      }
+      this.#parentOffsets.push(this.#parentRows.length);
+      this.#rowCount++;
+    }
+
+    const to = this.#rowCount;
+    const resolvedParentSlots = Uint32Array.from(this.#resolvePendingParents());
+    return { from, to, resolvedParentSlots };
   }
 
   stats(): CommitStoreStats {
