@@ -9,6 +9,7 @@ defineOptions({ inheritAttrs: false });
 withDefaults(
   defineProps<{
     modelValue: string;
+    type?: 'text' | 'password' | 'number';
     icon?: string;
     prefix?: string;
     placeholder?: string;
@@ -16,7 +17,7 @@ withDefaults(
     ui?: boolean;
     invalid?: boolean;
   }>(),
-  { size: 'sm' },
+  { size: 'sm', type: 'text' },
 );
 
 const emit = defineEmits<{
@@ -36,6 +37,7 @@ const emit = defineEmits<{
     <span v-if="prefix" class="ph">{{ prefix }}</span>
     <input
       v-bind="$attrs"
+      :type="type"
       :value="modelValue"
       :placeholder="placeholder"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
