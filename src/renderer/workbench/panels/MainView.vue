@@ -2,6 +2,7 @@
 import { activeTab } from '../../state/tabs';
 import ConsoleTabView from '../../views/console/ConsoleView.vue';
 import DdlTabView from '../../views/ddl/DdlView.vue';
+import DocumentTabView from '../../views/documents/DocumentView.vue';
 import DataTabView from '../../views/grid/DataView.vue';
 import EmptyState from './EmptyState.vue';
 </script>
@@ -11,6 +12,11 @@ import EmptyState from './EmptyState.vue';
   <DdlTabView v-else-if="activeTab && activeTab.kind === 'ddl'" :key="activeTab.id" :tab="activeTab" />
   <ConsoleTabView
     v-else-if="activeTab && activeTab.kind === 'console'"
+    :key="activeTab.id"
+    :tab="activeTab"
+  />
+  <DocumentTabView
+    v-else-if="activeTab && activeTab.kind === 'document'"
     :key="activeTab.id"
     :tab="activeTab"
   />

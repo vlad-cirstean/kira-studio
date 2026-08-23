@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
-import { drop as dropPage, setPage } from '../grid/page';
+import { drop as dropPage, setPage } from './resultPages';
 
 export interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';

@@ -3,14 +3,14 @@ import { computed } from 'vue';
 import { settingsState } from '../../state/settings';
 import VirtualList from '../../workbench/VirtualList.vue';
 import { alignmentFor, initialWidths } from '../grid/columns';
-import { cell, getPage, pageVersion } from '../grid/page';
+import { cell, documentRow, getPage, pageVersion } from './resultPages';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
 // result has no pager, no sort, no pending-changes, no persisted column widths/order: every one
 // of DataGrid's other features exists to serve those, so reusing it here would mean stripping
-// most of it back out. This keeps only what both share: views/grid/page.ts's page cache (so a
-// 600 000-cell result costs no more here than in the data grid) and columns.ts's width/alignment
-// helpers.
+// most of it back out. This keeps only what both share: columns.ts's width/alignment helpers —
+// the page cache itself is `./resultPages.ts` (P8), a generic-`Page` sibling of `grid/page.ts`
+// since a console result can be tabular (SQL) or document (Mongo shell) unlike a data tab.
 const props = defineProps<{ pageKey: string }>();
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
@@ -22,15 +22,21 @@ const page = computed(() => {
 });
 
 const widths = computed<Record<string, number>>(() =>
-  page.value ? initialWidths(page.value) : {},
+  page.value && page.value.kind === 'tabular' ? initialWidths(page.value) : {},
 );
-const totalWidth = computed(() =>
-  page.value ? page.value.columns.reduce((sum, c) => sum + (widths.value[c.name] ?? 96), 56) : 0,
-);
+const totalWidth = computed(() => {
+  const p = page.value;
+  if (!p || p.kind !== 'tabular') return 0;
+  return p.columns.reduce((sum, c) => sum + (widths.value[c.name] ?? 96), 56);
+});
 const rowIndices = computed(() => Array.from({ length: page.value?.rowCount ?? 0 }, (_, i) => i));
 
 function cellAt(row: number, col: number) {
   return cell(props.pageKey, row, col);
+}
+
+function docRowAt(row: number) {
+  return documentRow(props.pageKey, row) ?? { id: '', body: '' };
 }
 </script>
 
@@ -38,7 +44,7 @@ function cellAt(row: number, col: number) {
   <div class="console-result-grid" data-testid="console-result-grid">
     <div v-if="!page || page.rowCount === 0" class="no-rows">{{ page ? 'No rows' : '' }}</div>
     <VirtualList
-      v-else
+      v-else-if="page.kind === 'tabular'"
       :items="rowIndices"
       :row-height="rowHeight"
       class="body"
@@ -48,7 +54,7 @@ function cellAt(row: number, col: number) {
         <div class="row header-row" :style="{ height: `${rowHeight}px` }">
           <div class="gutter-cell header-gutter" />
           <div
-            v-for="col in page!.columns"
+            v-for="col in page.columns"
             :key="col.name"
             class="cell header-cell"
             :class="{ 'align-right': alignmentFor(col) === 'right' }"
@@ -63,7 +69,7 @@ function cellAt(row: number, col: number) {
         <div class="row" data-testid="console-result-row" :style="{ height: `${rowHeight}px` }">
           <div class="gutter-cell">{{ r + 1 }}</div>
           <div
-            v-for="(col, c) in page!.columns"
+            v-for="(col, c) in page.columns"
             :key="col.name"
             class="cell"
             data-testid="console-result-cell"
@@ -84,6 +90,14 @@ function cellAt(row: number, col: number) {
               >
             </template>
           </div>
+        </div>
+      </template>
+    </VirtualList>
+    <VirtualList v-else :items="rowIndices" :row-height="96" class="body doc-body">
+      <template #default="{ item: r }">
+        <div class="doc-row" data-testid="console-result-doc-row">
+          <div class="doc-id">{{ docRowAt(r).id }}</div>
+          <pre class="doc-body-text">{{ docRowAt(r).body }}</pre>
         </div>
       </template>
     </VirtualList>
@@ -162,5 +176,27 @@ function cellAt(row: number, col: number) {
   justify-content: center;
   color: var(--kira-fg-muted);
   font-size: 12px;
+}
+
+.doc-body {
+  padding: 4px;
+}
+
+.doc-row {
+  padding: 6px 8px;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.doc-id {
+  font-size: 10px;
+  color: var(--kira-fg-muted);
+  margin-bottom: 2px;
+}
+
+.doc-body-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--kira-font-family-mono, monospace);
 }
 </style>

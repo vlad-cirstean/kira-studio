@@ -26,6 +26,7 @@ function colorFor(tab: TabRecord): string | undefined {
 function iconFor(tab: TabRecord): string {
   if (tab.kind === 'ddl') return 'file-code';
   if (tab.kind === 'console') return 'terminal';
+  if (tab.kind === 'document') return 'json';
   const tail = pathTail(tab.path);
   const KIND_ICON: Record<string, string> = {
     table: 'table',

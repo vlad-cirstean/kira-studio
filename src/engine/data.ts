@@ -18,7 +18,7 @@ import {
   type ReadResponse,
   readRequestWireSchema,
 } from '../shared/protocol/data-ops';
-import type { TabularPage } from '../shared/protocol/page';
+import type { Page } from '../shared/protocol/page';
 import { AdapterError } from './adapters/errors';
 import { getLiveAdapter } from './adapters/live';
 import { cache, pageCacheKey } from './cache';
@@ -29,7 +29,7 @@ import { runOp } from './scheduler/ops';
 // it again for L2.
 export async function handleRead(
   payload: unknown,
-): Promise<{ response: ReadResponse; page: TabularPage }> {
+): Promise<{ response: ReadResponse; page: Page }> {
   const req: ReadRequestWire = readRequestWireSchema.parse(payload);
   const { key, label } = pageCacheKey(req);
 

@@ -176,6 +176,11 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     });
     if (rt.opId !== opId) return; // superseded by a newer load
 
+    // A 'data' tab only ever exists against a tabular-shaped adapter (Postgres/MariaDB) — Mongo
+    // opens a 'document' tab instead (P8) — so this narrows rather than widening setPage/getPage.
+    if (response.page.kind !== 'tabular') {
+      throw new Error(`unexpected page kind for a data tab: ${response.page.kind}`);
+    }
     setPage(tabId, response.page);
     rt.status = 'idle';
     rt.opId = null;

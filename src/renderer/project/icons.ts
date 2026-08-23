@@ -10,6 +10,8 @@ const KIND_ICON: Record<NodeKind, string> = {
   sequence: 'list-ordered',
   function: 'symbol-method',
   column: 'symbol-string', // overridden by columnTypeIcon() when the data type is known
+  collection: 'json', // P8: mongo's table-equivalent, matching TabStrip.vue's document-tab icon
+  index: 'symbol-key',
 };
 
 export function nodeIcon(kind: NodeKind): string {

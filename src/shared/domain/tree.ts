@@ -10,6 +10,8 @@ export const nodeKindSchema = z.enum([
   'function',
   'sequence',
   'column',
+  'collection', // P8: mongo's table-equivalent
+  'index', // P8: a leaf under a collection (or a table, later)
 ]);
 export type NodeKind = z.infer<typeof nodeKindSchema>;
 

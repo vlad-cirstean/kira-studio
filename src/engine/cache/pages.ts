@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { SortSpec } from '../../shared/domain/queries';
 import type { ReadRequestWire } from '../../shared/protocol/data-ops';
-import type { TabularPage } from '../../shared/protocol/page';
+import type { Page } from '../../shared/protocol/page';
 import { ByteLru } from './lru';
 
 const DEFAULT_BUDGET_BYTES = 64 * 1024 * 1024; // matches defaultSettings.cache.l2BudgetMb
@@ -34,20 +34,20 @@ export function pageCacheKey(req: ReadRequestWire): { key: string; label: string
 
 let hits = 0;
 let misses = 0;
-const store = new ByteLru<TabularPage>(DEFAULT_BUDGET_BYTES);
+const store = new ByteLru<Page>(DEFAULT_BUDGET_BYTES);
 
 export function configurePageBudget(bytes: number): void {
   store.setBudget(bytes);
 }
 
-export function getPage(key: string): TabularPage | undefined {
+export function getPage(key: string): Page | undefined {
   const page = store.get(key);
   if (page) hits++;
   else misses++;
   return page;
 }
 
-export function putPage(key: string, label: string, req: ReadRequestWire, page: TabularPage): void {
+export function putPage(key: string, label: string, req: ReadRequestWire, page: Page): void {
   store.set(key, page, page.byteSize, { connectionId: req.connectionId, path: req.path, label });
 }
 

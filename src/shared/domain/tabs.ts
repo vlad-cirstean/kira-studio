@@ -5,10 +5,10 @@ import { pathTail } from './tree';
 export const tabKindSchema = z.enum(['data', 'ddl', 'document', 'keyvalue', 'stream', 'console']);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
-// 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5. The restore path
-// drops rows of any other kind with a `warn` — a closed vocabulary decided once, same discipline
-// as P1's Caps/connectionKind.
-export const RENDERABLE_TAB_KINDS: readonly TabKind[] = ['data', 'ddl', 'console'];
+// 'data' and 'ddl' are renderable as of P4 (D18); 'console' joins them in P5.5, 'document' in P8.
+// The restore path drops rows of any other kind with a `warn` — a closed vocabulary decided once,
+// same discipline as P1's Caps/connectionKind.
+export const RENDERABLE_TAB_KINDS: readonly TabKind[] = ['data', 'ddl', 'console', 'document'];
 
 const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
 export type PageSize = z.infer<typeof pageSizeSchema>;
@@ -36,6 +36,15 @@ export const consoleTabStateSchema = z.object({
 });
 export type ConsoleTabState = z.infer<typeof consoleTabStateSchema>;
 
+// Only per-_id expand/collapse memory and the search text are session state (§8.7) — the loaded
+// documents themselves are runtime-only, like the grid's own rows, and never round-trip through
+// `tabs.save`.
+export const documentTabStateSchema = z.object({
+  expanded: z.record(z.string(), z.boolean()),
+  search: z.string(),
+});
+export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -48,11 +57,13 @@ export const tabRecordSchema = z.discriminatedUnion('kind', [
   z.object({ ...tabRecordBase, kind: z.literal('data'), state: dataTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('ddl'), state: ddlTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('console'), state: consoleTabStateSchema }),
+  z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
 export type DdlTabRecord = Extract<TabRecord, { kind: 'ddl' }>;
 export type ConsoleTabRecord = Extract<TabRecord, { kind: 'console' }>;
+export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -60,6 +71,10 @@ export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | nu
 
 export function asConsoleTab(tab: TabRecord | null | undefined): ConsoleTabRecord | null {
   return tab && tab.kind === 'console' ? tab : null;
+}
+
+export function asDocumentTab(tab: TabRecord | null | undefined): DocumentTabRecord | null {
+  return tab && tab.kind === 'document' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -82,6 +97,10 @@ export function defaultDdlTabState(): DdlTabState {
 
 export function defaultConsoleTabState(): ConsoleTabState {
   return { text: '' };
+}
+
+export function defaultDocumentTabState(): DocumentTabState {
+  return { expanded: {}, search: '' };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

@@ -10,6 +10,7 @@ import { cancelOp, runOp, wireScheduler } from '../../src/engine/scheduler/ops';
 import { isNull, isTruncated, type TabularPage } from '../../src/shared/protocol/page';
 import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
 import { type MariaFixture, startMariadb } from './support/mariadb';
+import { readTabular } from './support/page';
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 const BIG_ROWS = 1_000_000;
@@ -408,7 +409,8 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const page = await adapter.read(
+      const page = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -443,7 +445,8 @@ describe('mariadb adapter (§9.1)', () => {
           loggedCommand = text;
         },
       };
-      const page = await adapter.read(
+      const page = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -485,9 +488,9 @@ describe('mariadb adapter (§9.1)', () => {
         mode: 'offset',
         offset: 0,
       };
-      let lastPage: Awaited<ReturnType<typeof adapter.read>> | undefined;
+      let lastPage: TabularPage | undefined;
       for (let i = 0; i < 5; i++) {
-        const page = await adapter.read({ ...baseReq, cursor }, makeCtx());
+        const page = await readTabular(adapter, { ...baseReq, cursor }, makeCtx());
         lastPage = page;
         for (let r = 0; r < page.rowCount; r++) forwardIds.push(cellAt(page, 0, r) ?? '');
         const nextToken = page.position.nextToken;
@@ -510,7 +513,7 @@ describe('mariadb adapter (§9.1)', () => {
         token: initialPrevToken,
       };
       for (let i = 0; i < 5; i++) {
-        const page = await adapter.read({ ...baseReq, cursor: backCursor }, makeCtx());
+        const page = await readTabular(adapter, { ...baseReq, cursor: backCursor }, makeCtx());
         const ids: string[] = [];
         for (let r = 0; r < page.rowCount; r++) ids.push(cellAt(page, 0, r) ?? '');
         backwardIds.unshift(...ids);
@@ -526,7 +529,8 @@ describe('mariadb adapter (§9.1)', () => {
       const staleToken = lastPage.position.nextToken;
       if (!staleToken) throw new Error('expected a nextToken on the last forward page');
       await expect(
-        adapter.read(
+        readTabular(
+          adapter,
           { ...baseReq, filter: 'id > 0', cursor: { mode: 'after', token: staleToken } },
           makeCtx(),
         ),
@@ -541,7 +545,8 @@ describe('mariadb adapter (§9.1)', () => {
     await adapter.connect(fixture.config, makeCtx());
     try {
       // order_summary is a view with no unique key of its own.
-      const page = await adapter.read(
+      const page = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -558,7 +563,8 @@ describe('mariadb adapter (§9.1)', () => {
       expect(page.position.strategy).toBe('offset');
 
       // A mixed-direction structured sort on a table that does have a PK falls back too.
-      const mixedSortPage = await adapter.read(
+      const mixedSortPage = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -592,7 +598,8 @@ describe('mariadb adapter (§9.1)', () => {
         { kind: 'database', name: 'kira_test' },
         { kind: 'table', name: 'order_items' },
       ]);
-      const page = await adapter.read(
+      const page = await readTabular(
+        adapter,
         {
           path: target,
           projection: ['product_id', 'id'],
@@ -608,7 +615,8 @@ describe('mariadb adapter (§9.1)', () => {
       expect(page.chunks).toHaveLength(2);
 
       await expect(
-        adapter.read(
+        readTabular(
+          adapter,
           {
             path: target,
             projection: ['not_a_real_column'],
@@ -633,7 +641,8 @@ describe('mariadb adapter (§9.1)', () => {
         { kind: 'database', name: 'kira_test' },
         { kind: 'table', name: 'order_items' },
       ]);
-      const all = await adapter.read(
+      const all = await readTabular(
+        adapter,
         {
           path: target,
           projection: null,
@@ -644,7 +653,8 @@ describe('mariadb adapter (§9.1)', () => {
         },
         makeCtx(),
       );
-      const filtered = await adapter.read(
+      const filtered = await readTabular(
+        adapter,
         {
           path: target,
           projection: null,
@@ -658,7 +668,8 @@ describe('mariadb adapter (§9.1)', () => {
       expect(filtered.rowCount).toBeLessThan(all.rowCount);
 
       await expect(
-        adapter.read(
+        readTabular(
+          adapter,
           {
             path: target,
             projection: null,
@@ -672,7 +683,8 @@ describe('mariadb adapter (§9.1)', () => {
       ).rejects.toMatchObject({ code: 'E_QUERY' });
 
       try {
-        await adapter.read(
+        await readTabular(
+          adapter,
           {
             path: target,
             projection: null,
@@ -696,7 +708,8 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const page = await adapter.read(
+      const page = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -735,7 +748,8 @@ describe('mariadb adapter (§9.1)', () => {
 
       // decimal(20,6) comes back as its exact text, not a rounded double — this is the
       // assertion D3 exists for.
-      const decimalPage = await adapter.read(
+      const decimalPage = await readTabular(
+        adapter,
         {
           path: path([
             { kind: 'database', name: 'kira_test' },
@@ -803,7 +817,8 @@ describe('mariadb adapter (§9.1)', () => {
       await probeConn.query('INSERT IGNORE INTO app_probe (id) VALUES (1)');
 
       await expect(
-        adapter.read(
+        readTabular(
+          adapter,
           {
             path: path([
               { kind: 'database', name: 'kira_test' },
@@ -1039,7 +1054,8 @@ describe('mariadb adapter (§9.1)', () => {
         "INSERT INTO `kira_test`.`composite_pk` (`tenant_id`, `entity_id`, `name`) VALUES ('3', '1', 'new tenant')",
       ]);
 
-      const rows = await adapter.read(
+      const rows = await readTabular(
+        adapter,
         {
           path: compositePkPath(),
           projection: null,
@@ -1084,7 +1100,8 @@ describe('mariadb adapter (§9.1)', () => {
         "UPDATE `kira_test`.`composite_pk` SET `name` = 'tenant 1 / entity 1 updated' WHERE `tenant_id` = '1' AND `entity_id` = '1'",
       );
 
-      const rows = await adapter.read(
+      const rows = await readTabular(
+        adapter,
         {
           path: compositePkPath(),
           projection: null,
@@ -1158,7 +1175,8 @@ describe('mariadb adapter (§9.1)', () => {
       };
       await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({ code: 'E_QUERY' });
 
-      const rows = await adapter.read(
+      const rows = await readTabular(
+        adapter,
         {
           path: compositePkPath(),
           projection: null,
@@ -1213,7 +1231,8 @@ describe('mariadb adapter (§9.1)', () => {
         ].join(';\n'),
       );
 
-      const rows = await adapter.read(
+      const rows = await readTabular(
+        adapter,
         {
           path: compositePkPath(),
           projection: null,
@@ -1306,12 +1325,16 @@ describe('mariadb adapter (§9.1)', () => {
       expect(loggedCommand).toBe(statements.join(';\n'));
 
       expect(pages).toHaveLength(2);
-      expect(pages[0].rowCount).toBe(1);
-      const nameCol = pages[0].columns.findIndex((c) => c.name === 'name');
-      expect(cellAt(pages[0], nameCol, 0)).toBe('row 1');
+      const [page0, page1] = pages;
+      if (page0.kind !== 'tabular' || page1.kind !== 'tabular') {
+        throw new Error('expected tabular console pages');
+      }
+      expect(page0.rowCount).toBe(1);
+      const nameCol = page0.columns.findIndex((c) => c.name === 'name');
+      expect(cellAt(page0, nameCol, 0)).toBe('row 1');
 
       // A non-row-returning statement synthesizes a single-column/single-row status page.
-      expect(pages[1].columns).toEqual([
+      expect(page1.columns).toEqual([
         {
           name: 'status',
           dataType: 'text',
@@ -1320,8 +1343,8 @@ describe('mariadb adapter (§9.1)', () => {
           isPrimaryKey: false,
         },
       ]);
-      expect(pages[1].rowCount).toBe(1);
-      expect(cellAt(pages[1], 0, 0)).toBe('1 row(s) affected');
+      expect(page1.rowCount).toBe(1);
+      expect(cellAt(page1, 0, 0)).toBe('1 row(s) affected');
     } finally {
       await probeConn.query('DROP TABLE IF EXISTS console_probe');
       await probeConn.end();

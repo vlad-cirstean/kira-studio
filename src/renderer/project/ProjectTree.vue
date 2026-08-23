@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
-import { openDataTab } from '../state/tabs';
+import { openDataTab, openDocumentTab } from '../state/tabs';
 import { openContextMenu } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -21,6 +21,8 @@ import TreeRow from './TreeRow.vue';
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
 const OPENABLE_KINDS = new Set(['table', 'view', 'matview']);
+// A collection opens the same way, but into a 'document' tab (P8) — not the grid's 'data' tab.
+const DOCUMENT_OPENABLE_KINDS = new Set(['collection']);
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
@@ -57,6 +59,10 @@ function onToggle(row: TreeRowVm): void {
 function onOpen(row: TreeRowVm): void {
   if (OPENABLE_KINDS.has(row.kind)) {
     openDataTab(row.connectionId, row.path);
+    return;
+  }
+  if (DOCUMENT_OPENABLE_KINDS.has(row.kind)) {
+    openDocumentTab(row.connectionId, row.path);
     return;
   }
   if (row.expanded) collapse(row.connectionId, row.path);

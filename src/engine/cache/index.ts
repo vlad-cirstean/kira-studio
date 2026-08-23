@@ -3,7 +3,7 @@
 // live utility process, which P1 designed away. This module is L2 (result pages) and L3
 // (counts) only (D11). §11's "engine/cache/ holds L1/L2/L3" is superseded by that decision.
 import type { CacheStats, ReadRequestWire } from '../../shared/protocol/data-ops';
-import type { TabularPage } from '../../shared/protocol/page';
+import type { Page } from '../../shared/protocol/page';
 import * as counts from './counts';
 import * as pages from './pages';
 
@@ -51,12 +51,12 @@ export const cache = {
     pages.configurePageBudget(l2BudgetBytes);
     scheduleEmit();
   },
-  readPage(key: string): TabularPage | undefined {
+  readPage(key: string): Page | undefined {
     const page = pages.getPage(key);
     scheduleEmit();
     return page;
   },
-  storePage(key: string, label: string, req: ReadRequestWire, page: TabularPage): void {
+  storePage(key: string, label: string, req: ReadRequestWire, page: Page): void {
     pages.putPage(key, label, req, page);
     scheduleEmit();
   },

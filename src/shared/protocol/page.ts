@@ -78,14 +78,32 @@ export interface TabularPage {
 }
 
 /**
- * P8 widens this to `TabularPage | DocumentPage`, P9 adds `KeyValuePage`, P10 `StreamPage`
- * (D5). Switch on `page.kind` everywhere, even though there is one arm today — that is what
- * makes widening additive instead of a rewrite.
+ * One document per row: `ids`/`bodies` are fixed semantic columns (not a caller-supplied
+ * projection like TabularPage's `columns`) reusing the exact same TextColumnChunk codec —
+ * `ids` holds each document's `_id` as EJSON text, `bodies` the full document as EJSON text.
  */
-export type Page = TabularPage;
+export interface DocumentPage {
+  kind: 'document';
+  position: PagePosition;
+  ids: TextColumnChunk;
+  bodies: TextColumnChunk;
+  rowCount: number;
+  byteSize: number;
+  fetchedAt: number; // epoch ms
+}
+
+/**
+ * P9 adds `KeyValuePage`, P10 `StreamPage` (D5). Switch on `page.kind` everywhere, even though
+ * there are only two arms today — that is what makes widening additive instead of a rewrite.
+ */
+export type Page = TabularPage | DocumentPage;
 
 export const MAX_CELL_BYTES = 64 * 1024;
 export const MAX_PAGE_SIZE = 10_000;
+/** Per-document-body truncation budget for a multi-row document page (P8's D1/D6). */
+export const DOCUMENT_TRUNCATE_BYTES = MAX_CELL_BYTES;
+/** Per-document-body budget for a single explicitly-requested document ("show all", P8's D1). */
+export const DOCUMENT_TRUNCATE_BYTES_SINGLE = MAX_CELL_BYTES * 64;
 
 function bitsetBytes(rowCount: number): number {
   return Math.ceil(rowCount / 8);
@@ -179,7 +197,12 @@ class ColumnScratch {
   }
 
   /** Returns whether this row's value was truncated. */
-  appendValue(value: string | null, row: number, encoder: TextEncoder): boolean {
+  appendValue(
+    value: string | null,
+    row: number,
+    encoder: TextEncoder,
+    maxBytes: number = MAX_CELL_BYTES,
+  ): boolean {
     if (value === null) {
       this.isNullRow.push(true);
       this.rowStart.push(this.used);
@@ -188,8 +211,8 @@ class ColumnScratch {
     this.isNullRow.push(false);
     let bytes = encoder.encode(value);
     let truncated = false;
-    if (bytes.length > MAX_CELL_BYTES) {
-      bytes = truncateUtf8ToBoundary(bytes, MAX_CELL_BYTES);
+    if (bytes.length > maxBytes) {
+      bytes = truncateUtf8ToBoundary(bytes, maxBytes);
       this.truncatedRows.add(row);
       truncated = true;
     }
@@ -270,11 +293,50 @@ export function createTabularPageBuilder(columns: ColumnDescriptor[]): TabularPa
   };
 }
 
+/** Mirrors `createTabularPageBuilder`, fixed to the two semantic columns `DocumentPage` uses. */
+export interface DocumentPageBuilder {
+  /** `id`/`body` are each pre-serialized EJSON text (caller owns EJSON.stringify). */
+  push(id: string, body: string): void;
+  finish(position: PagePosition): DocumentPage;
+}
+
+export function createDocumentPageBuilder(opts?: { singleRow?: boolean }): DocumentPageBuilder {
+  const maxBytes = opts?.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : DOCUMENT_TRUNCATE_BYTES;
+  const idScratch = new ColumnScratch();
+  const bodyScratch = new ColumnScratch();
+  const encoder = new TextEncoder();
+  let rowCount = 0;
+
+  return {
+    push(id, body) {
+      const row = rowCount;
+      idScratch.appendValue(id, row, encoder, maxBytes);
+      bodyScratch.appendValue(body, row, encoder, maxBytes);
+      rowCount++;
+    },
+    finish(position) {
+      const ids = idScratch.finish(rowCount, false);
+      const bodies = bodyScratch.finish(rowCount, false);
+      const page: DocumentPage = {
+        kind: 'document',
+        position,
+        ids,
+        bodies,
+        rowCount,
+        byteSize: 0,
+        fetchedAt: Date.now(),
+      };
+      page.byteSize = chunkByteSize(ids) + chunkByteSize(bodies);
+      return page;
+    },
+  };
+}
+
 /**
  * The envelope-only schema (§4a): running Zod over every cell of a 600 000-cell page would
  * cost more than the query. Pair with `assertPageStructure` for the typed-array invariants.
  */
-export const pageEnvelopeSchema = z.object({
+export const tabularPageEnvelopeSchema = z.object({
   kind: z.literal('tabular'),
   columns: z.array(columnDescriptorSchema),
   rowCount: z.number().int().min(0),
@@ -284,29 +346,49 @@ export const pageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
-/** Throws when a chunk's typed arrays disagree with the envelope's `rowCount`. */
-export function assertPageStructure(page: TabularPage): void {
-  if (page.chunks.length !== page.columns.length) {
-    throw new Error(`page has ${page.chunks.length} chunks for ${page.columns.length} columns`);
+export const documentPageEnvelopeSchema = z.object({
+  kind: z.literal('document'),
+  rowCount: z.number().int().min(0),
+  position: pagePositionSchema,
+  byteSize: z.number().int().min(0),
+  fetchedAt: z.number(),
+});
+
+export const pageEnvelopeSchema = z.discriminatedUnion('kind', [
+  tabularPageEnvelopeSchema,
+  documentPageEnvelopeSchema,
+]);
+
+function assertChunkStructure(chunk: TextColumnChunk, rowCount: number, label: string): void {
+  if (!(chunk.data instanceof Uint8Array)) throw new Error(`${label}.data is not a Uint8Array`);
+  if (!(chunk.offsets instanceof Uint32Array)) {
+    throw new Error(`${label}.offsets is not a Uint32Array`);
   }
-  for (const chunk of page.chunks) {
-    if (!(chunk.data instanceof Uint8Array)) throw new Error('chunk.data is not a Uint8Array');
-    if (!(chunk.offsets instanceof Uint32Array)) {
-      throw new Error('chunk.offsets is not a Uint32Array');
-    }
-    if (!(chunk.nulls instanceof Uint8Array)) throw new Error('chunk.nulls is not a Uint8Array');
-    if (!(chunk.truncated instanceof Uint32Array)) {
-      throw new Error('chunk.truncated is not a Uint32Array');
-    }
-    if (chunk.offsets.length !== page.rowCount + 1) {
-      throw new Error(
-        `chunk.offsets has ${chunk.offsets.length} entries, expected ${page.rowCount + 1}`,
-      );
-    }
-    if (chunk.nulls.length !== bitsetBytes(page.rowCount)) {
-      throw new Error(
-        `chunk.nulls has ${chunk.nulls.length} bytes, expected ${bitsetBytes(page.rowCount)}`,
-      );
-    }
+  if (!(chunk.nulls instanceof Uint8Array)) throw new Error(`${label}.nulls is not a Uint8Array`);
+  if (!(chunk.truncated instanceof Uint32Array)) {
+    throw new Error(`${label}.truncated is not a Uint32Array`);
   }
+  if (chunk.offsets.length !== rowCount + 1) {
+    throw new Error(
+      `${label}.offsets has ${chunk.offsets.length} entries, expected ${rowCount + 1}`,
+    );
+  }
+  if (chunk.nulls.length !== bitsetBytes(rowCount)) {
+    throw new Error(
+      `${label}.nulls has ${chunk.nulls.length} bytes, expected ${bitsetBytes(rowCount)}`,
+    );
+  }
+}
+
+/** Throws when a page's typed arrays disagree with its own envelope fields. */
+export function assertPageStructure(page: Page): void {
+  if (page.kind === 'tabular') {
+    if (page.chunks.length !== page.columns.length) {
+      throw new Error(`page has ${page.chunks.length} chunks for ${page.columns.length} columns`);
+    }
+    for (const chunk of page.chunks) assertChunkStructure(chunk, page.rowCount, 'chunk');
+    return;
+  }
+  assertChunkStructure(page.ids, page.rowCount, 'ids');
+  assertChunkStructure(page.bodies, page.rowCount, 'bodies');
 }

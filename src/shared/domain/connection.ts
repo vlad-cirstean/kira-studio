@@ -17,6 +17,7 @@ export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   postgres: 5432,
   mariadb: 3306,
+  mongodb: 27017,
 };
 
 export const connectionColorSchema = z.enum([

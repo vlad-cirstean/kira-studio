@@ -15,7 +15,15 @@ import {
   setConnectionReadOnly,
 } from '../state/connections';
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
-import { activeTab, findDataTab, openConsoleTab, openDataTab, openDdlTab } from '../state/tabs';
+import {
+  activeTab,
+  findDataTab,
+  openConsoleTab,
+  openDataTab,
+  openDdlTab,
+  openDocumentTab,
+} from '../state/tabs';
+import { runCount as runDocumentCount } from '../views/documents/state';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import type { MenuItem } from '../workbench/state/contextMenu';
 import {
@@ -28,7 +36,15 @@ import {
   treeState,
 } from './state/tree';
 
-const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview', 'sequence', 'function']);
+const QUALIFIED_KINDS = new Set([
+  'schema',
+  'table',
+  'view',
+  'matview',
+  'sequence',
+  'function',
+  'collection',
+]);
 
 // Produced locally from the path — never round-trips to the engine for a string join (§9b).
 function qualifiedNameFor(row: TreeRowVm): string {
@@ -50,10 +66,13 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'view':
     case 'matview':
       return relationMenu(row);
+    case 'collection':
+      return collectionMenu(row);
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
     case 'column':
+    case 'index':
       return columnMenu(row);
     default:
       return [];
@@ -319,6 +338,65 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       label: 'Saved filters',
       icon: 'bookmark',
       items: savedFiltersSubmenu(row),
+    },
+  ];
+}
+
+// P8's collection row: near-copy of relationMenu, opening a 'document' tab instead of 'data' —
+// no "Open DDL" (Caps.ddl === false for mongo) and no saved-filters submenu (§8.10 names one for
+// "Table / view / collection" generally, but a saved query body is a SQL WHERE/ORDER BY shape
+// that has no Mongo-filter analog yet).
+function collectionMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'open-document',
+      label: 'Open',
+      icon: 'json',
+      run: () => {
+        openDocumentTab(row.connectionId, row.path);
+      },
+    },
+    {
+      type: 'item',
+      id: 'open-document-new-tab',
+      label: 'Open in new tab',
+      icon: 'json',
+      run: () => {
+        openDocumentTab(row.connectionId, row.path, { newTab: true });
+      },
+    },
+    ...consoleMenuItem(row),
+    {
+      type: 'item',
+      id: 'refresh',
+      label: 'Refresh',
+      icon: 'refresh',
+      run: () => refresh(row.connectionId, row.path),
+    },
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      run: () => copyText(row.name),
+    },
+    {
+      type: 'item',
+      id: 'copy-qualified-name',
+      label: 'Copy qualified name',
+      icon: 'copy',
+      run: () => copyText(qualifiedNameFor(row)),
+    },
+    {
+      type: 'item',
+      id: 'count-documents',
+      label: 'Count documents',
+      icon: 'symbol-numeric',
+      run: () => {
+        const tabId = openDocumentTab(row.connectionId, row.path);
+        void runDocumentCount(tabId);
+      },
     },
   ];
 }

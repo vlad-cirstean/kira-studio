@@ -1,22 +1,37 @@
 import {
   asConsoleTab,
   asDataTab,
+  asDocumentTab,
   type ConsoleTabRecord,
   type ConsoleTabState,
   type DataTabRecord,
   type DataTabState,
+  type DocumentTabRecord,
+  type DocumentTabState,
   defaultConsoleTabState,
   defaultDataTabState,
   defaultDdlTabState,
+  defaultDocumentTabState,
   type TabRecord,
 } from '@shared/domain/tabs';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
+import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
+import { dropForTab as dropDocumentPagesForTab } from '../views/documents/docPage';
 import { dropForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
+
+// Closing a tab must free whichever page store(s) it could have populated (§2.2) — a plain
+// no-op lookup miss for the stores a tab's own kind never touches, same discipline as calling
+// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind.
+function dropAllPagesForTab(id: string): void {
+  dropForTab(id);
+  dropConsoleResultPagesForTab(id);
+  dropDocumentPagesForTab(id);
+}
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
 // operations panel, none of which may reach into each other — hence renderer/state/, not
@@ -166,42 +181,89 @@ export function openConsoleTab(connectionId: string, path: string): string {
   return id;
 }
 
+// Opens a 'document' tab, reusing an existing one for the same (connectionId, path) — mirrors
+// openDataTab's identity rule (§8.4); `newTab` opens a fresh one regardless.
+export function openDocumentTab(
+  connectionId: string,
+  path: string,
+  opts?: { newTab?: boolean },
+): string {
+  if (!opts?.newTab) {
+    const existing = tabsState.tabs.find(
+      (t) => t.kind === 'document' && t.connectionId === connectionId && t.path === path,
+    );
+    if (existing) {
+      activateTab(existing.id);
+      return existing.id;
+    }
+  }
+
+  const id = crypto.randomUUID();
+  const record: TabRecord = {
+    id,
+    connectionId,
+    path,
+    kind: 'document',
+    state: defaultDocumentTabState(),
+    order: tabsState.tabs.length,
+    active: true,
+  };
+  deactivateAll();
+  tabsState.tabs.push(record);
+  tabsState.activeId = id;
+  tabsState.hydrated.add(id);
+  saveNow();
+  return id;
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
   if (!source) return id;
 
   const newId = crypto.randomUUID();
-  const record: TabRecord =
-    source.kind === 'data'
-      ? {
-          id: newId,
-          connectionId: source.connectionId,
-          path: source.path,
-          kind: 'data',
-          state: defaultDataTabState(source.state.pageSize),
-          order: tabsState.tabs.length,
-          active: true,
-        }
-      : source.kind === 'ddl'
-        ? {
-            id: newId,
-            connectionId: source.connectionId,
-            path: source.path,
-            kind: 'ddl',
-            state: defaultDdlTabState(),
-            order: tabsState.tabs.length,
-            active: true,
-          }
-        : {
-            id: newId,
-            connectionId: source.connectionId,
-            path: source.path,
-            kind: 'console',
-            state: defaultConsoleTabState(),
-            order: tabsState.tabs.length,
-            active: true,
-          };
+  let record: TabRecord;
+  if (source.kind === 'data') {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'data',
+      state: defaultDataTabState(source.state.pageSize),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  } else if (source.kind === 'ddl') {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'ddl',
+      state: defaultDdlTabState(),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  } else if (source.kind === 'document') {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'document',
+      state: defaultDocumentTabState(),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  } else {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'console',
+      state: defaultConsoleTabState(),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  }
   deactivateAll();
   tabsState.tabs.push(record);
   tabsState.activeId = newId;
@@ -216,7 +278,7 @@ export function closeTab(id: string): void {
   const wasActive = tabsState.tabs[idx].active;
   tabsState.tabs.splice(idx, 1);
   tabsState.hydrated.delete(id);
-  dropForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
+  dropAllPagesForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   clearSelectedCellFor(id);
   clearPending(id);
 
@@ -236,7 +298,7 @@ export function closeOthers(id: string): void {
   for (const t of tabsState.tabs) {
     if (t.id !== id) {
       tabsState.hydrated.delete(t.id);
-      dropForTab(t.id);
+      dropAllPagesForTab(t.id);
       clearSelectedCellFor(t.id);
       clearPending(t.id);
     }
@@ -252,7 +314,7 @@ export function closeToTheRight(id: string): void {
   if (idx < 0) return;
   for (const t of tabsState.tabs.slice(idx + 1)) {
     tabsState.hydrated.delete(t.id);
-    dropForTab(t.id);
+    dropAllPagesForTab(t.id);
     clearSelectedCellFor(t.id);
     clearPending(t.id);
   }
@@ -267,7 +329,7 @@ export function closeToTheRight(id: string): void {
 export function closeAll(): void {
   for (const t of tabsState.tabs) {
     tabsState.hydrated.delete(t.id);
-    dropForTab(t.id);
+    dropAllPagesForTab(t.id);
     clearSelectedCellFor(t.id);
     clearPending(t.id);
   }
@@ -316,6 +378,13 @@ export function patchConsoleTabState(id: string, patch: Partial<ConsoleTabState>
   saveDebounced();
 }
 
+export function patchDocumentTabState(id: string, patch: Partial<DocumentTabState>): void {
+  const target = tabsState.tabs.find((t) => t.id === id);
+  if (target?.kind !== 'document') return;
+  Object.assign(target.state, patch);
+  saveDebounced();
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -341,6 +410,10 @@ export function findDataTab(id: string): DataTabRecord | null {
 
 export function findConsoleTab(id: string): ConsoleTabRecord | null {
   return asConsoleTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findDocumentTab(id: string): DocumentTabRecord | null {
+  return asDocumentTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));
