@@ -11,16 +11,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import { type BeautifyMode, beautify } from './beautify';
 import { decodeToText, encodeFromText } from './binary';
-import {
-  describeTimestamp,
-  describeValue,
-  detectFormat,
-  encodeTimestamp,
-  type FormatGuess,
-  fromDatetimeLocalValue,
-  parseTimestampValue,
-  toDatetimeLocalValue,
-} from './detect';
+import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
   CELL_FORMATS,
   type CellFormat,
@@ -29,6 +20,15 @@ import {
   FORMAT_LANGUAGE,
 } from './formats';
 import { overrideFor, readOnlyReasonFor, setOverride } from './state';
+import {
+  defaultShapeFor,
+  describeTimestamp,
+  encodeTimestamp,
+  fromDatetimeLocalValue,
+  parseTimestamp,
+  parseTimestampValue,
+  toDatetimeLocalValue,
+} from './timestamp';
 
 const cell = computed(() => cellSelectionState.current);
 
@@ -178,9 +178,13 @@ function onTimestampPick(e: Event): void {
   if (!value) return;
   const d = fromDatetimeLocalValue(value);
   if (!d) return;
-  const encoded = encodeTimestamp(effectiveFormat.value, d);
-  if (encoded === null) return;
-  doc.value = encoded;
+  // P24 D16: re-encode using the buffer's own shape (its separator, offset spelling and
+  // sub-second precision), not a fixed one — otherwise a Postgres `2024-01-15 10:23:45+00`
+  // came back `2024-01-15T11:00:00.000Z`, changing far more than the picked moment (F7c).
+  const shape =
+    parseTimestamp(effectiveFormat.value, doc.value)?.shape ??
+    defaultShapeFor(effectiveFormat.value as 'epochSeconds' | 'epochMillis' | 'iso8601');
+  doc.value = encodeTimestamp(shape, d);
   // Same reasoning as generateUuid: the picker sits outside `.editor-body`, so no focusout ever
   // reaches onEditorBlur — stage immediately rather than waiting on a blur that will never come.
   saveEdit();
