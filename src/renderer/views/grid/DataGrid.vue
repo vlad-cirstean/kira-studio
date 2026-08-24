@@ -275,14 +275,9 @@ onMounted(() => {
   }
   syncScrollState();
 });
-// The tab-id guard inside clearSelectedCellFor is load-bearing: MainView.vue keys DataView by
-// tab id, so switching tabs unmounts one grid and mounts another in an order that is not safe
-// to rely on. The guard means a late unmount here cannot clobber the freshly mounted tab's
-// publication, and an early one is corrected by the new grid's `immediate` publish watch below.
 onUnmounted(() => {
   resizeObserver?.disconnect();
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  clearSelectedCellFor(props.tabId);
   // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
   // tab is gone — clearing it just stops the timer firing against an unmounted component.
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);

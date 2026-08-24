@@ -411,13 +411,9 @@ onMounted(() => {
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
-// The tab-id guard inside clearSelectedCellFor is load-bearing here too (DataGrid.vue's own
-// note): MainView.vue keys DocumentView by tab id, so switching tabs unmounts one document view
-// and mounts another in an order this can't rely on.
 onUnmounted(() => {
   unregisterCommand?.();
   unregisterFindCommand?.();
-  clearSelectedCellFor(props.tab.id);
 });
 </script>
 

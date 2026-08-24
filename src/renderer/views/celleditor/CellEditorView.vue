@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
@@ -295,6 +295,15 @@ function saveEdit(): void {
 function onEditorBlur(): void {
   if (isEditable.value && isDirty.value) saveEdit();
 }
+
+// P26 OQ1: now that a backgrounded tab keeps its selection (commit 3) instead of losing it to a
+// stale slot, a dirty buffer's destruction on unmount would otherwise become unconditional —
+// mirrors onEditorBlur's own staging rule so switching tabs by keyboard (Ctrl+Tab, which moves no
+// focus and so never fires onEditorBlur) can no longer silently drop an in-flight edit. Staging is
+// not committing: the edit is still reversible via the grid's own Revert/Discard.
+onBeforeUnmount(() => {
+  if (isEditable.value && isDirty.value) saveEdit();
+});
 
 // Ctrl/Cmd+Enter alongside blur-to-stage, for staging without needing to move focus away —
 // mirrors the same chord's common meaning elsewhere (submit/run). Caught on the wrapping div:
