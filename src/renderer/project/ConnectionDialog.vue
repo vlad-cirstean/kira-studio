@@ -15,6 +15,7 @@ import EngineIcon from '../theme/EngineIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
+import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import ColorPicker from './ColorPicker.vue';
 
@@ -49,6 +50,9 @@ const kinds = connectionKindSchema.options;
 
 const draft = computed(() => connectionsState.dialog.draft);
 const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
+// P25 D8: reported once at startup (state/connections.ts's hydrateConnections()), never changes
+// for the life of the process.
+const secretStatus = computed(() => connectionsState.secretStorage);
 
 // P16 design system: NewConnection.html (step 1, pick the engine) and ConnectionDialog.html
 // (step 2, only that engine's fields) are two mockups for this one dialog — both steps live
@@ -187,7 +191,15 @@ async function onSave(): Promise<void> {
     return;
   }
   fieldErrors.value = {};
-  await saveDialog();
+  // P25 D7: cleared before every attempt so a retry doesn't show a stale failure from the last
+  // one while the new one is in flight; saveDialog() throws rather than returning null on
+  // failure (see its own comment), so catching here is the one place a failed save is handled.
+  connectionsState.dialog.error = null;
+  try {
+    await saveDialog();
+  } catch (err) {
+    connectionsState.dialog.error = err instanceof Error ? err.message : String(err);
+  }
 }
 
 const isValid = computed(() =>
@@ -440,9 +452,35 @@ const preconnectText = computed({
             </span>
           </label>
 
-          <p class="credential-warning">
-            Credentials are stored unencrypted in ~/.kira-studio/kira.sqlite.
+          <span
+            v-if="connectionsState.dialog.error"
+            class="field-error"
+            data-testid="connection-save-error"
+            >{{ connectionsState.dialog.error }}</span
+          >
+
+          <!-- P25 D8: three states driven by connectionsState.secretStorage, replacing the old
+               unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
+               none of them rather than guessing. -->
+          <p
+            v-if="secretStatus?.available && !secretStatus.insecureFallback"
+            class="credential-note"
+            data-testid="connection-credential-note"
+          >
+            Credentials are encrypted with your macOS Keychain.
           </p>
+          <MessageStrip
+            v-else-if="secretStatus?.insecureFallback"
+            tone="warn"
+            data-testid="connection-credential-note"
+          >
+            Development fallback: credentials on this platform are obfuscated with a built-in
+            key, not a real keychain.
+          </MessageStrip>
+          <MessageStrip v-else-if="secretStatus" tone="err" data-testid="connection-credential-note">
+            The macOS Keychain is unavailable, so passwords cannot be saved. Everything else
+            about this connection can be.
+          </MessageStrip>
       </div>
     </template>
 
@@ -624,8 +662,8 @@ const preconnectText = computed({
   font-size: var(--kira-t-xs);
 }
 
-.credential-warning {
-  color: var(--kira-warn);
+.credential-note {
+  color: var(--kira-fg-muted);
   font-size: var(--kira-t-xs);
 }
 

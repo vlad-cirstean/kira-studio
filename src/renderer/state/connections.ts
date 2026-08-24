@@ -13,6 +13,9 @@ export interface ConnectionDialogState {
   mode: 'create' | 'edit';
   editingId: string | null;
   draft: ConnectionInput | null;
+  /** A save failure (D7) or a reveal-on-open failure (D9) — the dialog shows both in the same
+   *  slot, cleared whenever the dialog is (re)opened or a save is retried. */
+  error: string | null;
 }
 
 export const connectionsState = reactive({
@@ -23,6 +26,7 @@ export const connectionsState = reactive({
     mode: 'create',
     editingId: null,
     draft: null,
+    error: null,
   } as ConnectionDialogState,
   // P25: reported once at startup and never changes for the life of the process — the
   // connection dialog's credential note (D8) reads this directly.
@@ -76,17 +80,26 @@ export function defaultDraft(): ConnectionInput {
 }
 
 export function openCreateDialog(): void {
-  connectionsState.dialog = { open: true, mode: 'create', editingId: null, draft: defaultDraft() };
+  connectionsState.dialog = {
+    open: true,
+    mode: 'create',
+    editingId: null,
+    draft: defaultDraft(),
+    error: null,
+  };
 }
 
 // D9: editing calls reveal() once and puts the secret in the draft's password field; if the
 // user never touches it, the draft still carries the real value here but the field renders
 // masked (ConnectionDialog.vue) and the plain three-state convention on save is unaffected —
-// the dialog always sends the *current* password value, never a sentinel for "unchanged".
+// the dialog always sends the *current* password value, never a sentinel for "unchanged". A
+// decrypt failure (a restored kira.sqlite from another machine, a reset login keychain) opens
+// the dialog anyway, with an empty password field and `error` set instead of throwing — the
+// caller here has no try/catch of its own, so a throw would silently no-op the Edit menu item.
 export async function openEditDialog(id: string): Promise<void> {
   const summary = connectionsState.records.find((r) => r.id === id);
   if (!summary) return;
-  const { password } = await control.connectionsReveal(id);
+  const { password, error } = await control.connectionsReveal(id);
   const {
     id: _id,
     sortOrder: _sortOrder,
@@ -99,6 +112,7 @@ export async function openEditDialog(id: string): Promise<void> {
     mode: 'edit',
     editingId: id,
     draft: { ...fields, password },
+    error,
   };
 }
 
@@ -107,6 +121,9 @@ export function closeDialog(): void {
   connectionsState.dialog.draft = null;
 }
 
+// D7: throws on a failed create/update rather than swallowing it into a returned null — the
+// dialog's own onSave() is the single place that decides what a failed save looks like, and it
+// only sees a rejection if this function never catches one.
 export async function saveDialog(): Promise<ConnectionSummary | null> {
   const { mode, editingId, draft } = connectionsState.dialog;
   if (!draft) return null;
