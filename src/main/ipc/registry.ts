@@ -2,6 +2,7 @@ import { registerAppHandlers } from './app';
 import { registerConnectionsHandlers } from './connections';
 import type { IpcDeps } from './deps';
 import { registerEngineHandlers } from './engine';
+import { registerFilesHandlers } from './files';
 import { registerFiltersHandlers } from './filters';
 import { registerLayoutHandlers } from './layout';
 import { registerOpsHandlers } from './ops';
@@ -14,6 +15,7 @@ export type { IpcDeps } from './deps';
 
 export function registerIpc(deps: IpcDeps): void {
   registerAppHandlers();
+  registerFilesHandlers();
   registerSettingsHandlers(deps);
   registerLayoutHandlers(deps);
   registerEngineHandlers(deps);

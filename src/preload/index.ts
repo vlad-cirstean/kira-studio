@@ -113,6 +113,9 @@ const kiraApi: KiraApi = {
     ipcRenderer.send(IPC.appFlushed);
   },
 
+  filesChooseSave: (args: { defaultName: string }) => ipcRenderer.invoke(IPC.filesChooseSave, args),
+  filesChooseOpen: () => ipcRenderer.invoke(IPC.filesChooseOpen),
+
   connectionsList: () => ipcRenderer.invoke(IPC.connectionsList),
   connectionsCreate: (input: ConnectionInput) => ipcRenderer.invoke(IPC.connectionsCreate, input),
   connectionsUpdate: (args: { id: string; input: ConnectionInput }) =>

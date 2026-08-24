@@ -41,6 +41,9 @@ export const IPC = {
   appFlushBeforeClose: 'kira:app:flush-before-close',
   appFlushed: 'kira:app:flushed',
 
+  filesChooseSave: 'kira:files:chooseSave',
+  filesChooseOpen: 'kira:files:chooseOpen',
+
   connectionsList: 'kira:connections:list',
   connectionsCreate: 'kira:connections:create',
   connectionsUpdate: 'kira:connections:update',
@@ -116,6 +119,16 @@ export interface TreeDefinitionResult {
   source: 'cache' | 'server';
 }
 
+export interface FilesChooseSaveResult {
+  canceled: boolean;
+  filePath: string | null;
+}
+
+export interface FilesChooseOpenResult {
+  canceled: boolean;
+  file: { path: string; name: string; size: number } | null;
+}
+
 export interface KiraApi {
   appInfo(): Promise<AppInfo>;
   settingsGetAll(): Promise<Settings>;
@@ -141,6 +154,9 @@ export interface KiraApi {
   // still pending when the user quits is never silently lost.
   onFlushBeforeClose(cb: () => void): () => void;
   appFlushed(): void;
+
+  filesChooseSave(args: { defaultName: string }): Promise<FilesChooseSaveResult>;
+  filesChooseOpen(): Promise<FilesChooseOpenResult>;
 
   connectionsList(): Promise<ConnectionSummary[]>;
   connectionsCreate(input: ConnectionInput): Promise<ConnectionSummary>;

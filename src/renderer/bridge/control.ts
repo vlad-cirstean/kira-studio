@@ -21,6 +21,8 @@ import type {
   AppInfo,
   ConnectionTestResult,
   EngineStatus,
+  FilesChooseOpenResult,
+  FilesChooseSaveResult,
   TreeChildrenResult,
   TreeDefinitionResult,
   TreeDescribeResult,
@@ -60,6 +62,10 @@ export const control = {
   onViewRunAll: (cb: () => void): (() => void) => kira.onViewRunAll(cb),
   onFlushBeforeClose: (cb: () => void): (() => void) => kira.onFlushBeforeClose(cb),
   appFlushed: (): void => kira.appFlushed(),
+
+  filesChooseSave: (defaultName: string): Promise<FilesChooseSaveResult> =>
+    kira.filesChooseSave({ defaultName }),
+  filesChooseOpen: (): Promise<FilesChooseOpenResult> => kira.filesChooseOpen(),
 
   connectionsList: (): Promise<ConnectionSummary[]> => kira.connectionsList(),
   connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>
