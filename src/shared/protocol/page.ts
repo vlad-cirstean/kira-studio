@@ -100,11 +100,13 @@ export interface DocumentPage {
  *
  * P17 reuses this exact shape for a single s3 object (`redisType: 'object'`): `fields`/`values`
  * carry the object's metadata (ContentType, ContentLength, LastModified, ETag, StorageClass, ...)
- * plus a synthetic `Body` row for its (possibly truncated) text content — a flat field/value
- * listing is exactly what a hash-like key already renders, and s3's own tree (bucket → prefix →
- * object, '/'-delimited) already mirrors redis's own namespace tree (db → namespace, ':'-
- * delimited) closely enough that browsing one object's contents needs no new page kind. `ttlMs`/
- * `memoryBytes` are always null for an s3 object — neither concept exists there.
+ * plus, for an object at or under `OBJECT_BODY_PREVIEW_BYTES` (P33 D4), a synthetic `Body` row for
+ * its (possibly truncated) text content — a flat field/value listing is exactly what a hash-like
+ * key already renders, and s3's own tree (bucket → prefix → object, '/'-delimited) already mirrors
+ * redis's own namespace tree (db → namespace, ':'-delimited) closely enough that browsing one
+ * object's contents needs no new page kind. `ttlMs` is always null for an s3 object (no such
+ * concept there); `memoryBytes` (P33 D5) carries the object's real `ContentLength` instead —
+ * `KeyValueView.vue`'s existing size badge and its edit-size gate both read it from here.
  */
 export interface KeyValuePage {
   kind: 'keyvalue';

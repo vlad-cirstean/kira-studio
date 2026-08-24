@@ -8,19 +8,12 @@ import {
 import {
   createKeyValuePageBuilder,
   type KeyValuePage,
+  OBJECT_BODY_PREVIEW_BYTES,
   type PagePosition,
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapS3Error } from './errors';
-
-// A hard ceiling on how much of an object's body this will ever buffer into memory before giving
-// up on previewing it — well above the page-builder's own 4MB display truncation (page.ts's
-// DOCUMENT_TRUNCATE_BYTES_SINGLE, reused here via singleRow) so a moderately large text object
-// (a multi-MB JSON export, a log file) still previews in full up to that display budget, without
-// this adapter ever attempting to buffer, say, a multi-GB video object just to throw most of it
-// away a moment later.
-const MAX_BODY_DOWNLOAD_BYTES = 32 * 1024 * 1024;
 
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -81,16 +74,20 @@ export async function readObject(
   const builder = createKeyValuePageBuilder({
     redisType: 'object',
     ttlMs: null,
-    memoryBytes: null,
+    // P33 D5: an object's ContentLength *is* "how many bytes this item is" — the same question
+    // memoryBytes answers for a redis key. KeyValueView.vue's size badge and the edit-size gate
+    // both read it from here.
+    memoryBytes: head.ContentLength ?? null,
     singleRow: true,
   });
 
-  if (head.ContentLength !== undefined && head.ContentLength > MAX_BODY_DOWNLOAD_BYTES) {
+  // P33 D4: one number governs fetch, decode and render alike — above it nothing is transferred
+  // and no Body row exists at all (not a notice-as-value: F4 found the old 32 MB tier's "(too
+  // large to preview...)" string indistinguishable from real content on the wire). The renderer
+  // gates its own over-limit strip on the row's absence plus a known memoryBytes, the same shared
+  // constant, not a parsed string. Download exists for exactly this case now.
+  if (head.ContentLength === undefined || head.ContentLength > OBJECT_BODY_PREVIEW_BYTES) {
     pushMetadataFields(builder, head);
-    builder.push(
-      'Body',
-      `(too large to preview — ${formatBytes(head.ContentLength)}, over the ${formatBytes(MAX_BODY_DOWNLOAD_BYTES)} preview limit)`,
-    );
   } else {
     let res: GetObjectCommandOutput;
     try {
@@ -149,11 +146,13 @@ export async function countObject(
     throw mapS3Error(err);
   }
   // ContentType/ContentLength/LastModified/ETag are effectively always present on a real object;
-  // StorageClass is the only field readObject() may skip. The Body row itself is pushed for any
-  // object with a known length — including an empty (0-byte) one, which still has an (empty)
-  // body stream — so this counts on ContentLength being *defined*, not merely truthy.
+  // StorageClass is the only field readObject() may skip. P33 D4: the Body row itself is pushed
+  // only when readObject() would actually fetch and decode one — a known length at or under
+  // OBJECT_BODY_PREVIEW_BYTES — including an empty (0-byte) object, which still has an (empty)
+  // body stream. An over-limit or unknown-length object gets no Body row from either function, so
+  // Count and the visible row count never disagree (F6).
   let value = 4 + Object.keys(res.Metadata ?? {}).length;
   if (res.StorageClass) value++;
-  if (res.ContentLength !== undefined) value++;
+  if (res.ContentLength !== undefined && res.ContentLength <= OBJECT_BODY_PREVIEW_BYTES) value++;
   return { value, exact: true };
 }
