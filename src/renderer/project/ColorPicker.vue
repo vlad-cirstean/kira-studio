@@ -54,10 +54,20 @@ const colors = connectionColorSchema.options;
   outline-offset: 2px;
 }
 
-/* 'no colour' is a hollow ring rather than a hue, same visual as the tree/tab/toolbar rail's own
-   .p-conn-dot.none — never a 13th hue standing in for "nothing chosen". */
+/* P31 D26/F26: an outlined swatch with a diagonal slash — never a 13th hue standing in for
+   "nothing chosen". A plain hollow ring (the previous look) read, beside twelve saturated
+   circles on a dark surface, as "a very dark thirteenth colour" rather than "no colour"; the
+   slash is the universal "none" mark and unmistakable even at 16px. Ring brightened from
+   --kira-fg-disabled to --kira-fg-muted to read as deliberate rather than merely dim.
+   .p-conn-dot.none (the 5px rail dot elsewhere) is a status dot, not a choice, and is untouched. */
 .swatch.none {
-  border: 1.5px solid var(--kira-fg-disabled);
-  background: transparent;
+  border: 1.5px solid var(--kira-fg-muted);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
 }
 </style>

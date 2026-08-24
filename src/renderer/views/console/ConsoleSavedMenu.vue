@@ -112,7 +112,9 @@ async function saveCurrent(): Promise<void> {
     @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <span class="entry-name">{{ entry.name }}</span>
+      <!-- P31 D27/F27: full, untruncated text — same reasoning as grid/FilterHistoryMenu.vue's
+           own note (the 320px popover is structurally too narrow for a saved query's full text). -->
+      <span class="entry-name" v-tooltip="`${entry.name}\n${entry.body.text}`">{{ entry.name }}</span>
     </template>
     <template #entry-actions="{ entry }">
       <IconButton icon="edit" v-tooltip="'Rename'" @click.stop="rename(entry)" />

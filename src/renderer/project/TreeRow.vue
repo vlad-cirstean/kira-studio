@@ -95,12 +95,16 @@ function onContextMenu(e: MouseEvent): void {
   >
     <div class="p-tree-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
 
+    <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
+         drawn by the chevron direction, and it fires on the single most-hovered control in the
+         panel — no v-tooltip. :aria-label stays: the app's tooltip directive mirrors into
+         aria-label only when a control has no accessible name otherwise, so dropping both would
+         leave this button nameless. -->
     <button
       type="button"
       class="twisty"
       :class="{ invisible: !row.hasChildren }"
       tabindex="-1"
-      v-tooltip="row.expanded ? 'Collapse' : 'Expand'"
       :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >

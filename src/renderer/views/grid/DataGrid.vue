@@ -3,6 +3,7 @@ import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
+import { typeDescription } from '../../project/typeGlossary';
 import { shortcutFor } from '../../shortcuts/keys';
 import {
   clearSelectedCellFor,
@@ -85,11 +86,15 @@ const columnMetaByName = computed(() => {
 
 // Header hover: data type always (falls back to the page's own descriptor if DESCRIBE metadata
 // hasn't loaded yet), plus the column's DB comment when it has one.
+// P31 D29/F29: name, then dataType, then the glossary description (if any), then the DB comment
+// (if any), each on its own line — the header is where a type is actually read while working;
+// AppTooltip is pre-wrap, so this renders as one line per populated field.
 function headerTitleFor(name: string): string {
   const meta = columnMetaByName.value.get(name);
   const dataType = meta?.dataType ?? columnByName.value.get(name)?.dataType ?? '';
+  const description = dataType ? typeDescription(dataType) : null;
   const comment = meta?.comment;
-  return comment ? `${dataType} — ${comment}` : dataType;
+  return [name, dataType, description, comment].filter((line) => !!line).join('\n');
 }
 
 // P31 D11: a font change drops columns.ts's memoized measuring context (so the next measurement

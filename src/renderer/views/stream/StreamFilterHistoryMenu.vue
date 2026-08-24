@@ -81,7 +81,9 @@ function remove(entry: StreamFilterHistoryEntry): void {
     @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <span class="entry-name mono">{{ summarize(entry) }}</span>
+      <!-- P31 D27/F27: full, untruncated text — same reasoning as grid/FilterHistoryMenu.vue's
+           own note (the 320px popover is structurally too narrow for a long summary). -->
+      <span class="entry-name mono" v-tooltip="summarize(entry)">{{ summarize(entry) }}</span>
     </template>
   </SavedListMenu>
 </template>

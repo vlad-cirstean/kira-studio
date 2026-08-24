@@ -155,8 +155,21 @@ async function saveCurrent(): Promise<void> {
     @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <span v-if="isSaved(entry)" class="entry-name">{{ entry.name }}</span>
-      <span v-else class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
+      <!-- P31 D27/F27: full, untruncated text — the popover is 320px and a WHERE/ORDER BY clause
+           routinely isn't, so truncation here is structural, not a sizing accident. AppTooltip is
+           already max-width: 320px; white-space: pre-wrap, so a long clause wraps instead. -->
+      <span
+        v-if="isSaved(entry)"
+        class="entry-name"
+        v-tooltip="`${entry.name}\n${summarize(entry.body.where, entry.body.orderBy)}`"
+        >{{ entry.name }}</span
+      >
+      <span
+        v-else
+        class="entry-name mono"
+        v-tooltip="summarize(entry.where, entry.orderBy)"
+        >{{ summarize(entry.where, entry.orderBy) }}</span
+      >
     </template>
     <template #entry-actions="{ entry }">
       <IconButton
