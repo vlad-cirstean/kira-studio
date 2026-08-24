@@ -2,12 +2,10 @@
 import type { SortSpec } from '@shared/domain/queries';
 import type { DocumentTabRecord, DocumentTabState } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
-import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { clearSelectedCellFor, publishSelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -403,48 +401,6 @@ function onCollapseAll(): void {
 function onRowClick(i: number): void {
   selectRow(props.tab.id, i);
 }
-
-// Publishes the cell editor's target (cellSelection.ts's "P8/P10 publish into the same slot" —
-// this is P8's). A clicked document publishes its full EJSON body rather than one field within
-// it: DocumentView.vue already renders the whole body as one unit, so the document itself is the
-// natural grain to hand the cell editor, and it's the one place a truncated body's full 64 KB is
-// worth seeing formatted. `column` is synthetic — a document has no ColumnDescriptor of its own —
-// built with `typeClass: 'json'` so the cell editor's format detector opens it pretty-printed by
-// default, and `isPrimaryKey: true` since `_id` is exactly that.
-// P27 D30 note: this watch (and the panel it feeds) is scheduled to be removed once this phase's
-// commit 8 lands — Mongo has no real use for the cell editor here, and the row's own edit area
-// (commit 7) takes over editing entirely. Left as-is in this commit, matching the plan's own
-// per-commit boundary.
-watch(
-  [() => rt.value?.selectedRow, () => pageVersion.n, () => props.tab.id],
-  () => {
-    const row = rt.value?.selectedRow;
-    const doc = row === null || row === undefined ? null : documentRow(props.tab.id, row);
-    if (row === null || row === undefined || !doc) {
-      clearSelectedCellFor(props.tab.id);
-      return;
-    }
-    const column: ColumnDescriptor = {
-      name: 'document',
-      dataType: 'document',
-      typeClass: 'json',
-      nullable: false,
-      isPrimaryKey: true,
-    };
-    publishSelectedCell({
-      tabId: props.tab.id,
-      connectionId: props.tab.connectionId,
-      path: props.tab.path,
-      columnIndex: 0,
-      column,
-      row,
-      value: doc.body,
-      truncated: doc.isTruncated,
-      hasPrimaryKey: true,
-    });
-  },
-  { immediate: true },
-);
 
 let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
