@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import type { KeyValueTabRecord, KeyValueTabState } from '@shared/domain/tabs';
-import { decodePath, pathTail } from '@shared/domain/tree';
-import type { ColumnDescriptor } from '@shared/protocol/page';
+import { decodePath, pathParent, pathTail } from '@shared/domain/tree';
+import {
+  type ColumnDescriptor,
+  OBJECT_BODY_EDIT_BYTES,
+  OBJECT_BODY_PREVIEW_BYTES,
+} from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
+import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
@@ -27,6 +33,7 @@ import { keyValueMenu } from './keyValueMenu';
 import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
 import { matchedRows, searchState } from './kvSearch';
+import ObjectBodyEditor from './ObjectBodyEditor.vue';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -167,15 +174,30 @@ function writeDisabledReason(capFlag: boolean | undefined): string {
   return capFlag === false ? 'Not supported for this connection type' : 'Connection is read-only';
 }
 const editTitle = computed(() => {
+  if (page.value?.redisType === 'object') return objectEditGate.value.reason;
   if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate);
   if (!editableType.value) return 'Only string values are editable in this version';
   return 'Edit value';
 });
-const addTitle = computed(() =>
-  canInsert.value ? 'Add a new key' : writeDisabledReason(caps.value?.canInsert),
+const editDisabled = computed(() =>
+  page.value?.redisType === 'object'
+    ? !objectEditGate.value.editable
+    : !canUpdate.value || !editableType.value,
 );
-const deleteTitle = computed(() =>
-  canDelete.value ? 'Delete this key' : writeDisabledReason(caps.value?.canDelete),
+const addTitle = computed(() => {
+  if (page.value?.redisType === 'object') {
+    return canInsert.value ? 'Upload a file' : writeDisabledReason(caps.value?.canInsert);
+  }
+  return canInsert.value ? 'Add a new key' : writeDisabledReason(caps.value?.canInsert);
+});
+const deleteTitle = computed(() => {
+  if (page.value?.redisType === 'object') {
+    return canDelete.value ? 'Delete this object' : writeDisabledReason(caps.value?.canDelete);
+  }
+  return canDelete.value ? 'Delete this key' : writeDisabledReason(caps.value?.canDelete);
+});
+const downloadTitle = computed(() =>
+  canDownload.value ? 'Download this object' : 'Not supported for this connection type',
 );
 
 // The S3 object page's field/value listing is always exactly and only what read.ts pushed —
@@ -183,6 +205,70 @@ const deleteTitle = computed(() =>
 // paginate") — so the pager/page-size controls below would just be permanently-disabled dead
 // chrome for it, the same call StreamView.vue's isBatch makes for SQS's own non-paginating mode.
 const isSingleObjectPage = computed(() => page.value?.redisType === 'object');
+const canDownload = computed(() => !!caps.value?.fileTransfer);
+
+// P33 D4: the Body row is present only when the object is at or under OBJECT_BODY_PREVIEW_BYTES —
+// scanning the small, already-loaded field list for it (never a second fetch) is how the view
+// tells "too large to preview" apart from "this object genuinely has no readable body".
+function objectBodyRowFor(p: typeof page.value): { value: string; isTruncated: boolean } | null {
+  if (p?.redisType !== 'object') return null;
+  for (let i = 0; i < p.rowCount; i++) {
+    const row = rowAt(i);
+    if (row?.field === 'Body') return { value: row.value, isTruncated: row.isTruncated };
+  }
+  return null;
+}
+const objectBodyRow = computed(() => objectBodyRowFor(page.value));
+
+function objectContentType(p: typeof page.value): string {
+  if (!p) return '';
+  for (let i = 0; i < p.rowCount; i++) {
+    const row = rowAt(i);
+    if (row?.field === 'ContentType') return row.value;
+  }
+  return '';
+}
+const objectEditorLanguage = computed<EditorLanguageId>(() => {
+  const contentType = objectContentType(page.value);
+  if (/json/i.test(contentType)) return 'json';
+  if (/xml|html/i.test(contentType)) return 'xml';
+  return 'plain';
+});
+
+// P33 D6/D7: the whole of the edit-size decision, in one computed — every reason names the
+// actual number or the actual condition, never a silently-disabled control with no explanation.
+interface ObjectEditGate {
+  editable: boolean;
+  reason: string;
+}
+const objectEditGate = computed<ObjectEditGate>(() => {
+  if (!canUpdate.value)
+    return { editable: false, reason: writeDisabledReason(caps.value?.canUpdate) };
+  const bodyRow = objectBodyRow.value;
+  if (bodyRow === null) {
+    return { editable: false, reason: 'Too large to edit — download it to open it locally' };
+  }
+  if (bodyRow.isTruncated) {
+    return {
+      editable: false,
+      reason: 'Only part of this object was fetched — editing it would overwrite the rest',
+    };
+  }
+  if (bodyRow.value.includes('�')) {
+    return {
+      editable: false,
+      reason: "This object isn't valid UTF-8 text — download it to edit it locally",
+    };
+  }
+  const size = page.value?.memoryBytes ?? null;
+  if (size !== null && size > OBJECT_BODY_EDIT_BYTES) {
+    return {
+      editable: false,
+      reason: `Too large to edit (${formatBytes(size)} — the limit is ${formatBytes(OBJECT_BODY_EDIT_BYTES)})`,
+    };
+  }
+  return { editable: true, reason: 'Edit value' };
+});
 
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
 // immediately on Save (no staged/pending edit set — mirrors documentMutations.ts). -----------
@@ -192,6 +278,12 @@ const editSaving = ref(false);
 const editError = ref<string | null>(null);
 
 function openEdit(): void {
+  if (isSingleObjectPage.value) {
+    if (!objectEditGate.value.editable) return;
+    editError.value = null;
+    editOpen.value = true;
+    return;
+  }
   if (!canUpdate.value || !editableType.value) return;
   addOpen.value = false;
   editDraft.value = rowAt(0)?.value ?? '';
@@ -217,15 +309,36 @@ async function saveEdit(): Promise<void> {
 }
 
 // --- delete: type-agnostic (DEL works for any of the six types) — confirmed inline, mirrors
-// documentMenu.ts's window.confirm() precedent for a destructive, un-staged action. -----------
+// documentMenu.ts's window.confirm() precedent for a destructive, un-staged action. S3's object
+// delete rides state/objectStore.ts's deleteObject() instead of keyValueMutations' deleteKey(),
+// since it needs the object's whole path (not just its key name) to satisfy s3/mutate.ts's
+// bucket-rooted MutationPlan.path. ----------------------------------------------------------
 async function onDeleteKey(): Promise<void> {
   if (!canDelete.value || !keyName.value) return;
-  if (!window.confirm(`Delete key "${keyName.value}"? This removes the entire key.`)) return;
+  const label = isSingleObjectPage.value ? 'object' : 'key';
+  if (!window.confirm(`Delete ${label} "${keyName.value}"? This removes the entire ${label}.`)) {
+    return;
+  }
+  if (isSingleObjectPage.value) {
+    if (!props.tab.connectionId) return;
+    await deleteObject(props.tab.connectionId, props.tab.path, props.tab.id);
+    await reload(props.tab.id);
+    return;
+  }
   await deleteKey(props.tab.id, keyName.value);
 }
 
+// --- download: a read, never blocked by read-only (D18) — enabled regardless of canUpdate/
+// canDelete/canInsert, gated only on caps.fileTransfer. ---------------------------------------
+async function onDownload(): Promise<void> {
+  if (!canDownload.value || !props.tab.connectionId) return;
+  await downloadObject(props.tab.connectionId, props.tab.path, props.tab.id);
+}
+
 // --- add key popover: name + initial value, string-typed only (same D2 as edit). On success
-// the new key opens in its own tab — this tab is still showing a different, still-live key. ---
+// the new key opens in its own tab — this tab is still showing a different, still-live key.
+// For an S3 object page, Add instead opens the upload dialog (state/objectStore.ts) targeting
+// this object's own container — pathParent(tab.path), the bucket or prefix it lives under. ---
 const addOpen = ref(false);
 const addName = ref('');
 const addValue = ref('');
@@ -234,6 +347,11 @@ const addError = ref<string | null>(null);
 
 function openAdd(): void {
   if (!canInsert.value) return;
+  if (isSingleObjectPage.value) {
+    if (!props.tab.connectionId) return;
+    openUploadDialog(props.tab.connectionId, pathParent(props.tab.path) ?? '');
+    return;
+  }
   addName.value = '';
   addValue.value = '';
   addError.value = null;
@@ -265,6 +383,7 @@ function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
   e.preventDefault();
   const p = page.value;
   if (!p) return;
+  const isObject = p.redisType === 'object';
   openContextMenu(
     e,
     keyValueMenu({
@@ -273,12 +392,22 @@ function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
       redisType: p.redisType,
       canUpdate: canUpdate.value,
       canDelete: canDelete.value,
+      canDownload: canDownload.value,
+      editable: isObject ? objectEditGate.value.editable : p.redisType === 'string',
+      editUnavailableLabel: isObject
+        ? objectEditGate.value.reason
+        : 'Edit value (string keys only)',
       onEdit: () => {
+        if (isObject) {
+          openEdit();
+          return;
+        }
         editDraft.value = value;
         editError.value = null;
         editOpen.value = true;
       },
       onDelete: () => void onDeleteKey(),
+      onDownload: () => void onDownload(),
     }),
   );
 }
@@ -405,9 +534,10 @@ onUnmounted(() => {
       <template #badges>
         <template v-if="page">
           <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
-          <!-- TTL/memory are Redis-only concepts (always null for an S3 object — read.ts never
-               computes either) — showing "no expiry"/"unknown" for every object would just be
-               two permanently-meaningless badges, not real information. -->
+          <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
+               it) — showing "no expiry" for every object would be a permanently-meaningless chip,
+               not real information. Memory/size (P33 D5) is real for both: read.ts now sets
+               memoryBytes to the object's own ContentLength. -->
           <template v-if="!isSingleObjectPage">
             <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                  vanish should look like one (see the mockup's KeyValue.html). -->
@@ -415,8 +545,8 @@ onUnmounted(() => {
               <CodiconIcon name="history" :size="13" />
               {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
             </span>
-            <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
           </template>
+          <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
           <span v-if="connRecord" class="p-badge">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</span>
         </template>
       </template>
@@ -518,11 +648,16 @@ onUnmounted(() => {
             <IconButton
               icon="edit"
               data-testid="keyvalue-edit"
-              :disabled="!canUpdate || !editableType"
+              :disabled="editDisabled"
               v-tooltip="editTitle"
               @click="openEdit"
             />
-            <PopoverPanel v-if="editOpen" test-id="keyvalue-edit-popover" :width="320" @close="closeEdit">
+            <PopoverPanel
+              v-if="editOpen && !isSingleObjectPage"
+              test-id="keyvalue-edit-popover"
+              :width="320"
+              @close="closeEdit"
+            >
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
                 <TextField
@@ -557,6 +692,14 @@ onUnmounted(() => {
           />
 
           <IconButton
+            v-if="canDownload"
+            icon="cloud-download"
+            data-testid="keyvalue-download"
+            v-tooltip="downloadTitle"
+            @click="onDownload"
+          />
+
+          <IconButton
             icon="search"
             :active="!!rt?.searchOpen"
             v-tooltip="'Search this page'"
@@ -570,6 +713,17 @@ onUnmounted(() => {
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
           {{ rt.error.message }}
         </MessageStrip>
+        <!-- P33 D4: an object over OBJECT_BODY_PREVIEW_BYTES has no Body row at all — this is the
+             renderer's own honest explanation of that absence, gated on the same shared constant
+             the adapter used, not a parsed string. -->
+        <MessageStrip
+          v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
+          tone="warn"
+          data-testid="keyvalue-object-too-large"
+        >
+          Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
+          {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
+        </MessageStrip>
       </template>
 
       <KeyValueSearchToolbar
@@ -579,7 +733,18 @@ onUnmounted(() => {
         @close="onCloseSearch"
       />
 
-      <div class="p-panel table-panel">
+      <!-- P33 D8: reuses editOpen (Redis's own popover-open flag) rather than a second ref —
+           when it's true on an object page, this inline band replaces the field/value table
+           instead of the popover. -->
+      <ObjectBodyEditor
+        v-if="editOpen && isSingleObjectPage"
+        :tab-id="tab.id"
+        :object-key="keyName"
+        :initial="objectBodyRow?.value ?? ''"
+        :language="objectEditorLanguage"
+        @close="closeEdit"
+      />
+      <div v-else class="p-panel table-panel">
         <div class="p-thead">
           <div class="p-th gutter kv-col-gutter"></div>
           <div class="p-th kv-col-field">

@@ -1,5 +1,5 @@
 import { connectionColorSchema } from '@shared/domain/connection';
-import { decodePath } from '@shared/domain/tree';
+import { decodePath, pathParent } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
@@ -15,6 +15,7 @@ import {
   setConnectionReadOnly,
 } from '../state/connections';
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
+import { deleteObject, downloadObject, openUploadDialog } from '../state/objectStore';
 import {
   activeTab,
   findDataTab,
@@ -75,12 +76,13 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'collection':
       return collectionMenu(row);
     case 'namespace':
-    case 'prefix':
       return namespaceMenu(row);
+    case 'prefix':
+      return prefixMenu(row);
     case 'key':
       return keyMenu(row);
     case 'bucket':
-      return containerMenu(row);
+      return bucketMenu(row);
     case 'object':
       return objectMenu(row);
     case 'topic':
@@ -284,6 +286,30 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
     ...consoleMenuItem(row),
     ...setAsDefaultMenuItem(row),
   ];
+}
+
+// P33 D3: shared by bucketMenu/prefixMenu, mirroring consoleMenuItem's own one-gating-rule/
+// two-call-sites shape — offered only when the connection's caps say so (fileTransfer + canInsert)
+// and it isn't read-only, never a permanently disabled row.
+function uploadMenuItem(row: TreeRowVm): MenuItem[] {
+  const caps = connectionsState.states[row.connectionId]?.caps;
+  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  if (!caps?.fileTransfer || !caps.canInsert || record?.readOnly) return [];
+  return [
+    {
+      type: 'item',
+      id: 'upload-file',
+      label: 'Upload file…',
+      icon: 'cloud-upload',
+      run: () => openUploadDialog(row.connectionId, row.path),
+    },
+  ];
+}
+
+// P17's S3 bucket row: containerMenu (same as a SQL database/schema) plus P33's Upload — the
+// empty-bucket case (no object row to open one from) needs a tree entry point of its own.
+function bucketMenu(row: TreeRowVm): MenuItem[] {
+  return [...containerMenu(row), ...uploadMenuItem(row)];
 }
 
 // §8.10's own ordering: Open data / Open data in new tab come first, before Refresh.
@@ -491,6 +517,13 @@ function namespaceMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
+// P33: an S3 prefix gains Upload alongside namespaceMenu's own minimal shape — same gate as
+// bucketMenu's (uploadMenuItem), so a nested "folder" is as valid an upload target as the bucket
+// root.
+function prefixMenu(row: TreeRowVm): MenuItem[] {
+  return [...namespaceMenu(row), ...uploadMenuItem(row)];
+}
+
 // P9's key leaf: minimal open/copy-name only (D14) — no edit/delete rows anywhere, per the
 // read-only scope decision (D2). No separate "copy qualified name": a key node's `name` is
 // already the complete literal Redis key (D3), so it would just duplicate "Copy name".
@@ -526,13 +559,14 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P17's S3 object leaf: same shape as keyMenu (open/open-in-new-tab/copy-name, no edit/delete —
-// caps.canUpdate/canDelete are both false for S3 this phase). No separate "copy qualified name"
-// either, for the same reason keyMenu skips it: an object node's `name` is already the full S3
-// key verbatim (s3/catalog.ts, mirroring keyMenu's own key-name reasoning), so it would just
-// duplicate "Copy name".
+// P17's S3 object leaf: open/open-in-new-tab/copy-name (no separate "copy qualified name" — an
+// object node's `name` is already the full S3 key verbatim, s3/catalog.ts, mirroring keyMenu's
+// own key-name reasoning, so it would just duplicate "Copy name"), plus P33's Download and Delete,
+// each gated on the connection's own caps/read-only state rather than shown permanently disabled.
 function objectMenu(row: TreeRowVm): MenuItem[] {
-  return [
+  const caps = connectionsState.states[row.connectionId]?.caps;
+  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  const items: MenuItem[] = [
     {
       type: 'item',
       id: 'open-keyvalue',
@@ -561,6 +595,37 @@ function objectMenu(row: TreeRowVm): MenuItem[] {
       run: () => copyText(row.name),
     },
   ];
+
+  if (caps?.fileTransfer) {
+    items.push({ type: 'separator' });
+    items.push({
+      type: 'item',
+      id: 'download-object',
+      label: 'Download…',
+      icon: 'cloud-download',
+      run: () => void downloadObject(row.connectionId, row.path, null),
+    });
+  }
+
+  if (caps?.canDelete && !record?.readOnly) {
+    items.push({ type: 'separator' });
+    items.push({
+      type: 'item',
+      id: 'delete-object',
+      label: 'Delete',
+      icon: 'trash',
+      danger: true,
+      shortcut: 'tree.delete',
+      run: async () => {
+        if (!window.confirm(`Delete object "${row.name}"? This cannot be undone.`)) return;
+        await deleteObject(row.connectionId, row.path, null);
+        const parent = pathParent(row.path);
+        if (parent !== null) await refresh(row.connectionId, parent);
+      },
+    });
+  }
+
+  return items;
 }
 
 // P10's topic/queue leaf: minimal open/copy-name only (D13), same discipline as keyMenu — no
