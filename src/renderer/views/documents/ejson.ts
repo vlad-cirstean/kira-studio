@@ -7,6 +7,7 @@
 // `JSON.parse` never rounds a BSON integer through a lossy JS `number` the way it would for the SQL
 // cell editor's raw numeric literals (`beautify.ts`'s reason for a hand-written scanner there) —
 // plain `JSON.parse` is exact here.
+import type { BeautifyMode, BeautifyResult } from '../../beautify';
 
 export type DocNodeKind = 'object' | 'array' | 'scalar';
 
@@ -328,6 +329,279 @@ export function toShellText(body: string): string {
   const root = parseDocument(body);
   if (!root) return body;
   return shellNodeText(root, 0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Beautify/Minify for the document editor's shell-literal buffer (P27 D29). `beautify.ts`'s own
+// JSON scanner can't reindent this text — a shell constructor call (`ObjectId("…")`) isn't valid
+// JSON — so this is a small sibling scanner: the same lossless-raw-slice discipline, plus one more
+// literal kind, a call expression, captured whole and never interpreted. Beautify/Minify reindent
+// the buffer; they never re-serialise it or change a type.
+// ---------------------------------------------------------------------------------------------
+
+type ShellNode =
+  | { kind: 'literal'; raw: string }
+  | { kind: 'object'; members: { keyRaw: string; value: ShellNode }[] }
+  | { kind: 'array'; items: ShellNode[] };
+
+class ShellScanError extends Error {
+  constructor(readonly offset: number) {
+    super(`invalid document text at offset ${offset}`);
+  }
+}
+
+interface ShellCursor {
+  text: string;
+  i: number;
+}
+
+function isShellWs(c: string | undefined): boolean {
+  return c === ' ' || c === '\t' || c === '\n' || c === '\r';
+}
+
+function skipShellWs(c: ShellCursor): void {
+  while (isShellWs(c.text[c.i])) c.i++;
+}
+
+function parseShellString(c: ShellCursor): string {
+  const start = c.i;
+  const quote = c.text[c.i];
+  if (quote !== '"' && quote !== "'") throw new ShellScanError(c.i);
+  c.i++;
+  while (c.i < c.text.length && c.text[c.i] !== quote) {
+    if (c.text[c.i] === '\\') c.i++;
+    c.i++;
+  }
+  if (c.i >= c.text.length) throw new ShellScanError(c.i);
+  c.i++;
+  return c.text.slice(start, c.i);
+}
+
+function parseShellNumber(c: ShellCursor): string {
+  const start = c.i;
+  if (c.text[c.i] === '-') c.i++;
+  while (/[0-9.eE+-]/.test(c.text[c.i] ?? '')) c.i++;
+  if (c.i === start) throw new ShellScanError(c.i);
+  return c.text.slice(start, c.i);
+}
+
+function parseShellIdentWord(c: ShellCursor): string {
+  const start = c.i;
+  while (/[A-Za-z0-9_$]/.test(c.text[c.i] ?? '')) c.i++;
+  return c.text.slice(start, c.i);
+}
+
+// A constructor call's argument is opaque to this scanner — it only has to find the matching
+// close paren (tracking nested parens and quoted strings), never interpret what's inside.
+function parseShellCall(c: ShellCursor, identStart: number): string {
+  let depth = 0;
+  let quote: string | null = null;
+  while (c.i < c.text.length) {
+    const ch = c.text[c.i];
+    if (quote) {
+      if (ch === '\\') {
+        c.i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      c.i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      c.i++;
+      continue;
+    }
+    if (ch === '(') depth++;
+    if (ch === ')') {
+      depth--;
+      c.i++;
+      if (depth === 0) return c.text.slice(identStart, c.i);
+      continue;
+    }
+    c.i++;
+  }
+  throw new ShellScanError(c.i);
+}
+
+function parseShellValue(c: ShellCursor): ShellNode {
+  skipShellWs(c);
+  const ch = c.text[c.i];
+  if (ch === '{') return parseShellObject(c);
+  if (ch === '[') return parseShellArray(c);
+  if (ch === '"' || ch === "'") return { kind: 'literal', raw: parseShellString(c) };
+  if (ch === '-' || (ch >= '0' && ch <= '9')) return { kind: 'literal', raw: parseShellNumber(c) };
+  if (ch !== undefined && /[A-Za-z_$]/.test(ch)) {
+    const identStart = c.i;
+    const word = parseShellIdentWord(c);
+    skipShellWs(c);
+    if (c.text[c.i] === '(') return { kind: 'literal', raw: parseShellCall(c, identStart) };
+    if (word === 'true' || word === 'false' || word === 'null' || word === 'undefined') {
+      return { kind: 'literal', raw: word };
+    }
+    throw new ShellScanError(identStart);
+  }
+  throw new ShellScanError(c.i);
+}
+
+function parseShellKey(c: ShellCursor): string {
+  skipShellWs(c);
+  const ch = c.text[c.i];
+  if (ch === '"' || ch === "'") return parseShellString(c);
+  if (ch !== undefined && /[A-Za-z_$]/.test(ch)) return parseShellIdentWord(c);
+  throw new ShellScanError(c.i);
+}
+
+function parseShellObject(c: ShellCursor): ShellNode {
+  c.i++; // '{'
+  const members: { keyRaw: string; value: ShellNode }[] = [];
+  skipShellWs(c);
+  if (c.text[c.i] === '}') {
+    c.i++;
+    return { kind: 'object', members };
+  }
+  for (;;) {
+    const keyRaw = parseShellKey(c);
+    skipShellWs(c);
+    if (c.text[c.i] !== ':') throw new ShellScanError(c.i);
+    c.i++;
+    const value = parseShellValue(c);
+    members.push({ keyRaw, value });
+    skipShellWs(c);
+    if (c.text[c.i] === ',') {
+      c.i++;
+      skipShellWs(c);
+      if (c.text[c.i] === '}') {
+        c.i++;
+        break;
+      }
+      continue;
+    }
+    if (c.text[c.i] === '}') {
+      c.i++;
+      break;
+    }
+    throw new ShellScanError(c.i);
+  }
+  return { kind: 'object', members };
+}
+
+function parseShellArray(c: ShellCursor): ShellNode {
+  c.i++; // '['
+  const items: ShellNode[] = [];
+  skipShellWs(c);
+  if (c.text[c.i] === ']') {
+    c.i++;
+    return { kind: 'array', items };
+  }
+  for (;;) {
+    items.push(parseShellValue(c));
+    skipShellWs(c);
+    if (c.text[c.i] === ',') {
+      c.i++;
+      skipShellWs(c);
+      if (c.text[c.i] === ']') {
+        c.i++;
+        break;
+      }
+      continue;
+    }
+    if (c.text[c.i] === ']') {
+      c.i++;
+      break;
+    }
+    throw new ShellScanError(c.i);
+  }
+  return { kind: 'array', items };
+}
+
+function tryParseShellText(
+  text: string,
+): { ok: true; node: ShellNode } | { ok: false; offset: number } {
+  const c: ShellCursor = { text, i: 0 };
+  try {
+    const node = parseShellValue(c);
+    skipShellWs(c);
+    if (c.i !== text.length) throw new ShellScanError(c.i);
+    return { ok: true, node };
+  } catch (err) {
+    if (err instanceof ShellScanError) return { ok: false, offset: err.offset };
+    throw err;
+  }
+}
+
+function renderShellIndented(node: ShellNode, depth: number, out: string[]): void {
+  const pad = '  '.repeat(depth);
+  const padIn = '  '.repeat(depth + 1);
+  if (node.kind === 'literal') {
+    out.push(node.raw);
+    return;
+  }
+  if (node.kind === 'object') {
+    if (node.members.length === 0) {
+      out.push('{}');
+      return;
+    }
+    out.push('{\n');
+    node.members.forEach((m, idx) => {
+      out.push(padIn, JSON.stringify(m.keyRaw.replace(/^['"]|['"]$/g, '')), ': ');
+      renderShellIndented(m.value, depth + 1, out);
+      if (idx < node.members.length - 1) out.push(',');
+      out.push('\n');
+    });
+    out.push(pad, '}');
+    return;
+  }
+  if (node.items.length === 0) {
+    out.push('[]');
+    return;
+  }
+  out.push('[\n');
+  node.items.forEach((item, idx) => {
+    out.push(padIn);
+    renderShellIndented(item, depth + 1, out);
+    if (idx < node.items.length - 1) out.push(',');
+    out.push('\n');
+  });
+  out.push(pad, ']');
+}
+
+function renderShellCompact(node: ShellNode, out: string[]): void {
+  if (node.kind === 'literal') {
+    out.push(node.raw);
+    return;
+  }
+  if (node.kind === 'object') {
+    out.push('{');
+    node.members.forEach((m, idx) => {
+      if (idx > 0) out.push(',');
+      out.push(JSON.stringify(m.keyRaw.replace(/^['"]|['"]$/g, '')), ':');
+      renderShellCompact(m.value, out);
+    });
+    out.push('}');
+    return;
+  }
+  out.push('[');
+  node.items.forEach((item, idx) => {
+    if (idx > 0) out.push(',');
+    renderShellCompact(item, out);
+  });
+  out.push(']');
+}
+
+/**
+ * Beautify/Minify for the document editor's edit buffer — reindents Mongo shell literal text
+ * (JSON plus shell constructor calls) without re-serialising it or touching any value, including
+ * a constructor call's own argument (opaque to this scanner, D29). A buffer that fails to parse —
+ * a hand edit gone wrong — reports the same shape `beautify.ts`'s JSON formatter does.
+ */
+export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyResult {
+  const r = tryParseShellText(text);
+  if (!r.ok) return { text, ok: false, reason: `invalid document text at offset ${r.offset}` };
+  const out: string[] = [];
+  if (mode === 'indented') renderShellIndented(r.node, 0, out);
+  else renderShellCompact(r.node, out);
+  return { text: out.join(''), ok: true };
 }
 
 const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;

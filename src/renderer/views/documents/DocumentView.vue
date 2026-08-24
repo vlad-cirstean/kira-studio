@@ -24,13 +24,16 @@ import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import VirtualList from '../../workbench/VirtualList.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import DocumentTree from './DocumentTree.vue';
 import { documentRow, fieldNamesOnPage, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './documentMutations';
 import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
+import { beautifyShellText, toShellText } from './ejson';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import ProjectionMenu from './ProjectionMenu.vue';
 import {
@@ -248,22 +251,27 @@ const projectionCountLabel = computed(() => {
 });
 
 const creatingNew = ref(false);
-const newDraft = ref('');
+const NEW_DOCUMENT_TEMPLATE = '{\n  \n}';
+// P27 D28/D29: the new-document panel adopts the same edit-buffer row the document editor uses —
+// "revert" here means back to the empty template, not to a stored value that doesn't exist yet.
+const newBuffer = useEditBuffer({
+  original: () => NEW_DOCUMENT_TEMPLATE,
+  beautifier: () => beautifyShellText,
+});
 
 function onAddDocument(): void {
   creatingNew.value = true;
-  newDraft.value = '{\n  \n}';
+  newBuffer.reseed();
 }
 
 function cancelCreate(): void {
   creatingNew.value = false;
-  newDraft.value = '';
 }
 
 async function commitCreate(): Promise<void> {
-  await saveNewDocument(props.tab.id, newDraft.value);
+  await saveNewDocument(props.tab.id, newBuffer.doc.value);
   creatingNew.value = false;
-  newDraft.value = '';
+  newBuffer.reseed();
 }
 
 function onToggleSearch(): void {
@@ -279,7 +287,14 @@ function onCloseSearch(): void {
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 
 const editingId = ref<string | null>(null);
-const editDraft = ref('');
+// The row currently being edited seeds from toShellText(body) — the shell-literal spelling, not
+// the raw canonical-EJSON wire text — so editing reads the same ObjectId(…)/ISODate(…) form the
+// collapsed row and the tree already show (D14/D29).
+const editOriginal = ref('');
+const editBuffer = useEditBuffer({
+  original: () => editOriginal.value,
+  beautifier: () => beautifyShellText,
+});
 
 // D23: the list's v-for iterates this — plain per-row view objects, not an index range resolved
 // by a function. Carries the raw body alongside documentRows.ts's own DocumentRowView (whose
@@ -334,20 +349,19 @@ function onGoToMatch(row: number): void {
 
 function startEdit(id: string, body: string): void {
   editingId.value = id;
-  editDraft.value = body;
+  editOriginal.value = toShellText(body);
+  editBuffer.reseed();
 }
 
 function cancelEdit(): void {
   editingId.value = null;
-  editDraft.value = '';
 }
 
 async function commitEdit(): Promise<void> {
   const id = editingId.value;
   if (id === null) return;
-  await saveDocumentEdit(props.tab.id, id, editDraft.value);
+  await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
   editingId.value = null;
-  editDraft.value = '';
 }
 
 function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
@@ -657,8 +671,10 @@ onUnmounted(() => {
       </template>
 
       <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
-        <CodeMirrorHost v-model:doc="newDraft" language="json" :read-only="false" />
+        <CodeMirrorHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
         <div class="edit-actions">
+          <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" />
+          <span class="edit-actions-spacer"></span>
           <AppButton variant="primary" data-testid="document-new-save" @click="commitCreate">
             Save
           </AppButton>
@@ -756,8 +772,10 @@ onUnmounted(() => {
                 <!-- The editor is the same code surface the definition view and the console views
                      use — the only difference is the language. -->
                 <template v-if="editingId === item.view.id">
-                  <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
+                  <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
                   <div class="edit-actions">
+                    <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" />
+                    <span class="edit-actions-spacer"></span>
                     <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
                       Save
                     </AppButton>
@@ -957,8 +975,15 @@ onUnmounted(() => {
 .edit-actions {
   flex-shrink: 0;
   display: flex;
+  align-items: center;
   gap: var(--kira-s-3);
   padding: var(--kira-s-2) var(--kira-s-4);
   border-top: var(--kira-border-width) solid var(--kira-border);
+}
+
+/* Pushes Save/Cancel to the trailing edge, past P27 D28's EditBufferActions row. */
+.edit-actions-spacer {
+  flex: 1;
+  min-width: 0;
 }
 </style>
