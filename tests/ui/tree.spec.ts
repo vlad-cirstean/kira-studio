@@ -6,7 +6,7 @@ import {
   type PgFixture,
   startPostgres,
 } from './support/pg';
-import { expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from './support/tree';
 
 // Container-backed (D22): skips with a Colima-naming reason when the Docker daemon is
 // unreachable, rather than failing every UI spec in the project.
@@ -298,6 +298,129 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   expect(await menuItemIds(page)).toEqual(['new-connection', 'refresh-all', 'collapse-all']);
   await page.keyboard.press('Escape');
   await expandRow(page, ''); // restore — later steps expect the tree still expanded
+
+  // --- sticky ancestor band (P28 §5) ----------------------------------------------------------
+  // ProjectTree.vue's own literal (rowDensity defaults to 'comfortable') — the steady-state slot
+  // math (top = 0/H/2H) below depends on it exactly.
+  const H = 28;
+  const treeScroll = treeContainer(page);
+  const stickyRows = page.locator('[data-testid="tree-sticky-row"]');
+
+  // Nothing is pinned at the top of the list.
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(100);
+  await expect(stickyRows).toHaveCount(0);
+
+  // The connection and database pin as soon as they leave, in order, at top 0/H/2H.
+  await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
+    el.scrollIntoView({ block: 'start' }),
+  );
+  await page.waitForTimeout(100);
+  await expect(stickyRows).toHaveCount(3);
+  await expect(stickyRows.nth(0)).toHaveAttribute('data-path', '');
+  await expect(stickyRows.nth(1)).toHaveAttribute('data-path', DB_PATH);
+  await expect(stickyRows.nth(2)).toHaveAttribute('data-path', APP_PATH);
+  await expect(stickyRows.nth(0)).toHaveAttribute('data-depth', '0');
+  await expect(stickyRows.nth(1)).toHaveAttribute('data-depth', '1');
+  await expect(stickyRows.nth(2)).toHaveAttribute('data-depth', '2');
+
+  // The band never exceeds the cap: scrolled into the (depth-3) Sequences folder, still exactly
+  // three rows, and the folder itself is not among them.
+  await sequenceRow.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(100);
+  await expect(stickyRows).toHaveCount(3);
+  await expect(
+    page.locator('[data-testid="tree-sticky-row"]', { hasText: 'Sequences' }),
+  ).toHaveCount(0);
+
+  // A pinned row is a real row: its twisty collapses the real schema (the band shrinks to two),
+  // and it carries the connection's colour rail.
+  await expect(stickyRows.last()).toHaveAttribute('data-path', APP_PATH);
+  await expect(stickyRows.last().locator('.p-tree-rail')).toBeVisible();
+  await stickyRows.last().locator('.twisty').click();
+  await expect(stickyRows).toHaveCount(2);
+  await expandRow(page, APP_PATH); // restore for the assertions that follow
+
+  // The band does not duplicate anything the rest of the suite counts (F5): the connection-kind
+  // row count is unaffected, and no sticky row carries the tree's own roving tab stop.
+  await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
+    el.scrollIntoView({ block: 'start' }),
+  );
+  await page.waitForTimeout(100);
+  expect(await page.locator('[data-testid="tree-row"][data-kind="connection"]').count()).toBe(1);
+  expect(await page.locator('[data-testid="tree-sticky-row"][tabindex="0"]').count()).toBe(0);
+
+  // A row under the band is still reachable: the shared findRow scrolls it clear before
+  // returning, so a click on a row that would otherwise land at the very top succeeds unretried.
+  await (await findRow(page, WIDE_TABLE_PATH)).click();
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(100);
+
+  // --- two-connection handoff (D4): scrolling from one connection's section into the next ----
+  const conn2Id = await page.evaluate(
+    (cfg) =>
+      window.kira
+        .connectionsCreate({
+          name: 'Tree DB 2',
+          kind: 'postgres',
+          color: 'violet',
+          mode: 'fields',
+          readOnly: false,
+          host: cfg.host,
+          port: cfg.port,
+          database: cfg.database,
+          username: cfg.username,
+          password: cfg.password,
+          uri: null,
+          options: {},
+          preconnect: null,
+          preconnectSidecar: false,
+        })
+        .then((c) => c.id),
+    {
+      host: pg.config.host,
+      port: pg.config.port,
+      database: pg.config.database,
+      username: pg.config.username,
+      password: pg.config.password,
+    },
+  );
+  const conn2Row = connectionRow(page, 'Tree DB 2');
+  await expect(conn2Row).toBeVisible();
+
+  // Right at the boundary: the band's outermost — only — row is now the second connection.
+  await conn2Row.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(100);
+  await expect(stickyRows.first()).toContainText('Tree DB 2');
+
+  // One row shy of the boundary: the first connection is still pinned, its slot pushed to (or
+  // below) zero as the second connection's own header arrives to replace it — no gap, no second
+  // header at the same offset.
+  await treeScroll.evaluate((el, h) => {
+    el.scrollTop -= h;
+  }, H);
+  await page.waitForTimeout(100);
+  const firstStickyBeforeHandoff = stickyRows.first();
+  await expect(firstStickyBeforeHandoff).toContainText('Tree DB');
+  await expect(firstStickyBeforeHandoff).not.toContainText('Tree DB 2');
+  const topPx = await firstStickyBeforeHandoff.evaluate((el) => Number.parseFloat(el.style.top));
+  expect(topPx).toBeLessThanOrEqual(0);
+
+  // Deleting the second connection keeps every later `data-path=""` lookup in this test
+  // unambiguous — `path` is per-connection-relative, so two expanded connections would both
+  // render one.
+  await page.evaluate((id) => window.kira.connectionsDelete({ id }), conn2Id);
+  await expect(conn2Row).toHaveCount(0);
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(100);
 
   // --- disconnect: cached nodes still render; expanding any node (cached or not) reconnects
   // first rather than surfacing a disconnected error — the twisty is the primary way users
