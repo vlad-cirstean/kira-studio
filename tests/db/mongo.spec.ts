@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
-import { EJSON } from 'bson';
+import { Decimal128, EJSON } from 'bson';
 import { type Document, MongoClient } from 'mongodb';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { mongoCaps } from '../../src/engine/adapters/mongo/caps';
@@ -763,6 +763,99 @@ describe('mongo adapter (§9.1, P8)', () => {
       });
     } finally {
       await side.close();
+      await adapter.disconnect();
+    }
+  });
+
+  test('23. read: filter accepts a shell constructor and an extended-JSON wrapper for the same value (D15)', async () => {
+    const adapter = await createAdapter('mongodb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const target = path([
+        { kind: 'database', name: MONGO_DATABASE },
+        { kind: 'collection', name: 'widgets' },
+      ]);
+      const byConstructor = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: `{ _id: ObjectId('000000000000000000000005') }`,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(byConstructor.rowCount).toBe(1);
+      expect(docBodyAt(byConstructor, 0).name).toBe('widget-5');
+
+      // The exact text *Copy _id* now puts on the clipboard (P27 D12) — canonical extended JSON,
+      // not the shell spelling — must resolve to the same document (F14).
+      const byWrapper = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: `{ _id: {"$oid": "000000000000000000000005"} }`,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(byWrapper.rowCount).toBe(1);
+      expect(docBodyAt(byWrapper, 0).name).toBe('widget-5');
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('24. mutate: a body mixing shell constructors and extended-JSON wrappers writes real BSON types (D16)', async () => {
+    const adapter = await createAdapter('mongodb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const target = path([
+        { kind: 'database', name: MONGO_DATABASE },
+        { kind: 'collection', name: 'literal_probe' },
+      ]);
+      const body =
+        `{ _id: ObjectId('000000000000000000000a01'), ` +
+        `count: NumberInt(7), ` +
+        `price: {"$numberDecimal": "9.99"}, ` +
+        `when: ISODate('2024-01-01T00:00:00.000Z') }`;
+      const plan: MutationPlan = {
+        path: target,
+        ops: [{ kind: 'insert', values: { $document: body } }],
+      };
+      const result = await adapter.mutate(plan, makeCtx());
+      expect(result.affectedRows).toBe(1);
+
+      const page = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page.rowCount).toBe(1);
+      const doc = docBodyAt(page, 0);
+      // Read back through EJSON.parse (canonical, mirroring what the renderer sees). NumberInt's
+      // constructor (literal.ts) hands the driver a plain JS number — the driver's own wire
+      // serialization decides its stored width, so only the value is asserted here; price and
+      // when came from typed BSON constructors (Decimal128/Date) and are asserted by type too,
+      // since those never touch a plain-number code path.
+      expect(Number(doc.count)).toBe(7);
+      expect(doc.price).toBeInstanceOf(Decimal128);
+      expect((doc.price as Decimal128).toString()).toBe('9.99');
+      expect(doc.when).toBeInstanceOf(Date);
+      expect((doc.when as Date).toISOString()).toBe('2024-01-01T00:00:00.000Z');
+    } finally {
       await adapter.disconnect();
     }
   });

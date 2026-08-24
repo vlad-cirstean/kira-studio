@@ -74,15 +74,8 @@ async function setDocumentFilter(page: Page, filter: string): Promise<void> {
   await page.press('[data-testid="document-search"]', 'Enter');
 }
 
-test('mongodb — connect, tree, document tab, edit, delete, console, cancel', async ({
-  kira,
-  consoleErrors,
-}) => {
-  test.setTimeout(240_000);
+async function connectMongo(page: Page): Promise<void> {
   if (!mongo) throw new Error('mongo fixture did not start');
-  const { window: page } = kira;
-  page.on('dialog', (d) => d.accept());
-
   const cfg = mongo.config;
   await page.evaluate(
     (c) =>
@@ -118,6 +111,18 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
+}
+
+test('mongodb — connect, tree, document tab, edit, delete, console, cancel', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(240_000);
+  if (!mongo) throw new Error('mongo fixture did not start');
+  const { window: page } = kira;
+  page.on('dialog', (d) => d.accept());
+
+  await connectMongo(page);
 
   // --- tree: database -> collection, no schema level in between -----------------------------
   // Collections are tree leaves — no twisty, no per-index children (their indexes moved into the
@@ -158,15 +163,23 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await setDocumentFilter(page, "{ name: 'widget-1' }");
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(1, { timeout: 10_000 });
 
-  // --- edit: expand the row, replace its body, save ----------------------------------------
+  // --- collapsed row shows only the _id, plus field-count/size badges — D1 ------------------
   const editRow = page.locator('[data-testid="document-row"]');
-  await editRow.locator('[data-testid="document-toggle-expand"]').click();
+  await expect(editRow.locator('[data-testid="document-id"]')).toContainText('ObjectId(');
+  await expect(editRow.locator('[data-testid="document-field-count"]')).toContainText('fields');
+  await expect(editRow.locator('[data-testid="document-byte-badge"]')).toBeVisible();
+
+  // --- edit: the row is already expanded by default (D2) — replace its body, save -----------
   await expect(editRow.locator('[data-testid="document-body"]')).toBeVisible();
+  await expect(editRow.locator('[data-testid="document-tree"]')).toBeVisible();
   await editRow.locator('[data-testid="document-edit"]').click();
   const editCm = editRow.locator('[data-testid="document-body"] .cm-content');
   await editCm.click();
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type('{"name":"widget-1-edited","price":9,"active":true}');
+  // D28: the row's own edit-action row carries the shared EditBufferActions — the modified chip
+  // appears the moment the buffer diverges from what was seeded.
+  await expect(editRow.locator('[data-testid="document-edit-modified"]')).toBeVisible();
   await editRow.locator('[data-testid="document-edit-save"]').click();
 
   // The still-applied "widget-1" filter no longer matches the renamed document — proves the
@@ -177,23 +190,30 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   const editedRow = page.locator('[data-testid="document-row"]');
   await expect(editedRow).toHaveCount(1, { timeout: 10_000 });
   // _id is preserved across a whole-document replace (mutate.ts overwrites `_id` from the
-  // mutation's key), so this same row stays expanded and shows the new body automatically.
-  await expect(editedRow.locator('[data-testid="document-body"] .cm-content')).toContainText(
-    'widget-1-edited',
-  );
+  // mutation's key), so this same row stays expanded and shows the new body automatically —
+  // through DocumentTree.vue's flattened lines now, not a read-path CodeMirror (D19).
+  await expect(editedRow.locator('[data-testid="document-tree"]')).toContainText('widget-1-edited');
 
-  // --- delete: context menu, native confirm dialog (auto-accepted above) --------------------
+  // --- delete: the row's own Delete button (D5/D6), native confirm dialog (auto-accepted) ----
   await setDocumentFilter(page, "{ name: 'widget-2' }");
   const deleteRow = page.locator('[data-testid="document-row"]');
   await expect(deleteRow).toHaveCount(1, { timeout: 10_000 });
-  await deleteRow.click({ button: 'right' });
+  await expect(deleteRow.locator('[data-testid="document-delete"]')).toBeEnabled();
+  await deleteRow.locator('[data-testid="document-delete"]').click();
+  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(0, { timeout: 10_000 });
+
+  // --- delete via the context menu still works too (D7: the menu's shape is unchanged) ------
+  await setDocumentFilter(page, "{ name: 'widget-3' }");
+  const menuDeleteRow = page.locator('[data-testid="document-row"]');
+  await expect(menuDeleteRow).toHaveCount(1, { timeout: 10_000 });
+  await menuDeleteRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-delete-document"]');
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(0, { timeout: 10_000 });
 
-  // --- clear the filter: 25 seeded - 1 deleted (the edited one is renamed, not gone) --------
+  // --- clear the filter: 25 seeded - 2 deleted (the edited one is renamed, not gone) --------
   await setDocumentFilter(page, '');
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 1, {
+  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 2, {
     timeout: 10_000,
   });
 
@@ -215,7 +235,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
     )
     .toBe('cancelled');
   await setDocumentFilter(page, '');
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 1, {
+  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 2, {
     timeout: 10_000,
   });
 
@@ -231,8 +251,71 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   const consoleResult = consoleView.locator('[data-testid="console-result-grid"]');
   await expect(consoleResult).toHaveCount(1);
   await expect(consoleResult.locator('[data-testid="console-result-doc-row"]')).toContainText(
-    String(WIDGET_COUNT - 1),
+    String(WIDGET_COUNT - 2),
   );
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mongodb — page-size-1000 render tripwires, truncated fallback, go-to-match (P27 D8/D22/D24)', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(240_000);
+  if (!mongo) throw new Error('mongo fixture did not start');
+  const { window: page } = kira;
+  page.on('dialog', (d) => d.accept());
+
+  await connectMongo(page);
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+
+  // --- perf tripwires at page size 1000 (D24): bounded DOM row count, no per-row CodeMirror --
+  const bigPath = `${DB_PATH}/collection:big_widgets`;
+  await (await findRow(page, bigPath)).dblclick();
+  const view = page.locator('[data-testid="document-view"]');
+  await expect(view).toBeVisible();
+  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(100, { timeout: 15_000 });
+  await page.click('[data-testid="document-page-size-1000"]');
+  await expect
+    .poll(async () => page.locator('[data-testid="document-row"]').count(), { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  const rowCount = await page.locator('[data-testid="document-row"]').count();
+  expect(rowCount).toBeLessThanOrEqual(60);
+  // Every row's body renders through DocumentTree.vue while it's expanded (the default, D2) —
+  // never a per-row editor — so no CodeMirror instance exists anywhere in the list (D19/D24).
+  await expect(page.locator('[data-testid="document-list"] .cm-editor')).toHaveCount(0);
+
+  // --- go to match scrolls a document that starts off-screen into view (D8) ------------------
+  await page.click('[data-testid="document-toolbar-search"]');
+  await page.fill('[data-testid="document-search-input"]', 'big-widget-999');
+  await page.press('[data-testid="document-search-input"]', 'Enter');
+  await expect(page.locator('[data-testid="document-search-count"]')).toContainText('1', {
+    timeout: 10_000,
+  });
+  await page.click('[data-testid="document-search-next"]');
+  await expect(
+    page.locator('[data-testid="document-row"]', { hasText: 'big-widget-999' }),
+  ).toBeVisible({ timeout: 10_000 });
+  await page.click('[data-testid="document-search-close"]');
+
+  // --- expand all / collapse all still work on a large page (D32) ----------------------------
+  await page.click('[data-testid="document-collapse-all"]');
+  await expect(page.locator('[data-testid="document-tree"]')).toHaveCount(0);
+  await page.click('[data-testid="document-expand-all"]');
+  await expect(page.locator('[data-testid="document-tree"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
+
+  // --- a truncated document falls back to raw text, not an empty tree (D22) ------------------
+  const oversizedPath = `${DB_PATH}/collection:oversized_widgets`;
+  await (await findRow(page, oversizedPath)).dblclick();
+  await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
+  const truncRow = page.locator('[data-testid="document-row"]');
+  await expect(truncRow).toHaveCount(1, { timeout: 15_000 });
+  await expect(truncRow.locator('[data-testid="document-truncated"]')).toBeVisible();
+  await expect(truncRow.locator('[data-testid="document-tree"]')).toHaveCount(0);
+  await expect(truncRow.locator('[data-testid="document-body"] .cm-editor')).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
 });

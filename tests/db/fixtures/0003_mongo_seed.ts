@@ -30,6 +30,26 @@ export async function seedMongo(db: Db): Promise<void> {
 
   await db.collection('empty_collection').createIndex({ _id: 1 });
 
+  // P27 §5/D22: a document well past DOCUMENT_TRUNCATE_BYTES (64 KB) on a multi-row page, so a
+  // real read exercises the tree's raw-text fallback rather than a synthetic string.
+  const oversizedNote = 'x'.repeat(100_000);
+  await db.collection('oversized_widgets').insertOne({
+    _id: new ObjectId(hexId(900)),
+    name: 'giant-note',
+    note: oversizedNote,
+  });
+
+  // P27 §5's two page-size-1000 tripwires (bounded DOM row count, no CodeMirror while nothing is
+  // being edited) and the go-to-match scroll case need a page substantially larger than any single
+  // fetch — plain, uniform documents are enough; nothing here needs realistic field variety.
+  const bigHexId = (i: number) => `0000000000000000000${i.toString(16).padStart(5, '0')}`;
+  const bigWidgets = Array.from({ length: 1200 }, (_, i) => ({
+    _id: new ObjectId(bigHexId(i)),
+    seq: i,
+    label: `big-widget-${i}`,
+  }));
+  await db.collection('big_widgets').insertMany(bigWidgets);
+
   // P19 D17: a validated collection so the definition view's Validation section has both a
   // real $jsonSchema (rendered as a field table) and validationLevel/validationAction to show.
   await db.createCollection('validated_widgets', {
