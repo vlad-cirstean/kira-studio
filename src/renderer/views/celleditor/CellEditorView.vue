@@ -374,7 +374,7 @@ const timestampReading = computed(() => {
           @click="generateUuid"
         />
         <IconButton
-          icon="list-tree"
+          icon="expand-all"
           :size="14"
           :active="formatted === 'indented'"
           data-testid="cell-editor-beautify-indented"
@@ -383,7 +383,7 @@ const timestampReading = computed(() => {
           @click="applyBeautify('indented')"
         />
         <IconButton
-          icon="list-flat"
+          icon="collapse-all"
           :size="14"
           :active="formatted === 'compact'"
           data-testid="cell-editor-beautify-compact"
