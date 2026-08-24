@@ -18,9 +18,9 @@ export const GROUPED_KINDS: readonly {
   { kind: 'matview', label: 'Materialized views' },
   { kind: 'sequence', label: 'Sequences' },
   { kind: 'function', label: 'Functions', labelFor: { mariadb: 'Routines' } },
-  // P23 D1/D2: kafka's whole root is foldered, not just "other kinds" — a lone Consumer groups
-  // folder trailing several hundred topic rows would not be findable.
-  { kind: 'topic', label: 'Topics' },
+  // P23 D1 (revised): kafka follows the same rule as SQL — the primary kind (topics) shows first,
+  // ungrouped, and only the auxiliary kind (consumer groups) folders. Topics are what a user
+  // browses; a folder around them would bury the thing this tree exists to show.
   { kind: 'consumerGroup', label: 'Consumer groups' },
 ];
 

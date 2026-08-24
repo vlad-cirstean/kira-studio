@@ -125,27 +125,23 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
     timeout: 10_000,
   });
 
-  // --- tree: P23 D1/D2 folders the whole root into Topics / Consumer groups ---------------------
+  // --- tree: topics stay at the root, ungrouped, same as SQL tables (P23 D1 revised) — only the
+  // auxiliary consumer-group kind folders ------------------------------------------------------
   await expandRow(page, '');
-  const topicsFolder = await findRow(page, '#topic');
-  await expect(topicsFolder).toBeVisible();
-  await expect(topicsFolder).toHaveAttribute('data-kind', 'group');
-  await expect(topicsFolder).toContainText('Topics');
-  const groupsFolder = await findRow(page, '#consumerGroup');
-  await expect(groupsFolder).toBeVisible();
-  await expect(groupsFolder).toHaveAttribute('data-kind', 'group');
-  await expect(groupsFolder).toContainText('Consumer groups');
-
-  // P23 D1's own acceptance bar, same as P19's: expanding a folder is a pure render over
-  // already-fetched children — zero IPC calls, zero op-log rows, asserted rather than assumed.
-  const opsBeforeFolderExpand = await getOps(page);
-  await topicsFolder.locator('.twisty').click();
   const emptyTopicRow = await findRow(page, EMPTY_TOPIC_PATH);
   await expect(emptyTopicRow).toBeVisible();
   await expect(emptyTopicRow).toHaveAttribute('data-kind', 'topic');
   const ordersTopicRow = await findRow(page, ORDERS_TOPIC_PATH);
   await expect(ordersTopicRow).toBeVisible();
   await expect(ordersTopicRow).toHaveAttribute('data-kind', 'topic');
+  const groupsFolder = await findRow(page, '#consumerGroup');
+  await expect(groupsFolder).toBeVisible();
+  await expect(groupsFolder).toHaveAttribute('data-kind', 'group');
+  await expect(groupsFolder).toContainText('Consumer groups');
+
+  // P19 D1-D3's own acceptance bar: expanding a folder is a pure render over already-fetched
+  // children — zero IPC calls, zero op-log rows, asserted rather than assumed.
+  const opsBeforeFolderExpand = await getOps(page);
   await groupsFolder.locator('.twisty').click();
   const groupRow = await findRow(page, CONSUMER_GROUP_PATH);
   await expect(groupRow).toBeVisible();

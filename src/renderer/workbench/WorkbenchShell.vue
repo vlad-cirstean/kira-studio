@@ -144,20 +144,22 @@ const gridStyle = computed(() => ({
 }
 
 .tab-strip {
-  height: var(--kira-h-lg);
+  /* Taller than a tab (`--kira-h-md`, 26px) by design — the extra height is the tab's own
+     breathing room from this row's border-bottom, not a margin tacked on after it. Every other
+     boundary in this stack (breadcrumb / toolbar-rail / toolbar / grid) sits flush with zero gap;
+     a `margin-bottom` here to "give the tab bar space" read as one lone, mismatched gap against
+     that flush rhythm — asymmetric on its own, and still let a centred 26px tab sit only ~1.5px
+     above the border line it was meant to clear. 34px centres the tab with ~3-4px on each side. */
+  height: 34px;
   /* `.editor-area` is a column flexbox, so this row is itself a flex item on the vertical axis —
      without `min-height: 0` its default `min-height: auto` lets the tab buttons' own intrinsic
      height push it taller than the `height` above, which is what let individual tabs render past
-     this row's bottom edge and over the gap/breadcrumb below despite that gap existing. */
+     this row's bottom edge despite it being tall enough on paper. */
   min-height: 0;
   overflow: hidden;
   flex-shrink: 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);
-  /* A little breathing room before the view's own breadcrumb (ViewHeader) — without it the tab
-     strip's border sat flush against the breadcrumb row with no visual separation at all.
-     `--kira-s-2` (4px) still read as almost no gap at all; `--kira-s-3` is the smallest step up. */
-  margin-bottom: var(--kira-s-3);
 }
 
 .main-view {
