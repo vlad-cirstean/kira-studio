@@ -2,7 +2,7 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P23 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Status: **P0–P31 implemented** on the v1 feature branch — see §10's phasing table for the record.
 > Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
 > shipped.
 
@@ -146,6 +146,7 @@ type Caps = {
   stream: boolean           // renders in the stream view
   sql: boolean
   definition: boolean       // gates "Open definition" — a structured + raw-text object view
+  describe: boolean         // the adapter implements describe() — false for kafka/sqs/redis/s3 (P31)
   projection: boolean       // can fetch a column subset server-side
   serverFilter: boolean
   exactCount: boolean
@@ -308,11 +309,22 @@ A visual mockup of this chrome (rounded-pill tabs, floating sidebar/editor/panel
 4/6/8px corner-radius system) lives in `docs/design/kira-design-system/`, grounded in VS Code's
 actual `workbench.experimental.modernUI` CSS rather than approximated from memory.
 
+The whole workbench is inset from the window's own edge on three sides — 6px (`--kira-window-inset`)
+top/right/left, 2px (`--kira-gap`, unchanged) on the bottom so the status bar still reads as seated
+on the window edge — rather than flush against it (P31 D8). The tab strip scrolls horizontally once
+its tabs overflow the available width (mouse wheel included), rather than clipping the overflow with
+no way to reach it (P31 D6/D7).
+
 ### 8.2 Settings dialog
 
 Modal, sectioned. v1 sections:
 - **Appearance** — one font family + size for the whole app (UI, grid and editors alike), row
-  density.
+  density. Typing a font family that doesn't resolve to a real face marks the field invalid, names
+  the browser fallback it lands on, and still saves it (settings apply immediately, not just valid
+  ones) — a canvas-measurement check against a guaranteed-bogus probe name, since
+  `document.fonts.check()` returns `true` even for a nonexistent family (P31 D9/D10). A font change
+  re-measures every grid's column widths rather than reusing widths sized for whatever font was
+  active when the app first measured (P31 D11).
 - **Data** — default page size. (Prefetch and count-on-open toggles existed at one point; both
   were removed as functionality per user request, not merely hidden here — see §7.)
 - **Cache** — L2 byte budget, hit-rate readout, clear caches.
@@ -374,6 +386,11 @@ Toolbar, left to right:
 `↻ refresh` · `⏮ ◀ page N of M ▶ ⏭` · `rows [10|100|1k|10k]` · `Σ count all` · `columns ▾ (projection)`
 · `+ row` · `− row` · `⌘ preview command` · `🔍 search` · `⏹ stop`
 
+`columns`'s corner mark is a plain accent dot, not a count, shown only when the tab's column set
+deviates from default (some hidden, or reordered) — the exact numbers are in the tooltip instead
+(P31 D38). **Preview command** separates staged statements with a blank line, not just the join's
+own `;` (P31 D40).
+
 Below it, a second **filter toolbar**, left to right:
 
 `🕘 history` · `WHERE …` (free-text predicate, e.g. `field1 = 'a' and field2 is null`) ·
@@ -396,15 +413,25 @@ Below it, a second **filter toolbar**, left to right:
   grid to only the rows the search matched, without re-querying or losing scroll/selection state
   (rows are re-indexed by display position, the underlying page is untouched); a scan with zero
   matches while the toggle is on shows a dedicated "no matching rows" empty state with a one-click
-  way back to every row, distinct from the table's own "no rows" state.
+  way back to every row, distinct from the table's own "no rows" state. The same filter toggle and
+  match highlighting exist in every other in-page find widget the app has — document, key/value and
+  stream (§8.7/§8.9) — sharing one state module (P31 D16-D21). Paging, Fetch more, a page-size
+  change, Refresh or a `WHERE` re-run all restart the scan against the new page rather than leave a
+  stale match list pointing at rows that no longer hold what matched (P31 D22-D24).
 - **Stop** — aborts the in-flight op and forwards the cancel to the server (§5.1). Enabled only while
   an op is running.
 
 Grid: virtualized rows and columns, sticky header, row-number gutter, resizable/reorderable columns,
-sort by clicking a header, multi-cell/row/column selection, `NULL` rendered distinctly from empty
-string, type-aware right-alignment for numerics. Both axes render a 560px overscan buffer beyond
-the viewport (P29) — a fast fling in either direction outruns the main thread's own re-render
-before it can show a blank gap, not just vertically.
+sort by clicking a header (direction shown as a 13px codicon pinned to the header cell's own right
+edge, not a text glyph in the font-affected label flow — P31 D34), multi-cell/row/column selection,
+`NULL` rendered distinctly from empty string, type-aware right-alignment for numerics. Both axes
+render a 560px overscan buffer beyond the viewport (P29) — a fast fling in either direction outruns
+the main thread's own re-render before it can show a blank gap, not just vertically.
+
+The gutter's staged-change rail is a 2px bar: warn/yellow for a pending edit, ok/green for a pending
+insert, error/red for a pending delete (mutually exclusive — a row headed for deletion never also
+reads as edited, P31 D31). `Delete`/`⌘⌫` fires from a cell or range selection too, not only a row
+selection (P31 D32); the cell context menu's own **Delete row** does the same (P31 D33).
 
 **Copy/paste.** Copy row(s) as TSV (default), CSV, JSON, or `INSERT` statements. Paste of TSV/CSV
 into the grid stages new/edited rows as pending changes.
@@ -467,7 +494,10 @@ against the server — no pending-change staging or preview (§8.14's staged mod
 own). The cell editor panel (§8.6) is never shown for a document tab: a document's own row is
 already the read/write surface, and the panel has no primary key of its own to publish a cell for.
 Same search toolbar as the grid (client-side only), scrolling a match into view even when it
-starts outside the rendered window.
+starts outside the rendered window, with the same filter toggle and — new in P31 (D20) — real
+match highlighting: the matched document's row itself, and, while collapsed, a preview line
+showing the matched substring wrapped in `<mark>` (the row otherwise shows only `_id`, per D1
+above). An expanded document's own body is not highlighted.
 
 BSON values — `ObjectId`, dates, `Int32`/`Int64`/`Decimal128`, binary, and the rest of extended
 JSON — are recognised by shape (no driver import in the renderer) and rendered in shell form
@@ -480,10 +510,11 @@ the six constructors as completions.
 
 Namespace tree from `SCAN` with `:` splitting; per-type value renderers (string, hash, list, set,
 zset, stream) with TTL and memory usage shown. Never `KEYS`, never `SCAN` without a count budget.
-Toolbar adds a page-size control and in-page search. **Edit** and **Add key** are scoped to
-string-typed values only (a hash/list/set/zset/stream element needs its own per-type semantics,
-out of scope for this version); **Delete** works on any type. All three execute **immediately** —
-no pending-change staging or preview.
+Toolbar adds a page-size control and in-page search, with the same filter toggle and cell-level
+highlighting as the grid (P31 D17). **Edit** and **Add key** are scoped to string-typed values
+only (a hash/list/set/zset/stream element needs its own per-type semantics, out of scope for this
+version); **Delete** works on any type. All three execute **immediately** — no pending-change
+staging or preview.
 
 ### 8.9 Stream view (Kafka, SQS)
 
@@ -493,7 +524,12 @@ the document/cell viewer. SQS is poll-on-demand only (§5.1). An **Add message**
 staging or preview. Kafka is insert-only — a topic's log is immutable, so there is no per-message
 update or delete; SQS also supports **Delete** (a real per-item removal via the message's receipt
 handle) but no update. Kafka additionally offers offset/partition/timestamp filters with
-session-only (non-persisted) history.
+session-only (non-persisted) history — the timestamp field has a calendar `IconButton` +
+`DateTimePicker` trigger identical to the cell editor's own timestamp translate pane (§8.6), and an
+unparseable value is reported inline (`.is-invalid` + a message) rather than silently discarded
+(P31 D12-D14). In-page search shares the same filter toggle as the other three views, with the
+app's own `color-mix` match tint (P31 D17/D21) — row-level, since a stream match has no single
+column to point at.
 
 ### 8.10 Right-click coverage
 
@@ -624,7 +660,9 @@ deliberately never an accelerator, so the same key can mean the right thing in t
 local set is the grid's `Cmd/Ctrl+C`/`Cmd/Ctrl+V`/`Enter`/`Ctrl/Cmd+D`/`Delete` and the project
 tree's `Enter`/`Ctrl/Cmd+C`/`Shift+Alt+C`/`F2`/`Ctrl/Cmd+D`/`Delete`. This split is what
 `user-select: none` on `body` makes safe: outside a text field the native `role: 'copy'` accelerator
-has nothing to act on, so the keydown reaches the page.
+has nothing to act on, so the keydown reaches the page. The grid's own `Delete`/`⌘⌫` fires from a
+cell or range selection too, not only a row selection (P31 D32) — `Ctrl/Cmd+D` (Duplicate row)
+stays row-selection-only.
 
 Keyboard scopes exist only where a focusable container and a selection already do — the project
 tree and the SQL grid. The document, key/value, stream and operations views are mouse-and-menu only.
@@ -734,7 +772,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P27 Mongo document view redesign + ObjectId support + render perf** | Three related Mongo-specific fixes. (1) A document's collapsed preview shows only its primary key by default, all documents expanded to just their first layer of keys with correct spacing, and each document row gets three actions — edit, expand/collapse, delete — rather than expand/collapse being the only affordance; the cell editor panel (P26) is hidden by default for Mongo, its useful pieces (JSON beautify, byte count, revert) relocated into the expanded document's own edit area instead of a separate panel below. (2) `ObjectId` becomes usable in the filter bar (not just a raw 24-hex-char string match) and is parsed/rendered distinctly inside a document body — survey how other Mongo GUI clients (Compass, Studio 3T) represent it before choosing a shape, since a bare string and a tagged `{"$oid": "..."}` read very differently. (3) Mongo document rendering is currently slow enough to notice; profile and fix it | User-reported UX and performance issues in the one non-tabular view that ships today (P8); grouped into one phase because the preview reshape and the ObjectId work touch the same document-rendering code path, and the perf fix needs to be verified against whatever that reshape lands as, not the code it replaces. Implemented per `docs/v1/plans/P27-mongo-document-redesign.md`, all eleven commits: `beautify.ts` hoisted to the renderer root and `views/shared/useEditBuffer.ts`/`EditBufferActions.vue` extracted so the cell editor and the document row's own edit area share one dirty/beautify/bytes/revert implementation; `views/documents/ejson.ts` recognises the closed EJSON v2 wrapper set by shape (no `bson` import) and renders BSON in Mongo shell form; `engine/adapters/mongo/literal.ts` gained `resolveEjsonWrappers`/`parseDocumentLiteral` so the filter box, `mutate.ts` and the document editor all accept shell constructors *and* extended JSON in the same document; `VirtualList.vue` gained an additive `rowHeights` prop (prefix-sum offsets, binary search) backing `documentRows.ts`'s exact per-row height model and `DocumentTree.vue`'s flattened, CodeMirror-free read path; `DocumentView.vue`'s list moved onto that virtualizer with the new id-only/badge head, expanded-by-default first layer, and Edit/Delete row actions; the document view no longer publishes to the cell editor panel at all; the filter bar and Mongo console both offer the six BSON constructors as completions, and *Copy `_id`*/*Copy document* switched to the shell form. `bun run lint`/`typecheck`/`build` clean throughout and the four non-Docker Playwright specs pass; every Docker-gated spec this phase touches (`tests/db/mongo.spec.ts`'s new scenarios 23-24, `tests/ui/mongo.spec.ts`'s rewritten and new scenarios, `cell-editor.spec.ts` as the shared-buffer-extraction regression guard) self-skips cleanly in this sandbox (no Docker daemon) rather than erroring, and still needs a real run in CI or the macOS/Colima environment before this phase's document-tab rendering behavior is considered verified — the same standing caveat every Docker-gated phase in this branch has recorded for itself. |
 | **P28 Connections panel: sticky group headers + checkbox filter** | Two independent connections-panel fixes. (1) Scrolling the panel keeps the currently-open connection's group header stuck at the top, like a sticky section header, until scroll passes into the next connection's group. (2) The panel's filter changes from a regex/text match over the flat list to an expandable checkbox tree — filtering by kind/tag/whatever the tree's own grouping already exposes, checked rather than typed | Two isolated, independently-scoped UI fixes to the one panel that hasn't had a dedicated pass since P1 introduced it. Implemented per `docs/v1/plans/P28-connections-panel-sticky-checkbox.md`, all nine steps: `tests/ui/support/tree.ts` unified twenty files' worth of duplicated/flaky Playwright helpers into one band-aware copy; `VirtualList.vue` gained an additive `scrollstate` emit and a zero-height `#sticky` overlay slot; `project/stickyBand.ts` computes the pinned connection/database/schema band (capped at three rows, clamped to the viewport) purely from the flat row array and scroll offset, rendered by `ProjectTree.vue` as real `TreeRow`s (`sticky` prop, distinct testid, `tabindex="-1"`) so a pinned row is fully interactive; `grouping.ts` gained `labelForKind()` as the one source of every node kind's display label, per connection kind. The filter half replaced the glob/regex rule list (`connection_filters`, `shared/domain/connection-filter.ts`) with a set of exclusions (`shared/domain/tree-filter.ts`'s `TreeVisibility`, `connection_tree_filters` in migration 0005) — nothing ticked off is ever hidden, including an object fetched for the first time after the filter was saved; `project/filterTree.ts` derives the checkbox dialog's kind rows, tri-state object rows and live consequence count from the same cached nodes the tree itself renders from, no new IPC call; `FiltersDialog.vue` was rewritten as the two-section checkbox UI and now opens focused on the row it was invoked from, ancestors pre-expanded. `bun run lint`/`typecheck`/`build` clean throughout and the four non-Docker Playwright specs pass; `tests/ui/tree.spec.ts`'s sticky-header and checkbox-filter scenarios are Postgres-container-gated and self-skip cleanly in this sandbox (no Docker daemon) — they still need a real run in CI or the macOS/Colima environment, the same standing caveat every Docker-gated phase on this branch has recorded for itself. |
 | **P29 Grid/cell-view scroll rendering gap** | Scrolling either the data grid or the cell editor's own content quickly leaves a visible blank gap before the newly-scrolled-to content renders — worse horizontally than vertically. Root-cause the virtualization/paint timing (prefetch window, row-height math, horizontal column virtualization if any) and close the gap rather than papering over it with a spinner | A perceptible responsiveness regression in the app's two highest-traffic surfaces; standalone from every other phase in this batch. Implemented per `docs/v1/plans/P29-scroll-render-gap.md`, all eight steps: the report traced to `DataGrid.vue` (the only two-axis-virtualized surface — every CodeMirror host runs `EditorView.lineWrapping`, so the cell editor has no horizontal scroll to be "worse" at) and to five stacked causes — `rowRange`/`colRange` invalidating on every scroll pixel (fixed by deriving four primitive computeds so a sub-boundary scroll invalidates nothing downstream), zero column-axis overscan against the row axis's existing 560px (`columns.ts`'s `visibleColumnRange` gained symmetric pixel overscan, capped per side), ~126 `displayCell`/`cellNavEntry` calls per rendered cell from the template re-evaluating them on every render (collapsed into `renderRows`'s `RowVM`/`CellVM`, built once per render, template now reads fields only), `cellNavEntry` building a whole-row snapshot before knowing whether a column even had a nav affordance (gated on a `navColumns` precheck plus a narrow per-row value map), and `page.ts`'s decode cache clearing entirely on every row boundary crossed during a fling (now prunes only the rows that left the window). `.grid-row { contain: layout }` was added as a low-risk, low-cost addition; its own measured effect could not be isolated in this sandbox (see below). `bun run lint`/`typecheck`/`build` clean throughout and the four non-Docker Playwright specs pass; `budgets.spec.ts`'s new horizontal/wide-table scroll measurements and overscan-coverage invariants (`tests/ui/support/pg.ts`'s new `app.scroll_grid` fixture, 60 columns x 5000 rows) self-skip cleanly in this sandbox (no Docker daemon) and, along with the rest of the Docker-gated suite this phase's refactor is regression-guarded by (`data-view`/`mutations`/`interaction`/`tabs`/`leaks`/`cell-editor`/`perf.spec.ts`), still need a real run on the macOS/Colima box or CI — before/after PERF.md numbers are recorded as outstanding there, not fabricated. |
-| **P31 Cross-cutting polish and bug-fix batch** | A grouped batch of unrelated small fixes surfaced by use, in the tradition of P16: (1) verify the `describe is not supported for kafka`/`for sqs` log lines are a stale/incorrect warning rather than a sign the data shown is mocked, and fix or remove the log; (2) the tab strip can't be scrolled when tabs overflow — it should; (3) changing the font in Settings has no effect — fix; (4) add a small margin between the app's panels and the window's left/right/top edges; (5) give the Kafka view's ISO-timestamp fields the same date-picker affordance the grid's cell editor has (P24); (6) bring search-match highlighting and the "show only filtered rows" toggle (P24) to the Kafka, SQS, and Mongo views, which don't have it; (7) the search toolbar's match state doesn't update when the underlying page changes (a new page, fetch-more, or fetch-less changing which rows exist) — fix so match indices/highlights never point at stale rows; (8) drop the tooltip on the connections panel's expand/collapse control (it adds noise, not information); (9) the "no color" option in the new-connection color picker currently reads as a dark swatch — make it unambiguously read as transparent/none; (10) add descriptive tooltips for every column data type shown in the grid/definition view; (11) the saved/recent filters menu's hover tooltip truncates content that needs to be readable in full — widen or reflow it; (12) deleted (pending-delete) rows get a red left-edge marker, matching the existing yellow-for-modified/green-for-new convention, and Delete becomes a working keyboard shortcut and a right-click menu item, not mouse/toolbar-only; (13) drop the redundant sort-direction text from a sorted column's header label now that the click-to-sort chevron already shows it; (14) the query console's autocomplete popup doesn't respond to Arrow Up/Down — fix keyboard navigation; (15) the columns-projection toolbar button's "activated" label text overlaps its icon — remove the label and replace it with a small indicator dot/mark on the icon itself; (16) the SQL preview panel should insert a blank line between each generated statement for readability | Batched the same way P16 batched its own post-P15 fixes — none of these sixteen items is large enough to be its own phase, several touch the same surfaces (Kafka/SQS/Mongo search parity, P24's search infrastructure), and batching means one round of `test:ui` regression coverage instead of sixteen |
+| **P31 Cross-cutting polish and bug-fix batch** | A grouped batch of unrelated small fixes surfaced by use, in the tradition of P16: (1) verify the `describe is not supported for kafka`/`for sqs` log lines are a stale/incorrect warning rather than a sign the data shown is mocked, and fix or remove the log; (2) the tab strip can't be scrolled when tabs overflow — it should; (3) changing the font in Settings has no effect — fix; (4) add a small margin between the app's panels and the window's left/right/top edges; (5) give the Kafka view's ISO-timestamp fields the same date-picker affordance the grid's cell editor has (P24); (6) bring search-match highlighting and the "show only filtered rows" toggle (P24) to the Kafka, SQS, and Mongo views, which don't have it; (7) the search toolbar's match state doesn't update when the underlying page changes (a new page, fetch-more, or fetch-less changing which rows exist) — fix so match indices/highlights never point at stale rows; (8) drop the tooltip on the connections panel's expand/collapse control (it adds noise, not information); (9) the "no color" option in the new-connection color picker currently reads as a dark swatch — make it unambiguously read as transparent/none; (10) add descriptive tooltips for every column data type shown in the grid/definition view; (11) the saved/recent filters menu's hover tooltip truncates content that needs to be readable in full — widen or reflow it; (12) deleted (pending-delete) rows get a red left-edge marker, matching the existing yellow-for-modified/green-for-new convention, and Delete becomes a working keyboard shortcut and a right-click menu item, not mouse/toolbar-only; (13) drop the redundant sort-direction text from a sorted column's header label now that the click-to-sort chevron already shows it; (14) the query console's autocomplete popup doesn't respond to Arrow Up/Down — fix keyboard navigation; (15) the columns-projection toolbar button's "activated" label text overlaps its icon — remove the label and replace it with a small indicator dot/mark on the icon itself; (16) the SQL preview panel should insert a blank line between each generated statement for readability | Batched the same way P16 batched its own post-P15 fixes — none of these sixteen items is large enough to be its own phase, several touch the same surfaces (Kafka/SQS/Mongo search parity, P24's search infrastructure), and batching means one round of `test:ui` regression coverage instead of sixteen. Implemented per `docs/v1/plans/P31-polish-bugfix-batch.md`, all eleven commits: `caps.describe` (false for kafka/sqs/redis/s3) stops the definition view's second load from ever firing for an adapter that can't serve it; `CodeMirrorHost.vue`'s completion keymap wrapped in `Prec.highest` so Arrow Up/Down reach the popup instead of `defaultKeymap`'s cursor-move winning by array order; the workbench gained a 6px three-side window inset and the tab strip scrolls (wheel included) once its tabs overflow; `renderer/fonts.ts`'s canvas-measurement check (a candidate family vs. a guaranteed-bogus probe, since `document.fonts.check()` returns true for anything) reports an unavailable font honestly and re-measures every grid's column widths on a font change; all four in-page search toolbars (grid/documents/keyvalue/stream) now share `views/shared/searchFilter.ts`'s filter-toggle state, restart their scan when the underlying page is replaced (`pageVersion.n`), and Mongo/stream gained real match highlighting and empty states to match the grid/key-value pair that already had them; `DateTimePicker.vue` moved to `views/shared/` for the stream view's since-timestamp field, which now validates on apply instead of silently discarding an unparseable value; the grid's gutter gained its own red pending-delete rail (mutually exclusive with the yellow edit rail), `Delete`/`⌘⌫` and the cell context menu's own **Delete row** both work from a cell/range selection now, not only a row selection; the header's sort chevron became a 13px codicon pinned to the cell's own right edge, the Columns/Fields buttons swapped their "N / M" text badge for a plain indicator dot (the counts stayed in the tooltip), and the preview command panel puts a blank line between staged statements; `typeGlossary.ts` widened from "just the exotica" to every SQL type family plus Mongo's BSON `bsonType` spellings, the grid header tooltip gained the description, the project tree's twisty dropped its redundant tooltip (kept `aria-label`), the "no colour" swatch became a diagonal-slash mark instead of a hollow ring that read as a 13th hue, and the three saved/recent filter menus gained full-text tooltips on every entry. `bun run lint`/`typecheck`/`build` clean throughout every commit and the four non-Docker Playwright specs (`smoke`/`startup`/`workbench`/`connections`) pass — `workbench.spec.ts`'s own font-availability scenario is a real, executable regression guard in this sandbox (not Docker-gated), and caught two genuine bugs in `fonts.ts` and a pre-existing `TextField`/`:invalid`-prop snap-back bug in `SettingsDialog.vue` along the way, both fixed. Every other item this batch touches is Docker-gated (`tests/db/`, `tests/ui/kafka.spec.ts`/`sqs.spec.ts`/`mongo.spec.ts`/`redis.spec.ts`/`data-view.spec.ts`/`tabs.spec.ts`/`tooltips.spec.ts`) and self-skips cleanly in this sandbox (no Docker daemon) rather than erroring; it still needs a real run in CI or the macOS/Colima environment, including `tooltips.spec.ts`'s own new D25/D27 assertions, which were not added blind against an environment this sandbox cannot exercise. |
 | **P32 Kafka client migration + skip unnecessary group-join** | Migrate the Kafka adapter off its current client library onto `@confluentinc/kafka-javascript` (Kafka 4-compatible), and stop joining a consumer group for operations that don't need one — browsing/read-only paths currently pay a group-join round trip they have no use for | Kafka-adapter-internal; the client swap is lower-risk once P27's non-tabular-view lessons and P31's Kafka fixes are already landed, so it isn't chasing two moving targets in the same adapter at once |
 | **P33 S3: upload, download, delete, bounded edit** | S3 objects gain download and upload actions, and the demo-seed script gains more/larger sample content to exercise them against. Also add delete, and edit where the object is small enough to reasonably render/parse — above a size threshold, an object is neither parsed nor rendered, matching the grid's own large-value-truncation precedent (§8.6) rather than risking a stalled frame or a runaway parse | S3 shipped read-only browsing only in P17 S3, with mutation explicitly deferred; this is that deferred work, picked up once the rest of the mutation-and-editing patterns (grid pending-changes, Mongo insert/edit/delete, cell editor size limits) are established elsewhere in the app to reuse rather than reinvent |
 | **P34 MySQL adapter** | A sixth SQL-family adapter, `engine/adapters/mysql/`, matching the fixed internal shape (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`) `postgres/` and `mariadb/` already establish, with its own `tests/db/mysql.spec.ts` against a MySQL testcontainer | New-engine work is cheapest once every adapter-shape decision (definition view, pending-change staging, projection/caps negotiation) has already been exercised twice; MySQL is closer to MariaDB's dialect than any other engine in the app, so it's the lowest-risk new SQL adapter to add last |
@@ -790,11 +828,10 @@ src/
       grid/ documents/ keyvalue/ stream/ definition/ celleditor/ console/
                     -- each owns its own state module; a new page kind is one new folder here
                        plus one Page variant in shared/protocol, not a change to existing views
-                    celleditor/ also has timestamp.ts (shape-preserving parse/encode),
-                    DateTimePicker.vue and TimestampPane.vue — the translate pane (P24, §8.6) —
-                    and CellEditorDock.vue, the one mount point each data-shaped view uses to own
-                    the panel (P26): a v-if on that tab's selection, the resize splitter, the
-                    persisted global height
+                    celleditor/ also has timestamp.ts (shape-preserving parse/encode) and
+                    TimestampPane.vue — the translate pane (P24, §8.6) — and CellEditorDock.vue,
+                    the one mount point each data-shaped view uses to own the panel (P26): a v-if
+                    on that tab's selection, the resize splitter, the persisted global height
       documents/    ejson.ts (BSON shape recognition, shell-form render, no `bson` import — P27
                     D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
                     exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
@@ -803,7 +840,11 @@ src/
                     mongoVocabulary.ts, sqlIdent.ts, and (P27) useEditBuffer.ts (the
                     dirty/beautify/bytes/revert state machine) plus EditBufferActions.vue (the
                     chip/byte-badge/Beautify/Minify/Revert row) — mounted by both the cell editor
-                    and the document row's own edit area, one implementation instead of two
+                    and the document row's own edit area, one implementation instead of two.
+                    (P31) DateTimePicker.vue moved here from celleditor/ once the stream view's
+                    since-timestamp filter became its second consumer, and searchFilter.ts holds
+                    the "hide non-matching rows" toggle + matched-row derivation every in-page find
+                    widget (grid/documents/keyvalue/stream) shares
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
@@ -814,6 +855,9 @@ src/
                     renderer root in P27 so views/documents/ can use it without a sideways import
                     into views/celleditor/ — the CellFormat-aware dispatch stayed behind as
                     celleditor/formats.ts's beautifyFor()
+    fonts.ts        (P31) canvas-measurement font-availability check — document.fonts.check()
+                    returns true even for a nonexistent family, so this compares a candidate
+                    family's measured width against a guaranteed-bogus probe name instead
   shared/
     protocol/       ipc.ts, port.ts, engine-ops.ts — wire message shapes, one file per channel group
     domain/         connection.ts, tree.ts, ops.ts, uri.ts — types + Zod schemas for domain
