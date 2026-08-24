@@ -67,11 +67,11 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
       </template>
       <template v-else>0 of 0</template>
     </span>
-    <IconButton icon="chevron-up" :size="12" title="Previous match" data-testid="stream-search-prev" @click="prev" />
-    <IconButton icon="chevron-down" :size="12" title="Next match" data-testid="stream-search-next" @click="next" />
+    <IconButton icon="chevron-up" :size="12" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
+    <IconButton icon="chevron-down" :size="12" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
     <div class="sep" />
     <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
-    <IconButton icon="close" class="p-push" title="Close" data-testid="stream-search-close" @click="close" />
+    <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="stream-search-close" @click="close" />
   </div>
 </template>
 

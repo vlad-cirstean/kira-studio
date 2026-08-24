@@ -163,7 +163,7 @@ async function saveCurrent(): Promise<void> {
         v-if="isSaved(entry)"
         icon="edit"
         :size="12"
-        title="Rename"
+        v-tooltip="'Rename'"
         @click.stop="rename(entry)"
       />
     </template>

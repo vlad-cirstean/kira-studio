@@ -58,7 +58,7 @@ const runState = useRunState(() => props.tab.id);
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connection?.color) }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
     <div class="group">
-      <IconButton icon="refresh" :size="13" title="Refresh" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
+      <IconButton icon="refresh" :size="13" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
       <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
            is in flight (`is-live`, keyed off the same boolean that also drives `disabled`) — this
            shared Stop never got that treatment, so every non-grid view's Stop looked identically
@@ -68,7 +68,7 @@ const runState = useRunState(() => props.tab.id);
         icon="debug-stop"
         :size="13"
         :class="{ 'is-live': !!canStop }"
-        title="Stop"
+        v-tooltip="'Stop'"
         :data-testid="stopTestid"
         :disabled="!canStop"
         @click="emit('stop')"

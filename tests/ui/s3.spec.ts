@@ -193,7 +193,7 @@ test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView
   // --- read-only tooltips name the real reason (S3 has no write caps at all, not a toggle) -------
   await expect(rootView.locator('[data-testid="keyvalue-add"]')).toBeDisabled();
   await expect(rootView.locator('[data-testid="keyvalue-add"]')).toHaveAttribute(
-    'title',
+    'data-kira-tip',
     'Not supported for this connection type',
   );
 

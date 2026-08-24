@@ -93,7 +93,7 @@ function onContextMenu(e: MouseEvent): void {
       class="twisty"
       :class="{ invisible: !row.hasChildren }"
       tabindex="-1"
-      :title="row.expanded ? 'Collapse' : 'Expand'"
+      v-tooltip="row.expanded ? 'Collapse' : 'Expand'"
       :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >
@@ -102,14 +102,14 @@ function onContextMenu(e: MouseEvent): void {
     </button>
 
     <span v-if="row.kind === 'connection'" class="icon-box">
-      <span class="status-dot" :data-status="row.status" :title="statusTitle" />
+      <span class="status-dot" :data-status="row.status" v-tooltip="statusTitle" />
     </span>
     <span v-if="connectionKind" class="icon-box">
       <EngineIcon :kind="connectionKind" :size="14" />
     </span>
     <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="14" class="node-icon" />
 
-    <span class="label" :title="row.name">
+    <span class="label" v-tooltip="row.name">
       <template v-for="(part, i) in parts" :key="i">
         <mark v-if="part.hit">{{ part.text }}</mark>
         <template v-else>{{ part.text }}</template>

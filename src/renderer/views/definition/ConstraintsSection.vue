@@ -67,7 +67,7 @@ function onNavigate(c: ConstraintRow): void {
               v-if="c.referencedPath"
               type="button"
               class="ref-link"
-              :title="`Open ${referencedTableName(c)}'s definition`"
+              v-tooltip="`Open ${referencedTableName(c)}'s definition`"
               @click="onNavigate(c)"
             >
               {{ referencedTableName(c) }}

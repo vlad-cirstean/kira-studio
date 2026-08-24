@@ -996,7 +996,7 @@ defineExpose({ scrollCellIntoView });
           class="header-cell"
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
-          :title="headerTitleFor(columnOrder[c])"
+          v-tooltip="headerTitleFor(columnOrder[c])"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
             width: `${offsets[c + 1] - offsets[c]}px`,
@@ -1094,7 +1094,7 @@ defineExpose({ scrollCellIntoView });
             }}<span
               v-if="displayCell(r, c).truncated"
               class="truncated-marker"
-              title="value truncated at 64 KB"
+              v-tooltip="'value truncated at 64 KB'"
               >…</span
             >
           </template>

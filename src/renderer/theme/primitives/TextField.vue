@@ -76,7 +76,7 @@ function stepBy(dir: 1 | -1): void {
         class="step-btn"
         tabindex="-1"
         aria-hidden="true"
-        title="Increase"
+        v-tooltip="'Increase'"
         @mousedown.prevent="stepBy(1)"
       >
         <CodiconIcon name="chevron-up" :size="9" />
@@ -86,7 +86,7 @@ function stepBy(dir: 1 | -1): void {
         class="step-btn"
         tabindex="-1"
         aria-hidden="true"
-        title="Decrease"
+        v-tooltip="'Decrease'"
         @mousedown.prevent="stepBy(-1)"
       >
         <CodiconIcon name="chevron-down" :size="9" />

@@ -212,7 +212,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   const freshCountButton = page.locator('[data-testid="toolbar-count"]');
   await expect(freshCountButton).not.toHaveClass(/stale/);
   // Icon-only button — the number lives in its title tooltip, not visible text.
-  expect(await freshCountButton.getAttribute('title')).toBe('Count all rows');
+  expect(await freshCountButton.getAttribute('data-kira-tip')).toBe('Count all rows');
   await closeAllTabs(page);
 
   // --- scenario 3: deleting a connection closes its tabs, purges the tree, and leaves

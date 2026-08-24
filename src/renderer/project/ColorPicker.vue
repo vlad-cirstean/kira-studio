@@ -17,7 +17,7 @@ const colors = connectionColorSchema.options;
       class="swatch"
       :class="{ selected: modelValue === color, none: color === 'none' }"
       :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-      :title="color === 'none' ? 'No colour' : color"
+      v-tooltip="color === 'none' ? 'No colour' : color"
       :aria-label="color === 'none' ? 'No colour' : color"
       role="radio"
       :aria-checked="modelValue === color"

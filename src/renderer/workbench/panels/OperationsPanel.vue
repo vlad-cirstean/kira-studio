@@ -168,7 +168,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       <button
         type="button"
         class="clear-button"
-        title="Clears the in-memory ring only — op_log retention is automatic"
+        v-tooltip="'Clears the in-memory ring only — op_log retention is automatic'"
         @click="clearOps"
       >
         Clear
@@ -234,10 +234,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               </span>
               <span>{{ formatDuration(item.record.durationMs) }}</span>
               <span>{{ item.record.rows ?? '—' }}</span>
-              <span v-if="item.record.status === 'error'" class="mono truncate error-text" :title="item.record.error ?? ''">
+              <span v-if="item.record.status === 'error'" class="mono truncate error-text" v-tooltip="item.record.error ?? ''">
                 {{ item.record.error }}
               </span>
-              <span v-else class="mono truncate" :title="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
+              <span v-else class="mono truncate" v-tooltip="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
             </div>
             <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
               <CodeMirrorHost

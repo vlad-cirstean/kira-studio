@@ -115,7 +115,7 @@ async function saveCurrent(): Promise<void> {
       <span class="entry-name">{{ entry.name }}</span>
     </template>
     <template #entry-actions="{ entry }">
-      <IconButton icon="edit" :size="12" title="Rename" @click.stop="rename(entry)" />
+      <IconButton icon="edit" :size="12" v-tooltip="'Rename'" @click.stop="rename(entry)" />
     </template>
     <template #footer>
       <div class="p-sep" />

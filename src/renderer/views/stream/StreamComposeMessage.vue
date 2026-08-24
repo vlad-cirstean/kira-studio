@@ -63,7 +63,7 @@ async function submit(): Promise<void> {
       <div class="compose-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="add" :size="14" /></span>
         <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
-        <IconButton icon="close" class="p-push" title="Close" @click="emit('close')" />
+        <IconButton icon="close" class="p-push" v-tooltip="'Close'" @click="emit('close')" />
       </div>
 
       <div class="compose-body">

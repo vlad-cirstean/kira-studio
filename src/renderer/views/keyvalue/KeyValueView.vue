@@ -431,7 +431,7 @@ onUnmounted(() => {
             :size="13"
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
-            title="Previous page"
+            v-tooltip="'Previous page'"
             @click="goPrev(tab.id)"
           />
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
@@ -441,7 +441,7 @@ onUnmounted(() => {
             :size="13"
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
-            title="Next page"
+            v-tooltip="'Next page'"
             @click="goNext(tab.id)"
           />
         </div>
@@ -473,7 +473,7 @@ onUnmounted(() => {
           <IconButton
             icon="symbol-number"
             data-testid="keyvalue-count"
-            title="Exact count"
+            v-tooltip="'Exact count'"
             @click="runCount(tab.id)"
           />
         </div>
@@ -488,7 +488,7 @@ onUnmounted(() => {
               icon="add"
               data-testid="keyvalue-add"
               :disabled="!canInsert"
-              :title="addTitle"
+              v-tooltip="addTitle"
               @click="openAdd"
             />
             <PopoverPanel v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
@@ -524,7 +524,7 @@ onUnmounted(() => {
               icon="edit"
               data-testid="keyvalue-edit"
               :disabled="!canUpdate || !editableType"
-              :title="editTitle"
+              v-tooltip="editTitle"
               @click="openEdit"
             />
             <PopoverPanel v-if="editOpen" test-id="keyvalue-edit-popover" :width="320" @close="closeEdit">
@@ -557,14 +557,14 @@ onUnmounted(() => {
             icon="trash"
             data-testid="keyvalue-delete"
             :disabled="!canDelete"
-            :title="deleteTitle"
+            v-tooltip="deleteTitle"
             @click="onDeleteKey"
           />
 
           <IconButton
             icon="search"
             :active="!!rt?.searchOpen"
-            title="Search this page"
+            v-tooltip="'Search this page'"
             data-testid="keyvalue-search"
             @click="onToggleSearch"
           />
@@ -615,7 +615,7 @@ onUnmounted(() => {
                   'search-match': isSearchMatch(i, 'field'),
                   'search-match-current': isCurrentSearchMatch(i, 'field'),
                 }"
-                :title="rowAt(i)?.field"
+                v-tooltip="rowAt(i)?.field"
                 data-testid="keyvalue-field"
               >
                 {{ rowAt(i)?.field }}
@@ -626,11 +626,11 @@ onUnmounted(() => {
                   'search-match': isSearchMatch(i, 'value'),
                   'search-match-current': isCurrentSearchMatch(i, 'value'),
                 }"
-                :title="rowAt(i)?.value"
+                v-tooltip="rowAt(i)?.value"
                 data-testid="keyvalue-value"
               >
                 {{ rowAt(i)?.value }}
-                <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" title="value truncated"
+                <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" v-tooltip="'value truncated'"
                   >truncated</span
                 >
               </div>

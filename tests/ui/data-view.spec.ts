@@ -203,14 +203,17 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   // icon-only (no visible badge) — the number lives in its title tooltip instead.
   await page.click('[data-testid="toolbar-count"]');
   await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'title',
+    'data-kira-tip',
     /1,000,000/,
     { timeout: 15_000 },
   );
   await expect(page.locator('[data-testid="pager"]')).toContainText('of 100000');
 
   await page.click('[data-testid="pager-next"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute('title', /1,000,000/);
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    /1,000,000/,
+  );
 
   const opsBeforeCountRefresh = await getOps(page, connectionId);
   await page.click('[data-testid="toolbar-refresh"]');

@@ -435,7 +435,7 @@ onUnmounted(() => {
             icon="symbol-number"
             :size="13"
             data-testid="stream-count"
-            title="Count"
+            v-tooltip="'Count'"
             @click="runCount(tab.id)"
           />
           <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
@@ -444,7 +444,7 @@ onUnmounted(() => {
             icon="arrow-swap"
             active
             data-testid="stream-poll"
-            title="Poll for messages"
+            v-tooltip="'Poll for messages'"
             @click="onPoll"
           >
             Poll
@@ -455,7 +455,7 @@ onUnmounted(() => {
             :size="13"
             data-testid="stream-next"
             :disabled="!rt?.hasMore"
-            title="Next page"
+            v-tooltip="'Next page'"
             @click="goNext(tab.id)"
           />
         </div>
@@ -482,7 +482,7 @@ onUnmounted(() => {
               icon="add"
               :size="13"
               data-testid="stream-add-message"
-              :title="isKafka ? 'Produce a message' : 'Send a message'"
+              v-tooltip="isKafka ? 'Produce a message' : 'Send a message'"
               @click="composeOpen = !composeOpen"
             />
             <StreamComposeMessage
@@ -498,14 +498,14 @@ onUnmounted(() => {
             :size="13"
             data-testid="stream-delete-message"
             :disabled="!hasSelectedRow"
-            :title="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
+            v-tooltip="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
             @click="onDeleteMessage"
           />
           <IconButton
             icon="search"
             :size="13"
             :active="rt?.searchOpen"
-            title="Search this page"
+            v-tooltip="'Search this page'"
             data-testid="stream-search-toggle"
             @click="onToggleSearch"
           />
@@ -519,7 +519,7 @@ onUnmounted(() => {
         <div class="history-anchor">
           <IconButton
             icon="history"
-            title="Filter history"
+            v-tooltip="'Filter history'"
             data-testid="stream-filter-history-button"
             @click="filterHistoryOpen = !filterHistoryOpen"
           />
@@ -544,7 +544,7 @@ onUnmounted(() => {
           <AppButton
             icon="filter"
             data-testid="stream-filter-partition"
-            title="Filter by partition"
+            v-tooltip="'Filter by partition'"
             @click="onTogglePartitionMenu"
           >
             {{ partitionButtonLabel }}
@@ -593,7 +593,7 @@ onUnmounted(() => {
             @blur="onApplyFilter"
           />
         </div>
-        <AppButton data-testid="stream-filter-clear" title="Empty every field and refetch" @click="onClearFilter">
+        <AppButton data-testid="stream-filter-clear" v-tooltip="'Empty every field and refetch'" @click="onClearFilter">
           Clear
         </AppButton>
       </template>
@@ -741,7 +741,7 @@ onUnmounted(() => {
                 @click.stop="onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated)"
               >
                 {{ rowAt(i)?.body }}
-                <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" title="body truncated"
+                <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" v-tooltip="'body truncated'"
                   >(truncated)</span
                 >
               </div>

@@ -19,7 +19,7 @@ import { treeState } from './state/tree';
         icon="close"
         :size="12"
         class="clear-button"
-        title="Clear search"
+        v-tooltip="'Clear search'"
         aria-label="Clear search"
         @click="treeState.search = ''"
       />

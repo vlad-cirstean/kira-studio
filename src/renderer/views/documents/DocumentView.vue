@@ -454,7 +454,7 @@ onUnmounted(() => {
           <IconButton
             icon="chevron-left"
             :size="12"
-            title="First page"
+            v-tooltip="'First page'"
             data-testid="document-pager-first"
             :disabled="tab.state.pageIndex === 0"
             @click="goFirst(tab.id)"
@@ -464,7 +464,7 @@ onUnmounted(() => {
             :size="13"
             data-testid="document-prev"
             :disabled="tab.state.pageIndex === 0"
-            title="Previous page"
+            v-tooltip="'Previous page'"
             @click="goPrev(tab.id)"
           />
           <span class="page-label p-sm muted">
@@ -486,13 +486,13 @@ onUnmounted(() => {
             :size="13"
             data-testid="document-next"
             :disabled="!rt?.hasMore"
-            title="Next page"
+            v-tooltip="'Next page'"
             @click="goNext(tab.id)"
           />
           <IconButton
             icon="chevron-right"
             :size="12"
-            :title="pageCount ? 'Last page' : 'Count documents first'"
+            v-tooltip="pageCount ? 'Last page' : 'Count documents first'"
             data-testid="document-pager-last"
             :disabled="!pageCount"
             @click="goLast(tab.id)"
@@ -520,7 +520,7 @@ onUnmounted(() => {
           <IconButton
             icon="symbol-number"
             data-testid="document-count"
-            title="Run an exact countDocuments() — the estimate above is metadata"
+            v-tooltip="'Run an exact countDocuments() — the estimate above is metadata'"
             @click="runCount(tab.id)"
           />
           <div class="projection-anchor">
@@ -528,7 +528,7 @@ onUnmounted(() => {
               icon="list-selection"
               data-testid="document-toolbar-projection"
               :count="tab.state.projection !== null ? (projectionCountLabel ?? undefined) : undefined"
-              :title="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
+              v-tooltip="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
               @click="projectionOpen = !projectionOpen"
             />
             <ProjectionMenu
@@ -541,14 +541,14 @@ onUnmounted(() => {
           <IconButton
             icon="expand-all"
             :size="13"
-            title="Expand all"
+            v-tooltip="'Expand all'"
             data-testid="document-expand-all"
             @click="onExpandAll"
           />
           <IconButton
             icon="collapse-all"
             :size="13"
-            title="Collapse all"
+            v-tooltip="'Collapse all'"
             data-testid="document-collapse-all"
             @click="onCollapseAll"
           />
@@ -562,13 +562,13 @@ onUnmounted(() => {
             :size="13"
             data-testid="document-add"
             :disabled="!caps?.canInsert"
-            :title="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
+            v-tooltip="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
             @click="onAddDocument"
           />
           <IconButton
             icon="search"
             :active="rt?.searchOpen"
-            title="Search this page"
+            v-tooltip="'Search this page'"
             data-testid="document-toolbar-search"
             @click="onToggleSearch"
           />
@@ -585,7 +585,7 @@ onUnmounted(() => {
         <div class="history-anchor">
           <IconButton
             icon="history"
-            title="Saved &amp; recent filters"
+            v-tooltip="'Saved & recent filters'"
             data-testid="document-filter-history-button"
             @click="filterHistoryOpen = !filterHistoryOpen"
           />
@@ -614,14 +614,14 @@ onUnmounted(() => {
             v-model="sortText"
             prefix="SORT"
             placeholder="{ createdAt: -1, name: 1 }"
-            title="Mongo sort document: 1 = ascending, -1 = descending"
+            v-tooltip="'Mongo sort document: 1 = ascending, -1 = descending'"
             data-testid="document-sort"
             :candidates="sortCandidates"
             @enter="onSortInput"
             @blur="onSortInput"
           />
         </div>
-        <AppButton title="Empty both fields and refetch" data-testid="document-filter-clear" @click="onClearFilter">
+        <AppButton v-tooltip="'Empty both fields and refetch'" data-testid="document-filter-clear" @click="onClearFilter">
           Clear
         </AppButton>
       </template>
@@ -689,7 +689,7 @@ onUnmounted(() => {
                   :size="12"
                   :active="editingId === rowAt(i)?.id"
                   data-testid="document-edit"
-                  title="Edit"
+                  v-tooltip="'Edit'"
                   @click="rowAt(i) && startEdit(rowAt(i)!.id, rowAt(i)!.body)"
                 />
               </div>
@@ -724,7 +724,7 @@ onUnmounted(() => {
               <span
                 v-if="rowAt(i)?.isTruncated"
                 class="p-badge truncated-marker"
-                title="value truncated"
+                v-tooltip="'value truncated'"
                 >truncated</span
               >
             </div>

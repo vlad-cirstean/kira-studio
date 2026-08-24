@@ -43,7 +43,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
         :size="14"
         class="p-push"
         aria-label="Add connection"
-        title="New connection"
+        v-tooltip="'New connection'"
         data-testid="add-connection"
         @click="openCreateDialog"
       />

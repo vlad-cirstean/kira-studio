@@ -8,12 +8,15 @@ import { togglePalette } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
 import { settingsOpen } from './state/settings';
 import { activateNextTab, activatePrevTab, closeTab, tabsState } from './state/tabs';
+import AppTooltip from './workbench/AppTooltip.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
 import { initEngineState } from './workbench/state/engine';
 import { toggleOperationsPanel, toggleProjectPanel } from './workbench/state/layout';
+import { initTooltips } from './workbench/state/tooltip';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
 let unsubscribe: Array<() => void> = [];
+let teardownTooltips: (() => void) | null = null;
 
 function closeActiveTab(): void {
   if (tabsState.activeId) closeTab(tabsState.activeId);
@@ -21,6 +24,7 @@ function closeActiveTab(): void {
 
 onMounted(() => {
   void initEngineState();
+  teardownTooltips = initTooltips();
   unsubscribe = [
     control.onOpenSettings(() => {
       settingsOpen.value = true;
@@ -41,6 +45,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   for (const off of unsubscribe) off();
+  teardownTooltips?.();
 });
 </script>
 
@@ -49,4 +54,5 @@ onUnmounted(() => {
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <ContextMenu />
   <CommandPalette />
+  <AppTooltip />
 </template>

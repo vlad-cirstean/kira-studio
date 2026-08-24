@@ -140,9 +140,13 @@ test('mariadb — connect, tree, data tab, count, filter, cancel', async ({
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
 
   await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute('title', /3/, {
-    timeout: 15_000,
-  });
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    /3/,
+    {
+      timeout: 15_000,
+    },
+  );
 
   await page.fill('[data-testid="filter-where-input"]', 'quantity > 1');
   await page.press('[data-testid="filter-where-input"]', 'Enter');

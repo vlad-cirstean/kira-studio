@@ -248,7 +248,7 @@ const preconnectText = computed({
       <AppButton
         icon="chevron-left"
         class="p-push"
-        title="Pick a different engine"
+        v-tooltip="'Pick a different engine'"
         @click="step = 'engine'"
       >
         Change engine
@@ -276,7 +276,7 @@ const preconnectText = computed({
             :disabled="!SUPPORTED_KINDS.has(kind)"
             role="radio"
             :aria-checked="draft.kind === kind"
-            :title="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
+            v-tooltip="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
             :data-testid="`connection-kind-${kind}`"
             @click="pickKind(kind)"
           >
@@ -384,7 +384,7 @@ const preconnectText = computed({
                 </div>
                 <IconButton
                   :icon="showPassword ? 'eye-closed' : 'eye'"
-                  :title="showPassword ? 'Hide password' : 'Show password'"
+                  v-tooltip="showPassword ? 'Hide password' : 'Show password'"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 />

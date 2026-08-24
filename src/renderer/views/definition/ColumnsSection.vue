@@ -65,7 +65,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <span
               v-if="typeDescription(col.dataType)"
               class="type-info"
-              :title="typeDescription(col.dataType) ?? ''"
+              v-tooltip="typeDescription(col.dataType) ?? ''"
             >
               <CodiconIcon name="info" :size="12" />
             </span>

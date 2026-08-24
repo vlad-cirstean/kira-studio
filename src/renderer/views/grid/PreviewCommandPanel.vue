@@ -59,7 +59,7 @@ function close(): void {
         <IconButton
           icon="close"
           class="p-push"
-          title="Close"
+          v-tooltip="'Close'"
           data-testid="preview-command-close"
           @click="close"
         />

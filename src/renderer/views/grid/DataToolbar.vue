@@ -214,7 +214,7 @@ function onDiscard(): void {
     <div class="group">
       <IconButton
         icon="refresh"
-        title="Refresh"
+        v-tooltip="'Refresh'"
         data-testid="toolbar-refresh"
         :disabled="!!rt?.opId"
         @click="onRefresh"
@@ -222,7 +222,7 @@ function onDiscard(): void {
       <IconButton
         icon="debug-stop"
         :class="{ 'is-live': !!rt?.opId }"
-        title="Stop"
+        v-tooltip="'Stop'"
         data-testid="toolbar-stop"
         :disabled="!rt?.opId"
         @click="onStop"
@@ -237,7 +237,7 @@ function onDiscard(): void {
       <IconButton
         icon="chevron-left"
         :size="12"
-        title="First page"
+        v-tooltip="'First page'"
         data-testid="pager-first"
         :disabled="tab.state.pageIndex === 0"
         @click="onFirst"
@@ -245,7 +245,7 @@ function onDiscard(): void {
       <IconButton
         icon="chevron-left"
         :size="12"
-        title="Previous page"
+        v-tooltip="'Previous page'"
         data-testid="pager-prev"
         :disabled="tab.state.pageIndex === 0"
         @click="onPrev"
@@ -267,7 +267,7 @@ function onDiscard(): void {
       <IconButton
         icon="chevron-right"
         :size="12"
-        title="Next page"
+        v-tooltip="'Next page'"
         data-testid="pager-next"
         :disabled="!rt?.hasMore"
         @click="onNext"
@@ -275,7 +275,7 @@ function onDiscard(): void {
       <IconButton
         icon="chevron-right"
         :size="12"
-        :title="pageCount ? 'Last page' : 'Count rows first'"
+        v-tooltip="pageCount ? 'Last page' : 'Count rows first'"
         data-testid="pager-last"
         :disabled="!pageCount"
         @click="onLast"
@@ -306,7 +306,7 @@ function onDiscard(): void {
         icon="symbol-number"
         data-testid="toolbar-count"
         :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
-        :title="
+        v-tooltip="
           rt?.count
             ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
             : 'Count all rows'
@@ -319,7 +319,7 @@ function onDiscard(): void {
           icon="list-selection"
           data-testid="toolbar-columns"
           :count="columnsBadge"
-          :title="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
+          v-tooltip="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
           @click="columnsOpen = !columnsOpen"
         />
         <ColumnsMenu
@@ -338,19 +338,19 @@ function onDiscard(): void {
         icon="add"
         data-testid="toolbar-add-row"
         :disabled="!isWritable"
-        :title="isWritable ? 'Add a row' : 'Connection is read-only'"
+        v-tooltip="isWritable ? 'Add a row' : 'Connection is read-only'"
         @click="onAddRow"
       />
       <IconButton
         icon="trash"
         data-testid="toolbar-delete-row"
         :disabled="!isWritable"
-        :title="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
+        v-tooltip="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
         @click="onDeleteRow"
       />
       <IconButton
         icon="search"
-        title="Search this page"
+        v-tooltip="'Search this page'"
         data-testid="toolbar-search"
         @click="onToggleSearch"
       />
@@ -369,7 +369,7 @@ function onDiscard(): void {
           icon="eye"
           data-testid="toolbar-preview-command"
           :disabled="!isWritable"
-          :title="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
+          v-tooltip="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
           @click="previewOpen = !previewOpen"
         />
         <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
@@ -378,7 +378,7 @@ function onDiscard(): void {
         icon="discard"
         data-testid="toolbar-discard-changes"
         :disabled="!isWritable"
-        title="Discard pending changes"
+        v-tooltip="'Discard pending changes'"
         @click="onDiscard"
       />
       <IconButton
@@ -386,7 +386,7 @@ function onDiscard(): void {
         tone="primary"
         data-testid="toolbar-commit-changes"
         :disabled="!isWritable"
-        title="Commit pending changes"
+        v-tooltip="'Commit pending changes'"
         @click="onCommit"
       />
     </div>

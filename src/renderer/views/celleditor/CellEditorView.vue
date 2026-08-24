@@ -348,7 +348,7 @@ const timestampReading = computed(() => {
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
-      <span class="p-badge status-badge" :title="statusLine" data-testid="cell-editor-status">{{
+      <span class="p-badge status-badge" v-tooltip="statusLine" data-testid="cell-editor-status">{{
         statusLine
       }}</span>
 
@@ -358,7 +358,7 @@ const timestampReading = computed(() => {
           data-testid="cell-editor-format"
           :disabled="isNullValue"
           :value="override ?? 'auto'"
-          :title="detectedReason"
+          v-tooltip="detectedReason"
           @change="onFormatSelect"
         >
           <option value="auto">Auto — {{ FORMAT_LABEL[detectedFormat] }}</option>
@@ -370,7 +370,7 @@ const timestampReading = computed(() => {
           :size="14"
           data-testid="cell-editor-uuid-generate"
           :disabled="!canGenerateUuid"
-          :title="uuidGenerateTitle"
+          v-tooltip="uuidGenerateTitle"
           @click="generateUuid"
         />
         <IconButton
@@ -379,7 +379,7 @@ const timestampReading = computed(() => {
           :active="formatted === 'indented'"
           data-testid="cell-editor-beautify-indented"
           :disabled="!canBeautify(effectiveFormat)"
-          :title="beautifyIndentedTitle"
+          v-tooltip="beautifyIndentedTitle"
           @click="applyBeautify('indented')"
         />
         <IconButton
@@ -388,7 +388,7 @@ const timestampReading = computed(() => {
           :active="formatted === 'compact'"
           data-testid="cell-editor-beautify-compact"
           :disabled="!canBeautify(effectiveFormat)"
-          :title="beautifyCompactTitle"
+          v-tooltip="beautifyCompactTitle"
           @click="applyBeautify('compact')"
         />
         <IconButton
@@ -396,13 +396,13 @@ const timestampReading = computed(() => {
           :size="14"
           data-testid="cell-editor-beautify-reset"
           :disabled="!isDirty"
-          :title="resetDisabledTitle"
+          v-tooltip="resetDisabledTitle"
           @click="resetBuffer"
         />
       </span>
 
       <template #trailing>
-        <span v-if="readOnlyReason" class="p-chip warn" :title="readOnlyChipTitle">
+        <span v-if="readOnlyReason" class="p-chip warn" v-tooltip="readOnlyChipTitle">
           <CodiconIcon name="lock" :size="12" />
           {{ readOnlyChipText }}
         </span>
@@ -424,7 +424,7 @@ const timestampReading = computed(() => {
           data-testid="cell-editor-timestamp-picker"
           :value="timestampInputValue"
           :disabled="!isEditable"
-          :title="
+          v-tooltip="
             isEditable
               ? 'Pick a date and time — re-encodes into this cell\'s current timestamp format'
               : readOnlyChipText || 'Not editable'

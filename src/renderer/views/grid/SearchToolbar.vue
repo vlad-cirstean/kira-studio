@@ -139,21 +139,21 @@ onUnmounted(() => {
       <IconButton
         icon="case-sensitive"
         :active="matchCase"
-        title="Match case"
+        v-tooltip="'Match case'"
         data-testid="search-match-case"
         @click="matchCase = !matchCase"
       />
       <IconButton
         icon="whole-word"
         :active="wholeWord"
-        title="Whole word"
+        v-tooltip="'Whole word'"
         data-testid="search-whole-word"
         @click="wholeWord = !wholeWord"
       />
       <IconButton
         icon="regex"
         :active="regex"
-        title="Regular expression"
+        v-tooltip="'Regular expression'"
         data-testid="search-regex"
         @click="regex = !regex"
       />
@@ -172,12 +172,12 @@ onUnmounted(() => {
         <template v-else-if="scanning">{{ foundSoFar }}…</template>
         <template v-else>0 of 0</template>
       </span>
-      <IconButton icon="chevron-up" :size="12" title="Previous match" data-testid="search-prev" @click="goPrev" />
-      <IconButton icon="chevron-down" :size="12" title="Next match" data-testid="search-next" @click="goNext" />
+      <IconButton icon="chevron-up" :size="12" v-tooltip="'Previous match'" data-testid="search-prev" @click="goPrev" />
+      <IconButton icon="chevron-down" :size="12" v-tooltip="'Next match'" data-testid="search-next" @click="goNext" />
       <div class="sep" />
       <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
     </template>
-    <IconButton icon="close" class="p-push" title="Close" data-testid="search-close" @click="close" />
+    <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="search-close" @click="close" />
   </div>
 </template>
 

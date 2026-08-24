@@ -161,7 +161,7 @@ function selectKeyValueRow(row: number): void {
             :style="{ width: `${widths[col.name]}px` }"
           >
             <span class="name">{{ col.name }}</span>
-            <span class="p-badge" :title="col.dataType">{{ col.dataType }}</span>
+            <span class="p-badge" v-tooltip="col.dataType">{{ col.dataType }}</span>
           </div>
         </div>
       </template>
@@ -186,7 +186,7 @@ function selectKeyValueRow(row: number): void {
               }}<span
                 v-if="cellAt(r, c).truncated"
                 class="truncated-marker"
-                title="value truncated at 64 KB"
+                v-tooltip="'value truncated at 64 KB'"
                 >…</span
               >
             </template>

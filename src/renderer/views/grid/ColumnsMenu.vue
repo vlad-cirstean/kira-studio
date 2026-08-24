@@ -126,7 +126,7 @@ function close(): void {
             type="checkbox"
             :checked="selected.has(name)"
             :disabled="pkNames.has(name)"
-            :title="pkNames.has(name) ? 'Primary key — always shown' : undefined"
+            v-tooltip="pkNames.has(name) ? 'Primary key — always shown' : undefined"
             data-testid="columns-menu-item"
             @change="toggle(name)"
           />

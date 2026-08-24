@@ -15,6 +15,7 @@ import { totalRetainedBytes } from './views/grid/page';
 import { totalRetainedBytes as keyValueRetainedBytes } from './views/keyvalue/kvPage';
 import { totalRetainedBytes as streamRetainedBytes } from './views/stream/streamPage';
 import { hydrateLayout } from './workbench/state/layout';
+import { vTooltip } from './workbench/state/tooltip';
 
 declare global {
   interface Window {
@@ -57,7 +58,7 @@ async function bootstrap(): Promise<void> {
     hydrateOps(),
     hydrateTabs(),
   ]);
-  createApp(App).mount('#app');
+  createApp(App).directive('tooltip', vTooltip).mount('#app');
 }
 
 void bootstrap();

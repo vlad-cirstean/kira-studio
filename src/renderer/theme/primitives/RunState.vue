@@ -23,7 +23,7 @@ const label = computed(() => {
   <span
     class="p-run-state"
     :class="{ 'is-running': status === 'running', 'is-error': status === 'error' }"
-    :title="title"
+    v-tooltip="title"
   >
     {{ label }}<span class="ring" />
   </span>

@@ -34,7 +34,7 @@ const cacheSizeLabel = computed(() => {
     </div>
 
     <div class="side">
-      <span v-if="cacheSizeLabel" class="p-status" data-testid="cache-size" :title="cacheTitle">
+      <span v-if="cacheSizeLabel" class="p-status" data-testid="cache-size" v-tooltip="cacheTitle">
         <CodiconIcon name="database" :size="10" />
         {{ cacheSizeLabel }}
       </span>
@@ -42,7 +42,7 @@ const cacheSizeLabel = computed(() => {
         class="p-status"
         data-testid="engine-status"
         :data-status="engineState.status"
-        :title="engineState.lastPingMs !== null ? `${engineState.lastPingMs} ms` : undefined"
+        v-tooltip="engineState.lastPingMs !== null ? `${engineState.lastPingMs} ms` : undefined"
       >
         <CodiconIcon
           name="circle-large-filled"
@@ -59,7 +59,7 @@ const cacheSizeLabel = computed(() => {
           type="button"
           class="p-status"
           :class="{ 'is-on': layoutState.panel.project.visible }"
-          title="Connections"
+          v-tooltip="'Connections'"
           data-testid="toggle-project-panel"
           @click="toggleProjectPanel"
         >
@@ -69,7 +69,7 @@ const cacheSizeLabel = computed(() => {
           type="button"
           class="p-status"
           :class="{ 'is-on': layoutState.panel.operations.visible }"
-          title="Operations"
+          v-tooltip="'Operations'"
           data-testid="toggle-operations-panel"
           @click="toggleOperationsPanel"
         >
@@ -78,7 +78,7 @@ const cacheSizeLabel = computed(() => {
         <button
           type="button"
           class="p-status"
-          title="Settings"
+          v-tooltip="'Settings'"
           data-testid="open-settings"
           aria-label="Settings"
           @click="settingsOpen = true"

@@ -21,7 +21,7 @@ defineEmits<{ 'update:modelValue': [value: T] }>();
       :key="opt.value"
       type="button"
       :class="{ on: opt.value === modelValue }"
-      :title="opt.title"
+      v-tooltip="opt.title"
       :data-testid="opt.testid"
       @click="$emit('update:modelValue', opt.value)"
     >

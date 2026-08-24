@@ -669,7 +669,7 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
 
   // --- beautify buttons now carry a tooltip once enabled, not just when disabled ---------------
   await expect(page.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveAttribute(
-    'title',
+    'data-kira-tip',
     /./,
   );
 

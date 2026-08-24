@@ -179,7 +179,7 @@ const statusLine = computed(() => {
           variant="primary"
           data-testid="console-run-statement"
           :disabled="running"
-          title="Run the statement under the cursor"
+          v-tooltip="'Run the statement under the cursor'"
           @click="runStatement"
         >
           Run
@@ -188,7 +188,7 @@ const statusLine = computed(() => {
           icon="run-all"
           data-testid="console-run-all"
           :disabled="running"
-          title="Run every statement in the editor"
+          v-tooltip="'Run every statement in the editor'"
           @click="runAll"
         >
           Run all
@@ -198,7 +198,7 @@ const statusLine = computed(() => {
           <AppButton
             icon="bookmark"
             data-testid="console-saved-toggle"
-            title="Saved queries"
+            v-tooltip="'Saved queries'"
             @click="savedMenuOpen = !savedMenuOpen"
           >
             Saved queries

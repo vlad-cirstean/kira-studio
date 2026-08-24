@@ -195,7 +195,7 @@ const breadcrumb = computed(() => {
           <div class="sep" />
           <AppButton
             icon="copy"
-            title="Copy definition to clipboard"
+            v-tooltip="'Copy definition to clipboard'"
             data-testid="definition-copy"
             @click="onCopy"
           >
@@ -204,7 +204,7 @@ const breadcrumb = computed(() => {
         </template>
         <AppButton
           icon="terminal"
-          title="Open query console here"
+          v-tooltip="'Open query console here'"
           data-testid="definition-open-console"
           @click="onOpenConsole"
         >

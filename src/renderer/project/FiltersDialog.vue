@@ -135,7 +135,7 @@ const connectionName = computed(
             <input v-model="rule.isRegex" type="checkbox" />
             Regex
           </label>
-          <IconButton icon="trash" title="Delete rule" aria-label="Delete rule" @click="removeRule(index)" />
+          <IconButton icon="trash" v-tooltip="'Delete rule'" aria-label="Delete rule" @click="removeRule(index)" />
           <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
         </div>
       </div>

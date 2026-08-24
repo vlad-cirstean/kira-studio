@@ -101,8 +101,8 @@ test('preconnect — dialog field, persistence, and failure before connect', asy
   await expect(failRow.locator('.status-dot')).toHaveAttribute('data-status', 'error', {
     timeout: 10_000,
   });
-  await expect(failRow.locator('.status-dot')).toHaveAttribute('title', /exit 3/);
-  await expect(failRow.locator('.status-dot')).toHaveAttribute('title', /nope/);
+  await expect(failRow.locator('.status-dot')).toHaveAttribute('data-kira-tip', /exit 3/);
+  await expect(failRow.locator('.status-dot')).toHaveAttribute('data-kira-tip', /nope/);
   // Never observed 'connected' — the failing script must have aborted the connect outright,
   // proven here by the status never having flipped away from 'error' at all.
   await expect(failRow.locator('.status-dot')).not.toHaveAttribute('data-status', 'connected');
@@ -187,7 +187,10 @@ test.describe('preconnect — sidecar lifecycle against a live connection', () =
     await expect(row.locator('.status-dot')).toHaveAttribute('data-status', 'error', {
       timeout: 10_000,
     });
-    await expect(row.locator('.status-dot')).toHaveAttribute('title', /Pre-connect script exited/);
+    await expect(row.locator('.status-dot')).toHaveAttribute(
+      'data-kira-tip',
+      /Pre-connect script exited/,
+    );
     await row.click({ button: 'right' });
     await expect(page.locator('[data-testid="menu-item-connect"]')).toBeVisible();
     await page.keyboard.press('Escape');
