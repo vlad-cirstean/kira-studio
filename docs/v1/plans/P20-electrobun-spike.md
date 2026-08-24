@@ -557,3 +557,71 @@ follow-on phase's real cost is visible at the moment the decision gets made:
    pointer here?** Stage 0 step 4 assumes the latter (minimal edit: point at this plan, state the
    blocker). Rewriting the row is the alternative if the reduced scope in D1 is accepted as the
    phase's real definition.
+
+---
+
+## 9. Outcome (2026-08-23)
+
+§0's verdict above turned out not to be final: a later session had open egress to
+`hutch.blackboard.sh` and got past Stage 0 — Electrobun installed, Hutch/Cottontail resolved, and a
+real build ran. So the phase was investigated properly rather than staying closed on network access,
+and the answer changed from "blocked" to **"out of scope — will not be done,"** on different
+grounds than §0 anticipated. Two dealbreakers surfaced, both substantive rather than tooling
+friction:
+
+1. **No E2E testing path.** Electrobun's webview is WKWebView; Apple exposes no WebDriver/CDP
+   endpoint for it. `tests/ui/*.spec.ts`'s `_electron.launch()` has no equivalent, Cypress hits the
+   same wall, and the one working alternative — Appium's `mac2-driver`/XCUITest — drives the OS
+   accessibility tree, not the DOM. For this app's grid-heavy, cell-level UI that means rewriting the
+   suite's interaction model from scratch, not porting it.
+2. **The bulk-data architecture would regress** — this is §7 item 1 above, and it did not survive
+   contact. SPEC §4's `MessageChannelMain` design hands the engine subprocess a port straight into
+   the renderer so bulk query results never transit or block the main process. Electrobun's RPC
+   bridge (checked directly: `bridge-payload-ownership.test.ts`, no `Transferable`/`ArrayBuffer`/
+   `structuredClone` anywhere in `rpc.ts`) only copies payloads, with no port-transfer primitive.
+   Every bulk page would move onto the same event loop as the native menu and window chrome,
+   undermining `docs/PERF.md` §2.1's interaction budgets rather than just needing them re-measured.
+
+Electrobun is also pre-1.0 (Cottontail is v0.5.0), so the API surface under either `mainProcess`
+option is unverified beyond docs — a third factor, but not decisive on its own next to the two
+above. SPEC.md's P20 row has been rewritten to record this (§8 question 6, resolved: rewrite, not a
+pointer). The branch (`feature/electrobun`) and all local Electrobun/Hutch/Cottontail tooling
+(`.hutch/` in both the repo and `$HOME`, the `hutch electrobun init` PATH edit to `~/.zshrc`) were
+removed.
+
+### 9.1 Follow-up: squeezing Electron's own baseline instead
+
+Given P20 doesn't ship, the same session tried the cheaper alternative: tweak the existing Electron
+app's memory footprint directly rather than change runtimes. Two levers were tried against
+`tests/ui/memory.spec.ts`'s 5-connection/10-tab scenario (`expect(minTotal).toBeLessThan(350MB)`):
+`webPreferences.spellcheck: false` (no free-text prose entry in this app, so no functional loss) and
+`app.commandLine.appendSwitch('in-process-gpu')` (merges the GPU process into the browser process,
+trading away GPU-crash isolation).
+
+Measured same-machine, 3 repeats before and 3 after (both flags applied together):
+
+- Baseline (0 connections): ≈485.9MB avg → ≈430.7MB avg (**≈55MB / ~11% down**).
+- Loaded (5 conn / 10 tabs, the scenario the budget assertion checks): ≈527.9MB avg → ≈477.3MB avg
+  (**≈50.6MB / ~9.6% down**), consistent across all 3 repeats.
+- The assertion still failed by a wide margin in every run — best case 469.0MB, still ~119MB over
+  the 350MB budget.
+
+Also found in passing: `docs/PERF.md` §2.2's documented baseline (~739MB) and loaded (~765–836MB)
+figures are from a visibly heavier environment than this machine — this machine's own unmodified
+"before" numbers (450–521MB baseline, 522–571MB loaded) are already well below what's on record.
+`docs/PERF.md` has not been updated with fresh numbers as of this writing.
+
+`in-process-gpu` was researched before deciding whether to keep it: no evidence any major Electron
+app (VS Code, Discord, Slack, etc.) ships it deliberately, and Electron's own tracker has issues
+describing the flag's own fragility, independent of underlying GPU-driver stability
+([#18048](https://github.com/electron/electron/issues/18048),
+[#42688](https://github.com/electron/electron/issues/42688)). No usable real-world crash-rate figure
+was found either way.
+
+**Both flags were reverted** — `spellcheck: false` on the merits it was found to have no downside for
+this app but wasn't requested to ship; `in-process-gpu` for lack of production precedent weighed
+against a real but partial (~10%) and insufficient (test still fails) gain. Neither change is present
+on the branch. A real fix for the 350MB budget needs an architecture-level lever (e.g. lazy-starting
+the engine subprocess, which only helps the idle/0-connection number, not the always-5-connections
+loaded scenario the assertion checks) — per D21, that's a human decision, not something this
+follow-up should make unilaterally.
