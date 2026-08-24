@@ -8,7 +8,13 @@ import ErrorPopover from './ErrorPopover.vue';
 import { columnTypeIcon, nodeIcon } from './icons';
 import type { TreeRowVm } from './state/tree';
 
-const props = defineProps<{ row: TreeRowVm; selected: boolean }>();
+// P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
+// different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
+// (so the tree keeps its single roving tab stop). Every emit, every child element, the colour
+// rail and the twisty behave identically either way — a pinned row is a real row, not a decoration.
+const props = withDefaults(defineProps<{ row: TreeRowVm; selected: boolean; sticky?: boolean }>(), {
+  sticky: false,
+});
 const emit = defineEmits<{
   select: [row: TreeRowVm];
   toggle: [row: TreeRowVm];
@@ -77,11 +83,12 @@ function onContextMenu(e: MouseEvent): void {
     class="tree-row"
     :class="{ selected }"
     :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-    data-testid="tree-row"
+    :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
     :data-path="row.path"
     :data-kind="row.kind"
     :data-status="row.kind === 'connection' ? row.status : undefined"
-    :tabindex="selected ? 0 : -1"
+    :data-depth="sticky ? row.depth : undefined"
+    :tabindex="sticky ? -1 : selected ? 0 : -1"
     @click="onClick"
     @dblclick="onDblClick"
     @contextmenu.prevent.stop="onContextMenu"

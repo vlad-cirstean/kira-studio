@@ -22,6 +22,7 @@ import {
   treeState,
   visibleRows,
 } from './state/tree';
+import { STICKY_MAX_ROWS, stickyBand, stickyInsetFor } from './stickyBand';
 import TreeRow from './TreeRow.vue';
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
@@ -39,14 +40,34 @@ const KEYVALUE_OPENABLE_KINDS = new Set(['key', 'object']);
 const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
-const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
+const virtualListRef = ref<{ scrollToIndex: (index: number, inset?: number) => void } | null>(null);
 
 onMounted(() => {
   initTreeSync();
 });
 
+// P28 D2: published by VirtualList's own scrollstate emit — ProjectTree is the only component
+// that understands what an ancestor is, so the band's geometry lives here, not in VirtualList.
+const scrollTop = ref(0);
+const viewportHeight = ref(0);
+function onScrollState(state: { scrollTop: number; viewportHeight: number }): void {
+  scrollTop.value = state.scrollTop;
+  viewportHeight.value = state.viewportHeight;
+}
+
+// D5: three rows, further clamped so a deliberately short panel never spends more of its own
+// height on the band than it has rows to spare.
+const stickyMaxRows = computed(() =>
+  Math.max(0, Math.min(STICKY_MAX_ROWS, Math.floor(viewportHeight.value / rowHeight.value) - 2)),
+);
+
+const band = computed(() =>
+  stickyBand(visibleRows.value, scrollTop.value, rowHeight.value, stickyMaxRows.value),
+);
+
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
 // scrolling happens here, one tick later, once visibleRows reflects the newly expanded nodes.
+// The inset (P28 D6) keeps the revealed row clear of the band it would otherwise land behind.
 watch(
   () => treeState.pendingScrollKey,
   async (key) => {
@@ -54,7 +75,9 @@ watch(
     treeState.pendingScrollKey = null;
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const index = visibleRows.value.findIndex((row) => row.key === key);
-    if (index >= 0) virtualListRef.value?.scrollToIndex(index);
+    if (index < 0) return;
+    const inset = stickyInsetFor(visibleRows.value, index, rowHeight.value, stickyMaxRows.value);
+    virtualListRef.value?.scrollToIndex(index, inset);
   },
 );
 
@@ -164,7 +187,12 @@ function onTreeKeydown(e: KeyboardEvent): void {
       @contextmenu.prevent="onBackgroundContextMenu"
       @keydown="onTreeKeydown"
     >
-      <VirtualList ref="virtualListRef" :items="visibleRows" :row-height="rowHeight">
+      <VirtualList
+        ref="virtualListRef"
+        :items="visibleRows"
+        :row-height="rowHeight"
+        @scrollstate="onScrollState"
+      >
         <template #default="{ item }">
           <TreeRow
             :row="item"
@@ -174,6 +202,23 @@ function onTreeKeydown(e: KeyboardEvent): void {
             @open="onOpen"
             @contextmenu="onContextMenu"
           />
+        </template>
+        <template #sticky>
+          <div data-testid="tree-sticky-band">
+            <TreeRow
+              v-for="slot in band"
+              :key="slot.row.key"
+              class="sticky-row"
+              :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+              :row="slot.row"
+              :selected="treeState.selected === slot.row.key"
+              sticky
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+            />
+          </div>
         </template>
       </VirtualList>
     </div>
@@ -198,6 +243,18 @@ function onTreeKeydown(e: KeyboardEvent): void {
 .tree-body {
   flex: 1;
   min-height: 0;
+}
+
+/* Positioned relative to VirtualList's own zero-height .virtual-list-sticky (itself
+   position: sticky), which is what makes each row's `top` (stickyBand.ts's own output) land
+   correctly without this component needing to know anything about the scrollport (P28 D2). A row
+   here is opaque and full-width so it fully occludes whatever real row has scrolled up behind it. */
+.sticky-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--kira-bg);
+  z-index: 1;
 }
 
 /* P24 D34: reuses .p-strip.note (primitives.css) for padding/font-size/colour/background — this
