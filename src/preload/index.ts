@@ -4,7 +4,6 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '../shared/domain/connection';
-import type { ConnectionFilter, ConnectionFilterInput } from '../shared/domain/connection-filter';
 import type { OpRecord } from '../shared/domain/ops';
 import type {
   ConsoleBody,
@@ -16,6 +15,7 @@ import type {
   SortSpec,
 } from '../shared/domain/queries';
 import type { TabRecord } from '../shared/domain/tabs';
+import type { TreeVisibility } from '../shared/domain/tree-filter';
 import type { LayoutPatch } from '../shared/layout';
 import type {
   EngineStatus,
@@ -157,9 +157,9 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.treeInvalidate, args),
 
   filtersList: (args: { connectionId: string }) =>
-    ipcRenderer.invoke(IPC.filtersList, args) as Promise<ConnectionFilter[]>,
-  filtersReplace: (args: { connectionId: string; filters: ConnectionFilterInput[] }) =>
-    ipcRenderer.invoke(IPC.filtersReplace, args) as Promise<ConnectionFilter[]>,
+    ipcRenderer.invoke(IPC.filtersList, args) as Promise<TreeVisibility>,
+  filtersReplace: (args: { connectionId: string; visibility: TreeVisibility }) =>
+    ipcRenderer.invoke(IPC.filtersReplace, args) as Promise<TreeVisibility>,
 
   opsRecent: (args: { limit: number }) =>
     ipcRenderer.invoke(IPC.opsRecent, args) as Promise<OpRecord[]>,

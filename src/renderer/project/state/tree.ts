@@ -1,11 +1,11 @@
 import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connection';
-import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
 import type { SavedFilterQuery } from '@shared/domain/queries';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
+import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { connectConnection, connectionsState } from '../../state/connections';
-import { evaluate } from '../filter';
+import { isVisible, toSets, type VisibilitySets } from '../filter';
 import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
 
 export interface TreeRowVm {
@@ -49,7 +49,7 @@ export const treeState = reactive({
   expanded: new Set<string>(),
   loading: new Set<string>(),
   errors: {} as Record<string, string>,
-  filters: {} as Record<string, ConnectionFilter[]>,
+  visibility: {} as Record<string, TreeVisibility>,
   search: '',
   selected: null as string | null,
   /** Set by revealPath(); ProjectTree.vue watches it to scroll the row into view (Step 7b). */
@@ -104,16 +104,16 @@ async function loadChildren(connectionId: string, path: string, refresh: boolean
   }
 }
 
-export async function loadFilters(connectionId: string): Promise<void> {
-  if (treeState.filters[connectionId]) return;
-  treeState.filters[connectionId] = await control.filtersList(connectionId);
+export async function loadVisibility(connectionId: string): Promise<void> {
+  if (treeState.visibility[connectionId]) return;
+  treeState.visibility[connectionId] = await control.filtersList(connectionId);
 }
 
-export async function saveFilters(
+export async function saveVisibility(
   connectionId: string,
-  inputs: ConnectionFilterInput[],
+  visibility: TreeVisibility,
 ): Promise<void> {
-  treeState.filters[connectionId] = await control.filtersReplace(connectionId, inputs);
+  treeState.visibility[connectionId] = await control.filtersReplace(connectionId, visibility);
 }
 
 // D25: skips the round trip when treeState.children[k] is already populated. This is not the
@@ -139,7 +139,7 @@ export async function expand(connectionId: string, path: string): Promise<void> 
     }
   }
   if (connectionsState.states[connectionId]?.status !== 'connected') return;
-  await loadFilters(connectionId);
+  await loadVisibility(connectionId);
   treeState.expanded.add(k);
   if (treeState.children[k]) return;
   await loadChildren(connectionId, path, false);
@@ -229,7 +229,7 @@ export function dropConnectionState(connectionId: string): void {
   for (const k of Object.keys(treeState.errors)) {
     if (k.startsWith(prefix)) delete treeState.errors[k];
   }
-  delete treeState.filters[connectionId];
+  delete treeState.visibility[connectionId];
   for (const k of Object.keys(treeState.savedQueries)) {
     if (k.startsWith(prefix)) delete treeState.savedQueries[k];
   }
@@ -238,7 +238,7 @@ export function dropConnectionState(connectionId: string): void {
 }
 
 // Every connection id this module currently holds state for, gathered from the six collections'
-// own keys — `filters` is keyed directly by connectionId, the rest by rowKey (D6). Exported
+// own keys — `visibility` is keyed directly by connectionId, the rest by rowKey (D6). Exported
 // only for the Playwright-only `window.__kiraTreeConnectionIds` hook (main.ts, D6's leak spec).
 export function knownConnectionIds(): Set<string> {
   const ids = new Set<string>();
@@ -250,7 +250,7 @@ export function knownConnectionIds(): Set<string> {
   for (const k of treeState.expanded) addFromKey(k);
   for (const k of treeState.loading) addFromKey(k);
   for (const k of Object.keys(treeState.errors)) addFromKey(k);
-  for (const k of Object.keys(treeState.filters)) addFromKey(k);
+  for (const k of Object.keys(treeState.visibility)) addFromKey(k);
   for (const k of Object.keys(treeState.savedQueries)) addFromKey(k);
   return ids;
 }
@@ -284,7 +284,7 @@ function buildNodeRow(
   connectionId: string,
   node: TreeNode,
   depth: number,
-  filters: ConnectionFilter[],
+  sets: VisibilitySets,
   query: string,
   out: TreeRowVm[],
   stats: SearchStats,
@@ -310,7 +310,7 @@ function buildNodeRow(
       node.path,
       childNodes,
       depth + 1,
-      filters,
+      sets,
       query,
       childOut,
       stats,
@@ -344,17 +344,17 @@ function buildRows(
   parentPath: string,
   nodes: TreeNode[],
   depth: number,
-  filters: ConnectionFilter[],
+  sets: VisibilitySets,
   query: string,
   out: TreeRowVm[],
   stats: SearchStats,
 ): boolean {
   let anyMatch = false;
-  const visible = nodes.filter((node) => evaluate(node, filters));
+  const visible = nodes.filter((node) => isVisible(node, sets));
   const { ungrouped, groups } = partitionChildren(visible);
 
   for (const node of ungrouped) {
-    if (buildNodeRow(connectionId, node, depth, filters, query, out, stats)) anyMatch = true;
+    if (buildNodeRow(connectionId, node, depth, sets, query, out, stats)) anyMatch = true;
   }
 
   if (groups.length === 0) return anyMatch;
@@ -365,7 +365,7 @@ function buildRows(
     const childOut: TreeRowVm[] = [];
     let anyChildMatch = false;
     for (const member of group.nodes) {
-      if (buildNodeRow(connectionId, member, depth + 1, filters, query, childOut, stats)) {
+      if (buildNodeRow(connectionId, member, depth + 1, sets, query, childOut, stats)) {
         anyChildMatch = true;
       }
     }
@@ -401,14 +401,14 @@ const searchResult = computed(() => {
     const state = connectionsState.states[conn.id];
     const naturallyExpanded = treeState.expanded.has(connKey);
     const childNodes = treeState.children[connKey];
-    const filters = treeState.filters[conn.id] ?? [];
+    const sets = toSets(treeState.visibility[conn.id] ?? EMPTY_VISIBILITY);
 
     if (query && !childNodes) stats.incomplete = true;
 
     const childOut: TreeRowVm[] = [];
     let descendantMatch = false;
     if (childNodes && (query ? true : naturallyExpanded)) {
-      descendantMatch = buildRows(conn.id, '', childNodes, 1, filters, query, childOut, stats);
+      descendantMatch = buildRows(conn.id, '', childNodes, 1, sets, query, childOut, stats);
     }
 
     const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;

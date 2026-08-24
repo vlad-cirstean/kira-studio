@@ -1,90 +1,109 @@
 <script setup lang="ts">
-import type {
-  ConnectionFilter,
-  ConnectionFilterInput,
-  FilterNodeKind,
-} from '@shared/domain/connection-filter';
+import type { NodeKind } from '@shared/domain/tree';
+import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
-import { evaluate } from './filter';
-import { closeFiltersDialog, filtersDialogState, saveFilters, treeState } from './state/tree';
+import {
+  type FilterNodeRow,
+  kindRows,
+  nodeRows,
+  previewCounts,
+  toggleKind,
+  toggleNode,
+} from './filterTree';
+import { closeFiltersDialog, filtersDialogState, saveVisibility, treeState } from './state/tree';
 
-const NODE_KIND_LABEL: Record<FilterNodeKind, string> = {
-  database: 'Database',
-  schema: 'Schema',
-  table: 'Table',
-};
+// P28 D10-D19: checkboxes, not rules. Two sections over the same cached-node model — Object
+// types (kind, flat) and Objects (path, expandable) — plus a live-consequence strip. Nothing here
+// fetches; the dialog offers exactly what the tree has already cached (D21).
 
-const draft = ref<ConnectionFilterInput[]>([]);
+const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
+const expandedPaths = ref<Set<string>>(new Set());
+const nameFilter = ref('');
 
 watch(
   () => filtersDialogState.connectionId,
   (connectionId) => {
+    expandedPaths.value = new Set();
+    nameFilter.value = '';
     if (!connectionId) return;
-    const existing = treeState.filters[connectionId] ?? [];
-    draft.value = existing.map((r) => ({
-      nodeKind: r.nodeKind,
-      pattern: r.pattern,
-      isRegex: r.isRegex,
-      action: r.action,
-    }));
+    const existing = treeState.visibility[connectionId] ?? EMPTY_VISIBILITY;
+    draft.value = {
+      hiddenKinds: [...existing.hiddenKinds],
+      hiddenPaths: [...existing.hiddenPaths],
+    };
   },
   { immediate: true },
 );
 
-function addRule(): void {
-  draft.value.push({ nodeKind: 'schema', pattern: '', isRegex: false, action: 'hide' });
-}
+const kinds = computed(() =>
+  filtersDialogState.connectionId ? kindRows(filtersDialogState.connectionId, draft.value) : [],
+);
 
-function removeRule(index: number): void {
-  draft.value.splice(index, 1);
-}
+const objects = computed(() =>
+  filtersDialogState.connectionId
+    ? nodeRows(filtersDialogState.connectionId, draft.value, expandedPaths.value, nameFilter.value)
+    : { rows: [], truncated: false },
+);
 
-function ruleError(rule: ConnectionFilterInput): string | null {
-  if (!rule.isRegex || !rule.pattern) return null;
-  try {
-    new RegExp(rule.pattern);
-    return null;
-  } catch (err) {
-    return err instanceof Error ? err.message : 'Invalid pattern';
-  }
-}
-
-// A live preview computed from the same filter.ts evaluate() the tree itself uses, so this
-// dialog cannot disagree with what the tree will actually show.
+// A live preview computed from the same filterTree.ts previewCounts() the tree itself is
+// evaluated with, so this dialog cannot disagree with what the tree will actually show.
 const preview = computed(() => {
   const connectionId = filtersDialogState.connectionId;
-  if (!connectionId) return { hidden: 0, total: 0 };
-  const prefix = `${connectionId}|`;
-  const evalRules: ConnectionFilter[] = draft.value.map((r) => ({
-    ...r,
-    id: '',
-    connectionId: '',
-  }));
-  let hidden = 0;
-  let total = 0;
-  for (const [key, nodes] of Object.entries(treeState.children)) {
-    if (!key.startsWith(prefix)) continue;
-    for (const node of nodes) {
-      total += 1;
-      if (!evaluate(node, evalRules)) hidden += 1;
-    }
-  }
-  return { hidden, total };
+  if (!connectionId) return { shown: 0, total: 0 };
+  return previewCounts(connectionId, draft.value);
 });
+
+function onToggleKind(kind: NodeKind): void {
+  draft.value = toggleKind(draft.value, kind);
+}
+
+function onToggleNode(row: FilterNodeRow): void {
+  if (row.disabled) return;
+  draft.value = toggleNode(draft.value, row);
+}
+
+function onToggleExpand(path: string): void {
+  const next = new Set(expandedPaths.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  expandedPaths.value = next;
+}
+
+// D18: All/None act on the currently listed subset only — under a name filter, that is just the
+// matching rows and their ancestors, not the whole cached tree.
+function allObjects(): void {
+  let v = draft.value;
+  for (const row of objects.value.rows) {
+    if (row.state !== 'on' && !row.disabled) v = toggleNode(v, row);
+  }
+  draft.value = v;
+}
+
+function noneObjects(): void {
+  let v = draft.value;
+  for (const row of objects.value.rows) {
+    if (row.state !== 'off' && !row.disabled) v = toggleNode(v, row);
+  }
+  draft.value = v;
+}
+
+function allKinds(): void {
+  draft.value = { ...draft.value, hiddenKinds: [] };
+}
+
+function noneKinds(): void {
+  draft.value = { ...draft.value, hiddenKinds: kinds.value.map((r) => r.kind) };
+}
 
 async function onSave(): Promise<void> {
   const connectionId = filtersDialogState.connectionId;
   if (!connectionId) return;
-  await saveFilters(
-    connectionId,
-    draft.value.filter((r) => r.pattern.trim() !== ''),
-  );
+  await saveVisibility(connectionId, draft.value);
   closeFiltersDialog();
 }
 
@@ -100,7 +119,7 @@ const connectionName = computed(
     v-if="filtersDialogState.open"
     title="Tree filters"
     :width="560"
-    max-height="70vh"
+    max-height="80vh"
     test-id="filters-dialog"
     close-test-id="filters-dialog-close"
     @close="closeFiltersDialog"
@@ -111,44 +130,104 @@ const connectionName = computed(
     </template>
 
     <div class="dialog-body-inner">
-      <!-- Rules run top to bottom, last match wins — the preview strip below is the running
-           answer to "what will the tree actually show", so nobody has to evaluate the order
-           by hand. -->
       <span class="help">
-        Rules run top to bottom; the last matching rule wins. This never changes what a query
-        returns — only what is listed on the left.
+        Ticked types and objects are shown; unticking one hides it and everything under it.
+        Nothing you have not unticked is ever hidden — an object created later shows up too.
       </span>
 
-      <div class="rule-list">
-        <div v-for="(rule, index) in draft" :key="index" class="rule-row">
-          <select v-model="rule.nodeKind" class="p-select bordered">
-            <option v-for="(label, kind) in NODE_KIND_LABEL" :key="kind" :value="kind">{{ label }}</option>
-          </select>
-          <select v-model="rule.action" class="p-select bordered">
-            <option value="hide">Hide</option>
-            <option value="show">Show</option>
-          </select>
-          <div class="pattern-input-wrap">
-            <TextField v-model="rule.pattern" class="pattern-input" placeholder="pg_*" />
-          </div>
-          <label class="regex-checkbox">
-            <input v-model="rule.isRegex" type="checkbox" />
-            Regex
-          </label>
-          <IconButton icon="trash" v-tooltip="'Delete rule'" aria-label="Delete rule" @click="removeRule(index)" />
-          <span v-if="ruleError(rule)" class="field-error rule-error">{{ ruleError(rule) }}</span>
+      <section class="filter-section">
+        <div class="section-head">
+          <span class="section-title">Object types</span>
+          <span class="section-links">
+            <button type="button" class="link-btn" @click="allKinds">All</button>
+            <button type="button" class="link-btn" @click="noneKinds">None</button>
+          </span>
         </div>
-      </div>
+        <div class="kind-list" data-testid="filter-kind-list">
+          <label
+            v-for="row in kinds"
+            :key="row.kind"
+            class="kind-row"
+            :data-testid="`filter-kind-row-${row.kind}`"
+            :data-state="row.hidden ? 'off' : 'on'"
+          >
+            <input
+              type="checkbox"
+              :checked="!row.hidden"
+              @change="onToggleKind(row.kind)"
+            />
+            <span class="kind-label">{{ row.label }}</span>
+            <span class="kind-count">{{ row.count }}</span>
+          </label>
+          <span v-if="kinds.length === 0" class="empty-note">Nothing cached yet.</span>
+        </div>
+      </section>
 
-      <AppButton icon="add" class="add-rule" @click="addRule">Add rule</AppButton>
+      <section class="filter-section">
+        <div class="section-head">
+          <span class="section-title">Objects</span>
+          <span class="section-links">
+            <button type="button" class="link-btn" @click="allObjects">All</button>
+            <button type="button" class="link-btn" @click="noneObjects">None</button>
+          </span>
+        </div>
+        <div class="name-filter-wrap">
+          <TextField
+            v-model="nameFilter"
+            class="name-filter"
+            placeholder="Filter objects by name"
+            data-testid="filter-name-input"
+          />
+        </div>
+        <div class="object-list" data-testid="filter-object-list">
+          <div
+            v-for="row in objects.rows"
+            :key="row.path"
+            class="object-row"
+            data-testid="filter-object-row"
+            :data-path="row.path"
+            :data-state="row.state"
+            :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+          >
+            <button
+              v-if="row.hasChildren"
+              type="button"
+              class="twisty-btn"
+              :aria-label="expandedPaths.has(row.path) ? 'Collapse' : 'Expand'"
+              @click="onToggleExpand(row.path)"
+            >
+              <CodiconIcon :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'" :size="12" />
+            </button>
+            <span v-else class="twisty-spacer" />
+            <label class="object-checkbox-label" v-tooltip="row.disabledReason ?? undefined">
+              <input
+                type="checkbox"
+                :checked="row.state !== 'off'"
+                :indeterminate.prop="row.state === 'partial'"
+                :disabled="row.disabled"
+                @change="onToggleNode(row)"
+              />
+              <span class="object-name">{{ row.name }}</span>
+            </label>
+            <span v-if="row.hasChildren" class="object-count">{{ row.childCount }}</span>
+          </div>
+          <span v-if="objects.rows.length === 0" class="empty-note">Nothing cached yet.</span>
+          <span v-if="objects.truncated" class="empty-note truncated-note" data-testid="filter-object-truncated">
+            Showing the first 500 rows — type to narrow.
+          </span>
+        </div>
+      </section>
 
-      <div class="p-strip note preview-strip">
+      <div class="p-strip note preview-strip" data-testid="filters-preview">
         <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
         <span>
-          Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
-          is deleted — removing a rule brings it straight back.
+          Will show <b>{{ preview.shown }}</b> of <b>{{ preview.total }}</b> cached nodes.
         </span>
       </div>
+
+      <span class="help cached-note">
+        Only cached nodes are listed here — expand more of the tree to include them.
+      </span>
     </div>
 
     <template #footer>
@@ -179,60 +258,136 @@ const connectionName = computed(
   font-family: var(--kira-font-family);
 }
 
-.rule-list {
+.filter-section {
   display: flex;
   flex-direction: column;
   gap: var(--kira-s-2);
 }
 
-.rule-row {
+.section-head {
   display: flex;
   align-items: center;
-  gap: var(--kira-s-2);
-  flex-wrap: wrap;
+  justify-content: space-between;
 }
 
-.rule-row select {
-  height: var(--kira-h-md);
-}
-
-.pattern-input-wrap {
-  flex: 1;
-  min-width: 100px;
-}
-
-.pattern-input-wrap :deep(.p-input) {
-  width: 100%;
-}
-
-.regex-checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+.section-title {
   font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
+  font-weight: 600;
+  color: var(--kira-fg);
+}
+
+.section-links {
+  display: flex;
+  gap: var(--kira-s-2);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--kira-t-xs);
+  color: var(--kira-accent);
   cursor: pointer;
 }
 
-.regex-checkbox input {
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.kind-list,
+.object-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  padding: var(--kira-s-2);
+}
+
+.kind-row,
+.object-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  height: var(--kira-h-md);
+  cursor: default;
+}
+
+.kind-row input,
+.object-checkbox-label input {
   width: 14px;
   height: 14px;
   accent-color: var(--kira-accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-.field-error {
-  color: var(--kira-error);
+.object-checkbox-label input:disabled {
+  cursor: not-allowed;
+}
+
+.kind-label,
+.object-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--kira-t-sm);
+}
+
+.kind-count,
+.object-count {
   font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
 }
 
-.rule-error {
+.object-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.twisty-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+}
+
+.twisty-spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.empty-note {
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+  padding: var(--kira-s-2);
+}
+
+.truncated-note {
+  font-style: italic;
+}
+
+.name-filter-wrap {
   width: 100%;
 }
 
-.add-rule {
-  align-self: flex-start;
+.name-filter-wrap :deep(.p-input) {
+  width: 100%;
 }
 
 /* the live-consequence strip is boxed rather than full-bleed, since it sits inside the
@@ -241,6 +396,10 @@ const connectionName = computed(
   align-self: stretch;
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius-sm);
+}
+
+.cached-note {
+  align-self: flex-start;
 }
 
 .footer-actions {

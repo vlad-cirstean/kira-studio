@@ -1,5 +1,4 @@
 import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../domain/connection';
-import type { ConnectionFilter, ConnectionFilterInput } from '../domain/connection-filter';
 import type { ObjectDefinition } from '../domain/definition';
 import type { OpRecord } from '../domain/ops';
 import type {
@@ -14,6 +13,7 @@ import type {
 import type { SecretStorageStatus } from '../domain/secrets';
 import type { TabRecord } from '../domain/tabs';
 import type { ObjectMeta, TreeNode } from '../domain/tree';
+import type { TreeVisibility } from '../domain/tree-filter';
 import type { Layout, LayoutPatch } from '../layout';
 import type { Settings, SettingsPatch } from '../settings';
 
@@ -179,11 +179,11 @@ export interface KiraApi {
   }): Promise<TreeDefinitionResult>;
   treeInvalidate(args: { connectionId: string; path?: string }): Promise<void>;
 
-  filtersList(args: { connectionId: string }): Promise<ConnectionFilter[]>;
+  filtersList(args: { connectionId: string }): Promise<TreeVisibility>;
   filtersReplace(args: {
     connectionId: string;
-    filters: ConnectionFilterInput[];
-  }): Promise<ConnectionFilter[]>;
+    visibility: TreeVisibility;
+  }): Promise<TreeVisibility>;
 
   opsRecent(args: { limit: number }): Promise<OpRecord[]>;
   opsCancel(args: { opId: string }): Promise<void>;

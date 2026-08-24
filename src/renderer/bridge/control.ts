@@ -3,7 +3,6 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
-import type { ConnectionFilter, ConnectionFilterInput } from '@shared/domain/connection-filter';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
   ConsoleBody,
@@ -16,6 +15,7 @@ import type {
 } from '@shared/domain/queries';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { TabRecord } from '@shared/domain/tabs';
+import type { TreeVisibility } from '@shared/domain/tree-filter';
 import type { Layout, LayoutPatch } from '@shared/layout';
 import type {
   AppInfo,
@@ -107,12 +107,10 @@ export const control = {
   treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
     kira.treeInvalidate({ connectionId, path }),
 
-  filtersList: (connectionId: string): Promise<ConnectionFilter[]> =>
+  filtersList: (connectionId: string): Promise<TreeVisibility> =>
     kira.filtersList({ connectionId }),
-  filtersReplace: (
-    connectionId: string,
-    filters: ConnectionFilterInput[],
-  ): Promise<ConnectionFilter[]> => kira.filtersReplace(plain({ connectionId, filters })),
+  filtersReplace: (connectionId: string, visibility: TreeVisibility): Promise<TreeVisibility> =>
+    kira.filtersReplace(plain({ connectionId, visibility })),
 
   opsRecent: (limit: number): Promise<OpRecord[]> => kira.opsRecent({ limit }),
   opsCancel: (opId: string): Promise<void> => kira.opsCancel({ opId }),
