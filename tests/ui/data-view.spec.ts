@@ -332,6 +332,94 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="search-prev"]');
   expect(await getOps(page, connectionId)).toHaveLength(opsBeforeSearch.length); // zero new op-log rows
   await page.screenshot({ path: 'test-results/screenshots/search-toolbar.png' });
+
+  // --- P24: filter mode hides non-matching rows (D1-D13) -----------------------------------
+  // This page is still pageSize 10, unsorted (id-ascending), no WHERE — ids are plain digit
+  // strings and `hash` (big_rows' other column) is always a 32-char md5 hex string that can
+  // never equal one of them exactly, so an anchored regex alternation gives a deterministic,
+  // non-contiguous 3-row subset with no dependency on hash's actual bytes. Regex mode (and the
+  // still-open toolbar) carries over from the block above.
+  const filterToggle = page.locator('[data-testid="search-filter-rows"]');
+  const opsBeforeFilterSequence = await getOps(page, connectionId);
+
+  await page.fill('[data-testid="search-input"]', '^(2|5|9)$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3');
+  await filterToggle.click();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3);
+  // Row numbers stay real (D4): the gutter reads the rows' true, non-contiguous numbers rather
+  // than renumbering 1..3, which is the affordance that says rows are hidden at all.
+  await expect(page.locator('[data-testid="grid-gutter-cell"]')).toHaveText(['2', '5', '9']);
+  // The match counter is unaffected by filtering (D6) — every match is inside a visible row.
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3');
+  await expect(page.locator('[data-testid="search-scope"]')).toContainText(
+    'showing 3 of 10 loaded rows',
+  );
+
+  // Prev/next and the current-match highlight still work while filtering (D6).
+  await page.click('[data-testid="search-next"]');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('2 of 3');
+  await expect(page.locator('.search-match-current')).toBeVisible();
+
+  // Keyboard navigation stays inside the visible set (D11): id=2 is page row 1; ArrowDown must
+  // land on the next *visible* row (id=5, page row 4), not page row 2 (id=3, hidden).
+  await page.click('[data-testid="grid-cell"][data-row="1"][data-column="id"]');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-testid="grid-cell"].selected')).toHaveAttribute('data-row', '4');
+
+  // Copy column values follows the filter (D10): one clipboard line per visible row, not per
+  // loaded row.
+  await page.click('[data-testid="grid-header-cell"][data-column="id"]', { button: 'right' });
+  await page.click('[data-testid="menu-item-copy-column-values"]');
+  expect((await page.evaluate(() => navigator.clipboard.readText())).split('\n')).toEqual([
+    '2',
+    '5',
+    '9',
+  ]);
+
+  // Zero matches (D8): a query matching nothing shows the "No matching rows" empty state (not
+  // a blank grid, and not "No rows" — LAW 15) with a working "Show all rows" action.
+  await page.fill('[data-testid="search-input"]', '^nope-matches-nothing-here$');
+  await expect(page.locator('[data-testid="grid-no-matching-rows"]')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(0);
+  await page.click('[data-testid="grid-show-all-rows"]');
+  await expect(page.locator('[data-testid="grid-no-matching-rows"]')).toHaveCount(0);
+  await expect(filterToggle).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
+
+  // Pending inserts survive the filter (D5), whatever the query matches — an unsaved row is
+  // work in progress, not a search result, and can't be matched anyway (search never walks the
+  // pending set).
+  await page.click('[data-testid="toolbar-add-row"]');
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(1);
+  await filterToggle.click(); // query is still the zero-match string from above
+  await expect(page.locator('[data-testid="grid-no-matching-rows"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(1);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(0);
+  await filterToggle.click(); // back off
+
+  // Empty query keeps the toggle lit and shows everything (D7) — clearing the field must not
+  // empty the grid.
+  await page.fill('[data-testid="search-input"]', '');
+  await filterToggle.click();
+  await expect(filterToggle).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
+
+  // Closing the toolbar unfilters (D7), and reopening starts with the toggle off.
+  await page.fill('[data-testid="search-input"]', '^(2|5|9)$');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3);
+  await page.click('[data-testid="search-close"]');
+  await expect(searchToolbar).toHaveCount(0);
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10);
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(searchToolbar).toBeVisible();
+  await expect(filterToggle).not.toHaveClass(/is-active/);
+
+  // Zero operations for the whole filter sequence (D13): the single assertion that proves the
+  // filter never reached the server — a op-log row would mean it had.
+  expect(await getOps(page, connectionId)).toHaveLength(opsBeforeFilterSequence.length);
+
   await page.click('[data-testid="search-close"]');
   await expect(searchToolbar).toHaveCount(0);
 
