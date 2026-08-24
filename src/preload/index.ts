@@ -128,6 +128,7 @@ const kiraApi: KiraApi = {
   connectionsDisconnect: (args: { id: string }) =>
     ipcRenderer.invoke(IPC.connectionsDisconnect, args),
   connectionsStates: () => ipcRenderer.invoke(IPC.connectionsStates),
+  connectionsSecretsStatus: () => ipcRenderer.invoke(IPC.connectionsSecretsStatus),
   onConnectionState: (cb: (state: ConnectionState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: ConnectionState): void => cb(state);
     ipcRenderer.on(IPC.connectionState, listener);

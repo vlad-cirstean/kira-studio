@@ -11,6 +11,7 @@ import type {
   SavedQuery,
   SortSpec,
 } from '../domain/queries';
+import type { SecretStorageStatus } from '../domain/secrets';
 import type { TabRecord } from '../domain/tabs';
 import type { ObjectMeta, TreeNode } from '../domain/tree';
 import type { Layout, LayoutPatch } from '../layout';
@@ -47,6 +48,7 @@ export const IPC = {
   connectionsDelete: 'kira:connections:delete',
   connectionsReorder: 'kira:connections:reorder',
   connectionsReveal: 'kira:connections:reveal',
+  connectionsSecretsStatus: 'kira:connections:secretsStatus',
   connectionsTest: 'kira:connections:test',
   connectionsConnect: 'kira:connections:connect',
   connectionsDisconnect: 'kira:connections:disconnect',
@@ -146,7 +148,10 @@ export interface KiraApi {
   connectionsDuplicate(args: { id: string }): Promise<ConnectionSummary>;
   connectionsDelete(args: { id: string }): Promise<void>;
   connectionsReorder(args: { ids: string[] }): Promise<ConnectionSummary[]>;
-  connectionsReveal(args: { id: string }): Promise<{ password: string | null }>;
+  connectionsReveal(args: {
+    id: string;
+  }): Promise<{ password: string | null; error: string | null }>;
+  connectionsSecretsStatus(): Promise<SecretStorageStatus>;
   connectionsTest(args: { input: ConnectionInput }): Promise<ConnectionTestResult>;
   connectionsConnect(args: { id: string }): Promise<ConnectionState>;
   connectionsDisconnect(args: { id: string }): Promise<ConnectionState>;

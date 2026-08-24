@@ -42,4 +42,5 @@ export function registerConnectionsHandlers(deps: IpcDeps): void {
     connections.disconnect(idArgsSchema.parse(payload).id),
   );
   handle(IPC.connectionsStates, () => connections.states());
+  handle(IPC.connectionsSecretsStatus, () => connections.secretsStatus());
 }

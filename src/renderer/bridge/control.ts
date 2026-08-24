@@ -14,6 +14,7 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
+import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { Layout, LayoutPatch } from '@shared/layout';
 import type {
@@ -70,7 +71,7 @@ export const control = {
   connectionsDelete: (id: string): Promise<void> => kira.connectionsDelete({ id }),
   connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
     kira.connectionsReorder(plain({ ids })),
-  connectionsReveal: (id: string): Promise<{ password: string | null }> =>
+  connectionsReveal: (id: string): Promise<{ password: string | null; error: string | null }> =>
     kira.connectionsReveal({ id }),
   connectionsTest: (input: ConnectionInput): Promise<ConnectionTestResult> =>
     kira.connectionsTest(plain({ input })),
@@ -78,6 +79,7 @@ export const control = {
   connectionsDisconnect: (id: string): Promise<ConnectionState> =>
     kira.connectionsDisconnect({ id }),
   connectionsStates: (): Promise<ConnectionState[]> => kira.connectionsStates(),
+  connectionsSecretsStatus: (): Promise<SecretStorageStatus> => kira.connectionsSecretsStatus(),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
     kira.onConnectionState(cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>

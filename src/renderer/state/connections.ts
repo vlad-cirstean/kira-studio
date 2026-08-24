@@ -4,6 +4,7 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import { DEFAULT_PORT } from '@shared/domain/connection';
+import type { SecretStorageStatus } from '@shared/domain/secrets';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 
@@ -23,18 +24,23 @@ export const connectionsState = reactive({
     editingId: null,
     draft: null,
   } as ConnectionDialogState,
+  // P25: reported once at startup and never changes for the life of the process — the
+  // connection dialog's credential note (D8) reads this directly.
+  secretStorage: null as SecretStorageStatus | null,
 });
 
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeListChanged: (() => void) | null = null;
 
 export async function hydrateConnections(): Promise<void> {
-  const [records, states] = await Promise.all([
+  const [records, states, secretStorage] = await Promise.all([
     control.connectionsList(),
     control.connectionsStates(),
+    control.connectionsSecretsStatus(),
   ]);
   connectionsState.records = records;
   for (const state of states) connectionsState.states[state.connectionId] = state;
+  connectionsState.secretStorage = secretStorage;
 
   unsubscribeState?.();
   unsubscribeState = control.onConnectionState((state) => {
