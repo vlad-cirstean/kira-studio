@@ -272,6 +272,52 @@ test('autocomplete — console shows SQL keywords on a resolved dialect (MariaDB
   expect(consoleErrors).toEqual([]);
 });
 
+// P31 item 14/D36: ArrowUp/ArrowDown used to be shadowed by CodeMirror's defaultKeymap (bound
+// earlier in the extension array), so the completion popup never saw them — Prec.highest on the
+// completion keymap fixes that without depending on array order.
+test('autocomplete — arrow keys navigate the completion popup, Tab still accepts, Enter still newlines (P31 D36/D37)', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(240_000);
+  if (!mariadb) throw new Error('mariadb fixture did not start');
+  const { window: page } = kira;
+
+  await connectMariadb(page);
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+
+  await openRowMenu(page, DB_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const sqlConsole = page.locator('[data-testid="console-view"]');
+  await expect(sqlConsole).toBeVisible();
+  await sqlConsole.locator('.cm-content').click();
+  await page.keyboard.type('SEL');
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+
+  const options = tooltip.locator('li[role="option"]');
+  await expect(options.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  const thirdText = await options.nth(2).innerText();
+  await expect(options.nth(2)).toHaveAttribute('aria-selected', 'true');
+  await expect(options.first()).not.toHaveAttribute('aria-selected', 'true');
+
+  await page.keyboard.press('Tab');
+  await expect(tooltip).toHaveCount(0);
+  await expect(sqlConsole.locator('.cm-content')).toContainText(thirdText);
+
+  // Enter still inserts a newline while a fresh popup is open (P18 D18's guarantee).
+  await page.keyboard.type(' SEL');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  const beforeEnterLines = await sqlConsole.locator('.cm-line').count();
+  await page.keyboard.press('Enter');
+  await expect(sqlConsole.locator('.cm-line')).toHaveCount(beforeEnterLines + 1);
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('autocomplete — Mongo console completes collections, methods and operators', async ({
   kira,
   consoleErrors,

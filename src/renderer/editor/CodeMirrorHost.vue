@@ -8,7 +8,7 @@ import {
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
-import { Compartment, EditorState, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, type Extension, Prec } from '@codemirror/state';
 import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
@@ -103,7 +103,13 @@ function resolveAutocomplete(): Extension[] {
       defaultKeymap: false,
       override: props.completionSources?.length ? [...props.completionSources] : undefined,
     }),
-    keymap.of(CONSOLE_COMPLETION_KEYMAP),
+    // P31 D36: mirrors @codemirror/autocomplete's own completionKeymapExt
+    // (Prec.highest(keymap.computeN([completionConfig], …))) — with defaultKeymap: false above,
+    // this app builds its own keymap instead of getting that wrapper for free, and without it
+    // defaultKeymap's ArrowUp/ArrowDown (bound earlier in the extension array, CodeMirrorHost's
+    // own keymap.of(defaultKeymap) below) win by array order and the popup never sees the key.
+    // Prec.highest states the requirement outright rather than depending on that ordering.
+    Prec.highest(keymap.of(CONSOLE_COMPLETION_KEYMAP)),
   ];
 }
 
