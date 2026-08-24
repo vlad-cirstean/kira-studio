@@ -30,6 +30,10 @@ export interface Caps {
   // ---- language surfaces
   sql: boolean; // gates §8.14's query console menu item
   definition: boolean; // gates §8.10's "Open definition" (P19, was "Open DDL")
+  // The adapter implements describe(); gates the definition view's second, metadata load
+  // (P31 D2). false for kafka/sqs/redis/s3 — a stream or a key has no column/PK/FK metadata to
+  // describe, so definition() alone (gated by `definition` above) is the whole story for them.
+  describe: boolean;
 
   // ---- read pushdown
   projection: boolean; // can fetch a column subset server-side
@@ -67,6 +71,7 @@ export const capsSchema = z.object({
   defaultPageKind: pageKindSchema,
   sql: z.boolean(),
   definition: z.boolean(),
+  describe: z.boolean(),
   projection: z.boolean(),
   serverFilter: z.boolean(),
   exactCount: z.boolean(),

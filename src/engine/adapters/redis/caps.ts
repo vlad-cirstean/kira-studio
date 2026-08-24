@@ -15,6 +15,9 @@ export const redisCaps: Caps = {
   // would be a second, staler view of the same three facts for a node whose only other property is
   // its name.
   definition: false,
+  // describe() throws E_UNSUPPORTED (redis/index.ts). definition is already false above, so this
+  // is a coincidence of two unrelated flags (P31 F5), not something describe: false relies on.
+  describe: false,
   projection: false,
   serverFilter: false,
   // Per-key counts use O(1) exact type-length commands (HLEN/SCARD/ZCARD/LLEN/XLEN, or 1 for a

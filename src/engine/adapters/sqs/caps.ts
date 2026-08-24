@@ -14,6 +14,8 @@ export const sqsCaps: Caps = {
   // this before. One GetQueueAttributes call, no automatic message read (SPEC §5.1's rule is about
   // ReceiveMessage specifically).
   definition: true,
+  // describe() throws E_UNSUPPORTED (sqs/index.ts) — a queue has no column/PK/FK metadata.
+  describe: false,
   projection: false,
   serverFilter: false,
   exactCount: false, // ApproximateNumberOfMessages only

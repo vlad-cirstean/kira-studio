@@ -40,7 +40,7 @@ const ORDERS_TOPIC_PATH = `topic:${ORDERS_TOPIC}`;
 const EMPTY_TOPIC_PATH = `topic:${EMPTY_TOPIC}`;
 const CONSUMER_GROUP_PATH = `consumerGroup:${CONSUMER_GROUP}`;
 
-function getOps(page: Page): Promise<{ id: string }[]> {
+function getOps(page: Page): Promise<{ id: string; kind: string; status: string }[]> {
   return page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));
 }
 
@@ -200,6 +200,17 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   await expect(configSection).toBeVisible();
   await expect(configSection.locator('.def-row').first()).toBeVisible();
 
+  // --- P31 item 1: caps.describe is false for Kafka, so opening (and refreshing) a topic's
+  // definition tab must never issue a describe op or leave an error row behind (F1-F4). ---------
+  const opsAfterTopicDef = await getOps(page);
+  expect(opsAfterTopicDef.filter((o) => o.kind === 'describe')).toHaveLength(0);
+  expect(opsAfterTopicDef.filter((o) => o.status === 'error')).toHaveLength(0);
+  await topicDef.locator('[data-testid="definition-refresh"]').click();
+  await expect(partitionsSection).toBeVisible({ timeout: 10_000 });
+  const opsAfterTopicRefresh = await getOps(page);
+  expect(opsAfterTopicRefresh.filter((o) => o.kind === 'describe')).toHaveLength(0);
+  expect(opsAfterTopicRefresh.filter((o) => o.status === 'error')).toHaveLength(0);
+
   // --- a consumer group's definition shows Group/Members/Committed offsets -----------------------
   await openRowMenu(page, CONSUMER_GROUP_PATH);
   await page.click('[data-testid="menu-item-open-definition"]');
@@ -211,6 +222,10 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   );
   await expect(offsetsSection).toBeVisible({ timeout: 10_000 });
   await expect(offsetsSection.locator('.def-row')).toHaveCount(ORDERS_PARTITION_COUNT);
+
+  const opsAfterGroupDef = await getOps(page);
+  expect(opsAfterGroupDef.filter((o) => o.kind === 'describe')).toHaveLength(0);
+  expect(opsAfterGroupDef.filter((o) => o.status === 'error')).toHaveLength(0);
 
   expect(consoleErrors).toEqual([]);
 });

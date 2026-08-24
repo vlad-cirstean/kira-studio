@@ -11,6 +11,7 @@ export const mongoCaps: Caps = {
   defaultPageKind: 'document',
   sql: true,
   definition: true,
+  describe: true,
   projection: true,
   serverFilter: true,
   exactCount: false,

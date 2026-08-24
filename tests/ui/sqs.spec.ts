@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { DRAIN_QUEUE, EMPTY_QUEUE, ORDERS_QUEUE } from '../db/fixtures/0006_sqs_seed';
 import { expect, test } from './fixtures';
 import {
@@ -30,6 +31,10 @@ test.afterAll(async () => {
 
 const ORDERS_QUEUE_PATH = `queue:${ORDERS_QUEUE}`;
 const EMPTY_QUEUE_PATH = `queue:${EMPTY_QUEUE}`;
+
+function getOps(page: Page): Promise<{ id: string; kind: string; status: string }[]> {
+  return page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));
+}
 
 test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
   kira,
@@ -145,6 +150,17 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
   );
   await expect(attributesSection).toBeVisible({ timeout: 10_000 });
   await expect(attributesSection.locator('.def-row')).not.toHaveCount(0);
+
+  // --- P31 item 1: caps.describe is false for SQS, so opening (and refreshing) a queue's
+  // definition tab must never issue a describe op or leave an error row behind (F1-F4). ---------
+  const opsAfterQueueDef = await getOps(page);
+  expect(opsAfterQueueDef.filter((o) => o.kind === 'describe')).toHaveLength(0);
+  expect(opsAfterQueueDef.filter((o) => o.status === 'error')).toHaveLength(0);
+  await queueDef.locator('[data-testid="definition-refresh"]').click();
+  await expect(attributesSection).toBeVisible({ timeout: 10_000 });
+  const opsAfterQueueRefresh = await getOps(page);
+  expect(opsAfterQueueRefresh.filter((o) => o.kind === 'describe')).toHaveLength(0);
+  expect(opsAfterQueueRefresh.filter((o) => o.status === 'error')).toHaveLength(0);
 
   expect(consoleErrors).toEqual([]);
 });

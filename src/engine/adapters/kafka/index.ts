@@ -85,7 +85,8 @@ class KafkaAdapter implements Adapter {
   }
 
   async describe(): Promise<ObjectMeta> {
-    // §8.9 has no column/FK navigation for streams — never reached by a 'stream' tab.
+    // caps.describe is false (P31 D2) — unreachable while that flag gates every caller,
+    // including the definition view's own describe() load that used to fire this every time.
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for kafka');
   }
 

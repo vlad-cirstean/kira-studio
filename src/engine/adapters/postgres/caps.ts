@@ -8,6 +8,7 @@ export const postgresCaps: Caps = {
   defaultPageKind: 'tabular',
   sql: true,
   definition: true,
+  describe: true,
   projection: true,
   serverFilter: true,
   exactCount: true,

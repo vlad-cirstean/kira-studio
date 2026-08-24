@@ -94,7 +94,7 @@ class S3Adapter implements Adapter {
   }
 
   async describe(): Promise<ObjectMeta> {
-    // §8's grid-only celleditor path (ground rules) — never reached by a 'keyvalue' tab.
+    // caps.describe is false (P31 D2) — unreachable while that flag gates every caller.
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for s3');
   }
 

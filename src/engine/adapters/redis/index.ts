@@ -88,8 +88,7 @@ class RedisAdapter implements Adapter {
   }
 
   async describe(): Promise<ObjectMeta> {
-    // §8.8 has no FK/column navigation for Redis — describe() is only ever called from the
-    // grid's own celleditor/state.ts (ground rules), never reached by a 'keyvalue' tab.
+    // caps.describe is false (P31 D2) — unreachable while that flag gates every caller.
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for redis');
   }
 

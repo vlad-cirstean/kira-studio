@@ -17,6 +17,9 @@ export const s3Caps: Caps = {
   // Doing it properly means per-call degradation to a `notes` line per denial — its own piece of
   // work, not something this phase's Kafka/SQS pattern can just extend.
   definition: false,
+  // describe() throws E_UNSUPPORTED (s3/index.ts). definition is already false above, so this is
+  // a coincidence of two unrelated flags (P31 F5), not something describe: false relies on.
+  describe: false,
   projection: false,
   serverFilter: false,
   // count() (s3/read.ts's countObject) answers a single object's own field count via HeadObject,

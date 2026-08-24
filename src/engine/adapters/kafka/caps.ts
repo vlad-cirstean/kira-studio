@@ -13,6 +13,9 @@ export const kafkaCaps: Caps = {
   // P23 D5: a topic's partitions/config and a consumer group's members/offsets moved here once
   // the tree stopped showing them — this reverses P10's original "no definition" call.
   definition: true,
+  // describe() throws E_UNSUPPORTED (kafka/index.ts) — a stream has no column/PK/FK metadata.
+  // Gates the definition view's separate describe() load so it's never issued (P31 D2).
+  describe: false,
   projection: false,
   serverFilter: false,
   exactCount: true, // fetchTopicOffsets: high - low, summed across partitions
