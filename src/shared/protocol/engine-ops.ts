@@ -53,8 +53,16 @@ export const engineOpPayloadSchema = {
   [ENGINE_OP.connect]: z.object({ config: resolvedConnectionConfigSchema }),
   [ENGINE_OP.disconnect]: z.object({ connectionId: z.string() }),
   [ENGINE_OP.children]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
-  [ENGINE_OP.describe]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
-  [ENGINE_OP.definition]: z.object({ connectionId: z.string(), path: nodePathWireSchema }),
+  [ENGINE_OP.describe]: z.object({
+    connectionId: z.string(),
+    path: nodePathWireSchema,
+    tabId: z.string().nullable(),
+  }),
+  [ENGINE_OP.definition]: z.object({
+    connectionId: z.string(),
+    path: nodePathWireSchema,
+    tabId: z.string().nullable(),
+  }),
   [ENGINE_OP.test]: z.object({ config: resolvedConnectionConfigSchema }),
   [ENGINE_OP.cancel]: z.object({ opId: z.string() }),
   [ENGINE_OP.configureCache]: z.object({ l2BudgetBytes: z.number().int().min(1) }),

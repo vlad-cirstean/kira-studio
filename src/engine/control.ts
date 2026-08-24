@@ -88,9 +88,9 @@ async function handleChildren(payload: unknown) {
 }
 
 async function handleDescribe(payload: unknown) {
-  const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.describe].parse(payload);
+  const { connectionId, path, tabId } = engineOpPayloadSchema[ENGINE_OP.describe].parse(payload);
   const adapter = requireAdapter(connectionId);
-  const { value } = await runOp({ connectionId, kind: 'describe' }, async (ctx) => {
+  const { value } = await runOp({ connectionId, kind: 'describe', tabId }, async (ctx) => {
     const meta = await adapter.describe(path, ctx);
     ctx.setRows(meta.columns.length);
     return meta;
@@ -99,9 +99,9 @@ async function handleDescribe(payload: unknown) {
 }
 
 async function handleDefinition(payload: unknown) {
-  const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.definition].parse(payload);
+  const { connectionId, path, tabId } = engineOpPayloadSchema[ENGINE_OP.definition].parse(payload);
   const adapter = requireAdapter(connectionId);
-  const { value } = await runOp({ connectionId, kind: 'definition' }, async (ctx) => {
+  const { value } = await runOp({ connectionId, kind: 'definition', tabId }, async (ctx) => {
     const definition = await adapter.definition(path, ctx);
     ctx.setRows(definition.statements.length);
     return definition;

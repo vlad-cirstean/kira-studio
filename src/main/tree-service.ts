@@ -35,8 +35,21 @@ export interface TreeDefinitionResult {
 
 export interface TreeService {
   children(connectionId: string, path: string, refresh: boolean): Promise<TreeChildrenResult>;
-  describe(connectionId: string, path: string, refresh: boolean): Promise<TreeDescribeResult>;
-  definition(connectionId: string, path: string, refresh: boolean): Promise<TreeDefinitionResult>;
+  // `tabId` tags the resulting op-log row so the requesting tab's RunState can find its own
+  // duration (state/runState.ts) — a cache hit makes no engine call and so tags nothing, which
+  // is correct: there is no duration to show for work that never happened.
+  describe(
+    connectionId: string,
+    path: string,
+    refresh: boolean,
+    tabId?: string | null,
+  ): Promise<TreeDescribeResult>;
+  definition(
+    connectionId: string,
+    path: string,
+    refresh: boolean,
+    tabId?: string | null,
+  ): Promise<TreeDefinitionResult>;
   /** Drops L1 for one node (path given) or the whole connection (path omitted). No push of its
    * own — the caller already knows what it asked to invalidate. The D11 reconnect push is
    * `connections.onMetadataInvalidated`, a separate concern owned by connections.ts. */
@@ -80,7 +93,7 @@ export function createTreeService(
       return { nodes: result.nodes, source: 'server' };
     },
 
-    async describe(connectionId, path, refresh) {
+    async describe(connectionId, path, refresh, tabId = null) {
       if (!refresh) {
         const cached = await getCached(db, connectionId, path, 'describe');
         if (cached !== null) {
@@ -94,12 +107,13 @@ export function createTreeService(
       const result = await engineHost.call<{ meta: ObjectMeta }>(ENGINE_OP.describe, {
         connectionId,
         path: nodePath,
+        tabId,
       });
       await putCached(db, connectionId, path, 'describe', result.meta);
       return { meta: result.meta, source: 'server' };
     },
 
-    async definition(connectionId, path, refresh) {
+    async definition(connectionId, path, refresh, tabId = null) {
       if (!refresh) {
         const cached = await getCached(db, connectionId, path, 'definition');
         if (cached !== null) {
@@ -113,6 +127,7 @@ export function createTreeService(
       const result = await engineHost.call<{ definition: ObjectDefinition }>(ENGINE_OP.definition, {
         connectionId,
         path: nodePath,
+        tabId,
       });
       await putCached(db, connectionId, path, 'definition', result.definition);
       return { definition: result.definition, source: 'server' };

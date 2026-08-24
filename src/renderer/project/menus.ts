@@ -366,9 +366,9 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
 }
 
 // P8's collection row: near-copy of relationMenu, opening a 'document' tab instead of 'data' —
-// no "Open definition" (Caps.definition === false for mongo) and no saved-filters submenu (§8.10 names one for
-// "Table / view / collection" generally, but a saved query body is a SQL WHERE/ORDER BY shape
-// that has no Mongo-filter analog yet).
+// gains "Open definition" as of P19 D12 (Caps.definition === true for mongo). No saved-filters
+// submenu (§8.10 names one for "Table / view / collection" generally, but a saved query body is
+// a SQL WHERE/ORDER BY shape that has no Mongo-filter analog yet).
 function collectionMenu(row: TreeRowVm): MenuItem[] {
   return [
     {
@@ -389,6 +389,20 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
         openDocumentTab(row.connectionId, row.path, { newTab: true });
       },
     },
+    // D5: offered only when the connection's caps say so — never a permanently disabled row.
+    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+      ? [
+          {
+            type: 'item' as const,
+            id: 'open-definition',
+            label: 'Open definition',
+            icon: 'file-code',
+            run: () => {
+              openDefinitionTab(row.connectionId, row.path);
+            },
+          },
+        ]
+      : []),
     ...consoleMenuItem(row),
     {
       type: 'item',

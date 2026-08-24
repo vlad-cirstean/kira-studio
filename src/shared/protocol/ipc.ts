@@ -162,11 +162,13 @@ export interface KiraApi {
     connectionId: string;
     path: string;
     refresh?: boolean;
+    tabId?: string;
   }): Promise<TreeDescribeResult>;
   treeDefinition(args: {
     connectionId: string;
     path: string;
     refresh?: boolean;
+    tabId?: string;
   }): Promise<TreeDefinitionResult>;
   treeInvalidate(args: { connectionId: string; path?: string }): Promise<void>;
 

@@ -56,8 +56,8 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
 
   try {
     const [definitionResponse, describeResponse] = await Promise.all([
-      control.treeDefinition(tab.connectionId, tab.path, opts?.refresh),
-      control.treeDescribe(tab.connectionId, tab.path, opts?.refresh),
+      control.treeDefinition(tab.connectionId, tab.path, opts?.refresh, tabId),
+      control.treeDescribe(tab.connectionId, tab.path, opts?.refresh, tabId),
     ]);
     rt.definition = definitionResponse.definition;
     rt.source = definitionResponse.source;

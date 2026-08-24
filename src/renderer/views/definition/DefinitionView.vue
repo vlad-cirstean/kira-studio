@@ -250,7 +250,11 @@ const breadcrumb = computed(() => {
           :table-path="tab.path"
         />
         <IndexesSection :indexes="meta.indexes" />
-        <ConstraintsSection v-if="!isCollection" :constraints="constraintRows" />
+        <ConstraintsSection
+          v-if="!isCollection"
+          :connection-id="tab.connectionId ?? ''"
+          :constraints="constraintRows"
+        />
         <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
       </div>
       <!-- LAW — there is no editor status line: identity moved to the view header above,

@@ -2,6 +2,7 @@
 import type { ColumnMeta } from '@shared/domain/tree';
 import { columnTypeIcon } from '../../project/icons';
 import { columnsSectionMenu } from '../../project/menus';
+import { typeDescription } from '../../project/typeGlossary';
 import Codicon from '../../theme/Codicon.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 
@@ -33,6 +34,17 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
       <span class="p-badge">{{ columns.length }}</span>
     </header>
     <table class="def-table">
+      <thead>
+        <tr class="def-head-row">
+          <th class="def-col-icon"></th>
+          <th class="def-col-name">Name</th>
+          <th class="def-col-key">Key</th>
+          <th class="def-col-type">Type</th>
+          <th class="def-col-null">Null?</th>
+          <th class="def-col-default">Default</th>
+          <th class="def-col-comment">Comment</th>
+        </tr>
+      </thead>
       <tbody>
         <tr
           v-for="col in columns"
@@ -48,8 +60,21 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <span v-if="keyLabel(col) === 'PK'" class="header-key">PK</span>
             <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk">FK</span>
           </td>
-          <td class="def-col-type mono">{{ col.dataType }}</td>
-          <td class="def-col-null mono">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
+          <td class="def-col-type mono">
+            {{ col.dataType }}
+            <Codicon
+              v-if="typeDescription(col.dataType)"
+              name="info"
+              :size="12"
+              class="type-info"
+              :title="typeDescription(col.dataType) ?? undefined"
+            />
+          </td>
+          <!-- Nullable stated only as the exception — repeating "NOT NULL" on every row (the
+               common case in a well-designed schema) added noise without adding information. -->
+          <td class="def-col-null">
+            <Codicon v-if="col.nullable" name="check" :size="13" title="Nullable" />
+          </td>
           <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
           <td class="def-col-comment">{{ col.comment ?? '' }}</td>
         </tr>
@@ -82,6 +107,21 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   font-size: var(--kira-t-md);
 }
 
+.def-head-row th {
+  text-align: left;
+  font-weight: 400;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  white-space: nowrap;
+}
+.def-head-row th:last-child {
+  border-right: none;
+}
+
 .def-row {
   border-bottom: 1px solid var(--kira-border);
 }
@@ -93,6 +133,10 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   padding: var(--kira-s-2) var(--kira-s-3);
   vertical-align: middle;
   color: var(--kira-fg);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+}
+.def-table td:last-child {
+  border-right: none;
 }
 
 .def-col-icon {
@@ -112,8 +156,23 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   color: var(--kira-info);
 }
 
-.def-col-type,
-.def-col-null,
+.def-col-type {
+  color: var(--kira-fg-muted);
+  white-space: nowrap;
+}
+
+.type-info {
+  color: var(--kira-fg-disabled);
+  vertical-align: middle;
+  margin-left: var(--kira-s-1);
+  cursor: help;
+}
+
+.def-col-null {
+  width: 48px;
+  color: var(--kira-fg-muted);
+}
+
 .def-col-default {
   color: var(--kira-fg-muted);
   white-space: nowrap;

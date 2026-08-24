@@ -93,12 +93,14 @@ export const control = {
     connectionId: string,
     path: string,
     refresh?: boolean,
-  ): Promise<TreeDescribeResult> => kira.treeDescribe({ connectionId, path, refresh }),
+    tabId?: string,
+  ): Promise<TreeDescribeResult> => kira.treeDescribe({ connectionId, path, refresh, tabId }),
   treeDefinition: (
     connectionId: string,
     path: string,
     refresh?: boolean,
-  ): Promise<TreeDefinitionResult> => kira.treeDefinition({ connectionId, path, refresh }),
+    tabId?: string,
+  ): Promise<TreeDefinitionResult> => kira.treeDefinition({ connectionId, path, refresh, tabId }),
   treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
     kira.treeInvalidate({ connectionId, path }),
 
