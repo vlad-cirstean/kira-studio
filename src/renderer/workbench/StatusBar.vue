@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { formatBytes } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { settingsOpen } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -18,7 +19,7 @@ const cacheTitle = computed(() => {
 const cacheSizeLabel = computed(() => {
   const stats = cacheStatsState.stats;
   if (!stats) return null;
-  return `${(stats.l2Bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return formatBytes(stats.l2Bytes);
 });
 </script>
 

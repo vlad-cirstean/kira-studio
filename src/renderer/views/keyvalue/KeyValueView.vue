@@ -3,6 +3,7 @@ import type { KeyValueTabRecord, KeyValueTabState } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
@@ -123,10 +124,7 @@ function ttlText(ttlMs: number | null): string {
 }
 
 function memoryText(bytes: number | null): string {
-  if (bytes === null) return 'unknown';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  return bytes === null ? 'unknown' : formatBytes(bytes);
 }
 
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -

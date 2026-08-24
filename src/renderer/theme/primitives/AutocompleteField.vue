@@ -206,7 +206,6 @@ onBeforeUnmount(() => {
   <span
     class="p-input autocomplete-field"
     :class="{ 'is-invalid': invalid }"
-    :style="invalid ? { borderColor: 'var(--kira-error)' } : undefined"
   >
     <span v-if="prefix" class="ph">{{ prefix }}</span>
     <input

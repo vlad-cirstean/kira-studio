@@ -177,7 +177,11 @@ function onTreeKeydown(e: KeyboardEvent): void {
         </template>
       </VirtualList>
     </div>
-    <div v-if="searchIncomplete" class="search-incomplete-note" data-testid="search-incomplete-note">
+    <div
+      v-if="searchIncomplete"
+      class="p-strip note search-incomplete-note"
+      data-testid="search-incomplete-note"
+    >
       Searching cached nodes only — expand more of the tree to include it.
     </div>
   </div>
@@ -196,11 +200,11 @@ function onTreeKeydown(e: KeyboardEvent): void {
   min-height: 0;
 }
 
+/* P24 D34: reuses .p-strip.note (primitives.css) for padding/font-size/colour/background — this
+   note sits at the bottom of the tree, so its divider flips to the top edge, opposite .p-strip's
+   own default. */
 .search-incomplete-note {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-muted);
   border-top: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: none;
 }
 </style>

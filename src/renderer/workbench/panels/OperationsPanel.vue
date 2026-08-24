@@ -11,6 +11,7 @@ import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -165,14 +166,12 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </div>
       <SegmentedControl v-model="opsState.statusFilter" :options="statusFilterOptions" />
       <span class="running-count">{{ runningCount }} running</span>
-      <button
-        type="button"
-        class="clear-button"
+      <AppButton
         v-tooltip="'Clears the in-memory ring only — op_log retention is automatic'"
         @click="clearOps"
       >
         Clear
-      </button>
+      </AppButton>
     </div>
 
     <div v-if="visibleOps.length === 0" class="min-h-0 flex-1">
@@ -192,12 +191,14 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       <div class="ops-body">
         <!--
           The expanded command/error detail rows embed a CodeMirrorHost (D18/D19) inside
-          VirtualList's fixed 20px row rather than making VirtualList itself variable-height
+          VirtualList's fixed row rather than making VirtualList itself variable-height
           (P2 §0 note 14 leaves it fixed on purpose) — scoped CSS below forces a single
           non-wrapping line and hides the line-number gutter so it reads like the plain text
-          it replaces, just with SQL syntax highlighting.
+          it replaces, just with SQL syntax highlighting. This prop is JS, not CSS (P24 D34) — it
+          has to stay numerically equal to --kira-h-xs (18px), which .ops-row/.ops-columns/
+          .ops-detail-row and the embedded .cm-editor's own height all use below.
         -->
-        <VirtualList :items="listItems" :row-height="20">
+        <VirtualList :items="listItems" :row-height="18">
           <template #default="{ item }">
             <div
               v-if="item.kind === 'op'"
@@ -270,8 +271,8 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: var(--kira-s-4);
+  padding: var(--kira-s-2) var(--kira-s-4);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
@@ -291,29 +292,19 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   margin-left: auto;
 }
 
-.clear-button {
-  background: transparent;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 2px 8px;
-  font-size: var(--kira-t-sm);
-}
-
 .ops-columns,
 .ops-row,
 .ops-detail-row {
   display: grid;
   grid-template-columns: 90px 140px 40px 80px 90px 70px 60px 1fr;
-  gap: 8px;
-  padding: 0 8px;
+  gap: var(--kira-s-4);
+  padding: 0 var(--kira-s-4);
   align-items: center;
 }
 
 .ops-columns {
   flex-shrink: 0;
-  height: 20px;
+  height: var(--kira-h-xs);
   color: var(--kira-fg-muted);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
@@ -328,7 +319,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .ops-row {
-  height: 20px;
+  height: var(--kira-h-xs);
   cursor: pointer;
   user-select: text;
 }
@@ -344,7 +335,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 .connection-cell {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--kira-s-2);
   min-width: 0;
 }
 
@@ -373,7 +364,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 .status-cell {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--kira-s-2);
 }
 
 .spin {
@@ -399,7 +390,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .ops-detail-row {
-  height: 20px;
+  height: var(--kira-h-xs);
   grid-template-columns: 1fr;
   color: var(--kira-fg-muted);
   background: var(--kira-bg-elevated);
@@ -413,7 +404,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .ops-detail-cm :deep(.cm-editor) {
-  height: 20px;
+  height: var(--kira-h-xs);
   font-size: var(--kira-t-sm);
 }
 
@@ -432,7 +423,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .ops-detail-cm :deep(.cm-line) {
-  padding: 0 8px;
+  padding: 0 var(--kira-s-4);
 }
 
 .ops-detail-cm :deep(.cm-gutters) {

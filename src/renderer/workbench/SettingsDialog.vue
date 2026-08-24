@@ -2,6 +2,7 @@
 import type { RowDensity, SettingsPatch } from '@shared/settings';
 import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
+import { formatBytes } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -91,7 +92,7 @@ const hitRateLabel = computed(() => {
 const cacheSizeLabel = computed(() => {
   const stats = cacheStatsState.stats;
   if (!stats) return '—';
-  return `${(stats.l2Bytes / (1024 * 1024)).toFixed(1)} / ${(stats.l2BudgetBytes / (1024 * 1024)).toFixed(0)} MB`;
+  return `${formatBytes(stats.l2Bytes)} / ${formatBytes(stats.l2BudgetBytes)}`;
 });
 
 async function onClearCaches(): Promise<void> {

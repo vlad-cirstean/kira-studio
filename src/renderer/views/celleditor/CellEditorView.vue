@@ -3,6 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
+import { formatBytes } from '../../format';
 import { cellKey, cellSelectionState } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -344,7 +345,7 @@ const statusLine = computed(() => {
   if (isNullValue.value) return 'NULL';
   const value = doc.value;
   const parts: string[] = [];
-  parts.push(`${statusEncoder.encode(value).length} bytes`);
+  parts.push(formatBytes(statusEncoder.encode(value).length));
   const reading = describeValue(effectiveFormat.value, value);
   if (reading) parts.push(reading);
   if (isTruncatedValue.value) parts.push('showing the first 64 KB');

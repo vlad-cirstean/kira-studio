@@ -117,7 +117,7 @@ function onContextMenu(e: MouseEvent): void {
     </span>
 
     <span v-if="row.badges?.length" class="badges">
-      <span v-for="badge in row.badges" :key="badge" class="badge">{{ badge }}</span>
+      <span v-for="badge in row.badges" :key="badge" class="p-count">{{ badge }}</span>
     </span>
 
     <ErrorPopover v-if="row.error" :message="row.error" />
@@ -230,15 +230,6 @@ function onContextMenu(e: MouseEvent): void {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
-}
-
-.badge {
-  font-size: var(--kira-t-xs);
-  line-height: 1.4;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--kira-badge);
-  color: var(--kira-fg);
 }
 
 .detail {

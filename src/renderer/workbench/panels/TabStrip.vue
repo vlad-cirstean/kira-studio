@@ -136,8 +136,8 @@ watch(
       v-for="tab in tabs"
       :key="tab.id"
       type="button"
-      class="tab"
-      :class="{ active: tab.active }"
+      class="p-tab"
+      :class="{ 'is-active': tab.active }"
       data-testid="tab"
       :data-tab-id="tab.id"
       :data-tab-kind="tab.kind"
@@ -186,29 +186,10 @@ watch(
   display: none;
 }
 
-.tab {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  flex-shrink: 0;
-  height: var(--kira-h-md);
-  max-width: 220px;
-  padding: 0 var(--kira-s-3);
-  border: var(--kira-border-width) solid transparent;
-  border-radius: var(--kira-radius-sm);
-  background: transparent;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  font-size: var(--kira-t-md);
-}
-
-.tab.active {
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg);
-  border-color: var(--kira-border-strong);
-}
-
-.tab:hover:not(.active) {
+/* P24 D32: .tab used to re-declare .p-tab's own rules (primitives.css) by hand, 1px and 10px off
+   on type size and max-width respectively — the class is now .p-tab itself, and only what this
+   strip genuinely adds (the icon/title/close layout, the close button's hover reveal) stays here. */
+.p-tab:hover:not(.is-active) {
   background: var(--kira-hover);
 }
 
@@ -234,8 +215,8 @@ watch(
   opacity: 0;
 }
 
-.tab:hover .tab-close,
-.tab.active .tab-close {
+.p-tab:hover .tab-close,
+.p-tab.is-active .tab-close {
   opacity: 1;
 }
 

@@ -56,7 +56,6 @@ function stepBy(dir: 1 | -1): void {
   <span
     class="p-input"
     :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper }"
-    :style="invalid ? { borderColor: 'var(--kira-error)' } : undefined"
   >
     <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <span v-if="prefix" class="ph">{{ prefix }}</span>

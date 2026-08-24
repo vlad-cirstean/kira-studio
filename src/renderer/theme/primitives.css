@@ -150,6 +150,11 @@
   outline: var(--kira-border-width) solid var(--kira-focus);
   outline-offset: -2px;
 }
+/* P24 D36: was an inline :style — the one place in the app a colour could never be themed,
+   overridden, or seen in the stylesheet. */
+.p-input.is-invalid {
+  border-color: var(--kira-error);
+}
 .p-input input {
   background: none;
   border: none;
@@ -271,6 +276,11 @@
 .p-select:disabled {
   color: var(--kira-fg-disabled);
   cursor: default;
+}
+/* Only visible on .p-select.bordered — the borderless variant has no border to recolour, same as
+   every other state rule above it. */
+.p-select.is-invalid {
+  border-color: var(--kira-error);
 }
 
 /* ---------- P6 segmented ---------- */
