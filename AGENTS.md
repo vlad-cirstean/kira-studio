@@ -40,5 +40,33 @@
 - **The other dev environment (macOS) uses Colima** instead — `colima start` brings up the Docker
   daemon there; don't try the `dockerd`-directly approach on that box, and don't assume systemd
   either way.
+- **On Claude Code's Linux web containers specifically**, the outbound network policy blocks
+  `production.cloudfront.docker.com` (403, gateway policy denial) — the CDN host Docker Hub
+  redirects every blob download to. `docker pull` therefore resolves manifests fine but can never
+  actually fetch an image's layers, so `tests/db/`'s testcontainers-backed suites cannot run there
+  at all (they hang/fail waiting on a container that never starts). This is an environment network
+  policy limit, not a Docker config problem — don't spend time working around it.
+
+## Electron binary (for `tests/ui/`)
+
+- **Claude Code's Linux web containers**: `bun install` does not fetch the Electron binary —
+  `node_modules/electron/install.js` downloads it via `@electron/get`, which fails in this
+  environment with `AssertionError: assert(!this.paused)` deep inside undici's HTTP/1 parser (a
+  proxy/streaming quirk with that specific downloader, not a blocked host — plain `curl -L` against
+  the same `github.com/electron/electron/releases/download/vX.Y.Z/electron-vX.Y.Z-linux-x64.zip`
+  URL succeeds). Fix by downloading with `curl` and installing manually:
+  ```
+  curl -sSL -o /tmp/electron.zip https://github.com/electron/electron/releases/download/v<version>/electron-v<version>-linux-x64.zip
+  mkdir -p node_modules/electron/dist && cd node_modules/electron/dist && unzip -q /tmp/electron.zip && cd -
+  chmod +x node_modules/electron/dist/electron node_modules/electron/dist/chrome-sandbox node_modules/electron/dist/chrome_crashpad_handler
+  printf 'electron' > node_modules/electron/path.txt   # no trailing newline — install.js compares it verbatim
+  ```
+  `<version>` is `node_modules/electron/package.json`'s own `"version"` field. Verify with
+  `node -e "console.log(require('electron'))"` — it should print the binary path with no
+  "Downloading Electron binary..." message. This unlocks real `xvfb-run -a bunx playwright test`
+  runs for every spec that doesn't need a `tests/db/`-style container (confirmed:
+  `smoke.spec.ts`, `startup.spec.ts`, `workbench.spec.ts`, `connections.spec.ts` all pass) — most
+  other specs still `test.skip()` cleanly via `isDockerAvailable()` rather than fail, per the
+  Docker note above.
 
 Full spec: `docs/v1/SPEC.md`.
