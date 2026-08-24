@@ -69,7 +69,7 @@ onUnmounted(() => {
       :aria-label="`Error: ${props.message}`"
       @click="toggle"
     >
-      <CodiconIcon name="error" :size="12" />
+      <CodiconIcon name="error" :size="13" />
       <span class="error-trigger-text">{{ props.message }}</span>
     </button>
 

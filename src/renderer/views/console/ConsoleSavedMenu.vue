@@ -115,12 +115,12 @@ async function saveCurrent(): Promise<void> {
       <span class="entry-name">{{ entry.name }}</span>
     </template>
     <template #entry-actions="{ entry }">
-      <IconButton icon="edit" :size="12" v-tooltip="'Rename'" @click.stop="rename(entry)" />
+      <IconButton icon="edit" v-tooltip="'Rename'" @click.stop="rename(entry)" />
     </template>
     <template #footer>
       <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="console-save-current" @click="saveCurrent">
-        <span class="icon-box"><CodiconIcon name="add" :size="12" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current query…
       </button>
     </template>

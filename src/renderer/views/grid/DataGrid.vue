@@ -1204,7 +1204,7 @@ defineExpose({ scrollCellIntoView });
             :aria-label="cellNavEntry(r, c)?.kind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
             @click.stop="onCellNavClick(r, c, $event)"
           >
-            <CodiconIcon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="12" />
+            <CodiconIcon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
           </button>
         </div>
       </div>
@@ -1313,14 +1313,14 @@ defineExpose({ scrollCellIntoView });
 
 .sort-chevron {
   color: var(--kira-accent);
-  font-size: 9px;
+  font-size: var(--kira-t-xs);
   flex-shrink: 0;
 }
 
 .sort-order {
   color: var(--kira-accent-fg);
   background: var(--kira-accent);
-  font-size: 9px;
+  font-size: var(--kira-t-xs);
   line-height: 1;
   min-width: 12px;
   height: 12px;

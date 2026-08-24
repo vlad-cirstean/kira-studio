@@ -99,7 +99,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
               :class="{ none: item.swatch === 'none' }"
               :style="{ background: connColorVar(item.swatch) }"
             />
-            <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+            <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" class="item-icon" />
           </span>
           <span class="label">{{ item.label }}</span>
           <span
@@ -108,15 +108,15 @@ async function onItemClick(item: MenuItem): Promise<void> {
             :data-testid="`menu-item-${item.id}-shortcut`"
             >{{ formatShortcut(item.shortcut) }}</span
           >
-          <span v-if="item.checked" class="icon-box"><CodiconIcon name="check" :size="12" /></span>
+          <span v-if="item.checked" class="icon-box"><CodiconIcon name="check" :size="13" /></span>
         </div>
 
         <div v-else class="p-row row submenu-trigger" :data-testid="`menu-item-${item.id}`" @mouseenter="onRowEnter(item)">
           <span class="icon-box">
-            <CodiconIcon v-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
+            <CodiconIcon v-if="item.icon" :name="item.icon" :size="13" class="item-icon" />
           </span>
           <span class="label">{{ item.label }}</span>
-          <span class="icon-box"><CodiconIcon name="chevron-right" :size="12" class="caret" /></span>
+          <span class="icon-box"><CodiconIcon name="chevron-right" :size="13" class="caret" /></span>
 
           <div v-if="openSubmenuId === item.id" class="submenu p-float" data-testid="context-submenu">
             <template v-for="(sub, subIdx) in item.items" :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id">
@@ -135,7 +135,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                     :class="{ none: sub.swatch === 'none' }"
                     :style="{ background: connColorVar(sub.swatch) }"
                   />
-                  <CodiconIcon v-else-if="sub.icon" :name="sub.icon" :size="12" class="item-icon" />
+                  <CodiconIcon v-else-if="sub.icon" :name="sub.icon" :size="13" class="item-icon" />
                 </span>
                 <span class="label">{{ sub.label }}</span>
                 <span
@@ -145,7 +145,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   >{{ formatShortcut(sub.shortcut) }}</span
                 >
                 <span v-if="sub.type === 'item' && sub.checked" class="icon-box">
-                  <CodiconIcon name="check" :size="12" />
+                  <CodiconIcon name="check" :size="13" />
                 </span>
               </div>
             </template>

@@ -453,7 +453,6 @@ onUnmounted(() => {
         <div class="group pager" data-testid="document-pager">
           <IconButton
             icon="chevron-left"
-            :size="12"
             v-tooltip="'First page'"
             data-testid="document-pager-first"
             :disabled="tab.state.pageIndex === 0"
@@ -461,7 +460,6 @@ onUnmounted(() => {
           />
           <IconButton
             icon="arrow-left"
-            :size="13"
             data-testid="document-prev"
             :disabled="tab.state.pageIndex === 0"
             v-tooltip="'Previous page'"
@@ -483,7 +481,6 @@ onUnmounted(() => {
           </span>
           <IconButton
             icon="arrow-right"
-            :size="13"
             data-testid="document-next"
             :disabled="!rt?.hasMore"
             v-tooltip="'Next page'"
@@ -491,7 +488,6 @@ onUnmounted(() => {
           />
           <IconButton
             icon="chevron-right"
-            :size="12"
             v-tooltip="pageCount ? 'Last page' : 'Count documents first'"
             data-testid="document-pager-last"
             :disabled="!pageCount"
@@ -540,14 +536,12 @@ onUnmounted(() => {
           </div>
           <IconButton
             icon="expand-all"
-            :size="13"
             v-tooltip="'Expand all'"
             data-testid="document-expand-all"
             @click="onExpandAll"
           />
           <IconButton
             icon="collapse-all"
-            :size="13"
             v-tooltip="'Collapse all'"
             data-testid="document-collapse-all"
             @click="onCollapseAll"
@@ -559,7 +553,6 @@ onUnmounted(() => {
         <div class="group">
           <IconButton
             icon="add"
-            :size="13"
             data-testid="document-add"
             :disabled="!caps?.canInsert"
             v-tooltip="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
@@ -686,7 +679,6 @@ onUnmounted(() => {
                 <span v-if="editingId === rowAt(i)?.id" class="p-chip warn">editing</span>
                 <IconButton
                   icon="edit"
-                  :size="12"
                   :active="editingId === rowAt(i)?.id"
                   data-testid="document-edit"
                   v-tooltip="'Edit'"

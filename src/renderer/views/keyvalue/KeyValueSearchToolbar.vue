@@ -105,7 +105,7 @@ onUnmounted(() => {
        as SearchToolbar.vue. -->
   <div class="search-toolbar p-toolbar" data-testid="keyvalue-search-toolbar" @keydown="onKeydown">
     <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
-      <CodiconIcon name="search" :size="14" />
+      <CodiconIcon name="search" :size="13" />
     </span>
     <div class="search-input">
       <TextField
@@ -152,8 +152,8 @@ onUnmounted(() => {
         <template v-else-if="scanning">{{ foundSoFar }}…</template>
         <template v-else>0 of 0</template>
       </span>
-      <IconButton icon="chevron-up" :size="12" v-tooltip="'Previous match'" data-testid="keyvalue-search-prev" @click="goPrev" />
-      <IconButton icon="chevron-down" :size="12" v-tooltip="'Next match'" data-testid="keyvalue-search-next" @click="goNext" />
+      <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="keyvalue-search-prev" @click="goPrev" />
+      <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="keyvalue-search-next" @click="goNext" />
       <div class="sep" />
       <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
     </template>

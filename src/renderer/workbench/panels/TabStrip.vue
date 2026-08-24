@@ -158,7 +158,7 @@ watch(
         data-testid="tab-close"
         @click="onClose($event, tab)"
       >
-        <CodiconIcon name="close" :size="12" />
+        <CodiconIcon name="close" :size="13" />
       </span>
     </button>
   </div>
@@ -199,7 +199,7 @@ watch(
   background: transparent;
   color: var(--kira-fg-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--kira-t-md);
 }
 
 .tab.active {

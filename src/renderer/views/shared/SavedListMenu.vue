@@ -70,12 +70,12 @@ defineSlots<{
           v-tooltip="'Pin'"
           @click.stop="emit('togglePin', entry)"
         >
-          <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="12" />
+          <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
         </button>
         <slot name="entry" :entry="entry" />
         <span class="entry-actions">
           <slot name="entry-actions" :entry="entry" />
-          <IconButton icon="trash" :size="12" v-tooltip="'Delete'" @click.stop="emit('delete', entry)" />
+          <IconButton icon="trash" v-tooltip="'Delete'" @click.stop="emit('delete', entry)" />
         </span>
       </div>
 

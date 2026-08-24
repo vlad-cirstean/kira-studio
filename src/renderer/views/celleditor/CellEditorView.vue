@@ -398,7 +398,6 @@ const statusLine = computed(() => {
 
         <IconButton
           icon="sparkle"
-          :size="14"
           data-testid="cell-editor-uuid-generate"
           :disabled="!canGenerateUuid"
           v-tooltip="uuidGenerateTitle"
@@ -406,7 +405,6 @@ const statusLine = computed(() => {
         />
         <IconButton
           icon="expand-all"
-          :size="14"
           :active="formatted === 'indented'"
           data-testid="cell-editor-beautify-indented"
           :disabled="!canBeautify(effectiveFormat)"
@@ -415,7 +413,6 @@ const statusLine = computed(() => {
         />
         <IconButton
           icon="collapse-all"
-          :size="14"
           :active="formatted === 'compact'"
           data-testid="cell-editor-beautify-compact"
           :disabled="!canBeautify(effectiveFormat)"
@@ -424,7 +421,6 @@ const statusLine = computed(() => {
         />
         <IconButton
           icon="discard"
-          :size="14"
           data-testid="cell-editor-beautify-reset"
           :disabled="!isDirty"
           v-tooltip="resetTitle"
@@ -438,7 +434,7 @@ const statusLine = computed(() => {
              feedback) did anything at all. -->
         <span v-if="isDirty" class="p-chip warn" data-testid="cell-editor-modified">modified</span>
         <span v-if="readOnlyReason" class="p-chip warn" v-tooltip="readOnlyChipTitle">
-          <CodiconIcon name="lock" :size="12" />
+          <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
         </span>
       </template>
@@ -470,7 +466,7 @@ const statusLine = computed(() => {
            above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
         <div class="translate-head">
-          <CodiconIcon name="symbol-string" :size="12" />
+          <CodiconIcon name="symbol-string" :size="13" />
           <span>Decoded text</span>
         </div>
         <div v-if="decodedDoc !== null" class="translate-pane" data-testid="cell-editor-decoded">
@@ -494,7 +490,7 @@ const statusLine = computed(() => {
            field and calendar entirely — this file only decides whether to show it. -->
       <template v-else-if="isTimestampFormat">
         <div class="translate-head">
-          <CodiconIcon name="calendar" :size="12" />
+          <CodiconIcon name="calendar" :size="13" />
           <span>Date &amp; time</span>
         </div>
         <TimestampPane

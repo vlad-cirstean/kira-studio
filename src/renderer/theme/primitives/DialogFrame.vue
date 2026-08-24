@@ -86,7 +86,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
             :data-testid="closeTestId"
             @click="emit('close')"
           >
-            <CodiconIcon name="close" :size="14" />
+            <CodiconIcon name="close" :size="13" />
           </button>
         </div>
         <div class="dialog-body">

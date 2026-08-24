@@ -109,7 +109,7 @@ async function onClearCaches(): Promise<void> {
     @close="emit('close')"
   >
     <template #header>
-      <span class="icon-box muted"><CodiconIcon name="gear" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="gear" :size="13" /></span>
       <span>Settings</span>
     </template>
 

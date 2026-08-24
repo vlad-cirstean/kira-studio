@@ -177,7 +177,7 @@ const breadcrumb = computed(() => {
       <template #badges>
         <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
         <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
-          <CodiconIcon name="lock" :size="11" />
+          <CodiconIcon name="lock" :size="13" />
           read-only — {{ originPhrase }}
         </span>
       </template>
@@ -236,7 +236,7 @@ const breadcrumb = computed(() => {
           class="p-strip note"
           data-testid="definition-notes"
         >
-          <span class="icon-box"><CodiconIcon name="info" :size="14" /></span>
+          <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
           <ul class="notes-list">
             <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
           </ul>

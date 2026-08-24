@@ -97,17 +97,17 @@ function onContextMenu(e: MouseEvent): void {
       :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >
-      <CodiconIcon v-if="row.loading" name="loading" class="spin" :size="12" />
-      <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
+      <CodiconIcon v-if="row.loading" name="loading" class="spin" :size="13" />
+      <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
 
     <span v-if="row.kind === 'connection'" class="icon-box">
       <span class="status-dot" :data-status="row.status" v-tooltip="statusTitle" />
     </span>
     <span v-if="connectionKind" class="icon-box">
-      <EngineIcon :kind="connectionKind" :size="14" />
+      <EngineIcon :kind="connectionKind" :size="13" />
     </span>
-    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="14" class="node-icon" />
+    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="node-icon" />
 
     <span class="label" v-tooltip="row.name">
       <template v-for="(part, i) in parts" :key="i">
@@ -233,7 +233,7 @@ function onContextMenu(e: MouseEvent): void {
 }
 
 .badge {
-  font-size: 9px;
+  font-size: var(--kira-t-xs);
   line-height: 1.4;
   padding: 0 4px;
   border-radius: 3px;
@@ -248,7 +248,7 @@ function onContextMenu(e: MouseEvent): void {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--kira-fg-muted);
-  font-size: 11px;
+  font-size: var(--kira-t-sm);
 }
 
 </style>

@@ -227,7 +227,7 @@ const preconnectText = computed({
   >
     <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
     <template v-if="step === 'engine'" #header>
-      <span class="icon-box muted"><CodiconIcon name="database" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
       <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
       <span class="title-mid p-push">
         <span v-if="!isEdit" class="steps">
@@ -242,7 +242,7 @@ const preconnectText = computed({
          is identity here, not a control (changed via "Change engine" back to step 1). -->
     <template v-else #header>
       <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
-        <EngineIcon :kind="draft.kind" :size="16" />
+        <EngineIcon :kind="draft.kind" :size="13" />
       </span>
       <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
       <AppButton
@@ -451,7 +451,7 @@ const preconnectText = computed({
         <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" @click="continueToDetails">
           Continue
-          <span class="icon-box"><CodiconIcon name="chevron-right" :size="14" /></span>
+          <span class="icon-box"><CodiconIcon name="chevron-right" :size="13" /></span>
         </AppButton>
       </span>
     </template>

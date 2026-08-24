@@ -106,7 +106,7 @@ const connectionName = computed(
     @close="closeFiltersDialog"
   >
     <template #header>
-      <span class="icon-box muted"><CodiconIcon name="filter" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>
       <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
     </template>
 
@@ -143,7 +143,7 @@ const connectionName = computed(
       <AppButton icon="add" class="add-rule" @click="addRule">Add rule</AppButton>
 
       <div class="p-strip note preview-strip">
-        <span class="icon-box"><CodiconIcon name="info" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
         <span>
           Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
           is deleted — removing a rule brings it straight back.

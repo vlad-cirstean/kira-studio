@@ -40,7 +40,6 @@ function onPanelKeydown(e: KeyboardEvent): void {
       <span>Connections</span>
       <IconButton
         icon="add"
-        :size="14"
         class="p-push"
         aria-label="Add connection"
         v-tooltip="'New connection'"

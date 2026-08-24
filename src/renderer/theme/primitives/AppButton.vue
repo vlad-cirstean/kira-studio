@@ -26,7 +26,7 @@ withDefaults(
     ]"
     :style="variant === 'danger' ? { color: 'var(--kira-error)' } : undefined"
   >
-    <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="14" /></span>
+    <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <slot />
     <span v-if="count !== undefined" class="p-count">{{ count }}</span>
   </button>

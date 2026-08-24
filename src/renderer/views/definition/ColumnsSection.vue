@@ -53,7 +53,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           @contextmenu="onContextMenu($event, col)"
         >
           <td class="def-col-icon">
-            <CodiconIcon :name="columnTypeIcon(col.dataType)" :size="14" />
+            <CodiconIcon :name="columnTypeIcon(col.dataType)" :size="13" />
           </td>
           <td class="def-col-name">{{ col.name }}</td>
           <td class="def-col-key">
@@ -67,7 +67,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               class="type-info"
               v-tooltip="typeDescription(col.dataType) ?? ''"
             >
-              <CodiconIcon name="info" :size="12" />
+              <CodiconIcon name="info" :size="13" />
             </span>
           </td>
           <td class="def-col-null mono">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>

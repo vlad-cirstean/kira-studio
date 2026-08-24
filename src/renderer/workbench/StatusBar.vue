@@ -35,7 +35,7 @@ const cacheSizeLabel = computed(() => {
 
     <div class="side">
       <span v-if="cacheSizeLabel" class="p-status" data-testid="cache-size" v-tooltip="cacheTitle">
-        <CodiconIcon name="database" :size="10" />
+        <CodiconIcon name="database" :size="13" />
         {{ cacheSizeLabel }}
       </span>
       <span
@@ -46,7 +46,7 @@ const cacheSizeLabel = computed(() => {
       >
         <CodiconIcon
           name="circle-large-filled"
-          :size="10"
+          :size="13"
           :style="{ color: engineState.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
         />
         engine {{ engineState.status }}
@@ -63,7 +63,7 @@ const cacheSizeLabel = computed(() => {
           data-testid="toggle-project-panel"
           @click="toggleProjectPanel"
         >
-          <CodiconIcon name="layout-sidebar-left" :size="14" />
+          <CodiconIcon name="layout-sidebar-left" :size="13" />
         </button>
         <button
           type="button"
@@ -73,7 +73,7 @@ const cacheSizeLabel = computed(() => {
           data-testid="toggle-operations-panel"
           @click="toggleOperationsPanel"
         >
-          <CodiconIcon name="layout-panel" :size="14" />
+          <CodiconIcon name="layout-panel" :size="13" />
         </button>
         <button
           type="button"
@@ -83,7 +83,7 @@ const cacheSizeLabel = computed(() => {
           aria-label="Settings"
           @click="settingsOpen = true"
         >
-          <CodiconIcon name="settings-gear" :size="14" />
+          <CodiconIcon name="settings-gear" :size="13" />
         </button>
       </span>
     </div>

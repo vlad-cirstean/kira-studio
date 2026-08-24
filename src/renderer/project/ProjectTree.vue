@@ -199,7 +199,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
 .search-incomplete-note {
   flex-shrink: 0;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: var(--kira-t-xs);
   color: var(--kira-fg-muted);
   border-top: var(--kira-border-width) solid var(--kira-border);
 }

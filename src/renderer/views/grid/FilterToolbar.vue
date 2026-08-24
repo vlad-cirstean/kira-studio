@@ -180,7 +180,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </div>
     <span v-if="isStructuredSort" class="p-chip info" v-tooltip="'Sort came from clicking a column header'">
-      <CodiconIcon name="sort-precedence" :size="11" />from header
+      <CodiconIcon name="sort-precedence" :size="13" />from header
     </span>
     <AppButton v-tooltip="'Empty both fields and refetch'" @click="onClear"> Clear </AppButton>
   </div>

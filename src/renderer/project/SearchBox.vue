@@ -17,7 +17,6 @@ import { treeState } from './state/tree';
       <IconButton
         v-if="treeState.search"
         icon="close"
-        :size="12"
         class="clear-button"
         v-tooltip="'Clear search'"
         aria-label="Clear search"

@@ -185,7 +185,6 @@ const secondText = computed<string>({
     <div class="dtp-month-row">
       <IconButton
         icon="chevron-left"
-        :size="12"
         data-testid="datetime-picker-prev-month"
         v-tooltip="'Previous month'"
         @click="prevMonth"
@@ -195,7 +194,6 @@ const secondText = computed<string>({
       </span>
       <IconButton
         icon="chevron-right"
-        :size="12"
         data-testid="datetime-picker-next-month"
         v-tooltip="'Next month'"
         @click="nextMonth"
@@ -243,7 +241,7 @@ const secondText = computed<string>({
         max="59"
         data-testid="datetime-picker-second"
       />
-      <IconButton icon="clock" :size="12" data-testid="datetime-picker-now" v-tooltip="'Now'" @click="pickNow" />
+      <IconButton icon="clock" data-testid="datetime-picker-now" v-tooltip="'Now'" @click="pickNow" />
     </div>
   </div>
 </template>

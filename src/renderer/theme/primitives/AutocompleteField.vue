@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
       @mouseenter="activeIndex = i"
       @mousedown.prevent="accept(c)"
     >
-      <CodiconIcon v-if="c.icon" :name="c.icon" :size="12" class="sugg-icon" />
+      <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="sugg-icon" />
       <span class="sugg-label">{{ c.label }}</span>
       <span v-if="c.detail" class="sugg-detail">{{ c.detail }}</span>
     </li>

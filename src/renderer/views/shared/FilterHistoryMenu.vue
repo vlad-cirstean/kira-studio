@@ -162,7 +162,6 @@ async function saveCurrent(): Promise<void> {
       <IconButton
         v-if="isSaved(entry)"
         icon="edit"
-        :size="12"
         v-tooltip="'Rename'"
         @click.stop="rename(entry)"
       />
@@ -170,7 +169,7 @@ async function saveCurrent(): Promise<void> {
     <template #footer>
       <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
-        <span class="icon-box"><CodiconIcon name="add" :size="12" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current filter…
       </button>
     </template>

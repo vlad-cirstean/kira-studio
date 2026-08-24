@@ -220,7 +220,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(item.record) }}</span>
               <span>{{ item.record.kind }}</span>
               <span class="status-cell">
-                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="spin" :size="12" />
+                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="spin" :size="13" />
                 {{ item.record.status }}
                 <button
                   v-if="item.record.status === 'running'"
@@ -229,7 +229,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
                   aria-label="Cancel operation"
                   @click.stop="onCancel(item.record)"
                 >
-                  <CodiconIcon name="debug-stop" :size="12" />
+                  <CodiconIcon name="debug-stop" :size="13" />
                 </button>
               </span>
               <span>{{ formatDuration(item.record.durationMs) }}</span>
@@ -263,7 +263,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  font-size: 11px;
+  font-size: var(--kira-t-sm);
 }
 
 .ops-header {
@@ -298,7 +298,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   color: var(--kira-fg-muted);
   cursor: pointer;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--kira-t-sm);
 }
 
 .ops-columns,
@@ -411,7 +411,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 
 .ops-detail-cm :deep(.cm-editor) {
   height: 20px;
-  font-size: 11px;
+  font-size: var(--kira-t-sm);
 }
 
 /* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no

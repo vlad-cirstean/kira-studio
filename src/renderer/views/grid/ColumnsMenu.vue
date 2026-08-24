@@ -132,7 +132,7 @@ function close(): void {
           @dragover.prevent="onDragOver(index)"
           @dragend="onDragEnd"
         >
-          <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="14" /></span>
+          <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
           <input
             type="checkbox"
             :checked="selected.has(name)"

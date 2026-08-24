@@ -409,7 +409,7 @@ onUnmounted(() => {
             <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                  vanish should look like one (see the mockup's KeyValue.html). -->
             <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
-              <CodiconIcon name="history" :size="11" />
+              <CodiconIcon name="history" :size="13" />
               {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
             </span>
             <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
@@ -428,7 +428,6 @@ onUnmounted(() => {
           <IconButton
             v-if="!isSingleObjectPage"
             icon="arrow-left"
-            :size="13"
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
             v-tooltip="'Previous page'"
@@ -438,7 +437,6 @@ onUnmounted(() => {
           <IconButton
             v-if="!isSingleObjectPage"
             icon="arrow-right"
-            :size="13"
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
             v-tooltip="'Next page'"

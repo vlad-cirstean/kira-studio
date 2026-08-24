@@ -100,7 +100,7 @@ function openRecent(entry: RecentTableEntry): void {
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <button type="button" class="p-dlgbtn primary" @click="openCreateDialog">
-        <span class="icon-box"><CodiconIcon name="add" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         New connection
       </button>
     </div>

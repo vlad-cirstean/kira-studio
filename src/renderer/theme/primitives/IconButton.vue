@@ -13,7 +13,7 @@ withDefaults(
      * still needs to surface a number without falling back to a text label. */
     count?: string | number;
   }>(),
-  { size: 14, active: false, tone: 'default' },
+  { size: 13, active: false, tone: 'default' },
 );
 </script>
 
@@ -50,7 +50,7 @@ withDefaults(
   transform: translateY(-50%);
   height: 14px;
   min-width: 14px;
-  font-size: 9px;
+  font-size: var(--kira-t-xs);
   padding: 0 3px;
   /* Without this, a multi-word count (ColumnsMenu's "N / M" — the only current `:count` value
      with a space in it) wraps across two lines: as an absolutely-positioned element offset only

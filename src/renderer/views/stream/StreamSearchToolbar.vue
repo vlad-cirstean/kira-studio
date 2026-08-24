@@ -57,7 +57,7 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
 <template>
   <!-- Docks below the toolbar it searches, same placement law as grid/SearchToolbar.vue. -->
   <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
-    <span class="icon-box muted"><CodiconIcon name="search" :size="14" /></span>
+    <span class="icon-box muted"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
       <TextField v-model="query" placeholder="Find" data-testid="stream-search-input" />
     </div>
@@ -67,8 +67,8 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
       </template>
       <template v-else>0 of 0</template>
     </span>
-    <IconButton icon="chevron-up" :size="12" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
-    <IconButton icon="chevron-down" :size="12" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
+    <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
+    <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
     <div class="sep" />
     <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
     <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="stream-search-close" @click="close" />

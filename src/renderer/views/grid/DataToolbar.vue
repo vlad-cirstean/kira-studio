@@ -236,7 +236,6 @@ function onDiscard(): void {
     <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
       <IconButton
         icon="chevron-left"
-        :size="12"
         v-tooltip="'First page'"
         data-testid="pager-first"
         :disabled="tab.state.pageIndex === 0"
@@ -244,7 +243,6 @@ function onDiscard(): void {
       />
       <IconButton
         icon="chevron-left"
-        :size="12"
         v-tooltip="'Previous page'"
         data-testid="pager-prev"
         :disabled="tab.state.pageIndex === 0"
@@ -266,7 +264,6 @@ function onDiscard(): void {
       </span>
       <IconButton
         icon="chevron-right"
-        :size="12"
         v-tooltip="'Next page'"
         data-testid="pager-next"
         :disabled="!rt?.hasMore"
@@ -274,7 +271,6 @@ function onDiscard(): void {
       />
       <IconButton
         icon="chevron-right"
-        :size="12"
         v-tooltip="pageCount ? 'Last page' : 'Count rows first'"
         data-testid="pager-last"
         :disabled="!pageCount"

@@ -54,7 +54,7 @@ function close(): void {
   >
     <div class="preview-panel-inner">
       <div class="preview-panel-header p-panel-head">
-        <span class="icon-box"><CodiconIcon name="code" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
         <span>Preview SQL</span>
         <IconButton
           icon="close"

@@ -433,7 +433,6 @@ onUnmounted(() => {
         <div class="group">
           <IconButton
             icon="symbol-number"
-            :size="13"
             data-testid="stream-count"
             v-tooltip="'Count'"
             @click="runCount(tab.id)"
@@ -452,7 +451,6 @@ onUnmounted(() => {
           <IconButton
             v-else
             icon="arrow-right"
-            :size="13"
             data-testid="stream-next"
             :disabled="!rt?.hasMore"
             v-tooltip="'Next page'"
@@ -480,7 +478,6 @@ onUnmounted(() => {
             <IconButton
               v-if="canInsert"
               icon="add"
-              :size="13"
               data-testid="stream-add-message"
               v-tooltip="isKafka ? 'Produce a message' : 'Send a message'"
               @click="composeOpen = !composeOpen"
@@ -495,7 +492,6 @@ onUnmounted(() => {
           <IconButton
             v-if="isSqs && canDelete"
             icon="trash"
-            :size="13"
             data-testid="stream-delete-message"
             :disabled="!hasSelectedRow"
             v-tooltip="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
@@ -503,7 +499,6 @@ onUnmounted(() => {
           />
           <IconButton
             icon="search"
-            :size="13"
             :active="rt?.searchOpen"
             v-tooltip="'Search this page'"
             data-testid="stream-search-toggle"

@@ -34,10 +34,10 @@ const isNoColor = computed(() => !props.connColor || props.connColor === 'none')
   <div class="p-view-head">
     <span v-if="connColor !== undefined" class="p-conn-dot" :class="{ none: isNoColor }" :style="railStyle" />
     <span v-if="connKind" class="icon-box">
-      <EngineIcon :kind="connKind" :size="14" />
+      <EngineIcon :kind="connKind" :size="13" />
     </span>
     <span class="icon-box" :style="iconColor ? { color: iconColor } : undefined">
-      <CodiconIcon :name="icon" :size="14" />
+      <CodiconIcon :name="icon" :size="13" />
     </span>
     <span class="p-view-target" :data-testid="targetTestid">
       <span v-if="path" class="path">{{ path }}</span
