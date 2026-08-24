@@ -34,6 +34,46 @@ export function clearSearchState(tabId: string): void {
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup(clearSearchState);
 
+// P24 D2: the find widget's "hide non-matching rows" toggle. Kept separate from `searchState`
+// because that record is deleted every time the query goes empty (clearSearchState), which would
+// otherwise silently turn the toggle off on every cleared keystroke.
+export const searchFilterState = reactive({} as Record<string, boolean>);
+
+export function isSearchFiltering(tabId: string): boolean {
+  return searchFilterState[tabId] === true;
+}
+
+export function setSearchFiltering(tabId: string, on: boolean): void {
+  if (on) searchFilterState[tabId] = true;
+  else delete searchFilterState[tabId];
+}
+
+function clearSearchFilterState(tabId: string): void {
+  delete searchFilterState[tabId];
+}
+
+registerTabRuntimeCleanup(clearSearchFilterState);
+
+// P24 D2/D3: ascending, de-duplicated page-row indices with at least one match, or `null` when
+// the filter is off or there's no completed scan to filter by (D7: an empty query shows every
+// row). `runSearch` already emits matches in ascending row order (outer loop is `row`), so this
+// is one de-duplicating pass with no sort and no Set — and it reads only `entry.matches`, so
+// prev/next (which only move `entry.index`) never invalidate it.
+export function matchedRows(tabId: string): number[] | null {
+  if (!isSearchFiltering(tabId)) return null;
+  const entry = searchState[tabId];
+  if (!entry) return null;
+  const rows: number[] = [];
+  let last = -1;
+  for (const m of entry.matches) {
+    if (m.row !== last) {
+      rows.push(m.row);
+      last = m.row;
+    }
+  }
+  return rows;
+}
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
