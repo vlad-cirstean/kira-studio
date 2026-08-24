@@ -5,9 +5,8 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 
 // The complete, curated list of kinds that get their own folder, in render order. Any kind not
-// named here is never grouped and keeps its position — which is what leaves tables, collections,
-// redis namespaces/keys, s3 prefixes/objects, kafka topics/partitions/consumer groups and sqs
-// queues exactly as they are today.
+// named here is never grouped and keeps its position — which is what leaves redis namespaces/keys
+// and s3 prefixes/objects exactly as they are today.
 export const GROUPED_KINDS: readonly {
   kind: NodeKind;
   label: string;
@@ -19,6 +18,10 @@ export const GROUPED_KINDS: readonly {
   { kind: 'matview', label: 'Materialized views' },
   { kind: 'sequence', label: 'Sequences' },
   { kind: 'function', label: 'Functions', labelFor: { mariadb: 'Routines' } },
+  // P23 D1/D2: kafka's whole root is foldered, not just "other kinds" — a lone Consumer groups
+  // folder trailing several hundred topic rows would not be findable.
+  { kind: 'topic', label: 'Topics' },
+  { kind: 'consumerGroup', label: 'Consumer groups' },
 ];
 
 const GROUPED_KIND_SET = new Set(GROUPED_KINDS.map((g) => g.kind));
@@ -53,9 +56,10 @@ export function partitionChildren(nodes: TreeNode[]): {
 }
 
 // Kinds whose rows no longer expand in the tree, whatever a cached TreeNode's `hasChildren` says
-// (D5) — a table's columns moved into the definition view, and the adapters that produce these
+// (P19 D5) — a table's columns moved into the definition view, and the adapters that produce these
 // kinds already stopped emitting column children, but an L1 payload cached before this phase can
-// still carry `hasChildren: true` until the connection's next reconnect.
+// still carry `hasChildren: true` until the connection's next reconnect. P23 D3 adds `topic` for
+// the same reason: its partitions moved into the definition view too.
 export function isLeafKind(kind: NodeKind): boolean {
-  return kind === 'table' || kind === 'view' || kind === 'matview';
+  return kind === 'table' || kind === 'view' || kind === 'matview' || kind === 'topic';
 }

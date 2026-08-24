@@ -40,6 +40,10 @@ function topicPath(topic: string): NodePath {
   return path([{ kind: 'topic', name: topic }]);
 }
 
+function groupPath(groupId: string): NodePath {
+  return path([{ kind: 'consumerGroup', name: groupId }]);
+}
+
 const decoder = new TextDecoder();
 
 interface StreamRow {
@@ -99,7 +103,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     expect(kafkaCaps.tabular).toBe(false);
     expect(kafkaCaps.stream).toBe(true);
     expect(kafkaCaps.defaultPageKind).toBe('stream');
-    expect(kafkaCaps.definition).toBe(false);
+    expect(kafkaCaps.definition).toBe(true);
     expect(kafkaCaps.sql).toBe(false);
     expect(kafkaCaps.exactCount).toBe(true);
     expect(kafkaCaps.pagination).toBe('offsetWindow');
@@ -130,10 +134,17 @@ describe('kafka adapter (§9.1, P10)', () => {
     }
   });
 
-  test('4. tree enumeration: partitions nest under a topic, not consumer groups', async () => {
+  test('4. tree enumeration: a topic node has hasChildren:false (P23 D3), children() still works', async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
+      // D3: the tree no longer expands a topic — its root-level node says so — but D4 keeps
+      // children() itself enumerating real partitions, since StreamView.vue's partition filter is
+      // a second, live caller of exactly this call.
+      const root = await adapter.children(path([]), makeCtx());
+      const ordersNode = root.find((n) => n.kind === 'topic' && n.name === ORDERS_TOPIC);
+      expect(ordersNode?.hasChildren).toBe(false);
+
       const partitions = await adapter.children(topicPath(ORDERS_TOPIC), makeCtx());
       expect(partitions).toHaveLength(ORDERS_PARTITION_COUNT);
       expect(partitions.every((n) => n.kind === 'partition' && n.hasChildren === false)).toBe(true);
@@ -166,16 +177,41 @@ describe('kafka adapter (§9.1, P10)', () => {
     }
   });
 
-  test('6. describe/definition are unsupported', async () => {
+  test('6. describe stays unsupported; definition shows a topic and a consumer group', async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.definition(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
-        code: 'E_UNSUPPORTED',
-      });
+
+      // P23 D5: a topic's partitions (leader/replicas/isr — data the tree threw away, F8) and its
+      // non-default config, degrading to a note rather than failing if DESCRIBE_CONFIGS is denied.
+      const topicDef = await adapter.definition(topicPath(ORDERS_TOPIC), makeCtx());
+      expect(topicDef.kind).toBe('topic');
+      expect(topicDef.sections.map((s) => s.title)).toEqual(['Partitions', 'Configuration']);
+      const partitions = topicDef.sections.find((s) => s.title === 'Partitions');
+      expect(partitions?.rows.map((r) => r.name)).toEqual(['0', '1']);
+      expect(partitions?.rows.every((r) => /^leader \d+$/.test(r.value))).toBe(true);
+      const config = topicDef.sections.find((s) => s.title === 'Configuration');
+      expect(config?.rows.length).toBeGreaterThan(0);
+
+      // The seed consumer drained ORDERS_TOPIC and disconnected (0005_kafka_seed.ts), so the group
+      // has real committed offsets but no active members — exactly the "empty section, not an
+      // empty tab" case PropertiesSection.vue's own empty state exists for.
+      const groupDef = await adapter.definition(groupPath(CONSUMER_GROUP), makeCtx());
+      expect(groupDef.kind).toBe('consumerGroup');
+      expect(groupDef.sections.map((s) => s.title)).toEqual([
+        'Group',
+        'Members',
+        'Committed offsets',
+      ]);
+      const offsets = groupDef.sections.find((s) => s.title === 'Committed offsets');
+      expect(offsets?.rows).toHaveLength(ORDERS_PARTITION_COUNT);
+      expect(offsets?.rows.map((r) => r.name).sort()).toEqual([
+        `${ORDERS_TOPIC}[0]`,
+        `${ORDERS_TOPIC}[1]`,
+      ]);
     } finally {
       await adapter.disconnect();
     }

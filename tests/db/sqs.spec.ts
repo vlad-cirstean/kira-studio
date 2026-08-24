@@ -136,7 +136,7 @@ describe('sqs adapter (§9.1, P10)', () => {
     expect(sqsCaps.tabular).toBe(false);
     expect(sqsCaps.stream).toBe(true);
     expect(sqsCaps.defaultPageKind).toBe('stream');
-    expect(sqsCaps.definition).toBe(false);
+    expect(sqsCaps.definition).toBe(true);
     expect(sqsCaps.sql).toBe(false);
     expect(sqsCaps.exactCount).toBe(false);
     expect(sqsCaps.pagination).toBe('batch');
@@ -172,16 +172,37 @@ describe('sqs adapter (§9.1, P10)', () => {
     }
   });
 
-  test('6. describe/definition are unsupported', async () => {
+  test('6. describe stays unsupported; definition shows the queue attributes', async () => {
     const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
       await expect(adapter.describe(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
         code: 'E_UNSUPPORTED',
       });
-      await expect(adapter.definition(queuePath(ORDERS_QUEUE), makeCtx())).rejects.toMatchObject({
-        code: 'E_UNSUPPORTED',
-      });
+
+      // P23 D9: one GetQueueAttributes call, not a ReceiveMessage — opening the definition must
+      // not receive or hide a single message (SPEC §5.1's "SQS reads are never automatic" rule).
+      const countBefore = await adapter.count(
+        { path: queuePath(ORDERS_QUEUE), filter: null },
+        makeCtx(),
+      );
+
+      const def = await adapter.definition(queuePath(ORDERS_QUEUE), makeCtx());
+      expect(def.kind).toBe('queue');
+      expect(def.sections.map((s) => s.title)).toEqual(['Attributes']);
+      const attrs = def.sections[0]?.rows ?? [];
+      const names = attrs.map((r) => r.name);
+      expect(names).toContain('VisibilityTimeout');
+      expect(names).toContain('ApproximateNumberOfMessages');
+      expect(names).toContain('QueueArn');
+      // Sorted by name (D9) — a stable read, easy to scan.
+      expect(names).toEqual([...names].sort());
+
+      const countAfter = await adapter.count(
+        { path: queuePath(ORDERS_QUEUE), filter: null },
+        makeCtx(),
+      );
+      expect(countAfter.value).toBe(countBefore.value);
     } finally {
       await adapter.disconnect();
     }

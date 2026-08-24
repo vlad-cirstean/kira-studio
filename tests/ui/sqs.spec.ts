@@ -164,10 +164,25 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
     timeout: 10_000,
   });
 
-  // --- SQS is read-only with no console (D13) -----------------------------------------------------
+  // --- SQS is read-only with no console (D13); Open definition is offered instead (P23 D9) -------
   await openRowMenu(page, ORDERS_QUEUE_PATH);
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="menu-item-open-definition"]')).toBeVisible();
+
+  // --- a queue's definition shows its attributes, no console button ------------------------------
+  // (D9's "no message is received or made invisible by opening it" is verified at the adapter
+  // level — tests/db/sqs.spec.ts scenario 6, against the queue's ApproximateNumberOfMessages
+  // before/after — since that is where the actual SDK call this makes can be checked precisely.)
+  await page.click('[data-testid="menu-item-open-definition"]');
+  const queueDef = page.locator('[data-testid="definition-view"]');
+  await expect(queueDef).toBeVisible();
+  await expect(queueDef).toHaveAttribute('data-path', ORDERS_QUEUE_PATH);
+  await expect(queueDef.locator('[data-testid="definition-open-console"]')).toHaveCount(0);
+  const attributesSection = queueDef.locator(
+    '[data-testid="definition-properties"][data-title="Attributes"]',
+  );
+  await expect(attributesSection).toBeVisible({ timeout: 10_000 });
+  await expect(attributesSection.locator('.def-row')).not.toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });

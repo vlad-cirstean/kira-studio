@@ -38,7 +38,6 @@ test.afterAll(async () => {
 const ORDERS_TOPIC_PATH = `topic:${ORDERS_TOPIC}`;
 const EMPTY_TOPIC_PATH = `topic:${EMPTY_TOPIC}`;
 const CONSUMER_GROUP_PATH = `consumerGroup:${CONSUMER_GROUP}`;
-const ORDERS_PARTITION_0_PATH = `${ORDERS_TOPIC_PATH}/partition:0`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
@@ -76,6 +75,10 @@ async function openRowMenu(page: Page, path: string): Promise<void> {
   const row = await findRow(page, path);
   await row.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+}
+
+function getOps(page: Page): Promise<{ id: string }[]> {
+  return page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));
 }
 
 test('kafka — connect, tree, stream tab (offsetWindow), console-free', async ({
@@ -122,27 +125,39 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
     timeout: 10_000,
   });
 
-  // --- tree: topics and consumer groups are root-level siblings (P10's design) -----------------
+  // --- tree: P23 D1/D2 folders the whole root into Topics / Consumer groups ---------------------
   await expandRow(page, '');
+  const topicsFolder = await findRow(page, '#topic');
+  await expect(topicsFolder).toBeVisible();
+  await expect(topicsFolder).toHaveAttribute('data-kind', 'group');
+  await expect(topicsFolder).toContainText('Topics');
+  const groupsFolder = await findRow(page, '#consumerGroup');
+  await expect(groupsFolder).toBeVisible();
+  await expect(groupsFolder).toHaveAttribute('data-kind', 'group');
+  await expect(groupsFolder).toContainText('Consumer groups');
+
+  // P23 D1's own acceptance bar, same as P19's: expanding a folder is a pure render over
+  // already-fetched children — zero IPC calls, zero op-log rows, asserted rather than assumed.
+  const opsBeforeFolderExpand = await getOps(page);
+  await topicsFolder.locator('.twisty').click();
   const emptyTopicRow = await findRow(page, EMPTY_TOPIC_PATH);
   await expect(emptyTopicRow).toBeVisible();
   await expect(emptyTopicRow).toHaveAttribute('data-kind', 'topic');
   const ordersTopicRow = await findRow(page, ORDERS_TOPIC_PATH);
   await expect(ordersTopicRow).toBeVisible();
   await expect(ordersTopicRow).toHaveAttribute('data-kind', 'topic');
+  await groupsFolder.locator('.twisty').click();
   const groupRow = await findRow(page, CONSUMER_GROUP_PATH);
   await expect(groupRow).toBeVisible();
   await expect(groupRow).toHaveAttribute('data-kind', 'consumerGroup');
+  expect(await getOps(page)).toHaveLength(opsBeforeFolderExpand.length);
 
-  // --- partitions nest under the topic, not the consumer group ---------------------------------
-  await expandRow(page, ORDERS_TOPIC_PATH);
-  const partition0Row = await findRow(page, ORDERS_PARTITION_0_PATH);
-  await expect(partition0Row).toBeVisible();
-  await expect(partition0Row).toHaveAttribute('data-kind', 'partition');
+  // --- P23 D3: a topic no longer expands — its twisty is gone, no partition rows exist ----------
+  await expect(ordersTopicRow.locator('.twisty')).toHaveCount(0);
   const partitionRows = page.locator(
     `[data-testid="tree-row"][data-path^="${ORDERS_TOPIC_PATH}/partition:"]`,
   );
-  await expect(partitionRows).toHaveCount(ORDERS_PARTITION_COUNT);
+  await expect(partitionRows).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/screenshots/kafka.png' });
 
@@ -161,6 +176,23 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   await expect(firstRow.locator('[data-testid="stream-key"]')).toHaveText(/^key-\d$/);
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');
+
+  // --- P23 F4/D4: the partition filter still reads children() even though the tree no longer
+  // does — this is the single most important regression check in this phase.
+  await view.locator('[data-testid="stream-filter-partition"]').click();
+  const partitionMenu = page.locator('[data-testid="stream-partition-menu"]');
+  await expect(partitionMenu).toBeVisible();
+  await expect(partitionMenu.locator('.partition-option')).toHaveCount(ORDERS_PARTITION_COUNT);
+  await partitionMenu.locator('[data-testid="stream-filter-partition-option-0"]').click();
+  await expect(view.locator('[data-testid="stream-row"]')).not.toHaveCount(ORDERS_MESSAGE_COUNT, {
+    timeout: 10_000,
+  });
+  // Clear the filter again — the scenarios below assume the topic's full message set.
+  await partitionMenu.locator('[data-testid="stream-filter-partition-option-0"]').click();
+  await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(ORDERS_MESSAGE_COUNT, {
+    timeout: 10_000,
+  });
+  await page.keyboard.press('Escape');
 
   // --- row context menu: copy-key + copy-body, read-only (no delete/edit anywhere) -------------
   await firstRow.click({ button: 'right' });
@@ -185,10 +217,41 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   await expect(emptyView.locator('[data-testid="stream-row"]')).toHaveCount(0, { timeout: 15_000 });
   await expect(emptyView.locator('.no-rows')).toContainText('No messages');
 
-  // --- consumer groups/partitions are browse-only leaves — Kafka has no console (D13) -----------
+  // --- Kafka has no console (D13); a consumer group's menu now offers Open definition (P23 D7) --
   await openRowMenu(page, CONSUMER_GROUP_PATH);
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="menu-item-open-definition"]')).toBeVisible();
   await page.keyboard.press('Escape');
+
+  // --- P23: a topic's definition shows Partitions + Configuration, no console button ------------
+  await openRowMenu(page, ORDERS_TOPIC_PATH);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  const topicDef = page.locator('[data-testid="definition-view"]');
+  await expect(topicDef).toBeVisible();
+  await expect(topicDef).toHaveAttribute('data-path', ORDERS_TOPIC_PATH);
+  await expect(topicDef.locator('[data-testid="definition-open-console"]')).toHaveCount(0);
+  const partitionsSection = topicDef.locator(
+    '[data-testid="definition-properties"][data-title="Partitions"]',
+  );
+  await expect(partitionsSection).toBeVisible({ timeout: 10_000 });
+  await expect(partitionsSection.locator('.def-row')).toHaveCount(ORDERS_PARTITION_COUNT);
+  const configSection = topicDef.locator(
+    '[data-testid="definition-properties"][data-title="Configuration"]',
+  );
+  await expect(configSection).toBeVisible();
+  await expect(configSection.locator('.def-row').first()).toBeVisible();
+
+  // --- a consumer group's definition shows Group/Members/Committed offsets -----------------------
+  await openRowMenu(page, CONSUMER_GROUP_PATH);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  const groupDef = page.locator('[data-testid="definition-view"]');
+  await expect(groupDef).toBeVisible();
+  await expect(groupDef).toHaveAttribute('data-path', CONSUMER_GROUP_PATH);
+  const offsetsSection = groupDef.locator(
+    '[data-testid="definition-properties"][data-title="Committed offsets"]',
+  );
+  await expect(offsetsSection).toBeVisible({ timeout: 10_000 });
+  await expect(offsetsSection.locator('.def-row')).toHaveCount(ORDERS_PARTITION_COUNT);
 
   expect(consoleErrors).toEqual([]);
 });

@@ -1,8 +1,8 @@
 import type { Caps } from '../../../shared/caps';
 
-// §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, no definition, a
-// shell-style console (§8.14). Writable as of this phase — string-only edit/insert plus
-// type-agnostic delete (see the canInsert/canUpdate/canDelete comment below).
+// §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, a shell-style
+// console (§8.14). Writable as of this phase — string-only edit/insert plus type-agnostic delete
+// (see the canInsert/canUpdate/canDelete comment below).
 export const redisCaps: Caps = {
   tabular: false,
   documents: false,
@@ -10,6 +10,10 @@ export const redisCaps: Caps = {
   stream: false,
   defaultPageKind: 'keyvalue',
   sql: true,
+  // P23 D10: stays false permanently, not deferred — a key's type/TTL/memory usage are already on
+  // every KeyValuePage and already rendered by KeyValueView.vue (redis/read.ts). A definition tab
+  // would be a second, staler view of the same three facts for a node whose only other property is
+  // its name.
   definition: false,
   projection: false,
   serverFilter: false,

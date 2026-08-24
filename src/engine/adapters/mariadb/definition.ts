@@ -160,6 +160,7 @@ export async function buildDefinition(
     notes,
     constraints: constraintMetas,
     documentSchema: null,
+    sections: [],
     generatedAt: new Date().toISOString(),
   };
 }

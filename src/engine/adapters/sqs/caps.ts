@@ -1,7 +1,7 @@
 import type { Caps } from '../../../shared/caps';
 
 // §5.1's sqs row: stream-shaped, batch pagination (poll-on-demand, no addressable position),
-// approximate count only, no FK navigation, no definition, no console (P10's D13). Read-only in v1.
+// approximate count only, no FK navigation, no console (P10's D13).
 export const sqsCaps: Caps = {
   tabular: false,
   documents: false,
@@ -9,7 +9,11 @@ export const sqsCaps: Caps = {
   stream: true,
   defaultPageKind: 'stream',
   sql: false,
-  definition: false,
+  // P23 D9: a queue's attributes — visibility timeout, retention, redrive policy, FIFO/dedup,
+  // KMS key, ARN — reverses P10's original "no definition" call; nothing in the app showed any of
+  // this before. One GetQueueAttributes call, no automatic message read (SPEC §5.1's rule is about
+  // ReceiveMessage specifically).
+  definition: true,
   projection: false,
   serverFilter: false,
   exactCount: false, // ApproximateNumberOfMessages only

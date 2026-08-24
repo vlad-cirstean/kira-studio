@@ -21,6 +21,7 @@ import { AdapterError } from '../errors';
 import { sqsCaps } from './caps';
 import * as catalog from './catalog';
 import { connectSqs } from './client';
+import { buildQueueDefinition } from './definition';
 import { mapSqsError } from './errors';
 import * as mutate from './mutate';
 import { countQueue, pollQueue } from './read';
@@ -82,9 +83,11 @@ class SqsAdapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for sqs');
   }
 
-  async definition(): Promise<ObjectDefinition> {
-    // caps.definition === false gates §8.10's "Open definition" menu item for sqs — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for sqs');
+  async definition(path: NodePath): Promise<ObjectDefinition> {
+    const client = this.requireClient();
+    const queueName = this.resolveQueueTarget(path);
+    const queueUrl = await this.resolveQueueUrl(client, queueName);
+    return buildQueueDefinition(client, queueUrl, queueName);
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

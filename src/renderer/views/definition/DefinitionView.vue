@@ -22,6 +22,7 @@ import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
 import IndexesSection from './IndexesSection.vue';
+import PropertiesSection from './PropertiesSection.vue';
 import { load, runtime } from './state';
 import { buildConstraintRows } from './structure';
 import ValidationSection from './ValidationSection.vue';
@@ -118,6 +119,14 @@ const originPhrase = computed(() =>
   definition.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
 );
 
+// P23 D8: Open in console was unconditional before this phase, which only ever mattered because
+// every kind with a definition tab also had a console (Postgres/MariaDB/Mongo). Kafka and SQS
+// break that coincidence (caps.sql is false for both, P10's D13) — same gate project/menus.ts's
+// own consoleMenuItem() already uses for the tree's context-menu equivalent.
+const canOpenConsole = computed(
+  () => connectionsState.states[props.tab.connectionId ?? '']?.caps?.sql === true,
+);
+
 // P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
@@ -203,6 +212,7 @@ const breadcrumb = computed(() => {
           </AppButton>
         </template>
         <AppButton
+          v-if="canOpenConsole"
           icon="terminal"
           v-tooltip="'Open query console here'"
           data-testid="definition-open-console"
@@ -241,20 +251,27 @@ const breadcrumb = computed(() => {
           :read-only="true"
         />
       </div>
-      <div v-else-if="definition && meta" class="structure-body">
-        <ColumnsSection
-          v-if="!isCollection"
-          :columns="meta.columns"
-          :foreign-key-column-names="foreignKeyColumnNames"
-          :connection-id="tab.connectionId ?? ''"
-          :table-path="tab.path"
-        />
-        <IndexesSection :indexes="meta.indexes" />
-        <ConstraintsSection
-          v-if="!isCollection"
-          :connection-id="tab.connectionId ?? ''"
-          :constraints="constraintRows"
-        />
+      <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
+           describe() (F7), so a definition can arrive with meta still null. PropertiesSection
+           renders regardless; everything below it stays conditional on the data it needs, exactly
+           as before. -->
+      <div v-else-if="definition" class="structure-body">
+        <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
+        <template v-if="meta">
+          <ColumnsSection
+            v-if="!isCollection"
+            :columns="meta.columns"
+            :foreign-key-column-names="foreignKeyColumnNames"
+            :connection-id="tab.connectionId ?? ''"
+            :table-path="tab.path"
+          />
+          <IndexesSection :indexes="meta.indexes" />
+          <ConstraintsSection
+            v-if="!isCollection"
+            :connection-id="tab.connectionId ?? ''"
+            :constraints="constraintRows"
+          />
+        </template>
         <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
       </div>
       <!-- LAW — there is no editor status line: identity moved to the view header above,

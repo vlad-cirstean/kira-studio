@@ -54,21 +54,27 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   rt.status = 'loading';
   rt.error = null;
 
-  try {
-    const [definitionResponse, describeResponse] = await Promise.all([
-      control.treeDefinition(tab.connectionId, tab.path, opts?.refresh, tabId),
-      control.treeDescribe(tab.connectionId, tab.path, opts?.refresh, tabId),
-    ]);
-    rt.definition = definitionResponse.definition;
-    rt.source = definitionResponse.source;
-    rt.meta = describeResponse.meta;
-    rt.status = 'idle';
-  } catch (err) {
+  // P23 D8: describe() is allowed to fail independently — Kafka and SQS have none, and
+  // ObjectMeta has no shape for either (F7). Promise.all would fail the whole load over a
+  // describe() this view never required for its Structure body's PropertiesSection rows; a
+  // failed describe now just leaves `meta` null, same as if the adapter had nothing to say.
+  const [definitionResult, describeResult] = await Promise.allSettled([
+    control.treeDefinition(tab.connectionId, tab.path, opts?.refresh, tabId),
+    control.treeDescribe(tab.connectionId, tab.path, opts?.refresh, tabId),
+  ]);
+
+  if (definitionResult.status === 'rejected') {
     // On error this stores the message and nothing else (§0 note 13). It does not parse the
     // [CODE] prefix and does not call unmarkHydrated: the reconnect gate is computed from
     // connectionsState.states[…].status, which the engine's own connection:state event already
     // flips when a connection dies (§0 note 14), so the disconnected case corrects itself here.
+    const err = definitionResult.reason;
     rt.status = 'error';
     rt.error = err instanceof Error ? err.message : String(err);
+    return;
   }
+  rt.definition = definitionResult.value.definition;
+  rt.source = definitionResult.value.source;
+  rt.meta = describeResult.status === 'fulfilled' ? describeResult.value.meta : null;
+  rt.status = 'idle';
 }

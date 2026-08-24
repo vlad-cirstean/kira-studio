@@ -72,6 +72,7 @@ export async function buildDefinition(
       options?.validationLevel,
       options?.validationAction,
     ),
+    sections: [],
     generatedAt: new Date().toISOString(),
   };
 }

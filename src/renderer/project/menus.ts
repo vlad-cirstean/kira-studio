@@ -86,9 +86,8 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'topic':
     case 'queue':
       return streamNodeMenu(row);
-    case 'partition':
     case 'consumerGroup':
-      return simpleObjectMenu(row);
+      return consumerGroupMenu(row);
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
@@ -565,7 +564,9 @@ function objectMenu(row: TreeRowVm): MenuItem[] {
 }
 
 // P10's topic/queue leaf: minimal open/copy-name only (D13), same discipline as keyMenu — no
-// edit/delete rows anywhere, per the read-only scope decision.
+// edit/delete rows anywhere, per the read-only scope decision. P23 D7 adds "Open definition",
+// gated on caps.definition the same way relationMenu/collectionMenu gate it — a topic's partitions
+// and config, a queue's attributes, live there now that the tree no longer expands either.
 function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   return [
     {
@@ -587,6 +588,19 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
         openStreamTab(row.connectionId, row.path, { newTab: true });
       },
     },
+    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+      ? [
+          {
+            type: 'item' as const,
+            id: 'open-definition',
+            label: 'Open definition',
+            icon: 'file-code',
+            run: () => {
+              openDefinitionTab(row.connectionId, row.path);
+            },
+          },
+        ]
+      : []),
     {
       type: 'item',
       id: 'copy-name',
@@ -594,6 +608,43 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
       icon: 'copy',
       shortcut: 'tree.copyName',
       run: () => copyText(row.name),
+    },
+  ];
+}
+
+// P23 D7: split out of simpleObjectMenu rather than added to it — simpleObjectMenu is shared with
+// Postgres/MariaDB's sequence/function rows, where caps.definition is true but the adapter still
+// throws E_UNSUPPORTED for those paths (P19 §5); gating on caps there would offer a row that always
+// errors. A consumer group had no definition at all before this phase (F10).
+function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
+  return [
+    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+      ? [
+          {
+            type: 'item' as const,
+            id: 'open-definition',
+            label: 'Open definition',
+            icon: 'file-code',
+            run: () => {
+              openDefinitionTab(row.connectionId, row.path);
+            },
+          },
+        ]
+      : []),
+    {
+      type: 'item',
+      id: 'copy-name',
+      label: 'Copy name',
+      icon: 'copy',
+      shortcut: 'tree.copyName',
+      run: () => copyText(row.name),
+    },
+    {
+      type: 'item',
+      id: 'copy-qualified-name',
+      label: 'Copy qualified name',
+      icon: 'copy',
+      run: () => copyText(qualifiedNameFor(row)),
     },
   ];
 }

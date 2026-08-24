@@ -21,6 +21,7 @@ import { AdapterError } from '../errors';
 import { kafkaCaps } from './caps';
 import * as catalog from './catalog';
 import { connectKafka } from './client';
+import { buildGroupDefinition, buildTopicDefinition } from './definition';
 import { mapKafkaError } from './errors';
 import * as producer from './produce';
 import { countTopic, readTopic } from './read';
@@ -74,6 +75,11 @@ class KafkaAdapter implements Adapter {
         `unexpected root path segment kind: ${rootSegment.kind}`,
       );
     }
+    // P23 D4: a topic path still enumerates its partitions here — the tree no longer expands a
+    // topic (D3), but StreamView.vue's partition filter popover is a second, live caller of this
+    // same call, re-fetched every time it opens (loadPartitionOptions()). Deleting this the way
+    // P19's D5 deleted column enumeration would break that filter; the two cases differ precisely
+    // because this one still has a caller.
     if (segments.length === 1) return catalog.listPartitions(this.requireAdmin(), rootSegment.name);
     return []; // a partition — leaf.
   }
@@ -83,9 +89,18 @@ class KafkaAdapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for kafka');
   }
 
-  async definition(): Promise<ObjectDefinition> {
-    // caps.definition === false gates §8.10's "Open definition" menu item for kafka — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for kafka');
+  async definition(path: NodePath): Promise<ObjectDefinition> {
+    const [segment] = path.segments;
+    if (segment?.kind === 'topic') {
+      return buildTopicDefinition(this.requireAdmin(), segment.name);
+    }
+    if (segment?.kind === 'consumerGroup') {
+      return buildGroupDefinition(this.requireAdmin(), segment.name);
+    }
+    throw new AdapterError(
+      'E_NOT_FOUND',
+      `definition requires a topic or consumer group path, got: ${encodePath(path.segments)}`,
+    );
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {

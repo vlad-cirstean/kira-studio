@@ -31,7 +31,9 @@ async function listTopics(admin: Admin): Promise<TreeNode[]> {
         kind: 'topic',
         name: t.name,
         path: encodePath([{ kind: 'topic', name: t.name }]),
-        hasChildren: true,
+        // P23 D3: a topic no longer expands in the tree — its partitions moved into the
+        // definition view. `detail` keeps the count as the tree's at-a-glance summary.
+        hasChildren: false,
         detail: `${count} partition${count === 1 ? '' : 's'}`,
       };
     });
