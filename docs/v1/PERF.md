@@ -18,6 +18,7 @@ documents the procedure to run and what to fill in.
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
 | Grid scroll frame ≤ 8 ms | scroll-event `timeStamp` → DOM committed, **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — currently failing on macOS; see §2.1** |
+| Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same trigger→committed measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — not yet run in this environment; see §2.1** |
 | — (secondary) | rAF interval p95 < 24 ms, DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
 | Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
@@ -40,6 +41,8 @@ documents the procedure to run and what to fill in.
 | Cached tab switch | 5.3 ms | 6.9 ms | ≤ 50 ms (p95) | pass |
 | Cached tree expand | 1.8 ms | 2.8 ms | ≤ 50 ms (p95) | pass |
 | Console keystroke → completion popup (P18 addendum D26) | not yet run | not yet run | ≤ 50 ms (p50) | **not measured in this environment — see note below** |
+| Scroll response, horizontal (P29) | not yet run | not yet run | ≤ 8 ms (p50 gated, same reasoning as the vertical row) | **not measured in this environment — see note below** |
+| Scroll response, vertical, wide table (P29, `scroll_grid`) | not yet run | not yet run | ≤ 8 ms (p50 gated) | **not measured in this environment — see note below** |
 | Cell-editor populate latency (informational) | — | 41 ms | — | logged |
 | `perf.spec.ts` rAF scroll frame time | 16.7 ms | 16.8 ms | < 24 ms (secondary tripwire) | pass |
 | Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | ≤ 2500 ms | pass |
@@ -51,6 +54,19 @@ the Postgres fixture `tests/ui/support/pg.ts` starts cannot run and the whole `b
 suite (including the four rows above, whose numbers here predate this addendum) is skipped rather
 than re-measured. Run `xvfb-run -a bun run test:ui -- budgets` on a machine with Docker available
 and record the p50/p95 pair here.
+
+**P29 (scroll rendering gap) — not run in this environment.** `budgets.spec.ts` gained a
+horizontal scroll-response measurement and a wide-table (`app.scroll_grid`, 60 columns x 5000
+rows) vertical measurement, both gated the same way as the existing vertical `big_rows`
+measurement (p50 ≤ 8 ms, max ≤ 50 ms, p95 logged), plus the deterministic column/row
+overscan-coverage invariants, the DOM-cell bound, and the sub-row-scroll-mutates-nothing check
+(docs/v1/plans/P29-scroll-render-gap.md §5). None of this could be run here — same Docker
+constraint as above. Before/after numbers for the horizontal axis, the wide-table vertical axis,
+and whether `.grid-row { contain: layout }` (D8) measurably moved anything are all **outstanding**;
+run the suite on a machine with Docker and fill in a before/after pair here, on both axes, the way
+L-A's table entry does. If D8's line shows no attributable change, remove it per the plan's own
+instruction (D8: "if step 7's numbers show no change attributable to it, revert it in the same
+review") — it was kept in this session only because no numbers could be produced either way.
 
 **Scroll-response methodology note (contradicts plan D6's assumption).** The plan expected scroll
 response to be gated on p95, the same way the other three interaction budgets are. In practice,
