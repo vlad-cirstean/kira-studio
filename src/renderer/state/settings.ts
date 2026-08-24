@@ -9,6 +9,13 @@ import { control } from '../bridge/control';
 export const settingsState = reactive<Settings>(structuredClone(defaultSettings));
 export const settingsOpen = ref(false);
 
+// P31 D11: bumped by applyAppearance() below. A component that measures text against
+// --kira-font-family (the grid's column widths, views/grid/columns.ts's memoized measuring
+// context) takes this as an explicit reactive dependency so a font change re-measures instead of
+// reusing widths sized for whatever font was active when the module first measured. Lives here,
+// not in views/grid/columns.ts, so this module never has to import upward into views/* (§11).
+export const appearanceVersion = reactive({ n: 0 });
+
 export function applyAppearance(): void {
   const root = document.documentElement.style;
   root.setProperty('--kira-font-family', settingsState.appearance.fontFamily);
@@ -17,6 +24,7 @@ export function applyAppearance(): void {
     '--kira-row-height',
     settingsState.appearance.rowDensity === 'compact' ? '22px' : '28px',
   );
+  appearanceVersion.n++;
 }
 
 let unsubscribeChanged: (() => void) | null = null;

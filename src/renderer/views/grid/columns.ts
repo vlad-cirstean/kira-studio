@@ -21,6 +21,13 @@ function getMeasureCtx(): CanvasRenderingContext2D {
   return ctx;
 }
 
+/** Drops the memoized measuring context so the next initialWidths() call re-reads the current
+ *  appearance tokens (P31 D11) — without this, a font change leaves every unstored column sized
+ *  for whatever font was active when this module first measured, for the rest of the session. */
+export function resetMeasureCtx(): void {
+  measureCtx = null;
+}
+
 /** Measures the wider of the header and a sample of the first rows, clamped to [64, 480] px. */
 export function initialWidths(page: TabularPage): Record<string, number> {
   const ctx = getMeasureCtx();

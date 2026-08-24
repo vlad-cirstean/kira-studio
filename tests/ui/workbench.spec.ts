@@ -73,6 +73,55 @@ test('settings dialog appearance font size persists across relaunch', async ({ r
     )
     .toBe('16px');
 
+  // --- P31 item 3/D9/D10: an installed family applies and survives; an unavailable one is
+  // marked invalid, names the fallback, but is still saved (F10/F11). "Liberation Sans" is a
+  // real installed face in this Linux sandbox (fc-list) — "Georgia" is not, so it is not a valid
+  // stand-in for "an installed family" here the way it would be on macOS.
+  //
+  // Locator.fill()/keyboard typing on this field is unreliable in this Electron/Chromium build
+  // (list-attribute combobox role — fill() leaves the value untouched, and Ctrl+A/Backspace does
+  // not clear it either), so the value is written via the native property setter directly and
+  // the relevant DOM event is dispatched by hand instead. -------------------------------------
+  const familyInput = window.locator('input[list="kira-font-families"]');
+  async function typeFontFamily(
+    value: string,
+    ...events: Array<'input' | 'change'>
+  ): Promise<void> {
+    await familyInput.evaluate(
+      (el: HTMLInputElement, [v, evts]: [string, string[]]) => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter?.call(el, v);
+        for (const type of evts) el.dispatchEvent(new Event(type, { bubbles: true }));
+      },
+      [value, events] as [string, string[]],
+    );
+  }
+
+  await typeFontFamily('"Liberation Sans", sans-serif', 'input', 'change');
+  await expect
+    .poll(() =>
+      window.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--kira-font-family'),
+      ),
+    )
+    .toBe('"Liberation Sans", sans-serif');
+  await expect(window.locator('[data-testid="font-unavailable"]')).toHaveCount(0);
+  await expect(
+    window.evaluate(() => getComputedStyle(document.body).fontFamily),
+  ).resolves.toContain('Liberation Sans');
+
+  await typeFontFamily('KiraNoSuchFontXyz', 'input');
+  await expect(window.locator('[data-testid="font-unavailable"]')).toBeVisible();
+  await expect(window.locator('.p-input.is-invalid')).toBeVisible();
+  await typeFontFamily('KiraNoSuchFontXyz', 'change');
+  await expect
+    .poll(() =>
+      window.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--kira-font-family'),
+      ),
+    )
+    .toBe('KiraNoSuchFontXyz');
+
   await window.screenshot({ path: 'test-results/screenshots/settings.png' });
   await window.click('[data-testid="settings-close"]');
 
@@ -86,6 +135,13 @@ test('settings dialog appearance font size persists across relaunch', async ({ r
       ),
     )
     .toBe('16px');
+  await expect
+    .poll(() =>
+      window.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--kira-font-family'),
+      ),
+    )
+    .toBe('KiraNoSuchFontXyz');
 });
 
 test('settings dialog Advanced section persists across relaunch', async ({ relaunch }) => {

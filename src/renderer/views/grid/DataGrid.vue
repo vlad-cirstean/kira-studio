@@ -10,7 +10,7 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
-import { settingsState } from '../../state/settings';
+import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
@@ -23,6 +23,7 @@ import {
   columnOffsets,
   initialWidths,
   pageColumnIndexFor,
+  resetMeasureCtx,
   resolveColumnOrder,
   visibleColumnRange,
 } from './columns';
@@ -91,7 +92,17 @@ function headerTitleFor(name: string): string {
   return comment ? `${dataType} — ${comment}` : dataType;
 }
 
+// P31 D11: a font change drops columns.ts's memoized measuring context (so the next measurement
+// re-reads the current --kira-font-family/--kira-font-size tokens instead of the ones baked into
+// it at first use) and this computed takes appearanceVersion.n as an explicit dependency so it
+// re-measures right after, rather than reusing widths sized for the previous font indefinitely.
+watch(
+  () => appearanceVersion.n,
+  () => resetMeasureCtx(),
+);
+
 const widths = computed<Record<string, number>>(() => {
+  void appearanceVersion.n;
   const p = page.value;
   if (!p) return {};
   const stored = tab()?.state.columnWidths ?? {};

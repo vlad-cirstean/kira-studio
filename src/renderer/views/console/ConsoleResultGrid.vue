@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { settingsState } from '../../state/settings';
+import { appearanceVersion, settingsState } from '../../state/settings';
 import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../workbench/VirtualList.vue';
-import { alignmentFor, initialWidths } from '../grid/columns';
+import { alignmentFor, initialWidths, resetMeasureCtx } from '../grid/columns';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
@@ -35,9 +35,18 @@ const page = computed(() => {
   return getPage(props.pageKey);
 });
 
-const widths = computed<Record<string, number>>(() =>
-  page.value && page.value.kind === 'tabular' ? initialWidths(page.value) : {},
+// P31 D11/F13: same reasoning as DataGrid.vue's own widths computed — without this, a font
+// change leaves every result grid sized for whatever font was active when columns.ts's shared
+// measuring context was first created, for the rest of the session.
+watch(
+  () => appearanceVersion.n,
+  () => resetMeasureCtx(),
 );
+
+const widths = computed<Record<string, number>>(() => {
+  void appearanceVersion.n;
+  return page.value && page.value.kind === 'tabular' ? initialWidths(page.value) : {};
+});
 const totalWidth = computed(() => {
   const p = page.value;
   if (p?.kind !== 'tabular') return 0;

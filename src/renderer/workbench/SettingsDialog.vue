@@ -2,6 +2,7 @@
 import type { RowDensity, SettingsPatch } from '@shared/settings';
 import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
+import { fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
@@ -38,8 +39,23 @@ const sections = ['Appearance', 'Data', 'Cache', 'Advanced'] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
 
+// P31 D9/D10: a live local draft, updated on every keystroke (@input) so the preview line and
+// the availability check track what's actually typed — the commit itself stays on @change
+// (P16 §6's original reasoning holds: per-keystroke commits would repaint the whole app's font
+// for every partial family name). Superseding P16 §6's later `7641dd6` revert to plain @change
+// with no feedback at all: this restores the feedback without reintroducing the repaint cost.
+const fontFamilyDraft = ref(settingsState.appearance.fontFamily);
+const fontFamilyUnavailable = computed(() => !fontStackAvailable(fontFamilyDraft.value));
+const fontFamilyFallback = computed(() => resolveFontFallback(fontFamilyDraft.value));
+
+function onFontFamilyInput(e: Event): void {
+  fontFamilyDraft.value = (e.target as HTMLInputElement).value;
+}
+
 function onFontFamilyChange(e: Event): void {
-  void patchSettings({ appearance: { fontFamily: (e.target as HTMLInputElement).value } });
+  const value = (e.target as HTMLInputElement).value;
+  fontFamilyDraft.value = value;
+  void patchSettings({ appearance: { fontFamily: value } });
 }
 
 function onFontSizeChange(e: Event): void {
@@ -138,7 +154,9 @@ async function onClearCaches(): Promise<void> {
                 type="text"
                 size="md"
                 list="kira-font-families"
-                :model-value="settingsState.appearance.fontFamily"
+                :invalid="fontFamilyUnavailable"
+                :model-value="fontFamilyDraft"
+                @input="onFontFamilyInput"
                 @change="onFontFamilyChange"
               />
               <datalist id="kira-font-families">
@@ -147,7 +165,18 @@ async function onClearCaches(): Promise<void> {
                 <option value="Monaco, monospace" />
                 <option value="'JetBrains Mono', monospace" />
               </datalist>
-              <span class="helper-text">Grid cells, editors, anything that came out of a database.</span>
+              <span
+                class="font-preview"
+                data-testid="font-preview"
+                :style="{ fontFamily: fontFamilyDraft }"
+                >The quick brown fox jumps over the lazy dog — 0123456789</span
+              >
+              <span v-if="fontFamilyUnavailable" class="field-error" data-testid="font-unavailable">
+                Not installed<template v-if="fontFamilyFallback">
+                  — text falls back to the browser's {{ fontFamilyFallback }} default.</template
+                ><template v-else> — text falls back to the browser's default.</template>
+              </span>
+              <span v-else class="helper-text">Grid cells, editors, anything that came out of a database.</span>
             </label>
 
             <label class="field">
@@ -418,6 +447,20 @@ async function onClearCaches(): Promise<void> {
   color: var(--kira-fg-disabled);
   font-size: var(--kira-t-xs);
   line-height: 1.5;
+}
+
+.field-error {
+  color: var(--kira-error);
+  font-size: var(--kira-t-xs);
+  line-height: 1.5;
+}
+
+.font-preview {
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mono {
