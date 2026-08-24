@@ -30,5 +30,5 @@ export const kafkaCaps: Caps = {
   canDelete: false,
   writable: true,
   transactions: false,
-  cancel: true, // ctx.signal -> consumer.stop() inside read() is fully effective (P10's D6/D14)
+  cancel: true, // ctx.signal -> consumer.disconnect() inside read() is fully effective (P10's D6/D14, P32 D22)
 };

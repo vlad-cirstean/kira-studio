@@ -1,4 +1,5 @@
-import type { Admin, IHeaders, Kafka } from 'kafkajs';
+import type { Assignment, EofEvent, KafkaJS, Message } from '@confluentinc/kafka-javascript';
+import { KafkaConsumer } from '@confluentinc/kafka-javascript';
 import { parseKafkaStreamFilter } from '../../../shared/domain/streamFilter';
 import {
   createStreamPageBuilder,
@@ -8,6 +9,7 @@ import {
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
+import type { KafkaClientHandle } from './client';
 import { mapKafkaError } from './errors';
 
 interface PartitionWindow {
@@ -16,16 +18,37 @@ interface PartitionWindow {
   end: string; // frozen high watermark for this browse (never re-fetched mid-browse, D7)
 }
 
-function headersToPlain(headers: IHeaders | undefined): Record<string, string | string[]> {
+// P32 D19: required by librdkafka for any consumer (INTRODUCTION.md — "the group.id and
+// bootstrap.servers properties are required for a consumer") and never joined: a group is joined
+// by subscribe()/run(), which this browse never calls (F13/F13a, verified against the vendored
+// librdkafka C source, not just the JS docs). Can be a constant again (the pre-P32 code minted a
+// fresh UUID per browse) precisely because no group is ever created on the broker — the random
+// suffix existed only to keep concurrent browses out of each other's rebalances, which cannot
+// happen once nothing here ever rebalances.
+const BROWSE_GROUP_ID = 'kira-studio-browse';
+// One poll's fetch window — also the worst-case latency between an abort and the loop noticing
+// (D22) and between a window that can never fill and the empty-poll counter noticing it (D21).
+const POLL_TIMEOUT_MS = 1_000;
+// Consecutive empty polls that end a browse whose windows can never be filled — a compacted or
+// retention-deleted range inside [next, end) (D21).
+const MAX_EMPTY_POLLS = 2;
+
+// P32 D24/F15.3: the native consumer's Message.headers is an array of single-pair objects
+// ([{k1:v1}, {k2:v2}]), not kafkajs's Record — folded back into the wire shape's own
+// Record<string, string | string[]> (promoting a repeated key to an array, the existing
+// string[] case) so the `headers` column's contract is unchanged for the stream view and
+// produce.ts's own $headers round trip.
+function headersToPlain(headers: Message['headers']): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
   if (!headers) return out;
-  for (const [key, value] of Object.entries(headers)) {
-    if (value === undefined) continue;
-    out[key] = Array.isArray(value)
-      ? value.map((v) => (Buffer.isBuffer(v) ? v.toString('utf8') : v))
-      : Buffer.isBuffer(value)
-        ? value.toString('utf8')
-        : value;
+  for (const pair of headers) {
+    for (const [key, raw] of Object.entries(pair)) {
+      const value = Buffer.isBuffer(raw) ? raw.toString('utf8') : raw;
+      const existing = out[key];
+      if (existing === undefined) out[key] = value;
+      else if (Array.isArray(existing)) existing.push(value);
+      else out[key] = [existing, value];
+    }
   }
   return out;
 }
@@ -46,16 +69,16 @@ function finishPosition(
   };
 }
 
+// P32 D20: unchanged — this was always admin-side, and the compat admin keeps
+// fetchTopicOffsets/fetchTopicOffsetsByTimestamp with the same signature and return shape (F11).
 // D-filter: `rawFilter` is StreamView.vue's JSON-encoded KafkaStreamFilter (offset/partition/
 // timestamp), carried through the generic `filter` field — only ever consulted for a *fresh*
 // browse (a token-continued page's windows were already resolved once, per the D7 comment on
 // PartitionWindow, and re-applying the filter there would just be wrong once the user has paged
 // partway through). `partitions` narrows which partitions this browse even considers; `timestampMs`
-// (if set) wins over `offset` and reseeds via kafkajs's own `fetchTopicOffsetsByTimestamp` — the
-// exact API this adapter would otherwise have needed a consumer-side `seek`/`offsetsForTimes`
-// dance for.
+// (if set) wins over `offset` and reseeds via the admin's own `fetchTopicOffsetsByTimestamp`.
 async function freshWindows(
-  admin: Admin,
+  admin: KafkaJS.Admin,
   topic: string,
   rawFilter: string | null,
   ctx: OpCtx,
@@ -123,15 +146,56 @@ async function freshWindows(
   }));
 }
 
-// D6/D7: a new short-lived, unique-groupId consumer per read() call. It never commits offsets,
-// seeks each assigned partition to the requested (or freshly-watermarked) offset, and stops once
-// it has collected one page's worth of messages or drained every remaining partition up to the
-// watermark frozen at browse-start — forward-only, low-watermark-first (no tail/bidirectional
-// browsing, per the ground rules). `partitionsConsumedConcurrently` is left at kafkajs's default
-// of 1 (one partition processed at a time) so the shared `cursor` map below needs no locking.
+// P32 D23: the native API types offsets as `number` while the app's own contract is int64-as-
+// decimal-string (shared/domain/streamFilter.ts) — converting at exactly this one boundary keeps
+// the rest of the pipeline (token, filter, attrs column) unchanged. Not theoretical hygiene:
+// silently truncating an offset would produce a page of plausible-but-wrong messages, the worst
+// failure mode a DB client can have. Nine quadrillion messages in one partition is not reachable
+// in practice, which is why an explicit error is the right response rather than a fallback path.
+function toNativeOffset(decimalOffset: string): number {
+  const value = Number(decimalOffset);
+  if (!Number.isSafeInteger(value)) {
+    throw new AdapterError(
+      'E_UNSUPPORTED',
+      `offset ${decimalOffset} exceeds what this adapter can address as a JS number`,
+    );
+  }
+  return value;
+}
+
+function connectConsumer(consumer: KafkaConsumer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    consumer.connect(undefined, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function disconnectConsumer(consumer: KafkaConsumer): Promise<void> {
+  return new Promise((resolve) => {
+    consumer.disconnect(() => resolve());
+  });
+}
+
+function consumeBatch(consumer: KafkaConsumer, n: number): Promise<Message[]> {
+  return new Promise((resolve, reject) => {
+    consumer.consume(n, (err, messages) => {
+      if (err) reject(err);
+      else resolve(messages ?? []);
+    });
+  });
+}
+
+// P32 D19-D22 — the core commit: the browse consumer never subscribes. It is constructed with a
+// constant group.id, enable.auto.commit/enable.auto.offset.store off, enable.partition.eof on,
+// auto.offset.reset: 'error', then assign()s exactly the partitions in `remaining` at their start
+// offsets and consume(n, cb)s until the page is full, every window drained, every remaining
+// partition EOF, MAX_EMPTY_POLLS consecutive empty polls, or abort. No JoinGroup, no SyncGroup, no
+// Heartbeat, no LeaveGroup, no OffsetCommit, no OffsetFetch — the broker never creates group state
+// and `kira-studio-browse` never appears in listGroups() (P10's D6 promise, now structural).
 export async function readTopic(
-  kafka: Kafka,
-  admin: Admin,
+  handle: KafkaClientHandle,
   topic: string,
   req: Omit<ReadRequest, 'path'>,
   ctx: OpCtx,
@@ -146,7 +210,7 @@ export async function readTopic(
   const windows =
     req.cursor.mode === 'after'
       ? (JSON.parse(decodePageToken(req.cursor.token, fingerprint)[0]) as PartitionWindow[])
-      : await freshWindows(admin, topic, req.filter, ctx);
+      : await freshWindows(handle.admin, topic, req.filter, ctx);
 
   const remaining = windows.filter((w) => BigInt(w.next) < BigInt(w.end));
   if (remaining.length === 0) {
@@ -155,57 +219,84 @@ export async function readTopic(
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
-  const groupId = `kira-studio-browse-${crypto.randomUUID()}`;
-  const consumer = kafka.consumer({ groupId, sessionTimeout: 15_000 });
+  const consumer = new KafkaConsumer(
+    {
+      ...handle.rdConfig,
+      'group.id': BROWSE_GROUP_ID,
+      'enable.auto.commit': false,
+      'enable.auto.offset.store': false,
+      'enable.partition.eof': true,
+    } as never,
+    { 'auto.offset.reset': 'error' } as never,
+  );
+  consumer.setDefaultConsumeTimeout(POLL_TIMEOUT_MS);
+
+  const eofPartitions = new Set<number>();
+  consumer.on('partition.eof', (ev: EofEvent) => {
+    eofPartitions.add(ev.partition);
+  });
+
+  // P32 D22: consumer.disconnect() is the whole cancel mechanism now — stop() no longer exists on
+  // this client, "the user must disconnect the consumer" (F14/MIGRATION.md). Disconnect is
+  // strictly stronger than the old stop-then-disconnect pair since it tears the client down
+  // rather than parking it. Adapter.cancel() stays a permanent no-op (P10's D6/D14) — this signal
+  // bridge is the mechanism.
   const onAbort = (): void => {
-    void consumer.stop().catch(() => {});
+    void disconnectConsumer(consumer);
   };
   ctx.signal.addEventListener('abort', onAbort, { once: true });
 
   try {
     ctx.setCommand(`browse ${topic} (${remaining.length} partition(s) of ${windows.length})`);
-    await consumer.connect();
-    await consumer.subscribe({ topic, fromBeginning: false });
+    await connectConsumer(consumer);
+
+    const assignments: Assignment[] = remaining.map((w) => ({
+      topic,
+      partition: w.partition,
+      offset: toNativeOffset(w.next),
+    }));
+    consumer.assign(assignments);
 
     const builder = createStreamPageBuilder({ visibilityTimeoutSeconds: null });
     const cursor = new Map(windows.map((w): [number, PartitionWindow] => [w.partition, { ...w }]));
+    const remainingPartitions = new Set(remaining.map((w) => w.partition));
     let collected = 0;
-    let seeked = false;
+    let emptyPolls = 0;
 
-    await new Promise<void>((resolve, reject) => {
-      const allDone = (): boolean =>
-        [...cursor.values()].every((w) => BigInt(w.next) >= BigInt(w.end));
+    const allDone = (): boolean =>
+      [...cursor.values()].every((w) => BigInt(w.next) >= BigInt(w.end));
+    const allEof = (): boolean => [...remainingPartitions].every((p) => eofPartitions.has(p));
 
-      consumer
-        .run({
-          eachMessage: async ({ partition, message }) => {
-            if (!seeked || collected >= req.pageSize) return;
-            const w = cursor.get(partition);
-            if (!w) return;
-            const offset = BigInt(message.offset);
-            if (offset < BigInt(w.next) || offset >= BigInt(w.end)) return;
-            builder.push({
-              key: message.key ? message.key.toString('utf8') : null,
-              headers: JSON.stringify(headersToPlain(message.headers)),
-              attrs: JSON.stringify({ partition, offset: message.offset }),
-              timestamp: message.timestamp
-                ? new Date(Number(message.timestamp)).toISOString()
-                : null,
-              body: message.value ? message.value.toString('utf8') : '',
-            });
-            collected++;
-            w.next = String(offset + 1n);
-            if (collected >= req.pageSize || allDone()) resolve();
-          },
-        })
-        .catch(reject);
-
-      // seek() is documented to run after run() — kafkajs applies it once this consumer (the
-      // sole member of a fresh, unique group subscribed to only this topic) joins and is
-      // assigned every partition, which happens for all of them at once.
-      for (const w of remaining) consumer.seek({ topic, partition: w.partition, offset: w.next });
-      seeked = true;
-    });
+    while (collected < req.pageSize && !allDone() && !allEof()) {
+      if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+      const messages = await consumeBatch(consumer, req.pageSize - collected);
+      if (messages.length === 0) {
+        emptyPolls++;
+        if (emptyPolls >= MAX_EMPTY_POLLS) break;
+        continue;
+      }
+      emptyPolls = 0;
+      for (const message of messages) {
+        if (collected >= req.pageSize) break;
+        const w = cursor.get(message.partition);
+        if (!w) continue;
+        const offset = BigInt(message.offset);
+        if (offset < BigInt(w.next) || offset >= BigInt(w.end)) continue;
+        builder.push({
+          key: message.key
+            ? Buffer.isBuffer(message.key)
+              ? message.key.toString('utf8')
+              : message.key
+            : null,
+          headers: JSON.stringify(headersToPlain(message.headers)),
+          attrs: JSON.stringify({ partition: message.partition, offset: String(message.offset) }),
+          timestamp: message.timestamp ? new Date(message.timestamp).toISOString() : null,
+          body: message.value ? message.value.toString('utf8') : '',
+        });
+        collected++;
+        w.next = String(offset + 1n);
+      }
+    }
 
     if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
@@ -216,14 +307,14 @@ export async function readTopic(
     throw mapKafkaError(err);
   } finally {
     ctx.signal.removeEventListener('abort', onAbort);
-    await consumer.stop().catch(() => {});
-    await consumer.disconnect().catch(() => {});
+    await disconnectConsumer(consumer);
   }
 }
 
-// D6: exact via fetchTopicOffsets's high/low watermarks, summed across every partition.
+// P32 D20: unchanged — exact via fetchTopicOffsets's high/low watermarks, summed across every
+// partition.
 export async function countTopic(
-  admin: Admin,
+  admin: KafkaJS.Admin,
   topic: string,
   ctx: OpCtx,
 ): Promise<{ value: number; exact: boolean }> {
