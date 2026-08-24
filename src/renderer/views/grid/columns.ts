@@ -61,13 +61,22 @@ export interface ColumnRange {
   endIndex: number;
 }
 
+// The row axis has had overscan since P12; the column axis had none (F3 in P29's plan) — the
+// asymmetry the "worse horizontally" report traces to. Buffer in pixels, not a column count: a
+// column is 40-480 px wide, so "N columns of overscan" is a different distance on every table.
 export function visibleColumnRange(
   scrollLeft: number,
   viewportWidth: number,
   offsets: number[],
+  /** Extra rendered width on each side. */
+  overscanPx: number,
+  /** Hard cap per side, so a table of narrow columns can't multiply the DOM without bound. */
+  maxOverscanColumns: number,
 ): ColumnRange {
   const n = offsets.length - 1;
   if (n <= 0) return { startIndex: 0, endIndex: 0 };
+
+  // The exact visible range, no buffer — same binary-search-then-linear-walk shape as before.
   let lo = 0;
   let hi = n;
   while (lo < hi) {
@@ -77,7 +86,26 @@ export function visibleColumnRange(
   }
   let end = lo;
   while (end < n && offsets[end] < scrollLeft + viewportWidth) end++;
-  return { startIndex: lo, endIndex: end };
+
+  // Expand each side by columns whose combined width covers overscanPx, capped independently.
+  let startIndex = lo;
+  let leftPx = 0;
+  let leftCount = 0;
+  while (startIndex > 0 && leftPx < overscanPx && leftCount < maxOverscanColumns) {
+    startIndex--;
+    leftPx += offsets[startIndex + 1] - offsets[startIndex];
+    leftCount++;
+  }
+  let endIndex = end;
+  let rightPx = 0;
+  let rightCount = 0;
+  while (endIndex < n && rightPx < overscanPx && rightCount < maxOverscanColumns) {
+    rightPx += offsets[endIndex + 1] - offsets[endIndex];
+    endIndex++;
+    rightCount++;
+  }
+
+  return { startIndex, endIndex };
 }
 
 // §8.5's type-aware right-alignment for numerics.

@@ -43,13 +43,12 @@ import { runtime, setSort } from './state';
 const props = defineProps<{ tabId: string }>();
 
 const GUTTER_WIDTH = 56;
-// Widened from 8: a fast fling scroll is compositor-driven (the browser moves the viewport
-// instantly, with no need to wait on the main thread), while the actual row DOM only updates
-// once this component's scroll handler runs and re-renders — under a big flick that gap can
-// briefly outrun a thin buffer, showing blank space where rows haven't caught up yet ("cells
-// disappear, then reappear once you stop"). A wider buffer gives the main thread more scrolled
-// distance to fall behind before that gap becomes visible.
-const OVERSCAN_ROWS = 20;
+/** How far the compositor may outrun the main thread before a gap can show. 560 px = the row
+ *  axis's own overscan since P12 (20 rows x 28 px at comfortable density), now applied to the
+ *  column axis too (P29 D2). */
+const OVERSCAN_PX = 560;
+/** Per side. Bounds the DOM when columns are narrow enough that 560 px is a dozen of them. */
+const MAX_OVERSCAN_COLUMNS = 12;
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
@@ -288,15 +287,22 @@ onUnmounted(() => {
 // untouched (displayRowCount === page.rowCount when there's no filter).
 const rowRange = computed(() => {
   const total = displayRowCount.value;
-  const start = Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - OVERSCAN_ROWS);
+  const overscanRows = Math.ceil(OVERSCAN_PX / rowHeight.value);
+  const start = Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - overscanRows);
   const end = Math.min(
     total,
-    Math.ceil((scrollTop.value + viewportHeight.value) / rowHeight.value) + OVERSCAN_ROWS,
+    Math.ceil((scrollTop.value + viewportHeight.value) / rowHeight.value) + overscanRows,
   );
   return { start, end };
 });
 const colRange = computed(() =>
-  visibleColumnRange(scrollLeft.value, viewportWidth.value, offsets.value),
+  visibleColumnRange(
+    scrollLeft.value,
+    viewportWidth.value,
+    offsets.value,
+    OVERSCAN_PX,
+    MAX_OVERSCAN_COLUMNS,
+  ),
 );
 
 // The visible window as four *numbers*, not two objects (F4/D4): rowRange/colRange are computeds
