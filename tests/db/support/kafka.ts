@@ -1,6 +1,5 @@
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { KafkaContainer, type StartedKafkaContainer } from '@testcontainers/kafka';
-import { Kafka } from 'kafkajs';
 import { seedKafka } from '../fixtures/0005_kafka_seed';
 import { resolveDockerHost } from './docker';
 
@@ -42,8 +41,7 @@ async function start(): Promise<KafkaFixture> {
   const host = container.getHost();
   const port = container.getMappedPort(KAFKA_PORT);
 
-  const kafka = new Kafka({ clientId: 'kira-studio-seed', brokers: [`${host}:${port}`] });
-  await seedKafka(kafka);
+  await seedKafka(container);
 
   const now = new Date().toISOString();
   const config: ResolvedConnectionConfig = {
