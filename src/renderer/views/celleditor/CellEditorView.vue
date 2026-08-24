@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import type { BeautifyMode } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
@@ -9,10 +10,10 @@ import { connectionsState } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
-import { type BeautifyMode, beautify } from './beautify';
 import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
+  beautifyFor,
   CELL_FORMATS,
   type CellFormat,
   canBeautify,
@@ -247,7 +248,7 @@ function onDecodedInput(text: string): void {
 function applyBeautify(mode: BeautifyMode): void {
   const c = selectedCell.value;
   if (c.value === null || !canBeautify(effectiveFormat.value)) return;
-  const result = beautify(doc.value, effectiveFormat.value, mode);
+  const result = beautifyFor(effectiveFormat.value, doc.value, mode);
   if (result.ok) {
     formattedMode.value = mode;
     formattedForDoc.value = result.text;

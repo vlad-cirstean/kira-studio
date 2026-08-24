@@ -1,3 +1,4 @@
+import { type BeautifyMode, type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import type { EditorLanguageId } from '../../editor/languages';
 
 /** §8.6's closed vocabulary, decided once (D8) — the same call P1 D4 made for `Caps`. */
@@ -51,4 +52,17 @@ export const FORMAT_LANGUAGE: Record<CellFormat, EditorLanguageId> = {
 /** True only where a lossless reformatter exists (D11): json and xml. */
 export function canBeautify(format: CellFormat): boolean {
   return format === 'json' || format === 'xml';
+}
+
+/**
+ * Applied to whatever `text` the caller passes in — the current edit buffer (P24 D21), so
+ * hand-editing then beautifying formats the edit instead of discarding it. Reversibility
+ * (indented <-> compact) comes from both modes being lossless, not from always starting over at
+ * the stored value. Offered for `json` and `xml` only (D11); every other format has no lossless
+ * formatter and the caller must not invoke this for one (see `canBeautify` above).
+ */
+export function beautifyFor(format: CellFormat, text: string, mode: BeautifyMode): BeautifyResult {
+  if (format === 'json') return beautifyJson(text, mode);
+  if (format === 'xml') return beautifyXml(text, mode);
+  return { text, ok: false, reason: `${format} has no lossless formatter` };
 }

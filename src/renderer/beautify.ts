@@ -1,5 +1,3 @@
-import type { CellFormat } from './formats';
-
 export type BeautifyMode = 'indented' | 'compact';
 
 export interface BeautifyResult {
@@ -240,7 +238,7 @@ function renderJsonCompact(node: JsonNode, out: string[]): void {
   out.push(']');
 }
 
-function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
+export function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
   const r = tryParseJson(text);
   if (!r.ok) return { text, ok: false, reason: `invalid JSON at offset ${r.offset}` };
   const out: string[] = [];
@@ -501,7 +499,7 @@ function renderXmlCompact(nodes: XmlNode[], out: string[]): void {
   }
 }
 
-function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
+export function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
   const r = tryParseXml(text);
   if (!r.ok) return { text, ok: false, reason: r.reason };
   if (mode === 'indented') {
@@ -512,20 +510,4 @@ function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
   const out: string[] = [];
   renderXmlCompact(r.nodes, out);
   return { text: out.join(''), ok: true };
-}
-
-// ---------------------------------------------------------------------------------------------
-
-/**
- * Applied to whatever `text` the caller passes in — CellEditorView.vue passes the *current
- * buffer* (P24 D21), so hand-editing then beautifying formats the edit instead of discarding it.
- * Reversibility (indented <-> compact) comes from both modes being lossless, not from always
- * starting over at the stored value; Reset still restores the stored value outright regardless.
- * Offered for `json` and `xml` only (D11); every other format has no lossless formatter and the
- * caller must not invoke this for one (see `canBeautify` in formats.ts).
- */
-export function beautify(text: string, format: CellFormat, mode: BeautifyMode): BeautifyResult {
-  if (format === 'json') return beautifyJson(text, mode);
-  if (format === 'xml') return beautifyXml(text, mode);
-  return { text, ok: false, reason: `${format} has no lossless formatter` };
 }
