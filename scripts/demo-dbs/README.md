@@ -104,9 +104,19 @@ either.
 SQS gets three queues: `orders-queue` (5 messages), `drain-queue` (7 messages, a second queue so
 polling one doesn't race the other's `VisibilityTimeout`), and `empty-queue` (0 messages).
 
-S3 gets two buckets: `kira-demo-bucket` (three objects at different nesting depths — a root-level
-`readme.txt`, `reports/notes.txt`, and `reports/2024/summary.json` — so the tree's '/'-splitting
-has more than one level to prove out) and `kira-empty-bucket` (0 objects).
+S3 gets three buckets. `kira-demo-bucket` carries the full P33 (download/upload/delete/bounded
+edit) demo surface: `readme.txt` (root-level, `Metadata.seeded=true`), `reports/notes.txt` and
+`reports/2024/summary.json` (nesting depth), `reports/quarter one (Q1).json` (a key with spaces
+and parentheses, to exercise path encoding through download/delete/the tab title); a
+`sizes/` ladder — `tiny.txt` (0 bytes), `small.json` (~4 KB, ordinary edit case), `medium.csv`
+(~512 KB, editable but large enough to feel it), `large.log` (~2 MB — renders, but Edit is
+disabled since it's over `OBJECT_BODY_EDIT_BYTES`), `huge.bin` (~8 MB — over
+`OBJECT_BODY_PREVIEW_BYTES`, no Body row at all, Download is the only way to see it), `logo.png`
+(a real tiny PNG — previews lossily, Edit refused as not valid UTF-8); and `bulk/` with 1,200
+small JSON objects, past `ListObjectsV2`'s 1,000-key page, to exercise the tree's continuation
+loop. `kira-uploads-bucket` is empty — the upload target, and the case of a bucket with nothing
+in it to open an object from (Upload has to be reachable from the bucket row itself).
+`kira-empty-bucket` stays empty too, unrelated to uploads.
 
 Unlike the relational/document seeds, the Kafka/SQS/S3 seeds are **not** idempotent in the same
 way — topics/queues are created with `--if-not-exists`/reused and S3 objects are simply
