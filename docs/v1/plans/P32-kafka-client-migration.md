@@ -21,6 +21,15 @@
 > capability in `caps.ts` stays true, every wire shape (`StreamPage`, `KafkaStreamFilter`, the
 > offset-window page token) is unchanged, and no renderer file is touched.
 >
+> **The two facts that shape everything else, both verified here rather than assumed.** (1) The new
+> client exposes **no `DescribeConfigs` and no `describeCluster`** on either of its two API surfaces
+> (F11), so a topic's Configuration section and the connection's cluster id have no replacement —
+> D13/D14 say what happens instead, out loud. (2) **Bun cannot load this addon at any ABI** (F21):
+> given the *matching* prebuild it dies on an undefined `v8::FunctionTemplate::SetClassName`. That
+> retires P10's D15 for good and moves the Kafka adapter suite off `bun test` onto the Electron
+> runtime the shipped engine already uses (D27) — the largest structural change in the phase, and
+> the one the ask did not name.
+>
 > **What this phase is not.** It is not an SQS change — SQS shares only `StreamPage` and the stream
 > view with Kafka, uses `@aws-sdk/client-sqs`, and `sqs/read.ts` never looks at `filter`
 > (`src/shared/domain/streamFilter.ts:5-8`). It is not a feature phase: no new browse mode, no tail
@@ -51,9 +60,12 @@
 - **Comments per AGENTS.md:** only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint (a required-but-unused `group.id`, an ABI marker, an offset
   numeric range) gets exactly one line at its implementation site.
-- Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every step.
-  `bun run test:db` and `xvfb-run -a bun run test:ui` on the macOS/Colima box before the phase is
-  called done.
+- **The test runner bends around the driver, not the other way round.** Bun cannot load this
+  native module at all (F21, probed to a conclusion), so the Kafka adapter suite moves to a runtime
+  that can (D27) rather than being thinned, skipped, or left to a "works on my machine" note.
+- Run `bun run lint`, `bun run typecheck` (every project) and `bun run build` on every step.
+  `bun run test:db`, `bun run test:db:kafka` and `bun run test:ui` on the macOS/Colima box before
+  the phase is called done.
 - Commits follow Conventional Commits, one per step of §4.
 
 ## 1. Findings (verified against the tree, the published package, and the network — not assumed)
@@ -181,6 +193,23 @@ required string that produces no group, no JoinGroup, and no rebalance** — the
 This must be confirmed on a live broker by the assertion in §5 (`listGroups()` never shows the
 browse group), not trusted.
 
+**F13a — the same three facts, read out of the vendored librdkafka 2.15.0 source rather than the
+JS docs, including the one round trip that does *not* disappear.** The tarball ships
+`deps/librdkafka/` (F18), so the mechanism is checkable rather than inferred:
+`rdkafka.c:2825-2838` creates a consumer-group handle **only** when `group.id` is a non-empty
+string, and routes a consumer without one to the "Legacy consumer" queue; `rdkafka.c:5384-5390`
+(`rd_kafka_consumer_poll`) returns `RD_KAFKA_RESP_ERR__UNKNOWN_GROUP` when there is no group handle
+— and `consume(n, cb)` is `consumer_poll` underneath (`lib/kafka-consumer.js:477-489`,
+`_consumeNum`). That is why `group.id` is *required config* and cannot simply be omitted. The
+group-handle state machine then only issues JoinGroup/SyncGroup/Heartbeat once there is a
+subscription: `rdkafka_cgrp.c:7246-7262` shows a fresh handle going INIT → QUERY_COORD and stopping
+there. **So the honest claim is precise:** an `assign()`-only browse sends no JoinGroup, no
+SyncGroup, no Heartbeat, no LeaveGroup and — with `enable.auto.commit: false` and explicit start
+offsets (D19) — no OffsetCommit and no OffsetFetch, so the broker never creates group state and the
+group never appears in `listGroups()`. It may still send one **FindCoordinator**, which is a lookup,
+not a membership operation. Removing even that would require librdkafka's simple-consumer API,
+which this binding does not expose.
+
 **F14 — `stop()` does not exist on the compat consumer, and error classification moves from names to
 codes.** `MIGRATION.md:325` — *"`stop` is not yet supported, and the user must disconnect the
 consumer"* — which is F6's exact call. `MIGRATION.md:358` — *"Convert any checks based on
@@ -271,17 +300,26 @@ published as GitHub release assets either (probed `node-v43.4.1-headers.tar.gz`,
 curl-the-binary-from-GitHub workaround (`AGENTS.md:57-63`) has no analogue here. **The Electron-ABI
 build of this module can only be produced on the macOS/Colima box.**
 
-**F21 — P10's D15 ABI mismatch is explainable and probably fixable.** In this container
-`bun -e "process.versions.modules"` prints **137** (Bun 1.3.11, claiming Node 24.3.0) while
-`node -p` prints **127** (Node 22.22.2). `node-pre-gyp`'s install script picks the prebuild by the
-ABI of whichever runtime executes it — Node 22 here — so an install driven by `node` downloads
-`node-v127` and Bun then refuses it as built for the wrong ABI: *"127 vs required 137"*, P10's D15
-verbatim. Forcing the ABI at install time (`node-pre-gyp install --target=<the version Bun claims>`)
-puts the matching binary in place. Whether Bun's V8-API compatibility layer can then actually *load*
-a NAN addon is a separate, open question — Bun implements V8's C++ API on top of JavaScriptCore and
-`oven-sh/bun#4290` (NAN support) is the long-running tracking issue; native C++ addons are the
-best-documented remaining incompatibility. **This is the single highest-risk unknown in the phase
-and §4's step 1 is a probe that answers it before any adapter code is written.**
+**F21 — Bun cannot load this addon, and the ABI number was never the real obstacle. Probed to a
+conclusion in this container; this is no longer an open question.** The probe: extract the published
+tarball plus a downloaded prebuild into a scratch `node_modules` (with `bindings` and
+`file-uri-to-path` beside it) and `require` it from each runtime.
+
+| runtime | reported ABI (`process.versions.modules`) | binary given to it | result |
+|---|---|---|---|
+| Node 22.22.2 | 127 | `node-v127-linux-glibc-x64` | **loads.** `librdkafkaVersion` `2.15.0`; `features` = `gzip,snappy,ssl,sasl,regex,lz4,sasl_plain,sasl_scram,plugins,zstd,sasl_oauthbearer,http,oidc`; `new KafkaConsumer({…}, {})` constructs and exposes `assign`/`consume` |
+| Bun 1.3.11 (the version installed here) | 137 | `node-v127` (what a `node`-driven install leaves) | *"The module 'kafka' was compiled against a different Node.js ABI version using NODE_MODULE_VERSION 127. This version of Bun requires NODE_MODULE_VERSION 137"* — **P10's D15, verbatim** |
+| Bun 1.3.11 | 137 | `node-v137-linux-glibc-x64` — the **matching** ABI | **process dies:** `bun: symbol lookup error: …/confluent-kafka-javascript.node: undefined symbol: _ZN2v816FunctionTemplate12SetClassNameENS_5LocalINS_6StringEEE` (`v8::FunctionTemplate::SetClassName`), exit 127 |
+| Bun 1.4.0 (downloaded to scratch, not installed) | **147** | — | no `node-v147` prebuild exists (Confluent publishes through Node 24 = 137, F19), and the same `SetClassName` gap remains |
+
+So P10's D15 recorded the *symptom* (an ABI number mismatch) and this phase can now record the
+*cause*: Bun's V8 C++ shim does not implement the V8 entry points a NAN addon links against, so
+fixing the ABI selection only moves the failure from a readable error to a dynamic-linker abort.
+Upgrading Bun makes it strictly worse — a newer Bun claims a newer ABI that Confluent does not
+publish at all. **`tests/db/kafka.spec.ts` therefore cannot run under `bun test` after this phase,
+under any install configuration** (D27), and — the flip side — **the Node ABI is not needed anywhere
+in this repo either**, because nothing that loads this driver runs under plain Node: the engine runs
+inside Electron (F19) and the fixture stops using a JS client entirely (D26). One ABI, not two.
 Sources: [Bun issue #4290](https://github.com/oven-sh/bun/issues/4290) ·
 [How Bun supports V8 APIs without using V8](https://bun.com/blog/how-bun-supports-v8-apis-without-using-v8-part-1)
 
@@ -317,8 +355,10 @@ real consumer to `CONSUMER_GROUP`, drains the topic and disconnects, *"so this d
 under CONSUMER_GROUP once before tearing the consumer down"* — i.e. the fixture depends on the very
 group-join that Kafka 4 breaks for kafkajs (F8). `tests/db/support/kafka.ts:45-46` calls it from the
 Bun test process; `tests/ui/kafka.spec.ts:8,31` calls the same seed from the **Playwright/Node**
-process while the app under test loads the driver inside **Electron**. Two ABIs, one `node_modules`,
-one run.
+process while the app under test loads the driver inside **Electron**. With a native driver that is
+two runtimes that cannot both load it (F21) sharing one `node_modules` in one run — which is why
+D26 takes the JS client out of the fixture entirely rather than porting it: after that, the seed is
+a runtime the driver never enters.
 
 **F25 — four `tests/db/kafka.spec.ts` assertions encode things this phase changes.**
 `:93-94` asserts `serverVersion === 'Kafka'` **and** `details?.cluster` is truthy (F11 kills the
@@ -402,18 +442,22 @@ function groupTypeName(type: ConsumerGroupTypes): string;
 ```
 
 ```sh
-# scripts/native-abi.sh <node|electron> — NEW. Puts the right ABI's binary in place before a
-# runtime that is about to load it (D6). Resolves the target ABI from the runtime itself
-# (`bun -e process.versions.modules` / node_modules/electron/abi_version), compares it to the
-# marker written beside the built module, and either restores a cached build or produces one:
-#   node      -> node-pre-gyp install --target=<version the runtime claims>   (downloads a prebuild)
-#   electron  -> electron-rebuild --only @confluentinc/kafka-javascript       (builds from source)
-# Cached at .cache/native/confluent-kafka-javascript/<abi>.node, so switching back is a file copy.
+# scripts/native-electron-build.sh — NEW. Guarantees the driver's .node is built for the ABI of the
+# pinned Electron before anything that loads it runs (D6). Exactly one ABI exists in this repo
+# (F21): Electron's, read from node_modules/electron/abi_version (148 for electron@43.4.1).
+#   1. read the target ABI; compare with .native-abi, the marker written beside the built module
+#   2. if it matches, exit 0 (the common case: one `cat`)
+#   3. else restore .cache/native/confluent-kafka-javascript/<abi>.node if present (a file copy)
+#   4. else `electron-rebuild --only @confluentinc/kafka-javascript` — a from-source librdkafka
+#      build, minutes not seconds; cache the result under <abi> and write the marker
+# Wired as predev, pretest:ui, pretest:db:kafka and prepackage:mac (never pretest:db — the other
+# six engines never touch this driver). Cannot run in Claude Code's Linux web container: Electron's
+# headers host is proxy-blocked (F20).
 ```
 
 ```yaml
 # electron-builder.yml — a native production dependency exists now (D5/D7).
-# npmRebuild stays false; the Electron-ABI build is produced by scripts/native-abi.sh before
+# npmRebuild stays false; the Electron-ABI build is produced by scripts/native-electron-build.sh before
 # packaging, not by electron-builder's own rebuild step (which has no Bun support).
 asarUnpack:
   - out/main/engine.js
@@ -430,13 +474,13 @@ files:
 | # | Decision | Rationale |
 |---|----------|-----------|
 | D1 | **`@confluentinc/kafka-javascript@1.10.0` becomes a production `dependency`, pinned exact, and `kafkajs@2.2.4` is deleted from `package.json` in the same commit.** | The repo pins every dependency exactly (`package.json:35-79`), and 1.10.0 is the current `latest` (librdkafka 2.15.0). Keeping `kafkajs` "just for `describeConfigs`" would ship a second, unmaintained protocol implementation whose known Kafka 4 failure mode (F8) is the reason for this phase — and §0's one-driver rule exists so the next reader cannot find two answers to "how does this app talk to Kafka". |
-| D2 | **`trustedDependencies` gains `@confluentinc/kafka-javascript`** (`package.json:9-12`). | Bun blocks lifecycle scripts by default, and this package's whole install *is* a lifecycle script (`node-pre-gyp install --fallback-to-build`, F22). Without this line `bun install` silently produces a package with no binary and the first `require` fails with `bindings` not finding the module — a failure that looks like a code bug and is not one. |
+| D2 | **`trustedDependencies` gains `@confluentinc/kafka-javascript`** (`package.json:9-12`), and the `.node` it produces is treated as a *bootstrap*, not as the artifact the app loads. | Bun blocks lifecycle scripts by default and this package's whole install *is* a lifecycle script (`node-pre-gyp install --fallback-to-build`, F22); untrusted, `bun install` leaves a package with no `build/` at all and the first `require` fails inside `bindings`, which reads like a code bug and is not one. What the install downloads is a *Node*-ABI prebuild (F19) — useless to the shipped app, which runs at Electron's ABI, but useful twice: it makes `node -e "require('@confluentinc/kafka-javascript')"` work for driver-level spikes (how F10–F17 were confirmed), and it gives `electron-rebuild` a normal package layout to rebuild in place. D6's marker file is what stops the two from being confused: after `native-electron-build.sh` runs, the binary on disk is Electron's and the marker says so. |
 | D3 | **The engine keeps loading the driver lazily; no change to `registry.ts`.** | `registry.ts:11-19` already defers `import('./kafka')` until a Kafka connection is created (P12's lever L-A, `docs/v1/PERF.md:136`), which now also defers a `dlopen` of a 9.5 MB static binary. That is a bigger win than it was for a pure-JS driver, and it is already in place — this phase must simply not undo it by adding a top-level import anywhere else. |
 | D4 | **A note in `docs/v1/PERF.md` records that the Kafka driver's memory is now un-reclaimable once loaded**, without re-running P12's measurement suite. | A native module cannot be unloaded from a process; opening one Kafka connection permanently raises the engine's floor for the life of that engine. It is honest to say so next to L-A's numbers, and dishonest to leave PERF.md implying the driver set is symmetric. Re-measuring the whole memory suite is P12's job, not this phase's — §6. |
-| D5 | **`electron-builder.yml` keeps `npmRebuild: false`, and the Electron-ABI build is produced by `scripts/native-abi.sh electron` before packaging** (wired as a `prepackage:mac` script). | electron-builder's rebuild step shells out to the detected package manager; this repo uses Bun, which electron-builder does not support as a rebuild driver. An explicit script keeps the mechanism visible, makes the same build available to `bun run dev` and `test:ui` (which need it just as much — they run the real Electron), and matches the repo's existing script-driven verification style (`scripts/verify-packaging.sh`). The `npmRebuild: false` **comment** must change: its claim ("no native production dependency exists") is now false even though the setting is right. |
-| D6 | **`scripts/native-abi.sh <node\|electron>` owns the two-ABI problem**: it resolves the loading runtime's ABI, compares it to a marker file beside the built module, and restores from `.cache/native/…/<abi>.node` or builds. `pretest:db` runs it with `node`; `predev`, `pretest:ui` and `prepackage:mac` run it with `electron`. | There is exactly one `node_modules/@confluentinc/kafka-javascript/build/Release/*.node` and two runtimes that must load it — Bun for `tests/db` (ABI 137 here) and Electron for everything else (ABI 148, F19). Rebuilding on every switch would put a multi-minute librdkafka compile in the middle of the test loop; caching the two artifacts makes a switch a file copy. The marker file is what makes the script idempotent, so the common case (same ABI as last time) costs one `cat`. |
+| D5 | **`electron-builder.yml` keeps `npmRebuild: false`, and the Electron-ABI build is produced by `scripts/native-electron-build.sh` before packaging** (wired as a `prepackage:mac` script). | electron-builder's rebuild step shells out to the detected package manager; this repo uses Bun, which electron-builder does not support as a rebuild driver. An explicit script keeps the mechanism visible, makes the same build available to `bun run dev` and `test:ui` (which need it just as much — they run the real Electron), and matches the repo's existing script-driven verification style (`scripts/verify-packaging.sh`). The `npmRebuild: false` **comment** must change: its claim ("no native production dependency exists") is now false even though the setting is right. |
+| D6 | **`scripts/native-electron-build.sh` guarantees one binary for one ABI — Electron's.** It reads `node_modules/electron/abi_version`, compares it with the `.native-abi` marker beside the built module, and exits, restores from `.cache/native/…/<abi>.node`, or runs `electron-rebuild --only @confluentinc/kafka-javascript`. Wired as `predev`, `pretest:ui`, `pretest:db:kafka` and `prepackage:mac` — **not** `pretest:db`, which after D27 runs no Kafka code at all. | F21 settles what P10's D15 only observed: Bun cannot load a NAN addon at any ABI, so there is no second runtime to serve and no ABI switching to arbitrate. Every consumer of this driver — `bun run dev`, `test:ui`, the packaged app, and the Kafka suite under `ELECTRON_RUN_AS_NODE=1` (D27) — is Electron at ABI 148. The marker keeps the common case at one `cat`; the cache keyed by ABI means an Electron upgrade rebuilds once and a downgrade is a file copy. `@electron/rebuild` is added as a devDependency for this and nothing else. |
 | D7 | **`asarUnpack` gains the `.node`, and `files` excludes the vendored librdkafka sources, `src/`, `util/`, `examples/`, `ci/` and `build/Release/{obj.target,.deps}`.** | Electron cannot `dlopen` from inside an asar archive — the same constraint that already unpacks `out/main/engine.js` (`electron-builder.yml:12-16`). The exclusions drop ~11 MB of C sources and ~8 MB of `.o` intermediates (F19) that are pure build residue; the L-D bundle budget has 48 MB of headroom (252 of 300 MB) and this phase should spend a few MB of it on a runtime binary, not on object files. `verify-packaging.sh` gains an A6 check that the `.node` is present and unpacked, so a future `files` edit cannot silently break the packaged app. |
-| D8 | **`docs/v1/PACKAGING.md` §2 and `AGENTS.md` are updated by the implementing session**: PACKAGING.md's `npmRebuild` bullet is rewritten, and AGENTS.md gains a short "Native Kafka driver (librdkafka)" section stating the two ABIs, the `native-abi.sh` step, and F20's finding that the Electron-ABI build cannot be produced in Claude Code's Linux web container. | AGENTS.md already carries exactly this genre of hard-won environment fact for Docker (`:32-48`), the Electron binary (`:50-70`) and secrets (`:72-92`); an agent that hits "was compiled against a different Node.js version" with no note to read will burn an hour rediscovering F19/F20. Standing practice is that the implementing session makes the doc edits (P27 D34, P24 D41). |
+| D8 | **`docs/v1/PACKAGING.md` §2 and `AGENTS.md` are updated by the implementing session**: PACKAGING.md's `npmRebuild` bullet is rewritten, and AGENTS.md gains a short "Native Kafka driver (librdkafka)" section stating that the driver loads only under Electron's ABI and never under Bun (F21), the `native-electron-build.sh` step, and F20's finding that the Electron-ABI build cannot be produced in Claude Code's Linux web container. | AGENTS.md already carries exactly this genre of hard-won environment fact for Docker (`:32-48`), the Electron binary (`:50-70`) and secrets (`:72-92`); an agent that hits "was compiled against a different Node.js version" with no note to read will burn an hour rediscovering F19/F20. Standing practice is that the implementing session makes the doc edits (P27 D34, P24 D41). |
 
 ### Topic B — which API surface, and the adapter rewrite
 
@@ -457,7 +501,7 @@ files:
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D19 | **The browse consumer never subscribes.** It is constructed with a constant `group.id` (`kira-studio-browse`), `enable.auto.commit: false`, `enable.auto.offset.store: false`, `enable.partition.eof: true`, `auto.offset.reset: 'error'`, then `assign()`s exactly the partitions in `remaining` with their start offsets, and `consume(n, cb)`s until the page is full. | This is the phase's second requirement, implemented at the only place it exists (F4). `group.id` must be *set* (F13) and is never *joined*, because joining is what `subscribe()`/`run()` do — so the round trip, the coordinator lookup, the rebalance and the `__consumer_offsets` bookkeeping all disappear. The `groupId` can go back to a constant precisely because no group is created; the random UUID (`read.ts:158`) existed only to keep concurrent browses out of each other's rebalances. Auto-commit off (both flags) keeps P10's D6 promise that *"browsing a topic leaves no trace in `__consumer_offsets` and never interferes with real consumer groups"* — now structurally rather than by convention. `auto.offset.reset: 'error'` means a start offset that has fallen out of retention surfaces as an error instead of silently jumping to the beginning and returning the wrong page. |
+| D19 | **The browse consumer never subscribes.** It is constructed with a constant `group.id` (`kira-studio-browse`), `enable.auto.commit: false`, `enable.auto.offset.store: false`, `enable.partition.eof: true`, `auto.offset.reset: 'error'`, then `assign()`s exactly the partitions in `remaining` with their start offsets, and `consume(n, cb)`s until the page is full. | This is the phase's second requirement, implemented at the only place it exists (F4). `group.id` must be *set* (F13, F13a — librdkafka's `consumer_poll` refuses to run without a group handle) and is never *joined*, because joining is what `subscribe()`/`run()` do — so the JoinGroup/SyncGroup round trip, the heartbeat, the rebalance and the `__consumer_offsets` bookkeeping all disappear. What may remain is a single FindCoordinator lookup (F13a), which creates no group state on the broker; the plan claims that much and no more. The `groupId` can go back to a constant precisely because no group is created; the random UUID (`read.ts:158`) existed only to keep concurrent browses out of each other's rebalances. Auto-commit off (both flags) keeps P10's D6 promise that *"browsing a topic leaves no trace in `__consumer_offsets` and never interferes with real consumer groups"* — now structurally rather than by convention. `auto.offset.reset: 'error'` means a start offset that has fallen out of retention surfaces as an error instead of silently jumping to the beginning and returning the wrong page. |
 | D20 | **`freshWindows`, `PartitionWindow`, the page token, `finishPosition` and `countTopic` are unchanged** — watermarks still come from `admin.fetchTopicOffsets`, and the timestamp filter still resolves through `admin.fetchTopicOffsetsByTimestamp`. | They were always admin-side (F3) and the compat admin keeps both calls with the same signature and return shape (F11). Leaving them alone means the offset-window token stays byte-compatible, `tests/db/kafka.spec.ts`'s pagination scenarios 7–9 remain a genuine regression guard for the rewrite, and the browse consumer's contract shrinks to "fetch bytes from offset X of partition P" — which is exactly what `assign()` expresses and what `subscribe()` never did. The native consumer's own `queryWatermarkOffsets`/`offsetsForTimes` (F12) are deliberately **not** used: they would move work onto a client that has to be created first, for no gain. |
 | D21 | **The poll loop ends on the first of: page full, every window drained, every remaining partition reported EOF, `MAX_EMPTY_POLLS` consecutive empty polls, or abort.** Messages outside their partition's `[next, end)` window are ignored, exactly as today (`read.ts:186`). | A window is computed from watermarks and can outlive the data: compaction or a retention delete can leave `next < end` with nothing actually fetchable, and a loop that waits for a count it can never reach would hang a browse forever. EOF (`enable.partition.eof`) is the precise signal and the empty-poll counter is the belt-and-braces for the case where EOF is not delivered. Ignoring out-of-window messages rather than pausing the partition keeps the loop's state machine to one map and matches today's behaviour byte for byte. |
 | D22 | **Cancellation is `consumer.disconnect()` on `ctx.signal`, plus an `aborted` check between polls**; `Adapter.cancel()` stays a permanent no-op. | `stop()` no longer exists — *"the user must disconnect the consumer"* (F14/`MIGRATION.md:325`). Disconnect is strictly stronger than the old stop-then-disconnect pair (`read.ts:217-221`) because it tears the client down rather than parking it. The between-polls check bounds worst-case cancel latency at one `POLL_TIMEOUT_MS`, which is the same order as today's per-message check. `caps.cancel` stays `true` for the reason P10's D14 gave: the *mechanism* works, the method is not the mechanism. |
@@ -470,11 +514,11 @@ files:
 |---|----------|-----------|
 | D25 | **The test broker becomes `confluentinc/cp-kafka:8.0.x` (Apache Kafka 4.0), pinned to an exact patch tag the way 7.6.1 was.** `.withKraft()` stays (harmless, and explicit beats implicit). | A phase whose entire premise is Kafka 4 compatibility that is only ever tested against Kafka 3.6 has verified nothing (F23). CP 8.0 is the AK 4.0 line, `@testcontainers/kafka@12.1.0` auto-enables KRaft for `>=8.0.0` and keeps the same env/entrypoint contract it already uses, and both architectures are published — so this is a constant change plus a comment rewrite. Staying on the 8.0.x line rather than 8.1+/8.2+ keeps the target at *"the first Kafka that removed the old protocol versions"*, which is the compatibility edge this phase is about. |
 | D26 | **The seed stops using a JavaScript Kafka client and runs against the container's own CLI** (`kafka-topics --create`, `kafka-console-producer --property parse.headers=true`, and `kafka-consumer-groups --reset-offsets --to-earliest --execute --group … --topic …` to register the group with committed offsets and no members). | This is the decision that dissolves the dual-ABI problem in the test suite (F24): with no client in the Playwright/Node process, `tests/ui` needs only the Electron-ABI binary and `node_modules` never has to hold two. It also removes a second-order absurdity — the fixture creating a consumer group by *joining* one, in a phase about not joining groups — and it makes the seed independent of the library under test, so a driver bug cannot hide behind a seed written with the same driver. `--reset-offsets --execute` on a non-existent group creates committed offsets without any member, which is exactly the state scenario 6 asserts (`tests/db/kafka.spec.ts:199-214`). |
-| D27 | **`tests/db/kafka.spec.ts` stays a `bun:test` file run by `bun run test:db`, preceded by `scripts/native-abi.sh node` — *if and only if* step 1's probe shows Bun can load the addon.** | Zero test rewrites, the existing 16 scenarios keep their value as the regression guard for the whole rewrite, and the ABI script (D6) is needed for the packaging story anyway. F21 shows the mismatch P10 hit is an install-time ABI selection problem with a fix; whether Bun's V8 shim then loads a NAN addon is genuinely unknown and cannot be decided from a plan document — so it is decided by a probe, first, before any code depends on the answer. |
-| D28 | **If the probe fails, fallback B: the Kafka adapter suite moves to `tests/electron-db/kafka.spec.ts`, converted to `node:test` + `node:assert/strict`, bundled with esbuild and run under `ELECTRON_RUN_AS_NODE=1 electron` via a new `test:db:kafka` script.** `bun run test:db` then no longer collects it, and the repo has exactly one native ABI. | The adapter-level scenarios (error codes, cursors, cancellation, read-only enforcement) are not reachable from `tests/ui`, so deleting them is not an option and neither is leaving them permanently skipped. Electron-as-Node is the same runtime the shipped engine uses, which makes this fallback *more* faithful than the Bun run it replaces — its only real cost is a mechanical `expect(...)` → `assert...` conversion of 16 scenarios and one new script. Choosing between D27 and D28 is a step-1 outcome, not a coin flip left to the implementer: the probe's result decides it. |
+| D27 | **The Kafka adapter suite leaves Bun. `tests/db/kafka.spec.ts` moves to `tests/electron-db/kafka.spec.ts` and runs under `ELECTRON_RUN_AS_NODE=1 electron` via a new `test:db:kafka` script; `bun run test:db` keeps every other engine and no longer collects Kafka.** This is a decision, not a fallback — F21 closed the question. | Bun cannot load a NAN addon at any ABI (F21: matching-ABI load dies on an undefined `v8::FunctionTemplate::SetClassName`), so `bun test` and this driver are mutually exclusive facts, not a configuration to tune. The adapter-level scenarios — error-code classification, cursor/token paging, cancellation, read-only enforcement, the two new group-less tripwires (D30) — are not reachable from `tests/ui`, so deleting them is not an option and leaving them permanently skipped is the "half-implementation" §0 forbids. Electron-as-Node is *more* faithful than the Bun run it replaces: it is the exact runtime and ABI the shipped engine uses (F19). The move out of `tests/db/` (rather than a rename in place) is what keeps `bun test tests/db`'s file matcher from collecting it, since Bun's matcher takes any `*.spec.ts` under the directory it is given. §11's `tests/` layout gains the sibling directory (D34). |
+| D28 | **The conversion is mechanical and bounded: `bun:test`'s `describe`/`test`/`beforeAll`/`afterAll` become `node:test`'s `describe`/`test`/`before`/`after`, and every `expect(...)` becomes `node:assert/strict`.** The suite is bundled with esbuild (`--bundle --platform=node --external:electron --external:@confluentinc/kafka-javascript`) to `out/tests/kafka-suite.cjs` before Electron runs it. | Two mechanical obstacles, both real and both cheap once named. (1) `expect` does not exist outside Bun/Jest; the 16 scenarios use `toBe`/`toEqual`/`toMatchObject`/`rejects`/`toHaveLength`/`toBeGreaterThan`/`toMatch`, each of which has a one-line `assert` equivalent (`rejects.toMatchObject` becomes `assert.rejects(p, (e) => e.code === '…')`) — no assertion library is added. (2) Electron cannot execute the TypeScript sources directly: Node's type-stripping rejects the adapter's parameter properties (`index.ts:37`, `constructor(private readonly deps)`) and its ESM resolver rejects the repo's extensionless relative imports — both verified in this container. esbuild is already in the tree (`package.json:8-12`'s `trustedDependencies`, via Vite), so bundling costs a script line rather than a dependency. **`node:test`'s availability inside Electron is the one thing to confirm before writing the conversion** (step 1); if it is absent, `node:assert` plus a twenty-line sequential runner over an array of named async scenarios gives the same output and the same exit code. |
 | D29 | **The scenarios F25 lists are updated, not deleted:** `:94` asserts `details.brokers` instead of `details.cluster`; `:192-197` keeps both section titles and asserts the Configuration section is empty **with a note present** (D14); `:334-336`'s comment is rewritten for librdkafka's own metadata timeout and the 20 s allowance is re-checked. | These assertions are the contract this phase changes, so changing them is correct — but each change must assert the *new* promise rather than weaken to nothing. "Configuration is empty and says why" is a stronger assertion than deleting the check, because it fails if the note goes missing. |
 | D30 | **Two new `tests/db` scenarios are the proof of the phase's second half:** *17. a browse creates no consumer group* — run a full paged browse, then assert `admin.listGroups()` contains only the seeded group and nothing matching `kira-studio-browse`; *18. a browse leaves no committed offsets* — assert `admin.fetchOffsets({ groupId: 'kira-studio-browse' })` returns nothing for the browsed topic. | "Skip the group-join" is otherwise unfalsifiable from the outside — the code would look right and a regression (someone reintroducing `subscribe()`) would pass every existing test. These two are the tripwires, in the spirit of P27's D24: they assert the *cause*, not a timing. |
-| D31 | **`tests/ui/kafka.spec.ts` keeps its assertions and gains nothing**; it is re-run as the end-to-end guard that the rewritten adapter still feeds the stream view (`:173` still finds `seed` in the headers column). | It is the only test that exercises the driver inside a real Electron `utilityProcess` at ABI 148 — which is the configuration the shipped app runs and the one thing `tests/db` cannot check under either D27 or D28. Its value here is that it is unchanged: if the seed swap (D26) and the adapter rewrite are both correct, this file passes untouched. |
+| D31 | **`tests/ui/kafka.spec.ts` keeps its assertions and gains nothing**; it is re-run as the end-to-end guard that the rewritten adapter still feeds the stream view (`:173` still finds `seed` in the headers column). | It is the only test that exercises the driver inside a real Electron `utilityProcess` at ABI 148 — which is the configuration the shipped app runs end to end — the adapter suite (D27) exercises the same ABI but not the real `utilityProcess`, the MessagePort or the stream view. Its value here is that it is unchanged: if the seed swap (D26) and the adapter rewrite are both correct, this file passes untouched. |
 
 ### Topic E — cross-cutting
 
@@ -482,7 +526,7 @@ files:
 |---|----------|-----------|
 | D32 | **No wire, renderer, IPC, storage or cache change.** `StreamPage`, `KafkaStreamFilter`, the offset-window page token, `data.read` and the L2 cache key are untouched. | The phase is a driver swap plus one loop rewrite; keeping the wire fixed is what lets `tests/ui/kafka.spec.ts` and the stream view act as an untouched regression surface, and means no L2 invalidation on upgrade. |
 | D33 | **SQS is out of scope entirely, and the plan says so in `docs/v1/SPEC.md`'s P32 row when it is updated.** | The user's note names Kafka only; SQS uses `@aws-sdk/client-sqs`, shares no client code, and `sqs/read.ts` never reads the Kafka stream filter (`shared/domain/streamFilter.ts:5-8`). The only thing the two share is the `StreamPage` shape, which D32 freezes. |
-| D34 | **SPEC.md edits are made by the implementing session:** §5.1's Kafka row cancel mechanism (`:186`) becomes *"close the assigned consumer, `AbortSignal`"*; §8.11's Kafka topic definition sentence (`:507`) gains the DescribeConfigs caveat; §10's P32 row (`:695`) gets its outcome column **only once implemented**. §3's driver line (`:99-101`) finally becomes true and needs no edit. | Standing practice (P27 D34, P24 D41, P22 D11): the phasing table records what shipped, and the plan does not pre-write it. |
+| D34 | **SPEC.md edits are made by the implementing session:** §5.1's Kafka row cancel mechanism (`:186`) becomes *"close the assigned consumer, `AbortSignal`"*; §8.11's Kafka topic definition sentence (`:507`) gains the DescribeConfigs caveat; §11's `tests/` layout gains `electron-db/` with one line saying why it exists (D27); §10's P32 row (`:695`) gets its outcome column **only once implemented**. §3's driver line (`:99-101`) finally becomes true and needs no edit. | Standing practice (P27 D34, P24 D41, P22 D11): the phasing table records what shipped, and the plan does not pre-write it. |
 | D35 | **Every step keeps `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` green, and the phase is not done until `bun run test:db` and `xvfb-run -a bun run test:ui` are green on the macOS/Colima box.** | AGENTS.md's Docker note (`:43-48`) plus F20: neither the container suites nor the Electron-ABI build can happen in Claude Code's Linux web container. Saying "tests pass" on the strength of a typecheck would be the exact shortcut §0 forbids. |
 
 ## 4. Implementation order
@@ -490,19 +534,25 @@ files:
 Each step is one commit and must leave lint, typecheck (all three projects) and build green.
 Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fixtures, 12 the docs.
 
-1. **`chore(kafka): probe the confluent client's native binding under bun and electron`** — no
-   production code. On a scratch branch: add the dependency and `trustedDependencies` (D1/D2),
-   `bun install`, then run three probes and record the results **in the commit message**:
-   (a) `bun -e "require('@confluentinc/kafka-javascript')"` after forcing the prebuild for Bun's own
-   ABI (F21); (b) `node -e` the same, for the Node ABI; (c) on the macOS box,
-   `electron-rebuild --only @confluentinc/kafka-javascript` followed by
-   `ELECTRON_RUN_AS_NODE=1 electron -e "console.log(require('@confluentinc/kafka-javascript').librdkafkaVersion)"`.
-   **Probe (a)'s result selects D27 or D28 and nothing later in this plan is ambiguous once it is
-   known.** Probe (c) cannot run in Claude Code's Linux web container (F20).
+1. **`chore(kafka): build the confluent driver for electron's ABI and prove it loads`** — no
+   production code, and **this step happens on the macOS/Colima box** (F20: Electron's headers host
+   is proxy-blocked in Claude Code's Linux web container). Add the dependency and
+   `trustedDependencies` (D1/D2), `bun install`, then record in the commit message:
+   (a) `electron-rebuild --only @confluentinc/kafka-javascript` completing, and
+   `ELECTRON_RUN_AS_NODE=1 electron -e "const k=require('@confluentinc/kafka-javascript'); console.log(k.librdkafkaVersion, k.features.join(','))"`
+   printing `2.15.0` and a feature list **containing `ssl`, `sasl`, `sasl_plain` and `sasl_scram`**
+   — a from-source build silently drops SSL/SASL if OpenSSL headers are missing, which would break
+   every secured connection while every test against a plaintext container still passed;
+   (b) `ELECTRON_RUN_AS_NODE=1 electron -e "console.log(typeof require('node:test').test)"` —
+   D28's one open mechanical question, answered before the conversion is written.
+   The Bun half needs no probe: F21 settled it in the planning container, at both the mismatched and
+   the matching ABI.
 2. **`build(kafka): install the native driver and teach packaging about it`** — `package.json`
-   (dependency added, `kafkajs` removed, `trustedDependencies`, the `pre*` script wiring),
-   `scripts/native-abi.sh`, `electron-builder.yml` (`asarUnpack` + `files` exclusions + the corrected
-   `npmRebuild` comment), and `scripts/verify-packaging.sh`'s new A6 check (D1, D2, D5, D6, D7).
+   (dependency added, `kafkajs` removed, `trustedDependencies`, `@electron/rebuild` as a
+   devDependency, the `pre*` script wiring, `test:db:kafka`),
+   `scripts/native-electron-build.sh`, `electron-builder.yml` (`asarUnpack` + `files` exclusions +
+   the corrected `npmRebuild` comment), and `scripts/verify-packaging.sh`'s new A6 check
+   (D1, D2, D5, D6, D7).
    The tree does not compile at the end of this step only if step 3 is not in the same series — so
    land 2 and 3 back to back and keep 2 mechanical.
 3. **`refactor(kafka): one librdkafka config, admin and producer on the compat API`** —
@@ -525,13 +575,18 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
 9. **`test(kafka): seed the fixture through the broker's own CLI`** —
    `tests/db/fixtures/0005_kafka_seed.ts` and `tests/db/support/kafka.ts` per D26, keeping every
    exported constant (`ORDERS_TOPIC`, `ORDERS_MESSAGE_COUNT`, …) so both spec files' imports are
-   unchanged.
-10. **`test(kafka): run the fixture against a Kafka 4 broker`** — the image bump and its comment
-    (D25). Run `bun run test:db` on the macOS box here: this is the first point where the whole
-    stack is exercised against Kafka 4.
-11. **`test(kafka): cover the group-less browse and the changed contracts`** — scenarios 17–18
-    (D30) and the F25 assertion updates (D29); under fallback B this is also where the suite moves
-    and converts (D28).
+   unchanged. This is the commit that removes the last JS Kafka client from any non-Electron
+   process, so it must land before step 10 moves the suite.
+10. **`test(kafka): run the adapter suite under electron-as-node`** — `tests/db/kafka.spec.ts`
+    moves to `tests/electron-db/kafka.spec.ts`, converts to `node:test` + `node:assert/strict`, and
+    gains the esbuild bundle step and the `test:db:kafka` script (D27/D28). Acceptance: the 16
+    existing scenarios pass **with their assertions unchanged in substance**, still against
+    `cp-kafka:7.6.1` — so a failure here is the runner move, not Kafka 4. `bun run test:db` (the
+    other engines) stays green and no longer collects a Kafka file.
+11. **`test(kafka): run the fixture against a Kafka 4 broker, and cover the group-less browse`** —
+    the image bump to `cp-kafka:8.0.x` and its comment (D25), scenarios 17–20 (D30) and the F25
+    assertion updates (D29). This is the first point where the whole stack is exercised against
+    Kafka 4; run `bun run test:db`, `bun run test:db:kafka` and `bun run test:ui` on the macOS box.
 12. **`docs: SPEC.md, PACKAGING.md, PERF.md and AGENTS.md for P32`** — D4, D8, D18, D34 (not the
     §10 outcome column, which is written once the phase is verified green).
 
@@ -546,13 +601,15 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
 | `tests/db/kafka.spec.ts:199-214` | The group definition gains rows (D15) and the seed now creates the group via CLI (D26). | Section titles unchanged; add assertions that the Group section's `state` row reads a **name** (`/^[A-Za-z ]+$/`, not a digit) and that committed offsets still cover both partitions. |
 | `tests/db/kafka.spec.ts:334-357` (scenario 11) | The retry/backoff comment describes kafkajs's retry budget, which no longer exists. | Rewrite the comment for librdkafka's metadata timeout; keep `E_QUERY` (D17) and re-check whether the 20 s allowance is still needed — if librdkafka fails faster, shrink it rather than leaving a stale number. |
 | `tests/db/kafka.spec.ts:400-434` (scenarios 14–15) | Cancellation's mechanism changed (D22). | No assertion change: `cancel()` is still `false` and an already-aborted signal still yields `E_CANCELLED`. These two are the guard that D22 did not weaken cancellation, so they must pass **unchanged**. |
-| `tests/db/fixtures/0005_kafka_seed.ts`, `tests/db/support/kafka.ts` | D25/D26. | Seed via container `exec`; image bumped to CP 8.0.x. Every exported constant keeps its name and value so both consuming specs are untouched by this. |
+| `tests/db/fixtures/0005_kafka_seed.ts`, `tests/db/support/kafka.ts` | D25/D26. | Seed via container `exec`; image bumped to CP 8.0.x. Every exported constant keeps its name and value so both consuming specs are untouched by this. Both files stay under `tests/db/` and stay client-free, because the moved suite (D27) and `tests/ui/kafka.spec.ts` both import them from different runtimes. **Verify on the container** that `kafka-consumer-groups --reset-offsets --to-earliest --execute` against a group that has never existed does create committed offsets rather than erroring — it is the one CLI behaviour in D26 that is asserted rather than read from a manual. |
+| `tests/db/kafka.spec.ts` → `tests/electron-db/kafka.spec.ts` | Bun cannot load the driver (F21/D27). | Whole file moves and converts to `node:test` + `node:assert/strict` (D28); scenario names, order and substance unchanged, so the diff is reviewable as a mechanical conversion. `tests/electron-db/tsconfig.json` mirrors `tests/db/tsconfig.json` (`include: ["**/*.ts", "../db/support/**/*.ts", "../db/fixtures/**/*.ts"]`, the same `@shared/*` path, `types: ["node"]` instead of `["bun-types"]`) and `typecheck:db` becomes two `tsgo` invocations so the moved suite stays type-checked rather than quietly dropping out of `bun run typecheck`. |
 | `tests/ui/kafka.spec.ts` | Nothing — it must pass unchanged (D31). | **No change permitted.** It is the only coverage of the driver inside a real Electron `utilityProcess`; if a testid or wait has to move, the adapter rewrite changed something it promised not to. |
 | `scripts/verify-packaging.sh` | A native production dependency now has to survive packaging (D7). | New check A6: `app.asar.unpacked/node_modules/@confluentinc/kafka-javascript/build/Release/*.node` exists in a built `.app`, and no `.node` is inside `app.asar`. |
 
 ### New coverage
 
-**`tests/db/kafka.spec.ts`, appended to the existing describe** (same container, same seed):
+**`tests/electron-db/kafka.spec.ts`, appended to the moved describe** (same container, same seed —
+D27):
 
 - **17. a browse joins no consumer group** (D19/D30). Page through `ORDERS_TOPIC` at
   `pageSize: 2` until `hasMore` is false — several browses, several consumers — then call
@@ -571,9 +628,9 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
   window `next` exceeds `Number.MAX_SAFE_INTEGER`; assert `E_UNSUPPORTED` with a message naming the
   offset — a unit-shaped scenario that needs no special broker state.
 
-**No new spec file** under D27. Under fallback B (D28) the file moves to
-`tests/electron-db/kafka.spec.ts` with its assertions converted to `node:assert/strict`, and
-`package.json` gains `test:db:kafka`; the scenario list above is unchanged either way.
+**No new spec *file*** — scenarios 17–20 are appended to the moved suite, so the move (step 10) and
+the new coverage (step 11) stay separately reviewable: step 10's diff is a conversion with no
+behaviour change, step 11's is new assertions with no conversion noise.
 
 ### What cannot be verified in Claude Code's Linux web container — stated plainly
 
@@ -584,13 +641,17 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
 - **`xvfb-run -a bun run test:ui` cannot run the Kafka spec here** for the same reason (it skips
   cleanly, `tests/ui/kafka.spec.ts:26-31`), and after this phase it additionally cannot run the app
   against Kafka at all here, because the Electron-ABI build of the driver cannot be produced (F20).
-- **What *can* be verified here:** `bun install` with the new dependency, the Node/Bun load probes
-  of step 1 (a) and (b), `lint`, `typecheck` (all three), `build`, and the electron-builder `--dir`
-  build minus the native rebuild.
-- **What must be run on the macOS/Colima box before this phase is called done:** step 1's probe (c),
-  `bun run test:db` against the Kafka 4 container, `xvfb-run`-less `bun run test:ui`,
-  `bun run package:mac:dir` + `bun run verify:packaging`, and one manual browse of a real topic in
-  the running app.
+- **`bun run test:db:kafka` cannot run here either**, for two independent reasons: the container
+  (above) and the fact that the Electron-ABI build the runner loads cannot be produced here (F20).
+- **What *can* be verified here:** `bun install` with the new dependency, `lint`, `typecheck` (all
+  projects, including the moved suite), `build`, the electron-builder `--dir` build minus the native
+  rebuild, and — usefully — a *Node*-ABI load of the driver via `node-pre-gyp install` in a scratch
+  directory, which is how F10–F17's API shapes were confirmed and how a future reader can re-confirm
+  them without a broker.
+- **What must be run on the macOS/Colima box before this phase is called done:** step 1's two
+  Electron probes, `bun run test:db` (the other engines), `bun run test:db:kafka` against the Kafka 4
+  container, `bun run test:ui`, `bun run package:mac:dir` + `bun run verify:packaging`, and one
+  manual browse of a real topic in the running app.
 
 ## 6. Explicitly out of scope
 
@@ -608,8 +669,13 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
 - **Re-running P12's memory suite** (D4). A native module changes the engine's memory profile and
   P12's levers were measured against a pure-JS driver set — but re-deriving those numbers is P12's
   methodology, and this phase only records the structural fact.
-- **Bun's NAN support itself.** If step 1's probe fails, the answer is fallback B (D28), not
-  patching, shimming or reporting upstream.
+- **Bun's NAN support itself.** F21 is a verified upstream gap (`v8::FunctionTemplate::SetClassName`
+  is not implemented by Bun's V8 shim); this phase routes around it (D27) and does not patch, shim
+  or vendor anything. If Bun ever closes it, moving the suite back is a smaller change than the one
+  this phase makes.
+- **Moving the other `tests/db` suites off Bun.** Postgres, MariaDB, Mongo, Redis, SQS and S3 all use
+  pure-JS drivers that Bun loads fine; only Kafka has a native driver, so only Kafka moves. A
+  wholesale runner migration would be a repo-wide change with no Kafka benefit.
 - **A second Kafka connection kind** (e.g. "Confluent Cloud" with OAUTHBEARER). The client supports
   `sasl.oauthbearer` and the connection dialog has no surface for it; adding one is a P1-shaped
   change to the connection schema.
@@ -625,12 +691,14 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
 
 ```
 package.json                        MOD  +@confluentinc/kafka-javascript@1.10.0 (dependencies),
-                                         -kafkajs, +trustedDependencies entry, pre* script wiring
-                                         for scripts/native-abi.sh (D1/D2/D6)
+                                         -kafkajs, +@electron/rebuild (devDependencies),
+                                         +trustedDependencies entry, +test:db:kafka, pre* wiring
+                                         for scripts/native-electron-build.sh, typecheck:db covers
+                                         both test projects (D1/D2/D6/D27/D28)
 electron-builder.yml                MOD  asarUnpack += the .node; files exclusions for deps/src/
                                          obj.target; npmRebuild comment corrected (D5/D7)
 scripts/
-  native-abi.sh                     NEW  node|electron ABI swap + cache + marker (D6)
+  native-electron-build.sh          NEW  one ABI (Electron's): marker + cache + electron-rebuild (D6)
   verify-packaging.sh               MOD  A6: the .node is present and unpacked (D7)
 src/engine/adapters/kafka/
   client.ts                         MOD  RdConfig + KafkaClientHandle; one librdkafka config for
@@ -656,18 +724,23 @@ src/shared/protocol/page.ts          --  UNCHANGED (D32)
 tests/
   db/support/kafka.ts               MOD  cp-kafka:8.0.x; no JS client in the fixture (D25/D26)
   db/fixtures/0005_kafka_seed.ts    MOD  seeded through the container's own CLI (D26)
-  db/kafka.spec.ts                  MOD  scenarios 17-20 added; F25's four assertions updated
-                                         (D29/D30)  [fallback B: moves to tests/electron-db/]
+  db/kafka.spec.ts                  DEL  moves to tests/electron-db/ — bun cannot load the
+                                         driver (F21/D27)
+  electron-db/kafka.spec.ts         NEW  the same 16 scenarios on node:test + node:assert/strict,
+                                         plus 17-20; F25's four assertions updated (D27-D30)
+  electron-db/tsconfig.json         NEW  mirrors tests/db/tsconfig.json, types: ["node"] (D28)
   ui/kafka.spec.ts                   --  UNCHANGED — the Electron-ABI end-to-end guard (D31)
 docs/
-  v1/SPEC.md                        MOD  §5.1 cancel column, §8.11 caveat, §10 P32 outcome once
+  v1/SPEC.md                        MOD  §5.1 cancel column, §8.11 caveat, §11's tests/ layout
+                                         gains electron-db/, §10 P32 outcome once
                                          implemented (D34)
   v1/PACKAGING.md                   MOD  §2's npmRebuild bullet, the new unpack entry (D8)
   v1/PERF.md                        MOD  one note: the Kafka driver is native and not reclaimable
                                          once loaded (D4)
   v1/plans/P32-kafka-client-migration.md   NEW  this document
-AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" section: two ABIs,
-                                         native-abi.sh, and F20's blocked-headers finding (D8)
+AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" section: Electron's
+                                         ABI only (never bun), native-electron-build.sh, the
+                                         test:db:kafka runner, and F20's blocked-headers finding (D8)
 ```
 
 ## 8. Acceptance checklist
@@ -701,8 +774,9 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
 
 **Kafka 4**
 
-- [ ] `tests/db` runs green against `confluentinc/cp-kafka:8.0.x` (Apache Kafka 4.0) on the
-      macOS/Colima box — every existing scenario plus 17–20.
+- [ ] `bun run test:db:kafka` runs green against `confluentinc/cp-kafka:8.0.x` (Apache Kafka 4.0) on
+      the macOS/Colima box — every existing scenario plus 17–20 — and `bun run test:db` (the six
+      other engines) is green and no longer collects a Kafka file.
 - [ ] The seed creates topics, messages with headers, and a consumer group with committed offsets
       **without** any JavaScript Kafka client.
 - [ ] `tests/ui/kafka.spec.ts` passes unchanged, against the same Kafka 4 container, with the app's
@@ -710,10 +784,13 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
 
 **Native module and packaging**
 
-- [ ] Step 1's three probes are recorded in the repo history, and the D27/D28 choice cites them.
+- [ ] Step 1's Electron probes are recorded in the repo history, including the `features` list —
+      `ssl`, `sasl`, `sasl_plain` and `sasl_scram` present, i.e. the from-source build did not
+      silently drop the security features the prebuilt binaries carry.
 - [ ] `bun run dev` starts and a Kafka connection works — i.e. the Electron-ABI build is in place
-      and `scripts/native-abi.sh electron` is idempotent on a second run.
-- [ ] Switching between `bun run test:db` and `bun run test:ui` does not require a manual rebuild.
+      and `scripts/native-electron-build.sh` is idempotent on a second run (second run does no work).
+- [ ] Running `test:db`, `test:db:kafka`, `test:ui` and `dev` in any order needs no manual rebuild,
+      and a fresh `bun install` followed by one of them produces a working driver.
 - [ ] `bun run package:mac:dir` produces an `.app` whose `app.asar.unpacked` contains the `.node`,
       whose `app.asar` contains none, and whose size is still under the 300 MB L-D budget;
       `bun run verify:packaging` passes including the new A6.
@@ -722,8 +799,9 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
 
 **Overall**
 
-- [ ] `bun run lint`, `bun run typecheck` (all three) and `bun run build` clean.
-- [ ] SPEC.md §5.1 and §8.11 describe what shipped; §10's P32 row is filled in last.
+- [ ] `bun run lint`, `bun run typecheck` (every project, the moved suite included) and
+      `bun run build` clean.
+- [ ] SPEC.md §5.1, §8.11 and §11 describe what shipped; §10's P32 row is filled in last.
 
 ## 9. Open questions for the user
 
@@ -742,12 +820,16 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
    make Kafka's `sslmode` consistent with Postgres's — at the cost of a security-relevant behaviour
    change landing inside a driver swap. Worth doing as its own small change if the consistency
    matters.
-4. **If Bun cannot load the addon, is fallback B's Electron-as-Node runner acceptable for
-   `tests/db/kafka.spec.ts` (D28), or would you rather the Kafka adapter suite lean on
-   `tests/ui/kafka.spec.ts` alone?** D28 keeps adapter-level coverage at the cost of one converted
-   spec file and one extra script, and it has the side benefit of testing the driver in the exact
-   runtime the app ships. The lighter alternative loses the error-code, cursor and cancellation
-   scenarios entirely, which this plan does not recommend.
+4. **The Kafka adapter suite has to leave `bun test` — is the Electron-as-Node runner (D27/D28) the
+   right destination?** This is no longer conditional: F21 verified that Bun cannot load the addon
+   at *any* ABI, so `bun test` and this driver cannot coexist. What remains a choice is where the 16
+   scenarios go. D27 moves them to `tests/electron-db/` under `ELECTRON_RUN_AS_NODE=1 electron`,
+   which costs one mechanical conversion, one esbuild bundle step, one script and one `tests/`
+   directory — and buys coverage in the exact runtime the shipped engine uses. The alternatives:
+   (a) leave the adapter suite behind and rely on `tests/ui/kafka.spec.ts`, which loses the
+   error-code, cursor, cancellation and read-only scenarios and both group-less tripwires — not
+   recommended; (b) keep the whole `tests/db` tree but run *all* of it under Electron-as-Node, which
+   is a repo-wide change six other engines do not need.
 5. **Should the connection tooltip show the broker list rather than a count?** D13 reports
    `brokers: "3"` plus the librdkafka version because `details` is free-form and currently unread by
    the UI. Listing `id@host:port` for each broker is the same one line of code and is genuinely
