@@ -22,6 +22,35 @@ test('panel visibility toggles persist across relaunch', async ({ relaunch }) =>
   await expect(window.locator('[data-testid="operations-panel"]')).toBeVisible();
 });
 
+// P31 item 4/D8: 6px top/right/left inset from the window edge, 2px (--kira-gap, unchanged)
+// on the bottom so the status bar still reads as seated on the window edge.
+test('the workbench is inset from the window edge on three sides (P31 D8)', async ({
+  relaunch,
+}) => {
+  const { window } = await relaunch();
+  const shell = window.locator('.workbench-shell');
+  const padding = await shell.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return {
+      top: style.paddingTop,
+      right: style.paddingRight,
+      bottom: style.paddingBottom,
+      left: style.paddingLeft,
+    };
+  });
+  expect(padding.top).toBe('6px');
+  expect(padding.right).toBe('6px');
+  expect(padding.left).toBe('6px');
+  expect(padding.bottom).toBe('2px');
+
+  const [shellBox, projectBox] = await Promise.all([
+    shell.boundingBox(),
+    window.locator('[data-testid="project-panel"]').boundingBox(),
+  ]);
+  if (!shellBox || !projectBox) throw new Error('bounding boxes not found');
+  expect(projectBox.x - shellBox.x).toBeGreaterThanOrEqual(6);
+});
+
 test('settings dialog appearance font size persists across relaunch', async ({ relaunch }) => {
   let { window } = await relaunch();
 

@@ -128,10 +128,26 @@ watch(
   },
   { immediate: true },
 );
+
+// P31 D7/F9: a plain mouse produces only a vertical wheel axis (deltaY), and this strip's own
+// horizontal scrollbar is deliberately thin/subtle — without this, the strip is reachable only by
+// trackpad. A no-op once the strip doesn't overflow, so it never fights ordinary page scroll.
+function onWheel(e: WheelEvent): void {
+  const el = stripRef.value;
+  if (!el || e.deltaY === 0 || el.scrollWidth <= el.clientWidth) return;
+  el.scrollLeft += e.deltaY;
+  e.preventDefault();
+}
 </script>
 
 <template>
-  <div v-if="tabs.length > 0" ref="stripRef" class="tab-strip" data-testid="tab-strip-row">
+  <div
+    v-if="tabs.length > 0"
+    ref="stripRef"
+    class="tab-strip"
+    data-testid="tab-strip-row"
+    @wheel="onWheel"
+  >
     <button
       v-for="tab in tabs"
       :key="tab.id"
@@ -177,13 +193,24 @@ watch(
   padding: 2px 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
-  /* Scrolls with too many tabs open, but stays a tab strip, not a scroll pane — no visible
-     scrollbar (still scrollable via trackpad/shift-wheel/drag). */
-  scrollbar-width: none;
+  /* Scrolls with too many tabs open, and shows it: a thin track in the app's own thumb colour
+     (P31 D7) — was scrollbar-width: none, which hid the only on-screen sign that more tabs exist
+     past the edge. Reachable by wheel (onWheel above), trackpad, or drag either way. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--kira-scrollbar) transparent;
 }
 
 .tab-strip::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.tab-strip::-webkit-scrollbar-thumb {
+  background: var(--kira-scrollbar);
+  border-radius: var(--kira-radius);
+}
+
+.tab-strip::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* P24 D32: .tab used to re-declare .p-tab's own rules (primitives.css) by hand, 1px and 10px off

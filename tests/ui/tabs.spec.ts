@@ -279,3 +279,50 @@ test('tabs — independent state, context menu, colours, session restore', async
 
   expect(consoleErrors).toEqual([]);
 });
+
+// P31 item 2/D6/D7: WorkbenchShell's own class name used to collide with TabStrip's identically
+// named root under scoped CSS's "child inherits the parent's scope id too" rule, so the outer
+// overflow: hidden always won regardless of what TabStrip.vue itself declared (F7). D6 renames the
+// outer wrapper; D7 adds a wheel handler and a visible thin scrollbar.
+test('the tab strip scrolls once tabs overflow it (P31 D6/D7)', async ({ kira, consoleErrors }) => {
+  test.setTimeout(240_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  await connectAndOpenOrderItems(page);
+  const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
+  // Twelve independent tabs of the same table (§8.4: "the same table opens any number of
+  // times") — enough at any reasonable window width to overflow a 900px-wide strip.
+  for (let i = 0; i < 12; i++) {
+    await orderItemsRow.click({ button: 'right' });
+    await page.click('[data-testid="menu-item-open-data-new-tab"]');
+  }
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(12);
+
+  const strip = page.locator('[data-testid="tab-strip-row"]');
+  const overflowX = await strip.evaluate((el) => getComputedStyle(el).overflowX);
+  expect(overflowX).not.toBe('hidden');
+  const { scrollWidth, clientWidth } = await strip.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  expect(scrollWidth).toBeGreaterThan(clientWidth);
+
+  const scrollLeftBefore = await strip.evaluate((el) => el.scrollLeft);
+  await strip.hover();
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).toBeGreaterThan(scrollLeftBefore);
+
+  // Activating the first tab again scrolls it back into view (TabStrip.vue's own watch, unchanged).
+  await page.locator('[data-testid="tab"]').first().click();
+  await expect
+    .poll(async () => {
+      const box = await page.locator('[data-testid="tab"]').first().boundingBox();
+      const stripBox = await strip.boundingBox();
+      if (!box || !stripBox) return false;
+      return box.x >= stripBox.x;
+    })
+    .toBe(true);
+
+  expect(consoleErrors).toEqual([]);
+});

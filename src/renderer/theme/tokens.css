@@ -34,6 +34,9 @@
      thick" at once, since they were the same 4px measurement stacked three times (grid gap +
      splitter track + grid gap) between any two panels. */
   --kira-gap: 2px;
+  /* App chrome <-> window edge (P31 D8) — deliberately not --kira-gap, which also sets the
+     splitter track width; raising that would thicken every resize bar. */
+  --kira-window-inset: 6px;
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);

@@ -40,7 +40,7 @@ const gridStyle = computed(() => ({
     />
 
     <div class="editor-area" style="grid-area: main">
-      <div class="tab-strip" data-testid="tab-strip"><TabStrip /></div>
+      <div class="tab-strip-slot" data-testid="tab-strip"><TabStrip /></div>
       <div class="main-view" data-testid="main-view"><MainView /></div>
     </div>
 
@@ -82,7 +82,10 @@ const gridStyle = computed(() => ({
   grid-template-columns: var(--project-w) var(--project-split-w) 1fr;
   grid-template-rows: 1fr var(--ops-split-h) var(--ops-h) var(--kira-statusbar-h);
   gap: var(--kira-gap);
-  padding: var(--kira-gap);
+  /* Top/right/left inset from the window edge (P31 D8) is its own token, deliberately not
+     --kira-gap — that token also sizes the splitter track, and raising it would thicken every
+     resize bar. Bottom stays --kira-gap: the status bar reads as seated on the window edge. */
+  padding: var(--kira-window-inset) var(--kira-window-inset) var(--kira-gap);
   background: var(--kira-bg-chrome);
 }
 
@@ -106,7 +109,7 @@ const gridStyle = computed(() => ({
   overflow: hidden;
 }
 
-.tab-strip {
+.tab-strip-slot {
   /* Taller than a tab (`--kira-h-md`, 26px) by design — the extra height is the tab's own
      breathing room from this row's border-bottom, not a margin tacked on after it. Every other
      boundary in this stack (breadcrumb / toolbar-rail / toolbar / grid) sits flush with zero gap;
