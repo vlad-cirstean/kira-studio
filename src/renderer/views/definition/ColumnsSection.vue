@@ -62,18 +62,18 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           </td>
           <td class="def-col-type mono">
             {{ col.dataType }}
-            <Codicon
+            <span
               v-if="typeDescription(col.dataType)"
-              name="info"
-              :size="12"
               class="type-info"
-              :title="typeDescription(col.dataType) ?? undefined"
-            />
+              :title="typeDescription(col.dataType) ?? ''"
+            >
+              <Codicon name="info" :size="12" />
+            </span>
           </td>
           <!-- Nullable stated only as the exception — repeating "NOT NULL" on every row (the
                common case in a well-designed schema) added noise without adding information. -->
           <td class="def-col-null">
-            <Codicon v-if="col.nullable" name="check" :size="13" title="Nullable" />
+            <Codicon v-if="col.nullable" name="close" :size="12" title="Nullable" />
           </td>
           <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
           <td class="def-col-comment">{{ col.comment ?? '' }}</td>

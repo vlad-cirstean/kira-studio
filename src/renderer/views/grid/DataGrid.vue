@@ -300,10 +300,47 @@ function alignFor(displayCol: number): 'left' | 'right' {
   return descriptor ? alignmentFor(descriptor) : 'left';
 }
 
-function currentSortDirection(name: string): 'asc' | 'desc' | null {
+// queries.ts's own doc comment: typing in the ORDER BY box always produces a `text` sort and
+// "clears the header indicators" — true for the machine-driven distinction that keeps pagination
+// on `offset` (D7), but a user who types "a asc, b desc" still expects the headers to reflect it.
+// This best-effort, display-only parse recovers per-column direction + position for exactly that
+// case; a term that doesn't match a real column name (an expression, a typo) is silently skipped
+// rather than guessed at. It never feeds back into `state.sort` — the text/structured split for
+// pagination purposes is untouched.
+function parseTextSortTerms(
+  text: string,
+  knownColumns: readonly string[],
+): { column: string; direction: 'asc' | 'desc' }[] {
+  const known = new Set(knownColumns);
+  const terms: { column: string; direction: 'asc' | 'desc' }[] = [];
+  for (const raw of text.split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^(?:"([^"]+)"|`([^`]+)`|(\w+))\b\s*(desc|asc)?/i);
+    const name = match?.[1] ?? match?.[2] ?? match?.[3];
+    if (!name || !known.has(name)) continue;
+    terms.push({ column: name, direction: match?.[4]?.toLowerCase() === 'desc' ? 'desc' : 'asc' });
+  }
+  return terms;
+}
+
+const sortTerms = computed(() => {
   const sort = tab()?.state.sort;
-  if (sort?.kind !== 'structured') return null;
-  return sort.terms.find((t) => t.column === name)?.direction ?? null;
+  if (!sort) return [];
+  if (sort.kind === 'structured') return sort.terms;
+  return parseTextSortTerms(sort.text, columnOrder.value);
+});
+
+function currentSortDirection(name: string): 'asc' | 'desc' | null {
+  return sortTerms.value.find((t) => t.column === name)?.direction ?? null;
+}
+
+// Only worth a number once there's more than one active sort key — a lone chevron already says
+// everything a "1" badge would.
+function sortOrderIndex(name: string): number | null {
+  if (sortTerms.value.length < 2) return null;
+  const index = sortTerms.value.findIndex((t) => t.column === name);
+  return index === -1 ? null : index + 1;
 }
 
 // Cycles asc -> desc -> none and mirrors into the ORDER BY box via setSort (D6).
@@ -953,6 +990,9 @@ defineExpose({ scrollCellIntoView });
           <span v-if="currentSortDirection(columnOrder[c])" class="sort-chevron">{{
             currentSortDirection(columnOrder[c]) === 'asc' ? '▲' : '▼'
           }}</span>
+          <span v-if="sortOrderIndex(columnOrder[c])" class="sort-order">{{
+            sortOrderIndex(columnOrder[c])
+          }}</span>
           <span
             role="button"
             aria-label="Select column"
@@ -1149,6 +1189,21 @@ defineExpose({ scrollCellIntoView });
 .sort-chevron {
   color: var(--kira-accent);
   font-size: 9px;
+  flex-shrink: 0;
+}
+
+.sort-order {
+  color: var(--kira-accent-fg);
+  background: var(--kira-accent);
+  font-size: 9px;
+  line-height: 1;
+  min-width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
   flex-shrink: 0;
 }
 

@@ -1,5 +1,5 @@
 import { connectionColorSchema } from '@shared/domain/connection';
-import { decodePath, pathParent } from '@shared/domain/tree';
+import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
@@ -92,11 +92,6 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'sequence':
     case 'function':
       return simpleObjectMenu(row);
-    case 'index':
-      // P19 D9: a table's column rows moved into the definition view (their own context menu
-      // lives there now); a Mongo index leaf still lives in the tree (P8's D10) and still uses
-      // this menu.
-      return columnMenu(row);
     default:
       return [];
   }
@@ -632,56 +627,7 @@ function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// The active tab if it already targets this column's table, otherwise open (or reuse) that
-// table's data tab first — never silently no-op, and never act on an unrelated tab.
-function targetTabFor(row: TreeRowVm): string {
-  const tablePath = pathParent(row.path) ?? '';
-  const active = activeTab.value;
-  if (active && active.connectionId === row.connectionId && active.path === tablePath) {
-    return active.id;
-  }
-  return openDataTab(row.connectionId, tablePath).id;
-}
-
-function columnMenu(row: TreeRowVm): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      run: () => copyText(row.name),
-    },
-    {
-      type: 'item',
-      id: 'add-to-projection',
-      label: 'Add to projection',
-      icon: 'list-selection',
-      run: () => {
-        const tabId = targetTabFor(row);
-        const tab = findDataTab(tabId);
-        const current = tab?.state.projection ?? null;
-        if (current?.includes(row.name)) return;
-        void setProjection(tabId, current ? [...current, row.name] : [row.name]);
-      },
-    },
-    {
-      type: 'item',
-      id: 'sort-by',
-      label: 'Sort by',
-      icon: 'sort-precedence',
-      run: () => {
-        const tabId = targetTabFor(row);
-        void setSort(tabId, {
-          kind: 'structured',
-          terms: [{ column: row.name, direction: 'asc' }],
-        });
-      },
-    },
-  ];
-}
-
-// D9: the definition view's Columns section reuses columnMenu's exact three items, but it
+// D9: the definition view's Columns section reuses the tree's former column-row menu items, but it
 // already has the table's own path directly (`tab.path`) — no `pathParent()` needed the way the
 // tree's former column rows required.
 function targetTabForTable(connectionId: string, tablePath: string): string {

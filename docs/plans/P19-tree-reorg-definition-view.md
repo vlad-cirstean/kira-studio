@@ -570,3 +570,15 @@ docs/
    their own folder and are therefore more visible, showing `pg_get_functiondef` / `SHOW CREATE
    FUNCTION` in the same view is a small, natural follow-on — but it is genuinely new adapter work
    and a new menu case, so it belongs in its own phase unless it is wanted now.
+
+## 9. Addendum — open question 2 resolved
+
+The inconsistency did bother: a Mongo collection now also stops expanding. `mongo/index.ts`'s
+`children()` returns `[]` for a collection path (matching `listCollections`' `hasChildren: false`)
+instead of `catalog.listIndexNodes()`; that function is deleted, along with the now-dead `'index'`
+NodeKind (`nodeKindSchema`, `icons.ts`'s `KIND_ICON`, `menus.ts`'s `case 'index'` and the tree-only
+`columnMenu`/`targetTabFor` it alone called). Indexes are unaffected as data — `describeIndexes()`
+still backs `describe()`'s `ObjectMeta.indexes`, which the definition view's Indexes section already
+renders. SPEC §5.1's Mongo row updated to match; `tests/db/mongo.spec.ts` scenario 3 now asserts
+`hasChildren === false` instead of enumerating index tree nodes, and scenario 5 targets a collection
+path directly instead of a now-unrepresentable index path.

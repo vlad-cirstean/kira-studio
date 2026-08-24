@@ -524,6 +524,7 @@ onUnmounted(() => {
             <IconButton
               icon="list-selection"
               data-testid="document-toolbar-projection"
+              :count="tab.state.projection !== null ? (projectionCountLabel ?? undefined) : undefined"
               :title="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
               @click="projectionOpen = !projectionOpen"
             />

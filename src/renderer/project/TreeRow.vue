@@ -93,6 +93,8 @@ function onContextMenu(e: MouseEvent): void {
       class="twisty"
       :class="{ invisible: !row.hasChildren }"
       tabindex="-1"
+      :title="row.expanded ? 'Collapse' : 'Expand'"
+      :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >
       <Codicon v-if="row.loading" name="loading" class="spin" :size="12" />

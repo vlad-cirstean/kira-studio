@@ -12,7 +12,6 @@ const KIND_ICON: Record<NodeKind, string> = {
   function: 'symbol-method',
   column: 'symbol-string', // overridden by columnTypeIcon() when the data type is known
   collection: 'json', // P8: mongo's table-equivalent, matching TabStrip.vue's document-tab icon
-  index: 'symbol-key',
   namespace: 'symbol-namespace', // P9: an intermediate ':'-delimited redis key level
   key: 'tag', // P9: a leaf redis key, matching TabStrip.vue's keyvalue-tab icon
   topic: 'broadcast', // P10: a kafka topic, matching TabStrip.vue's stream-tab icon

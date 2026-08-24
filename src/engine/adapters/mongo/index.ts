@@ -86,15 +86,16 @@ class MongoAdapter implements Adapter {
     if (segments.length === 1) return catalog.listCollections(db);
     if (!objectSegment) throw new AdapterError('E_NOT_FOUND', 'missing path segment at depth 1');
 
+    // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws. P19 D5's own
+    // SQL-relation precedent applies here too: a collection's indexes moved into the definition
+    // view (describeIndexes(), still used by describe()), so a collection is a leaf like a table.
     if (segments.length === 2) {
-      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws.
       if (objectSegment.kind !== 'collection') {
         throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
       }
-      return catalog.listIndexNodes(db, objectSegment.name);
+      return [];
     }
 
-    if (segments.length === 3) return []; // an index — leaf.
     throw new AdapterError('E_NOT_FOUND', `unrecognized path depth ${segments.length}`);
   }
 

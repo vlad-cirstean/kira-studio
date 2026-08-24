@@ -11,7 +11,6 @@ export const nodeKindSchema = z.enum([
   'sequence',
   'column',
   'collection', // P8: mongo's table-equivalent
-  'index', // P8: a leaf under a collection (or a table, later)
   'namespace', // P9: an intermediate ':'-delimited level in a redis key tree
   'key', // P9: a leaf redis key, opened as a key/value tab
   'topic', // P10: a kafka topic, opened as a stream tab

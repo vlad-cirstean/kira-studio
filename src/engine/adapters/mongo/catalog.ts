@@ -22,7 +22,7 @@ export async function listDatabases(client: MongoClient): Promise<TreeNode[]> {
   }
 }
 
-// §5.1: database -> collections (+ indexes). No routine/sequence-equivalent kind for Mongo.
+// §5.1: database -> collections. No routine/sequence-equivalent kind for Mongo.
 export async function listCollections(db: Db): Promise<TreeNode[]> {
   try {
     const collections = await db.listCollections({}, { nameOnly: true }).toArray();
@@ -34,7 +34,9 @@ export async function listCollections(db: Db): Promise<TreeNode[]> {
           { kind: 'database', name: db.databaseName },
           { kind: 'collection', name: c.name },
         ]),
-        hasChildren: true, // + indexes (§5.1)
+        // P19 D5's own SQL-relation precedent: a collection's indexes moved into the definition
+        // view, so a collection is a leaf like a table — no tree expand arrow.
+        hasChildren: false,
         detail: c.type === 'view' ? 'view' : undefined,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -71,22 +73,4 @@ export async function describeIndexes(db: Db, collection: string): Promise<Mongo
   } catch (err) {
     throw mapMongoError(err);
   }
-}
-
-// §8.10's dedicated index row — each index is its own addressable tree leaf, not folded into
-// the collection node (D10).
-export async function listIndexNodes(db: Db, collection: string): Promise<TreeNode[]> {
-  const indexes = await describeIndexes(db, collection);
-  return indexes.map((idx) => ({
-    kind: 'index' as const,
-    name: idx.name,
-    path: encodePath([
-      { kind: 'database', name: db.databaseName },
-      { kind: 'collection', name: collection },
-      { kind: 'index', name: idx.name },
-    ]),
-    hasChildren: false,
-    detail: idx.unique ? 'unique' : undefined,
-    badges: idx.name === '_id_' ? ['PK'] : undefined,
-  }));
 }

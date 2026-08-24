@@ -105,18 +105,9 @@ describe('mongo adapter (§9.1, P8)', () => {
       );
       expect(collections.map((n) => n.name).sort()).toEqual(['empty_collection', 'widgets']);
       expect(collections.every((n) => n.kind === 'collection')).toBe(true);
-
-      const indexes = await adapter.children(
-        path([
-          { kind: 'database', name: MONGO_DATABASE },
-          { kind: 'collection', name: 'widgets' },
-        ]),
-        makeCtx(),
-      );
-      expect(indexes.map((n) => n.name).sort()).toEqual(['_id_', 'name_1']);
-      expect(indexes.every((n) => n.kind === 'index')).toBe(true);
-      const idIndex = indexes.find((n) => n.name === '_id_');
-      expect(idIndex?.badges).toEqual(['PK']);
+      // P19 D5's own SQL-relation precedent: a collection is a leaf, same as a table — its
+      // indexes moved into the definition view (describe(), covered by test 6 below).
+      expect(collections.every((n) => n.hasChildren === false)).toBe(true);
     } finally {
       await adapter.disconnect();
     }
@@ -137,11 +128,12 @@ describe('mongo adapter (§9.1, P8)', () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
+      // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a
+      // collection is one now (P19 D5's own SQL-relation precedent), so this asks its own path.
       const children = await adapter.children(
         path([
           { kind: 'database', name: MONGO_DATABASE },
           { kind: 'collection', name: 'widgets' },
-          { kind: 'index', name: 'name_1' },
         ]),
         makeCtx(),
       );

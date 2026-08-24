@@ -384,6 +384,7 @@ const preconnectText = computed({
                 </div>
                 <IconButton
                   :icon="showPassword ? 'eye-closed' : 'eye'"
+                  :title="showPassword ? 'Hide password' : 'Show password'"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 />

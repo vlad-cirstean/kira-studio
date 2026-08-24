@@ -130,6 +130,19 @@ const columnCountLabel = computed(() => {
   return `${projection ? projection.length : total} / ${total}`;
 });
 
+// The Columns button's own corner badge (IconButton's `count` prop) — shown only when the tab's
+// column set deviates from default (some columns hidden, or the order was dragged), so the icon
+// stays clean until there's actually something to flag. A hidden-column deviation gets the
+// existing "N / M" count; an order-only deviation (every column still shown) gets a plain dot,
+// since "M / M" would look like a count but say nothing.
+const columnsBadge = computed(() => {
+  const state = tab.value?.state;
+  if (!state) return undefined;
+  if (state.projection !== null) return columnCountLabel.value ?? undefined;
+  if (state.columnOrder !== null) return '•';
+  return undefined;
+});
+
 // P16 design system's warn chip: "N rows edited" — the count is already tracked per-tab by
 // pendingChanges.ts (edits + deletes + inserts), just not summed anywhere for display yet.
 const pendingCount = computed(() => {
@@ -305,6 +318,7 @@ function onDiscard(): void {
         <IconButton
           icon="list-selection"
           data-testid="toolbar-columns"
+          :count="columnsBadge"
           :title="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
           @click="columnsOpen = !columnsOpen"
         />
