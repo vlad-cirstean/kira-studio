@@ -370,7 +370,11 @@ Below it, a second **filter toolbar**, left to right:
   changes will execute. No execution from that panel.
 - **Search toolbar** — toggled, VS Code-styled: query, match case, whole word, regex, match count,
   prev/next. Searches the **loaded page only** — never the server. Server-side narrowing is the
-  filter toolbar's `WHERE`, and the two are deliberately not mixed.
+  filter toolbar's `WHERE`, and the two are deliberately not mixed. A **filter toggle** narrows the
+  grid to only the rows the search matched, without re-querying or losing scroll/selection state
+  (rows are re-indexed by display position, the underlying page is untouched); a scan with zero
+  matches while the toggle is on shows a dedicated "no matching rows" empty state with a one-click
+  way back to every row, distinct from the table's own "no rows" state.
 - **Stop** — aborts the in-flight op and forwards the cancel to the server (§5.1). Enabled only while
   an op is running.
 
@@ -395,15 +399,21 @@ Clicking a cell renders its value here in CodeMirror.
 - **Manual type override** — dropdown; the choice sticks per column for the session.
 - **Beautify** — two modes: *indented* and *compact* (single-line, no indentation).
 - **UUID format** gets a generate button (a fresh `crypto.randomUUID()`, overwriting the buffer).
-- **Timestamp formats** (epoch seconds/millis, ISO-8601) get a `datetime-local` picker alongside
-  the local/UTC reading — picking a moment re-encodes it into whichever of the three shapes the
-  cell already uses.
+- **Timestamp formats** (epoch seconds/millis, ISO-8601) get a **translate pane** below the raw
+  value, on the same footing as the hex/base64 decoded-text pane: an editable field plus a
+  local/UTC toggle and an expressive calendar picker (month grid, time-of-day controls, a "now"
+  shortcut), kept in sync with the raw value in both directions in real time — typing in the
+  translate pane or picking a moment re-encodes the raw value, and editing the raw value re-parses
+  into the pane. Re-encoding preserves the value's original shape byte-for-byte (separator, UTC
+  offset style, fractional-second digits) apart from the digits that actually changed.
 - **Hex and base64** get a second, editable "decoded text" pane below the raw value — the same
   bytes as plaintext, kept in sync in both directions (typing plaintext re-encodes the raw value;
   editing the raw value re-decodes the plaintext). Bytes that aren't valid UTF-8 show a note
   instead of a second editor rather than rendering garbled text.
 - **Editable.** Committing a change stages a pending cell edit (§8.13) rather than writing
-  immediately. The panel is forced read-only when the connection is marked read-only.
+  immediately. The panel is forced read-only when the connection is marked read-only, and likewise
+  when the cell's value was truncated on load — a partial value can be read and copied, but never
+  staged as a write over the full one.
 
 ### 8.7 Document view (Mongo, and any document-shaped page)
 
@@ -659,6 +669,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P21 Menu shortcut hints** | Every context-menu item that has a keyboard shortcut prints it alongside its label, VS Code style — muted and right-aligned. A single shared binding table (`src/shared/shortcuts.ts`) becomes the one source of truth §8.16 already promised, feeding the native menu bar's accelerators, the context menus' displayed keys, and the local DOM-scoped keydown handlers alike, so a printed key and the key that runs can no longer drift. Audits all 104 context-menu rows across 21 builders, surfaces 5 bindings that already worked but were never shown (the grid's `Cmd/Ctrl+C` over cell/row/column selections, its `Enter`-to-edit, and the tab strip's `Cmd/Ctrl+W`), and adds 9 new ones following VS Code's own conventions — `F2` rename, `Delete`/`⌘⌫` delete, `Ctrl/Cmd+C` copy, `Ctrl/Cmd+N` new, `Enter` open, `Shift+Alt+C` copy path, plus duplicate on `Ctrl/Cmd+D` — scoped to the two surfaces that already have focus and a selection, the project tree and the SQL grid. See `docs/plans/P21-menu-shortcut-hints.md` | The right-click matrix (P6) and every view that feeds it are complete, so the audit can be exhaustive rather than provisional; and the binding table has to exist before shortcuts can be shown, let alone remapped |
 | **P22 App-owned tooltips** | Every hover hint in the app is drawn by the app instead of by the OS. The native `title` attribute is removed from `src/renderer` entirely — all 123 of them, in 34 files — and replaced by a `v-tooltip` directive plus one `AppTooltip.vue` singleton mounted beside `ContextMenu.vue`, sharing the same `Teleport`/`fixed`/`.p-float` chrome every other floating surface already uses. Opens after 400 ms (the app's existing hover constant, `CodeMirrorHost.vue`'s lint delay), re-arms without the pause when moving between adjacent controls, hides on leave/click/key/scroll/blur, and is `pointer-events: none` so it can never intercept the press it describes. Resolves the hovered control through one document-level rAF-coalesced `pointermove` + `elementFromPoint`, deliberately *not* per-element `mouseenter`, because Blink dispatches no pointer events on a disabled control and a dozen of these hints exist only to explain a disabled state. Accessibility is two mechanical rules inside the directive: mirror the hint into `aria-label` where the control has no accessible name (only 18 `aria-label`s exist against 123 `title`s today), and wire `aria-describedby` while shown, with `focusin` opening it for keyboard users. See `docs/plans/P22-app-owned-tooltips.md`, §8.17 | Implemented exactly per the plan: all 123 real `title`/`:title` sites across 34 files converted (the 6 remaining `title=` in the tree are unrelated component props — `DialogFrame`'s and `SavedListMenu`'s own `title` prop, never a directive target), `main.ts` registers `v-tooltip` globally, `App.vue` installs and tears down the one document-level listener set. Seven existing UI-test assertions that read `title` as a data channel were retargeted to `data-kira-tip`, and `tests/ui/tooltips.spec.ts` covers the open-delay timing, a disabled control's hint (the case a naive `mouseenter` implementation would miss), a hint on a control inside an already-open popover, and both the `pointer-events: none` and `aria-describedby`/auto-`aria-label` guarantees |
 | **P23 Kafka tree reshape + stream-engine definitions** | A Kafka topic stops expanding into partition rows — it becomes a leaf, the way P19 made SQL tables leaves — and the cluster's root list follows the same rule P19 set for SQL: topics show first, ungrouped, and only the auxiliary **Consumer groups** kind folders, by extending P19's renderer-only `GROUPED_KINDS` table by one row (no adapter change, no new `NodeKind`, no path segment, no IPC on expand). The partition data is relocated, not deleted: `caps.definition` flips to `true` for Kafka and SQS, and `ObjectDefinition` gains a generic `sections` list (name/value/detail rows) rendered by a new `PropertiesSection.vue` inside P19's existing definition view — a topic shows its partitions (id, leader, replicas, ISR, from metadata the tree already fetched and discarded) plus its `describeConfigs` topic configuration with sensitive values masked; a consumer group, which had no view at all, shows its state, members and committed offsets; an SQS queue shows its full `GetQueueAttributes` set. The definition view stops hard-requiring `describe()` (`Promise.allSettled`, `meta` may stay null) and gates its Open-in-console button on `caps.sql`. `children()` on a topic path is deliberately left intact — the stream view's partition multiselect is a live second consumer of it. Redis stays `definition: false` permanently (its key type/TTL/memory are already on every key/value page); S3 stays `false` as a named follow-up (a bucket's properties are five SDK calls a single-bucket IAM policy routinely denies). See `docs/plans/P23-kafka-tree-and-stream-definitions.md`, §5.1, §8.3, §8.10, §8.11 | Implemented per the plan, with its D2 open question resolved the other way after user feedback: topics stay ungrouped at the root (the literal reading of "a folder for other elements", matching P19's SQL rule exactly) rather than the plan's own initial default of foldering the whole root; SQS is in scope (D9, as the plan defaulted). `kafka/definition.ts` and `sqs/definition.ts` degrade to a `notes` line rather than failing the tab when `describeConfigs` (Kafka) is denied — verified against `tests/db/kafka.spec.ts`/`sqs.spec.ts` scenario 6 and `tests/ui/kafka.spec.ts`/`sqs.spec.ts`'s new definition-tab coverage, plus `tests/ui/definition.spec.ts` passing unchanged as D8's regression guard that Postgres/MariaDB/Mongo definition tabs moved by nothing |
+| **P24 Search filter, cell editor fixes, expressive date picker, design cohesion** | Three user-directed topics from one sweep, per `docs/plans/P24-search-filter-celleditor-dates-design.md`: (1) the grid's search toolbar gains a filter toggle that narrows the grid to only the matched rows, client-side and reversible, with its own "no matching rows" empty state; (2) a set of cell-editor bugs (a stale disabled-reset tooltip, no keyboard way to abandon an edit, a truncated value silently stageable as a full-value write, `statusLine` disagreeing with the buffer while typing) plus moving timestamp formats out of the native `datetime-local` picker into a **translate pane** on the same footing as the hex/base64 decoded-text pane — an editable field and an app-owned calendar picker (local/UTC toggle, month grid, time controls, a "now" shortcut), synced with the raw value in both directions in real time and re-encoding into the value's exact original shape; (3) a design-cohesion sweep fixing sixteen findings (F1–F16) — one icon size, one type scale, `SegmentedControl`/definition-section primitives replacing five sets of hand-rolled duplicates, `.is-invalid` states that were dead CSS, a `formatBytes` used from four different places instead of three divergent ones, and the grid's view header finally carrying the same kind/count/read-write/PK facts every sibling view already shows | Implemented per the plan, all twelve steps, each left `bun run lint`/`typecheck`/`build` green. `tests/ui/data-view.spec.ts` and `cell-editor.spec.ts` gained the new scenarios the plan's §5 names, but — like every other testcontainers-backed spec — could not be executed in the sandbox this phase was implemented in (Docker image pulls blocked by that environment's network policy, see `AGENTS.md`); they need a real run in CI or the macOS/Colima environment before this phase's `tests/db/`-adjacent coverage is considered verified. The four non-container specs (`smoke`, `startup`, `workbench`, `connections`) were run and pass |
 
 ---
 
@@ -703,10 +714,14 @@ src/
       grid/ documents/ keyvalue/ stream/ definition/ celleditor/ console/
                     -- each owns its own state module; a new page kind is one new folder here
                        plus one Page variant in shared/protocol, not a change to existing views
+                    celleditor/ also has timestamp.ts (shape-preserving parse/encode),
+                    DateTimePicker.vue and TimestampPane.vue — the translate pane (P24, §8.6)
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
     theme/          tokens, codicons
+    format.ts       shared number/byte formatting (formatBytes), used by the status bar,
+                    settings dialog and cell editor alike (P24)
   shared/
     protocol/       ipc.ts, port.ts, engine-ops.ts — wire message shapes, one file per channel group
     domain/         connection.ts, tree.ts, ops.ts, uri.ts — types + Zod schemas for domain
