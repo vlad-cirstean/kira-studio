@@ -515,7 +515,7 @@ the two diverge the mac key follows a slash. See §8.16 for the binding table it
 | Consumer group (P23) | Open definition, Copy name `Ctrl/Cmd+C`, Copy qualified name |
 | Column (definition view) | Copy name, Add to projection, Sort by |
 | Tab | Close `Ctrl/Cmd+W`, Close others, Close to the right, Close all, Duplicate tab, Copy name, Reveal in project panel |
-| Grid cell | Copy `Ctrl/Cmd+C`, Copy with header, Copy as JSON, Paste `Ctrl/Cmd+V`, Edit `Enter`, Set NULL, Filter by this value, Go to referenced row |
+| Grid cell | Copy `Ctrl/Cmd+C`, Copy with header, Copy as JSON, Paste `Ctrl/Cmd+V`, Edit `Enter`, Set NULL, Delete row `Delete`/`⌘⌫`, Filter by this value, Go to referenced row |
 | Grid row | Copy row(s) ▸ (TSV `Ctrl/Cmd+C`/CSV/JSON/INSERT), Duplicate row `Ctrl/Cmd+D`, Revert row(s) (un-stages a pending edit/delete on the row, disabled when there's nothing to revert), Delete row `Delete`/`⌘⌫` |
 | Grid header | Sort asc/desc, Clear sort, Hide column, Show all columns, Copy column name, Copy column values `Ctrl/Cmd+C` |
 | Document | Expand all, Collapse all, Copy document, Copy `_id`, Edit, Delete (P27: both copy items now copy the Mongo shell form — `ObjectId("…")`, not the raw wire JSON — so pasting *Copy `_id`* into the filter bar as `{ _id: … }` works) |

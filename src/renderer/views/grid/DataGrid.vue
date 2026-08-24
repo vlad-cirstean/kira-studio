@@ -155,11 +155,14 @@ function isForeignKeyDisplayCol(displayCol: number): boolean {
   return !!name && foreignKeyColumnNames.value.has(name);
 }
 
-// The design's `.tr.dirty .td.gutter` rail: a row with a staged edit or delete, drawn once on
-// the gutter cell rather than re-deriving it per visible column.
+// The design's `.tr.dirty .td.gutter` rail: a row with a staged edit, drawn once on the gutter
+// cell rather than re-deriving it per visible column. P31 D31: narrowed to `edits` only — a row
+// staged for deletion (isDeleted below) gets its own red rail instead, mutually exclusive with
+// this one, since a row headed for deletion will not have its edits applied and painting it
+// "edited" yellow described an outcome that would never happen.
 function isDirtyRow(row: number): boolean {
   const p = pendingFor(props.tabId);
-  return !!p && (p.edits.has(row) || p.deletes.has(row));
+  return !!p && p.edits.has(row);
 }
 const isWritable = computed(() => {
   const t = tab();
@@ -1121,9 +1124,7 @@ function onKeydown(e: KeyboardEvent): void {
 
   // P21 D5: dispatched through rowMenu() itself (the same builder onGutterContextMenu calls) so
   // the printed shortcut and the executed action can't drift, and `disabled: !canEdit` is honoured
-  // for free — inert on a read-only table without restating that guard here. Only a row selection
-  // has a rowMenu to dispatch into; a cell/range selection leaves Delete/Cmd+D inert by falling
-  // through (the switch below has no case for either key).
+  // for free — inert on a read-only table without restating that guard here.
   const rowShortcut = shortcutFor(e, ['grid.duplicateRows', 'grid.deleteRows']);
   if (rowShortcut && runtimeEntry.selection?.kind === 'row') {
     const { rows } = runtimeEntry.selection;
@@ -1136,6 +1137,34 @@ function onKeydown(e: KeyboardEvent): void {
         canEdit: canEditTable.value,
       }),
       rowShortcut,
+    );
+    if (ran) e.preventDefault();
+    return;
+  }
+
+  // P31 D32/F31: Delete/Cmd+Backspace also fires from a cell or range selection, not just a row
+  // selection (which requires a gutter click) — clicking a cell is the ordinary way a row gets
+  // picked. Duplicate stays row-selection-only (D32 doesn't ask for a cell/range form of it).
+  // Still dispatched through rowMenu() for the same reasons as above.
+  const deleteShortcut = shortcutFor(e, ['grid.deleteRows']);
+  const cellOrRangeSel = runtimeEntry.selection;
+  if (deleteShortcut && (cellOrRangeSel?.kind === 'cell' || cellOrRangeSel?.kind === 'range')) {
+    const rows =
+      cellOrRangeSel.kind === 'range'
+        ? Array.from(
+            { length: Math.abs(cellOrRangeSel.row - cellOrRangeSel.anchorRow) + 1 },
+            (_, i) => Math.min(cellOrRangeSel.row, cellOrRangeSel.anchorRow) + i,
+          )
+        : [cellOrRangeSel.row];
+    const ran = runMenuShortcut(
+      rowMenu({
+        tabId: props.tabId,
+        rows,
+        qualifiedName: qualifiedName(),
+        snapshot: rowSnapshot,
+        canEdit: canEditTable.value,
+      }),
+      deleteShortcut,
     );
     if (ran) e.preventDefault();
     return;
@@ -1292,7 +1321,7 @@ defineExpose({ scrollCellIntoView });
         <div
           class="gutter-cell"
           data-testid="grid-gutter-cell"
-          :class="{ dirty: rowVm.dirty }"
+          :class="{ dirty: rowVm.dirty, deleted: rowVm.deleted }"
           :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
           @click="onGutterClick(rowVm.row, $event)"
           @contextmenu.prevent="onGutterContextMenu(rowVm.row, $event)"
@@ -1535,7 +1564,7 @@ defineExpose({ scrollCellIntoView });
   cursor: pointer;
 }
 
-/* README/FIX: a row with a staged edit or delete gets the same 2px warn rail the mockup's
+/* README/FIX: a row with a staged edit gets the same 2px warn rail the mockup's
    .tr.dirty .td.gutter::before draws — never a background tint across the whole row. */
 .gutter-cell.dirty {
   position: relative;
@@ -1549,6 +1578,23 @@ defineExpose({ scrollCellIntoView });
   bottom: 0;
   width: 2px;
   background: var(--kira-warn);
+}
+
+/* P31 D31/F30: a row staged for deletion gets its own red rail — mutually exclusive with .dirty
+   above (isDirtyRow no longer counts a delete), since a row headed for deletion will not have any
+   staged edits applied. */
+.gutter-cell.deleted {
+  position: relative;
+}
+
+.gutter-cell.deleted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-error);
 }
 
 /* A pending-insert row is not "edited" (nothing existing changed) — same 2px rail treatment,

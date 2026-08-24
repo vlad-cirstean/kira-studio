@@ -222,6 +222,20 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       run: () => stageNull(ctx.tabId, ctx.row, ctx.columnName),
     },
     {
+      // P31 D33/F32: singular "row" (not rowMenu's "row(s)") — a cell selection is one row by
+      // construction, so the plural label rowMenu correctly uses for its own multi-row case would
+      // be a lie here. Same shortcut/danger/disabled as rowMenu's own Delete row(s) so the printed
+      // key and DataGrid.vue's D32 keyboard handler can't drift apart.
+      type: 'item',
+      id: 'delete-row',
+      label: 'Delete row',
+      icon: 'trash',
+      danger: true,
+      disabled: !ctx.canEdit,
+      shortcut: 'grid.deleteRows',
+      run: () => toggleDelete(ctx.tabId, [ctx.row]),
+    },
+    {
       type: 'item',
       id: 'filter-by-value',
       label: 'Filter by this value',
