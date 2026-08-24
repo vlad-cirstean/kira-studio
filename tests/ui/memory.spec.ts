@@ -328,7 +328,7 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
   const minTotal = Math.min(...series.map((s) => s.totalBytes));
   expect(minTotal).toBeLessThan(350 * 1024 * 1024);
 
-  // --- record L2 hit rate / usage for docs/PERF.md (logged, not asserted here) -------------------
+  // --- record L2 hit rate / usage for docs/v1/PERF.md (logged, not asserted here) -------------------
   await page.click('[data-testid="open-settings"]');
   await page.click('[data-testid="settings-section-Cache"]');
   const usageValue = (

@@ -73,7 +73,7 @@ async function menuItemIds(page: Page): Promise<string[]> {
     .locator(':scope > div')
     .evaluateAll((els) =>
       els.map((el) =>
-        el.classList.contains('separator')
+        el.classList.contains('p-sep')
           ? '--separator--'
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),

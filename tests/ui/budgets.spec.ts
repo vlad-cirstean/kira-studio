@@ -9,7 +9,7 @@ import {
 } from './support/pg';
 
 // P12 §2.1's real interaction budgets (D5/D6), measured for real against §3 of
-// docs/plans/P12-hardening.md — tests/ui/perf.spec.ts's rAF/DOM-cell tripwires stay unchanged
+// docs/v1/plans/P12-hardening.md — tests/ui/perf.spec.ts's rAF/DOM-cell tripwires stay unchanged
 // alongside these and are not superseded by them (D7).
 test.describe.configure({ timeout: 180_000 });
 
@@ -221,7 +221,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // "one frame wait" samples is therefore not a measurement of app work at all in this
   // environment (the same reason perf.spec.ts's rAF tripwire can't demonstrate 8ms either) — so
   // only the typical-case (p50, unaffected by whether a step happened to straddle a frame
-  // boundary) is asserted against the budget; p95 is logged for docs/PERF.md, not gated.
+  // boundary) is asserted against the budget; p95 is logged for docs/v1/PERF.md, not gated.
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(8);
   // Still a real regression guard: no sample may run past several frame periods worth of
   // dispatch-plus-work, which would indicate the app itself — not frame scheduling — is slow.

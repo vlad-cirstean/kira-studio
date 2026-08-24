@@ -238,13 +238,20 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   const constraintsSection = definitionView.locator('[data-testid="definition-constraints"]');
   await expect(constraintsSection).toBeVisible();
   // order_items has a PK, two FKs (order_id, product_id) and a CHECK on quantity (D11).
-  await expect(constraintsSection).toContainText('primary key');
-  await expect(constraintsSection).toContainText('foreign key');
+  // P19's badge redesign (1e6b6b0) gave primaryKey/foreignKey rows a PK/FK letter badge instead
+  // of the plain text label — only check/unique/exclusion still render a lowercase text badge.
+  await expect(constraintsSection).toContainText('PK');
+  await expect(constraintsSection).toContainText('FK');
   await expect(constraintsSection).toContainText('check');
 
   // D9: the tree's former column-row context menu, relocated — Copy name / Add to projection /
   // Sort by, addressed by the table's own tab path directly.
   const idColumnRow = columnsSection.locator('tr', { has: page.getByText('id', { exact: true }) });
+  // Same race openRowMenu() guards against, but here against the Structure body's own scroll
+  // container: settle any pending scrollIntoView first, so the right-click's own actionability
+  // scroll can't deliver its 'scroll' event late, right after the menu opens.
+  await idColumnRow.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
   await idColumnRow.click({ button: 'right' });
   const contextMenu = page.locator('[data-testid="context-menu"]');
   await expect(contextMenu).toBeVisible();
@@ -264,6 +271,13 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(definitionView).toBeVisible();
 
   // --- scenario 3: menu coverage ------------------------------------------------------------
+  // P19 groups views/matviews/sequences/functions into folders, collapsed by default — expand
+  // each so the rows below are actually in the tree.
+  await expandRow(page, VIEWS_FOLDER_PATH);
+  await expandRow(page, MATVIEWS_FOLDER_PATH);
+  await expandRow(page, SEQUENCES_FOLDER_PATH);
+  await expandRow(page, FUNCTIONS_FOLDER_PATH);
+
   await openRowMenu(page, ORDER_ITEMS_PATH);
   await expect(page.locator('[data-testid="menu-item-open-definition"]')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -426,7 +440,7 @@ test('Definition tab — tree grouping: folders collapsed by default, zero-IPC e
   // Tables render first, ungrouped, ahead of any folder.
   const wideTableRow = await findRow(page, WIDE_TABLE_PATH);
   await expect(wideTableRow).toBeVisible();
-  await expect(wideTableRow.locator('.twisty')).toHaveCount(0);
+  await expect(wideTableRow.locator('.twisty')).not.toBeVisible();
 
   for (const path of [
     VIEWS_FOLDER_PATH,

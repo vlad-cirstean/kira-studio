@@ -158,6 +158,14 @@ onUnmounted(() => {
   view = null;
 });
 
+// A caller-driven refocus point: e.g. the query console's saved-queries popover unmounts its
+// focused list entry on close (P18 addendum), which browsers resolve by dropping focus to
+// <body> rather than back to the editor — there's nothing else in this component tree that
+// would naturally reclaim it.
+defineExpose({
+  focus: () => view?.focus(),
+});
+
 watch(
   () => props.doc,
   (doc) => {

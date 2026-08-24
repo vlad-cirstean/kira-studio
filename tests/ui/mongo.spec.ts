@@ -30,7 +30,6 @@ test.afterAll(async () => {
 const WIDGET_COUNT = 25;
 const DB_PATH = 'database:kira_test';
 const WIDGETS_PATH = `${DB_PATH}/collection:widgets`;
-const WIDGETS_ID_INDEX_PATH = `${WIDGETS_PATH}/index:_id_`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
@@ -120,15 +119,17 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
     timeout: 10_000,
   });
 
-  // --- tree: database -> collection -> indexes, no schema level in between ------------------
+  // --- tree: database -> collection, no schema level in between -----------------------------
+  // Collections are tree leaves — no twisty, no per-index children (their indexes moved into the
+  // definition view's Indexes section; the 'index' NodeKind and its tree leaves are gone, matching
+  // SQL tables, P19 D5/its own resolved open question 2).
   await expandRow(page, '');
   const dbRow = await expandRow(page, DB_PATH);
   await expect(dbRow).toHaveAttribute('data-kind', 'database');
-  const widgetsRow = await expandRow(page, WIDGETS_PATH);
+  const widgetsRow = await findRow(page, WIDGETS_PATH);
+  await expect(widgetsRow).toBeVisible();
   await expect(widgetsRow).toHaveAttribute('data-kind', 'collection');
-  const idIndexRow = await findRow(page, WIDGETS_ID_INDEX_PATH);
-  await expect(idIndexRow).toBeVisible();
-  await expect(idIndexRow).toHaveAttribute('data-kind', 'index');
+  await expect(widgetsRow.locator('.twisty')).not.toBeVisible();
 
   await page.screenshot({ path: 'test-results/screenshots/mongo.png' });
 
@@ -136,13 +137,20 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await (await findRow(page, WIDGETS_PATH)).dblclick();
   const view = page.locator('[data-testid="document-view"]');
   await expect(view).toBeVisible();
-  await expect(view.locator('[data-testid="document-target"]')).toHaveText('widgets');
+  // DocumentView.vue passes a `path` breadcrumb prefix (connection / database /) alongside the
+  // name into ViewHeader's shared `target-testid` span (same convention as KeyValueView.vue,
+  // whose own target assertions in s3.spec.ts use toContainText for the same reason) — the full
+  // text includes that prefix, not just the collection name.
+  await expect(view.locator('[data-testid="document-target"]')).toContainText('widgets');
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT, {
     timeout: 15_000,
   });
 
   await page.click('[data-testid="document-count"]');
-  await expect(page.locator('[data-testid="document-status"]')).toContainText('25 total', {
+  // P16 removed the standalone status-line text (data-testid="document-status") — the exact
+  // count now only surfaces indirectly, via pageCount driving the pager's "of N pages" label
+  // (default page size 100 > 25 docs, so exactly one page) once the count resolves.
+  await expect(page.locator('[data-testid="document-pager"]')).toContainText('of 1', {
     timeout: 15_000,
   });
 

@@ -3,7 +3,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
@@ -85,6 +85,18 @@ const lintSource = computed(() => consoleLintSource(connectionKind.value));
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
+// Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
+// doesn't read as a type-only use of the CodeMirrorHost import — same convention as
+// ConsoleSavedMenu.vue's promptInput/SearchToolbar.vue's own template ref.
+const editorHost = ref<{ focus: () => void } | null>(null);
+// The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
+// closes right after loading), and nothing else in the tree reclaims focus — without this the
+// editor is left unfocused (DOM focus falls to <body>) right after a saved query loads, even
+// though the whole point of loading one is to keep working in the editor.
+function onSavedMenuClose(): void {
+  savedMenuOpen.value = false;
+  void nextTick(() => editorHost.value?.focus());
+}
 
 // P18 addendum D20: the editor's own doc is a shallowRef, not `tab.state.text` directly — binding
 // the template to the tab's reactive text made this view's whole render effect (toolbar, strips,
@@ -208,7 +220,7 @@ const statusLine = computed(() => {
                ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
                of the window instead of under "Saved queries" (task #58). Wrapping it here next to
                its button, the same shape every other toolbar menu already uses, fixes that. -->
-          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="savedMenuOpen = false" />
+          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
         </div>
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
@@ -223,6 +235,7 @@ const statusLine = computed(() => {
 
       <div class="editor-body">
         <CodeMirrorHost
+          ref="editorHost"
           :doc="localDoc"
           :language="language"
           :sql-dialect="dialect"

@@ -140,7 +140,7 @@ async function menuItemIds(page: Page): Promise<string[]> {
     .locator(':scope > div')
     .evaluateAll((els) =>
       els.map((el) =>
-        el.classList.contains('separator')
+        el.classList.contains('p-sep')
           ? '--separator--'
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),
@@ -213,7 +213,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // pre-upgrade cache entry might still say. Columns moved into the definition view.
   const wideTableRow = await findRow(page, WIDE_TABLE_PATH);
   await expect(wideTableRow).toHaveAttribute('data-kind', 'table');
-  await expect(wideTableRow.locator('.twisty')).toHaveCount(0);
+  await expect(wideTableRow.locator('.twisty')).not.toBeVisible();
 
   const wideTableChildren = await page.evaluate(
     ({ id, path }) => window.kira.treeChildren({ connectionId: id, path }),
@@ -302,19 +302,19 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // D9: "Set as default" is unchecked until chosen, then stays checked on this row and clears
   // on the previously-default one — Postgres-only (§8.9), same connection this spec already has.
   await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
   ).toHaveCount(0);
   await page.click('[data-testid="menu-item-set-as-default"]');
 
   await openRowMenu(page, DB_PATH);
   await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
   ).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, APP_PATH);
   await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .check .codicon-check'),
+    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -360,43 +360,42 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.keyboard.press('Escape');
   await expandRow(page, ''); // restore — later steps expect the tree still expanded
 
-  // --- disconnect: cached nodes still render, uncached nodes show an inline affordance ----
+  // --- disconnect: cached nodes still render; expanding any node (cached or not) reconnects
+  // first rather than surfacing a disconnected error — the twisty is the primary way users
+  // browse, so it shouldn't require a separate explicit "Connect" click first (P16 §8,
+  // state/tree.ts's expand()). ---------------------------------------------------------------
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-disconnect"]');
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
-  // app is cached (L1 survives disconnect) — collapse/re-expand still works. Tables/collections
-  // no longer have their own expand cycle to exercise here (P19 D5); a schema is the closest
-  // still-lazy level.
+  // app is cached (L1 survives disconnect) — collapse/re-expand reconnects first (silently),
+  // then still renders from cache with no error. Tables/collections no longer have their own
+  // expand cycle to exercise here (P19 D5); a schema is the closest still-lazy level.
+  const opsBeforeReconnect = await getOps(page);
   await (await findRow(page, APP_PATH)).locator('.twisty').click();
   const appRowAgain = await expandRow(page, APP_PATH);
-  await expect(appRowAgain.locator('.row-error')).toHaveCount(0);
-
-  // analytics was never expanded — no cache entry, and the connection is down: an inline
-  // error, not a native/error-dialog affordance.
-  const analyticsRow = await findRow(page, ANALYTICS_PATH);
-  await analyticsRow.locator('.twisty').click();
-  await expect(analyticsRow.locator('.row-error')).toContainText(/not connected/i, {
-    timeout: 10_000,
-  });
-
-  // --- reconnect: D11 — cache invalidated, every expanded path re-fetched -----------------
-  const opsBeforeReconnect = await getOps(page);
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
+  await expect(appRowAgain.locator('[data-testid="error-popover-trigger"]')).toHaveCount(0);
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
 
-  await expect(analyticsRow.locator('.row-error')).toHaveCount(0, { timeout: 10_000 });
-
-  // Currently-expanded *real* paths for this connection: '', database, app schema, analytics
-  // schema — 4 — plus the connect op itself. The Sequences folder is also still "expanded" but
-  // is a synthetic '#'-path with no adapter path of its own, so it is skipped, not re-fetched
-  // (project/state/tree.ts's refreshExpanded()) — its members already reload with its parent.
+  // D11: reconnecting invalidates the cache and re-fetches every currently-expanded *real* path
+  // for this connection — '', database, app schema — 3 — plus the connect op itself. The
+  // Sequences folder is also still "expanded" but is a synthetic '#'-path with no adapter path
+  // of its own, so it is skipped, not re-fetched (project/state/tree.ts's refreshExpanded()) —
+  // its members already reload with its parent.
   await expect
     .poll(async () => (await getOps(page)).length, { timeout: 10_000 })
-    .toBe(opsBeforeReconnect.length + 1 + 4);
+    .toBe(opsBeforeReconnect.length + 1 + 3);
+
+  // analytics was never expanded — no cache entry — but the connection is already back up (the
+  // app-row expand above reconnected it), so this is a normal fresh fetch with real children,
+  // not an error.
+  const analyticsRow = await findRow(page, ANALYTICS_PATH);
+  await analyticsRow.locator('.twisty').click();
+  await expect(analyticsRow.locator('[data-testid="error-popover-trigger"]')).toHaveCount(0, {
+    timeout: 10_000,
+  });
 
   // --- search: cached-only, matches + ancestors, incomplete note --------------------------
   await page.fill('[data-testid="tree-search"]', 'order');

@@ -25,6 +25,12 @@ test.afterAll(async () => {
   await pg?.stop();
 });
 
+// CodeMirror's defaultKeymap binds selectAll to "Mod-a", which resolves to Cmd on macOS and Ctrl
+// elsewhere — a literal 'Control+A' silently no-ops on macOS (the keystroke just doesn't match
+// any binding), leaving the prior selection/cursor alone so typed text inserts instead of
+// replacing.
+const SELECT_ALL = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+
 const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
 const FORMATS_PATH = `${APP_PATH}/table:formats`;
@@ -100,23 +106,46 @@ async function selectCell(page: Page, row: number, column: string): Promise<void
 async function scrollColumnIntoView(page: Page, column: string): Promise<void> {
   const grid = page.locator('[data-testid="data-grid"]');
   const target = page.locator(`[data-testid="grid-header-cell"][data-column="${column}"]`);
-  if ((await target.count()) > 0) return;
-  await grid.evaluate((el) => {
-    el.scrollLeft = 0;
-  });
-  // Setting scrollLeft programmatically dispatches the 'scroll' event asynchronously — without
-  // this wait, the loop's first check below races ahead of Vue's re-render and wrongly concludes
-  // the reset didn't bring the target into view, so it scrolls right and never returns to 0.
-  await page.waitForTimeout(50);
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return;
-    const atEnd = await grid.evaluate((el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
-    if (atEnd) break;
+  if ((await target.count()) === 0) {
     await grid.evaluate((el) => {
-      el.scrollLeft += Math.max(200, el.clientWidth);
+      el.scrollLeft = 0;
     });
-    await page.waitForTimeout(30);
+    // Setting scrollLeft programmatically dispatches the 'scroll' event asynchronously — without
+    // this wait, the loop's first check below races ahead of Vue's re-render and wrongly
+    // concludes the reset didn't bring the target into view, so it scrolls right and never
+    // returns to 0.
+    await page.waitForTimeout(50);
+    for (let i = 0; i < 80; i++) {
+      if ((await target.count()) > 0) break;
+      const atEnd = await grid.evaluate(
+        (el) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1,
+      );
+      if (atEnd) break;
+      await grid.evaluate((el) => {
+        el.scrollLeft += Math.max(200, el.clientWidth);
+      });
+      // A wide (60-column) table's virtualized header recompute is heavier than the tree's row
+      // virtualization — 30ms wasn't consistently enough for it to land before the next check,
+      // so a full-viewport-wide step could overshoot straight past a single-column target.
+      await page.waitForTimeout(100);
+    }
+    // The stepped loop above can land just short of the true scrollable end if a layout change
+    // (e.g. the cell-editor panel opening, which narrows the grid) transiently shrinks
+    // clientWidth/scrollWidth mid-scroll, making `atEnd` trigger early against a now-stale,
+    // smaller pair — jump straight to the real (post-settle) max as a fallback so a target column
+    // near the far right isn't left just out of view.
+    if ((await target.count()) === 0) {
+      await grid.evaluate((el) => {
+        el.scrollLeft = el.scrollWidth;
+      });
+      await page.waitForTimeout(150);
+    }
   }
+  // Column virtualization (visibleColumnIndices) recomputes asynchronously after the scroll
+  // event settles — without this wait, a cell in the freshly-visible column can be located and
+  // then detached/re-keyed mid-click as the recompute finishes ("element was detached from the
+  // DOM, retrying").
+  await page.waitForTimeout(150);
 }
 
 async function editorText(page: Page): Promise<string> {
@@ -432,7 +461,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   const beforeType = await editorText(page);
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
-  await page.keyboard.press('Control+A');
+  await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited from the cell editor"');
   expect(await editorText(page)).not.toBe(beforeType);
 
@@ -458,7 +487,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   // the pending edit must be gone, not just the on-screen text.
   const originalSample = await cellText(page, 0, 'sample');
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
-  await page.keyboard.press('Control+A');
+  await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited then reverted"');
   await page.click('[data-testid="cell-editor-beautify-reset"]');
   expect(await editorText(page)).toBe(originalSample);
@@ -470,7 +499,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   // Ctrl+Enter stages immediately, without needing to blur.
   await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
-  await page.keyboard.press('Control+A');
+  await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited via ctrl-enter"');
   await page.keyboard.press('Control+Enter');
   await expect(
@@ -614,13 +643,18 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
   await expect(panel).toHaveAttribute('data-detected', 'epochSeconds');
   const picker = page.locator('[data-testid="cell-editor-timestamp-picker"]');
   await expect(picker).toBeVisible();
-  await picker.fill('2030-06-15T12:30:00');
+  // Chromium's datetime-local value setter silently trims a trailing ":00" seconds component
+  // (confirmed via direct evaluate() against a bare <input>, independent of this app/Vue) — a
+  // value with exactly zero seconds round-trips as one without, and Playwright's fill() then sees
+  // input.value !== the string it set and throws "Malformed value". Use a non-zero seconds
+  // component so the assigned value survives verbatim.
+  await picker.fill('2030-06-15T12:30:15');
   await expect(encoded).toHaveText(/^\d+$/);
   const pickedEpoch = Number(await encoded.innerText());
   // Round-trips through the reading row (local/UTC), not just a raw number — proves the picker
   // and describeTimestamp agree on the same moment.
   await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('2030');
-  expect(Math.abs(pickedEpoch - Date.UTC(2030, 5, 15, 12, 30, 0) / 1000)).toBeLessThan(24 * 3600);
+  expect(Math.abs(pickedEpoch - Date.UTC(2030, 5, 15, 12, 30, 15) / 1000)).toBeLessThan(24 * 3600);
   await expect(
     page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
   ).toHaveClass(/pending-edit/);
@@ -639,7 +673,7 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
   await expect(decoded).toContainText('Hello, World!');
 
   await decoded.click();
-  await page.keyboard.press('Control+A');
+  await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('Goodbye!');
   await expect(encoded).toHaveText(btoa('Goodbye!'));
   // Blurring stages the re-encoded value, not the plaintext — the grid must show base64.

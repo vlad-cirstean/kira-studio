@@ -703,7 +703,16 @@ function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
 // tree's former column rows required.
 function targetTabForTable(connectionId: string, tablePath: string): string {
   const active = activeTab.value;
-  if (active && active.connectionId === connectionId && active.path === tablePath) {
+  // D9: this menu lives only in the Definition view's Columns section, so `active` here is
+  // always that table's *definition* tab, never its data tab — matching on connectionId/path
+  // alone would reuse the definition tab itself and silently no-op the projection/sort patch
+  // (patchDataTabState only writes to a 'data'-kind record).
+  if (
+    active &&
+    active.kind === 'data' &&
+    active.connectionId === connectionId &&
+    active.path === tablePath
+  ) {
     return active.id;
   }
   return openDataTab(connectionId, tablePath).id;

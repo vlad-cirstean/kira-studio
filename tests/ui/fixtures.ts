@@ -50,6 +50,15 @@ export const test = base.extend<KiraFixtures>({
         if (msg.type() === 'error') consoleErrors.push(msg.text());
       });
       await window.waitForSelector('[data-testid="status-bar"]');
+      // A fresh profile has no persisted window bounds, so Electron falls back to its own
+      // built-in default (800x600) — which happens to equal this app's declared minimum
+      // (window.ts's minWidth/minHeight). At that size, opening the cell editor panel (default
+      // height 180px) can squeeze the grid's own viewport down to a few px, well under one row +
+      // header — not a realistic size for these interaction tests to run at. Resize to something
+      // closer to a typical user's window before any test touches the UI.
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.setSize(1440, 960);
+      });
 
       current = { app, window };
       return current;

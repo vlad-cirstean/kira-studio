@@ -148,7 +148,14 @@ async function waitForGrid(page: Page): Promise<void> {
 }
 
 async function closeAllTabs(page: Page): Promise<void> {
-  await page.click('[data-testid="tab"]', { button: 'right' });
+  // Same race openRowMenu() guards against, but against the tab strip's own scroll: the active
+  // tab auto-scrolls into view (TabStrip.vue), which can leave the first (leftmost) tab off-
+  // screen — settle any pending scroll before the right-click's own actionability scroll can
+  // deliver its 'scroll' event late, right after the menu opens.
+  const firstTab = page.locator('[data-testid="tab"]').first();
+  await firstTab.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  await firstTab.click({ button: 'right' });
   await page.click('[data-testid="menu-item-close-all"]');
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
 }
@@ -268,7 +275,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   // --- scenario 4: L3 is bounded (F19, D19) -----------------------------------------------------
   // Drive many more distinct {path, filter} combinations than D19's ~2 000-entry budget could
   // ever hold, and assert the map stops growing at the budget instead of tracking the request
-  // count — the failure this replaces was an unbounded `Map` (docs/PERF.md §4 item 1).
+  // count — the failure this replaces was an unbounded `Map` (docs/v1/PERF.md §4 item 1).
   const COMBOS = 2500;
   const CONCURRENCY = 25;
   for (let start = 0; start < COMBOS; start += CONCURRENCY) {

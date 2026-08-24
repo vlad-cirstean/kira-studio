@@ -151,6 +151,11 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
 
   // --- scenario 1: an enabled control — hidden before the delay, shown after, hides on leave ---
+  // A cold hover, not a scan: settle the pointer away from the tree first and outlast
+  // TOOLTIP_REARM_MS (state/tooltip.ts's D6), or this hover lands in the rearm window left by the
+  // dblclick above and opens immediately instead of waiting the full TOOLTIP_DELAY_MS.
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(350);
   const refreshButton = page.locator('[data-testid="toolbar-refresh"]');
   await refreshButton.hover();
   await page.waitForTimeout(150);

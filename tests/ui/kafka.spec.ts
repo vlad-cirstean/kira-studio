@@ -148,8 +148,8 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   await expect(groupRow).toHaveAttribute('data-kind', 'consumerGroup');
   expect(await getOps(page)).toHaveLength(opsBeforeFolderExpand.length);
 
-  // --- P23 D3: a topic no longer expands — its twisty is gone, no partition rows exist ----------
-  await expect(ordersTopicRow.locator('.twisty')).toHaveCount(0);
+  // --- P23 D3: a topic no longer expands — its twisty is hidden, no partition rows exist --------
+  await expect(ordersTopicRow.locator('.twisty')).not.toBeVisible();
   const partitionRows = page.locator(
     `[data-testid="tree-row"][data-path^="${ORDERS_TOPIC_PATH}/partition:"]`,
   );

@@ -17,7 +17,7 @@ documents the procedure to run and what to fill in.
 
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
-| Grid scroll frame ≤ 8 ms | scroll-event `timeStamp` → DOM committed, **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted** |
+| Grid scroll frame ≤ 8 ms | scroll-event `timeStamp` → DOM committed, **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — currently failing on macOS; see §2.1** |
 | — (secondary) | rAF interval p95 < 24 ms, DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
 | Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
@@ -66,6 +66,23 @@ tripwire can't demonstrate 8 ms either). `budgets.spec.ts` therefore asserts on 
 by whether a step straddled a frame boundary) and keeps a looser `max ≤ 50 ms` sanity bound instead
 of gating on p95; the p95 number above is logged, not gated. This should be re-checked against a
 real macOS display before relying on p95 anywhere in this environment's history.
+
+**macOS re-run (2026-08-24), scroll response — fails, not yet resolved.** On this environment
+(the actual macOS Colima-based dev machine, not the Linux/Xvfb container the baseline above was
+captured on) `tests/ui/budgets.spec.ts` alone measures scroll response p50=16.5 ms, p95=17.4 ms —
+failing the `≤ 8 ms` p50 gate (`Expected: <= 8, Received: 16.5`), reproducible across repeated
+isolated runs. 16.5 ms is within noise of one full frame period at 60 Hz (16.67 ms), and every
+other budget in the same run (cell→editor, cached tab switch, cached tree expand, all p95-gated at
+≤ 50 ms) passes comfortably with no comparable elevation — consistent with the same
+frame-scheduling artifact already diagnosed above (a `scrollTop` write's rendering isn't visible
+to a `MutationObserver` until the next "update the rendering" step), just saturating **all** 20
+samples on this machine's compositor instead of "roughly half" as on the Xvfb container, rather
+than a 3× app-work regression appearing in only one of four interaction budgets. Per the same
+reasoning D21 applies to §2.2's memory budget: this is reported here for a human decision (is
+16.5 ms an acceptable macOS number for this metric, does the assertion need a per-environment
+budget, or does the measurement itself need to change to isolate app work from compositor cadence)
+— the assertion in `tests/ui/budgets.spec.ts` is left unmodified and currently fails in this
+environment.
 
 ### 2.2 Memory budget — `tests/ui/memory.spec.ts`
 

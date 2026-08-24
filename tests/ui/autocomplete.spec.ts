@@ -338,7 +338,10 @@ test('autocomplete — Mongo console completes collections, methods and operator
   await page.keyboard.type('db.');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('widgets');
-  await page.keyboard.press('Tab');
+  // Collections sort alphabetically when unfiltered (empty_collection, validated_widgets,
+  // widgets), so Tab would accept whichever ranks first, not necessarily "widgets" — click the
+  // exact option instead of relying on ranking order.
+  await tooltip.getByText('widgets', { exact: true }).click();
   await expect(mongoConsole.locator('.cm-content')).toContainText('db.widgets');
 
   // Position 2: after `db.<collection>.`, the ten supported methods.
@@ -346,7 +349,9 @@ test('autocomplete — Mongo console completes collections, methods and operator
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('find');
   await expect(tooltip).toContainText('aggregate');
-  await page.keyboard.press('Tab');
+  // Methods sort alphabetically when unfiltered (aggregate first) — click the exact option
+  // instead of relying on Tab picking whichever ranks first.
+  await tooltip.getByText('find', { exact: true }).click();
   await expect(mongoConsole.locator('.cm-content')).toContainText('db.widgets.find');
 
   // Position 3: a `$`-prefixed token, the query-operator vocabulary — and no SQL keyword
@@ -523,9 +528,11 @@ test('console lint — Redis diagnostics (D24)', async ({ kira, consoleErrors })
   await multilineConsole.locator('.cm-content').click();
 
   // F10's known splitter bug (out of scope to fix here): a statement spanning more than one
-  // non-empty line warns instead of silently mis-executing.
+  // non-empty line warns instead of silently mis-executing. It's a single diagnostic (one issue,
+  // `from`→`to` spanning both lines) — CodeMirror can't render one inline mark decoration across
+  // a line break, so it splits it into one `.cm-lintRange-warning` span per line, not one total.
   await page.keyboard.type('GET a\nGET b');
-  await expect(multilineConsole.locator('.cm-lintRange-warning')).toHaveCount(1, {
+  await expect(multilineConsole.locator('.cm-lintRange-warning')).toHaveCount(2, {
     timeout: 5_000,
   });
 

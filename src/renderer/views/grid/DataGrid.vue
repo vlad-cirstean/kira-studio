@@ -1042,11 +1042,15 @@ defineExpose({ scrollCellIntoView });
         :class="{ 'pending-delete': isDeleted(r) }"
         :style="{ top: `${rowHeight + r * rowHeight}px`, height: `${rowHeight}px` }"
       >
+        <!-- scroll-margin-top = rowHeight on gutter/grid cells below: `.header-row` is
+             position: sticky, which a native scrollIntoView(IfNeeded) call doesn't otherwise know
+             to leave room for — without it, scrolling row 0's cell "into view" can land it flush
+             against the container's top, right underneath the sticky header. -->
         <div
           class="gutter-cell"
           data-testid="grid-gutter-cell"
           :class="{ dirty: isDirtyRow(r) }"
-          :style="{ width: `${GUTTER_WIDTH}px` }"
+          :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
           @click="onGutterClick(r, $event)"
           @contextmenu.prevent="onGutterContextMenu(r, $event)"
         >
@@ -1071,7 +1075,11 @@ defineExpose({ scrollCellIntoView });
               hasNav: !!cellNavEntry(r, c),
             })
           "
-          :style="{ left: `${GUTTER_WIDTH + offsets[c]}px`, width: `${offsets[c + 1] - offsets[c]}px` }"
+          :style="{
+            left: `${GUTTER_WIDTH + offsets[c]}px`,
+            width: `${offsets[c + 1] - offsets[c]}px`,
+            scrollMarginTop: `${rowHeight}px`,
+          }"
           @click="onCellClick(r, c, $event)"
           @dblclick="onCellDblClick(r, c)"
           @contextmenu.prevent="onCellContextMenu(r, c, $event)"

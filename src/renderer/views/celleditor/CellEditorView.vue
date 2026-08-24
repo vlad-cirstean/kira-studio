@@ -153,6 +153,10 @@ const uuidGenerateTitle = computed<string>(() =>
 function generateUuid(): void {
   if (!canGenerateUuid.value) return;
   doc.value = crypto.randomUUID();
+  // The button sits outside `.editor-body`, so no focusout ever reaches onEditorBlur — this is a
+  // one-shot action like Ctrl+Enter, not a keystroke mid-edit, so it stages immediately rather
+  // than waiting on a blur that will never come.
+  saveEdit();
 }
 
 // Timestamp datetime-local picker: reads/writes the live buffer (doc), not the stored value, so
@@ -175,7 +179,11 @@ function onTimestampPick(e: Event): void {
   const d = fromDatetimeLocalValue(value);
   if (!d) return;
   const encoded = encodeTimestamp(effectiveFormat.value, d);
-  if (encoded !== null) doc.value = encoded;
+  if (encoded === null) return;
+  doc.value = encoded;
+  // Same reasoning as generateUuid: the picker sits outside `.editor-body`, so no focusout ever
+  // reaches onEditorBlur — stage immediately rather than waiting on a blur that will never come.
+  saveEdit();
 }
 
 // Hex/base64 decoded-text pane: a second, editable view of the same bytes as plaintext. `null`

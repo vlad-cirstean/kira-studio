@@ -276,10 +276,13 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await expect(page.locator('.sort-chevron')).toHaveCount(0);
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1'); // default order is still PK-ascending
 
+  // A free-text ORDER BY that names a real column is reflected back in that header's chevron —
+  // a display-only, best-effort parse (DataGrid.vue's parseTextSortTerms) that never touches the
+  // text/structured sort-kind split pagination depends on (queries.ts D6/D7).
   await page.fill('[data-testid="filter-orderby-input"]', 'id ASC');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1');
-  await expect(page.locator('.sort-chevron')).toHaveCount(0);
+  await expect(page.locator('.sort-chevron')).toHaveCount(1);
   await page.fill('[data-testid="filter-orderby-input"]', '');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
 
@@ -394,8 +397,17 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   // --- saved filter persistence: relaunch closes this window, so it runs last ------------
   const { window: reopened } = await relaunch();
   await expandRow(reopened, '');
+  // Session restore (P2) reconnects a connection that was live when the app closed — this one
+  // was connected throughout the whole test above, so by the time the menu opens it is usually
+  // already reconnecting or connected again, and 'Connect' has nothing to show; only fall back to
+  // clicking it for the (still valid) case where restore hasn't kicked off the reconnect yet.
   await openRowMenu(reopened, '');
-  await reopened.click('[data-testid="menu-item-connect"]');
+  const connectItem = reopened.locator('[data-testid="menu-item-connect"]');
+  if ((await connectItem.count()) > 0) {
+    await connectItem.click();
+  } else {
+    await reopened.keyboard.press('Escape');
+  }
   await expect(
     reopened.locator('[data-testid="tree-row"][data-kind="connection"] .status-dot'),
   ).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });

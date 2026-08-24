@@ -27,6 +27,23 @@ test.afterAll(async () => {
   await pg?.stop();
 });
 
+// shared/shortcuts.ts's cmdOrCtrl chords resolve via matchesShortcut (renderer/shortcuts/keys.ts),
+// which on mac requires metaKey and explicitly rejects ctrlKey (the "other platform" mod) — unlike
+// DataGrid.vue's own inline copy/paste checks (`e.ctrlKey || e.metaKey`), which accept either. A
+// literal 'Control+d'/'Control+c' silently no-ops on macOS for any shortcut routed through
+// shortcutFor: grid.duplicateRows, tree.copyName, tree.duplicate.
+const DUPLICATE_KEY = process.platform === 'darwin' ? 'Meta+d' : 'Control+d';
+const COPY_KEY = process.platform === 'darwin' ? 'Meta+c' : 'Control+c';
+// A literal Control+click is a different beast: on macOS, Chromium translates it at the OS level
+// into a contextmenu event instead of (or in addition to) a click, regardless of what the target's
+// own click handler checks for — unlike a keyboard chord, this isn't something app code can accept
+// either modifier for. DataGrid.vue's onGutterClick toggle-select needs a real click event to fire.
+const TOGGLE_MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
+// grid.deleteRows has a mac-specific override in shortcuts.ts (Cmd+Backspace, shown as "⌘⌫" in the
+// row menu) rather than the plain 'Delete' chord used elsewhere — a literal Delete keypress never
+// matches shortcutFor on darwin.
+const DELETE_KEY = process.platform === 'darwin' ? 'Meta+Backspace' : 'Delete';
+
 const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
 // Same target mutations.spec.ts uses and for the same reason: a genuine 2-column primary key,
@@ -84,7 +101,7 @@ async function menuItemIds(page: Page): Promise<string[]> {
     .locator(':scope > div')
     .evaluateAll((els) =>
       els.map((el) =>
-        el.classList.contains('separator')
+        el.classList.contains('p-sep')
           ? '--separator--'
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),
@@ -374,7 +391,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   expect(row2Csv.trim()).toBe('2,1,tenant 2 / entity 1');
 
   await gutterCell(page, 0).click(); // [0]
-  await gutterCell(page, 2).click({ modifiers: ['Control'] }); // toggles row 2 in -> [0,2] disjoint
+  await gutterCell(page, 2).click({ modifiers: [TOGGLE_MODIFIER] }); // toggles row 2 in -> [0,2] disjoint
   await rightClick(gutterCell(page, 0)); // inside [0,2] -> acts on both
   await openSubmenu(page, 'copy-rows');
   await page.click('[data-testid="menu-item-copy-rows-json"]');
@@ -524,7 +541,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
 
   await gutterCell(page, 1).click();
   await grid.focus();
-  await page.keyboard.press('Delete');
+  await page.keyboard.press(DELETE_KEY);
   await expect(page.locator('[data-testid="grid-row"][data-row="1"]')).toHaveClass(
     /pending-delete/,
   );
@@ -532,7 +549,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
 
   await gutterCell(page, 0).click();
   await grid.focus();
-  await page.keyboard.press('Control+d');
+  await page.keyboard.press(DUPLICATE_KEY);
   await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(1);
   await discardChanges(page);
 
@@ -564,7 +581,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   await expect(connectionRow).toHaveCount(1);
   await connectionRow.click();
   await expect(connectionRow).toHaveClass(/selected/);
-  await page.keyboard.press('Control+c');
+  await page.keyboard.press(COPY_KEY);
   expect(await clipboardText(page)).toBe('Interaction DB');
 
   await connectionRow.click();
@@ -580,7 +597,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
     .locator('[data-testid="tree-row"][data-kind="connection"]')
     .count();
   await connectionRow.click();
-  await page.keyboard.press('Control+d');
+  await page.keyboard.press(DUPLICATE_KEY);
   await expect(page.locator('[data-testid="tree-row"][data-kind="connection"]')).toHaveCount(
     connectionCountBefore + 1,
   );

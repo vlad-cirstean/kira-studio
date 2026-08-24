@@ -218,10 +218,13 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   // Establish a known count first — F21/D18's stale marking has nothing to grey otherwise.
   const countButton = page.locator('[data-testid="toolbar-count"]');
   await countButton.click();
-  await expect(countButton).not.toHaveClass(/stale/, { timeout: 10_000 });
-  // The count button is icon-only (no visible badge) — the number lives in its title tooltip.
+  // The count button is icon-only (no visible badge) — the number lives in its title tooltip;
+  // `toHaveAttribute` polls, so this also waits out runCount()'s async round-trip (a one-shot
+  // getAttribute right after click can read the pre-count fallback text).
+  await expect(countButton).toHaveAttribute('data-kira-tip', /Count all rows — Σ \d/, {
+    timeout: 10_000,
+  });
   const countBeforeCommit = await countButton.getAttribute('data-kira-tip');
-  expect(countBeforeCommit).toMatch(/Count all rows — Σ \d/);
   const opsBeforeCommit = await countOps(page);
 
   const deletedRowName = await cellText(page, 1, 'name');
@@ -235,19 +238,23 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
     .allInnerTexts();
   expect(remainingNames).not.toContain(deletedRowName);
 
-  // §7/F21/D18: a local mutation greys the count instead of blanking it — same total, `stale`
-  // class, refresh codicon — and picking that up costs no new count op (it's an L3 cache hit,
-  // §7's "keep the number, grey it, let the user decide").
-  await expect(countButton).toHaveClass(/stale/, { timeout: 10_000 });
-  await expect(countButton.locator('.codicon-refresh')).toBeVisible();
-  expect(await countButton.getAttribute('data-kira-tip')).toBe(countBeforeCommit);
+  // §7/F21/D18: a local mutation greys the count instead of blanking it — same total, a
+  // "(stale, click to refresh)" tooltip suffix (the visible signal is an inline warn-colour
+  // style now, not a class — 7641dd6a's icon-only toolbar pass dropped the .stale class and
+  // .codicon-refresh icon in favour of the tooltip text) — and picking that up costs no new
+  // count op (it's an L3 cache hit, §7's "keep the number, grey it, let the user decide").
+  await expect(countButton).toHaveAttribute('data-kira-tip', /stale, click to refresh/, {
+    timeout: 10_000,
+  });
+  expect(await countButton.getAttribute('data-kira-tip')).toBe(
+    `${countBeforeCommit} (stale, click to refresh)`,
+  );
   expect(await countOps(page)).toHaveLength(opsBeforeCommit.length);
 
   // Clicking it through produces exactly one new count op and clears the stale mark.
   await countButton.click();
   await expect.poll(async () => (await countOps(page)).length).toBe(opsBeforeCommit.length + 1);
-  await expect(countButton).not.toHaveClass(/stale/, { timeout: 10_000 });
-  await expect(countButton.locator('.codicon-refresh')).toHaveCount(0);
+  await expect(countButton).not.toHaveAttribute('data-kira-tip', /stale/, { timeout: 10_000 });
   // The delete actually shrank the table by one row — the refreshed total proves this was a
   // real recount, not just a stale-flag flip.
   expect(await countButton.getAttribute('data-kira-tip')).not.toBe(countBeforeCommit);

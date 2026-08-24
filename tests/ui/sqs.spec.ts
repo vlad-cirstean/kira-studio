@@ -139,7 +139,7 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
     timeout: 15_000,
   });
   await expect(view.locator('[data-testid="stream-visibility-timeout"]')).toContainText(
-    /visibility: \d+s/,
+    /visibility \d+s/,
   );
 
   const firstRow = view.locator('[data-testid="stream-row"]').first();

@@ -129,7 +129,7 @@ test('mariadb — connect, tree, data tab, count, filter, cancel', async ({
   // definition view (definition.spec.ts covers that in depth).
   const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
   await expect(orderItemsRow).toHaveAttribute('data-kind', 'table');
-  await expect(orderItemsRow.locator('.twisty')).toHaveCount(0);
+  await expect(orderItemsRow.locator('.twisty')).not.toBeVisible();
 
   await page.screenshot({ path: 'test-results/screenshots/mariadb.png' });
 

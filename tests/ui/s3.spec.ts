@@ -41,7 +41,10 @@ const EMPTY_BUCKET_PATH = `bucket:${EMPTY_BUCKET}`;
 const ROOT_OBJECT_PATH = `${MAIN_BUCKET_PATH}/object:${ROOT_OBJECT_KEY}`;
 const REPORTS_PREFIX_PATH = `${MAIN_BUCKET_PATH}/prefix:reports`;
 const NESTED_PREFIX_PATH = `${REPORTS_PREFIX_PATH}/prefix:2024`;
-const NESTED_OBJECT_PATH = `${NESTED_PREFIX_PATH}/object:summary.json`;
+// An object leaf's own path segment carries the full key verbatim (catalog.ts's listPrefixChildren,
+// P9 D3 precedent), not just this level's local segment — same as ROOT_OBJECT_PATH above, just
+// with a key that needs encodeURIComponent since it contains '/'.
+const NESTED_OBJECT_PATH = `${NESTED_PREFIX_PATH}/object:${encodeURIComponent(NESTED_OBJECT_KEY)}`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');

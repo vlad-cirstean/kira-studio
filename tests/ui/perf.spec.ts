@@ -81,6 +81,19 @@ async function retainedBytes(page: Page): Promise<number> {
   return page.evaluate(() => window.__kiraGridRetainedBytes?.() ?? -1);
 }
 
+// Same race openRowMenu() guards against, but against the tab strip's own scroll: the active tab
+// auto-scrolls into view (TabStrip.vue), which can leave the first (leftmost) tab off-screen —
+// settle any pending scroll before the right-click's own actionability scroll can deliver its
+// 'scroll' event late, right after the menu opens.
+async function closeAllTabs(page: Page): Promise<void> {
+  const firstTab = page.locator('[data-testid="tab"]').first();
+  await firstTab.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  await firstTab.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-close-all"]');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+}
+
 test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 budget', async ({
   kira,
 }) => {
@@ -178,9 +191,7 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 b
   expect(Math.max(...cellCounts)).toBeLessThan(1500);
 
   // --- retained bytes: closing ten tabs frees exactly what opening them retained ----------
-  await page.click('[data-testid="tab"]', { button: 'right' });
-  await page.click('[data-testid="menu-item-close-all"]');
-  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+  await closeAllTabs(page);
   const baseline = await retainedBytes(page);
 
   for (let i = 0; i < 10; i++) {
@@ -197,9 +208,7 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 b
   const afterOpen = await retainedBytes(page);
   expect(afterOpen).toBeGreaterThan(baseline);
 
-  await page.click('[data-testid="tab"]', { button: 'right' });
-  await page.click('[data-testid="menu-item-close-all"]');
-  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+  await closeAllTabs(page);
   const afterClose = await retainedBytes(page);
   expect(afterClose).toBe(baseline);
 

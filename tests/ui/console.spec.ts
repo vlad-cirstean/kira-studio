@@ -25,11 +25,19 @@ test.afterAll(async () => {
   await pg?.stop();
 });
 
+// @codemirror/commands' historyKeymap binds undo/redo to "Mod-z"/"Mod-y" (redo is "Mod-Shift-z"
+// specifically on mac, not "Mod-y") — "Mod" resolves to Cmd on macOS, Ctrl elsewhere, so a
+// literal 'Control+z'/'Control+y' silently no-ops on macOS.
+const UNDO_KEY = process.platform === 'darwin' ? 'Meta+z' : 'Control+z';
+const REDO_KEY = process.platform === 'darwin' ? 'Meta+Shift+z' : 'Control+y';
+
 const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
 const ORDER_ITEMS_PATH = `${APP_PATH}/table:order_items`;
 const INVOICE_SEQ_PATH = `${APP_PATH}/sequence:invoice_number_seq`;
 const FULL_NAME_PATH = `${APP_PATH}/function:full_name`;
+const SEQUENCES_FOLDER_PATH = `${APP_PATH}#sequence`;
+const FUNCTIONS_FOLDER_PATH = `${APP_PATH}#function`;
 
 function treeContainer(page: Page): Locator {
   return page.locator('[data-testid="tree-background"] .virtual-list');
@@ -144,12 +152,48 @@ async function clickMenuItem(
   itemLabel: string,
 ): Promise<void> {
   await app.evaluate(
-    ({ Menu }, args) => {
+    ({ Menu, BrowserWindow }, args) => {
       const menu = Menu.getApplicationMenu();
       const top = menu?.items.find((i) => i.label === args.menuLabel);
       const item = top?.submenu?.items.find((i) => i.label === args.itemLabel);
       if (!item) throw new Error(`menu item not found: ${args.menuLabel} > ${args.itemLabel}`);
-      item.click();
+      const win = BrowserWindow.getAllWindows()[0];
+      // role: 'undo'/'redo' (and cut/copy/paste/selectAll) on macOS dispatch through the native
+      // NSResponder first-responder chain rather than calling into webContents directly — real
+      // menu-bar clicks and OS undo gestures resolve that chain correctly, but a MenuItem#click()
+      // invoked programmatically here (not a real native click) does not, and silently no-ops even
+      // though the target webContents is focused (confirmed empirically: window/webContents both
+      // report focused, and CodeMirror's own history() extension already handles the resulting
+      // "historyUndo"/"historyRedo" beforeinput event correctly). webContents.undo()/.redo() were
+      // tried as a replacement, but redo() alone doesn't reapply CM6's own undone edit — Chromium's
+      // internal edit-command stack never recorded the edit in the first place (CM6's beforeinput
+      // handler calls preventDefault() before Chromium's native editing commands run), so
+      // webContents.redo() has nothing queued even though the historyUndo synthesis for undo()
+      // happened to work. Simulate the actual accelerator keypress instead — the same path already
+      // proven reliable for UNDO_KEY/REDO_KEY elsewhere in this file — so CM6's own keymap handles
+      // it directly, for both undo and redo.
+      const isMac = process.platform === 'darwin';
+      const pressAccelerator = (
+        key: string,
+        modifiers: Array<'meta' | 'control' | 'shift'>,
+      ): void => {
+        win?.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers });
+        win?.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers });
+      };
+      const roleCommand: Record<string, () => void> = {
+        undo: () => pressAccelerator('Z', [isMac ? 'meta' : 'control']),
+        redo: () => pressAccelerator(isMac ? 'Z' : 'Y', isMac ? ['meta', 'shift'] : ['control']),
+        cut: () => win?.webContents.cut(),
+        copy: () => win?.webContents.copy(),
+        paste: () => win?.webContents.paste(),
+        selectAll: () => win?.webContents.selectAll(),
+      };
+      const role = item.role as string | undefined;
+      if (role && roleCommand[role]) {
+        roleCommand[role]();
+      } else {
+        item.click(undefined, win, win?.webContents);
+      }
     },
     { menuLabel, itemLabel },
   );
@@ -162,7 +206,7 @@ test('Query console — open, run statement/all, errors, saved queries, session 
 }) => {
   test.setTimeout(300_000);
   if (!pg) throw new Error('postgres fixture did not start');
-  const { app, window: page } = kira;
+  const { window: page } = kira;
 
   const cfg = {
     host: pg.config.host,
@@ -197,6 +241,11 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await openRowMenu(page, ORDER_ITEMS_PATH);
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toBeVisible();
   await page.keyboard.press('Escape');
+
+  // P19 groups sequences/functions into folders, collapsed by default — expand each so the rows
+  // below are actually in the tree.
+  await expandRow(page, SEQUENCES_FOLDER_PATH);
+  await expandRow(page, FUNCTIONS_FOLDER_PATH);
 
   await openRowMenu(page, INVOICE_SEQ_PATH);
   await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
@@ -307,37 +356,48 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   });
 
   // --- scenario 7: undo/redo (P18 addendum D15) ---------------------------------------------
-  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
-  const consoleView5 = page.locator('[data-testid="console-view"]');
+  // relaunch() above closed the original app/window (fixtures.ts's launch() calls
+  // current.app.close() before opening the next one) — the original `page`/`app` are dead, so
+  // everything from here on must go through `relaunched`, not the stale destructured bindings.
+  const page7 = relaunched.window;
+  const app7 = relaunched.app;
+  // The fresh window's tree starts fully collapsed regardless of what the previous window had
+  // expanded (only tabs/state, not tree-expansion UI state, survives a relaunch) — re-expand down
+  // to the table before finding the row, same as the initial expand at the top of the test.
+  await expandRow(page7, '');
+  await expandRow(page7, DB_PATH);
+  await expandRow(page7, APP_PATH);
+  await openConsoleFromMenu(page7, ORDER_ITEMS_PATH);
+  const consoleView5 = page7.locator('[data-testid="console-view"]');
   const editor5 = consoleView5.locator('.cm-content');
 
   // A run of typed characters lands as one history step, not one per keystroke — a single
   // Control+Z removes the whole statement, not its last character.
-  await typeInto(consoleView5, page, 'SELECT 1;');
+  await typeInto(consoleView5, page7, 'SELECT 1;');
   await expect(editor5).toContainText('SELECT 1;');
-  await page.keyboard.press('Control+z');
+  await page7.keyboard.press(UNDO_KEY);
   await expect(editor5).toHaveText('');
-  await page.keyboard.press('Control+y');
+  await page7.keyboard.press(REDO_KEY);
   await expect(editor5).toContainText('SELECT 1;');
 
   // The Edit ▸ Undo/Redo menu items (role: 'undo'/'redo') reach the same history, and a further
   // burst of typing groups as its own separate step rather than merging with the first.
-  await typeInto(consoleView5, page, ' -- more');
+  await typeInto(consoleView5, page7, ' -- more');
   await expect(editor5).toContainText('SELECT 1; -- more');
-  await clickMenuItem(app, 'Edit', 'Undo');
+  await clickMenuItem(app7, 'Edit', 'Undo');
   await expect(editor5).toHaveText('SELECT 1;');
-  await clickMenuItem(app, 'Edit', 'Redo');
+  await clickMenuItem(app7, 'Edit', 'Redo');
   await expect(editor5).toContainText('SELECT 1; -- more');
 
   // Undoing a saved-query load restores the previous text and leaves the cursor where typing was
   // left off, not pinned at 0 in a document undo did not reset (P18 addendum acceptance
   // checklist) — typing after undo appends at the end instead of landing at the front.
-  await page.click('[data-testid="console-saved-toggle"]');
-  await page.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }).click();
+  await page7.click('[data-testid="console-saved-toggle"]');
+  await page7.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }).click();
   await expect(editor5).toContainText('SELECT 42 AS answer;');
-  await page.keyboard.press('Control+z');
+  await page7.keyboard.press(UNDO_KEY);
   await expect(editor5).toContainText('SELECT 1; -- more');
-  await page.keyboard.type('!');
+  await page7.keyboard.type('!');
   await expect(editor5).toContainText('SELECT 1; -- more!');
 
   expect(consoleErrors).toEqual([]);
