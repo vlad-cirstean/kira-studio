@@ -74,16 +74,21 @@ export async function loadSavedQueries(connectionId: string, path: string): Prom
 export const filtersDialogState = reactive({
   open: false,
   connectionId: null as string | null,
+  /** P28 D20: the row the dialog was invoked from — its ancestors pre-expanded and the row
+   *  itself scrolled into view, rather than opening with no relationship to what was clicked. */
+  focusPath: null as string | null,
 });
 
-export function openFiltersDialog(connectionId: string): void {
+export function openFiltersDialog(connectionId: string, focusPath?: string): void {
   filtersDialogState.open = true;
   filtersDialogState.connectionId = connectionId;
+  filtersDialogState.focusPath = focusPath || null;
 }
 
 export function closeFiltersDialog(): void {
   filtersDialogState.open = false;
   filtersDialogState.connectionId = null;
+  filtersDialogState.focusPath = null;
 }
 
 export function rowKey(connectionId: string, path: string): string {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -25,10 +25,24 @@ const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
 
+// D20: every ancestor segment of `path`, outermost first — mirrors state/tree.ts's own
+// revealPath() accumulation, since a dialog row and a tree row share the same path encoding.
+function ancestorsOf(path: string): Set<string> {
+  const segments = path.split('/');
+  const out = new Set<string>();
+  let acc = '';
+  for (let i = 0; i < segments.length - 1; i++) {
+    acc = acc ? `${acc}/${segments[i]}` : segments[i];
+    out.add(acc);
+  }
+  return out;
+}
+
 watch(
   () => filtersDialogState.connectionId,
-  (connectionId) => {
-    expandedPaths.value = new Set();
+  async (connectionId) => {
+    const focusPath = filtersDialogState.focusPath;
+    expandedPaths.value = focusPath ? ancestorsOf(focusPath) : new Set();
     nameFilter.value = '';
     if (!connectionId) return;
     const existing = treeState.visibility[connectionId] ?? EMPTY_VISIBILITY;
@@ -36,6 +50,11 @@ watch(
       hiddenKinds: [...existing.hiddenKinds],
       hiddenPaths: [...existing.hiddenPaths],
     };
+    if (!focusPath) return;
+    await nextTick();
+    document
+      .querySelector(`[data-testid="filter-object-row"][data-path="${CSS.escape(focusPath)}"]`)
+      ?.scrollIntoView({ block: 'center' });
   },
   { immediate: true },
 );

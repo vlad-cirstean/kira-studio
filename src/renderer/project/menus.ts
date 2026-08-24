@@ -189,7 +189,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'filters',
       label: 'Filters…',
       icon: 'filter',
-      run: () => openFiltersDialog(row.connectionId),
+      run: () => openFiltersDialog(row.connectionId, row.path),
     },
     ...consoleMenuItem(row),
     {
@@ -279,7 +279,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       id: 'filters',
       label: 'Filters…',
       icon: 'filter',
-      run: () => openFiltersDialog(row.connectionId),
+      run: () => openFiltersDialog(row.connectionId, row.path),
     },
     ...consoleMenuItem(row),
     ...setAsDefaultMenuItem(row),
