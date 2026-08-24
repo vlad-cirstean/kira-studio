@@ -12,6 +12,11 @@ export interface Completion {
   /** A codicon name (`symbol-field`, `symbol-keyword`, `symbol-operator`) — the same set
    *  `project/icons.ts` already draws from. */
   icon?: string;
+  /** How many characters from the end of `insert` (or `label`) the caret lands after acceptance —
+   *  0 (the default) means "at the very end". A BSON constructor completion (P27 D17) inserts
+   *  `ObjectId('')` with this set to 2, landing the caret between the quotes rather than after
+   *  the closing paren. */
+  caretOffsetFromEnd?: number;
 }
 
 // The run of identifier-ish characters ending at the caret: covers a bare SQL column (`stat`), a

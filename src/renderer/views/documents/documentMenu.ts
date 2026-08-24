@@ -1,5 +1,6 @@
 import type { MenuItem } from '../../workbench/state/contextMenu';
 import { deleteDocument } from './documentMutations';
+import { parseIdLabel, toShellText } from './ejson';
 import { setAllExpanded, toggleExpanded } from './state';
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
@@ -36,13 +37,18 @@ export function documentMenu(
       type: 'item',
       id: 'copy-document',
       label: 'Copy document',
-      run: () => void navigator.clipboard.writeText(body),
+      // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already shows,
+      // and what saveDocumentEdit/parseDocumentLiteral already accept back.
+      run: () => void navigator.clipboard.writeText(toShellText(body)),
     },
     {
       type: 'item',
       id: 'copy-id',
       label: 'Copy _id',
-      run: () => void navigator.clipboard.writeText(id),
+      // The shell form is also what turns *Copy _id* into a working filter (F14, D12/D15): paste
+      // it as `{ _id: ObjectId("...") }` and resolveEjsonWrappers/the shell constructor resolve it
+      // to the same value either way.
+      run: () => void navigator.clipboard.writeText(parseIdLabel(id).text),
     },
     { type: 'separator' },
     { type: 'item', id: 'edit-document', label: 'Edit', run: onEdit },

@@ -1,8 +1,20 @@
-import type { CompletionSource } from '@codemirror/autocomplete';
+import { type CompletionSource, snippet } from '@codemirror/autocomplete';
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { rowKey, treeState } from '../../project/state/tree';
-import { MONGO_QUERY_OPERATORS } from '../shared/mongoVocabulary';
+import {
+  MONGO_QUERY_OPERATORS,
+  MONGO_VALUE_CONSTRUCTORS,
+  type MongoValueConstructor,
+} from '../shared/mongoVocabulary';
+
+// P27 D17: reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain
+// AutocompleteField consumes — only the caret-positioning mechanism differs, since CodeMirror has
+// its own (a `#{}` snippet placeholder) rather than an offset-from-end number.
+function toSnippetTemplate(c: MongoValueConstructor): string {
+  const pos = c.insert.length - c.caretOffsetFromEnd;
+  return `${c.insert.slice(0, pos)}#{}${c.insert.slice(pos)}`;
+}
 
 // P18 addendum D21: the first path segment is the database node's own key
 // (`database:<name>`, shared/domain/tree.ts's encodePath) — a console opened from a database or
@@ -50,6 +62,18 @@ function mongoCompletionSource(connectionId: string, path: string): CompletionSo
       return {
         from: word.from,
         options: MONGO_QUERY_OPERATORS.map((label) => ({ label, type: 'keyword' })),
+      };
+    }
+    // P27 D17: the six BSON constructors — offered wherever a bare word starts, same as any other
+    // identifier completion; CodeMirror's own default matching narrows the list as more is typed.
+    if (/^[A-Za-z]/.test(word.text)) {
+      return {
+        from: word.from,
+        options: MONGO_VALUE_CONSTRUCTORS.map((c) => ({
+          label: c.name,
+          apply: snippet(toSnippetTemplate(c)),
+          type: 'function',
+        })),
       };
     }
     return null;

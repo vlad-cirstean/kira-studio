@@ -124,7 +124,7 @@ function accept(completion: Completion): void {
   open.value = false;
   forceAll.value = false;
   void nextTick(() => {
-    const pos = wordStart.value + insertText.length;
+    const pos = wordStart.value + insertText.length - (completion.caretOffsetFromEnd ?? 0);
     el.setSelectionRange(pos, pos);
     el.focus();
   });

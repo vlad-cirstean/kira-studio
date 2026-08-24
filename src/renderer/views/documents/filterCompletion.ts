@@ -1,6 +1,6 @@
 // P18 D9: candidate lists for DocumentView.vue's filter/SORT boxes.
 import type { Completion } from '../../theme/primitives/completion';
-import { MONGO_QUERY_OPERATORS } from '../shared/mongoVocabulary';
+import { MONGO_QUERY_OPERATORS, MONGO_VALUE_CONSTRUCTORS } from '../shared/mongoVocabulary';
 import { fieldNamesOnPage } from './docPage';
 
 // Mirrors engine/adapters/mongo/literal.ts's own bare-identifier tokenizer rule exactly — a field
@@ -35,7 +35,16 @@ export function mongoFilterCandidates(tabId: string): Completion[] {
     detail: 'operator',
     icon: 'symbol-operator',
   }));
-  return [...fieldCompletions(tabId), ...operators];
+  // P27 D17: the six BSON constructors, only where a value goes — never offered for the sort
+  // box below (mongoSortCandidates), which has no use for one.
+  const constructors = MONGO_VALUE_CONSTRUCTORS.map((c) => ({
+    label: c.name,
+    insert: c.insert,
+    caretOffsetFromEnd: c.caretOffsetFromEnd,
+    detail: 'constructor',
+    icon: 'symbol-constructor',
+  }));
+  return [...fieldCompletions(tabId), ...operators, ...constructors];
 }
 
 // The sort box's own key: value grammar (DocumentView.vue's parseSortText) supplies the rest —
