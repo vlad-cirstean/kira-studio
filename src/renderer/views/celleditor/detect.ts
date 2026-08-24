@@ -172,15 +172,15 @@ function detectHex(input: DetectInput): FormatGuess | null {
   return { format: 'hex', score, reason: 'hex-encoded bytes' };
 }
 
-const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/;
-const BASE64_URL_RE = /^[A-Za-z0-9_-]+={0,2}$/;
+export const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+export const BASE64_URL_RE = /^[A-Za-z0-9_-]+={0,2}$/;
 // §5b's own worked example (`SGVsbG8sIFdvcmxkIQ==`, the base64 of "Hello, World!") is 20
 // characters — shorter than the ≥ 24 the prose states. The concrete, scored, tested example
 // (also asserted end-to-end in Step 7 against a real `app.formats` row) is treated as
 // authoritative over the prose figure; 20 is the reconciled floor.
 const BASE64_MIN_LENGTH = 20;
 
-function base64ToStd(t: string, isUrlSafe: boolean): string {
+export function base64ToStd(t: string, isUrlSafe: boolean): string {
   return isUrlSafe ? t.replace(/-/g, '+').replace(/_/g, '/') : t;
 }
 
@@ -426,25 +426,68 @@ function parseIso8601(t: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// D15 revised: a decoded timestamp gets its own row under the header (too long to share the
-// status badge with the byte count) — CellEditorView calls this separately from describeValue.
-export function describeTimestamp(format: CellFormat, text: string): TimestampReading | null {
+// The Date a timestamp-shaped cell's text represents, or null if it doesn't parse — shared by
+// describeTimestamp's reading and the datetime-local picker's initial value (CellEditorView.vue),
+// so the picker can never show a moment describeTimestamp itself couldn't decode.
+export function parseTimestampValue(format: CellFormat, text: string): Date | null {
   const t = text.trim();
   try {
     if (format === 'epochSeconds' || format === 'epochMillis') {
       const n = Number(t);
       if (!Number.isFinite(n)) return null;
       const d = new Date(format === 'epochSeconds' ? n * 1000 : n);
-      return Number.isNaN(d.getTime()) ? null : formatUtcAndLocal(d);
+      return Number.isNaN(d.getTime()) ? null : d;
     }
-    if (format === 'iso8601') {
-      const d = parseIso8601(t);
-      return d ? formatUtcAndLocal(d) : null;
-    }
+    if (format === 'iso8601') return parseIso8601(t);
     return null;
   } catch {
     return null;
   }
+}
+
+// D15 revised: a decoded timestamp gets its own row under the header (too long to share the
+// status badge with the byte count) — CellEditorView calls this separately from describeValue.
+export function describeTimestamp(format: CellFormat, text: string): TimestampReading | null {
+  const d = parseTimestampValue(format, text);
+  return d ? formatUtcAndLocal(d) : null;
+}
+
+// The inverse of parseTimestampValue — encodes a Date picked from the cell editor's
+// datetime-local input back into the cell's own timestamp shape, so picking a date is exactly as
+// reversible as typing one by hand. `null` for any non-timestamp format (the caller only ever
+// calls this when parseTimestampValue's own format check already passed).
+export function encodeTimestamp(format: CellFormat, d: Date): string | null {
+  if (format === 'epochSeconds') return String(Math.round(d.getTime() / 1000));
+  if (format === 'epochMillis') return String(d.getTime());
+  if (format === 'iso8601') return d.toISOString();
+  return null;
+}
+
+// `<input type="datetime-local">`'s own value shape: local wall-clock time, no offset — built from
+// the same local getters formatUtcAndLocal already uses for the local half of its reading.
+export function toDatetimeLocalValue(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+const DATETIME_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+// Parses a datetime-local input's value from its components, not via `new Date(str)` — a bare
+// "YYYY-MM-DDTHH:mm:ss" string is ambiguous across engines (UTC vs. local), the same class of
+// problem parseIso8601's own comment documents for an offset-less ISO string. Constructing from
+// components pins it to local time unambiguously, matching what the picker's own clock face shows.
+export function fromDatetimeLocalValue(value: string): Date | null {
+  const m = DATETIME_LOCAL_RE.exec(value);
+  if (!m) return null;
+  const [, y, mo, day, h, mi, s] = m;
+  const d = new Date(
+    Number(y),
+    Number(mo) - 1,
+    Number(day),
+    Number(h),
+    Number(mi),
+    Number(s ?? '0'),
+  );
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** D15's one-line reading, or null when the format implies no decoding. Must never throw. */

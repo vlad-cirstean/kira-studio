@@ -383,6 +383,14 @@ Clicking a cell renders its value here in CodeMirror.
   ISO-8601, UUID, URL, CSV, plain text. Detection is a scored guess, always overridable.
 - **Manual type override** — dropdown; the choice sticks per column for the session.
 - **Beautify** — two modes: *indented* and *compact* (single-line, no indentation).
+- **UUID format** gets a generate button (a fresh `crypto.randomUUID()`, overwriting the buffer).
+- **Timestamp formats** (epoch seconds/millis, ISO-8601) get a `datetime-local` picker alongside
+  the local/UTC reading — picking a moment re-encodes it into whichever of the three shapes the
+  cell already uses.
+- **Hex and base64** get a second, editable "decoded text" pane below the raw value — the same
+  bytes as plaintext, kept in sync in both directions (typing plaintext re-encodes the raw value;
+  editing the raw value re-decodes the plaintext). Bytes that aren't valid UTF-8 show a note
+  instead of a second editor rather than rendering garbled text.
 - **Editable.** Committing a change stages a pending cell edit (§8.13) rather than writing
   immediately. The panel is forced read-only when the connection is marked read-only.
 

@@ -550,3 +550,128 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   expect(consoleErrors).toEqual([]);
 });
+
+test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(300_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  const cfg = {
+    host: pg.config.host,
+    port: pg.config.port,
+    database: pg.config.database,
+    username: pg.config.username,
+    password: pg.config.password,
+  };
+  await createConnection(page, cfg, { name: 'Format Actions DB', color: 'blue', readOnly: false });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(
+    page.locator('[data-testid="tree-row"][data-kind="connection"] .status-dot'),
+  ).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  const formatsRow = await findRow(page, FORMATS_PATH);
+  await formatsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="grid-header-cell"][data-column="sample"]'),
+  ).toBeVisible();
+  const panel = page.locator('[data-testid="cell-editor-panel"]');
+  const encoded = page.locator('[data-testid="cell-editor-encoded"] .cm-content');
+
+  // Fixture row order (0001_seed.sql's own INSERT order, already relied on by the sibling test's
+  // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds, 8=uuid.
+
+  // --- UUID generate — overwrites the buffer with a fresh v4 UUID, staged like any other edit --
+  await selectCell(page, 8, 'sample');
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'uuid');
+  const beforeUuid = await encoded.innerText();
+  await expect(page.locator('[data-testid="cell-editor-uuid-generate"]')).toBeEnabled();
+  await page.click('[data-testid="cell-editor-uuid-generate"]');
+  const afterUuid = await encoded.innerText();
+  expect(afterUuid).not.toBe(beforeUuid);
+  expect(afterUuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="8"][data-column="sample"]'),
+  ).toHaveClass(/pending-edit/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // The generate button is disabled for every other format.
+  await selectCell(page, 0, 'sample'); // json row
+  await panel.waitFor();
+  await expect(page.locator('[data-testid="cell-editor-uuid-generate"]')).toBeDisabled();
+
+  // --- timestamp datetime-local picker — pick a moment, it re-encodes into the cell's own shape -
+  await selectCell(page, 5, 'sample'); // epochSeconds row
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'epochSeconds');
+  const picker = page.locator('[data-testid="cell-editor-timestamp-picker"]');
+  await expect(picker).toBeVisible();
+  await picker.fill('2030-06-15T12:30:00');
+  await expect(encoded).toHaveText(/^\d+$/);
+  const pickedEpoch = Number(await encoded.innerText());
+  // Round-trips through the reading row (local/UTC), not just a raw number — proves the picker
+  // and describeTimestamp agree on the same moment.
+  await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('2030');
+  expect(Math.abs(pickedEpoch - Date.UTC(2030, 5, 15, 12, 30, 0) / 1000)).toBeLessThan(24 * 3600);
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
+  ).toHaveClass(/pending-edit/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // No picker for a non-timestamp format.
+  await selectCell(page, 0, 'sample');
+  await panel.waitFor();
+  await expect(page.locator('[data-testid="cell-editor-timestamp-picker"]')).toHaveCount(0);
+
+  // --- hex/base64 decoded pane — editing the plaintext re-encodes the raw box, and vice versa ---
+  await selectCell(page, 3, 'sample'); // base64 row: "Hello, World!"
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'base64');
+  const decoded = page.locator('[data-testid="cell-editor-decoded"] .cm-content');
+  await expect(decoded).toContainText('Hello, World!');
+
+  await decoded.click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('Goodbye!');
+  await expect(encoded).toHaveText(btoa('Goodbye!'));
+  // Blurring stages the re-encoded value, not the plaintext — the grid must show base64.
+  await page.locator('[data-testid="cell-editor-format"]').focus();
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="3"][data-column="sample"]'),
+  ).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 3, 'sample')).toBe(btoa('Goodbye!'));
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // hex row: raw bytes 0xcafebabedeadbeef are not valid UTF-8 — the decoded pane shows a note,
+  // not garbled text, and offers no second editor to type into.
+  await selectCell(page, 4, 'sample');
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'hex');
+  await expect(page.locator('[data-testid="cell-editor-decoded"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toContainText(
+    'not valid UTF-8',
+    { ignoreCase: true },
+  );
+
+  // No decoded pane for a non-binary format.
+  await selectCell(page, 0, 'sample');
+  await panel.waitFor();
+  await expect(page.locator('[data-testid="cell-editor-decoded"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toHaveCount(0);
+
+  // --- beautify buttons now carry a tooltip once enabled, not just when disabled ---------------
+  await expect(page.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveAttribute(
+    'title',
+    /./,
+  );
+
+  expect(consoleErrors).toEqual([]);
+});

@@ -10,7 +10,17 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import { type BeautifyMode, beautify } from './beautify';
-import { describeTimestamp, describeValue, detectFormat, type FormatGuess } from './detect';
+import { decodeToText, encodeFromText } from './binary';
+import {
+  describeTimestamp,
+  describeValue,
+  detectFormat,
+  encodeTimestamp,
+  type FormatGuess,
+  fromDatetimeLocalValue,
+  parseTimestampValue,
+  toDatetimeLocalValue,
+} from './detect';
 import {
   CELL_FORMATS,
   type CellFormat,
@@ -112,14 +122,100 @@ watch(
   { immediate: true },
 );
 
-const beautifyDisabledTitle = computed<string | undefined>(() =>
+const beautifyDisabledTitle = computed<string>(() =>
   canBeautify(effectiveFormat.value)
-    ? undefined
+    ? ''
     : 'Indented and compact formatting apply to JSON and XML/HTML.',
+);
+// Bug fix (tooltip audit follow-up): these two buttons previously had no title at all once
+// enabled — `beautifyDisabledTitle` was written to only ever describe the *disabled* case, so a
+// working Beautify/Minify pair had no hover hint explaining what "list-tree"/"list-flat" even do.
+const beautifyIndentedTitle = computed<string>(() =>
+  canBeautify(effectiveFormat.value)
+    ? 'Beautify — pretty-print with indentation'
+    : beautifyDisabledTitle.value,
+);
+const beautifyCompactTitle = computed<string>(() =>
+  canBeautify(effectiveFormat.value)
+    ? 'Minify — remove all whitespace'
+    : beautifyDisabledTitle.value,
 );
 const resetDisabledTitle = computed<string | undefined>(() =>
   isDirty.value ? undefined : 'Already showing the stored value.',
 );
+
+// UUID generation: overwrites the buffer outright, same shape as applyBeautify's own "replace
+// doc.value" contract — Reset already exists for "I changed my mind."
+const canGenerateUuid = computed(() => effectiveFormat.value === 'uuid' && isEditable.value);
+const uuidGenerateTitle = computed<string>(() =>
+  canGenerateUuid.value ? 'Generate a new random UUID' : 'Available when the format is UUID.',
+);
+function generateUuid(): void {
+  if (!canGenerateUuid.value) return;
+  doc.value = crypto.randomUUID();
+}
+
+// Timestamp datetime-local picker: reads/writes the live buffer (doc), not the stored value, so
+// it stays in lockstep with hand-typed edits and with itself across repeated picks — the same
+// "buffer is the single source of what Save stages" contract the rest of this file already keeps.
+const isTimestampFormat = computed(
+  () =>
+    effectiveFormat.value === 'epochSeconds' ||
+    effectiveFormat.value === 'epochMillis' ||
+    effectiveFormat.value === 'iso8601',
+);
+const timestampInputValue = computed<string>(() => {
+  if (!isTimestampFormat.value) return '';
+  const d = parseTimestampValue(effectiveFormat.value, doc.value);
+  return d ? toDatetimeLocalValue(d) : '';
+});
+function onTimestampPick(e: Event): void {
+  const value = (e.target as HTMLInputElement).value;
+  if (!value) return;
+  const d = fromDatetimeLocalValue(value);
+  if (!d) return;
+  const encoded = encodeTimestamp(effectiveFormat.value, d);
+  if (encoded !== null) doc.value = encoded;
+}
+
+// Hex/base64 decoded-text pane: a second, editable view of the same bytes as plaintext. `null`
+// means "not valid UTF-8" — shown as a note instead of a second editor rather than rendering
+// garbled bytes. `skipNextDecode` breaks the encode<->decode cycle: onDecodedInput re-encodes into
+// `doc`, and without the guard that write would immediately re-trigger a decode back into
+// `decodedDoc`, fighting the very keystroke that just landed there (the same shape ConsoleView.vue's
+// `lastEmitted` guard uses for its own doc-decoupling, D20).
+const showDecodedPane = computed(
+  () => effectiveFormat.value === 'hex' || effectiveFormat.value === 'base64',
+);
+const decodedDoc = ref<string | null>('');
+let skipNextDecode = false;
+
+function syncDecodedFromDoc(): void {
+  if (!showDecodedPane.value) {
+    decodedDoc.value = '';
+    return;
+  }
+  decodedDoc.value = decodeToText(effectiveFormat.value as 'hex' | 'base64', doc.value);
+}
+
+watch(
+  [doc, effectiveFormat],
+  () => {
+    if (skipNextDecode) {
+      skipNextDecode = false;
+      return;
+    }
+    syncDecodedFromDoc();
+  },
+  { immediate: true },
+);
+
+function onDecodedInput(text: string): void {
+  decodedDoc.value = text;
+  if (!showDecodedPane.value) return;
+  skipNextDecode = true;
+  doc.value = encodeFromText(effectiveFormat.value as 'hex' | 'base64', text, doc.value);
+}
 
 function applyBeautify(mode: BeautifyMode): void {
   const c = cell.value;
@@ -219,11 +315,11 @@ const statusLine = computed(() => {
 });
 
 // Local first, then UTC (as asked) — its own row under the header rather than squeezed into the
-// status badge alongside the byte count.
+// status badge alongside the byte count. Reads the live buffer (doc), not the stored value, so it
+// stays in sync with the datetime-local picker below and with hand-typed edits alike.
 const timestampReading = computed(() => {
-  const c = cell.value;
-  if (!c || c.value === null) return null;
-  return describeTimestamp(effectiveFormat.value, c.value);
+  if (!cell.value || isNullValue.value) return null;
+  return describeTimestamp(effectiveFormat.value, doc.value);
 });
 </script>
 
@@ -270,12 +366,20 @@ const timestampReading = computed(() => {
         </select>
 
         <IconButton
+          icon="sparkle"
+          :size="14"
+          data-testid="cell-editor-uuid-generate"
+          :disabled="!canGenerateUuid"
+          :title="uuidGenerateTitle"
+          @click="generateUuid"
+        />
+        <IconButton
           icon="list-tree"
           :size="14"
           :active="formatted === 'indented'"
           data-testid="cell-editor-beautify-indented"
           :disabled="!canBeautify(effectiveFormat)"
-          :title="beautifyDisabledTitle"
+          :title="beautifyIndentedTitle"
           @click="applyBeautify('indented')"
         />
         <IconButton
@@ -284,7 +388,7 @@ const timestampReading = computed(() => {
           :active="formatted === 'compact'"
           data-testid="cell-editor-beautify-compact"
           :disabled="!canBeautify(effectiveFormat)"
-          :title="beautifyDisabledTitle"
+          :title="beautifyCompactTitle"
           @click="applyBeautify('compact')"
         />
         <IconButton
@@ -305,26 +409,74 @@ const timestampReading = computed(() => {
       </template>
     </ViewHeader>
 
-    <!-- Local first, then UTC (own row — too long to share the header's status badge). -->
+    <!-- Local first, then UTC (own row — too long to share the header's status badge). The
+         datetime-local picker is the reverse direction: pick a moment, get it re-encoded into
+         whatever timestamp shape this cell already uses. -->
     <div v-if="timestampReading" class="p-strip note timestamp-row" data-testid="cell-editor-timestamp">
       <CodiconIcon name="clock" :size="13" />
       <span data-testid="cell-editor-timestamp-local">{{ timestampReading.local }}</span>
       <span class="ts-sep">·</span>
       <span data-testid="cell-editor-timestamp-utc">{{ timestampReading.utc }}</span>
+      <span class="p-input timestamp-picker">
+        <input
+          type="datetime-local"
+          step="1"
+          data-testid="cell-editor-timestamp-picker"
+          :value="timestampInputValue"
+          :disabled="!isEditable"
+          :title="
+            isEditable
+              ? 'Pick a date and time — re-encodes into this cell\'s current timestamp format'
+              : readOnlyChipText || 'Not editable'
+          "
+          @change="onTimestampPick"
+        />
+      </span>
     </div>
 
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
          (onEditorKeydown) stages without needing to move focus away; neither is on CodeMirrorHost
          itself, since its own keymap only binds plain Enter (for newlines) and lets everything
-         else bubble. -->
-    <div class="editor-body" @keydown="onEditorKeydown" @focusout="onEditorBlur">
-      <CodeMirrorHost
-        :doc="doc"
-        :language="language"
-        :sql-dialect="sqlDialect"
-        :read-only="!isEditable"
-        @update:doc="doc = $event"
-      />
+         else bubble. Both are on the wrapping div, so they cover the decoded pane too. -->
+    <div
+      class="editor-body"
+      :class="{ 'has-decoded': showDecodedPane }"
+      @keydown="onEditorKeydown"
+      @focusout="onEditorBlur"
+    >
+      <div class="encoded-pane" data-testid="cell-editor-encoded">
+        <CodeMirrorHost
+          :doc="doc"
+          :language="language"
+          :sql-dialect="sqlDialect"
+          :read-only="!isEditable"
+          @update:doc="doc = $event"
+        />
+      </div>
+
+      <!-- Hex/base64 only: the same bytes as editable plaintext, kept in lockstep with the
+           encoded box above in both directions (encode<->decode, see onDecodedInput). -->
+      <template v-if="showDecodedPane">
+        <div class="decoded-head">
+          <CodiconIcon name="symbol-string" :size="12" />
+          <span>Decoded text</span>
+        </div>
+        <div v-if="decodedDoc !== null" class="decoded-pane" data-testid="cell-editor-decoded">
+          <CodeMirrorHost
+            :doc="decodedDoc"
+            language="plain"
+            :read-only="!isEditable"
+            @update:doc="onDecodedInput"
+          />
+        </div>
+        <div
+          v-else
+          class="p-strip note decoded-pane-empty"
+          data-testid="cell-editor-decoded-empty"
+        >
+          Not valid UTF-8 text — showing the raw {{ FORMAT_LABEL[effectiveFormat] }} value only.
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -381,8 +533,58 @@ const timestampReading = computed(() => {
   opacity: 0.5;
 }
 
+/* Pushed to the strip's own trailing edge — .p-strip is already a flex row (primitives.css). */
+.timestamp-picker {
+  margin-left: auto;
+}
+
+.timestamp-picker input {
+  /* Chromium's own datetime-local chrome (the field segments + calendar glyph) doesn't inherit
+     `color` for every part no matter what .p-input does — color-scheme is the one lever that gets
+     the calendar glyph itself to render light-on-dark instead of as a barely visible dark icon. */
+  color-scheme: dark;
+}
+
 .editor-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.encoded-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Hex/base64's decoded-text pane stacks below the encoded value, mirroring ConsoleView.vue's own
+   stacked result panels rather than a side-by-side split — this panel is usually too narrow for
+   two columns to read comfortably. */
+.editor-body.has-decoded .encoded-pane {
+  flex: 1 1 55%;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.decoded-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-1) var(--kira-s-4);
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.decoded-pane {
+  flex: 1 1 45%;
+  min-height: 0;
+}
+
+.decoded-pane-empty {
+  flex: 1 1 45%;
+  align-items: center;
+  color: var(--kira-fg-disabled);
 }
 </style>
