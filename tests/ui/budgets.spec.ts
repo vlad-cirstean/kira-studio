@@ -242,8 +242,8 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     el.scrollTop = 0;
   });
 
-  // cell-editor-panel only mounts once a cell is selected (CellEditorView.vue's `v-else`) — the
-  // very first measured click would otherwise find no panel to observe yet. Warm up on a
+  // cell-editor-panel only mounts once a cell is selected (CellEditorDock.vue's own `v-if`, P26) —
+  // the very first measured click would otherwise find no panel to observe yet. Warm up on a
   // different cell (row 0's "id" column) so every measured click below is a genuine transition.
   await page.click('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
   await expect(page.locator('[data-testid="cell-editor-panel"]')).toBeVisible();

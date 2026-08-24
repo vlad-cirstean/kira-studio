@@ -848,3 +848,109 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   expect(consoleErrors).toEqual([]);
 });
+
+test("cell editor — owned by the view, never shows another tab's cell", async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(300_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  const cfg = {
+    host: pg.config.host,
+    port: pg.config.port,
+    database: pg.config.database,
+    username: pg.config.username,
+    password: pg.config.password,
+  };
+  await createConnection(page, cfg, { name: 'Ownership DB', color: 'green', readOnly: false });
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  const panel = page.locator('[data-testid="cell-editor-panel"]');
+
+  // (1) Open a data tab and select a cell.
+  const formatsRow = await findRow(page, FORMATS_PATH);
+  await formatsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await selectCell(page, 0, 'sample');
+  await panel.waitFor();
+  const dataTabId = (await panel.getAttribute('data-cell-key'))?.split(':')[0] ?? '';
+  await expect(panel).toHaveAttribute('data-cell-key', `${dataTabId}:0:sample`);
+
+  // A manual format override, set now so step (7) below can assert it survives the moves ahead
+  // untouched (D13 — the override map is keyed by (connection, path, column), not by tab).
+  await page.selectOption('[data-testid="cell-editor-format"]', 'text');
+  await expect(panel).toHaveAttribute('data-format', 'text');
+
+  // (2) Ownership: the panel lives inside the tab's own view subtree, not beside it — this is
+  // the assertion that fails against the pre-P26 shell-mounted singleton and is the structural
+  // statement of the whole phase.
+  const dock = page.locator('[data-testid="main-view"] [data-testid="cell-editor"]');
+  await expect(dock).toHaveCount(1);
+  await expect(dock).toHaveAttribute('data-tab-id', dataTabId);
+
+  // (3) Open a console tab on the same connection, run a query, click a result cell —
+  // ConsoleResultGrid publishes but neither republishes on mount nor clears on unmount (the exact
+  // class of publisher that produced the reported bug).
+  await openRowMenu(page, FORMATS_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const consoleTabId =
+    (await page
+      .locator('[data-testid="tab"][data-tab-kind="console"]')
+      .last()
+      .getAttribute('data-tab-id')) ?? '';
+  await page.locator('[data-testid="console-view"] .cm-content').click();
+  await page.keyboard.type('select 1 as x;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(page.locator('[data-testid="console-result-grid"]')).toBeVisible();
+  await page.locator('[data-testid="console-result-cell"]').first().click();
+  await expect(panel).toHaveAttribute('data-cell-key', new RegExp(`^${consoleTabId}:`));
+
+  // (4) The bug: switch back to the data tab. The panel must show the data tab's cell again —
+  // never the console tab's, whether by the grid's own republish-on-mount or by nothing
+  // overwriting a per-tab record that no longer exists in a shared slot.
+  await page.locator(`[data-testid="tab"][data-tab-id="${dataTabId}"]`).click();
+  await expect(panel).toHaveAttribute('data-cell-key', `${dataTabId}:0:sample`);
+  const dockHeight = await dock.evaluate((el) => el.getBoundingClientRect().height);
+
+  // (5) Switch to the console tab again: its own cell is back too, unchanged (D6 — a
+  // backgrounded tab keeps its selection instead of losing it).
+  await page.locator(`[data-testid="tab"][data-tab-id="${consoleTabId}"]`).click();
+  await expect(panel).toHaveAttribute('data-cell-key', new RegExp(`^${consoleTabId}:`));
+  // D5: the panel's height is a persisted global, not per-tab — it must not visually reset.
+  const consoleDockHeight = await dock.evaluate((el) => el.getBoundingClientRect().height);
+  expect(consoleDockHeight).toBe(dockHeight);
+
+  // (6) A definition tab mounts no dock at all — the minimal reproduction of the user's report
+  // (switch from a cell-bearing tab straight into one that never had the panel in the first
+  // place, and the panel used to keep showing the old tab's cell).
+  await openRowMenu(page, FORMATS_PATH);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  await expect(page.locator('[data-testid="definition-view"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
+
+  // (7) Switch back to the data tab: the panel returns, and the format override set in step (1)
+  // still applies (D13 — untouched by the move to per-view ownership).
+  await page.locator(`[data-testid="tab"][data-tab-id="${dataTabId}"]`).click();
+  await expect(panel).toHaveAttribute('data-cell-key', `${dataTabId}:0:sample`);
+  await expect(panel).toHaveAttribute('data-format', 'text');
+
+  // (8) Closing the tab frees its record — no stale panel, no console error.
+  await page
+    .locator(`[data-testid="tab"][data-tab-id="${dataTabId}"] [data-testid="tab-close"]`)
+    .click();
+  await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
+
+  expect(consoleErrors).toEqual([]);
+});
