@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { getPage } from './kvPage';
+import { getPage, pageVersion } from './kvPage';
 import { clearSearchState, runSearch, type SearchHandle, searchState } from './kvSearch';
 
 // Mirrors views/grid/SearchToolbar.vue exactly (same docking rule, same case/word/regex
@@ -11,7 +11,11 @@ import { clearSearchState, runSearch, type SearchHandle, searchState } from './k
 // column instead of a tabular page's column index.
 const props = defineProps<{ tabId: string }>();
 
-const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
+// P31 D22/F24: pageVersion.n is the explicit dependency — getPage reads a plain, non-reactive Map.
+const loadedRowCount = computed(() => {
+  void pageVersion.n;
+  return getPage(props.tabId)?.rowCount ?? 0;
+});
 const emit = defineEmits<{ goToMatch: [row: number, col: 'field' | 'value']; close: [] }>();
 
 const query = ref('');
@@ -31,7 +35,9 @@ let handle: SearchHandle | null = null;
 
 const entry = computed(() => searchState[props.tabId]);
 
-function startSearch(): void {
+// autoScroll is false for the page-replaced re-scan (D23) — see views/grid/SearchToolbar.vue's
+// identical note.
+function startSearch(autoScroll = true): void {
   handle?.cancel();
   errorMessage.value = null;
   if (query.value === '') {
@@ -62,11 +68,20 @@ function startSearch(): void {
   handle.done.then((matches) => {
     scanning.value = false;
     searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
-    if (matches.length > 0) emit('goToMatch', matches[0].row, matches[0].col);
+    if (autoScroll && matches.length > 0) emit('goToMatch', matches[0].row, matches[0].col);
   });
 }
 
-watch([query, matchCase, wholeWord, regex], startSearch);
+watch([query, matchCase, wholeWord, regex], () => startSearch());
+
+// P31 D22/D23/F23: a page change (Refresh, page navigation, a poll) must restart the scan
+// against the new page rather than leave searchState pointing at rows the old page held.
+watch(
+  () => pageVersion.n,
+  () => {
+    if (query.value !== '') startSearch(false);
+  },
+);
 
 function goNext(): void {
   const e = entry.value;

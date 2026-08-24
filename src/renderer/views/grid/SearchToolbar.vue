@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { getPage } from './page';
+import { getPage, pageVersion } from './page';
 import {
   clearSearchState,
   isSearchFiltering,
@@ -18,7 +18,12 @@ const props = defineProps<{ tabId: string }>();
 
 // README: "search walks the loaded rows only and never issues a query" — this label is what
 // keeps a hit count from ever being mistaken for a count over the whole table.
-const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
+// P31 D22/F24: `getPage` reads a plain, non-reactive Map — `pageVersion.n` is the explicit
+// dependency that makes this recompute when the page is replaced.
+const loadedRowCount = computed(() => {
+  void pageVersion.n;
+  return getPage(props.tabId)?.rowCount ?? 0;
+});
 
 // P24 D9: the scope label gains a filtered form ("showing N of M loaded rows") whenever the
 // toggle is on and a scan has completed.
@@ -50,7 +55,10 @@ let handle: SearchHandle | null = null;
 
 const entry = computed(() => searchState[props.tabId]);
 
-function startSearch(): void {
+// autoScroll is false for the page-replaced re-scan (D23): jumping the viewport because a
+// background refresh landed would move the page under the user's hands, unlike a query edit
+// which is the user's own action and should jump to the first hit immediately.
+function startSearch(autoScroll = true): void {
   handle?.cancel();
   errorMessage.value = null;
   if (query.value === '') {
@@ -81,11 +89,23 @@ function startSearch(): void {
   handle.done.then((matches) => {
     scanning.value = false;
     searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
-    if (matches.length > 0) emit('goToMatch', matches[0].row, matches[0].col);
+    if (autoScroll && matches.length > 0) emit('goToMatch', matches[0].row, matches[0].col);
   });
 }
 
-watch([query, matchCase, wholeWord, regex], startSearch);
+watch([query, matchCase, wholeWord, regex], () => startSearch());
+
+// P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
+// setPage and bump pageVersion.n — without this, searchState[tabId].matches keeps pointing at
+// rows from the page that's gone, so the grid highlights row:col pairs that now hold unrelated
+// values and prev/next scrolls to arbitrary rows. Restarting the scan is the only way back to a
+// consistent match list; not auto-scrolling matches a fresh scan's own initial state (D23).
+watch(
+  () => pageVersion.n,
+  () => {
+    if (query.value !== '') startSearch(false);
+  },
+);
 
 function goNext(): void {
   const e = entry.value;

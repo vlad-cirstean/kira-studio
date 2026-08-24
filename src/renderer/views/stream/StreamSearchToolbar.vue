@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { getPage } from './streamPage';
+import { getPage, pageVersion } from './streamPage';
 import {
   clearStreamSearchState,
   goToNextMatch,
@@ -17,7 +17,11 @@ const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
 
 // README's own "search walks the loaded rows only and never issues a query" wording, borrowed
 // verbatim from grid/SearchToolbar.vue's precedent — applies here too (item 5).
-const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
+// P31 D22/F24: pageVersion.n is the explicit dependency — getPage reads a plain, non-reactive Map.
+const loadedRowCount = computed(() => {
+  void pageVersion.n;
+  return getPage(props.tabId)?.rowCount ?? 0;
+});
 
 const query = ref('');
 const entry = computed(() => streamSearchState[props.tabId]);
@@ -32,6 +36,16 @@ watch(query, (q) => {
   const e = streamSearchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
 });
+
+// P31 D22/D23/F23: a Fetch more/poll/page change calls setPage and bumps pageVersion.n —
+// re-scan against the new page (runStreamSearch already resets index to the first match, or -1,
+// per D23) without auto-scrolling; a background poll must not move the viewport under the user.
+watch(
+  () => pageVersion.n,
+  () => {
+    if (query.value !== '') runStreamSearch(props.tabId, query.value);
+  },
+);
 
 function next(): void {
   const row = goToNextMatch(props.tabId);
