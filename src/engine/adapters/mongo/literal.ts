@@ -1,4 +1,4 @@
-import { Decimal128, Long, ObjectId } from 'bson';
+import { Decimal128, EJSON, Long, ObjectId } from 'bson';
 import { AdapterError } from '../errors';
 
 // D9: a small hand-written JSON5-lite tokenizer/parser for Mongo shell-style literal text —
@@ -253,14 +253,86 @@ export function parseJson5Literal(text: string): unknown {
   return value;
 }
 
-export function parseFilterObject(text: string | null): Record<string, unknown> {
-  if (text === null || text.trim() === '') return {};
-  const value = parseJson5Literal(text);
+// D15: the wrapper keys EJSON v2 defines — a plain object matching one of these shapes is a BSON
+// value spelled as extended JSON rather than a shell constructor call (`ObjectId(...)` is already
+// resolved to a real ObjectId by CONSTRUCTORS above, at parse time; `{"$oid": "..."}` is not).
+const EJSON_WRAPPER_KEYS = new Set([
+  '$oid',
+  '$date',
+  '$numberInt',
+  '$numberLong',
+  '$numberDouble',
+  '$numberDecimal',
+  '$binary',
+  '$timestamp',
+  '$regularExpression',
+  '$code',
+  '$ref',
+  '$minKey',
+  '$maxKey',
+]);
+
+function looksLikeEjsonWrapper(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length > 0 && keys.some((k) => EJSON_WRAPPER_KEYS.has(k));
+}
+
+// A shell constructor call (ObjectId(...), ISODate(...), NumberLong(...), NumberDecimal(...)) is
+// already a real BSON instance by the time this runs — walking its own internal fields would be
+// wrong, so those pass through untouched. Plain Date is included: ISODate(...) and Date(...) both
+// construct one (CONSTRUCTORS above).
+function isResolvedBsonInstance(value: object): boolean {
+  return (
+    value instanceof ObjectId ||
+    value instanceof Date ||
+    value instanceof Long ||
+    value instanceof Decimal128
+  );
+}
+
+/**
+ * Recursively replaces every extended-JSON wrapper object ({$oid}, {$date}, {$numberLong},
+ * {$binary}, …) with the BSON value it denotes, by handing that subtree to `bson`'s own
+ * `EJSON.parse`. Leaves every other object alone. This is what makes `{ _id: {"$oid": "507f…"} }`
+ * — the exact text *Copy _id* puts on the clipboard (P27 D12) — a working filter (F14).
+ */
+export function resolveEjsonWrappers(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(resolveEjsonWrappers);
+  if (value !== null && typeof value === 'object') {
+    if (isResolvedBsonInstance(value)) return value;
+    if (looksLikeEjsonWrapper(value)) {
+      try {
+        return EJSON.parse(JSON.stringify(value));
+      } catch {
+        // The shape matched but the value didn't (e.g. `{ $oid: 123 }`) — fall through and treat
+        // it as a plain object; Mongo will reject a meaningless filter with its own error.
+      }
+    }
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = resolveEjsonWrappers(v);
+    return out;
+  }
+  return value;
+}
+
+function parseLiteralObject(text: string, errorMessage: string): Record<string, unknown> {
+  const value = resolveEjsonWrappers(parseJson5Literal(text));
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new AdapterError(
-      'E_QUERY',
-      'filter must be a JSON object literal, e.g. { field: "value" }',
-    );
+    throw new AdapterError('E_QUERY', errorMessage);
   }
   return value as Record<string, unknown>;
+}
+
+/**
+ * The one grammar every Mongo text surface in the app parses with: shell constructors *and*
+ * extended JSON, in the same document. Used by `parseFilterObject` and by `mutate.ts` (D15/D16).
+ */
+export function parseDocumentLiteral(text: string): Record<string, unknown> {
+  return parseLiteralObject(text, 'document must be a JSON object');
+}
+
+export function parseFilterObject(text: string | null): Record<string, unknown> {
+  if (text === null || text.trim() === '') return {};
+  return parseLiteralObject(text, 'filter must be a JSON object literal, e.g. { field: "value" }');
 }

@@ -1,10 +1,10 @@
-import { EJSON } from 'bson';
 import type { Db, Document } from 'mongodb';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapMongoError } from './errors';
+import { parseDocumentLiteral, parseJson5Literal, resolveEjsonWrappers } from './literal';
 
 // D3: the reserved sentinel key for a whole-document replace, expressed through the existing
 // relational-shaped MutationRowOp rather than widening the shared mutation schema — `$` can
@@ -38,7 +38,10 @@ function parseIdKey(key: Record<string, string | null>): unknown {
   const raw = key._id;
   if (raw === null) return null;
   try {
-    return EJSON.parse(raw);
+    // P27 D16: an `_id` is a value, not a document — this composes the same two primitives
+    // parseDocumentLiteral does (JSON5-lite parse + wrapper resolution) rather than routing
+    // through parseDocumentLiteral's own object-only shape, since `_id` need not be an object.
+    return resolveEjsonWrappers(parseJson5Literal(raw));
   } catch {
     throw new AdapterError('E_QUERY', 'malformed _id in mutation key');
   }
@@ -93,15 +96,7 @@ export async function mutate(
             'document mutation requires a $document replacement',
           );
         }
-        let parsed: unknown;
-        try {
-          parsed = EJSON.parse(bodyText);
-        } catch {
-          throw new AdapterError('E_QUERY', 'malformed document JSON');
-        }
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          throw new AdapterError('E_QUERY', 'document must be a JSON object');
-        }
+        const parsed = parseDocumentLiteral(bodyText);
         const replacement = { ...(parsed as Document), _id: id };
         // replaceOne() has no AbortSignal support in the driver (unlike find/findOne/
         // countDocuments/aggregate) — `comment` still tags it for D7's killOp fallback.
@@ -135,15 +130,7 @@ export async function mutate(
         if (typeof bodyText !== 'string') {
           throw new AdapterError('E_UNSUPPORTED', 'document mutation requires a $document body');
         }
-        let parsed: unknown;
-        try {
-          parsed = EJSON.parse(bodyText);
-        } catch {
-          throw new AdapterError('E_QUERY', 'malformed document JSON');
-        }
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          throw new AdapterError('E_QUERY', 'document must be a JSON object');
-        }
+        const parsed = parseDocumentLiteral(bodyText);
         // insertOne() has no AbortSignal support in the driver (same gap replaceOne/deleteOne
         // have above) — `comment` still tags it for D7's killOp fallback.
         const result = await collection.insertOne(parsed as Document, { comment: ctx.opId });
