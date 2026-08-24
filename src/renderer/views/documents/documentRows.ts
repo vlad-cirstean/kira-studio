@@ -156,18 +156,21 @@ const EDITING_H = 220; // the fixed editor panel height (unchanged from the pre-
  *
  * `isExpanded` is supplied by the caller (state.ts's `isDocumentExpanded`) rather than looked up
  * here — this module and state.ts would otherwise import each other (docPage.ts already does,
- * below, for `resetRows`), and one circular edge is enough.
+ * below, for `resetRows`), and one circular edge is enough. `hasSearchPreview` is the same kind
+ * of caller-supplied flag (P31 D20): DocumentView.vue's own docSearch.ts-derived state, adding
+ * one line's worth of height for the collapsed row's `<mark>`-highlighted preview line.
  */
 export function rowHeight(
   tabId: string,
   row: number,
   editingId: string | null,
   isExpanded: boolean,
+  hasSearchPreview = false,
 ): number {
   const doc = documentRow(tabId, row);
   if (!doc) return HEAD_H;
   if (doc.id === editingId) return HEAD_H + EDITING_H;
-  if (!isExpanded) return HEAD_H;
+  if (!isExpanded) return hasSearchPreview ? HEAD_H + LINE_H : HEAD_H;
   const parsed = parseRow(tabId, row);
   if (!parsed?.root) return HEAD_H + EDITING_H;
   const lines = visibleLines(tabId, row).length;

@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
+import { matchedRowsOf } from '../shared/searchFilter';
 import { documentRow, getPage } from './docPage';
 
 export interface Match {
@@ -33,15 +34,21 @@ export function clearSearchState(tabId: string): void {
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup(clearSearchState);
 
+// P31 D16: thin wrapper over matchedRowsOf, same shape as grid/search.ts's own.
+export function matchedRows(tabId: string): number[] | null {
+  return matchedRowsOf(tabId, searchState[tabId]?.matches);
+}
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// P27 D9: DocumentView.vue no longer has a preview-line function to mirror (D1 deleted it — the
-// collapsed row shows only the `_id` now) — this already searches the whole document body
-// regardless, whitespace collapsed and never truncated, so search still finds a match anywhere in
-// a document even though the row itself shows none of that text.
-function previewLineFor(body: string): string {
+// P27 D9/P31 D20: DocumentView.vue's collapsed row shows only the `_id` until expanded (D1) —
+// exported so the view can build the *same* string a search matched against, and wrap the
+// matched substring using docSearch's own start/end offsets without the two ever disagreeing.
+// This searches the whole document body regardless, whitespace collapsed and never truncated, so
+// a match can exist even though the un-searched row shows none of that text.
+export function previewLineFor(body: string): string {
   return body.replace(/\s+/g, ' ').trim();
 }
 

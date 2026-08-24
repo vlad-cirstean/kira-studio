@@ -24,10 +24,12 @@ import VirtualList from '../../workbench/VirtualList.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import { setSearchFiltering } from '../shared/searchFilter';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import DocumentTree from './DocumentTree.vue';
 import { documentRow, fieldNamesOnPage, pageVersion } from './docPage';
+import { searchState as docSearchState, matchedRows, previewLineFor } from './docSearch';
 import { documentMenu } from './documentMenu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './documentMutations';
 import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
@@ -303,11 +305,14 @@ interface DocumentRowEntry {
   body: string;
 }
 
+// P31 D17/D18: the same "hide non-matching rows" toggle grid/keyvalue/stream share (P24 D2).
+const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
+
 const rows = computed<DocumentRowEntry[]>(() => {
   void pageVersion.n;
-  const count = rt.value?.rowCount ?? 0;
+  const indices = displayRows.value ?? Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
   const out: DocumentRowEntry[] = [];
-  for (let i = 0; i < count; i++) {
+  for (const i of indices) {
     const doc = documentRow(props.tab.id, i);
     const view = rowView(props.tab.id, i);
     if (!doc || !view) continue;
@@ -316,32 +321,82 @@ const rows = computed<DocumentRowEntry[]>(() => {
   return out;
 });
 
+// P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
+// matched substring wrapped in <mark> inside a preview line built with docSearch's own
+// previewLineFor, so the highlighted offsets can never disagree with what the scanner matched
+// against. Keyed by row (docSearch's Match has no column, unlike the grid/keyvalue's).
+const docMatchIndex = computed(() => {
+  const entry = docSearchState[props.tab.id];
+  if (!entry) return null;
+  const byRow = new Map<number, Array<{ start: number; end: number }>>();
+  for (const m of entry.matches) {
+    const list = byRow.get(m.row);
+    if (list) list.push(m);
+    else byRow.set(m.row, [m]);
+  }
+  return { byRow, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
+});
+function isSearchMatch(row: number): boolean {
+  return docMatchIndex.value?.byRow.has(row) ?? false;
+}
+function isCurrentSearchMatch(row: number): boolean {
+  return docMatchIndex.value?.current?.row === row;
+}
+
+interface PreviewSegment {
+  text: string;
+  matched: boolean;
+}
+
+// Splits the same string the scanner matched against into matched/unmatched runs, in order —
+// docSearch.ts's Match.start/end are offsets into exactly this string (previewLineFor(body)), so
+// there is no separate "what did it match" computation to keep in sync.
+function previewSegments(row: number, body: string): PreviewSegment[] {
+  const matches = docMatchIndex.value?.byRow.get(row);
+  const line = previewLineFor(body);
+  if (!matches || matches.length === 0) return [{ text: line, matched: false }];
+  const segments: PreviewSegment[] = [];
+  let cursor = 0;
+  for (const m of matches) {
+    if (m.start > cursor) segments.push({ text: line.slice(cursor, m.start), matched: false });
+    segments.push({ text: line.slice(m.start, m.end), matched: true });
+    cursor = m.end;
+  }
+  if (cursor < line.length) segments.push({ text: line.slice(cursor), matched: false });
+  return segments;
+}
+
 // One height per row, in `rows`' own order — VirtualList's `rowHeights` prop (P27 D18/D20).
 // Depends on `rowsVersion` too: a nested-path toggle inside DocumentTree.vue changes a row's
 // visible line count without changing `rows` itself (id/fieldCount/byteLabel/root are unaffected).
 const rowHeights = computed<number[]>(() => {
   void pageVersion.n;
   void rowsVersion.n;
-  return rows.value.map((r) =>
-    rowHeight(
+  return rows.value.map((r) => {
+    const expanded = isDocumentExpanded(props.tab.id, r.view.id);
+    return rowHeight(
       props.tab.id,
       r.view.index,
       editingId.value,
-      isDocumentExpanded(props.tab.id, r.view.id),
-    ),
-  );
+      expanded,
+      !expanded && isSearchMatch(r.view.index),
+    );
+  });
 });
 
 // A search match names a row index into the currently loaded page (docSearch.ts) — jumping to it
 // expands that document (if it wasn't already) and scrolls it into view via VirtualList's own
 // offset-aware scrollToIndex (D8) rather than querySelector + scrollIntoView, which silently did
-// nothing for a match outside the rendered window (F10).
+// nothing for a match outside the rendered window (F10). scrollToIndex takes a position in
+// `rows.value` (the rendered array), not a raw page-row number — the two only coincide when the
+// filter toggle (D17) is off, so this always looks the position up rather than assuming they match.
 function onGoToMatch(row: number): void {
   const view = rowView(props.tab.id, row);
   if (!view) return;
   if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
   void nextTick(() => {
-    virtualListRef.value?.scrollToIndex(row);
+    const index = rows.value.findIndex((r) => r.view.index === row);
+    if (index >= 0) virtualListRef.value?.scrollToIndex(index);
   });
 }
 
@@ -644,6 +699,18 @@ onUnmounted(() => {
           :icon="rt ? 'json' : 'loading'"
           :label="rt ? 'No documents' : 'Loading…'"
         />
+        <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+             from "no documents loaded". -->
+        <EmptyState
+          v-else-if="displayRows && displayRows.length === 0"
+          icon="search"
+          label="No matching rows"
+          data-testid="document-no-matching-rows"
+        >
+          <AppButton data-testid="document-show-all-rows" @click="setSearchFiltering(tab.id, false)">
+            Show all rows
+          </AppButton>
+        </EmptyState>
         <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
              the body — until expanded; an expanded document renders through DocumentTree.vue's
              flat line list, never a per-row CodeMirror instance, which is what makes "every
@@ -662,6 +729,8 @@ onUnmounted(() => {
               :class="{
                 open: isDocumentExpanded(tab.id, item.view.id),
                 selected: rt?.selectedRow === index,
+                'search-match': isSearchMatch(item.view.index),
+                'search-match-current': isCurrentSearchMatch(item.view.index),
               }"
               data-testid="document-row"
               :data-id="item.view.id"
@@ -719,6 +788,21 @@ onUnmounted(() => {
                     @click.stop="onDeleteRow(item.view.id)"
                   />
                 </div>
+              </div>
+              <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
+                   collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
+                   substring in <mark> inside the same string docSearch.ts's scanner matched
+                   against, so it cannot disagree with the offsets. Only while collapsed: an
+                   expanded document's own body is out of scope (§6). -->
+              <div
+                v-if="isSearchMatch(item.view.index) && !isDocumentExpanded(tab.id, item.view.id)"
+                class="doc-preview-match"
+                data-testid="document-search-preview"
+              >
+                <template v-for="(seg, si) in previewSegments(item.view.index, item.body)" :key="si">
+                  <mark v-if="seg.matched">{{ seg.text }}</mark>
+                  <template v-else>{{ seg.text }}</template>
+                </template>
               </div>
               <div
                 v-if="isDocumentExpanded(tab.id, item.view.id)"
@@ -876,6 +960,39 @@ onUnmounted(() => {
    highlight at the same time. */
 .doc-row.selected > .doc-head {
   box-shadow: inset 2px 0 0 var(--kira-accent);
+}
+
+/* P31 D20: the same color-mix tint / solid-current pair DataGrid.vue and KeyValueView.vue use —
+   a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
+   still reads through it) since a document match has no single cell to point at. */
+.doc-row.search-match {
+  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+}
+
+.doc-row.search-match-current {
+  background: var(--kira-warn);
+}
+
+.doc-preview-match {
+  padding: 0 var(--kira-s-4) var(--kira-s-2);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not
+   inheritance) — this compound selector is what actually flips it on the current match. */
+.doc-row.search-match-current .doc-preview-match {
+  color: var(--kira-bg);
+}
+
+.doc-preview-match mark {
+  background: var(--kira-warn);
+  color: var(--kira-bg);
+  border-radius: var(--kira-radius-sm);
 }
 
 .expand-toggle {

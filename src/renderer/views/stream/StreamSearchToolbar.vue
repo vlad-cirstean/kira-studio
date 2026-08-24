@@ -3,11 +3,13 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import { isSearchFiltering, setSearchFiltering } from '../shared/searchFilter';
 import { getPage, pageVersion } from './streamPage';
 import {
   clearStreamSearchState,
   goToNextMatch,
   goToPrevMatch,
+  matchedRows,
   runStreamSearch,
   streamSearchState,
 } from './streamSearch';
@@ -22,6 +24,13 @@ const loadedRowCount = computed(() => {
   void pageVersion.n;
   return getPage(props.tabId)?.rowCount ?? 0;
 });
+
+// P31 D17: the same filter-mode toggle grid/SearchToolbar.vue has (P24 D1/D9).
+const filtering = computed(() => isSearchFiltering(props.tabId));
+const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
+function toggleFilter(): void {
+  setSearchFiltering(props.tabId, !filtering.value);
+}
 
 const query = ref('');
 const entry = computed(() => streamSearchState[props.tabId]);
@@ -58,6 +67,8 @@ function prev(): void {
 
 function close(): void {
   clearStreamSearchState(props.tabId);
+  // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
+  setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
@@ -74,7 +85,12 @@ onMounted(() => {
   void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
 });
 
-onUnmounted(() => clearStreamSearchState(props.tabId));
+onUnmounted(() => {
+  clearStreamSearchState(props.tabId);
+  // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
+  // above — the toggle must reset here too (mirrors grid/SearchToolbar.vue's own note).
+  setSearchFiltering(props.tabId, false);
+});
 </script>
 
 <template>
@@ -98,7 +114,26 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
     <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
     <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
     <div class="sep" />
-    <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
+    <!-- P31 D17: same filter *mode* as grid/SearchToolbar.vue (P24 D1/D9) — hides every
+         non-matching row. -->
+    <div class="group">
+      <IconButton
+        icon="filter"
+        :active="filtering"
+        v-tooltip="
+          filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
+        "
+        data-testid="stream-search-filter-rows"
+        @click="toggleFilter"
+      />
+    </div>
+    <div class="sep" />
+    <span class="p-xs dim" data-testid="stream-search-scope">
+      <template v-if="filtering && filteredRowCount !== null">
+        showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
+      </template>
+      <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
+    </span>
     <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="stream-search-close" @click="close" />
   </div>
 </template>

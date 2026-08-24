@@ -3,8 +3,15 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import { isSearchFiltering, setSearchFiltering } from '../shared/searchFilter';
 import { getPage, pageVersion } from './kvPage';
-import { clearSearchState, runSearch, type SearchHandle, searchState } from './kvSearch';
+import {
+  clearSearchState,
+  matchedRows,
+  runSearch,
+  type SearchHandle,
+  searchState,
+} from './kvSearch';
 
 // Mirrors views/grid/SearchToolbar.vue exactly (same docking rule, same case/word/regex
 // toggles, same "loaded rows only" framing) — narrowed to kvSearch.ts's `'field' | 'value'`
@@ -17,6 +24,13 @@ const loadedRowCount = computed(() => {
   return getPage(props.tabId)?.rowCount ?? 0;
 });
 const emit = defineEmits<{ goToMatch: [row: number, col: 'field' | 'value']; close: [] }>();
+
+// P31 D17: the same filter-mode toggle grid/SearchToolbar.vue has (P24 D1/D9).
+const filtering = computed(() => isSearchFiltering(props.tabId));
+const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
+function toggleFilter(): void {
+  setSearchFiltering(props.tabId, !filtering.value);
+}
 
 const query = ref('');
 const matchCase = ref(false);
@@ -101,6 +115,8 @@ function goPrev(): void {
 function close(): void {
   handle?.cancel();
   clearSearchState(props.tabId);
+  // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
+  setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
@@ -121,6 +137,9 @@ onMounted(() => {
 onUnmounted(() => {
   handle?.cancel();
   clearSearchState(props.tabId);
+  // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
+  // above — the toggle must reset here too (mirrors grid/SearchToolbar.vue's own note).
+  setSearchFiltering(props.tabId, false);
 });
 </script>
 
@@ -166,6 +185,22 @@ onUnmounted(() => {
 
     <div class="sep" />
 
+    <!-- P31 D17: same filter *mode* as grid/SearchToolbar.vue (P24 D1/D9) — hides every
+         non-matching row. -->
+    <div class="group">
+      <IconButton
+        icon="filter"
+        :active="filtering"
+        v-tooltip="
+          filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
+        "
+        data-testid="keyvalue-search-filter-rows"
+        @click="toggleFilter"
+      />
+    </div>
+
+    <div class="sep" />
+
     <span v-if="errorMessage" class="p-sm search-error" data-testid="keyvalue-search-error">{{
       errorMessage
     }}</span>
@@ -180,7 +215,12 @@ onUnmounted(() => {
       <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="keyvalue-search-prev" @click="goPrev" />
       <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="keyvalue-search-next" @click="goNext" />
       <div class="sep" />
-      <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
+      <span class="p-xs dim" data-testid="keyvalue-search-scope">
+        <template v-if="filtering && filteredRowCount !== null">
+          showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
+        </template>
+        <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
+      </span>
     </template>
     <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="keyvalue-search-close" @click="close" />
   </div>

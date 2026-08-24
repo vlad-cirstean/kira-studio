@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
+import { isSearchFiltering } from '../shared/searchFilter';
 import { getPage, streamRow } from './streamPage';
 
 // Item 5's precedent (grid/search.ts): filters purely client-side against the already-fetched
@@ -43,6 +44,14 @@ export function runStreamSearch(tabId: string, query: string): void {
     }
   }
   streamSearchState[tabId] = { query, matches, index: matches.length > 0 ? 0 : -1 };
+}
+
+// P31 D16: streamSearch's own matches are already ascending, distinct row indices (one entry
+// per matching row, built by a single `row` loop) — filtering just gates them on the toggle,
+// with no de-dup pass needed the way matchedRowsOf's Match[]-shaped callers need one.
+export function matchedRows(tabId: string): number[] | null {
+  if (!isSearchFiltering(tabId)) return null;
+  return streamSearchState[tabId]?.matches ?? null;
 }
 
 export function goToNextMatch(tabId: string): number | null {

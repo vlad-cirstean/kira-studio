@@ -20,6 +20,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import { setSearchFiltering } from '../shared/searchFilter';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
@@ -38,7 +39,7 @@ import {
 import { streamMenu } from './streamMenu';
 import { deleteSqsMessage } from './streamMutations';
 import { getPage, pageVersion, streamRow } from './streamPage';
-import { streamSearchState } from './streamSearch';
+import { matchedRows, streamSearchState } from './streamSearch';
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -107,8 +108,12 @@ const page = computed(() => {
   return getPage(props.tab.id);
 });
 
+// P31 D17/D18: the same "hide non-matching rows" toggle grid/keyvalue/documents share (P24 D2) —
+// filtered rows keep their real row number (the `i + 1` gutter below), same as those views.
+const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
 const rowIndices = computed(() => {
   void pageVersion.n;
+  if (displayRows.value) return displayRows.value;
   return Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
 });
 
@@ -621,6 +626,19 @@ onUnmounted(() => {
           icon="inbox"
           :label="rt ? 'No messages' : ''"
         />
+        <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+             from "no messages loaded". -->
+        <EmptyState
+          v-else-if="displayRows && displayRows.length === 0"
+          class="no-rows"
+          icon="search"
+          label="No matching rows"
+          data-testid="stream-no-matching-rows"
+        >
+          <AppButton data-testid="stream-show-all-rows" @click="setSearchFiltering(tab.id, false)">
+            Show all rows
+          </AppButton>
+        </EmptyState>
         <template v-else>
           <div class="p-thead">
             <div class="p-th gutter" style="width: 40px" />
@@ -786,12 +804,15 @@ onUnmounted(() => {
   background: var(--kira-hover);
 }
 
+/* P31 D21: adopts the same color-mix tint / solid-current pair as DataGrid.vue and
+   KeyValueView.vue, replacing the inset bar so all four search-capable views agree. */
 .stream-row.search-match {
-  box-shadow: inset 2px 0 0 var(--kira-warn);
+  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
 }
 
 .stream-row.search-match-current {
-  background: var(--kira-hover);
+  background: var(--kira-warn);
+  color: var(--kira-bg);
 }
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */

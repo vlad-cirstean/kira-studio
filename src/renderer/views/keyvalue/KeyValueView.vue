@@ -21,11 +21,12 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import { setSearchFiltering } from '../shared/searchFilter';
 import KeyValueSearchToolbar from './KeyValueSearchToolbar.vue';
 import { keyValueMenu } from './keyValueMenu';
 import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
-import { searchState } from './kvSearch';
+import { matchedRows, searchState } from './kvSearch';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -106,8 +107,12 @@ const prevDisabled = computed(
   () => props.tab.state.pageIndex === 0 || page.value?.position.strategy !== 'offset',
 );
 
+// P31 D17/D18: the same "hide non-matching rows" toggle grid/documents/stream share (P24 D2) —
+// filtered rows keep their real row number (the `i + 1` gutter below), same as those views.
+const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
 const rowIndices = computed(() => {
   void pageVersion.n;
+  if (displayRows.value) return displayRows.value;
   return Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
 });
 
@@ -592,6 +597,18 @@ onUnmounted(() => {
             :icon="rt ? 'database' : 'loading'"
             :label="rt ? 'No data' : 'Loading…'"
           />
+          <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+               from "no data loaded". -->
+          <EmptyState
+            v-else-if="displayRows && displayRows.length === 0"
+            icon="search"
+            label="No matching rows"
+            data-testid="keyvalue-no-matching-rows"
+          >
+            <AppButton data-testid="keyvalue-show-all-rows" @click="setSearchFiltering(tab.id, false)">
+              Show all rows
+            </AppButton>
+          </EmptyState>
           <template v-else>
             <div
               v-for="i in rowIndices"

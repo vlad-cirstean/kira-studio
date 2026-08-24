@@ -1,6 +1,7 @@
 import { cellText } from '@shared/protocol/page';
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
+import { matchedRowsOf } from '../shared/searchFilter';
 import { getPage } from './kvPage';
 
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns
@@ -37,6 +38,11 @@ export function clearSearchState(tabId: string): void {
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup(clearSearchState);
+
+// P31 D16: thin wrapper over matchedRowsOf, same shape as grid/search.ts's own.
+export function matchedRows(tabId: string): number[] | null {
+  return matchedRowsOf(tabId, searchState[tabId]?.matches);
+}
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
