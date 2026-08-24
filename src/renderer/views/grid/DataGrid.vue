@@ -299,9 +299,18 @@ const colRange = computed(() =>
   visibleColumnRange(scrollLeft.value, viewportWidth.value, offsets.value),
 );
 
+// The visible window as four *numbers*, not two objects (F4/D4): rowRange/colRange are computeds
+// returning fresh object literals, so Vue's Object.is comparison always counts them as changed —
+// a 1px scroll would otherwise re-render every visible cell for byte-identical DOM. A primitive
+// computed only notifies its own dependents when the number itself changes.
+const rowStart = computed(() => rowRange.value.start);
+const rowEnd = computed(() => rowRange.value.end);
+const colStart = computed(() => colRange.value.startIndex);
+const colEnd = computed(() => colRange.value.endIndex);
+
 const visibleRows = computed<{ row: number; pos: number }[]>(() => {
   const out: { row: number; pos: number }[] = [];
-  for (let pos = rowRange.value.start; pos < rowRange.value.end; pos++) {
+  for (let pos = rowStart.value; pos < rowEnd.value; pos++) {
     out.push({ row: rowAtDisplayPosition(pos), pos });
   }
   return out;
@@ -325,7 +334,7 @@ watch(visiblePageRowBounds, (r) => setVisibleWindow(props.tabId, r.start, r.end)
 
 const visibleColumnIndices = computed(() => {
   const out: number[] = [];
-  for (let c = colRange.value.startIndex; c < colRange.value.endIndex; c++) out.push(c);
+  for (let c = colStart.value; c < colEnd.value; c++) out.push(c);
   return out;
 });
 
