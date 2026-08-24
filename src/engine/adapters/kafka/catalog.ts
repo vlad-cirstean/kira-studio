@@ -1,4 +1,4 @@
-import type { Admin } from 'kafkajs';
+import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import { mapKafkaError } from './errors';
 
@@ -11,19 +11,22 @@ function isInternal(name: string): boolean {
 // caps.ts's doc-comment table reads "cluster -> topics, consumer groups" — both are root-level
 // siblings, not nested under each topic (a consumer group can span many topics, or none of the
 // ones currently browsed, so nesting it under one topic would misrepresent it).
-export async function listRoot(admin: Admin): Promise<TreeNode[]> {
+export async function listRoot(admin: KafkaJS.Admin): Promise<TreeNode[]> {
   const [topicNodes, groupNodes] = await Promise.all([listTopics(admin), listGroups(admin)]);
   return [...topicNodes, ...groupNodes];
 }
 
-async function listTopics(admin: Admin): Promise<TreeNode[]> {
-  let metadata: { topics: { name: string; partitions: { partitionId: number }[] }[] };
+// P32 D9/F15.1: fetchTopicMetadata returns the topic array directly now, not `{ topics: [...] }`
+// — the array's own elements (name, partitions[].partitionId/leader/replicas/isr) kept their
+// kafkajs field names in this client's own compat layer, so only the outer shape changed.
+async function listTopics(admin: KafkaJS.Admin): Promise<TreeNode[]> {
+  let topics: KafkaJS.ITopicMetadata[];
   try {
-    metadata = await admin.fetchTopicMetadata();
+    topics = await admin.fetchTopicMetadata();
   } catch (err) {
     throw mapKafkaError(err);
   }
-  const nodes = metadata.topics
+  const nodes = topics
     .filter((t) => !isInternal(t.name))
     .map((t): TreeNode => {
       const count = t.partitions.length;
@@ -41,8 +44,8 @@ async function listTopics(admin: Admin): Promise<TreeNode[]> {
   return nodes;
 }
 
-async function listGroups(admin: Admin): Promise<TreeNode[]> {
-  let groups: { groupId: string }[];
+async function listGroups(admin: KafkaJS.Admin): Promise<TreeNode[]> {
+  let groups: KafkaJS.GroupOverview[];
   try {
     ({ groups } = await admin.listGroups());
   } catch (err) {
@@ -62,14 +65,14 @@ async function listGroups(admin: Admin): Promise<TreeNode[]> {
   return nodes;
 }
 
-export async function listPartitions(admin: Admin, topic: string): Promise<TreeNode[]> {
-  let metadata: { topics: { name: string; partitions: { partitionId: number }[] }[] };
+export async function listPartitions(admin: KafkaJS.Admin, topic: string): Promise<TreeNode[]> {
+  let topics: KafkaJS.ITopicMetadata[];
   try {
-    metadata = await admin.fetchTopicMetadata({ topics: [topic] });
+    topics = await admin.fetchTopicMetadata({ topics: [topic] });
   } catch (err) {
     throw mapKafkaError(err);
   }
-  const found = metadata.topics.find((t) => t.name === topic);
+  const found = topics.find((t) => t.name === topic);
   return (found?.partitions ?? [])
     .slice()
     .sort((a, b) => a.partitionId - b.partitionId)
