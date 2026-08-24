@@ -408,6 +408,9 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await selectCell(page, 3, 'big_text');
   await expect(page.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('64 KB');
+  // P24 D27: a truncated value is read-only — see the sibling test's dedicated scenario for the
+  // full behaviour (both editors refuse it, the value stays readable).
+  await expect(panel).toHaveAttribute('data-read-only-reason', 'value-truncated');
 
   // Captured here, not at the very top: scenarios 1-7 legitimately open several new tables
   // (nested_json, wide_table, nulls_and_unicode), each a genuine read — the zero-ops invariant
@@ -580,7 +583,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   expect(consoleErrors).toEqual([]);
 });
 
-test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane', async ({
+test('cell editor — UUID generate, timestamp translate pane, hex/base64 decoded pane', async ({
   kira,
   consoleErrors,
 }) => {
@@ -637,33 +640,117 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
   await panel.waitFor();
   await expect(page.locator('[data-testid="cell-editor-uuid-generate"]')).toBeDisabled();
 
-  // --- timestamp datetime-local picker — pick a moment, it re-encodes into the cell's own shape -
+  // --- timestamp translate pane (P24 D14/D15/D18/D19) --------------------------------------
   await selectCell(page, 5, 'sample'); // epochSeconds row
   await panel.waitFor();
   await expect(panel).toHaveAttribute('data-detected', 'epochSeconds');
-  const picker = page.locator('[data-testid="cell-editor-timestamp-picker"]');
-  await expect(picker).toBeVisible();
-  // Chromium's datetime-local value setter silently trims a trailing ":00" seconds component
-  // (confirmed via direct evaluate() against a bare <input>, independent of this app/Vue) — a
-  // value with exactly zero seconds round-trips as one without, and Playwright's fill() then sees
-  // input.value !== the string it set and throws "Malformed value". Use a non-zero seconds
-  // component so the assigned value survives verbatim.
-  await picker.fill('2030-06-15T12:30:15');
+  const tsField = page.locator('[data-testid="cell-editor-timestamp-field"]');
+  await expect(tsField).toBeVisible();
+  // D18: no native system chrome anywhere in the panel — the app-owned calendar replaces it.
+  await expect(page.locator('input[type="datetime-local"]')).toHaveCount(0);
+
+  // D15: live and bidirectional — typing in the field updates the encoded box on every
+  // keystroke, with no blur.
+  await tsField.fill('2030-06-15 12:30:15');
   await expect(encoded).toHaveText(/^\d+$/);
   const pickedEpoch = Number(await encoded.innerText());
-  // Round-trips through the reading row (local/UTC), not just a raw number — proves the picker
+  // Round-trips through the reading row (local/UTC), not just a raw number — proves the field
   // and describeTimestamp agree on the same moment.
   await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('2030');
   expect(Math.abs(pickedEpoch - Date.UTC(2030, 5, 15, 12, 30, 15) / 1000)).toBeLessThan(24 * 3600);
+  // Nothing staged yet — the field alone doesn't blur the editor.
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
+  ).not.toHaveClass(/pending-edit/);
+  await page.locator('[data-testid="cell-editor-format"]').focus();
   await expect(
     page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
   ).toHaveClass(/pending-edit/);
   await page.click('[data-testid="toolbar-discard-changes"]');
 
-  // No picker for a non-timestamp format.
+  // No translate pane for a non-timestamp format.
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
-  await expect(page.locator('[data-testid="cell-editor-timestamp-picker"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cell-editor-timestamp-field"]')).toHaveCount(0);
+
+  // --- shape preservation (D16): wide_table.ts_a is a real Postgres timestamptz defaulted to
+  // now(), so its text comes back in Postgres's own space+microseconds+offset shape, not a
+  // literal this fixture chose. Editing only the hour through the field must change only the
+  // hour digits, leaving the separator/offset/fractional precision exactly as they were. -----
+  const wideRow2 = await findRow(page, WIDE_PATH);
+  await wideRow2.dblclick();
+  await scrollColumnIntoView(page, 'ts_a');
+  await selectCell(page, 0, 'ts_a');
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'iso8601');
+  const originalTs = await encoded.innerText();
+  expect(originalTs).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:\d{2})?|Z)$/);
+  const tsFieldValue = await page
+    .locator('[data-testid="cell-editor-timestamp-field"]')
+    .inputValue();
+  const [datePart, timePart] = tsFieldValue.split(' ');
+  const [hh, mm, ss] = (timePart ?? '').split(':');
+  const bumpedHour = String((Number(hh) + 1) % 24).padStart(2, '0');
+  await page
+    .locator('[data-testid="cell-editor-timestamp-field"]')
+    .fill(`${datePart} ${bumpedHour}:${mm}:${ss}`);
+  const afterHourEdit = await encoded.innerText();
+  expect(afterHourEdit).not.toBe(originalTs);
+  const suffixFrom = (s: string) => s.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}/, '');
+  expect(suffixFrom(afterHourEdit)).toBe(suffixFrom(originalTs)); // minute/sec/fraction/offset unchanged
+  expect(afterHourEdit[10]).toBe(originalTs[10]); // the separator itself (space, not 'T')
+
+  // Editing the encoded box back updates the field, again with no blur (D15, the reverse
+  // direction).
+  await encoded.click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type(originalTs);
+  await expect(page.locator('[data-testid="cell-editor-timestamp-field"]')).toHaveValue(
+    tsFieldValue,
+  );
+  await expect(page.locator('[data-testid="cell-editor-timestamp-relative"]')).not.toHaveText('');
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
+  ).not.toHaveClass(/pending-edit/); // exploring/typing-then-reverting stages nothing
+
+  // --- zone switch preserves the value (D19): toggling Local -> UTC -> Local must leave the
+  // encoded buffer byte-identical. -----------------------------------------------------------
+  const docBeforeZoneToggle = await encoded.innerText();
+  await page.click('[data-testid="cell-editor-timestamp-zone-utc"]');
+  await page.click('[data-testid="cell-editor-timestamp-zone-local"]');
+  expect(await encoded.innerText()).toBe(docBeforeZoneToggle);
+
+  // --- the calendar is app-owned (D18), and exploring it stages nothing (D15) ---------------
+  await page.click('[data-testid="cell-editor-timestamp-calendar"]');
+  const calendarPopover = page.locator('[data-testid="cell-editor-timestamp-calendar-popover"]');
+  await expect(calendarPopover).toBeVisible();
+  await expect(calendarPopover).toHaveClass(/p-float/);
+  await page.click('[data-testid="datetime-picker-next-month"]');
+  await page.keyboard.press('Escape');
+  await expect(calendarPopover).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
+  ).not.toHaveClass(/pending-edit/);
+
+  // Picking a day and blurring stages exactly one pending edit.
+  await page.click('[data-testid="cell-editor-timestamp-calendar"]');
+  await page
+    .locator(
+      '[data-testid="datetime-picker-day"][data-in-month="true"]:not([data-selected="true"])',
+    )
+    .first()
+    .click();
+  await page.locator('[data-testid="cell-editor-format"]').focus();
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
+  ).toHaveClass(/pending-edit/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // Back to the formats table for the remaining scenarios.
+  await formatsRow.dblclick();
+  await expect(
+    page.locator('[data-testid="grid-header-cell"][data-column="sample"]'),
+  ).toBeVisible();
 
   // --- hex/base64 decoded pane — editing the plaintext re-encodes the raw box, and vice versa ---
   await selectCell(page, 3, 'sample'); // base64 row: "Hello, World!"
@@ -684,6 +771,18 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
   expect(await cellText(page, 3, 'sample')).toBe(btoa('Goodbye!'));
   await page.click('[data-testid="toolbar-discard-changes"]');
 
+  // The decoded pane's loop guard (D20/F7b): retyping *identical* plaintext is a no-op write —
+  // it must not leave the guard permanently armed and silently swallow the next genuine edit.
+  await decoded.click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type('Hello, World!'); // re-encodes to the exact same base64 already there
+  await encoded.click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type(btoa('Second edit'));
+  await expect(decoded).toContainText('Second edit');
+  await page.locator('[data-testid="cell-editor-format"]').focus();
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
   // hex row: raw bytes 0xcafebabedeadbeef are not valid UTF-8 — the decoded pane shows a note,
   // not garbled text, and offers no second editor to type into.
   await selectCell(page, 4, 'sample');
@@ -701,11 +800,51 @@ test('cell editor — UUID generate, timestamp picker, hex/base64 decoded pane',
   await expect(page.locator('[data-testid="cell-editor-decoded"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toHaveCount(0);
 
-  // --- beautify buttons now carry a tooltip once enabled, not just when disabled ---------------
+  // --- beautify/reset buttons carry a tooltip once enabled, not just when disabled -------------
   await expect(page.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveAttribute(
     'data-kira-tip',
     /./,
   );
+
+  // --- modified chip + data-dirty (D25), Escape reverts (D26/F10) ------------------------------
+  await selectCell(page, 0, 'sample'); // json row
+  await panel.waitFor();
+  await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
+  await expect(panel).toHaveAttribute('data-dirty', 'false');
+  const originalJson = await editorText(page);
+  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type('"escape me"');
+  await expect(page.locator('[data-testid="cell-editor-modified"]')).toBeVisible();
+  await expect(panel).toHaveAttribute('data-dirty', 'true');
+  // Reset's tooltip while enabled (D24/F7a) — the same bug already fixed for the beautify pair.
+  await expect(page.locator('[data-testid="cell-editor-beautify-reset"]')).toHaveAttribute(
+    'data-kira-tip',
+    /./,
+  );
+  await page.locator('[data-testid="cell-editor-panel"] .cm-content').press('Escape');
+  await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
+  await expect(panel).toHaveAttribute('data-dirty', 'false');
+  expect(await editorText(page)).toBe(originalJson);
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
+  ).not.toHaveClass(/pending-edit/);
+
+  // --- a truncated value refuses both editors (D27/F7f) -----------------------------------------
+  const nullsRow2 = await findRow(page, NULLS_PATH);
+  await nullsRow2.dblclick();
+  await scrollColumnIntoView(page, 'big_text');
+  await selectCell(page, 3, 'big_text');
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-read-only-reason', 'value-truncated');
+  await expect(page.locator('[data-testid="cell-editor-encoded"] .cm-content')).toHaveAttribute(
+    'contenteditable',
+    'false',
+  );
+  // The value stays fully readable — only writing it back is refused.
+  await expect(page.locator('[data-testid="cell-editor-encoded"] .cm-content')).not.toBeEmpty();
+  await page.locator('[data-testid="grid-cell"][data-row="3"][data-column="big_text"]').dblclick();
+  await expect(page.locator('[data-testid="grid-cell-input"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
