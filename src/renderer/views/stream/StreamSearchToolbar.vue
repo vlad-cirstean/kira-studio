@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -21,6 +21,11 @@ const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
 
 const query = ref('');
 const entry = computed(() => streamSearchState[props.tabId]);
+
+// See views/grid/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
+// target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
+// right place to autofocus (this component is mounted fresh each time the toolbar opens).
+const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 watch(query, (q) => {
   runStreamSearch(props.tabId, q);
@@ -51,6 +56,10 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+onMounted(() => {
+  void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
+});
+
 onUnmounted(() => clearStreamSearchState(props.tabId));
 </script>
 
@@ -59,7 +68,12 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
   <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
     <span class="icon-box muted"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
-      <TextField v-model="query" placeholder="Find" data-testid="stream-search-input" />
+      <TextField
+        ref="searchInput"
+        v-model="query"
+        placeholder="Find"
+        data-testid="stream-search-input"
+      />
     </div>
     <span class="p-sm muted search-count" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">

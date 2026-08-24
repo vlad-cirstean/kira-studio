@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -21,6 +21,11 @@ const regex = ref(false);
 const errorMessage = ref<string | null>(null);
 const scanning = ref(false);
 const foundSoFar = ref(0);
+
+// See views/grid/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
+// target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
+// right place to autofocus (this component is mounted fresh each time the toolbar opens).
+const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 let handle: SearchHandle | null = null;
 
@@ -94,6 +99,10 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+onMounted(() => {
+  void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
+});
+
 onUnmounted(() => {
   handle?.cancel();
   clearSearchState(props.tabId);
@@ -109,6 +118,7 @@ onUnmounted(() => {
     </span>
     <div class="search-input">
       <TextField
+        ref="searchInput"
         v-model="query"
         placeholder="Find"
         data-testid="keyvalue-search-input"

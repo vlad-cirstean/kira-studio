@@ -586,7 +586,11 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="tbody" ref="tbodyRef" data-testid="keyvalue-list">
-          <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No data' : ''" />
+          <EmptyState
+            v-if="!rt || rt.rowCount === 0"
+            :icon="rt ? 'database' : 'loading'"
+            :label="rt ? 'No data' : 'Loading…'"
+          />
           <template v-else>
             <div
               v-for="i in rowIndices"

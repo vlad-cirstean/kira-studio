@@ -76,6 +76,18 @@ const pathPrefix = computed(() => {
   return parts.length ? `${parts.join(' / ')} / ` : '';
 });
 
+// P24 D37: the grid was the one view whose header carried no facts at all — every sibling view
+// (KeyValue has four badges, Definition two, Documents one) says more about what's on screen than
+// this one did. Kind + column count + read-only state are always known the moment a tab opens;
+// the row count is gated on rt.count existing at all (§7 forbids computing one automatically), so
+// this badge appears only once the user has actually pressed Σ, never before.
+const columnCount = computed(() => rt.value?.meta?.columns.length ?? null);
+const isWritable = computed(() => !connectionRecord.value?.readOnly);
+const primaryKeyLabel = computed(() => {
+  const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
+  return names.length ? `PK ${names.join(', ')}` : null;
+});
+
 async function onReconnectAndLoad(): Promise<void> {
   if (!props.tab.connectionId) return;
   if (connectionStatus.value !== 'connected') {
@@ -128,7 +140,25 @@ function onCloseSearch(): void {
       :conn-color="connectionRecord?.color ?? null"
       :conn-kind="connectionRecord?.kind"
       target-testid="grid-target"
-    />
+    >
+      <span v-if="targetTail?.kind" class="p-badge" data-testid="grid-kind-badge">{{
+        targetTail.kind
+      }}</span>
+      <span v-if="columnCount !== null" class="p-badge" data-testid="grid-column-count-badge"
+        >{{ columnCount }} columns</span
+      >
+      <span class="p-badge" data-testid="grid-writable-badge">{{
+        isWritable ? 'read-write' : 'read-only'
+      }}</span>
+      <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
+        >Σ {{ rt.count.value.toLocaleString() }} rows</span
+      >
+      <template #trailing>
+        <span v-if="primaryKeyLabel" class="p-chip info" data-testid="grid-pk-chip">{{
+          primaryKeyLabel
+        }}</span>
+      </template>
+    </ViewHeader>
     <!-- DataToolbar and FilterToolbar render their own .p-toolbar bands unchanged; this is just
          their new host, moved from the shell-level Toolbar.vue so every view's chrome lives
          inside the view. -->

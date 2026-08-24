@@ -638,7 +638,11 @@ onUnmounted(() => {
       </div>
 
       <div ref="listBodyRef" class="list-body" data-testid="document-list">
-        <EmptyState v-if="!rt || rt.rowCount === 0" :label="rt ? 'No documents' : ''" />
+        <EmptyState
+          v-if="!rt || rt.rowCount === 0"
+          :icon="rt ? 'json' : 'loading'"
+          :label="rt ? 'No documents' : 'Loading…'"
+        />
         <template v-else>
           <div
             v-for="i in rowIndices"
