@@ -12,6 +12,7 @@ import { createSecretCipher } from './secret-cipher';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
+import { upgradeLegacySecrets } from './storage/repos/secrets';
 import { getAllSettings } from './storage/repos/settings';
 import { createTreeService } from './tree-service';
 import { createWindow } from './window';
@@ -62,16 +63,19 @@ async function main(): Promise<void> {
   // call would create the Keychain item under Chromium's own app name instead of this app's
   // (electron/electron#45328), and `app.whenReady()` above is what makes `app.setName` at :18
   // actually take effect for it.
-  createSecretCipher();
+  const secretCipher = createSecretCipher();
 
   ensureLayout();
   sweepOldLogs();
   const { db, raw, close } = await openDb();
   migrate(raw);
+  // One-shot upgrade of any password written before P25 (D10) — after migrate(), before
+  // anything reads a connection's secret.
+  await upgradeLegacySecrets(db, secretCipher);
   const settings = await getAllSettings(db);
 
   const engineHost = startEngine({ maxOldSpaceMb: settings.advanced.engineMemoryCapMb });
-  const connections = createConnectionsService(db, engineHost);
+  const connections = createConnectionsService(db, engineHost, secretCipher);
   const tree = createTreeService(db, engineHost, connections);
   void pushEngineConfig(engineHost, db);
 

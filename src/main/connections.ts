@@ -4,11 +4,13 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '../shared/domain/connection';
+import type { SecretStorageStatus } from '../shared/domain/secrets';
 import { injectUriPassword, stripUriPassword } from '../shared/domain/uri';
 import { ENGINE_OP, type ResolvedConnectionConfig } from '../shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
 import { createPreconnectSupervisor, type PreconnectExit } from './preconnect';
+import type { SecretCipher } from './secret-cipher';
 import type { KiraDb } from './storage/db';
 import {
   type ConnectionFields,
@@ -35,8 +37,9 @@ export interface ConnectionsService {
   duplicate(id: string): Promise<ConnectionSummary>;
   remove(id: string): Promise<void>;
   reorder(ids: string[]): Promise<ConnectionSummary[]>;
-  reveal(id: string): Promise<{ password: string | null }>;
+  reveal(id: string): Promise<{ password: string | null; error: string | null }>;
   test(input: ConnectionInput): Promise<ConnectionTestResult>;
+  secretsStatus(): SecretStorageStatus;
   connect(id: string): Promise<ConnectionState>;
   disconnect(id: string): Promise<ConnectionState>;
   states(): ConnectionState[];
@@ -61,8 +64,12 @@ function extractFields(summary: ConnectionSummary): ConnectionFields {
   return fields;
 }
 
-export function createConnectionsService(db: KiraDb, engineHost: EngineHost): ConnectionsService {
-  const secrets = createSecretStore(db);
+export function createConnectionsService(
+  db: KiraDb,
+  engineHost: EngineHost,
+  cipher: SecretCipher,
+): ConnectionsService {
+  const secrets = createSecretStore(db, cipher);
   const states = new Map<string, ConnectionState>();
   const stateHandlers = new Set<(state: ConnectionState) => void>();
   const invalidatedHandlers = new Set<(connectionId: string) => void>();
@@ -238,6 +245,11 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         uri = stripped.uri;
         password = stripped.password;
       }
+      // P25 D6: validate the secret can be encrypted before writing anything — a throw here
+      // (cipher unavailable) leaves no row behind at all, rather than a connection whose
+      // password half silently failed to land. secrets.set() below re-encrypts the same
+      // plaintext once the row actually exists (a new row has no password column to update yet).
+      if (password !== null) cipher.encrypt(password);
       const id = crypto.randomUUID();
       const created = await insertConnection(db, {
         id,
@@ -264,6 +276,9 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         uri = stripped.uri;
         password = stripped.password;
       }
+      // P25 D6: the row already exists, so — unlike create() — the secret can be written first;
+      // a throw here (cipher unavailable) means updateConnection() never runs, leaving every
+      // other field exactly as it was rather than a half-applied edit.
       if (password !== null) {
         await secrets.set(id, password === '' ? null : password);
       }
@@ -275,7 +290,6 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     async duplicate(id) {
       const existing = await getConnection(db, id);
       if (!existing) throw new Error(`connection ${id} not found`);
-      const password = await secrets.get(id);
       const newId = crypto.randomUUID();
       const fields = extractFields(existing);
       const created = await insertConnection(db, {
@@ -283,7 +297,9 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
         fields: { ...fields, name: `${fields.name} copy` },
         createdAt: new Date().toISOString(),
       });
-      await secrets.set(newId, password);
+      // P25 D11: a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
+      // there is no reason for this path to need the OS key at all.
+      await secrets.copy(id, newId);
       void emitListChanged();
       return created;
     },
@@ -307,9 +323,19 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     },
 
     async reveal(id) {
-      const password = await secrets.get(id);
-      log('info', 'connections', `secret revealed for ${id}`);
-      return { password };
+      // P25 D9: catches rather than throws — the renderer's openEditDialog() has no error
+      // handling around this call, so an undecryptable stored secret (a restored kira.sqlite
+      // from another machine, a reset login keychain) must not become an unhandled rejection
+      // that silently no-ops the Edit menu item.
+      try {
+        const password = await secrets.get(id);
+        log('info', 'connections', `secret revealed for ${id}`);
+        return { password, error: null };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log('warn', 'connections', `secret reveal failed for ${id}: ${message}`);
+        return { password: null, error: message };
+      }
     },
 
     async test(input) {
@@ -377,5 +403,7 @@ export function createConnectionsService(db: KiraDb, engineHost: EngineHost): Co
     },
 
     shutdown: () => preconnect.stopAll(),
+
+    secretsStatus: () => cipher.status,
   };
 }
