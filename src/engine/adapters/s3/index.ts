@@ -1,7 +1,10 @@
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
-import type { ObjectTransferResult } from '../../../shared/domain/object-store';
+import type {
+  ObjectDownloadRequest,
+  ObjectTransferResult,
+} from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -25,6 +28,7 @@ import { connectS3 } from './client';
 import { mapS3Error } from './errors';
 import * as mutateOps from './mutate';
 import { countObject, readObject } from './read';
+import { downloadObject } from './transfer';
 
 // Mirrors redis/index.ts closely: bucket ~ redis's database, prefix ~ redis's namespace, object ~
 // redis's key — a lazy, '/'-delimited tree with the same "only the leaf opens a tab, every
@@ -133,10 +137,9 @@ class S3Adapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 's3 has no query console');
   }
 
-  async downloadObject(): Promise<ObjectTransferResult> {
-    // P33 commit 3 replaces this with a real implementation (transfer.ts's downloadObject) —
-    // caps.fileTransfer is still false at this commit (caps.ts), so this is never reached yet.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not yet implemented for s3');
+  async downloadObject(req: ObjectDownloadRequest, ctx: OpCtx): Promise<ObjectTransferResult> {
+    const { bucket, key } = this.resolveObjectTarget(req.path);
+    return downloadObject(this.requireClient(), bucket, key, req.destPath, ctx);
   }
 
   // The SDK's own abortSignal request option (passed straight through in catalog.ts/read.ts) is

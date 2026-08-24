@@ -7,6 +7,8 @@ import {
   type ExecuteResponse,
   type MutateRequestWire,
   type MutateResponse,
+  type ObjectDownloadRequestWire,
+  type ObjectDownloadResponse,
   PORT_EVENT,
   type PreviewRequestWire,
   type PreviewResponse,
@@ -53,6 +55,8 @@ export const data = {
     for (const page of response.pages) assertPageStructure(page);
     return response;
   },
+  objectDownload: (req: ObjectDownloadRequestWire): Promise<ObjectDownloadResponse> =>
+    request(DATA_OP.objectDownload, plain(req), NO_TIMEOUT) as Promise<ObjectDownloadResponse>,
   clearCaches: async (): Promise<void> => {
     await request(DATA_OP.cacheClear);
   },

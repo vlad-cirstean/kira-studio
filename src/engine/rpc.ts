@@ -1,7 +1,14 @@
 import type { PingPayload, PortRequest, PortResponse } from '../shared/port';
 import { DATA_OP, invalidateRequestWireSchema } from '../shared/protocol/data-ops';
 import { cache } from './cache';
-import { handleCount, handleExecute, handleMutate, handlePreview, handleRead } from './data';
+import {
+  handleCount,
+  handleExecute,
+  handleMutate,
+  handleObjectDownload,
+  handlePreview,
+  handleRead,
+} from './data';
 
 type Handler = (payload: unknown) => Promise<unknown>;
 
@@ -18,6 +25,7 @@ const handlers: Record<string, Handler> = {
   [DATA_OP.preview]: handlePreview,
   [DATA_OP.mutate]: handleMutate,
   [DATA_OP.execute]: handleExecute,
+  [DATA_OP.objectDownload]: handleObjectDownload,
   [DATA_OP.invalidate]: async (payload) => {
     const { connectionId, path, scope } = invalidateRequestWireSchema.parse(payload);
     // P13 D18: 'pages' is the post-mutation reload — the count's stale mark was already set by

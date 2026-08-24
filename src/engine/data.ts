@@ -1,4 +1,5 @@
 import type { MutationPlan } from '../shared/domain/mutations';
+import type { ObjectDownloadRequest } from '../shared/domain/object-store';
 import { decodePath } from '../shared/domain/tree';
 import {
   type CountRequestWire,
@@ -10,6 +11,9 @@ import {
   type MutateRequestWire,
   type MutateResponse,
   mutateRequestWireSchema,
+  type ObjectDownloadRequestWire,
+  type ObjectDownloadResponse,
+  objectDownloadRequestWireSchema,
   type PreviewRequestWire,
   type PreviewResponse,
   previewRequestWireSchema,
@@ -136,6 +140,27 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
   // for the renderer's explicit ↻ Refresh.
   cache.invalidateAfterMutation(req.connectionId, req.path);
   return { affectedRows: value.affectedRows };
+}
+
+// P33: no cache interaction at all — a download reads nothing the L1/L2 cache holds (it streams
+// bytes to a local file, never a Page), and never returns bytes over the port (§4: bulk data
+// never transits main or the renderer — the engine writes the file itself). 'transfer' rather
+// than 'read' as the op kind (D9) so a multi-hundred-MB download reads as a file transfer in the
+// Operations panel, not a mysteriously slow read.
+export async function handleObjectDownload(payload: unknown): Promise<ObjectDownloadResponse> {
+  const req: ObjectDownloadRequestWire = objectDownloadRequestWireSchema.parse(payload);
+  const adapter = getLiveAdapter(req.connectionId);
+  if (!adapter) {
+    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+  }
+
+  const path = decodePath(req.connectionId, req.path);
+  const downloadReq: ObjectDownloadRequest = { path, destPath: req.destPath };
+  const { value } = await runOp(
+    { connectionId: req.connectionId, kind: 'transfer', opId: req.opId, tabId: req.tabId },
+    (ctx) => adapter.downloadObject(downloadReq, ctx),
+  );
+  return { bytes: value.bytes };
 }
 
 // §8.14: no cache interaction at all — console results never populate L2 (they are not a table
