@@ -1492,6 +1492,11 @@ defineExpose({ scrollCellIntoView });
   position: absolute;
   left: 0;
   right: 0;
+  /* Scopes a row's layout invalidation to the row (P29 D8) — not `paint` (the cells already clip
+     their own overflow, and the sticky gutter/absolutely-positioned nav button both sit inside
+     this box) and not `will-change` (this compositing a ~280 000px-tall sizer trades §2.1 for
+     §2.2, the way P12's memory findings warn against). */
+  contain: layout;
 }
 
 /* No zebra striping — the design's own _gridrows.html/_style.css draws no alternating row
