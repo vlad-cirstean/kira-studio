@@ -6,6 +6,7 @@ import { useRunState } from '../../state/runState';
 import { activeDataTab } from '../../state/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import RunState from '../../theme/primitives/RunState.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
@@ -33,13 +34,14 @@ import {
   stop,
 } from './state';
 
-const PAGE_SIZES: DataTabState['pageSize'][] = [10, 100, 1000, 10000];
-const PAGE_SIZE_LABEL: Record<DataTabState['pageSize'], string> = {
-  10: '10',
-  100: '100',
-  1000: '1k',
-  10000: '10k',
-};
+// P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
+// (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
+const PAGE_SIZE_OPTIONS: { value: DataTabState['pageSize']; label: string; testid: string }[] = [
+  { value: 10, label: '10', testid: 'page-size-10' },
+  { value: 100, label: '100', testid: 'page-size-100' },
+  { value: 1000, label: '1k', testid: 'page-size-1000' },
+  { value: 10000, label: '10k', testid: 'page-size-10000' },
+];
 
 const tab = computed(() => activeDataTab.value);
 const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
@@ -278,22 +280,12 @@ function onDiscard(): void {
       />
     </div>
 
-    <!-- Left as the hand-rolled .p-seg group rather than <SegmentedControl>: tabs.spec.ts/leaks.spec.ts
-         assert `toHaveClass(/active/)` on these buttons, and SegmentedControl.vue (off-limits to edit)
-         only ever applies `.on` — swapping components here would silently break those tests
-         (rule 3: correctness over consistency). -->
-    <div class="p-seg" data-testid="page-size-picker">
-      <button
-        v-for="size in PAGE_SIZES"
-        :key="size"
-        type="button"
-        :class="{ active: tab.state.pageSize === size }"
-        :data-testid="`page-size-${size}`"
-        @click="onPageSize(size)"
-      >
-        {{ PAGE_SIZE_LABEL[size] }}
-      </button>
-    </div>
+    <SegmentedControl
+      :model-value="tab.state.pageSize"
+      :options="PAGE_SIZE_OPTIONS"
+      data-testid="page-size-picker"
+      @update:model-value="onPageSize"
+    />
 
     <div class="sep" />
 
@@ -429,13 +421,6 @@ function onDiscard(): void {
 
 .page-input :deep(input) {
   text-align: center;
-}
-
-/* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
-   the `active` class name because tests/ui assert on it directly. */
-.p-seg > button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
 }
 
 .columns-anchor,

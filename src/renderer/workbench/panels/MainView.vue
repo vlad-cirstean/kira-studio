@@ -164,8 +164,9 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .start-title {
+  /* P24 D31: no bold text anywhere in the app — --kira-t-xl (the scale's largest step) already
+     carries the emphasis a first-run heading needs. */
   font-size: var(--kira-t-xl);
-  font-weight: 500;
   color: var(--kira-fg);
   letter-spacing: -0.01em;
 }

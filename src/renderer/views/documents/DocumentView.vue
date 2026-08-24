@@ -18,6 +18,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -198,13 +199,14 @@ function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null):
   setSort(props.tab.id, orderBy);
 }
 
-const PAGE_SIZES: DocumentTabState['pageSize'][] = [10, 100, 1000, 10000];
-const PAGE_SIZE_LABEL: Record<DocumentTabState['pageSize'], string> = {
-  10: '10',
-  100: '100',
-  1000: '1k',
-  10000: '10k',
-};
+// P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
+const PAGE_SIZE_OPTIONS: { value: DocumentTabState['pageSize']; label: string; testid: string }[] =
+  [
+    { value: 10, label: '10', testid: 'document-page-size-10' },
+    { value: 100, label: '100', testid: 'document-page-size-100' },
+    { value: 1000, label: '1k', testid: 'document-page-size-1000' },
+    { value: 10000, label: '10k', testid: 'document-page-size-10000' },
+  ];
 
 function onPageSize(size: DocumentTabState['pageSize']): void {
   setPageSize(props.tab.id, size);
@@ -495,20 +497,12 @@ onUnmounted(() => {
           />
         </div>
         <div class="sep"></div>
-        <!-- Left as the hand-rolled .p-seg group, same as DataToolbar.vue's own page-size picker
-             (and for the same reason — tests assert `active` directly on these buttons). -->
-        <div class="p-seg" data-testid="document-page-size-picker">
-          <button
-            v-for="size in PAGE_SIZES"
-            :key="size"
-            type="button"
-            :class="{ active: tab.state.pageSize === size }"
-            :data-testid="`document-page-size-${size}`"
-            @click="onPageSize(size)"
-          >
-            {{ PAGE_SIZE_LABEL[size] }}
-          </button>
-        </div>
+        <SegmentedControl
+          :model-value="tab.state.pageSize"
+          :options="PAGE_SIZE_OPTIONS"
+          data-testid="document-page-size-picker"
+          @update:model-value="onPageSize"
+        />
         <div class="sep"></div>
         <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
              the exact count, the fields/projection menu, and expand/collapse-all. -->
@@ -791,14 +785,6 @@ onUnmounted(() => {
 
 .projection-anchor {
   position: relative;
-}
-
-/* .p-seg's own primitive only paints `.on` (see primitives.css) — kept as `active` because
-   tests/ui assert on it directly (DataToolbar.vue's identical page-size picker and its own
-   comment on why this stays hand-rolled rather than <SegmentedControl>). */
-.p-seg > button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
 }
 
 .new-doc-panel {

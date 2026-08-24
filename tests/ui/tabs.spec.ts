@@ -163,11 +163,11 @@ test('tabs — independent state, context menu, colours, session restore', async
   await page.fill('[data-testid="pager-page-input"]', '5');
   await page.press('[data-testid="pager-page-input"]', 'Tab');
   await page.click('[data-testid="page-size-1000"]');
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
 
   // Switch to tab 1: untouched (page 1, page size 100).
   await tabLocator(page, tab1Id).click();
-  await expect(page.locator('[data-testid="page-size-100"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="page-size-100"]')).toHaveClass(/on/);
   await expect(page.locator('[data-testid="pager-page-input"]')).toHaveValue('1');
 
   await page.screenshot({ path: 'test-results/screenshots/tabs.png' });
@@ -300,7 +300,7 @@ test('tabs — independent state, context menu, colours, session restore', async
   await restoredTabs.last().click();
   await restored.click('[data-testid="reconnect-load"]');
   await expect(restored.locator('[data-testid="data-grid"]')).toBeVisible({ timeout: 15_000 });
-  await expect(restored.locator('[data-testid="page-size-1000"]')).toHaveClass(/active/);
+  await expect(restored.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
   await expect(restored.locator('[data-testid="pager-page-input"]')).toHaveValue('3');
   await restored.screenshot({ path: 'test-results/screenshots/restored-tab.png' });
 

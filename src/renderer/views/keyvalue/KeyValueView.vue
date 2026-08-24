@@ -15,6 +15,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -128,16 +129,14 @@ function memoryText(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
-// --- page size (mirrors views/grid/DataToolbar.vue's hand-rolled .p-seg group — left inline
-// here for the same reason DataToolbar's own comment gives: tests assert on the `active` class
-// directly, so this stays a per-view control rather than a shared component). ---------------
-const PAGE_SIZES: KeyValueTabState['pageSize'][] = [10, 100, 1000, 10000];
-const PAGE_SIZE_LABEL: Record<KeyValueTabState['pageSize'], string> = {
-  10: '10',
-  100: '100',
-  1000: '1k',
-  10000: '10k',
-};
+// --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
+const PAGE_SIZE_OPTIONS: { value: KeyValueTabState['pageSize']; label: string; testid: string }[] =
+  [
+    { value: 10, label: '10', testid: 'keyvalue-page-size-10' },
+    { value: 100, label: '100', testid: 'keyvalue-page-size-100' },
+    { value: 1000, label: '1k', testid: 'keyvalue-page-size-1000' },
+    { value: 10000, label: '10k', testid: 'keyvalue-page-size-10000' },
+  ];
 function onPageSize(size: KeyValueTabState['pageSize']): void {
   void setPageSize(props.tab.id, size);
 }
@@ -449,18 +448,12 @@ onUnmounted(() => {
 
           <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
                DataToolbar.vue's own page-size segmented control occupies. -->
-          <div class="p-seg" data-testid="keyvalue-page-size-picker">
-            <button
-              v-for="size in PAGE_SIZES"
-              :key="size"
-              type="button"
-              :class="{ active: tab.state.pageSize === size }"
-              :data-testid="`keyvalue-page-size-${size}`"
-              @click="onPageSize(size)"
-            >
-              {{ PAGE_SIZE_LABEL[size] }}
-            </button>
-          </div>
+          <SegmentedControl
+            :model-value="tab.state.pageSize"
+            :options="PAGE_SIZE_OPTIONS"
+            data-testid="keyvalue-page-size-picker"
+            @update:model-value="onPageSize"
+          />
         </template>
 
         <div class="sep" />
@@ -702,13 +695,6 @@ onUnmounted(() => {
 .search-match-current {
   background: var(--kira-warn);
   color: var(--kira-bg);
-}
-
-/* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
-   the `active` class name to match DataToolbar.vue's own precedent (tests/ui assert on it). */
-.p-seg > button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
 }
 
 .edit-anchor,

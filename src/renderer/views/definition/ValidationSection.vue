@@ -52,47 +52,6 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 </template>
 
 <style scoped>
-.def-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
-}
-
-.def-section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-}
-
-.def-section-title {
-  font-weight: 600;
-  color: var(--kira-fg);
-}
-
-.def-empty {
-  color: var(--kira-fg-muted);
-  margin: 0;
-}
-
-.def-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--kira-t-md);
-}
-
-.def-row {
-  border-bottom: 1px solid var(--kira-border);
-}
-.def-row:hover {
-  background: var(--kira-hover);
-}
-
-.def-table td {
-  padding: var(--kira-s-2) var(--kira-s-3);
-  vertical-align: middle;
-  color: var(--kira-fg);
-}
-
 .def-val-desc {
   color: var(--kira-fg-muted);
 }
@@ -104,9 +63,5 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
   border-radius: var(--kira-radius-sm);
   white-space: pre-wrap;
   color: var(--kira-fg);
-}
-
-.mono {
-  font-family: var(--kira-font-family);
 }
 </style>

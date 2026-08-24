@@ -316,7 +316,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   height: 20px;
   color: var(--kira-fg-muted);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-weight: 600;
+  /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
+     size, case and letter-spacing alone, matching .p-panel-head's own section-label idiom. */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .ops-body {

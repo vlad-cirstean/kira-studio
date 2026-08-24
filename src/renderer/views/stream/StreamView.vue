@@ -15,6 +15,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -183,15 +184,13 @@ const statusLine = computed(() => {
   return parts.join(' · ');
 });
 
-// Item 1: kept as the hand-rolled .p-seg group rather than a shared component — grid/
-// DataToolbar.vue's own comment explains why (tests assert `active` directly on these buttons).
-const PAGE_SIZES: PageSize[] = [10, 100, 1000, 10000];
-const PAGE_SIZE_LABEL: Record<PageSize, string> = {
-  10: '10',
-  100: '100',
-  1000: '1k',
-  10000: '10k',
-};
+// P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
+const PAGE_SIZE_OPTIONS: { value: PageSize; label: string; testid: string }[] = [
+  { value: 10, label: '10', testid: 'stream-page-size-10' },
+  { value: 100, label: '100', testid: 'stream-page-size-100' },
+  { value: 1000, label: '1k', testid: 'stream-page-size-1000' },
+  { value: 10000, label: '10k', testid: 'stream-page-size-10000' },
+];
 function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
 }
@@ -458,18 +457,12 @@ onUnmounted(() => {
           />
         </div>
 
-        <div class="p-seg" data-testid="stream-page-size-picker">
-          <button
-            v-for="size in PAGE_SIZES"
-            :key="size"
-            type="button"
-            :class="{ active: tab.state.pageSize === size }"
-            :data-testid="`stream-page-size-${size}`"
-            @click="onPageSize(size)"
-          >
-            {{ PAGE_SIZE_LABEL[size] }}
-          </button>
-        </div>
+        <SegmentedControl
+          :model-value="tab.state.pageSize"
+          :options="PAGE_SIZE_OPTIONS"
+          data-testid="stream-page-size-picker"
+          @update:model-value="onPageSize"
+        />
 
         <div class="sep" />
 
@@ -818,12 +811,6 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* .p-seg's own primitive only paints `.on` (see primitives.css) — the page-size control keeps
-   the `active` class name because tests/ui assert on it directly (mirrors DataToolbar.vue). */
-.p-seg > button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-}
 
 .history-anchor,
 .partition-anchor {

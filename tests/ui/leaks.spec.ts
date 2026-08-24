@@ -260,7 +260,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   // D7, `replaceTabs`'s INSERT re-inserted a row bearing A's now-nonexistent connection_id and
   // every subsequent save threw — silently killing persistence for the rest of the session.
   await page.click('[data-testid="page-size-1000"]');
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
   await page.waitForTimeout(300); // state/tabs.ts's debounced save
 
   ({ window: page } = await relaunch());
@@ -270,7 +270,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   await expect(page.locator('[data-testid="reconnect-panel"]')).toBeVisible();
   await page.click('[data-testid="reconnect-load"]');
   await waitForGrid(page);
-  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
 
   // --- scenario 4: L3 is bounded (F19, D19) -----------------------------------------------------
   // Drive many more distinct {path, filter} combinations than D19's ~2 000-entry budget could

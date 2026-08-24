@@ -80,55 +80,9 @@ function onNavigate(c: ConstraintRow): void {
 </template>
 
 <style scoped>
-.def-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
-}
-
-.def-section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-}
-
-.def-section-title {
-  font-weight: 600;
-  color: var(--kira-fg);
-}
-
-.def-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--kira-t-md);
-}
-
-.def-head-row th {
-  text-align: left;
-  font-weight: 400;
-  padding: var(--kira-s-2) var(--kira-s-3);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
-  border-right: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-  white-space: nowrap;
-}
-.def-head-row th:last-child {
-  border-right: none;
-}
-
-.def-row {
-  border-bottom: 1px solid var(--kira-border);
-}
-.def-row:hover {
-  background: var(--kira-hover);
-}
-
+/* Only these two aren't in the shared .def-table td rule (primitives.css) — see
+   ColumnsSection.vue's own comment on why. */
 .def-table td {
-  padding: var(--kira-s-2) var(--kira-s-3);
-  vertical-align: middle;
-  color: var(--kira-fg);
   border-right: var(--kira-border-width) solid var(--kira-border);
 }
 .def-table td:last-child {
@@ -161,9 +115,5 @@ function onNavigate(c: ConstraintRow): void {
 }
 .ref-link:hover {
   color: var(--kira-accent);
-}
-
-.mono {
-  font-family: var(--kira-font-family);
 }
 </style>
