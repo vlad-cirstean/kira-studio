@@ -8,13 +8,24 @@ files:
   - out/**/*                                # electron-vite's build output; `main` points into it
   - package.json
   - '!**/*.map'
+  # P32 D7: the vendored librdkafka C/C++ sources and build intermediates are pure build residue —
+  # ~11 MB of sources plus ~8 MB of .o files (P32 F19) that the packaged app never touches.
+  - '!node_modules/@confluentinc/kafka-javascript/{deps,src,util,examples,ci}/**'
+  - '!node_modules/@confluentinc/kafka-javascript/build/Release/{obj.target,.deps}/**'
 asar: true
 # out/main/engine.js is loaded via `utilityProcess.fork()` (main/engine-host.ts) — a forked entry
 # point can't be exec'd from inside the asar archive, so it must be unpacked (P12 plan §5 checklist
-# item 3).
+# item 3). The Kafka driver's .node is unpacked for the same reason: Electron cannot dlopen a
+# native addon from inside an asar archive (P32 D7) — scripts/native-electron-build.sh guarantees
+# it is built for Electron's own ABI before packaging runs (P32 D6).
 asarUnpack:
   - out/main/engine.js
-npmRebuild: false                           # no native production dependency exists (D14)
+  - node_modules/@confluentinc/kafka-javascript/build/Release/*.node
+# P32 D5: a native production dependency exists now, but npmRebuild stays false — electron-builder's
+# own rebuild step shells out to the detected package manager, which does not support Bun.
+# scripts/native-electron-build.sh (wired as prepackage:mac) produces the Electron-ABI build before
+# electron-builder ever runs, so its own rebuild step has nothing left to do.
+npmRebuild: false
 electronLanguages:
   - en                                      # dark-mode-only, English-only v1; trims .lproj weight
 mac:

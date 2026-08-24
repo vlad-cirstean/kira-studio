@@ -8,10 +8,12 @@
   "main": "out/main/index.js",
   "trustedDependencies": [
     "electron",
-    "esbuild"
+    "esbuild",
+    "@confluentinc/kafka-javascript"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
+    "predev": "sh scripts/native-electron-build.sh",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
@@ -21,8 +23,12 @@
     "typecheck:node": "tsgo --noEmit -p tsconfig.node.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck:db": "tsgo --noEmit -p tests/db/tsconfig.json",
+    "pretest:ui": "sh scripts/native-electron-build.sh",
     "test:ui": "electron-vite build && playwright test",
     "test:db": "bun test tests/db",
+    "pretest:db:kafka": "sh scripts/native-electron-build.sh",
+    "test:db:kafka": "bunx esbuild tests/electron-db/kafka.spec.ts --bundle --platform=node --external:electron --external:@confluentinc/kafka-javascript --outfile=out/tests/kafka-suite.cjs && ELECTRON_RUN_AS_NODE=1 electron out/tests/kafka-suite.cjs",
+    "prepackage:mac": "sh scripts/native-electron-build.sh",
     "package:mac": "electron-vite build && electron-builder --mac --arm64 --publish never",
     "package:mac:dir": "electron-vite build && electron-builder --mac --arm64 --dir --publish never",
     "verify:packaging": "sh scripts/verify-packaging.sh"
@@ -38,6 +44,7 @@
     "@codemirror/lint": "6.9.7",
     "@codemirror/state": "6.7.1",
     "@codemirror/view": "6.43.9",
+    "@electron/rebuild": "4.2.0",
     "@lezer/highlight": "1.2.3",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
@@ -66,11 +73,11 @@
     "@aws-sdk/client-s3": "3.1116.0",
     "@aws-sdk/client-sqs": "3.1116.0",
     "@aws-sdk/credential-providers": "3.1116.0",
+    "@confluentinc/kafka-javascript": "1.10.0",
     "bson": "6",
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",
     "ioredis": "6.0.0",
-    "kafkajs": "2.2.4",
     "mariadb": "3.5.3",
     "mongodb": "6",
     "pg": "8.23.0",

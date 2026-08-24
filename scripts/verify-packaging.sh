@@ -105,6 +105,26 @@ else
   else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
+
+  # A6: the Kafka driver's native module is unpacked, and only there (P32 D7) — Electron cannot
+  # dlopen a native addon from inside an asar archive, so a .node left inside app.asar would make
+  # every Kafka connection fail at runtime with no build-time signal.
+  if [ -d "$APP" ]; then
+    UNPACKED_NATIVE="$APP/Contents/Resources/app.asar.unpacked/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node"
+    if [ ! -f "$UNPACKED_NATIVE" ]; then
+      fail "kafka driver not unpacked" "\"$UNPACKED_NATIVE\" is missing"
+    fi
+    ASAR="$APP/Contents/Resources/app.asar"
+    if [ -f "$ASAR" ] && command -v npx >/dev/null 2>&1; then
+      if npx --yes asar list "$ASAR" 2>/dev/null | grep -q '@confluentinc/kafka-javascript/build/Release/.*\.node$'; then
+        fail "kafka driver inside app.asar" "\"$ASAR\" contains a .node under @confluentinc/kafka-javascript — it must be asarUnpack'd, not bundled"
+      fi
+    else
+      note "skipped the app.asar contents half of A6 — no asar CLI available on this runner"
+    fi
+  else
+    note "skipped A6 — \"$APP\" not present"
+  fi
 fi
 
 if [ "$FAILED" = "1" ]; then
