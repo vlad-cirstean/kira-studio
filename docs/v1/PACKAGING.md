@@ -25,8 +25,13 @@ loop for cold-start and RSS measurements.
 ## 2. Config summary (`electron-builder.yml`)
 
 - `appId: com.kirathecat.kira-studio`, `productName: Kira Studio`.
-- `asar: true`, with `out/main/engine.js` unpacked (`asarUnpack`) — it's loaded via
-  `utilityProcess.fork()` and a forked entry point can't be exec'd from inside an asar archive.
+- `asar: true`, with `out/main/engine.js` and (P32) the Kafka adapter's native driver
+  (`node_modules/@confluentinc/kafka-javascript/build/Release/*.node`) unpacked (`asarUnpack`) —
+  `engine.js` is loaded via `utilityProcess.fork()` and a forked entry point can't be exec'd from
+  inside an asar archive; a native addon can't be `require()`'d from inside one either, for the
+  same reason. `files` also excludes the driver's source/build-intermediate directories
+  (`deps/`, `src/`, `util/`, `examples/`, `ci/`, `build/Release/{obj.target,.deps}/`) — only the
+  built `.node` file the packaged app actually loads ships.
 - `mac.identity: '-'` (ad-hoc) with `mac.hardenedRuntime: false` — deliberately not `identity: null`
   (which skips signing entirely and gets killed by the kernel on Apple Silicon) or the
   hardened-runtime default (which needs an entitlements file for ad-hoc signing to launch).
@@ -39,8 +44,11 @@ loop for cold-start and RSS measurements.
   signing rather than something worth working around with a private/bundled key, which would be
   strictly worse security and would have to be unpicked once real signing lands.
 - Targets: `dmg` and `zip`, arm64 only, into `dist/` (already gitignored).
-- `npmRebuild: false` — every native dependency in the tree belongs to a devDependency; the
-  production dependency set is pure JS.
+- `npmRebuild: false` — stays false even now that the tree has one real native production
+  dependency (P32's `@confluentinc/kafka-javascript`): its Electron-ABI build is produced by
+  `scripts/native-electron-build.sh` (run as `prepackage:mac`) rather than electron-builder's own
+  rebuild step, which has no Bun support. By the time `electron-builder` runs, the driver is
+  already built for the right ABI and just needs packaging, not rebuilding.
 - `electronLanguages: ['en']` — dark-mode-only, English-only v1; trims `.lproj` locale weight.
 
 ## 3. Verification checklist — results from this environment
@@ -60,6 +68,15 @@ and their output inspected directly:
 | `.app` on-disk size (lever L-D, budget ≤ 300 MB) | **252 MB** — under budget |
 | Full (non-`--dir`) build, `zip` target | **pass** — produced `dist/Kira Studio-0.1.0-arm64.zip`, 315 MB |
 | Full (non-`--dir`) build, `dmg` target | **fails** — see §5 |
+
+**P32 update:** this table predates the Kafka adapter's native driver and has not been re-run since
+— `prepackage:mac`'s `native-electron-build.sh` step needs a real `electron-rebuild` against
+Electron's headers, which this sandbox's proxy blocks (the same F20 finding that blocks it for
+`predev`/`pretest:ui`). `scripts/verify-packaging.sh`'s new A6 check (the driver's `.node` is
+present and unpacked under `app.asar.unpacked`, and absent from inside `app.asar` itself) exists
+but has not been run against a real package for the same reason. This table's own asar/unpack/size
+numbers are all pre-P32 and need a fresh run once the driver's macOS build is verified (plan step
+1) — not assumed to still hold with a native module added to the tree.
 
 Not verifiable off macOS (needs a human on real hardware — see §4): code signature check, Gatekeeper
 quarantine behavior, cold-start timing, packaged RSS cross-check, `~/.kira-studio/` real-home

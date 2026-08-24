@@ -91,4 +91,38 @@
   plaintext. This is deliberate (see `docs/v1/plans/P25-credential-keychain-encryption.md` D13),
   not a bug to work around.
 
+## Native Kafka driver (librdkafka, P32)
+
+- The Kafka adapter's driver, `@confluentinc/kafka-javascript`, wraps a native NAN addon (built
+  against V8's C++ API, not N-API) — it is **ABI-specific per JS runtime**, not portable the way a
+  pure-JS dependency is. `bun install` only ever provides a Node-ABI bootstrap build.
+- **Electron's ABI is the only one that matters for this app.** `scripts/native-electron-build.sh`
+  rebuilds the driver for Electron's own ABI (read from `node_modules/electron/abi_version`) before
+  anything that loads it runs — wired as `predev`, `pretest:ui`, `pretest:db:kafka` and
+  `prepackage:mac`. It caches a successful build under `.cache/native/confluent-kafka-javascript/<abi>.node`
+  and writes a marker beside the built module, so a matching ABI skips the rebuild entirely on
+  every run after the first.
+- **Never bun.** Confirmed empirically (not just from the docs): Bun cannot load this addon at any
+  ABI. Even a matching-ABI build crashes with `undefined symbol: v8::FunctionTemplate::SetClassName`
+  when required from Bun. This is why the Kafka adapter suite runs under
+  `ELECTRON_RUN_AS_NODE=1 electron` (`bun run test:db:kafka`, `tests/electron-db/kafka.spec.ts` on
+  `node:test`/`node:assert/strict`) instead of `bun test tests/db` like every other engine.
+- **Claude Code's Linux web containers**: `electron-rebuild` (what
+  `native-electron-build.sh` calls to do the real work) needs to download Electron's C++ headers
+  from `artifacts.electronjs.org`, which this environment's proxy blocks (403). This means
+  `predev`, `pretest:ui`, `pretest:db:kafka` and `prepackage:mac` all fail here whenever the cache
+  doesn't already hold a matching-ABI build — there is no known workaround in this environment (F20).
+  `native-electron-build.sh` backs up the existing `.node` file before attempting a rebuild and
+  restores it on failure, specifically because `node-gyp`/`electron-rebuild` deletes
+  `build/Release` *before* attempting the build — without the backup, a failed rebuild attempt in
+  an unsupported environment would destroy the Node-ABI bootstrap binary `bun install` provided,
+  corrupting `node_modules` rather than just failing cleanly.
+- What still works here despite the above: `bun run build` (electron-vite's
+  `externalizeDepsPlugin()` never bundles or executes the native module — it just leaves the
+  `require()` call for Electron's own runtime resolution), `bun run lint`/`typecheck`, and running
+  `tests/electron-db/kafka.spec.ts`'s bundle under `ELECTRON_RUN_AS_NODE=1 electron` far enough to
+  confirm `node:test` exists and every import resolves — it then fails cleanly at
+  `isDockerAvailable()`, the same point every `tests/db/`-style spec fails at here (no Docker
+  daemon, see above).
+
 Full spec: `docs/v1/SPEC.md`.

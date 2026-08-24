@@ -158,6 +158,19 @@ directories, so deferring the import here defers each driver's load until a conn
 is actually created. Result: baseline engine RSS dropped to ~119 MB (this is the number reflected
 in the baseline table above). ~32 MB recovered — real, but small next to the ~450 MB gap to budget.
 
+**P32 note: the Kafka driver is native, not JS, and its memory is not reclaimable the way the
+other five drivers' is.** `@confluentinc/kafka-javascript` replaced `kafkajs` as the Kafka driver
+in P32 — the numbers above predate that swap and were measured with the pure-JS `kafkajs`. Once a
+Kafka connection is created and L-A's lazy import pulls the native addon into the engine process,
+its compiled code and librdkafka's own internal buffers (per-connection socket/protocol state, not
+V8 heap) stay resident for the life of the process; V8's garbage collector has no visibility into
+that memory and disconnecting the adapter does not release it back to the OS the way closing a
+`pg`/`mongodb`/`ioredis` connection does. This is a property of loading any native Node addon, not
+a P32-specific leak — it just means L-A's "lazy load defers the cost" framing is slightly
+optimistic for Kafka specifically: the deferred cost, once paid, is paid for the rest of the
+process's life. Not yet re-measured against this baseline (needs the macOS/Colima box, same as
+P32's other unverified-in-this-sandbox items).
+
 **Other levers checked, none fired:**
 
 | Lever | Trigger | Measured | Fired? |
