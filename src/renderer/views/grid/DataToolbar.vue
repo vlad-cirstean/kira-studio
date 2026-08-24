@@ -350,6 +350,7 @@ function onDiscard(): void {
       />
       <IconButton
         icon="search"
+        :active="!!rt?.searchOpen"
         v-tooltip="'Search this page'"
         data-testid="toolbar-search"
         @click="onToggleSearch"
@@ -439,10 +440,6 @@ function onDiscard(): void {
 .p-seg > button.active {
   background: var(--kira-bg-input);
   color: var(--kira-fg);
-}
-
-.p-iconbtn.is-live {
-  color: var(--kira-error);
 }
 
 .columns-anchor,

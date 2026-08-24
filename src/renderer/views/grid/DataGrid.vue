@@ -14,6 +14,7 @@ import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../workbench/state/contextMenu';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
@@ -36,7 +37,7 @@ import {
   stageEdit,
   stageInsertValue,
 } from './pendingChanges';
-import { searchState } from './search';
+import { matchedRows, searchState, setSearchFiltering } from './search';
 import { runtime, setSort } from './state';
 
 const props = defineProps<{ tabId: string }>();
@@ -179,8 +180,42 @@ function qualifiedName(): string {
     .join('.');
 }
 
+// P24 D2/D3: the find widget's "hide non-matching rows" toggle, read as a plain row-index list —
+// `null` means unfiltered, and every expression below short-circuits to today's arithmetic in
+// that case, so the frame budget is unchanged by construction on the common (unfiltered) path.
+const displayRows = computed<number[] | null>(() => matchedRows(props.tabId));
+const displayRowCount = computed(() =>
+  displayRows.value ? displayRows.value.length : (page.value?.rowCount ?? 0),
+);
+
+// P24 D3/D5/D6/D11: converts between a *page row index* (what selection/pending-changes/search
+// identify a row by) and its *display position* (its 0-based rank among the rows actually
+// rendered) — the indirection virtualization, scroll-into-view and arrow-key nav all need once
+// rows can be hidden. `displayRows` is always ascending (matchedRows' own contract), so this is a
+// binary search: an exact hit is the common case (the row is visible), and a miss (the row was
+// just filtered out from under a live selection) falls through to the position it would sort
+// into, so nav/scroll lands on the nearest visible row instead of doing nothing.
+function displayPositionOf(row: number): number {
+  const rowCount = page.value?.rowCount ?? 0;
+  if (row >= rowCount) return displayRowCount.value + (row - rowCount); // pending insert (D5)
+  const dr = displayRows.value;
+  if (!dr) return row; // unfiltered: identity
+  let lo = 0;
+  let hi = dr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((dr[mid] as number) < row) lo = mid + 1;
+    else hi = mid;
+  }
+  return Math.min(lo, Math.max(0, dr.length - 1));
+}
+function rowAtDisplayPosition(pos: number): number {
+  const dr = displayRows.value;
+  return dr ? (dr[pos] ?? pos) : pos;
+}
+
 const totalHeight = computed(
-  () => ((page.value?.rowCount ?? 0) + insertRows.value.length) * rowHeight.value,
+  () => (displayRowCount.value + insertRows.value.length) * rowHeight.value,
 );
 
 // The gutter shows the row's position in the whole result set, not just this page's fetched
@@ -253,11 +288,14 @@ onUnmounted(() => {
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
 });
 
+// P24 D3: in *display-position* space (0..displayRowCount), not page-row space — the rows a
+// filter hides are never virtualized at all, which is what keeps the unfiltered path's arithmetic
+// untouched (displayRowCount === page.rowCount when there's no filter).
 const rowRange = computed(() => {
-  const rowCount = page.value?.rowCount ?? 0;
+  const total = displayRowCount.value;
   const start = Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - OVERSCAN_ROWS);
   const end = Math.min(
-    rowCount,
+    total,
     Math.ceil((scrollTop.value + viewportHeight.value) / rowHeight.value) + OVERSCAN_ROWS,
   );
   return { start, end };
@@ -266,13 +304,30 @@ const colRange = computed(() =>
   visibleColumnRange(scrollLeft.value, viewportWidth.value, offsets.value),
 );
 
-watch(rowRange, (r) => setVisibleWindow(props.tabId, r.start, r.end));
-
-const visibleRowIndices = computed(() => {
-  const out: number[] = [];
-  for (let r = rowRange.value.start; r < rowRange.value.end; r++) out.push(r);
+const visibleRows = computed<{ row: number; pos: number }[]>(() => {
+  const out: { row: number; pos: number }[] = [];
+  for (let pos = rowRange.value.start; pos < rowRange.value.end; pos++) {
+    out.push({ row: rowAtDisplayPosition(pos), pos });
+  }
   return out;
 });
+
+// F3: setVisibleWindow is a cache-clearing hint, not a correctness contract — the min/max page
+// row of a (possibly non-contiguous, while filtering) visible slice can only make page.ts's
+// decode cache live slightly longer, never decode a cell nobody rendered.
+const visiblePageRowBounds = computed(() => {
+  const rows = visibleRows.value;
+  if (rows.length === 0) return { start: 0, end: 0 };
+  let min = rows[0]?.row ?? 0;
+  let max = min;
+  for (const { row } of rows) {
+    if (row < min) min = row;
+    if (row > max) max = row;
+  }
+  return { start: min, end: max + 1 };
+});
+watch(visiblePageRowBounds, (r) => setVisibleWindow(props.tabId, r.start, r.end));
+
 const visibleColumnIndices = computed(() => {
   const out: number[] = [];
   for (let c = colRange.value.startIndex; c < colRange.value.endIndex; c++) out.push(c);
@@ -685,13 +740,20 @@ function onCellNavClick(row: number, displayCol: number, e: MouseEvent): void {
   openContextMenu(e, entry.items);
 }
 
+// P24 D10: while filtering, both this and onCopy's column branch below walk the *visible* rows
+// only — the column the user can see has N rows, and copying every loaded row from a grid
+// showing 12 would be a silent mismatch pasted straight into a spreadsheet.
+function rowsForColumnOps(rowCount: number): number[] {
+  return displayRows.value ?? Array.from({ length: rowCount }, (_, i) => i);
+}
+
 // The loaded page's values only for one column (§8.5's own scope boundary) — used by the header
 // menu's "Copy column values".
 function columnValuesFor(displayCol: number): string[] {
   const p = page.value;
   if (!p) return [];
   const out: string[] = [];
-  for (let r = 0; r < p.rowCount; r++) {
+  for (const r of rowsForColumnOps(p.rowCount)) {
     const dc = displayCell(r, displayCol);
     out.push(dc.isNull ? '' : dc.text);
   }
@@ -799,7 +861,7 @@ function onCopy(): void {
     return;
   }
   const lines: string[] = [];
-  for (let r = 0; r < p.rowCount; r++) {
+  for (const r of rowsForColumnOps(p.rowCount)) {
     lines.push(
       sel.cols
         .map((c) => {
@@ -864,7 +926,10 @@ function scrollCellIntoView(row: number, displayCol: number): void {
   if (!el) return;
   // Every row's own `top` style is offset by one rowHeight for the header row above it (see the
   // header-row/grid-row template bindings) — this has to match or the target lands one row short.
-  const rowTop = rowHeight.value + row * rowHeight.value;
+  // P24 D6: `row` is a page-row index (what search/PK-FK-nav/add-row all address a row by); the
+  // pixel position it scrolls to is the row's *display* position, which collapses to identity
+  // when nothing is filtered.
+  const rowTop = rowHeight.value + displayPositionOf(row) * rowHeight.value;
   const rowBottom = rowTop + rowHeight.value;
   if (rowTop < el.scrollTop) el.scrollTop = rowTop;
   else if (rowBottom > el.scrollTop + el.clientHeight) el.scrollTop = rowBottom - el.clientHeight;
@@ -929,11 +994,14 @@ function onKeydown(e: KeyboardEvent): void {
     return;
   }
   switch (e.key) {
+    // P24 D11: steps by *display* position and clamps to the visible row count, so ArrowDown
+    // never walks into a row the filter hid — otherwise the selection would vanish (it publishes
+    // for a row nothing renders) with no visible cause.
     case 'ArrowUp':
-      row = Math.max(0, row - 1);
+      row = rowAtDisplayPosition(Math.max(0, displayPositionOf(row) - 1));
       break;
     case 'ArrowDown':
-      row = Math.min(p.rowCount - 1, row + 1);
+      row = rowAtDisplayPosition(Math.min(displayRowCount.value - 1, displayPositionOf(row) + 1));
       break;
     case 'ArrowLeft':
       col = Math.max(0, col - 1);
@@ -983,6 +1051,20 @@ defineExpose({ scrollCellIntoView });
       label="No rows"
       data-testid="grid-no-rows"
     />
+    <!-- P24 D8: filtering to zero matches is a distinct empty state from "the table is empty"
+         (LAW 15 names both by name) — but a pending insert row is work in progress, not a search
+         result, so its presence keeps the grid itself on screen even with zero real matches. -->
+    <EmptyState
+      v-else-if="page && displayRows && displayRowCount === 0 && insertRows.length === 0"
+      class="no-rows"
+      icon="search"
+      label="No matching rows"
+      data-testid="grid-no-matching-rows"
+    >
+      <AppButton data-testid="grid-show-all-rows" @click="setSearchFiltering(props.tabId, false)">
+        Show all rows
+      </AppButton>
+    </EmptyState>
     <div
       v-else-if="page"
       class="grid-sizer"
@@ -1033,14 +1115,18 @@ defineExpose({ scrollCellIntoView });
         </div>
       </div>
 
+      <!-- P24 D3/D4: `r` is the row's real page-row index (what selection/gutter number/pending
+           changes all address it by, unchanged by filtering — D4); `pos` is separately its
+           display position, used only for pixel placement, so the gutter still reads the row's
+           true number (`3, 17, 84, …`) even while filtered. -->
       <div
-        v-for="r in visibleRowIndices"
+        v-for="{ row: r, pos } in visibleRows"
         :key="r"
         class="grid-row"
         data-testid="grid-row"
         :data-row="r"
         :class="{ 'pending-delete': isDeleted(r) }"
-        :style="{ top: `${rowHeight + r * rowHeight}px`, height: `${rowHeight}px` }"
+        :style="{ top: `${rowHeight + pos * rowHeight}px`, height: `${rowHeight}px` }"
       >
         <!-- scroll-margin-top = rowHeight on gutter/grid cells below: `.header-row` is
              position: sticky, which a native scrollIntoView(IfNeeded) call doesn't otherwise know
@@ -1120,6 +1206,10 @@ defineExpose({ scrollCellIntoView });
         </div>
       </div>
 
+      <!-- P24 D5: a pending insert is never hidden by the filter, whatever the query says — its
+           *pixel* position follows the display row count (renders after the last visible row),
+           but its *identity* (the pseudo row index the gutter click and pendingChanges use) stays
+           `page.rowCount + idx`, unchanged. -->
       <div
         v-for="(insert, idx) in insertRows"
         :key="insert.id"
@@ -1127,7 +1217,7 @@ defineExpose({ scrollCellIntoView });
         data-testid="grid-row-insert"
         :data-insert-id="insert.id"
         :style="{
-          top: `${rowHeight + ((page?.rowCount ?? 0) + idx) * rowHeight}px`,
+          top: `${rowHeight + displayPositionOf((page?.rowCount ?? 0) + idx) * rowHeight}px`,
           height: `${rowHeight}px`,
         }"
         @click="onGutterClick((page?.rowCount ?? 0) + idx, $event)"

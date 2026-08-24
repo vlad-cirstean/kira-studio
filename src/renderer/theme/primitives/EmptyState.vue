@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '../CodiconIcon.vue';
 
-// The `.p-empty` no-rows/no-messages/empty-list placeholder — icon + label, no action (see
-// ReconnectGate.vue for the button-bearing sibling of this pattern). No current call site puts
-// anything besides icon+label inside it, so this stays props-only rather than growing a default
-// slot no one uses.
+// The `.p-empty` no-rows/no-messages/empty-list placeholder — icon + label, optionally one action
+// via the default slot (LAW 15: "no matching rows" is the one case in the app that needs it — see
+// ReconnectGate.vue for the older, bespoke button-bearing sibling this slot now generalises).
 defineProps<{
   icon?: string;
   label?: string;
@@ -15,5 +14,6 @@ defineProps<{
   <div class="p-empty">
     <CodiconIcon v-if="icon" :name="icon" :size="24" class="big" />
     <span v-if="label" class="label">{{ label }}</span>
+    <slot />
   </div>
 </template>

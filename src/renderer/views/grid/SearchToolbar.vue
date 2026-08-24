@@ -4,13 +4,30 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { getPage } from './page';
-import { clearSearchState, runSearch, type SearchHandle, searchState } from './search';
+import {
+  clearSearchState,
+  isSearchFiltering,
+  matchedRows,
+  runSearch,
+  type SearchHandle,
+  searchState,
+  setSearchFiltering,
+} from './search';
 
 const props = defineProps<{ tabId: string }>();
 
 // README: "search walks the loaded rows only and never issues a query" — this label is what
 // keeps a hit count from ever being mistaken for a count over the whole table.
 const loadedRowCount = computed(() => getPage(props.tabId)?.rowCount ?? 0);
+
+// P24 D9: the scope label gains a filtered form ("showing N of M loaded rows") whenever the
+// toggle is on and a scan has completed.
+const filtering = computed(() => isSearchFiltering(props.tabId));
+const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
+
+function toggleFilter(): void {
+  setSearchFiltering(props.tabId, !filtering.value);
+}
 const emit = defineEmits<{ goToMatch: [row: number, col: number]; close: [] }>();
 
 // Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
@@ -88,6 +105,8 @@ function goPrev(): void {
 function close(): void {
   handle?.cancel();
   clearSearchState(props.tabId);
+  // P24 D7: a closed toolbar must never leave rows hidden with no visible cause.
+  setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
@@ -112,6 +131,9 @@ onMounted(() => {
 onUnmounted(() => {
   handle?.cancel();
   clearSearchState(props.tabId);
+  // P24 D7: Cmd+F toggling searchOpen off (DataView.vue's view.find command) unmounts this
+  // component without ever calling close() above — the toggle must reset here too.
+  setSearchFiltering(props.tabId, false);
 });
 </script>
 
@@ -161,6 +183,23 @@ onUnmounted(() => {
 
     <div class="sep" />
 
+    <!-- P24 D1/D9: a filter *mode* on this same widget — hides every row with no match. Its own
+         group, flanked by .sep on both sides, since case/word/regex say *how to match* and this
+         (with prev/next) says *what to do with the matches*. -->
+    <div class="group">
+      <IconButton
+        icon="filter"
+        :active="filtering"
+        v-tooltip="
+          filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
+        "
+        data-testid="search-filter-rows"
+        @click="toggleFilter"
+      />
+    </div>
+
+    <div class="sep" />
+
     <span v-if="errorMessage" class="p-sm search-error" data-testid="search-error">{{
       errorMessage
     }}</span>
@@ -175,7 +214,12 @@ onUnmounted(() => {
       <IconButton icon="chevron-up" :size="12" v-tooltip="'Previous match'" data-testid="search-prev" @click="goPrev" />
       <IconButton icon="chevron-down" :size="12" v-tooltip="'Next match'" data-testid="search-next" @click="goNext" />
       <div class="sep" />
-      <span class="p-xs dim">in the {{ loadedRowCount.toLocaleString() }} loaded rows</span>
+      <span class="p-xs dim" data-testid="search-scope">
+        <template v-if="filtering && filteredRowCount !== null">
+          showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
+        </template>
+        <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
+      </span>
     </template>
     <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="search-close" @click="close" />
   </div>
