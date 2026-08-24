@@ -103,7 +103,7 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // for the same already-saved-tab-restores discipline as keyValueTabStateSchema's own comment).
 // The filter fields are Kafka-only positioning knobs (SQS shows none of them — no matching
 // concept, per its own read.ts): `offsetFilter`/`partitions` restrict a fresh browse's
-// starting windows (kafka/read.ts), `timestampFilter` seeks via kafkajs's
+// starting windows (kafka/read.ts), `timestampFilter` seeks via the client's
 // `fetchTopicOffsetsByTimestamp` — all persisted per tab like DataTabState's own `filter`,
 // but kept structured (independent fields) rather than one WHERE-style free-text field,
 // since Kafka has no predicate language to parse. Recent-filter *history* is deliberately NOT

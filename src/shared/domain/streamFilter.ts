@@ -8,7 +8,7 @@ import { z } from 'zod';
 // (queue-based, `batch` pagination — kafkaCaps.pagination === 'offsetWindow' is what gates the
 // filter row's visibility in StreamView.vue), so sqs/read.ts never looks at `filter`.
 export interface KafkaStreamFilter {
-  /** Decimal string — kafkajs offsets are int64, too large for a JS `number`. Starting offset for
+  /** Decimal string — Kafka offsets are int64, too large for a JS `number`. Starting offset for
    *  a *fresh* browse (a token-continued page ignores this — the windows it resumes were already
    *  computed once, per kafka/read.ts's D7), applied to every included partition and clamped into
    *  that partition's own [low, high] watermark range. Ignored once `timestampMs` is also set. */
@@ -17,7 +17,7 @@ export interface KafkaStreamFilter {
    *  excluded from the browse entirely, not merely hidden after the fact). Empty means "every
    *  partition" — task #61 widened this from a single optional partition to a multiselect. */
   partitions: number[];
-  /** Epoch ms — seeks every included partition's starting offset via kafkajs's
+  /** Epoch ms — seeks every included partition's starting offset via the client's
    *  `admin.fetchTopicOffsetsByTimestamp` instead of the low watermark or `offset` above. */
   timestampMs: number | null;
 }

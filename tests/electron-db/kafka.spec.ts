@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import assert from 'node:assert/strict';
+import { after, before, describe, test } from 'node:test';
 import type { NodePath } from '@shared/domain/tree';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
@@ -11,10 +12,17 @@ import {
   ORDERS_MESSAGE_COUNT,
   ORDERS_PARTITION_COUNT,
   ORDERS_TOPIC,
-} from './fixtures/0005_kafka_seed';
-import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
-import { type KafkaFixture, startKafka } from './support/kafka';
-import { readStream } from './support/page';
+} from '../db/fixtures/0005_kafka_seed';
+import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from '../db/support/docker';
+import { type KafkaFixture, startKafka } from '../db/support/kafka';
+import { readStream } from '../db/support/page';
+
+// P32 D27/D28: this suite left Bun for `ELECTRON_RUN_AS_NODE=1 electron` (test:db:kafka) because
+// Bun cannot load the native driver at any ABI (F21). node:test/node:assert/strict replace
+// bun:test/expect mechanically — every assertion here is the same check, not a new one. The
+// fixture/support files stay under tests/db/ and stay client-free (0005_kafka_seed.ts, support/
+// kafka.ts, support/docker.ts, support/page.ts) since tests/ui/kafka.spec.ts also imports them,
+// from a third runtime again.
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 
@@ -64,25 +72,36 @@ function rowAt(page: StreamPage, row: number): StreamRow {
   };
 }
 
-/** preview()/cancel() are synchronous — `.rejects` doesn't apply. */
+/** preview()/cancel() are synchronous — assert.rejects doesn't apply. */
 function expectSyncThrow(fn: () => unknown, code: AdapterErrorCode): void {
   try {
     fn();
     throw new Error('expected the call to throw');
   } catch (err) {
-    expect(err).toBeInstanceOf(AdapterError);
-    expect((err as AdapterError).code).toBe(code);
+    assert.ok(err instanceof AdapterError);
+    assert.strictEqual((err as AdapterError).code, code);
   }
+}
+
+async function assertRejectsWithCode(p: Promise<unknown>, code: AdapterErrorCode): Promise<void> {
+  await assert.rejects(p, (err: unknown) => {
+    assert.ok(err instanceof AdapterError);
+    assert.strictEqual((err as AdapterError).code, code);
+    return true;
+  });
 }
 
 let fixture: KafkaFixture;
 
-beforeAll(async () => {
-  if (!(await isDockerAvailable())) throw new Error(DOCKER_UNAVAILABLE_MESSAGE);
-  fixture = await startKafka();
-}, CONTAINER_START_TIMEOUT_MS);
+before(
+  async () => {
+    if (!(await isDockerAvailable())) throw new Error(DOCKER_UNAVAILABLE_MESSAGE);
+    fixture = await startKafka();
+  },
+  { timeout: CONTAINER_START_TIMEOUT_MS },
+);
 
-afterAll(async () => {
+after(async () => {
   await fixture?.stop();
 });
 
@@ -90,30 +109,30 @@ describe('kafka adapter (§9.1, P10)', () => {
   test('1. connect / disconnect', async () => {
     const adapter = await createAdapter('kafka', deps);
     const info = await adapter.connect(fixture.config, makeCtx());
-    expect(info.serverVersion).toBe('Kafka');
-    expect(info.details?.cluster).toBeTruthy();
+    assert.strictEqual(info.serverVersion, 'Kafka');
+    // P32 D13/D29: this client has no describeCluster() — details reports the configured
+    // bootstrap-server count instead of a live cluster id.
+    assert.ok(info.details?.brokers);
     await adapter.disconnect();
 
-    await expect(adapter.children(path([]), makeCtx())).rejects.toMatchObject({
-      code: 'E_CONNECT',
-    });
+    await assertRejectsWithCode(adapter.children(path([]), makeCtx()), 'E_CONNECT');
   });
 
   test('2. cap honesty', () => {
-    expect(kafkaCaps.tabular).toBe(false);
-    expect(kafkaCaps.stream).toBe(true);
-    expect(kafkaCaps.defaultPageKind).toBe('stream');
-    expect(kafkaCaps.definition).toBe(true);
-    expect(kafkaCaps.sql).toBe(false);
-    expect(kafkaCaps.exactCount).toBe(true);
-    expect(kafkaCaps.pagination).toBe('offsetWindow');
+    assert.strictEqual(kafkaCaps.tabular, false);
+    assert.strictEqual(kafkaCaps.stream, true);
+    assert.strictEqual(kafkaCaps.defaultPageKind, 'stream');
+    assert.strictEqual(kafkaCaps.definition, true);
+    assert.strictEqual(kafkaCaps.sql, false);
+    assert.strictEqual(kafkaCaps.exactCount, true);
+    assert.strictEqual(kafkaCaps.pagination, 'offsetWindow');
     // A topic's log is immutable — canUpdate/canDelete stay false permanently, but
     // kafka/produce.ts's producer().send() lands a real canInsert (this session's addition).
-    expect(kafkaCaps.canInsert).toBe(true);
-    expect(kafkaCaps.canUpdate).toBe(false);
-    expect(kafkaCaps.canDelete).toBe(false);
-    expect(kafkaCaps.writable).toBe(true);
-    expect(kafkaCaps.cancel).toBe(true);
+    assert.strictEqual(kafkaCaps.canInsert, true);
+    assert.strictEqual(kafkaCaps.canUpdate, false);
+    assert.strictEqual(kafkaCaps.canDelete, false);
+    assert.strictEqual(kafkaCaps.writable, true);
+    assert.strictEqual(kafkaCaps.cancel, true);
   });
 
   test('3. tree enumeration: root is topics + consumer groups, siblings', async () => {
@@ -123,12 +142,12 @@ describe('kafka adapter (§9.1, P10)', () => {
       const root = await adapter.children(path([]), makeCtx());
       const topics = root.filter((n) => n.kind === 'topic').map((n) => n.name);
       const groups = root.filter((n) => n.kind === 'consumerGroup').map((n) => n.name);
-      expect(topics).toEqual([EMPTY_TOPIC, ORDERS_TOPIC].sort());
-      expect(groups).toEqual([CONSUMER_GROUP]);
+      assert.deepStrictEqual(topics, [EMPTY_TOPIC, ORDERS_TOPIC].sort());
+      assert.deepStrictEqual(groups, [CONSUMER_GROUP]);
       // Neither root-level internal topics (__consumer_offsets) nor the group leaf's own
       // hasChildren promise should ever surface a nonexistent twisty.
       const group = root.find((n) => n.kind === 'consumerGroup');
-      expect(group?.hasChildren).toBe(false);
+      assert.strictEqual(group?.hasChildren, false);
     } finally {
       await adapter.disconnect();
     }
@@ -143,12 +162,15 @@ describe('kafka adapter (§9.1, P10)', () => {
       // a second, live caller of exactly this call.
       const root = await adapter.children(path([]), makeCtx());
       const ordersNode = root.find((n) => n.kind === 'topic' && n.name === ORDERS_TOPIC);
-      expect(ordersNode?.hasChildren).toBe(false);
+      assert.strictEqual(ordersNode?.hasChildren, false);
 
       const partitions = await adapter.children(topicPath(ORDERS_TOPIC), makeCtx());
-      expect(partitions).toHaveLength(ORDERS_PARTITION_COUNT);
-      expect(partitions.every((n) => n.kind === 'partition' && n.hasChildren === false)).toBe(true);
-      expect(partitions.map((n) => n.name)).toEqual(['0', '1']);
+      assert.strictEqual(partitions.length, ORDERS_PARTITION_COUNT);
+      assert.ok(partitions.every((n) => n.kind === 'partition' && n.hasChildren === false));
+      assert.deepStrictEqual(
+        partitions.map((n) => n.name),
+        ['0', '1'],
+      );
     } finally {
       await adapter.disconnect();
     }
@@ -165,13 +187,13 @@ describe('kafka adapter (§9.1, P10)', () => {
         ]),
         makeCtx(),
       );
-      expect(partitionChildren).toEqual([]);
+      assert.deepStrictEqual(partitionChildren, []);
 
       const groupChildren = await adapter.children(
         path([{ kind: 'consumerGroup', name: CONSUMER_GROUP }]),
         makeCtx(),
       );
-      expect(groupChildren).toEqual([]);
+      assert.deepStrictEqual(groupChildren, []);
     } finally {
       await adapter.disconnect();
     }
@@ -181,34 +203,47 @@ describe('kafka adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      await expect(adapter.describe(topicPath(ORDERS_TOPIC), makeCtx())).rejects.toMatchObject({
-        code: 'E_UNSUPPORTED',
-      });
+      await assertRejectsWithCode(
+        adapter.describe(topicPath(ORDERS_TOPIC), makeCtx()),
+        'E_UNSUPPORTED',
+      );
 
-      // P23 D5: a topic's partitions (leader/replicas/isr — data the tree threw away, F8) and its
-      // non-default config, degrading to a note rather than failing if DESCRIBE_CONFIGS is denied.
+      // P23 D5: a topic's partitions (leader/replicas/isr — data the tree threw away, F8).
+      // P32 D14: this client has no DescribeConfigs — Configuration stays, empty, with a note
+      // saying why (a permanent degradation now, not an ACL-denied one).
       const topicDef = await adapter.definition(topicPath(ORDERS_TOPIC), makeCtx());
-      expect(topicDef.kind).toBe('topic');
-      expect(topicDef.sections.map((s) => s.title)).toEqual(['Partitions', 'Configuration']);
+      assert.strictEqual(topicDef.kind, 'topic');
+      assert.deepStrictEqual(
+        topicDef.sections.map((s) => s.title),
+        ['Partitions', 'Configuration'],
+      );
       const partitions = topicDef.sections.find((s) => s.title === 'Partitions');
-      expect(partitions?.rows.map((r) => r.name)).toEqual(['0', '1']);
-      expect(partitions?.rows.every((r) => /^leader \d+$/.test(r.value))).toBe(true);
+      assert.deepStrictEqual(
+        partitions?.rows.map((r) => r.name),
+        ['0', '1'],
+      );
+      assert.ok(partitions?.rows.every((r) => /^leader \d+$/.test(r.value)));
       const config = topicDef.sections.find((s) => s.title === 'Configuration');
-      expect(config?.rows.length).toBeGreaterThan(0);
+      assert.strictEqual(config?.rows.length, 0);
+      assert.ok(topicDef.notes.some((n) => /DescribeConfigs/.test(n)));
 
       // The seed consumer drained ORDERS_TOPIC and disconnected (0005_kafka_seed.ts), so the group
       // has real committed offsets but no active members — exactly the "empty section, not an
       // empty tab" case PropertiesSection.vue's own empty state exists for.
       const groupDef = await adapter.definition(groupPath(CONSUMER_GROUP), makeCtx());
-      expect(groupDef.kind).toBe('consumerGroup');
-      expect(groupDef.sections.map((s) => s.title)).toEqual([
-        'Group',
-        'Members',
-        'Committed offsets',
-      ]);
+      assert.strictEqual(groupDef.kind, 'consumerGroup');
+      assert.deepStrictEqual(
+        groupDef.sections.map((s) => s.title),
+        ['Group', 'Members', 'Committed offsets'],
+      );
+      // P32 D15/D29: state is a numeric enum on this client — the definition view must resolve it
+      // to a name (STABLE, EMPTY, ...), never render the bare digit.
+      const groupSection = groupDef.sections.find((s) => s.title === 'Group');
+      const stateRow = groupSection?.rows.find((r) => r.name === 'state');
+      assert.match(stateRow?.value ?? '', /^[A-Za-z ]+$/);
       const offsets = groupDef.sections.find((s) => s.title === 'Committed offsets');
-      expect(offsets?.rows).toHaveLength(ORDERS_PARTITION_COUNT);
-      expect(offsets?.rows.map((r) => r.name).sort()).toEqual([
+      assert.strictEqual(offsets?.rows.length, ORDERS_PARTITION_COUNT);
+      assert.deepStrictEqual(offsets?.rows.map((r) => r.name).sort(), [
         `${ORDERS_TOPIC}[0]`,
         `${ORDERS_TOPIC}[1]`,
       ]);
@@ -233,21 +268,24 @@ describe('kafka adapter (§9.1, P10)', () => {
         { ...req, cursor: { mode: 'offset', offset: 0 } },
         makeCtx(),
       );
-      expect(page.position.strategy).toBe('offsetWindow');
-      expect(page.rowCount).toBe(ORDERS_MESSAGE_COUNT);
-      expect(page.position.hasMore).toBe(false);
-      expect(page.visibilityTimeoutSeconds).toBeNull();
+      assert.strictEqual(page.position.strategy, 'offsetWindow');
+      assert.strictEqual(page.rowCount, ORDERS_MESSAGE_COUNT);
+      assert.strictEqual(page.position.hasMore, false);
+      assert.strictEqual(page.visibilityTimeoutSeconds, null);
 
       const seqs = Array.from({ length: page.rowCount }, (_, r) => {
         const row = rowAt(page, r);
-        expect(row.key).toMatch(/^key-\d$/);
-        expect(row.headers.source).toBe('seed');
-        expect(typeof row.attrs.partition).toBe('number');
-        expect(typeof row.attrs.offset).toBe('string');
-        expect(row.timestamp).not.toBeNull();
+        assert.match(row.key ?? '', /^key-\d$/);
+        assert.strictEqual(row.headers.source, 'seed');
+        assert.strictEqual(typeof row.attrs.partition, 'number');
+        assert.strictEqual(typeof row.attrs.offset, 'string');
+        assert.notStrictEqual(row.timestamp, null);
         return (JSON.parse(row.body) as { seq: number }).seq;
       }).sort((a, b) => a - b);
-      expect(seqs).toEqual(Array.from({ length: ORDERS_MESSAGE_COUNT }, (_, i) => i));
+      assert.deepStrictEqual(
+        seqs,
+        Array.from({ length: ORDERS_MESSAGE_COUNT }, (_, i) => i),
+      );
     } finally {
       await adapter.disconnect();
     }
@@ -279,7 +317,7 @@ describe('kafka adapter (§9.1, P10)', () => {
         if (!token) throw new Error('expected a nextToken on a truncated page');
         cursor = { mode: 'after', token };
       }
-      expect(seen.size).toBe(ORDERS_MESSAGE_COUNT);
+      assert.strictEqual(seen.size, ORDERS_MESSAGE_COUNT);
     } finally {
       await adapter.disconnect();
     }
@@ -301,8 +339,8 @@ describe('kafka adapter (§9.1, P10)', () => {
         },
         makeCtx(),
       );
-      expect(page.rowCount).toBe(0);
-      expect(page.position.hasMore).toBe(false);
+      assert.strictEqual(page.rowCount, 0);
+      assert.strictEqual(page.position.hasMore, false);
     } finally {
       await adapter.disconnect();
     }
@@ -312,7 +350,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      await expect(
+      await assertRejectsWithCode(
         readStream(
           adapter,
           {
@@ -325,19 +363,24 @@ describe('kafka adapter (§9.1, P10)', () => {
           },
           makeCtx(),
         ),
-      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+        'E_UNSUPPORTED',
+      );
     } finally {
       await adapter.disconnect();
     }
   });
 
-  // admin.fetchTopicOffsets() retries a genuinely-missing topic with kafkajs's default backoff
-  // (5 retries, up to ~9s total) before finally rejecting — longer than bun's 5s test default.
-  test('11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND', async () => {
+  // admin.fetchTopicOffsets() on a genuinely-missing topic retries with this client's own default
+  // backoff before finally rejecting — carried over from kafkajs's equivalent allowance
+  // unverified in this sandbox (no Docker); the macOS/Colima box re-checks the actual duration
+  // against librdkafka's own metadata-timeout behaviour (P32 D29).
+  test('11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND', {
+    timeout: 20_000,
+  }, async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      await expect(
+      await assertRejectsWithCode(
         readStream(
           adapter,
           {
@@ -350,22 +393,25 @@ describe('kafka adapter (§9.1, P10)', () => {
           },
           makeCtx(),
         ),
-      ).rejects.toMatchObject({ code: 'E_QUERY' });
+        'E_QUERY',
+      );
     } finally {
       await adapter.disconnect();
     }
-  }, 20_000);
+  });
 
   test('12. count: exact via high/low watermark subtraction', async () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      expect(
+      assert.deepStrictEqual(
         await adapter.count({ path: topicPath(ORDERS_TOPIC), filter: null }, makeCtx()),
-      ).toEqual({ value: ORDERS_MESSAGE_COUNT, exact: true });
-      expect(
+        { value: ORDERS_MESSAGE_COUNT, exact: true },
+      );
+      assert.deepStrictEqual(
         await adapter.count({ path: topicPath(EMPTY_TOPIC), filter: null }, makeCtx()),
-      ).toEqual({ value: 0, exact: true });
+        { value: 0, exact: true },
+      );
     } finally {
       await adapter.disconnect();
     }
@@ -383,15 +429,17 @@ describe('kafka adapter (§9.1, P10)', () => {
           adapter.preview({ path: topicPath(ORDERS_TOPIC), ops: [{ kind: 'delete', key: {} }] }),
         'E_UNSUPPORTED',
       );
-      await expect(
+      await assertRejectsWithCode(
         adapter.mutate(
           { path: topicPath(ORDERS_TOPIC), ops: [{ kind: 'update', key: {}, changes: {} }] },
           makeCtx(),
         ),
-      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
-      await expect(
+        'E_UNSUPPORTED',
+      );
+      await assertRejectsWithCode(
         adapter.execute({ path: topicPath(ORDERS_TOPIC), statements: ['x'] }, makeCtx()),
-      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+        'E_UNSUPPORTED',
+      );
     } finally {
       await adapter.disconnect();
     }
@@ -401,7 +449,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      expect(await adapter.cancel(crypto.randomUUID())).toBe(false);
+      assert.strictEqual(await adapter.cancel(crypto.randomUUID()), false);
     } finally {
       await adapter.disconnect();
     }
@@ -414,7 +462,7 @@ describe('kafka adapter (§9.1, P10)', () => {
       const controller = new AbortController();
       controller.abort();
       const ctx: OpCtx = { opId: crypto.randomUUID(), signal: controller.signal, setCommand() {} };
-      await expect(
+      await assertRejectsWithCode(
         readStream(
           adapter,
           {
@@ -427,7 +475,8 @@ describe('kafka adapter (§9.1, P10)', () => {
           },
           ctx,
         ),
-      ).rejects.toMatchObject({ code: 'E_CANCELLED' });
+        'E_CANCELLED',
+      );
     } finally {
       await adapter.disconnect();
     }
@@ -451,7 +500,7 @@ describe('kafka adapter (§9.1, P10)', () => {
         },
         makeCtx(),
       );
-      expect(result.affectedRows).toBe(1);
+      assert.strictEqual(result.affectedRows, 1);
 
       const page = await readStream(
         adapter,
@@ -465,10 +514,10 @@ describe('kafka adapter (§9.1, P10)', () => {
         },
         makeCtx(),
       );
-      expect(page.rowCount).toBe(1);
+      assert.strictEqual(page.rowCount, 1);
       const row = rowAt(page, 0);
-      expect(row.key).toBe('produced-key');
-      expect(JSON.parse(row.body)).toEqual({ seq: 999 });
+      assert.strictEqual(row.key, 'produced-key');
+      assert.deepStrictEqual(JSON.parse(row.body), { seq: 999 });
     } finally {
       await adapter.disconnect();
     }
