@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Codicon from '../Codicon.vue';
-import Button from './Button.vue';
+import CodiconIcon from '../CodiconIcon.vue';
+import AppButton from './AppButton.vue';
 
 // §8.4: a restored tab shows only this gate until pressed — nothing loads automatically. Every
 // data/stream/keyvalue/document/definition/console view opens on the same `.p-empty` + button shape
@@ -23,15 +23,15 @@ const emit = defineEmits<{ reconnect: [] }>();
 
 <template>
   <div class="p-empty" :data-testid="containerTestid">
-    <Codicon v-if="icon" :name="icon" :size="24" class="big" />
+    <CodiconIcon v-if="icon" :name="icon" :size="24" class="big" />
     <span v-if="label" class="label">{{ label }}</span>
-    <Button
+    <AppButton
       :variant="variant"
       kind="dialog"
       :data-testid="buttonTestid"
       @click="emit('reconnect')"
     >
       {{ buttonLabel }}
-    </Button>
+    </AppButton>
   </div>
 </template>

@@ -12,7 +12,7 @@ import {
 import { connectionsState } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../workbench/state/contextMenu';
@@ -1107,7 +1107,7 @@ defineExpose({ scrollCellIntoView });
             :aria-label="cellNavEntry(r, c)?.kind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
             @click.stop="onCellNavClick(r, c, $event)"
           >
-            <Codicon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="12" />
+            <CodiconIcon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="12" />
           </button>
         </div>
       </div>

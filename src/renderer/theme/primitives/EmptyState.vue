@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // The `.p-empty` no-rows/no-messages/empty-list placeholder — icon + label, no action (see
 // ReconnectGate.vue for the button-bearing sibling of this pattern). No current call site puts
@@ -13,7 +13,7 @@ defineProps<{
 
 <template>
   <div class="p-empty">
-    <Codicon v-if="icon" :name="icon" :size="24" class="big" />
+    <CodiconIcon v-if="icon" :name="icon" :size="24" class="big" />
     <span v-if="label" class="label">{{ label }}</span>
   </div>
 </template>

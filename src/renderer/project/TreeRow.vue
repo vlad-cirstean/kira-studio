@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { connectionsState } from '../state/connections';
-import Codicon from '../theme/Codicon.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import EngineIcon from '../theme/EngineIcon.vue';
 import ErrorPopover from './ErrorPopover.vue';
@@ -97,8 +97,8 @@ function onContextMenu(e: MouseEvent): void {
       :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >
-      <Codicon v-if="row.loading" name="loading" class="spin" :size="12" />
-      <Codicon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
+      <CodiconIcon v-if="row.loading" name="loading" class="spin" :size="12" />
+      <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
     </button>
 
     <span v-if="row.kind === 'connection'" class="icon-box">
@@ -107,7 +107,7 @@ function onContextMenu(e: MouseEvent): void {
     <span v-if="connectionKind" class="icon-box">
       <EngineIcon :kind="connectionKind" :size="14" />
     </span>
-    <Codicon v-else-if="row.kind !== 'connection'" :name="icon" :size="14" class="node-icon" />
+    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="14" class="node-icon" />
 
     <span class="label" :title="row.name">
       <template v-for="(part, i) in parts" :key="i">

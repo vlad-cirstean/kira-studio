@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { cellSelectionState } from '../state/cellSelection';
+import PanelSplitter from './PanelSplitter.vue';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
-import Splitter from './Splitter.vue';
 import StatusBar from './StatusBar.vue';
 import {
   layoutState,
@@ -43,7 +43,7 @@ const gridStyle = computed(() => ({
     >
       <ProjectPanel />
     </div>
-    <Splitter
+    <PanelSplitter
       v-if="projectVisible"
       style="grid-area: splitproj"
       orientation="col"
@@ -58,7 +58,7 @@ const gridStyle = computed(() => ({
       <div class="main-view" data-testid="main-view"><MainView /></div>
     </div>
 
-    <Splitter
+    <PanelSplitter
       v-if="cellVisible"
       style="grid-area: splitcell"
       orientation="row"
@@ -77,7 +77,7 @@ const gridStyle = computed(() => ({
       <CellEditorPanel />
     </div>
 
-    <Splitter
+    <PanelSplitter
       v-if="opsVisible"
       style="grid-area: splitops"
       orientation="row"

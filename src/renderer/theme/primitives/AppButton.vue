@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // P2 (kind="toolbar", h-sm, the default) and P3 (kind="dialog", h-md, the only bordered
 // button) share this one component since their slot shape is identical — only the primitive
@@ -26,7 +26,7 @@ withDefaults(
     ]"
     :style="variant === 'danger' ? { color: 'var(--kira-error)' } : undefined"
   >
-    <span v-if="icon" class="icon-box"><Codicon :name="icon" :size="14" /></span>
+    <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="14" /></span>
     <slot />
     <span v-if="count !== undefined" class="p-count">{{ count }}</span>
   </button>

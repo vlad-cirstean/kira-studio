@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // P1. Every other native attribute (disabled, title, aria-label, data-testid, @click, class)
 // reaches the <button> by fallthrough — nothing here restates what the element already does.
@@ -24,7 +24,7 @@ withDefaults(
     :class="{ 'is-active': active, 'is-primary': tone === 'primary' }"
     :style="tone === 'danger' ? { color: 'var(--kira-error)' } : undefined"
   >
-    <Codicon :name="icon" :size="size" />
+    <CodiconIcon :name="icon" :size="size" />
     <span v-if="count !== undefined" class="p-count corner-count">{{ count }}</span>
   </button>
 </template>

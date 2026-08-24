@@ -5,7 +5,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { cellKey, cellSelectionState } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
@@ -299,7 +299,7 @@ const timestampReading = computed(() => {
 
       <template #trailing>
         <span v-if="readOnlyReason" class="p-chip warn" :title="readOnlyChipTitle">
-          <Codicon name="lock" :size="12" />
+          <CodiconIcon name="lock" :size="12" />
           {{ readOnlyChipText }}
         </span>
       </template>
@@ -307,7 +307,7 @@ const timestampReading = computed(() => {
 
     <!-- Local first, then UTC (own row — too long to share the header's status badge). -->
     <div v-if="timestampReading" class="p-strip note timestamp-row" data-testid="cell-editor-timestamp">
-      <Codicon name="clock" :size="13" />
+      <CodiconIcon name="clock" :size="13" />
       <span data-testid="cell-editor-timestamp-local">{{ timestampReading.local }}</span>
       <span class="ts-sep">·</span>
       <span data-testid="cell-editor-timestamp-utc">{{ timestampReading.utc }}</span>

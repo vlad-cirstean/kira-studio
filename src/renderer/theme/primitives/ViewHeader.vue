@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ConnectionColor, ConnectionKind } from '@shared/domain/connection';
 import { computed } from 'vue';
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 import { connColorVar } from '../connColor';
 import EngineIcon from '../EngineIcon.vue';
 
@@ -37,7 +37,7 @@ const isNoColor = computed(() => !props.connColor || props.connColor === 'none')
       <EngineIcon :kind="connKind" :size="14" />
     </span>
     <span class="icon-box" :style="iconColor ? { color: iconColor } : undefined">
-      <Codicon :name="icon" :size="14" />
+      <CodiconIcon :name="icon" :size="14" />
     </span>
     <span class="p-view-target" :data-testid="targetTestid">
       <span v-if="path" class="path">{{ path }}</span

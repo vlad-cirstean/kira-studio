@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { getPage } from './streamPage';
@@ -57,7 +57,7 @@ onUnmounted(() => clearStreamSearchState(props.tabId));
 <template>
   <!-- Docks below the toolbar it searches, same placement law as grid/SearchToolbar.vue. -->
   <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
-    <span class="icon-box muted"><Codicon name="search" :size="14" /></span>
+    <span class="icon-box muted"><CodiconIcon name="search" :size="14" /></span>
     <div class="search-input">
       <TextField v-model="query" placeholder="Find" data-testid="stream-search-input" />
     </div>

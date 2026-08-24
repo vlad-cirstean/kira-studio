@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { getPage } from './kvPage';
@@ -105,7 +105,7 @@ onUnmounted(() => {
        as SearchToolbar.vue. -->
   <div class="search-toolbar p-toolbar" data-testid="keyvalue-search-toolbar" @keydown="onKeydown">
     <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
-      <Codicon name="search" :size="14" />
+      <CodiconIcon name="search" :size="14" />
     </span>
     <div class="search-input">
       <TextField

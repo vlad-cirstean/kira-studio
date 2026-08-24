@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { cacheStatsState } from '../state/cacheStats';
 import { settingsOpen } from '../state/settings';
-import Codicon from '../theme/Codicon.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { engineState } from './state/engine';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from './state/layout';
@@ -35,7 +35,7 @@ const cacheSizeLabel = computed(() => {
 
     <div class="side">
       <span v-if="cacheSizeLabel" class="p-status" data-testid="cache-size" :title="cacheTitle">
-        <Codicon name="database" :size="10" />
+        <CodiconIcon name="database" :size="10" />
         {{ cacheSizeLabel }}
       </span>
       <span
@@ -44,7 +44,7 @@ const cacheSizeLabel = computed(() => {
         :data-status="engineState.status"
         :title="engineState.lastPingMs !== null ? `${engineState.lastPingMs} ms` : undefined"
       >
-        <Codicon
+        <CodiconIcon
           name="circle-large-filled"
           :size="10"
           :style="{ color: engineState.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
@@ -63,7 +63,7 @@ const cacheSizeLabel = computed(() => {
           data-testid="toggle-project-panel"
           @click="toggleProjectPanel"
         >
-          <Codicon name="layout-sidebar-left" :size="14" />
+          <CodiconIcon name="layout-sidebar-left" :size="14" />
         </button>
         <button
           type="button"
@@ -73,7 +73,7 @@ const cacheSizeLabel = computed(() => {
           data-testid="toggle-operations-panel"
           @click="toggleOperationsPanel"
         >
-          <Codicon name="layout-panel" :size="14" />
+          <CodiconIcon name="layout-panel" :size="14" />
         </button>
         <button
           type="button"
@@ -83,7 +83,7 @@ const cacheSizeLabel = computed(() => {
           aria-label="Settings"
           @click="settingsOpen = true"
         >
-          <Codicon name="settings-gear" :size="14" />
+          <CodiconIcon name="settings-gear" :size="14" />
         </button>
       </span>
     </div>

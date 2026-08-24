@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue';
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // P4. inheritAttrs is off because the one attribute every call site actually needs to land
 // correctly — data-testid — belongs on the real <input> a test drives, not on this wrapping
@@ -58,7 +58,7 @@ function stepBy(dir: 1 | -1): void {
     :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper }"
     :style="invalid ? { borderColor: 'var(--kira-error)' } : undefined"
   >
-    <span v-if="icon" class="icon-box"><Codicon :name="icon" :size="13" /></span>
+    <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <span v-if="prefix" class="ph">{{ prefix }}</span>
     <input
       v-bind="$attrs"
@@ -79,7 +79,7 @@ function stepBy(dir: 1 | -1): void {
         title="Increase"
         @mousedown.prevent="stepBy(1)"
       >
-        <Codicon name="chevron-up" :size="9" />
+        <CodiconIcon name="chevron-up" :size="9" />
       </button>
       <button
         type="button"
@@ -89,7 +89,7 @@ function stepBy(dir: 1 | -1): void {
         title="Decrease"
         @mousedown.prevent="stepBy(-1)"
       >
-        <Codicon name="chevron-down" :size="9" />
+        <CodiconIcon name="chevron-down" :size="9" />
       </button>
     </span>
   </span>

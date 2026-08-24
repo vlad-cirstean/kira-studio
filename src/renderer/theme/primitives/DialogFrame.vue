@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // Shared chrome for every modal dialog (ConnectionDialog, FiltersDialog, SettingsDialog):
 // scrim, Escape-to-close, click-outside-to-close, a Tab focus trap, and focus-on-mount. Each
@@ -86,7 +86,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
             :data-testid="closeTestId"
             @click="emit('close')"
           >
-            <Codicon name="close" :size="14" />
+            <CodiconIcon name="close" :size="14" />
           </button>
         </div>
         <div class="dialog-body">

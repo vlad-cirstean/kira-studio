@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 
 // The `.p-strip` message banner (warn/err) used above a view's body — DefinitionView's own `note` tone
 // has no consumer besides itself and stays inline there rather than widening this to a third
@@ -18,7 +18,7 @@ withDefaults(
 
 <template>
   <div class="p-strip" :class="tone">
-    <span v-if="icon" class="icon-box"><Codicon :name="icon" :size="iconSize" /></span>
+    <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="iconSize" /></span>
     <slot />
   </div>
 </template>

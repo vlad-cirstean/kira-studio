@@ -15,7 +15,7 @@ import {
   duplicateTab,
   tabsState,
 } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { openContextMenu } from '../state/contextMenu';
 
@@ -149,7 +149,7 @@ watch(
       @contextmenu.prevent="onContextMenu($event, tab)"
     >
       <span class="p-tab-rail" />
-      <Codicon :name="iconFor(tab)" :size="13" class="tab-icon" />
+      <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
       <span class="tab-title">{{ tabTitle(tab) }}</span>
       <span
         class="tab-close"
@@ -158,7 +158,7 @@ watch(
         data-testid="tab-close"
         @click="onClose($event, tab)"
       >
-        <Codicon name="close" :size="12" />
+        <CodiconIcon name="close" :size="12" />
       </span>
     </button>
   </div>

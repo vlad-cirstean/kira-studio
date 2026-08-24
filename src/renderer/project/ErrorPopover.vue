@@ -4,8 +4,8 @@
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
-import Codicon from '../theme/Codicon.vue';
-import Button from '../theme/primitives/Button.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
+import AppButton from '../theme/primitives/AppButton.vue';
 
 const props = defineProps<{ message: string }>();
 
@@ -69,7 +69,7 @@ onUnmounted(() => {
       :aria-label="`Error: ${props.message}`"
       @click="toggle"
     >
-      <Codicon name="error" :size="12" />
+      <CodiconIcon name="error" :size="12" />
       <span class="error-trigger-text">{{ props.message }}</span>
     </button>
 
@@ -83,8 +83,8 @@ onUnmounted(() => {
       >
         <div class="error-popover-body">{{ props.message }}</div>
         <div class="p-toolbar last error-popover-actions">
-          <Button class="p-push" @click="copyText(props.message)">Copy</Button>
-          <Button @click="close">Close</Button>
+          <AppButton class="p-push" @click="copyText(props.message)">Copy</AppButton>
+          <AppButton @click="close">Close</AppButton>
         </div>
       </div>
     </Teleport>

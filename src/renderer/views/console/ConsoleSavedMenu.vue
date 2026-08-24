@@ -3,8 +3,8 @@ import type { SavedConsoleQuery } from '@shared/domain/queries';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { findConsoleTab } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import SavedListMenu from '../shared/SavedListMenu.vue';
@@ -120,7 +120,7 @@ async function saveCurrent(): Promise<void> {
     <template #footer>
       <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="console-save-current" @click="saveCurrent">
-        <span class="icon-box"><Codicon name="add" :size="12" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="12" /></span>
         Save current query…
       </button>
     </template>
@@ -138,10 +138,10 @@ async function saveCurrent(): Promise<void> {
         @keydown.escape="cancelPrompt"
       />
       <div class="prompt-actions">
-        <Button kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </Button>
-        <Button kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
+        <AppButton kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </AppButton>
+        <AppButton kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
           OK
-        </Button>
+        </AppButton>
       </div>
     </div>
   </div>

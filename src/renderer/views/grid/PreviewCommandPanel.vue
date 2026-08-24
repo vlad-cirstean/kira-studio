@@ -3,9 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { previewPending } from './pendingChanges';
 
 const props = defineProps<{ tabId: string }>();
@@ -45,7 +45,7 @@ function close(): void {
 </script>
 
 <template>
-  <Popover
+  <PopoverPanel
     anchor="right"
     :width="480"
     test-id="preview-command-panel"
@@ -54,7 +54,7 @@ function close(): void {
   >
     <div class="preview-panel-inner">
       <div class="preview-panel-header p-panel-head">
-        <span class="icon-box"><Codicon name="code" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="code" :size="14" /></span>
         <span>Preview SQL</span>
         <IconButton
           icon="close"
@@ -75,7 +75,7 @@ function close(): void {
         <CodeMirrorHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>
     </div>
-  </Popover>
+  </PopoverPanel>
 </template>
 
 <style scoped>

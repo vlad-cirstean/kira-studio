@@ -10,9 +10,9 @@ import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
-import Codicon from '../theme/Codicon.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
-import Button from '../theme/primitives/Button.vue';
+import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
@@ -227,7 +227,7 @@ const preconnectText = computed({
   >
     <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
     <template v-if="step === 'engine'" #header>
-      <span class="icon-box muted"><Codicon name="database" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="database" :size="14" /></span>
       <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
       <span class="title-mid p-push">
         <span v-if="!isEdit" class="steps">
@@ -236,7 +236,7 @@ const preconnectText = computed({
           <span class="step"><span class="n">2</span>Details</span>
         </span>
       </span>
-      <Button v-if="isEdit" icon="chevron-left" @click="step = 'details'">Back</Button>
+      <AppButton v-if="isEdit" icon="chevron-left" @click="step = 'details'">Back</AppButton>
     </template>
     <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
          is identity here, not a control (changed via "Change engine" back to step 1). -->
@@ -245,14 +245,14 @@ const preconnectText = computed({
         <EngineIcon :kind="draft.kind" :size="16" />
       </span>
       <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
-      <Button
+      <AppButton
         icon="chevron-left"
         class="p-push"
         title="Pick a different engine"
         @click="step = 'engine'"
       >
         Change engine
-      </Button>
+      </AppButton>
     </template>
 
     <template v-if="step === 'engine'">
@@ -448,18 +448,18 @@ const preconnectText = computed({
 
     <template v-if="step === 'engine'" #footer>
       <span class="footer-actions p-push">
-        <Button kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</Button>
-        <Button kind="dialog" variant="primary" @click="continueToDetails">
+        <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
+        <AppButton kind="dialog" variant="primary" @click="continueToDetails">
           Continue
-          <span class="icon-box"><Codicon name="chevron-right" :size="14" /></span>
-        </Button>
+          <span class="icon-box"><CodiconIcon name="chevron-right" :size="14" /></span>
+        </AppButton>
       </span>
     </template>
     <template v-else #footer>
       <div class="test-area">
-        <Button kind="dialog" icon="plug" data-testid="connection-test" @click="onTest">
+        <AppButton kind="dialog" icon="plug" data-testid="connection-test" @click="onTest">
           Test connection
-        </Button>
+        </AppButton>
         <span
           v-if="testState.status !== 'idle'"
           class="test-chip p-chip"
@@ -476,8 +476,8 @@ const preconnectText = computed({
         </span>
       </div>
       <div class="footer-actions">
-        <Button kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</Button>
-        <Button
+        <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
+        <AppButton
           kind="dialog"
           variant="primary"
           data-testid="connection-save"
@@ -485,7 +485,7 @@ const preconnectText = computed({
           @click="onSave"
         >
           Save
-        </Button>
+        </AppButton>
       </div>
     </template>
   </DialogFrame>

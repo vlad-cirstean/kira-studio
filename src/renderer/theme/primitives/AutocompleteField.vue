@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import Codicon from '../Codicon.vue';
+import CodiconIcon from '../CodiconIcon.vue';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './completion';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
@@ -81,7 +81,7 @@ function recompute(el: HTMLInputElement): void {
 // D3: a `position: fixed` list positioned from the input's own rect, not Teleported and not
 // anchored via CSS (`position: absolute` relative to this field) — a toolbar row is exactly the
 // kind of fixed-height, easily-overflow-clipped ancestor task #58 already ran into with
-// Popover.vue, and `fixed` sidesteps that regardless of what any ancestor's `overflow` says.
+// PopoverPanel.vue, and `fixed` sidesteps that regardless of what any ancestor's `overflow` says.
 function positionList(): void {
   const el = inputRef.value;
   if (!el) return;
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
       @mouseenter="activeIndex = i"
       @mousedown.prevent="accept(c)"
     >
-      <Codicon v-if="c.icon" :name="c.icon" :size="12" class="sugg-icon" />
+      <CodiconIcon v-if="c.icon" :name="c.icon" :size="12" class="sugg-icon" />
       <span class="sugg-label">{{ c.label }}</span>
       <span v-if="c.detail" class="sugg-detail">{{ c.detail }}</span>
     </li>

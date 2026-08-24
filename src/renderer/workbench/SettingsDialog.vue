@@ -4,8 +4,8 @@ import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
-import Codicon from '../theme/Codicon.vue';
-import Button from '../theme/primitives/Button.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
+import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import TextField from '../theme/primitives/TextField.vue';
 
@@ -109,7 +109,7 @@ async function onClearCaches(): Promise<void> {
     @close="emit('close')"
   >
     <template #header>
-      <span class="icon-box muted"><Codicon name="gear" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="gear" :size="14" /></span>
       <span>Settings</span>
     </template>
 
@@ -238,14 +238,14 @@ async function onClearCaches(): Promise<void> {
               <span>Hit rate</span>
               <TextField type="text" size="md" :model-value="hitRateLabel" disabled />
             </label>
-            <Button
+            <AppButton
               kind="dialog"
               class="action-button"
               data-testid="settings-clear-caches"
               @click="onClearCaches"
             >
               Clear caches
-            </Button>
+            </AppButton>
           </template>
 
           <template v-else>
@@ -281,15 +281,15 @@ async function onClearCaches(): Promise<void> {
     <template #footer>
       <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
       <span class="footer-actions">
-        <Button kind="dialog" data-testid="settings-cancel" @click="onCancel">Cancel</Button>
-        <Button
+        <AppButton kind="dialog" data-testid="settings-cancel" @click="onCancel">Cancel</AppButton>
+        <AppButton
           kind="dialog"
           variant="primary"
           data-testid="settings-close"
           @click="emit('close')"
         >
           Done
-        </Button>
+        </AppButton>
       </span>
     </template>
   </DialogFrame>

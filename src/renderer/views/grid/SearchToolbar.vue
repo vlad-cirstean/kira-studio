@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { getPage } from './page';
@@ -120,7 +120,7 @@ onUnmounted(() => {
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
   <div class="search-toolbar p-toolbar" data-testid="search-toolbar" @keydown="onKeydown">
     <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
-      <Codicon name="search" :size="14" />
+      <CodiconIcon name="search" :size="14" />
     </span>
     <div class="search-input">
       <TextField
@@ -132,7 +132,7 @@ onUnmounted(() => {
       />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
-         single-value picker, so each is its own icon button rather than a <Segmented> (which
+         single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
          only models "exactly one option selected") — the same three codicons VS Code's own
          find widget uses for this. -->
     <div class="group">

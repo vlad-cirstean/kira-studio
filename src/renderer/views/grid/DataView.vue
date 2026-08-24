@@ -6,8 +6,8 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 import { connColorVar } from '../../theme/connColor';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Strip from '../../theme/primitives/Strip.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
@@ -157,7 +157,7 @@ function onCloseSearch(): void {
            that started it (DataToolbar's p-run-state), never a bar across the top of the view —
            §8.5's "never a spinner that replaces the previous page" still holds, it just no longer
            needs a bar of its own to say so. -->
-      <Strip
+      <MessageStrip
         v-if="rt?.status === 'error' && rt.error"
         tone="err"
         icon="warning"
@@ -165,7 +165,7 @@ function onCloseSearch(): void {
         class="error-strip"
       >
         <span>{{ rt.error.message }}</span>
-      </Strip>
+      </MessageStrip>
       <div class="grid-area">
         <DataGrid ref="dataGridRef" :tab-id="tab.id" />
       </div>

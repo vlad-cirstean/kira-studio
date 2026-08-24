@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 
 // Shared popover shell for grid/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
 // a "Saved" list (pin/rename/delete an entry, click to apply it) with an optional "Recent" list
@@ -52,7 +52,7 @@ defineSlots<{
 </script>
 
 <template>
-  <Popover anchor="left" :width="320" :test-id="panelTestId" :backdrop-test-id="backdropTestId" @close="emit('close')">
+  <PopoverPanel anchor="left" :width="320" :test-id="panelTestId" :backdrop-test-id="backdropTestId" @close="emit('close')">
     <div class="saved-list-menu-inner">
       <div class="p-menu-label">{{ title }}</div>
       <div v-if="saved.length === 0" class="empty-row p-sm dim">{{ emptySavedText }}</div>
@@ -70,7 +70,7 @@ defineSlots<{
           title="Pin"
           @click.stop="emit('togglePin', entry)"
         >
-          <Codicon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="12" />
+          <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="12" />
         </button>
         <slot name="entry" :entry="entry" />
         <span class="entry-actions">
@@ -96,7 +96,7 @@ defineSlots<{
 
       <slot name="footer" />
     </div>
-  </Popover>
+  </PopoverPanel>
 </template>
 
 <style scoped>

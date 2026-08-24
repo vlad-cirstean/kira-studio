@@ -6,8 +6,8 @@ import type {
 } from '@shared/domain/connection-filter';
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
-import Codicon from '../theme/Codicon.vue';
-import Button from '../theme/primitives/Button.vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
+import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
@@ -106,7 +106,7 @@ const connectionName = computed(
     @close="closeFiltersDialog"
   >
     <template #header>
-      <span class="icon-box muted"><Codicon name="filter" :size="14" /></span>
+      <span class="icon-box muted"><CodiconIcon name="filter" :size="14" /></span>
       <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
     </template>
 
@@ -140,10 +140,10 @@ const connectionName = computed(
         </div>
       </div>
 
-      <Button icon="add" class="add-rule" @click="addRule">Add rule</Button>
+      <AppButton icon="add" class="add-rule" @click="addRule">Add rule</AppButton>
 
       <div class="p-strip note preview-strip">
-        <span class="icon-box"><Codicon name="info" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="info" :size="14" /></span>
         <span>
           Hides <b>{{ preview.hidden }}</b> of <b>{{ preview.total }}</b> cached nodes. Nothing
           is deleted — removing a rule brings it straight back.
@@ -154,8 +154,8 @@ const connectionName = computed(
     <template #footer>
       <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="footer-actions p-push">
-        <Button kind="dialog" @click="closeFiltersDialog">Cancel</Button>
-        <Button kind="dialog" variant="primary" @click="onSave">Save filters</Button>
+        <AppButton kind="dialog" @click="closeFiltersDialog">Cancel</AppButton>
+        <AppButton kind="dialog" variant="primary" @click="onSave">Save filters</AppButton>
       </span>
     </template>
   </DialogFrame>

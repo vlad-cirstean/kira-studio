@@ -3,7 +3,7 @@ import type { ColumnMeta } from '@shared/domain/tree';
 import { columnTypeIcon } from '../../project/icons';
 import { columnsSectionMenu } from '../../project/menus';
 import { typeDescription } from '../../project/typeGlossary';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 
 const props = defineProps<{
@@ -53,7 +53,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           @contextmenu="onContextMenu($event, col)"
         >
           <td class="def-col-icon">
-            <Codicon :name="columnTypeIcon(col.dataType)" :size="14" />
+            <CodiconIcon :name="columnTypeIcon(col.dataType)" :size="14" />
           </td>
           <td class="def-col-name">{{ col.name }}</td>
           <td class="def-col-key">
@@ -67,13 +67,13 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               class="type-info"
               :title="typeDescription(col.dataType) ?? ''"
             >
-              <Codicon name="info" :size="12" />
+              <CodiconIcon name="info" :size="12" />
             </span>
           </td>
           <!-- Nullable stated only as the exception — repeating "NOT NULL" on every row (the
                common case in a well-designed schema) added noise without adding information. -->
           <td class="def-col-null">
-            <Codicon v-if="col.nullable" name="close" :size="12" title="Nullable" />
+            <CodiconIcon v-if="col.nullable" name="close" :size="12" title="Nullable" />
           </td>
           <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
           <td class="def-col-comment">{{ col.comment ?? '' }}</td>

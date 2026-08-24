@@ -9,10 +9,10 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import Segmented from '../../theme/primitives/Segmented.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
@@ -163,7 +163,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
           data-testid="ops-filter"
         />
       </div>
-      <Segmented v-model="opsState.statusFilter" :options="statusFilterOptions" />
+      <SegmentedControl v-model="opsState.statusFilter" :options="statusFilterOptions" />
       <span class="running-count">{{ runningCount }} running</span>
       <button
         type="button"
@@ -220,7 +220,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(item.record) }}</span>
               <span>{{ item.record.kind }}</span>
               <span class="status-cell">
-                <Codicon v-if="item.record.status === 'running'" name="loading" class="spin" :size="12" />
+                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="spin" :size="12" />
                 {{ item.record.status }}
                 <button
                   v-if="item.record.status === 'running'"
@@ -229,7 +229,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
                   aria-label="Cancel operation"
                   @click.stop="onCancel(item.record)"
                 >
-                  <Codicon name="debug-stop" :size="12" />
+                  <CodiconIcon name="debug-stop" :size="12" />
                 </button>
               </span>
               <span>{{ formatDuration(item.record.durationMs) }}</span>

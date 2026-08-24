@@ -7,14 +7,14 @@ import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
-import Button from '../../theme/primitives/Button.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -409,7 +409,7 @@ onUnmounted(() => {
             <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                  vanish should look like one (see the mockup's KeyValue.html). -->
             <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
-              <Codicon name="history" :size="11" />
+              <CodiconIcon name="history" :size="11" />
               {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
             </span>
             <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
@@ -491,7 +491,7 @@ onUnmounted(() => {
               :title="addTitle"
               @click="openAdd"
             />
-            <Popover v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
+            <PopoverPanel v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Add key (string value)</div>
                 <TextField v-model="addName" placeholder="Key name" data-testid="keyvalue-add-name" />
@@ -506,17 +506,17 @@ onUnmounted(() => {
                   {{ addError }}
                 </div>
                 <div class="popover-actions">
-                  <Button kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
-                  <Button
+                  <AppButton kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</AppButton>
+                  <AppButton
                     kind="dialog"
                     variant="primary"
                     data-testid="keyvalue-add-save"
                     :disabled="addSaving"
                     @click="submitAdd"
-                  >Save</Button>
+                  >Save</AppButton>
                 </div>
               </div>
-            </Popover>
+            </PopoverPanel>
           </div>
 
           <div class="edit-anchor">
@@ -527,7 +527,7 @@ onUnmounted(() => {
               :title="editTitle"
               @click="openEdit"
             />
-            <Popover v-if="editOpen" test-id="keyvalue-edit-popover" :width="320" @close="closeEdit">
+            <PopoverPanel v-if="editOpen" test-id="keyvalue-edit-popover" :width="320" @close="closeEdit">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
                 <TextField
@@ -540,17 +540,17 @@ onUnmounted(() => {
                   {{ editError }}
                 </div>
                 <div class="popover-actions">
-                  <Button kind="dialog" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
-                  <Button
+                  <AppButton kind="dialog" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</AppButton>
+                  <AppButton
                     kind="dialog"
                     variant="primary"
                     data-testid="keyvalue-edit-save"
                     :disabled="editSaving"
                     @click="saveEdit"
-                  >Save</Button>
+                  >Save</AppButton>
                 </div>
               </div>
-            </Popover>
+            </PopoverPanel>
           </div>
 
           <IconButton
@@ -572,9 +572,9 @@ onUnmounted(() => {
       </template>
 
       <template #strips>
-        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
+        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
           {{ rt.error.message }}
-        </Strip>
+        </MessageStrip>
       </template>
 
       <KeyValueSearchToolbar

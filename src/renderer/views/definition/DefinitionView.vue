@@ -13,11 +13,11 @@ import {
   openConsoleTab,
   patchDefinitionTabState,
 } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Segmented from '../../theme/primitives/Segmented.vue';
-import Strip from '../../theme/primitives/Strip.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
@@ -168,7 +168,7 @@ const breadcrumb = computed(() => {
       <template #badges>
         <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
         <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
-          <Codicon name="lock" :size="11" />
+          <CodiconIcon name="lock" :size="11" />
           read-only — {{ originPhrase }}
         </span>
       </template>
@@ -179,7 +179,7 @@ const breadcrumb = computed(() => {
       <template #toolbar>
         <div class="sep" />
         <div class="group">
-          <Segmented
+          <SegmentedControl
             :model-value="pane"
             :options="PANE_OPTIONS"
             data-testid="definition-pane"
@@ -193,40 +193,40 @@ const breadcrumb = computed(() => {
              own per-section content and count badges, nothing to copy as one document. -->
         <template v-if="pane === 'source'">
           <div class="sep" />
-          <Button
+          <AppButton
             icon="copy"
             title="Copy definition to clipboard"
             data-testid="definition-copy"
             @click="onCopy"
           >
             Copy
-          </Button>
+          </AppButton>
         </template>
-        <Button
+        <AppButton
           icon="terminal"
           title="Open query console here"
           data-testid="definition-open-console"
           @click="onOpenConsole"
         >
           Open in console
-        </Button>
+        </AppButton>
       </template>
 
       <template #strips>
-        <Strip
+        <MessageStrip
           v-if="rt?.status === 'error' && rt.error"
           tone="err"
           icon="error"
           data-testid="definition-error"
         >
           <span class="err-message">{{ rt.error }}</span>
-        </Strip>
+        </MessageStrip>
         <div
           v-if="pane === 'source' && definition && definition.notes.length > 0"
           class="p-strip note"
           data-testid="definition-notes"
         >
-          <span class="icon-box"><Codicon name="info" :size="14" /></span>
+          <span class="icon-box"><CodiconIcon name="info" :size="14" /></span>
           <ul class="notes-list">
             <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
           </ul>

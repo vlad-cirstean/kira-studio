@@ -2,8 +2,8 @@
 import type { Caps } from '@shared/caps';
 import { ref } from 'vue';
 import { findDocumentTab } from '../../state/tabs';
-import Button from '../../theme/primitives/Button.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { fieldNamesOnPage } from './docPage';
 import { setProjection } from './state';
 
@@ -46,7 +46,7 @@ function close(): void {
 </script>
 
 <template>
-  <Popover
+  <PopoverPanel
     anchor="right"
     :width="200"
     test-id="document-projection-menu"
@@ -55,8 +55,8 @@ function close(): void {
   >
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
-        <Button data-testid="document-projection-select-all" @click="selectAll"> All </Button>
-        <Button data-testid="document-projection-select-none" @click="selectNone"> None </Button>
+        <AppButton data-testid="document-projection-select-all" @click="selectAll"> All </AppButton>
+        <AppButton data-testid="document-projection-select-none" @click="selectNone"> None </AppButton>
       </div>
       <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm muted">
         No fields seen yet — load a page first.
@@ -78,7 +78,7 @@ function close(): void {
         loaded page; `_id` is always returned.
       </div>
     </div>
-  </Popover>
+  </PopoverPanel>
 </template>
 
 <style scoped>

@@ -7,9 +7,9 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Button from '../../theme/primitives/Button.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Strip from '../../theme/primitives/Strip.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -120,7 +120,7 @@ const statusLine = computed(() => {
            permanently disabled here (reserved slot, same as the definition view's Stop): Run/Run all are
            the console's two start verbs, and neither one is "refresh". -->
       <template #toolbar>
-        <Button
+        <AppButton
           icon="play"
           variant="primary"
           data-testid="console-run-statement"
@@ -129,8 +129,8 @@ const statusLine = computed(() => {
           @click="runStatement"
         >
           Run
-        </Button>
-        <Button
+        </AppButton>
+        <AppButton
           icon="run-all"
           data-testid="console-run-all"
           :disabled="running"
@@ -138,18 +138,18 @@ const statusLine = computed(() => {
           @click="runAll"
         >
           Run all
-        </Button>
+        </AppButton>
         <div class="sep"></div>
         <div class="saved-anchor">
-          <Button
+          <AppButton
             icon="bookmark"
             data-testid="console-saved-toggle"
             title="Saved queries"
             @click="savedMenuOpen = !savedMenuOpen"
           >
             Saved queries
-          </Button>
-          <!-- Popover.vue anchors itself to its own DOM parent (see its own comment) — this menu
+          </AppButton>
+          <!-- PopoverPanel.vue anchors itself to its own DOM parent (see its own comment) — this menu
                used to render several levels away from its trigger button (a direct child of
                ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
                of the window instead of under "Saved queries" (task #58). Wrapping it here next to
@@ -162,9 +162,9 @@ const statusLine = computed(() => {
       </template>
 
       <template #strips>
-        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
+        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
           {{ rt.error.message }}
-        </Strip>
+        </MessageStrip>
       </template>
 
       <div class="editor-body">

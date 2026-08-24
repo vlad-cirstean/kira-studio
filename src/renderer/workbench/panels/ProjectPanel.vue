@@ -4,7 +4,7 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SearchBox from '../../project/SearchBox.vue';
 import { treeState } from '../../project/state/tree';
 import { connectionsState, openCreateDialog } from '../../state/connections';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 
 // VS Code's own file-explorer "type to search" pattern: a tree row holds real DOM focus once
@@ -57,7 +57,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
     <!-- FirstRun.html's side-empty: says what the panel is for, nothing more — the headline
          already lives on the main start page, so it is not repeated here. -->
     <div v-else class="side-empty">
-      <span class="dim"><Codicon name="database" :size="24" /></span>
+      <span class="dim"><CodiconIcon name="database" :size="24" /></span>
       <span class="p-xs dim side-empty-text">Everything you connect to<br />shows up here.</span>
     </div>
     <FiltersDialog />

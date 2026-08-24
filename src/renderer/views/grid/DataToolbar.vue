@@ -282,8 +282,8 @@ function onDiscard(): void {
       />
     </div>
 
-    <!-- Left as the hand-rolled .p-seg group rather than <Segmented>: tabs.spec.ts/leaks.spec.ts
-         assert `toHaveClass(/active/)` on these buttons, and Segmented.vue (off-limits to edit)
+    <!-- Left as the hand-rolled .p-seg group rather than <SegmentedControl>: tabs.spec.ts/leaks.spec.ts
+         assert `toHaveClass(/active/)` on these buttons, and SegmentedControl.vue (off-limits to edit)
          only ever applies `.on` — swapping components here would silently break those tests
          (rule 3: correctness over consistency). -->
     <div class="p-seg" data-testid="page-size-picker">

@@ -9,12 +9,12 @@ import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated, patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
-import Button from '../../theme/primitives/Button.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -244,7 +244,7 @@ function onApplyFromHistory(
 }
 
 // Item 1's partition popover — a checkbox list anchored to a button (mirrors ColumnsMenu.vue's
-// own anchor+Popover pattern), rather than the old free-text field. `partitionOptions` is
+// own anchor+PopoverPanel pattern), rather than the old free-text field. `partitionOptions` is
 // (re)fetched every time the popover opens, via the same tree.children IPC ProjectTree.vue uses
 // (a topic's path already resolves to its partition list one level down, kafka/index.ts's
 // `children()`) — cheap enough for an on-demand round trip, and keeps the list honest if the
@@ -439,7 +439,7 @@ onUnmounted(() => {
             @click="runCount(tab.id)"
           />
           <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
-          <Button
+          <AppButton
             v-if="isBatch"
             icon="arrow-swap"
             active
@@ -448,7 +448,7 @@ onUnmounted(() => {
             @click="onPoll"
           >
             Poll
-          </Button>
+          </AppButton>
           <IconButton
             v-else
             icon="arrow-right"
@@ -541,15 +541,15 @@ onUnmounted(() => {
           />
         </div>
         <div class="partition-anchor">
-          <Button
+          <AppButton
             icon="filter"
             data-testid="stream-filter-partition"
             title="Filter by partition"
             @click="onTogglePartitionMenu"
           >
             {{ partitionButtonLabel }}
-          </Button>
-          <Popover
+          </AppButton>
+          <PopoverPanel
             v-if="partitionMenuOpen"
             anchor="left"
             :width="200"
@@ -581,7 +581,7 @@ onUnmounted(() => {
                 <span>partition {{ p }}</span>
               </label>
             </div>
-          </Popover>
+          </PopoverPanel>
         </div>
         <div class="filter-field">
           <TextField
@@ -593,23 +593,23 @@ onUnmounted(() => {
             @blur="onApplyFilter"
           />
         </div>
-        <Button data-testid="stream-filter-clear" title="Empty every field and refetch" @click="onClearFilter">
+        <AppButton data-testid="stream-filter-clear" title="Empty every field and refetch" @click="onClearFilter">
           Clear
-        </Button>
+        </AppButton>
       </template>
 
       <!-- The one destructive truth of this view, stated once at the top. -->
       <template #strips>
-      <Strip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
+      <MessageStrip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
         <span
           >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
           above) — it does not browse a stable position.</span
         >
-      </Strip>
+      </MessageStrip>
 
-      <Strip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" :icon-size="13" data-testid="stream-error">
+      <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" :icon-size="13" data-testid="stream-error">
         <span>{{ rt.error.message }}</span>
-      </Strip>
+      </MessageStrip>
 
       <StreamSearchToolbar
         v-if="rt?.searchOpen"
@@ -767,7 +767,7 @@ onUnmounted(() => {
 }
 
 /* Task #64: the compose-message popover was rendered as a sibling of ViewChrome, far from the
-   "Add message" button that opens it — Popover.vue anchors to its own DOM parent, so it needs to
+   "Add message" button that opens it — PopoverPanel.vue anchors to its own DOM parent, so it needs to
    be a sibling of the trigger, same wrapper shape as .columns-anchor/.add-anchor elsewhere. */
 .add-message-anchor {
   position: relative;
@@ -844,7 +844,7 @@ onUnmounted(() => {
   width: 100%;
 }
 
-/* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-Popover shape. */
+/* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */
 .partition-menu {
   display: flex;
   flex-direction: column;

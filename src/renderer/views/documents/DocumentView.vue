@@ -10,14 +10,14 @@ import { registerCommand } from '../../shortcuts/commands';
 import { clearSelectedCellFor, publishSelectedCell } from '../../state/cellSelection';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import Button from '../../theme/primitives/Button.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import Strip from '../../theme/primitives/Strip.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
@@ -621,15 +621,15 @@ onUnmounted(() => {
             @blur="onSortInput"
           />
         </div>
-        <Button title="Empty both fields and refetch" data-testid="document-filter-clear" @click="onClearFilter">
+        <AppButton title="Empty both fields and refetch" data-testid="document-filter-clear" @click="onClearFilter">
           Clear
-        </Button>
+        </AppButton>
       </template>
 
       <template #strips>
-        <Strip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
+        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
-        </Strip>
+        </MessageStrip>
         <!-- Below the filter/sort row, above the list it searches — SearchToolbar.vue's own
              "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
         <DocumentSearchToolbar
@@ -643,10 +643,10 @@ onUnmounted(() => {
       <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
         <CodeMirrorHost v-model:doc="newDraft" language="json" :read-only="false" />
         <div class="edit-actions">
-          <Button variant="primary" data-testid="document-new-save" @click="commitCreate">
+          <AppButton variant="primary" data-testid="document-new-save" @click="commitCreate">
             Save
-          </Button>
-          <Button data-testid="document-new-cancel" @click="cancelCreate"> Cancel </Button>
+          </AppButton>
+          <AppButton data-testid="document-new-cancel" @click="cancelCreate"> Cancel </AppButton>
         </div>
       </div>
 
@@ -675,7 +675,7 @@ onUnmounted(() => {
                 :aria-label="isExpanded(rowAt(i)?.id ?? '') ? 'Collapse' : 'Expand'"
                 @click="rowAt(i) && toggleExpanded(tab.id, rowAt(i)!.id)"
               >
-                <Codicon
+                <CodiconIcon
                   :name="isExpanded(rowAt(i)?.id ?? '') ? 'chevron-down' : 'chevron-right'"
                   :size="13"
                 />
@@ -700,19 +700,19 @@ onUnmounted(() => {
               <template v-if="editingId === rowAt(i)?.id">
                 <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
                 <div class="edit-actions">
-                  <Button
+                  <AppButton
                     variant="primary"
                     data-testid="document-edit-save"
                     @click="commitEdit"
                   >
                     Save
-                  </Button>
-                  <Button
+                  </AppButton>
+                  <AppButton
                     data-testid="document-edit-cancel"
                     @click="cancelEdit"
                   >
                     Cancel
-                  </Button>
+                  </AppButton>
                 </div>
               </template>
               <CodeMirrorHost
@@ -803,7 +803,7 @@ onUnmounted(() => {
 
 /* .p-seg's own primitive only paints `.on` (see primitives.css) — kept as `active` because
    tests/ui assert on it directly (DataToolbar.vue's identical page-size picker and its own
-   comment on why this stays hand-rolled rather than <Segmented>). */
+   comment on why this stays hand-rolled rather than <SegmentedControl>). */
 .p-seg > button.active {
   background: var(--kira-bg-input);
   color: var(--kira-fg);

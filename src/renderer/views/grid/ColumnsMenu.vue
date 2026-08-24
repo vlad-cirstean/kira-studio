@@ -2,9 +2,9 @@
 import type { Caps } from '@shared/caps';
 import { computed, ref } from 'vue';
 import { findDataTab } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { runtime, setColumnOrder, setProjection } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
@@ -95,7 +95,7 @@ function close(): void {
 </script>
 
 <template>
-  <Popover
+  <PopoverPanel
     anchor="right"
     :width="200"
     test-id="columns-menu"
@@ -104,8 +104,8 @@ function close(): void {
   >
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
-        <Button data-testid="columns-select-all" @click="selectAll"> All </Button>
-        <Button data-testid="columns-select-none" @click="selectNone"> None </Button>
+        <AppButton data-testid="columns-select-all" @click="selectAll"> All </AppButton>
+        <AppButton data-testid="columns-select-none" @click="selectNone"> None </AppButton>
       </div>
       <div v-if="!meta" class="columns-menu-loading p-sm muted">Loading columns…</div>
       <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
@@ -121,7 +121,7 @@ function close(): void {
           @dragover.prevent="onDragOver(index)"
           @dragend="onDragEnd"
         >
-          <span class="drag-handle" aria-hidden="true"><Codicon name="gripper" :size="14" /></span>
+          <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="14" /></span>
           <input
             type="checkbox"
             :checked="selected.has(name)"
@@ -138,7 +138,7 @@ function close(): void {
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
-  </Popover>
+  </PopoverPanel>
 </template>
 
 <style scoped>

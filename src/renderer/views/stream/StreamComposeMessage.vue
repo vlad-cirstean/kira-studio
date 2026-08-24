@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import Popover from '../../theme/primitives/Popover.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { produceKafkaMessage, sendSqsMessage } from './streamMutations';
 
@@ -52,7 +52,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <Popover
+  <PopoverPanel
     anchor="right"
     :width="380"
     test-id="stream-add-message-panel"
@@ -61,7 +61,7 @@ async function submit(): Promise<void> {
   >
     <div class="compose-inner">
       <div class="compose-header p-panel-head">
-        <span class="icon-box"><Codicon name="add" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="14" /></span>
         <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
         <IconButton icon="close" class="p-push" title="Close" @click="emit('close')" />
       </div>
@@ -100,8 +100,8 @@ async function submit(): Promise<void> {
       </div>
 
       <div class="compose-actions">
-        <Button kind="dialog" @click="emit('close')">Cancel</Button>
-        <Button
+        <AppButton kind="dialog" @click="emit('close')">Cancel</AppButton>
+        <AppButton
           kind="dialog"
           variant="primary"
           :disabled="!canSubmit"
@@ -109,10 +109,10 @@ async function submit(): Promise<void> {
           @click="submit"
         >
           {{ isKafka ? 'Produce' : 'Send' }}
-        </Button>
+        </AppButton>
       </div>
     </div>
-  </Popover>
+  </PopoverPanel>
 </template>
 
 <style scoped>

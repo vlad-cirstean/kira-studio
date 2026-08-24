@@ -2,8 +2,8 @@
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import Codicon from '../../theme/Codicon.vue';
-import Button from '../../theme/primitives/Button.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SavedListMenu from './SavedListMenu.vue';
 
@@ -170,7 +170,7 @@ async function saveCurrent(): Promise<void> {
     <template #footer>
       <div class="p-sep" />
       <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
-        <span class="icon-box"><Codicon name="add" :size="12" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="12" /></span>
         Save current filter…
       </button>
     </template>
@@ -195,10 +195,10 @@ async function saveCurrent(): Promise<void> {
         />
       </span>
       <div class="prompt-actions">
-        <Button kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </Button>
-        <Button kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
+        <AppButton kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </AppButton>
+        <AppButton kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
           OK
-        </Button>
+        </AppButton>
       </div>
     </div>
   </div>

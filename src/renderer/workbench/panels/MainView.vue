@@ -11,7 +11,7 @@ import {
   type RecentTableEntry,
   recentTablesState,
 } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import ConsoleTabView from '../../views/console/ConsoleView.vue';
 import DefinitionTabView from '../../views/definition/DefinitionView.vue';
@@ -94,13 +94,13 @@ function openRecent(entry: RecentTableEntry): void {
   <!-- FirstRun.html — no connections at all: one button, no duplicate engine grid. -->
   <div v-else-if="!hasConnections" class="start" data-testid="first-run">
     <div class="start-inner first-run">
-      <span class="start-mark dim"><Codicon name="database" :size="32" /></span>
+      <span class="start-mark dim"><CodiconIcon name="database" :size="32" /></span>
       <div class="start-title">No connections yet</div>
       <div class="start-sub muted">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <button type="button" class="p-dlgbtn primary" @click="openCreateDialog">
-        <span class="icon-box"><Codicon name="add" :size="14" /></span>
+        <span class="icon-box"><CodiconIcon name="add" :size="14" /></span>
         New connection
       </button>
     </div>
@@ -127,7 +127,7 @@ function openRecent(entry: RecentTableEntry): void {
               :style="{ background: connColorVar(connectionFor(entry)?.color) ?? 'none' }"
             />
             <span class="icon-box" :style="{ color: iconColorFor(entry) }">
-              <Codicon :name="iconFor(entry)" :size="13" />
+              <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="entry-path">{{ entry.path }}</span>
             <span class="p-push p-xs dim">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>

@@ -4,9 +4,9 @@ import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { connectionsState } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
-import Codicon from '../../theme/Codicon.vue';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import Button from '../../theme/primitives/Button.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import {
@@ -180,9 +180,9 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </div>
     <span v-if="isStructuredSort" class="p-chip info" title="Sort came from clicking a column header">
-      <Codicon name="sort-precedence" :size="11" />from header
+      <CodiconIcon name="sort-precedence" :size="11" />from header
     </span>
-    <Button title="Empty both fields and refetch" @click="onClear"> Clear </Button>
+    <AppButton title="Empty both fields and refetch" @click="onClear"> Clear </AppButton>
   </div>
 </template>
 
