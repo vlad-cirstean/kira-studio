@@ -740,6 +740,84 @@ function cellNavEntry(
   return null;
 }
 
+// P29 D5: every rendered cell's state, computed exactly once per render instead of the 7-11
+// function calls per cell the template made before this — displayCell/cellClass/isSelected/
+// isSearchMatch/isCurrentSearchMatch/alignFor/isForeignKeyDisplayCol/isEditing/cellNavEntry keep
+// their signatures and are called from here instead of the template. Changes no rendered
+// attribute, class name or data-testid — the existing suite is the regression guard for it.
+interface CellVM {
+  col: number; // display column index — what selection/copy address
+  name: string; // column name — the v-for :key, unchanged
+  left: number;
+  width: number;
+  text: string;
+  isNull: boolean;
+  truncated: boolean;
+  staged: boolean;
+  editing: boolean;
+  navKind: 'fk' | 'pk' | null;
+  classes: Record<string, boolean>;
+}
+
+interface RowVM {
+  /** The page row index (P24 D3/D4): gutter number, selection, pending changes and search
+   *  matches all address a row by this, unchanged by filtering. */
+  row: number;
+  /** The display position: pixel placement only — identical to `row` when nothing is filtered
+   *  (P29 D11, preserving P24 D3/D4's split literally). */
+  pos: number;
+  gutterNumber: number;
+  dirty: boolean;
+  deleted: boolean;
+  cells: CellVM[];
+}
+
+const renderRows = computed<RowVM[]>(() => {
+  const cols = visibleColumnIndices.value;
+  const names = columnOrder.value;
+  const offs = offsets.value;
+  const base = rowNumberBase.value;
+  const out: RowVM[] = [];
+  for (const { row, pos } of visibleRows.value) {
+    const cells: CellVM[] = [];
+    for (const c of cols) {
+      const name = names[c] ?? '';
+      const dc = displayCell(row, c);
+      const nav = cellNavEntry(row, c);
+      cells.push({
+        col: c,
+        name,
+        left: GUTTER_WIDTH + (offs[c] ?? 0),
+        width: (offs[c + 1] ?? 0) - (offs[c] ?? 0),
+        text: dc.text,
+        isNull: dc.isNull,
+        truncated: dc.truncated,
+        staged: dc.staged,
+        editing: isEditing(row, c),
+        navKind: nav?.kind ?? null,
+        classes: cellClass({
+          alignRight: alignFor(c) === 'right',
+          selected: isSelected(row, c),
+          searchMatch: isSearchMatch(row, c),
+          searchMatchCurrent: isCurrentSearchMatch(row, c),
+          pendingEdit: dc.staged,
+          fk: isForeignKeyDisplayCol(c) && !dc.isNull,
+          hasNav: !!nav,
+        }),
+      });
+    }
+    out.push({
+      row,
+      pos,
+      gutterNumber: base + row + 1,
+      dirty: isDirtyRow(row),
+      deleted: isDeleted(row),
+      cells,
+    });
+  }
+  return out;
+});
+
 // D6: exactly one candidate navigates immediately; more than one opens the same ContextMenu
 // popup the right-click cell menu uses, anchored at the click.
 function onCellNavClick(row: number, displayCol: number, e: MouseEvent): void {
@@ -1128,18 +1206,19 @@ defineExpose({ scrollCellIntoView });
         </div>
       </div>
 
-      <!-- P24 D3/D4: `r` is the row's real page-row index (what selection/gutter number/pending
-           changes all address it by, unchanged by filtering — D4); `pos` is separately its
-           display position, used only for pixel placement, so the gutter still reads the row's
-           true number (`3, 17, 84, …`) even while filtered. -->
+      <!-- P29 D5/D11: each rowVm/cellVm is built once per render (renderRows above) — the
+           template only reads fields. `rowVm.row` is the page-row index (selection/gutter
+           number/pending changes/search all address a row by it, unchanged by filtering);
+           `rowVm.pos` is separately its display position, used only for pixel placement, so the
+           gutter still reads the row's true number (`3, 17, 84, …`) even while filtered. -->
       <div
-        v-for="{ row: r, pos } in visibleRows"
-        :key="r"
+        v-for="rowVm in renderRows"
+        :key="rowVm.row"
         class="grid-row"
         data-testid="grid-row"
-        :data-row="r"
-        :class="{ 'pending-delete': isDeleted(r) }"
-        :style="{ top: `${rowHeight + pos * rowHeight}px`, height: `${rowHeight}px` }"
+        :data-row="rowVm.row"
+        :class="{ 'pending-delete': rowVm.deleted }"
+        :style="{ top: `${rowHeight + rowVm.pos * rowHeight}px`, height: `${rowHeight}px` }"
       >
         <!-- scroll-margin-top = rowHeight on gutter/grid cells below: `.header-row` is
              position: sticky, which a native scrollIntoView(IfNeeded) call doesn't otherwise know
@@ -1148,43 +1227,33 @@ defineExpose({ scrollCellIntoView });
         <div
           class="gutter-cell"
           data-testid="grid-gutter-cell"
-          :class="{ dirty: isDirtyRow(r) }"
+          :class="{ dirty: rowVm.dirty }"
           :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
-          @click="onGutterClick(r, $event)"
-          @contextmenu.prevent="onGutterContextMenu(r, $event)"
+          @click="onGutterClick(rowVm.row, $event)"
+          @contextmenu.prevent="onGutterContextMenu(rowVm.row, $event)"
         >
-          {{ rowNumberBase + r + 1 }}
+          {{ rowVm.gutterNumber }}
         </div>
         <div
-          v-for="c in visibleColumnIndices"
-          :key="columnOrder[c]"
+          v-for="cellVm in rowVm.cells"
+          :key="cellVm.name"
           class="grid-cell"
           data-testid="grid-cell"
-          :data-row="r"
-          :data-column="columnOrder[c]"
-          :data-null="displayCell(r, c).isNull"
-          :class="
-            cellClass({
-              alignRight: alignFor(c) === 'right',
-              selected: isSelected(r, c),
-              searchMatch: isSearchMatch(r, c),
-              searchMatchCurrent: isCurrentSearchMatch(r, c),
-              pendingEdit: displayCell(r, c).staged,
-              fk: isForeignKeyDisplayCol(c) && !displayCell(r, c).isNull,
-              hasNav: !!cellNavEntry(r, c),
-            })
-          "
+          :data-row="rowVm.row"
+          :data-column="cellVm.name"
+          :data-null="cellVm.isNull"
+          :class="cellVm.classes"
           :style="{
-            left: `${GUTTER_WIDTH + offsets[c]}px`,
-            width: `${offsets[c + 1] - offsets[c]}px`,
+            left: `${cellVm.left}px`,
+            width: `${cellVm.width}px`,
             scrollMarginTop: `${rowHeight}px`,
           }"
-          @click="onCellClick(r, c, $event)"
-          @dblclick="onCellDblClick(r, c)"
-          @contextmenu.prevent="onCellContextMenu(r, c, $event)"
+          @click="onCellClick(rowVm.row, cellVm.col, $event)"
+          @dblclick="onCellDblClick(rowVm.row, cellVm.col)"
+          @contextmenu.prevent="onCellContextMenu(rowVm.row, cellVm.col, $event)"
         >
           <input
-            v-if="isEditing(r, c)"
+            v-if="cellVm.editing"
             v-model="editingBuffer"
             class="cell-input"
             data-testid="grid-cell-input"
@@ -1193,28 +1262,28 @@ defineExpose({ scrollCellIntoView });
             @blur="commitEdit"
             @click.stop
           />
-          <template v-else-if="displayCell(r, c).isNull">
+          <template v-else-if="cellVm.isNull">
             <span class="cell-null">NULL</span>
           </template>
           <template v-else>
-            {{ displayCell(r, c).text
+            {{ cellVm.text
             }}<span
-              v-if="displayCell(r, c).truncated"
+              v-if="cellVm.truncated"
               class="truncated-marker"
               v-tooltip="'value truncated at 64 KB'"
               >…</span
             >
           </template>
           <button
-            v-if="cellNavEntry(r, c)"
+            v-if="cellVm.navKind"
             type="button"
             class="cell-nav-btn"
             data-testid="cell-nav-button"
-            :data-nav-kind="cellNavEntry(r, c)?.kind"
-            :aria-label="cellNavEntry(r, c)?.kind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
-            @click.stop="onCellNavClick(r, c, $event)"
+            :data-nav-kind="cellVm.navKind"
+            :aria-label="cellVm.navKind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
+            @click.stop="onCellNavClick(rowVm.row, cellVm.col, $event)"
           >
-            <CodiconIcon :name="cellNavEntry(r, c)?.kind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
+            <CodiconIcon :name="cellVm.navKind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
           </button>
         </div>
       </div>
