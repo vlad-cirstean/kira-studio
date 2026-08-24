@@ -29,5 +29,5 @@ mac:
     - target: zip
       arch: [arm64]
 dmg:
-  writeUpdateInfo: false                    # no auto-update in v1 (§1/§3) — verified, docs/PACKAGING.md §7
+  writeUpdateInfo: false                    # no auto-update in v1 (§1/§3) — verified, docs/v1/PACKAGING.md §7
 artifactName: ${productName}-${version}-${arch}.${ext}

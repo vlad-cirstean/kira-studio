@@ -3,12 +3,12 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across six database engines.
+Vue 3 — one workbench across seven database engines.
 
 ## Status
 
 - **v1 is in development.** There are no published binaries yet — you build it from source (see
-  [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md)).
+  [Development](#development) and [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md)).
 - **macOS 13+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1.
@@ -22,16 +22,14 @@ Vue 3 — one workbench across six database engines.
 |---|---|---|---|---|---|---|---|---|
 | PostgreSQL | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MariaDB | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
-| MongoDB | Documents | yes (shell-style) | no | yes | no | estimate only | cursor | yes |
-| Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | read-only in v1 |
-| Kafka | Stream | no | no | no | no | yes (offset delta) | offset window | read-only in v1 |
-| SQS | Stream | no | no | no | no | approximate | receive batches | read-only in v1 |
+| MongoDB | Documents | yes (shell-style) | yes | yes | yes | estimate only | cursor | yes |
+| Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | yes (string keys only) |
+| Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
+| SQS | Stream | no | yes | no | no | approximate | receive batches | insert + delete |
+| S3 | Key/value | no | no | no | no | per-object only | continuation token | read-only |
 
 ¹ The console takes each engine's native command form, not SQL — that's why the column isn't
 called "SQL".
-
-**S3** appears in the connection dialog, marked *"not yet supported"*, and has no adapter behind
-it — it's planned, not shipped.
 
 A couple of things worth knowing up front:
 
@@ -54,10 +52,13 @@ A couple of things worth knowing up front:
   in-page find toolbar, stop button.
 - **Cell editor** — a CodeMirror panel with format autodetect (JSON, XML, SQL, base64, hex, epoch,
   ISO-8601, UUID, URL, CSV), manual override, and indented/compact beautify.
-- **Document, key/value and stream views** — MongoDB documents with per-`_id` expand state, Redis
-  keyspace with per-type renderers and TTL, Kafka/SQS message lists.
-- **Mutations** — add/delete row and cell edits staged as a per-tab pending-change set with an
-  exact command preview; commit or rollback; nothing reaches the database until commit.
+- **Document, key/value and stream views** — MongoDB documents with per-`_id` expand state and an
+  add/edit/delete document action; Redis keyspace with per-type renderers and TTL, plus
+  add/edit/delete on string-typed keys (delete works on any type); Kafka/SQS message lists with an
+  add-message (produce/send) action, and SQS message delete. These writes execute immediately
+  against the server, with no staging or preview — that model is specific to the SQL grid below.
+- **Mutations (SQL grid)** — add/delete row and cell edits staged as a per-tab pending-change set
+  with an exact command preview; commit or rollback; nothing reaches the database until commit.
 - **PK/FK navigation** — jump from a key cell to referencing or referenced rows in a pre-filtered
   new tab, driven by cached FK metadata (PostgreSQL/MariaDB).
 - **Query console** — a per-connection console tab, run-statement/run-all, results in the grid,
@@ -65,7 +66,7 @@ A couple of things worth knowing up front:
 - **Operations panel** — every DB operation live, with duration, rows, command, cancel, re-run,
   and a persisted op log with retention.
 - **Caching** — three tiers: persisted metadata, a byte-budgeted in-memory result-page LRU, and
-  counts; with prefetch and a hit-rate readout (see [`docs/PERF.md`](docs/PERF.md)).
+  counts; with prefetch and a hit-rate readout (see [`docs/v1/PERF.md`](docs/v1/PERF.md)).
 - **Keyboard & command palette** — a deliberately minimal VS Code-flavoured set: `⌘,` settings,
   `⌘B` project panel, `⌘J` operations panel, `⇧⌘P` palette, `⌘F` find, `F5` refresh, `⌘↩` run
   statement, `⇧⌘↩` run all, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close tab, `⇧⌘W` close window.
@@ -104,7 +105,7 @@ right-click → Open, or:
 xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
 ```
 
-See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the electron-builder config and the full
+See [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) for the electron-builder config and the full
 verification checklist.
 
 ## Development
@@ -151,15 +152,16 @@ engines and a real UI instead.
 - **`bun run test:ui`** — Playwright driving the built Electron app via `_electron.launch()`. It
   builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:ui`.
 - **Local fixture databases for manual testing** — see
-  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): four engines, a ~20k-row e-commerce
-  dataset, via Colima + Docker Compose.
+  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): all seven engines, a ~20k-row
+  e-commerce dataset for the four relational/document/key-value stores plus a small backlog for
+  Kafka/SQS/S3, via Colima + Docker Compose.
 
 ## Architecture
 
 Kira Studio runs as three processes: the Vue 3 renderer, an Electron main process for windowing
 and app-local storage, and every database driver isolated in its own `utilityProcess` ("engine").
 Control (connect, cancel, settings) flows through main; bulk result pages travel directly between
-renderer and engine over a `MessagePort`, skipping main entirely — see `docs/SPEC.md` §4 for the
+renderer and engine over a `MessagePort`, skipping main entirely — see `docs/v1/SPEC.md` §4 for the
 diagram.
 
 Two facts worth knowing before reading further:
@@ -181,29 +183,31 @@ docs           specification, performance, packaging, per-phase plans
 scripts/demo-dbs   local fixture databases for manual testing
 ```
 
-See [`docs/SPEC.md`](docs/SPEC.md) §11 for the full directory breakdown.
+See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 
 ## Documentation
 
-- [`docs/SPEC.md`](docs/SPEC.md) — the full specification: scope, architecture, adapter model,
+- [`docs/v1/SPEC.md`](docs/v1/SPEC.md) — the full specification: scope, architecture, adapter model,
   storage, caching, UI.
-- [`docs/PERF.md`](docs/PERF.md) — performance budgets, how each is measured, and the recorded
+- [`docs/v1/PERF.md`](docs/v1/PERF.md) — performance budgets, how each is measured, and the recorded
   numbers.
-- [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
+- [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
-- [`docs/plans/`](docs/plans/) — one implementation plan per phase, P0 through P16.
-- [`docs/design/vscode-modern-ui/`](docs/design/vscode-modern-ui/) — the workbench visual
+- [`docs/v1/plans/`](docs/v1/plans/) — one implementation plan per phase, P0 through P23.
+- [`docs/v1/design/kira-design-system/`](docs/v1/design/kira-design-system/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
 - [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md) — local fixture databases.
 
 ## Not in v1
 
-S3; MySQL; SQLite as a connection target; light mode; Windows/Linux; DDL editing; export to
+MySQL; SQLite as a connection target; light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; multiple windows; credential encryption; SSH
 tunneling (planned for v2); code signing/notarization; unit tests. **Auto-update is deliberately
-absent and verified as such** — see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7. Writes are
-limited to add-row, delete-row and cell-edit — Redis, Kafka and SQS are read-only.
+absent and verified as such** — see [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) §7. SQL-table writes
+(add-row, delete-row, cell-edit) are staged as pending changes with a preview; MongoDB/Redis/
+Kafka/SQS writes are capability-gated per engine (see the table above) and execute immediately,
+with no staging or preview; S3 is read-only.
 
 ## License
 

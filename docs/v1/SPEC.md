@@ -2,7 +2,7 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P19 implemented** on the v1 feature branch — see §10's phasing table for the record.
+> Status: **P0–P23 implemented** on the v1 feature branch — see §10's phasing table for the record.
 > Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
 > shipped.
 
@@ -14,8 +14,11 @@ A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScri
 ## 1. Scope
 
 **In scope (v1):** MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, S3. macOS only. Dark mode only.
-Read paths complete. Write paths: **add row, delete row, and cell editing** — all staged as pending
-changes with an exact-command preview. **DDL is read-only** but modelled for editing.
+Read paths complete. Write paths: PostgreSQL/MariaDB tables get **add row, delete row, and cell
+editing**, staged as pending changes with an exact-command preview (§8.14). MongoDB, Redis, Kafka
+and SQS also write — insert/update/delete gated per adapter's `canInsert`/`canUpdate`/`canDelete`
+capability (§5, §8.7–§8.9) — but apply **immediately**, with no staging or preview; S3 stays
+read-only. **DDL is read-only** but modelled for editing.
 
 Also in v1: a **SQL/query console** (opened from the right-click menu of a connection, database or
 table), **saved filters and queries per table**, and a per-connection **read-only guard** that blocks
@@ -206,10 +209,12 @@ carries a visible notice to that effect. The column is named and accessed throug
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
-            uri, options_json, created_at, updated_at, sort_order)
+            uri, options_json, preconnect, preconnect_sidecar, created_at, updated_at, sort_order)
 connection_filters(id, connection_id, node_kind, pattern, is_regex, action)  -- hide/show rules
-saved_queries(id, connection_id, path, name, kind, body, created_at, used_at)
+saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
                                                        -- saved filters/queries per table + console
+filter_history(id, connection_id, path, where_text, order_by_json, used_at)
+                                                       -- §8.5's History list of past filters/sorts
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
        command, error)                                  -- rotated, capped
@@ -291,8 +296,8 @@ Modern** — both its colors *and* the recently reworked chrome layout: rounded/
 borders, the detached look rather than the older flat-edge one.
 
 A visual mockup of this chrome (rounded-pill tabs, floating sidebar/editor/panel surfaces, the
-4/6/8px corner-radius system) lives in `docs/design/vscode-modern-ui/`, grounded in VS Code's actual
-`workbench.experimental.modernUI` CSS rather than approximated from memory.
+4/6/8px corner-radius system) lives in `docs/design/kira-design-system/`, grounded in VS Code's
+actual `workbench.experimental.modernUI` CSS rather than approximated from memory.
 
 ### 8.2 Settings dialog
 
@@ -402,19 +407,33 @@ Clicking a cell renders its value here in CodeMirror.
 
 ### 8.7 Document view (Mongo, and any document-shaped page)
 
-Virtualized list of documents. Each document has expand/collapse (recursive, remembers state per
-`_id`), an **edit** button and a **delete** button. Large values are truncated with a
-"show all" affordance so a 2 MB document cannot stall a frame. Same search toolbar as the grid.
+Virtualized list of documents. Toolbar: page-size control, a sort field, a **fields** (projection)
+picker — pushed server-side via Mongo's `find()` projection — exact count, and an **Add document**
+action. Each document has expand/collapse (recursive, remembers state per `_id`), an **edit**
+button and a **delete** button; clicking a document also publishes it to the cell editor panel.
+Insert/edit/delete execute **immediately** against the server — no pending-change staging or
+preview (§8.14's staged model is the SQL grid's own). Large values are truncated with a
+"show all" affordance so a 2 MB document cannot stall a frame. Same search toolbar as the grid
+(client-side only).
 
 ### 8.8 Key/value view (Redis)
 
 Namespace tree from `SCAN` with `:` splitting; per-type value renderers (string, hash, list, set,
 zset, stream) with TTL and memory usage shown. Never `KEYS`, never `SCAN` without a count budget.
+Toolbar adds a page-size control and in-page search. **Edit** and **Add key** are scoped to
+string-typed values only (a hash/list/set/zset/stream element needs its own per-type semantics,
+out of scope for this version); **Delete** works on any type. All three execute **immediately** —
+no pending-change staging or preview.
 
 ### 8.9 Stream view (Kafka, SQS)
 
 Message list with key, headers, partition/offset (Kafka) or message/receipt attributes (SQS), body in
-the document/cell viewer. SQS is poll-on-demand only (§5.1).
+the document/cell viewer. SQS is poll-on-demand only (§5.1). An **Add message** action produces
+(Kafka) or sends (SQS) a new message with key/body/headers, executed **immediately** with no
+staging or preview. Kafka is insert-only — a topic's log is immutable, so there is no per-message
+update or delete; SQS also supports **Delete** (a real per-item removal via the message's receipt
+handle) but no update. Kafka additionally offers offset/partition/timestamp filters with
+session-only (non-persisted) history.
 
 ### 8.10 Right-click coverage
 
@@ -427,8 +446,10 @@ the two diverge the mac key follows a slash. See §8.16 for the binding table it
 | Target | Items |
 |---|---|
 | Connection | Connect, Disconnect, **Open query console**, Refresh, Edit `F2`, Duplicate `Ctrl/Cmd+D`, Copy name `Ctrl/Cmd+C`, Copy URI `Shift+Alt+C`/`⌥⌘C`, Filters…, Color ▸, Read-only ✓, Delete `Delete`/`⌘⌫` |
-| Database / schema | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default |
+| Database / schema / (S3) Bucket | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default |
+| Redis namespace / S3 prefix | Refresh, Copy name `Ctrl/Cmd+C` |
 | Table / view / collection | Open data `Enter`, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name `Ctrl/Cmd+C`, Copy qualified name, Count rows, Saved filters ▸ |
+| Redis key / S3 object | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C` |
 | Object-kind folder (P19, and P23's Kafka Consumer groups) | Refresh, Collapse all |
 | Topic / queue (P23) | Open `Enter`, Open in new tab, Open definition, Copy name `Ctrl/Cmd+C` |
 | Consumer group (P23) | Open definition, Copy name `Ctrl/Cmd+C`, Copy qualified name |

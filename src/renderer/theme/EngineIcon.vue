@@ -4,7 +4,7 @@ import { computed } from 'vue';
 
 // P16 design system: the products' own logos, redrawn to 16px as currentColor
 // paths so they take the connection colour and obey the icon law — not the
-// vendored trademarked marks (docs/design/kira-design-system, "The engine
+// vendored trademarked marks (docs/v1/design/kira-design-system, "The engine
 // marks are drawn here, not vendored"). 1:1 with parts/_icons.html's i-*
 // engine symbols.
 const props = defineProps<{ kind: ConnectionKind; size?: number }>();

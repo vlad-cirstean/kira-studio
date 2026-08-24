@@ -769,7 +769,7 @@ function onHeaderContextMenu(displayCol: number, e: MouseEvent): void {
 }
 
 // D1: local, DOM-focus-scoped copy/paste — never a native Electron accelerator (see the ground
-// rules note at the top of docs/plans/P6-interaction-completeness.md for why).
+// rules note at the top of docs/v1/plans/P6-interaction-completeness.md for why).
 function onCopy(): void {
   const sel = rt()?.selection;
   const p = page.value;

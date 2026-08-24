@@ -128,5 +128,5 @@ export interface AdapterDeps {
 /**
  * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5,
  * `execute` in P5.5 — all above, nothing pending. A later phase that widens `Adapter` again does
- * so by amending docs/plans/P1-connections-and-tree.md §4b first, same discipline as this line.
+ * so by amending docs/v1/plans/P1-connections-and-tree.md §4b first, same discipline as this line.
  */

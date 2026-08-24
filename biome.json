@@ -13,7 +13,7 @@
       "!test-results",
       "!playwright-report",
       "!node_modules",
-      "!docs/design",
+      "!docs/v1/design",
       "!.claude"
     ]
   },

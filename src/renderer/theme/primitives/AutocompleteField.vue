@@ -11,7 +11,7 @@ defineOptions({ inheritAttrs: false });
 // BY, Mongo's filter/sort) — a drop-in TextField look-alike (same .p-input box, same
 // v-model/prefix/placeholder/invalid contract, same enter/blur events) rather than a wrapper
 // around TextField itself. Verified against the pinned vue@3.5.41 sources before choosing this
-// shape (docs/plans/P18-autocomplete.md §1): TextField spreads $attrs onto its <input> *before*
+// shape (docs/v1/plans/P18-autocomplete.md §1): TextField spreads $attrs onto its <input> *before*
 // its own inline handlers, so a caller's keydown listener always runs first in Vue's merged-array
 // invoker and can only suppress TextField's own `enter` emit via three undocumented internals
 // (attrs-before-handlers ordering, array-concat merge order, the array invoker's private
@@ -132,7 +132,7 @@ function accept(completion: Completion): void {
 
 function onKeydown(e: KeyboardEvent): void {
   // Ctrl+Space / Cmd+Space: explicit "show me everything", matching completionKeymap's own
-  // binding (docs/plans/P18-autocomplete.md realities #8) so the console and these plain fields
+  // binding (docs/v1/plans/P18-autocomplete.md realities #8) so the console and these plain fields
   // share one muscle memory.
   if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();

@@ -9,7 +9,7 @@ import RunState from '../../theme/primitives/RunState.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 
 // The view-head + rail + toolbar + run-state trio every non-grid view opens with (LAW 09/10/12
-// in docs/design/kira-design-system). Refresh/Stop live here rather than in each view's own
+// in docs/v1/design/kira-design-system). Refresh/Stop live here rather than in each view's own
 // toolbar slot because "Stop always follows Refresh, disabled when idle" is a chrome-level rule,
 // not a per-view choice — six views implementing it separately is exactly how three of them
 // drifted into showing Stop only while running instead of merely disabling it.
@@ -81,7 +81,7 @@ const runState = useRunState(() => props.tab.id);
     </div>
     <!-- RunState sits last, after everything else in the toolbar (including toolbar-end): its
          label's width changes as elapsed time ticks up, and it must never be able to reflow
-         controls to its left (see docs/design/kira-design-system LAW 12). -->
+         controls to its left (see docs/v1/design/kira-design-system LAW 12). -->
     <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
   </div>
   <div v-if="$slots['toolbar-2']" class="p-toolbar last">

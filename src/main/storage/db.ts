@@ -54,7 +54,7 @@ export async function openDb(): Promise<OpenedDb> {
   } catch {
     throw new Error(
       'node:sqlite is unavailable in this Electron build. Swap this file to better-sqlite3 + ' +
-        '@electron/rebuild (see D2 in docs/plans/P0-foundations.md) — nothing outside db.ts changes.',
+        '@electron/rebuild (see D2 in docs/v1/plans/P0-foundations.md) — nothing outside db.ts changes.',
     );
   }
 
