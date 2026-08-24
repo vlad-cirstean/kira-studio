@@ -29,4 +29,16 @@
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc., with a `!` or `BREAKING CHANGE:`
   footer for breaking changes.
 
+## Docker (for `tests/db/` testcontainers)
+
+- **Claude Code on the web's Linux containers**: the `docker` CLI is preinstalled but the daemon
+  isn't running — there's no systemd (`PID 1` isn't systemd), so `systemctl start docker` doesn't
+  work. Start it directly instead, as root: `nohup dockerd > /tmp/dockerd.log 2>&1 & disown`, then
+  give it a few seconds and check `docker info` / `/tmp/dockerd.log` for `"API listen on
+  /var/run/docker.sock"`. This has to be done once per fresh container/session — it doesn't
+  persist.
+- **The other dev environment (macOS) uses Colima** instead — `colima start` brings up the Docker
+  daemon there; don't try the `dockerd`-directly approach on that box, and don't assume systemd
+  either way.
+
 Full spec: `docs/v1/SPEC.md`.
