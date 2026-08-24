@@ -20,15 +20,7 @@ import {
   FORMAT_LANGUAGE,
 } from './formats';
 import { overrideFor, readOnlyReasonFor, setOverride } from './state';
-import {
-  defaultShapeFor,
-  describeTimestamp,
-  encodeTimestamp,
-  fromDatetimeLocalValue,
-  parseTimestamp,
-  parseTimestampValue,
-  toDatetimeLocalValue,
-} from './timestamp';
+import TimestampPane from './TimestampPane.vue';
 
 const cell = computed(() => cellSelectionState.current);
 
@@ -159,36 +151,14 @@ function generateUuid(): void {
   saveEdit();
 }
 
-// Timestamp datetime-local picker: reads/writes the live buffer (doc), not the stored value, so
-// it stays in lockstep with hand-typed edits and with itself across repeated picks — the same
-// "buffer is the single source of what Save stages" contract the rest of this file already keeps.
+// P24 D14/D15: dates get the same translate-pane treatment as hex/base64 below — TimestampPane
+// owns its own readings/editing entirely; this file only decides *whether* to show it.
 const isTimestampFormat = computed(
   () =>
     effectiveFormat.value === 'epochSeconds' ||
     effectiveFormat.value === 'epochMillis' ||
     effectiveFormat.value === 'iso8601',
 );
-const timestampInputValue = computed<string>(() => {
-  if (!isTimestampFormat.value) return '';
-  const d = parseTimestampValue(effectiveFormat.value, doc.value);
-  return d ? toDatetimeLocalValue(d) : '';
-});
-function onTimestampPick(e: Event): void {
-  const value = (e.target as HTMLInputElement).value;
-  if (!value) return;
-  const d = fromDatetimeLocalValue(value);
-  if (!d) return;
-  // P24 D16: re-encode using the buffer's own shape (its separator, offset spelling and
-  // sub-second precision), not a fixed one — otherwise a Postgres `2024-01-15 10:23:45+00`
-  // came back `2024-01-15T11:00:00.000Z`, changing far more than the picked moment (F7c).
-  const shape =
-    parseTimestamp(effectiveFormat.value, doc.value)?.shape ??
-    defaultShapeFor(effectiveFormat.value as 'epochSeconds' | 'epochMillis' | 'iso8601');
-  doc.value = encodeTimestamp(shape, d);
-  // Same reasoning as generateUuid: the picker sits outside `.editor-body`, so no focusout ever
-  // reaches onEditorBlur — stage immediately rather than waiting on a blur that will never come.
-  saveEdit();
-}
 
 // Hex/base64 decoded-text pane: a second, editable view of the same bytes as plaintext. `null`
 // means "not valid UTF-8" — shown as a note instead of a second editor rather than rendering
@@ -199,6 +169,9 @@ function onTimestampPick(e: Event): void {
 const showDecodedPane = computed(
   () => effectiveFormat.value === 'hex' || effectiveFormat.value === 'base64',
 );
+// P24 D14: the translate pane shown below the encoded value — hex/base64's decoded-text pane or
+// (D15) the timestamp pane — chosen by format, sharing one head/body/staging shape.
+const showTranslatePane = computed(() => showDecodedPane.value || isTimestampFormat.value);
 const decodedDoc = ref<string | null>('');
 let skipNextDecode = false;
 
@@ -222,11 +195,23 @@ watch(
   { immediate: true },
 );
 
+// P24 D20: the one write-guard both translate-pane update paths route through — only actually
+// writes `doc` when the candidate differs, and reports whether it did so the caller can decide
+// what side effect (if any) rides along. Replaces arming skipNextDecode unconditionally *before*
+// a write that might not happen: F7b — that left the flag permanently set once a no-op write
+// occurred (edit the decoded pane to text that re-encodes identically), silently swallowing the
+// *next* genuine edit with no way back except reselecting the cell.
+function writeDoc(next: string): boolean {
+  if (next === doc.value) return false;
+  doc.value = next;
+  return true;
+}
+
 function onDecodedInput(text: string): void {
   decodedDoc.value = text;
   if (!showDecodedPane.value) return;
-  skipNextDecode = true;
-  doc.value = encodeFromText(effectiveFormat.value as 'hex' | 'base64', text, doc.value);
+  const next = encodeFromText(effectiveFormat.value as 'hex' | 'base64', text, doc.value);
+  if (writeDoc(next)) skipNextDecode = true;
 }
 
 function applyBeautify(mode: BeautifyMode): void {
@@ -309,8 +294,8 @@ const targetLabel = computed(() => {
 
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
-// "X (manual)" segment here would just repeat what's a few pixels to the right. A decoded
-// timestamp reading runs its own row below (timestampReading) rather than sharing this badge —
+// "X (manual)" segment here would just repeat what's a few pixels to the right. A timestamp
+// reading runs in its own translate pane below (TimestampPane) rather than sharing this badge —
 // it was crowding out the byte count and truncation/beautify notes that live here.
 const statusLine = computed(() => {
   const c = cell.value;
@@ -324,14 +309,6 @@ const statusLine = computed(() => {
   if (isTruncatedValue.value) parts.push('showing the first 64 KB');
   if (beautifyFailure.value) parts.push(beautifyFailure.value);
   return parts.join(' · ');
-});
-
-// Local first, then UTC (as asked) — its own row under the header rather than squeezed into the
-// status badge alongside the byte count. Reads the live buffer (doc), not the stored value, so it
-// stays in sync with the datetime-local picker below and with hand-typed edits alike.
-const timestampReading = computed(() => {
-  if (!cell.value || isNullValue.value) return null;
-  return describeTimestamp(effectiveFormat.value, doc.value);
 });
 </script>
 
@@ -421,38 +398,15 @@ const timestampReading = computed(() => {
       </template>
     </ViewHeader>
 
-    <!-- Local first, then UTC (own row — too long to share the header's status badge). The
-         datetime-local picker is the reverse direction: pick a moment, get it re-encoded into
-         whatever timestamp shape this cell already uses. -->
-    <div v-if="timestampReading" class="p-strip note timestamp-row" data-testid="cell-editor-timestamp">
-      <CodiconIcon name="clock" :size="13" />
-      <span data-testid="cell-editor-timestamp-local">{{ timestampReading.local }}</span>
-      <span class="ts-sep">·</span>
-      <span data-testid="cell-editor-timestamp-utc">{{ timestampReading.utc }}</span>
-      <span class="p-input timestamp-picker">
-        <input
-          type="datetime-local"
-          step="1"
-          data-testid="cell-editor-timestamp-picker"
-          :value="timestampInputValue"
-          :disabled="!isEditable"
-          v-tooltip="
-            isEditable
-              ? 'Pick a date and time — re-encodes into this cell\'s current timestamp format'
-              : readOnlyChipText || 'Not editable'
-          "
-          @change="onTimestampPick"
-        />
-      </span>
-    </div>
-
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
          (onEditorKeydown) stages without needing to move focus away; neither is on CodeMirrorHost
          itself, since its own keymap only binds plain Enter (for newlines) and lets everything
-         else bubble. Both are on the wrapping div, so they cover the decoded pane too. -->
+         else bubble. Both are on the wrapping div, so they cover the translate pane too — TimestampPane
+         lives inside here (not in its own strip, as the native picker used to) precisely so it
+         inherits this same staging rule instead of needing its own (P24 D14/D15). -->
     <div
       class="editor-body"
-      :class="{ 'has-decoded': showDecodedPane }"
+      :class="{ 'has-translate': showTranslatePane }"
       @keydown="onEditorKeydown"
       @focusout="onEditorBlur"
     >
@@ -466,14 +420,14 @@ const timestampReading = computed(() => {
         />
       </div>
 
-      <!-- Hex/base64 only: the same bytes as editable plaintext, kept in lockstep with the
-           encoded box above in both directions (encode<->decode, see onDecodedInput). -->
+      <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
+           above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
-        <div class="decoded-head">
+        <div class="translate-head">
           <CodiconIcon name="symbol-string" :size="12" />
           <span>Decoded text</span>
         </div>
-        <div v-if="decodedDoc !== null" class="decoded-pane" data-testid="cell-editor-decoded">
+        <div v-if="decodedDoc !== null" class="translate-pane" data-testid="cell-editor-decoded">
           <CodeMirrorHost
             :doc="decodedDoc"
             language="plain"
@@ -483,11 +437,27 @@ const timestampReading = computed(() => {
         </div>
         <div
           v-else
-          class="p-strip note decoded-pane-empty"
+          class="p-strip note translate-pane-empty"
           data-testid="cell-editor-decoded-empty"
         >
           Not valid UTF-8 text — showing the raw {{ FORMAT_LABEL[effectiveFormat] }} value only.
         </div>
+      </template>
+
+      <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
+           field and calendar entirely — this file only decides whether to show it. -->
+      <template v-else-if="isTimestampFormat">
+        <div class="translate-head">
+          <CodiconIcon name="calendar" :size="12" />
+          <span>Date &amp; time</span>
+        </div>
+        <TimestampPane
+          class="translate-pane"
+          :doc="doc"
+          :format="effectiveFormat"
+          :read-only="!isEditable"
+          @update:doc="writeDoc($event)"
+        />
       </template>
     </div>
   </div>
@@ -533,30 +503,6 @@ const timestampReading = computed(() => {
   text-overflow: ellipsis;
 }
 
-/* Local first, then UTC — its own row so the (fairly long) pair of translations don't crowd the
-   header's badges. Reuses .p-strip.note's subtle info-row look rather than inventing a new one. */
-.timestamp-row {
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-4);
-}
-
-.ts-sep {
-  opacity: 0.5;
-}
-
-/* Pushed to the strip's own trailing edge — .p-strip is already a flex row (primitives.css). */
-.timestamp-picker {
-  margin-left: auto;
-}
-
-.timestamp-picker input {
-  /* Chromium's own datetime-local chrome (the field segments + calendar glyph) doesn't inherit
-     `color` for every part no matter what .p-input does — color-scheme is the one lever that gets
-     the calendar glyph itself to render light-on-dark instead of as a barely visible dark icon. */
-  color-scheme: dark;
-}
-
 .editor-body {
   flex: 1;
   min-height: 0;
@@ -569,15 +515,15 @@ const timestampReading = computed(() => {
   min-height: 0;
 }
 
-/* Hex/base64's decoded-text pane stacks below the encoded value, mirroring ConsoleView.vue's own
-   stacked result panels rather than a side-by-side split — this panel is usually too narrow for
-   two columns to read comfortably. */
-.editor-body.has-decoded .encoded-pane {
+/* The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
+   encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a side-by-side
+   split — this panel is usually too narrow for two columns to read comfortably. */
+.editor-body.has-translate .encoded-pane {
   flex: 1 1 55%;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.decoded-head {
+.translate-head {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -589,12 +535,12 @@ const timestampReading = computed(() => {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.decoded-pane {
+.translate-pane {
   flex: 1 1 45%;
   min-height: 0;
 }
 
-.decoded-pane-empty {
+.translate-pane-empty {
   flex: 1 1 45%;
   align-items: center;
   color: var(--kira-fg-disabled);
