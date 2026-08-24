@@ -711,6 +711,54 @@ function rowSnapshot(row: number): RowSnapshot {
   return { columns: [...columnOrder.value], values };
 }
 
+// P29 D6: the cheap precheck that makes cellNavEntry affordable — exactly the two predicates
+// gridMenu.ts already applies (foreignKeyNavItems filters on `fk.columns.includes(columnName)`;
+// referencedByItems requires `meta.primaryKey.includes(columnName)` and a non-empty
+// `referencedBy`), so a column outside both sets provably yields no items, with no snapshot
+// built. `valueNames` is the union of `columns` over BOTH edge lists — the only names
+// foreignKeyValueFilter (gridMenu.ts) ever reads out of a row's values.
+const navColumns = computed<{ fk: Set<string>; pk: Set<string>; valueNames: string[] }>(() => {
+  const meta = rt()?.meta ?? null;
+  const fk = new Set<string>();
+  const pk = new Set<string>();
+  const valueNames = new Set<string>();
+  if (meta) {
+    for (const edge of meta.foreignKeys) {
+      for (const name of edge.columns) {
+        fk.add(name);
+        valueNames.add(name);
+      }
+    }
+    if (meta.primaryKey && meta.referencedBy.length > 0) {
+      for (const name of meta.primaryKey) pk.add(name);
+      for (const edge of meta.referencedBy) {
+        for (const name of edge.columns) valueNames.add(name);
+      }
+    }
+  }
+  return { fk, pk, valueNames: [...valueNames] };
+});
+
+// `rowSnapshot(row)` narrowed to `navColumns.valueNames`, memoised per row for one render via the
+// optional cache renderRows passes — a table with no FK and no inbound reference (the common
+// case) never builds one at all, since valueNames is then empty.
+function navValuesFor(
+  row: number,
+  cache?: Map<number, Record<string, string | null>>,
+): Record<string, string | null> {
+  const cached = cache?.get(row);
+  if (cached) return cached;
+  const out: Record<string, string | null> = {};
+  for (const name of navColumns.value.valueNames) {
+    const c = columnOrder.value.indexOf(name);
+    if (c < 0) continue;
+    const dc = displayCell(row, c);
+    out[name] = dc.isNull ? null : dc.text;
+  }
+  cache?.set(row, out);
+  return out;
+}
+
 // P7 D3/D5/D7: the single source of truth for a cell's nav affordance — both the button's
 // v-if/icon and its click handler read this, so they can never disagree about what's showing.
 // 'fk' wins over 'pk' when a cell is somehow both (D7); null while editing (D8), before meta has
@@ -718,16 +766,19 @@ function rowSnapshot(row: number): RowSnapshot {
 function cellNavEntry(
   row: number,
   displayCol: number,
+  navCache?: Map<number, Record<string, string | null>>,
 ): { kind: 'fk' | 'pk'; items: MenuItem[] } | null {
   if (isEditing(row, displayCol)) return null;
   const name = columnOrder.value[displayCol];
   const meta = rt()?.meta ?? null;
   const t = tab();
   if (!name || !meta || !t?.connectionId) return null;
+  const { fk, pk } = navColumns.value;
+  if (!fk.has(name) && !pk.has(name)) return null;
   const fkCtx = {
     connectionId: t.connectionId,
     dialect: dialect.value,
-    rowValues: rowSnapshot(row).values,
+    rowValues: navValuesFor(row, navCache),
   };
   const fkItems = foreignKeyNavItems(name, meta, fkCtx).filter(
     (i) => i.type === 'item' && !i.disabled,
@@ -777,13 +828,16 @@ const renderRows = computed<RowVM[]>(() => {
   const names = columnOrder.value;
   const offs = offsets.value;
   const base = rowNumberBase.value;
+  // Per-render only, keyed by row: cellNavEntry's own narrow value map (P29 D6), built at most
+  // once even though several columns of the same row can each carry a nav affordance.
+  const navCache = new Map<number, Record<string, string | null>>();
   const out: RowVM[] = [];
   for (const { row, pos } of visibleRows.value) {
     const cells: CellVM[] = [];
     for (const c of cols) {
       const name = names[c] ?? '';
       const dc = displayCell(row, c);
-      const nav = cellNavEntry(row, c);
+      const nav = cellNavEntry(row, c, navCache);
       cells.push({
         col: c,
         name,
