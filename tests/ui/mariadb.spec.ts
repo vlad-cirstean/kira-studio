@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
@@ -6,6 +6,7 @@ import {
   type MariaFixture,
   startMariadb,
 } from './support/mariadb';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // The second engine through the real UI, deliberately small (D27): if this passes and no
 // renderer file has a MariaDB branch in it, the adapter-abstraction claim is proven.
@@ -29,44 +30,6 @@ test.afterAll(async () => {
 const DB_PATH = 'database:kira_test';
 const ORDER_ITEMS_PATH = `${DB_PATH}/table:order_items`;
 const BIG_ROWS_PATH = `${DB_PATH}/table:big_rows`;
-
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
 
 async function firstGutterNumber(page: Page): Promise<string> {
   const grid = page.locator('[data-testid="data-grid"]');

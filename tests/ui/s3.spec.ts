@@ -1,4 +1,3 @@
-import type { Locator, Page } from '@playwright/test';
 import {
   EMPTY_BUCKET,
   MAIN_BUCKET,
@@ -14,6 +13,7 @@ import {
   type S3Fixture,
   startS3,
 } from './support/s3';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // The seventh engine through the real UI (P17, mirrors sqs.spec.ts's discipline for the sixth):
 // the point of this spec is the object browser's tree (bucket → prefix/object, lazy, '/'-
@@ -45,44 +45,6 @@ const NESTED_PREFIX_PATH = `${REPORTS_PREFIX_PATH}/prefix:2024`;
 // P9 D3 precedent), not just this level's local segment — same as ROOT_OBJECT_PATH above, just
 // with a key that needs encodeURIComponent since it contains '/'.
 const NESTED_OBJECT_PATH = `${NESTED_PREFIX_PATH}/object:${encodeURIComponent(NESTED_OBJECT_KEY)}`;
-
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
 
 test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView', async ({
   kira,

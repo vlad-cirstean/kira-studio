@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   CONSUMER_GROUP,
   EMPTY_TOPIC,
@@ -13,6 +13,7 @@ import {
   type KafkaFixture,
   startKafka,
 } from './support/kafka';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // The fifth engine through the real UI (P10, mirrors redis.spec.ts's discipline for the fourth):
 // stream-shaped pages, not tabular grids/documents/key-values, are the point of this spec — it
@@ -38,44 +39,6 @@ test.afterAll(async () => {
 const ORDERS_TOPIC_PATH = `topic:${ORDERS_TOPIC}`;
 const EMPTY_TOPIC_PATH = `topic:${EMPTY_TOPIC}`;
 const CONSUMER_GROUP_PATH = `consumerGroup:${CONSUMER_GROUP}`;
-
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
 
 function getOps(page: Page): Promise<{ id: string }[]> {
   return page.evaluate(() => window.kira.opsRecent({ limit: 1000 }));

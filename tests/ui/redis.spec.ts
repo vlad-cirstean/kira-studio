@@ -1,4 +1,3 @@
-import type { Locator, Page } from '@playwright/test';
 import {
   HASH_FIELDS,
   HASH_KEY,
@@ -13,6 +12,7 @@ import {
   type RedisFixture,
   startRedis,
 } from './support/redis';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // The fourth engine through the real UI (P9, mirrors mongo.spec.ts's discipline for the third):
 // key/value-shaped pages, not tabular grids or documents, are the point of this spec — it proves
@@ -44,44 +44,6 @@ const LIST_KEY_PATH = `${QUEUE_NS_PATH}/key:${encodeURIComponent(LIST_KEY)}`;
 const SESSION_NS_PATH = `${DB0_PATH}/namespace:session`;
 const TTL_KEY_PATH = `${SESSION_NS_PATH}/key:${encodeURIComponent(TTL_KEY)}`;
 const DB1_OTHER_NS_PATH = `${DB1_PATH}/namespace:other-db`;
-
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
 
 test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleErrors }) => {
   test.setTimeout(240_000);

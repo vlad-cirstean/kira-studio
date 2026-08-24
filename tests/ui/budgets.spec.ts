@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { measureClickToDom, measureScrollResponses, percentile } from './support/measure';
 import {
@@ -7,6 +7,7 @@ import {
   type PgFixture,
   startPostgres,
 } from './support/pg';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // P12 §2.1's real interaction budgets (D5/D6), measured for real against §3 of
 // docs/v1/plans/P12-hardening.md — tests/ui/perf.spec.ts's rAF/DOM-cell tripwires stay unchanged
@@ -33,10 +34,6 @@ const APP_PATH = `${DB_PATH}/schema:app`;
 const BIG_ROWS_PATH = `${APP_PATH}/table:big_rows`;
 const WIDE_TABLE_PATH = `${APP_PATH}/table:wide_table`;
 
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
 // A script-driven `scrollTop` assignment's native `scroll` event is deferred to Chromium's next
 // "update the rendering" step (the same per-frame cadence requestAnimationFrame uses — see
 // measure.ts's measureScrollResponses doc comment for how this was proven). Under this
@@ -45,72 +42,6 @@ function treeContainer(page: Page): Locator {
 // well after that, and ContextMenu.vue's scroll-anywhere-closes-menu listener then closes a
 // caller's just-opened menu as if it were stale. Instead, track the most recent 'scroll' event
 // globally and poll until a quiet period has passed with no new one (or a generous cap elapses).
-async function settleScroll(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const w = window as unknown as { __kiraLastScrollAt?: number };
-    if (w.__kiraLastScrollAt === undefined) {
-      w.__kiraLastScrollAt = performance.now() - 1000;
-      window.addEventListener(
-        'scroll',
-        () => {
-          w.__kiraLastScrollAt = performance.now();
-        },
-        true,
-      );
-    }
-    const quietMs = 100;
-    const maxWaitMs = 1000;
-    const deadline = performance.now() + maxWaitMs;
-    while (performance.now() - (w.__kiraLastScrollAt ?? 0) < quietMs) {
-      if (performance.now() >= deadline) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-  });
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) {
-      // The row can exist in the DOM (rendered via overscan) without being fully inside the
-      // container's visible viewport — in which case Playwright's own actionability check would
-      // scroll it into view as part of the caller's next click, generating a fresh scroll event
-      // *after* this function's settle wait. Center it ourselves first so that doesn't happen.
-      await target.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-      await settleScroll(page);
-      return target;
-    }
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  await settleScroll(page);
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
-
 function logStats(label: string, values: number[]): void {
   const p50 = percentile(values, 50);
   const p95 = percentile(values, 95);

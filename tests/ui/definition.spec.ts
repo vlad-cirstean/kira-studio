@@ -7,6 +7,7 @@ import {
   type PgFixture,
   startPostgres,
 } from './support/pg';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -46,10 +47,6 @@ interface OpRecordLike {
   kind: string;
 }
 
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
 // Scrolling the tree closes any open context menu (a window-level capture-phase 'scroll'
 // listener backs that, correctly, so a menu never floats over content that's moved out from
 // under it) — and a programmatic scrollTop write dispatches its 'scroll' event asynchronously,
@@ -59,56 +56,6 @@ function treeContainer(page: Page): Locator {
 // event itself (falling back to a short timeout for a write that doesn't actually move
 // scrollTop, which fires no event at all) before ever proceeding — the row is only found or
 // clicked once no scroll event from this helper's own writes can still be in flight.
-async function scrollAndSettle(container: Locator, mode: 'reset' | 'advance'): Promise<void> {
-  await container.evaluate(
-    (el, m) =>
-      new Promise<void>((resolve) => {
-        const before = el.scrollTop;
-        const target = m === 'reset' ? 0 : before + Math.max(200, el.clientHeight);
-        if (target === before) {
-          resolve();
-          return;
-        }
-        const onScroll = () => {
-          el.removeEventListener('scroll', onScroll);
-          resolve();
-        };
-        el.addEventListener('scroll', onScroll);
-        el.scrollTop = target;
-        // Fallback in case the browser coalesces/suppresses the event unexpectedly.
-        setTimeout(() => {
-          el.removeEventListener('scroll', onScroll);
-          resolve();
-        }, 300);
-      }),
-    mode,
-  );
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  if ((await target.count()) > 0) return target;
-  await scrollAndSettle(container, 'reset');
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) break;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await scrollAndSettle(container, 'advance');
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
 // A right-click on a row that Playwright still considers not-quite-in-view triggers its own
 // internal scroll-into-view as part of the click's actionability check — a scroll whose 'scroll'
 // event (caught, correctly, by a window-level listener that closes any open context menu so one
@@ -116,14 +63,6 @@ async function expandRow(page: Page, path: string): Promise<Locator> {
 // right after the click opens a fresh menu, closing it before the next assertion sees it.
 // Scrolling the row fully into view ourselves first, and waiting out any resulting event, means
 // the click that follows has nothing left to scroll.
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
-
 async function getOps(page: Page, connectionId: string): Promise<OpRecordLike[]> {
   const all = await page.evaluate(() => window.kira.opsRecent({ limit: 5000 }));
   return all.filter((o) => o.connectionId === connectionId);

@@ -1,4 +1,3 @@
-import type { Locator, Page } from '@playwright/test';
 import { DRAIN_QUEUE, EMPTY_QUEUE, ORDERS_QUEUE } from '../db/fixtures/0006_sqs_seed';
 import { expect, test } from './fixtures';
 import {
@@ -7,6 +6,7 @@ import {
   type SqsFixture,
   startSqs,
 } from './support/sqs';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // The sixth engine through the real UI (P10, mirrors kafka.spec.ts's discipline for the fifth):
 // SQS's 'batch' pagination is the point of this spec — it proves the view never auto-loads and
@@ -30,44 +30,6 @@ test.afterAll(async () => {
 
 const ORDERS_QUEUE_PATH = `queue:${ORDERS_QUEUE}`;
 const EMPTY_QUEUE_PATH = `queue:${EMPTY_QUEUE}`;
-
-function treeContainer(page: Page): Locator {
-  return page.locator('[data-testid="tree-background"] .virtual-list');
-}
-
-async function findRow(page: Page, path: string): Promise<Locator> {
-  const container = treeContainer(page);
-  const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
-  await container.evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  for (let i = 0; i < 80; i++) {
-    if ((await target.count()) > 0) return target;
-    const atBottom = await container.evaluate(
-      (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
-    );
-    if (atBottom) break;
-    await container.evaluate((el) => {
-      el.scrollTop += Math.max(200, el.clientHeight);
-    });
-    await page.waitForTimeout(30);
-  }
-  return target;
-}
-
-async function expandRow(page: Page, path: string): Promise<Locator> {
-  const row = await findRow(page, path);
-  await expect(row).toBeVisible();
-  await row.locator('.twisty').click();
-  await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
-  return row;
-}
-
-async function openRowMenu(page: Page, path: string): Promise<void> {
-  const row = await findRow(page, path);
-  await row.click({ button: 'right' });
-  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
-}
 
 test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
   kira,
