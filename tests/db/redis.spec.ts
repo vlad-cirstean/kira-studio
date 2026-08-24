@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
-import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
 import { redisCaps } from '../../src/engine/adapters/redis/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { cellText, type KeyValuePage } from '../../src/shared/protocol/page';
@@ -74,17 +73,6 @@ function kvPairs(page: KeyValuePage): Record<string, string> {
   const out: Record<string, string> = {};
   for (let r = 0; r < page.rowCount; r++) out[kvFieldAt(page, r)] = kvValueAt(page, r);
   return out;
-}
-
-/** preview()/cancel() are synchronous — `.rejects` doesn't apply. */
-function expectSyncThrow(fn: () => unknown, code: AdapterErrorCode): void {
-  try {
-    fn();
-    throw new Error('expected the call to throw');
-  } catch (err) {
-    expect(err).toBeInstanceOf(AdapterError);
-    expect((err as AdapterError).code).toBe(code);
-  }
 }
 
 let fixture: RedisFixture;
@@ -169,7 +157,7 @@ describe('redis adapter (§9.1, P9)', () => {
     expect(redisCaps.exactCount).toBe(true);
     expect(redisCaps.pagination).toBe('cursor');
     expect(redisCaps.cancel).toBe(true);
-    expect(redisCaps.writable).toBe(false);
+    expect(redisCaps.writable).toBe(true);
   });
 
   test('5. children of a leaf', async () => {
@@ -494,18 +482,51 @@ describe('redis adapter (§9.1, P9)', () => {
     }
   });
 
-  test('17. preview/mutate are unsupported — read-only in v1 (D2)', async () => {
+  test('17. preview/mutate: insert, update, delete (D2 write support)', async () => {
     const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const plan: MutationPlan = {
-        path: keyPath('counter'),
-        ops: [{ kind: 'delete', key: { field: '42' } }],
+      const insertPlan: MutationPlan = {
+        path: keyPath('mutate-test-key'),
+        ops: [{ kind: 'insert', values: { _key: 'mutate-test-key', $value: 'hello' } }],
       };
-      expectSyncThrow(() => adapter.preview(plan), 'E_UNSUPPORTED');
-      await expect(adapter.mutate(plan, makeCtx())).rejects.toMatchObject({
-        code: 'E_UNSUPPORTED',
+      expect(adapter.preview(insertPlan)).toEqual(['SET mutate-test-key hello NX']);
+      expect(await adapter.mutate(insertPlan, makeCtx())).toEqual({ affectedRows: 1 });
+
+      // NX means a second insert of the same key must fail rather than silently overwrite.
+      await expect(adapter.mutate(insertPlan, makeCtx())).rejects.toMatchObject({
+        code: 'E_QUERY',
       });
+
+      const updatePlan: MutationPlan = {
+        path: keyPath('mutate-test-key'),
+        ops: [{ kind: 'update', key: { _key: 'mutate-test-key' }, changes: { $value: 'world' } }],
+      };
+      expect(adapter.preview(updatePlan)).toEqual(['SET mutate-test-key world']);
+      expect(await adapter.mutate(updatePlan, makeCtx())).toEqual({ affectedRows: 1 });
+
+      const page = await readKeyValue(
+        adapter,
+        {
+          path: keyPath('mutate-test-key'),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(kvValueAt(page, 0)).toBe('world');
+
+      const deletePlan: MutationPlan = {
+        path: keyPath('mutate-test-key'),
+        ops: [{ kind: 'delete', key: { _key: 'mutate-test-key' } }],
+      };
+      expect(adapter.preview(deletePlan)).toEqual(['DEL mutate-test-key']);
+      expect(await adapter.mutate(deletePlan, makeCtx())).toEqual({ affectedRows: 1 });
+      // Deleting an already-gone key is a no-op affecting zero rows, not an error.
+      expect(await adapter.mutate(deletePlan, makeCtx())).toEqual({ affectedRows: 0 });
     } finally {
       await adapter.disconnect();
     }

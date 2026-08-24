@@ -103,7 +103,11 @@ describe('mongo adapter (§9.1, P8)', () => {
         path([{ kind: 'database', name: MONGO_DATABASE }]),
         makeCtx(),
       );
-      expect(collections.map((n) => n.name).sort()).toEqual(['empty_collection', 'widgets']);
+      expect(collections.map((n) => n.name).sort()).toEqual([
+        'empty_collection',
+        'validated_widgets',
+        'widgets',
+      ]);
       expect(collections.every((n) => n.kind === 'collection')).toBe(true);
       // P19 D5's own SQL-relation precedent: a collection is a leaf, same as a table — its
       // indexes moved into the definition view (describe(), covered by test 6 below).

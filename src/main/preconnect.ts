@@ -51,10 +51,27 @@ interface Entry {
   exited: Promise<void>;
 }
 
-function tailLine(buffer: string, chunk: string): string {
-  const combined = (buffer + chunk).split(/\r?\n/).filter((line) => line.trim() !== '');
-  const last = combined[combined.length - 1] ?? '';
-  return last.length > STDERR_TAIL_MAX ? last.slice(0, STDERR_TAIL_MAX) : last;
+// Chunks from a pipe never line up with newlines — a single echo'd line can arrive split across
+// several 'data' events, or several lines can arrive in one. `carry` holds only the unterminated
+// remainder after the last newline seen so far; without tracking that separately from `last`, a
+// line already completed by a previous chunk's trailing newline would get silently reused as a
+// prefix for the next chunk's content instead of being replaced by it.
+function makeTailTracker(): { push(chunk: string): void; value(): string } {
+  let carry = '';
+  let last = '';
+  return {
+    push(chunk: string): void {
+      const lines = (carry + chunk).split(/\r?\n/);
+      carry = lines.pop() ?? '';
+      for (const line of lines) {
+        if (line.trim() !== '') last = line;
+      }
+      if (carry.trim() !== '') last = carry;
+    },
+    value(): string {
+      return last.length > STDERR_TAIL_MAX ? last.slice(0, STDERR_TAIL_MAX) : last;
+    },
+  };
 }
 
 export function createPreconnectSupervisor(deps: PreconnectDeps): PreconnectSupervisor {
@@ -103,7 +120,7 @@ export function createPreconnectSupervisor(deps: PreconnectDeps): PreconnectSupe
           },
         });
 
-        let stderrTail = '';
+        const stderrTailTracker = makeTailTracker();
         let settled = false;
 
         let resolveExited: () => void;
@@ -121,8 +138,8 @@ export function createPreconnectSupervisor(deps: PreconnectDeps): PreconnectSupe
         };
 
         child.stderr?.on('data', (chunk: Buffer) => {
-          stderrTail = tailLine(stderrTail, chunk.toString('utf8'));
-          entry.lastStderr = stderrTail || null;
+          stderrTailTracker.push(chunk.toString('utf8'));
+          entry.lastStderr = stderrTailTracker.value() || null;
         });
 
         const settleTimer = setTimeout(() => {
@@ -161,7 +178,7 @@ export function createPreconnectSupervisor(deps: PreconnectDeps): PreconnectSupe
               const detail = signal
                 ? `(signal ${signal})`
                 : `(exit ${code === null ? 'unknown' : code})`;
-              const tail = stderrTail ? `: ${stderrTail}` : '';
+              const tail = stderrTailTracker.value() ? `: ${stderrTailTracker.value()}` : '';
               reject(new Error(`Pre-connect script failed ${detail}${tail}`));
             }
             return;
@@ -175,7 +192,7 @@ export function createPreconnectSupervisor(deps: PreconnectDeps): PreconnectSupe
             connectionId,
             code,
             signal,
-            lastStderr: stderrTail || null,
+            lastStderr: stderrTailTracker.value() || null,
           };
           if (entry.armed) {
             emitExit(exit);

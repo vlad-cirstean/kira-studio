@@ -108,16 +108,17 @@ export async function listPrefixChildren(
     }
     for (const obj of contents) {
       if (!obj.Key || obj.Key === prefix) continue; // skip the exact-prefix "directory marker"
-      const segment = obj.Key.slice(prefix.length);
       objectNodes.push({
         kind: 'object',
         // The full key verbatim, not just this local segment — same split as redis/catalog.ts's
         // namespaceNodes (local segment) vs. keyNodes (full key, P9 D3): every intermediate
         // "folder" node here carries just its own segment, but the leaf carries the identifier a
         // consumer actually needs (KeyValueView.vue's header/tab title, TabStrip.vue's tab label —
-        // both read straight off pathTail(path).name with no S3-specific reconstruction).
+        // both read straight off pathTail(path).name with no S3-specific reconstruction). The
+        // encoded path's own last segment must carry the same full key, not the local segment,
+        // or pathTail() hands those consumers only the last path component back.
         name: obj.Key,
-        path: encodePath([...ancestor, { kind: 'object', name: segment }]),
+        path: encodePath([...ancestor, { kind: 'object', name: obj.Key }]),
         hasChildren: false,
       });
     }

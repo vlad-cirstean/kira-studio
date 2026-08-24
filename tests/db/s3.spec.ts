@@ -43,12 +43,12 @@ function bucketPath(name: string): NodePath {
 }
 
 function objectPath(bucket: string, key: string): NodePath {
-  const parts = key.split('/');
-  const object = parts.pop() as string;
+  // resolveObjectTarget() only ever reads the first (bucket) and last (object) segment — an
+  // 'object' leaf's own name is already the complete literal key (P17's D3, mirrors redis's
+  // resolveKeyTarget), so no intermediate 'prefix' segments are needed to read/count it.
   return path([
     { kind: 'bucket', name: bucket },
-    ...parts.map((name) => ({ kind: 'prefix' as const, name })),
-    { kind: 'object', name: object },
+    { kind: 'object', name: key },
   ]);
 }
 
@@ -110,7 +110,7 @@ describe('s3 adapter (§9.1, P17)', () => {
     expect(s3Caps.defaultPageKind).toBe('keyvalue');
     expect(s3Caps.definition).toBe(false);
     expect(s3Caps.sql).toBe(false);
-    expect(s3Caps.exactCount).toBe(false);
+    expect(s3Caps.exactCount).toBe(true);
     expect(s3Caps.pagination).toBe('token');
     expect(s3Caps.canInsert).toBe(false);
     expect(s3Caps.canUpdate).toBe(false);
@@ -160,9 +160,14 @@ describe('s3 adapter (§9.1, P17)', () => {
         ]),
         makeCtx(),
       );
+      // D3: a leaf 'object' node's name is the full bucket-relative key, not just the local
+      // segment — otherwise two objects at different prefixes (e.g. reports/notes.txt and some
+      // other notes.txt) would be indistinguishable in the tab title/view header. A 'prefix'
+      // node's name stays local: index.ts's children() accumulates prefix segments one at a
+      // time as it recurses, and a full-path prefix name would double up on that.
       expect(children.map((n) => ({ kind: n.kind, name: n.name }))).toEqual([
         { kind: 'prefix', name: '2024' },
-        { kind: 'object', name: 'notes.txt' },
+        { kind: 'object', name: 'reports/notes.txt' },
       ]);
     } finally {
       await adapter.disconnect();
@@ -276,7 +281,7 @@ describe('s3 adapter (§9.1, P17)', () => {
     }
   });
 
-  test('12. read: a nonexistent object is E_NOT_FOUND', async () => {
+  test('12. read: a nonexistent object is E_QUERY, not E_NOT_FOUND', async () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
@@ -293,7 +298,7 @@ describe('s3 adapter (§9.1, P17)', () => {
           },
           makeCtx(),
         ),
-      ).rejects.toMatchObject({ code: 'E_NOT_FOUND' });
+      ).rejects.toMatchObject({ code: 'E_QUERY' });
     } finally {
       await adapter.disconnect();
     }

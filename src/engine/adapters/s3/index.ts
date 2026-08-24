@@ -149,9 +149,9 @@ class S3Adapter implements Adapter {
         `read requires a bucket/.../object path, got: ${encodePath(segments)}`,
       );
     }
-    const prefixSegments = rest.slice(0, -1).map((s) => s.name);
-    const key = [...prefixSegments, objectSegment.name].join('/');
-    return { bucket: bucketSegment.name, key };
+    // objectSegment.name is already the full key (catalog.ts encodes it that way, mirroring
+    // redis/index.ts's resolveKeyTarget) — no prefix-segment joining needed.
+    return { bucket: bucketSegment.name, key: objectSegment.name };
   }
 }
 

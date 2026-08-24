@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import type { ConnectionKind } from '@shared/domain/connection';
 import { definitionText } from '@shared/domain/definition';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
@@ -850,11 +851,12 @@ describe('postgres adapter (§9.1)', () => {
   });
 
   test('19. unsupported kind', async () => {
-    // P10 gave kafka and sqs real adapters — s3 is the only kind left with no factory in the
-    // registry, so it is the still-unsupported kind this test now targets.
-    await expect(createAdapter('s3', deps)).rejects.toThrow(AdapterError);
+    // P17 gave s3 a real adapter too — every ConnectionKind now has a registry entry, so the only
+    // way left to exercise the registry's fallback-throw is a kind outside the enum entirely.
+    const bogusKind = 'not-a-real-kind' as ConnectionKind;
+    await expect(createAdapter(bogusKind, deps)).rejects.toThrow(AdapterError);
     try {
-      await createAdapter('s3', deps);
+      await createAdapter(bogusKind, deps);
       throw new Error('expected createAdapter to throw');
     } catch (err) {
       expect(err).toBeInstanceOf(AdapterError);
