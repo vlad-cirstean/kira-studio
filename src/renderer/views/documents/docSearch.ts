@@ -37,9 +37,10 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Mirrors previewLine() in DocumentView.vue exactly (whitespace collapsed, no truncation here —
-// truncating the search haystack would just make a match past character 200 unfindable for no
-// benefit, since this never re-renders long text anywhere).
+// P27 D9: DocumentView.vue no longer has a preview-line function to mirror (D1 deleted it — the
+// collapsed row shows only the `_id` now) — this already searches the whole document body
+// regardless, whitespace collapsed and never truncated, so search still finds a match anywhere in
+// a document even though the row itself shows none of that text.
 function previewLineFor(body: string): string {
   return body.replace(/\s+/g, ' ').trim();
 }

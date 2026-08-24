@@ -22,12 +22,15 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
+import VirtualList from '../../workbench/VirtualList.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
-import { documentRow, fieldNamesOnPage, isIdNull, pageVersion } from './docPage';
+import DocumentTree from './DocumentTree.vue';
+import { documentRow, fieldNamesOnPage, pageVersion } from './docPage';
 import { documentMenu } from './documentMenu';
-import { saveDocumentEdit, saveNewDocument } from './documentMutations';
+import { deleteDocument, saveDocumentEdit, saveNewDocument } from './documentMutations';
+import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import ProjectionMenu from './ProjectionMenu.vue';
 import {
@@ -36,6 +39,7 @@ import {
   goNext,
   goPrev,
   goToPage,
+  isDocumentExpanded,
   load,
   reload,
   runCount,
@@ -272,52 +276,61 @@ function onCloseSearch(): void {
   if (r) r.searchOpen = false;
 }
 
-const listBodyRef = ref<HTMLElement | null>(null);
-
-// A search match names a row index into the currently loaded page (docSearch.ts) — jumping to it
-// expands that document (if it wasn't already) and scrolls it into view, the closest document
-// equivalent of DataGrid.vue's scrollCellIntoView.
-function onGoToMatch(row: number): void {
-  const doc = rowAt(row);
-  if (!doc) return;
-  if (!isExpanded(doc.id)) toggleExpanded(props.tab.id, doc.id);
-  void nextTick(() => {
-    const el = listBodyRef.value?.querySelector(`[data-id="${CSS.escape(doc.id)}"]`);
-    el?.scrollIntoView({ block: 'nearest' });
-  });
-}
-
-const rowIndices = computed(() => {
-  void pageVersion.n;
-  return Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
-});
-
-const allIds = computed(() => {
-  void pageVersion.n;
-  return rowIndices.value
-    .map((i) => documentRow(props.tab.id, i)?.id)
-    .filter((id): id is string => id !== undefined);
-});
-
-function rowAt(i: number) {
-  void pageVersion.n;
-  return documentRow(props.tab.id, i);
-}
-
-function isExpanded(id: string): boolean {
-  return !!props.tab.state.expanded[id];
-}
-
-// One preview line: the body's own text, collapsed to a single line — expanding shows the full
-// EJSON via the read-only CodeMirror host below (§8.7's "truncation with a show-all affordance"
-// maps onto that same expand action for a document already loaded in the page).
-function previewLine(body: string): string {
-  const oneLine = body.replace(/\s+/g, ' ').trim();
-  return oneLine.length > 200 ? `${oneLine.slice(0, 200)}…` : oneLine;
-}
+const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 
 const editingId = ref<string | null>(null);
 const editDraft = ref('');
+
+// D23: the list's v-for iterates this — plain per-row view objects, not an index range resolved
+// by a function. Carries the raw body alongside documentRows.ts's own DocumentRowView (whose
+// `root` is a parsed tree, not text) since Edit/context-menu/cell-editor-publish still need the
+// literal EJSON string.
+interface DocumentRowEntry {
+  view: DocumentRowView;
+  body: string;
+}
+
+const rows = computed<DocumentRowEntry[]>(() => {
+  void pageVersion.n;
+  const count = rt.value?.rowCount ?? 0;
+  const out: DocumentRowEntry[] = [];
+  for (let i = 0; i < count; i++) {
+    const doc = documentRow(props.tab.id, i);
+    const view = rowView(props.tab.id, i);
+    if (!doc || !view) continue;
+    out.push({ view, body: doc.body });
+  }
+  return out;
+});
+
+// One height per row, in `rows`' own order — VirtualList's `rowHeights` prop (P27 D18/D20).
+// Depends on `rowsVersion` too: a nested-path toggle inside DocumentTree.vue changes a row's
+// visible line count without changing `rows` itself (id/fieldCount/byteLabel/root are unaffected).
+const rowHeights = computed<number[]>(() => {
+  void pageVersion.n;
+  void rowsVersion.n;
+  return rows.value.map((r) =>
+    rowHeight(
+      props.tab.id,
+      r.view.index,
+      editingId.value,
+      isDocumentExpanded(props.tab.id, r.view.id),
+    ),
+  );
+});
+
+// A search match names a row index into the currently loaded page (docSearch.ts) — jumping to it
+// expands that document (if it wasn't already) and scrolls it into view via VirtualList's own
+// offset-aware scrollToIndex (D8) rather than querySelector + scrollIntoView, which silently did
+// nothing for a match outside the rendered window (F10).
+function onGoToMatch(row: number): void {
+  const view = rowView(props.tab.id, row);
+  if (!view) return;
+  if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
+  void nextTick(() => {
+    virtualListRef.value?.scrollToIndex(row);
+  });
+}
 
 function startEdit(id: string, body: string): void {
   editingId.value = id;
@@ -339,10 +352,18 @@ async function commitEdit(): Promise<void> {
 
 function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
   e.preventDefault();
+  const ids = rows.value.map((r) => r.view.id);
   openContextMenu(
     e,
-    documentMenu(props.tab.id, id, body, allIds.value, () => startEdit(id, body)),
+    documentMenu(props.tab.id, id, body, ids, () => startEdit(id, body)),
   );
+}
+
+// D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
+// (documentMenu.ts) — one delete path, not two.
+function onDeleteRow(id: string): void {
+  if (!window.confirm(`Delete this document (_id: ${id})?`)) return;
+  void deleteDocument(props.tab.id, id);
 }
 
 function onStop(): void {
@@ -350,11 +371,19 @@ function onStop(): void {
 }
 
 function onExpandAll(): void {
-  setAllExpanded(props.tab.id, allIds.value, true);
+  setAllExpanded(
+    props.tab.id,
+    rows.value.map((r) => r.view.id),
+    true,
+  );
 }
 
 function onCollapseAll(): void {
-  setAllExpanded(props.tab.id, allIds.value, false);
+  setAllExpanded(
+    props.tab.id,
+    rows.value.map((r) => r.view.id),
+    false,
+  );
 }
 
 function onRowClick(i: number): void {
@@ -363,17 +392,20 @@ function onRowClick(i: number): void {
 
 // Publishes the cell editor's target (cellSelection.ts's "P8/P10 publish into the same slot" —
 // this is P8's). A clicked document publishes its full EJSON body rather than one field within
-// it: DocumentView.vue already renders the whole body as one unit (the preview line, the expanded
-// CodeMirror host), so the document itself is the natural grain to hand the cell editor, and it's
-// the one place a truncated body's full 64 KB is worth seeing formatted. `column` is synthetic —
-// a document has no ColumnDescriptor of its own — built with `typeClass: 'json'` so the cell
-// editor's format detector opens it pretty-printed by default, and `isPrimaryKey: true` since
-// `_id` is exactly that.
+// it: DocumentView.vue already renders the whole body as one unit, so the document itself is the
+// natural grain to hand the cell editor, and it's the one place a truncated body's full 64 KB is
+// worth seeing formatted. `column` is synthetic — a document has no ColumnDescriptor of its own —
+// built with `typeClass: 'json'` so the cell editor's format detector opens it pretty-printed by
+// default, and `isPrimaryKey: true` since `_id` is exactly that.
+// P27 D30 note: this watch (and the panel it feeds) is scheduled to be removed once this phase's
+// commit 8 lands — Mongo has no real use for the cell editor here, and the row's own edit area
+// (commit 7) takes over editing entirely. Left as-is in this commit, matching the plan's own
+// per-commit boundary.
 watch(
   [() => rt.value?.selectedRow, () => pageVersion.n, () => props.tab.id],
   () => {
     const row = rt.value?.selectedRow;
-    const doc = row === null || row === undefined ? null : rowAt(row);
+    const doc = row === null || row === undefined ? null : documentRow(props.tab.id, row);
     if (row === null || row === undefined || !doc) {
       clearSelectedCellFor(props.tab.id);
       return;
@@ -634,89 +666,119 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div ref="listBodyRef" class="list-body" data-testid="document-list">
+      <div class="list-body" data-testid="document-list">
         <EmptyState
           v-if="!rt || rt.rowCount === 0"
           :icon="rt ? 'json' : 'loading'"
           :label="rt ? 'No documents' : 'Loading…'"
         />
-        <template v-else>
-          <div
-            v-for="i in rowIndices"
-            :key="rowAt(i)?.id ?? i"
-            class="doc-row"
-            :class="{ open: isExpanded(rowAt(i)?.id ?? ''), selected: rt?.selectedRow === i }"
-            data-testid="document-row"
-            :data-id="rowAt(i)?.id"
-            @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.id, rowAt(i)!.body)"
-          >
-            <!-- Publishes the whole document to the cell editor (see the `watch` above). The
-                 expand toggle and Edit button below are nested inside this same click target —
-                 clicking either also reselects the row, which is harmless (selecting the row you
-                 just expanded/started editing is never wrong) so there is no need to stop
-                 propagation out of either. -->
-            <div class="doc-head" @click="onRowClick(i)">
-              <button
-                type="button"
-                class="expand-toggle"
-                data-testid="document-toggle-expand"
-                :aria-label="isExpanded(rowAt(i)?.id ?? '') ? 'Collapse' : 'Expand'"
-                @click="rowAt(i) && toggleExpanded(tab.id, rowAt(i)!.id)"
+        <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
+             the body — until expanded; an expanded document renders through DocumentTree.vue's
+             flat line list, never a per-row CodeMirror instance, which is what makes "every
+             document expanded by default" (D2) affordable at all. -->
+        <VirtualList
+          v-else
+          ref="virtualListRef"
+          class="document-virtual-list"
+          :items="rows"
+          :row-height="26"
+          :row-heights="rowHeights"
+        >
+          <template #default="{ item, index }">
+            <div
+              class="doc-row"
+              :class="{
+                open: isDocumentExpanded(tab.id, item.view.id),
+                selected: rt?.selectedRow === index,
+              }"
+              data-testid="document-row"
+              :data-id="item.view.id"
+              :style="{ height: `${rowHeights[index]}px` }"
+              @contextmenu="onRowContextMenu($event, item.view.id, item.body)"
+            >
+              <!-- Publishes the whole document to the cell editor (see the `watch` above). The
+                   expand toggle and the Edit/Delete buttons below are nested inside this same click
+                   target — clicking any of them also reselects the row, which is harmless (selecting
+                   the row you just acted on is never wrong), so their own handlers stop propagation
+                   rather than double-firing selectRow with the same index. -->
+              <div class="doc-head" @click="onRowClick(index)">
+                <button
+                  type="button"
+                  class="expand-toggle"
+                  data-testid="document-toggle-expand"
+                  :aria-label="isDocumentExpanded(tab.id, item.view.id) ? 'Collapse' : 'Expand'"
+                  @click.stop="toggleExpanded(tab.id, item.view.id)"
+                >
+                  <CodiconIcon
+                    :name="isDocumentExpanded(tab.id, item.view.id) ? 'chevron-down' : 'chevron-right'"
+                    :size="13"
+                  />
+                </button>
+                <span class="doc-id" data-testid="document-id">{{ item.view.idLabel }}</span>
+                <span class="p-badge" data-testid="document-field-count"
+                  >{{ item.view.fieldCount }} fields</span
+                >
+                <span class="p-badge" data-testid="document-byte-badge">{{
+                  item.view.byteLabel
+                }}</span>
+                <span
+                  v-if="item.view.isTruncated"
+                  class="p-badge warn"
+                  v-tooltip="'value truncated'"
+                  data-testid="document-truncated"
+                  >truncated</span
+                >
+                <span class="doc-head-spacer"></span>
+                <div class="doc-row-actions">
+                  <span v-if="editingId === item.view.id" class="p-chip warn">editing</span>
+                  <IconButton
+                    icon="edit"
+                    :active="editingId === item.view.id"
+                    data-testid="document-edit"
+                    :disabled="!caps?.canUpdate"
+                    v-tooltip="caps?.canUpdate ? 'Edit' : 'Connection does not support update'"
+                    @click.stop="startEdit(item.view.id, item.body)"
+                  />
+                  <IconButton
+                    icon="trash"
+                    data-testid="document-delete"
+                    :disabled="!caps?.canDelete"
+                    v-tooltip="caps?.canDelete ? 'Delete' : 'Connection does not support delete'"
+                    @click.stop="onDeleteRow(item.view.id)"
+                  />
+                </div>
+              </div>
+              <div
+                v-if="isDocumentExpanded(tab.id, item.view.id)"
+                class="doc-body"
+                data-testid="document-body"
               >
-                <CodiconIcon
-                  :name="isExpanded(rowAt(i)?.id ?? '') ? 'chevron-down' : 'chevron-right'"
-                  :size="13"
+                <!-- The editor is the same code surface the definition view and the console views
+                     use — the only difference is the language. -->
+                <template v-if="editingId === item.view.id">
+                  <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
+                  <div class="edit-actions">
+                    <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
+                      Save
+                    </AppButton>
+                    <AppButton data-testid="document-edit-cancel" @click="cancelEdit">
+                      Cancel
+                    </AppButton>
+                  </div>
+                </template>
+                <DocumentTree
+                  v-else-if="item.view.root"
+                  :tab-id="tab.id"
+                  :row="item.view.index"
+                  @toggle-path="(path) => togglePath(tab.id, item.view.index, path)"
                 />
-              </button>
-              <span class="doc-id" data-testid="document-id">{{ rowAt(i)?.id }}</span>
-              <span class="doc-preview">{{ previewLine(rowAt(i)?.body ?? '') }}</span>
-              <div class="doc-row-actions">
-                <span v-if="editingId === rowAt(i)?.id" class="p-chip warn">editing</span>
-                <IconButton
-                  icon="edit"
-                  :active="editingId === rowAt(i)?.id"
-                  data-testid="document-edit"
-                  v-tooltip="'Edit'"
-                  @click="rowAt(i) && startEdit(rowAt(i)!.id, rowAt(i)!.body)"
-                />
+                <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
+                     object) falls back to raw text rather than a tree that has nothing to walk. -->
+                <CodeMirrorHost v-else :doc="item.body" language="json" :read-only="true" />
               </div>
             </div>
-            <!-- The editor is the same code surface the definition view and the console views use — the only
-                 difference is the language. -->
-            <div v-if="isExpanded(rowAt(i)?.id ?? '')" class="doc-body" data-testid="document-body">
-              <template v-if="editingId === rowAt(i)?.id">
-                <CodeMirrorHost v-model:doc="editDraft" language="json" :read-only="false" />
-                <div class="edit-actions">
-                  <AppButton
-                    variant="primary"
-                    data-testid="document-edit-save"
-                    @click="commitEdit"
-                  >
-                    Save
-                  </AppButton>
-                  <AppButton
-                    data-testid="document-edit-cancel"
-                    @click="cancelEdit"
-                  >
-                    Cancel
-                  </AppButton>
-                </div>
-              </template>
-              <CodeMirrorHost
-                v-else
-                :doc="rowAt(i)?.body ?? ''"
-                language="json"
-                :read-only="true"
-              />
-              <span
-                v-if="rowAt(i)?.isTruncated"
-                class="p-badge truncated-marker"
-                v-tooltip="'value truncated'"
-                >truncated</span
-              >
-            </div>
-          </div>
-        </template>
+          </template>
+        </VirtualList>
       </div>
     </ViewChrome>
     <CellEditorDock :tab-id="tab.id" />
@@ -804,12 +866,22 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
+.document-virtual-list {
+  height: 100%;
+}
+
+/* The row's own total height is set inline from documentRows.ts's rowHeight() (P27 D20) — CSS
+   only distributes it between the fixed-height head and whatever's left for the body, never
+   restates the number itself. */
 .doc-row {
+  display: flex;
+  flex-direction: column;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .doc-head {
   height: var(--kira-h-md);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--kira-s-3);
@@ -855,15 +927,11 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.doc-preview {
+/* Pushes .doc-row-actions to the trailing edge, the same role .doc-preview played before D1
+   emptied that slot. */
+.doc-head-spacer {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--kira-font-family);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
 }
 
 .doc-row-actions {
@@ -873,12 +941,17 @@ onUnmounted(() => {
   gap: var(--kira-s-2);
 }
 
+/* flex: 1 over the row's own inline height (above) rather than a literal number — matches
+   HEAD_H + visibleLines().length * LINE_H (or the fixed editing height) exactly, whichever this
+   row currently is. */
 .doc-body {
-  height: 220px;
+  flex: 1;
+  min-height: 0;
   border-top: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-elevated);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .edit-actions {
@@ -887,11 +960,5 @@ onUnmounted(() => {
   gap: var(--kira-s-3);
   padding: var(--kira-s-2) var(--kira-s-4);
   border-top: var(--kira-border-width) solid var(--kira-border);
-}
-
-.truncated-marker {
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin: var(--kira-s-2) var(--kira-s-4);
 }
 </style>

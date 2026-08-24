@@ -238,15 +238,38 @@ export function selectRow(tabId: string, row: number | null): void {
   ensureRuntime(tabId).selectedRow = row;
 }
 
+// P27 D2: a document is expanded by default now — `expanded[id] === undefined` means expanded,
+// and only an explicit `false` collapses it. A tab saved under the old semantics (every row
+// missing meant collapsed) reads as `{}`, which under this new reading means "all expanded" —
+// exactly the new default, so no schema change and no migration.
+export function isDocumentExpanded(tabId: string, id: string): boolean {
+  const tab = findDocumentTab(tabId);
+  return tab ? tab.state.expanded[id] !== false : true;
+}
+
 export function toggleExpanded(tabId: string, id: string): void {
   const tab = findDocumentTab(tabId);
   if (!tab) return;
-  const expanded = { ...tab.state.expanded, [id]: !tab.state.expanded[id] };
+  const expanded = { ...tab.state.expanded };
+  if (isDocumentExpanded(tabId, id)) {
+    expanded[id] = false;
+  } else {
+    // Back to the default (expanded) — deleting the key keeps the map from growing an entry for
+    // every row a user has ever touched, one direction of which never happens with `true`.
+    delete expanded[id];
+  }
   patchDocumentTabState(tabId, { expanded });
 }
 
+// D2/D32: *Expand all* clears the map outright rather than writing one `true` per row — the
+// default is already expanded, so a 10 000-row page writes an empty object to `state_json`
+// instead of 10 000 keys. *Collapse all* is unchanged: it still needs one `false` per row.
 export function setAllExpanded(tabId: string, ids: string[], value: boolean): void {
+  if (value) {
+    patchDocumentTabState(tabId, { expanded: {} });
+    return;
+  }
   const expanded: Record<string, boolean> = {};
-  for (const id of ids) expanded[id] = value;
+  for (const id of ids) expanded[id] = false;
   patchDocumentTabState(tabId, { expanded });
 }
