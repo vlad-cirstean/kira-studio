@@ -1,6 +1,6 @@
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
-import type { MutationResult } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
@@ -23,6 +23,7 @@ import { s3Caps } from './caps';
 import * as catalog from './catalog';
 import { connectS3 } from './client';
 import { mapS3Error } from './errors';
+import * as mutateOps from './mutate';
 import { countObject, readObject } from './read';
 
 // Mirrors redis/index.ts closely: bucket ~ redis's database, prefix ~ redis's namespace, object ~
@@ -37,6 +38,7 @@ class S3Adapter implements Adapter {
   // SPEC §6's options_json `bucket` field — set, this scopes the whole tree to one bucket (see
   // catalog.ts's listBuckets), for credentials that can only ever see that one bucket.
   private scopedBucket: string | null = null;
+  private readOnly = false;
 
   constructor(private readonly deps: AdapterDeps) {}
 
@@ -52,6 +54,7 @@ class S3Adapter implements Adapter {
     }
     this.client = client;
     this.scopedBucket = scopedBucket;
+    this.readOnly = cfg.readOnly;
     return { serverVersion: 'Amazon S3' };
   }
 
@@ -114,14 +117,15 @@ class S3Adapter implements Adapter {
     return countObject(this.requireClient(), bucket, key, ctx);
   }
 
-  preview(): string[] {
-    // caps.writable === false — no mutation UI ever calls preview() for s3 (P17 is read-only
-    // browsing only); never reached.
-    throw new AdapterError('E_UNSUPPORTED', 's3 is read-only in this phase');
+  preview(plan: MutationPlan): string[] {
+    return mutateOps.preview(plan);
   }
 
-  async mutate(): Promise<MutationResult> {
-    throw new AdapterError('E_UNSUPPORTED', 's3 is read-only in this phase');
+  // A single client serves the whole bucket-rooted tree (unlike mariadb/postgres's per-database
+  // connection set) — mutate.ts's own resolveBucketSegment validates plan.path, so this just
+  // forwards the client and the connection's read-only flag (F1).
+  async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
+    return mutateOps.mutate(this.requireClient(), ctx, this.readOnly, plan);
   }
 
   async execute(): Promise<Page[]> {

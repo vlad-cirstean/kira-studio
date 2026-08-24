@@ -22,7 +22,7 @@ import { mapS3Error } from './errors';
 // away a moment later.
 const MAX_BODY_DOWNLOAD_BYTES = 32 * 1024 * 1024;
 
-function formatBytes(n: number): string {
+export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
   let value = n / 1024;

@@ -2,7 +2,9 @@ import type { Caps } from '../../../shared/caps';
 
 // §5.1's s3 row: reuses the keyvalue shape (page.ts's own doc comment on KeyValuePage explains
 // why — a single object's metadata+body is exactly a flat field/value listing, same as a redis
-// hash). Read-only browsing only in this phase (P17): no insert/update/delete, no console.
+// hash). P33: object edit/delete/upload/download, all executed immediately (D1) — no console, and
+// still no bucket-lifecycle management (create/delete/rename a bucket) or recursive prefix delete
+// (D13/§6).
 export const s3Caps: Caps = {
   tabular: false,
   documents: false,
@@ -29,13 +31,17 @@ export const s3Caps: Caps = {
   exactCount: true,
   pagination: 'token', // ListObjectsV2's own ContinuationToken
   foreignKeys: false,
-  canInsert: false,
-  canUpdate: false,
-  canDelete: false,
-  writable: false,
+  // P33: an object's body is replaced wholesale via PutObject (canUpdate), a new object is
+  // created via a local-file upload (canInsert), and DeleteObject removes one (canDelete) — see
+  // mutate.ts. No per-object update in place the way a SQL row or a redis string has; PutObject
+  // is always a full overwrite, which is why edit is bounded by size (D6) rather than partial.
+  canInsert: true,
+  canUpdate: true,
+  canDelete: true,
+  writable: true,
   transactions: false,
   cancel: true, // the SDK's own abortSignal request option is fully effective, same as sqs/kafka
-  // P33 commit 2 flips this to true alongside canInsert/canUpdate/canDelete/writable — false here
-  // only for the brief window between this commit (the contract) and that one (the behaviour).
-  fileTransfer: false,
+  // P33 D3: gates Download outright and Upload together with canInsert — the only engine whose
+  // items are files with an OS dialog to move them through.
+  fileTransfer: true,
 };
