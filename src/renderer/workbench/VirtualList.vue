@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 // P27 D18: `rowHeights`, when present, replaces the uniform `scrollTop / rowHeight` math below
 // with prefix-sum offsets and a binary search — document rows have a collapsed head and an
@@ -16,6 +16,12 @@ const props = withDefaults(
   { overscan: 8 },
 );
 
+// P28 D2: `scrollstate` publishes what only lived in these private refs before — the sticky band
+// (project/stickyBand.ts) needs both to compute which ancestor rows are pinned and where, but
+// VirtualList itself stays ignorant of what an ancestor is; ProjectTree is the only consumer that
+// understands `depth`.
+const emit = defineEmits<{ scrollstate: [{ scrollTop: number; viewportHeight: number }] }>();
+
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const viewportHeight = ref(0);
@@ -24,6 +30,12 @@ let resizeObserver: ResizeObserver | null = null;
 function onScroll(): void {
   scrollTop.value = containerRef.value?.scrollTop ?? 0;
 }
+
+watch(
+  [scrollTop, viewportHeight],
+  ([st, vh]) => emit('scrollstate', { scrollTop: st, viewportHeight: vh }),
+  { immediate: true },
+);
 
 onMounted(() => {
   viewportHeight.value = containerRef.value?.clientHeight ?? 0;
@@ -101,15 +113,18 @@ const bottomSpacer = computed(() => {
 // Scrolls just enough to bring `index` into view — top-aligned if it's above the viewport,
 // bottom-aligned if below, a no-op if already visible. Used by the tab menu's "Reveal in
 // project panel" (Step 7b) and, with `rowHeights` set, the document view's go-to-match (P27 D8).
-function scrollToIndex(index: number): void {
+// `inset` (P28 D6) keeps that many px clear above the row when it is top-aligned, so a caller
+// whose #sticky slot occludes the top of the scrollport (ProjectTree's ancestor band) does not
+// reveal a row directly behind it — the row lands `inset` px lower instead.
+function scrollToIndex(index: number, inset = 0): void {
   const el = containerRef.value;
   if (!el) return;
   const offsetsArr = offsets.value;
   const rowTop = offsetsArr ? (offsetsArr[index] ?? 0) : index * props.rowHeight;
   const rowH = offsetsArr ? (props.rowHeights?.[index] ?? props.rowHeight) : props.rowHeight;
   const rowBottom = rowTop + rowH;
-  if (rowTop < el.scrollTop) {
-    el.scrollTop = rowTop;
+  if (rowTop - inset < el.scrollTop) {
+    el.scrollTop = rowTop - inset;
   } else if (rowBottom > el.scrollTop + el.clientHeight) {
     el.scrollTop = rowBottom - el.clientHeight;
   }
@@ -132,6 +147,14 @@ defineExpose({ scrollToIndex });
       <slot :item="row.item" :index="row.index" />
     </template>
     <div :style="{ height: `${bottomSpacer}px` }" />
+    <!-- Zero-height: contributes no layout, so topSpacer/bottomSpacer above keep their meaning
+         exactly and startIndex/endIndex never need to account for it. `position: sticky` inside
+         the scroll container's own content box is what makes it an overlay rather than the
+         in-flow #header slot above — it spans the rows and stops short of the scrollbar
+         (P28 D2). Only ProjectTree.vue passes this today. -->
+    <div v-if="$slots.sticky" class="virtual-list-sticky" data-testid="virtual-list-sticky">
+      <slot name="sticky" />
+    </div>
   </div>
 </template>
 
@@ -145,5 +168,12 @@ defineExpose({ scrollToIndex });
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.virtual-list-sticky {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 2;
 }
 </style>
