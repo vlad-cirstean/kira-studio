@@ -35,4 +35,7 @@ export const s3Caps: Caps = {
   writable: false,
   transactions: false,
   cancel: true, // the SDK's own abortSignal request option is fully effective, same as sqs/kafka
+  // P33 commit 2 flips this to true alongside canInsert/canUpdate/canDelete/writable — false here
+  // only for the brief window between this commit (the contract) and that one (the behaviour).
+  fileTransfer: false,
 };

@@ -1,6 +1,7 @@
 import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -143,6 +144,11 @@ class RedisAdapter implements Adapter {
   // single fast command — the signal check is fully sufficient on its own, so this stays a
   // permanent no-op rather than attempting a `CLIENT KILL` that would be unsafe under
   // `DbConnectionSet`'s one-connection-per-db-index sharing (P9's D7).
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // caps.fileTransfer === false — no UI ever offers Download for redis; never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for redis');
+  }
+
   async cancel(): Promise<boolean> {
     return false;
   }

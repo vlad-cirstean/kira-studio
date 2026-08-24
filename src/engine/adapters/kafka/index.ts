@@ -1,6 +1,7 @@
 import { librdkafkaVersion } from '@confluentinc/kafka-javascript';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -127,6 +128,11 @@ class KafkaAdapter implements Adapter {
   // inside read() is the sole cancel mechanism, mirroring P9's D7/D8 — this stays a permanent
   // no-op. The mechanism changed shape (stop() no longer exists on this client, F14), not its
   // effectiveness.
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // caps.fileTransfer === false — no UI ever offers Download for kafka; never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for kafka');
+  }
+
   async cancel(): Promise<boolean> {
     return false;
   }

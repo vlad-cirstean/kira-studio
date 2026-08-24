@@ -31,4 +31,5 @@ export const sqsCaps: Caps = {
   writable: true,
   transactions: false,
   cancel: true, // the SDK's own abortSignal request option is fully effective (P10's D14)
+  fileTransfer: false,
 };

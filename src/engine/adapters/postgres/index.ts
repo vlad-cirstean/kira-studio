@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -328,6 +329,11 @@ class PostgresAdapter implements Adapter {
       databaseSegment?.kind === 'database' ? databaseSegment.name : null,
     );
     return consoleQuery.execute(client, ctx, this.trackerFor(ctx.opId), req.statements);
+  }
+
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // caps.fileTransfer === false — no UI ever offers Download for postgres; never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for postgres');
   }
 
   async cancel(opId: string): Promise<boolean> {

@@ -23,4 +23,5 @@ export const mariadbCaps: Caps = {
   writable: true,
   transactions: true,
   cancel: true,
+  fileTransfer: false,
 };

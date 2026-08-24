@@ -1,6 +1,7 @@
 import type { SQSClient } from '@aws-sdk/client-sqs';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -130,6 +131,11 @@ class SqsAdapter implements Adapter {
 
   // D14: the SDK's own abortSignal request option (passed straight through in read.ts/pollQueue)
   // is the sole cancel mechanism — this stays a permanent no-op, mirroring kafka's own cancel().
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // caps.fileTransfer === false — no UI ever offers Download for sqs; never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for sqs');
+  }
+
   async cancel(): Promise<boolean> {
     return false;
   }

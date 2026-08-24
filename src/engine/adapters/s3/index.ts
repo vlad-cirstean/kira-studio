@@ -1,6 +1,7 @@
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -126,6 +127,12 @@ class S3Adapter implements Adapter {
   async execute(): Promise<Page[]> {
     // caps.sql === false — no console for s3; never reached.
     throw new AdapterError('E_UNSUPPORTED', 's3 has no query console');
+  }
+
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // P33 commit 3 replaces this with a real implementation (transfer.ts's downloadObject) —
+    // caps.fileTransfer is still false at this commit (caps.ts), so this is never reached yet.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not yet implemented for s3');
   }
 
   // The SDK's own abortSignal request option (passed straight through in catalog.ts/read.ts) is

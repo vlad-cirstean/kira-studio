@@ -11,6 +11,9 @@ export const opKindSchema = z.enum([
   'count',
   'mutate',
   'execute',
+  // P33: a bulk-bytes file transfer (an S3 download) — distinct from 'read' so a multi-hundred-MB
+  // transfer's op-log row is legible as a file transfer, not a mysteriously slow read.
+  'transfer',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

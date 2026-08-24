@@ -344,6 +344,9 @@ describe('mariadb adapter (§9.1)', () => {
           execute() {
             throw new Error('not used by this test');
           },
+          downloadObject() {
+            throw new Error('not used by this test');
+          },
           async cancel() {
             if (!tracked || tracked.threadId === null) return false;
             const cancelClient = await createConnection({

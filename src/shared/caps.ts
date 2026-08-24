@@ -59,6 +59,12 @@ export interface Caps {
 
   // ---- lifecycle
   cancel: boolean; // can forward a cancel to the server — ADDED (D4, D5)
+
+  /** P33: this engine's items are *files* — they can be streamed to and from a local path, and
+   *  the UI may offer an OS file dialog for them. Orthogonal to canInsert/canUpdate: S3 is the
+   *  only engine where "add an item" means "pick a file", and the only one with a download at
+   *  all. Gates the Download action outright; gates Upload together with canInsert. */
+  fileTransfer: boolean;
 }
 
 // Crosses the engine<->main process boundary on connect (P2's ConnectInfo.caps addition) and
@@ -83,6 +89,7 @@ export const capsSchema = z.object({
   writable: z.boolean(),
   transactions: z.boolean(),
   cancel: z.boolean(),
+  fileTransfer: z.boolean(),
 });
 
 /**

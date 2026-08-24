@@ -37,4 +37,5 @@ export const redisCaps: Caps = {
   writable: true,
   transactions: false,
   cancel: true, // ctx.signal between bounded SCAN-family rounds is fully effective (D7/D8)
+  fileTransfer: false,
 };

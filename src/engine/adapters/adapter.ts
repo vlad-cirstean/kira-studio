@@ -3,6 +3,7 @@ import type { ConnectionKind } from '../../shared/domain/connection';
 import type { ConsoleRequest } from '../../shared/domain/console';
 import type { ObjectDefinition } from '../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../shared/domain/mutations';
+import type { ObjectDownloadRequest, ObjectTransferResult } from '../../shared/domain/object-store';
 import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
 import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
 import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
@@ -119,6 +120,14 @@ export interface Adapter {
    * Gated by `caps.sql`.
    */
   execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>;
+
+  /**
+   * P33: streams one object's bytes into `req.destPath`. A **read** — never blocked by the
+   * connection's read-only flag. Gated by `caps.fileTransfer`; every adapter with that flag
+   * false throws `E_UNSUPPORTED`. Honours `ctx.signal` mid-stream and leaves no file behind on
+   * cancellation or failure.
+   */
+  downloadObject(req: ObjectDownloadRequest, ctx: OpCtx): Promise<ObjectTransferResult>;
 }
 
 export interface AdapterDeps {
@@ -127,6 +136,7 @@ export interface AdapterDeps {
 
 /**
  * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5,
- * `execute` in P5.5 — all above, nothing pending. A later phase that widens `Adapter` again does
- * so by amending docs/v1/plans/P1-connections-and-tree.md §4b first, same discipline as this line.
+ * `execute` in P5.5, `downloadObject` in P33 — all above, nothing pending. A later phase that
+ * widens `Adapter` again does so by amending docs/v1/plans/P1-connections-and-tree.md §4b first,
+ * same discipline as this line.
  */

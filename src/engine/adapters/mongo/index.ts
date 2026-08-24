@@ -2,6 +2,7 @@ import type { Db, MongoClient } from 'mongodb';
 import type { ConsoleRequest } from '../../../shared/domain/console';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
+import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import {
   encodePath,
   type NodePath,
@@ -196,6 +197,11 @@ class MongoAdapter implements Adapter {
   // `inprog` privilege; the `$currentOp` aggregation *stage* with the default `allUsers: false`
   // returns only this connection's own in-flight ops and needs no special privilege — the common
   // case is an ordinary connection with plain readWrite on its own database, not an admin one.
+  async downloadObject(): Promise<ObjectTransferResult> {
+    // caps.fileTransfer === false — no UI ever offers Download for mongodb; never reached.
+    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for mongodb');
+  }
+
   async cancel(opId: string): Promise<boolean> {
     const client = this.client;
     if (!client) return false;

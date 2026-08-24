@@ -461,6 +461,7 @@ export interface AdapterDeps {
 | P5 | `preview(plan: MutationPlan): string[]` — **synchronous, never executes** | `caps.writable` |
 | P5 | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>` | `caps.writable` |
 | P5.5 | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>` | `caps.sql` |
+| P33 | `downloadObject(req: ObjectDownloadRequest, ctx: OpCtx): Promise<ObjectTransferResult>` — streams one object's bytes to a local path; a **read**, never blocked by the connection's read-only flag | `caps.fileTransfer` |
 
 Rules that hold for every adapter, present and future — put them as a doc comment at the top of `adapter.ts`:
 

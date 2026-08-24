@@ -149,6 +149,23 @@ export const DOCUMENT_TRUNCATE_BYTES = MAX_CELL_BYTES;
 /** Per-document-body budget for a single explicitly-requested document ("show all", P8's D1). */
 export const DOCUMENT_TRUNCATE_BYTES_SINGLE = MAX_CELL_BYTES * 64;
 
+/** P33: the ceiling on an object body the app fetches, decodes and renders **at all**. Equal to
+ *  DOCUMENT_TRUNCATE_BYTES_SINGLE by construction, not by coincidence: a body that could only be
+ *  shown truncated is a body whose remainder was transferred for nothing, now that Download
+ *  hands over the whole file instead. Above this, nothing is fetched and no Body row exists. */
+export const OBJECT_BODY_PREVIEW_BYTES = DOCUMENT_TRUNCATE_BYTES_SINGLE; // 4 MB
+
+/** P33: the ceiling on an object body the app will let the user edit and write back. Lower than
+ *  the render ceiling because editing is a different cost class — a mutable CodeMirror buffer,
+ *  a full re-encode and a PutObject of the result — and because a bad write is not undoable in
+ *  an unversioned bucket. Sixteen cell budgets: far above a DB cell (a 200 KB JSON export is a
+ *  normal thing to fix by hand), far below a document-sized page. */
+export const OBJECT_BODY_EDIT_BYTES = MAX_CELL_BYTES * 16; // 1 MB
+
+/** P33: AWS's hard limit for a single PutObject. Above it an upload needs multipart, which this
+ *  phase does not implement (D12) — the adapter refuses with a message that says so. */
+export const OBJECT_UPLOAD_MAX_BYTES = 5 * 1024 * 1024 * 1024; // 5 GiB
+
 function bitsetBytes(rowCount: number): number {
   return Math.ceil(rowCount / 8);
 }

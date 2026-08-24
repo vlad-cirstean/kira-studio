@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { type MutationRowOp, mutationRowOpSchema } from '../domain/mutations';
+import { localFilePathSchema } from '../domain/object-store';
 import { type SortSpec, sortSpecSchema } from '../domain/queries';
 import type { Page } from './page';
 
@@ -17,6 +18,9 @@ export const DATA_OP = {
   mutate: 'data:mutate',
   /** P5.5 §8.14: adapter.execute() — one op-log row for the whole statement batch. */
   execute: 'data:execute',
+  /** P33: streams one S3 object's bytes into a local file. Never returns bytes over the port —
+   *  the engine writes the file itself (§4: bulk data never transits main *or* the renderer). */
+  objectDownload: 'data:objectDownload',
   cacheStats: 'cache:stats',
   cacheClear: 'cache:clear',
 } as const;
@@ -165,6 +169,26 @@ export const executeRequestWireSchema = z.object({
 
 export interface ExecuteResponse {
   pages: Page[];
+}
+
+export interface ObjectDownloadRequestWire {
+  opId: string;
+  tabId: string | null;
+  connectionId: string;
+  path: string;
+  destPath: string;
+}
+
+export const objectDownloadRequestWireSchema = z.object({
+  opId: z.string(),
+  tabId: z.string().nullable(),
+  connectionId: z.string(),
+  path: z.string(),
+  destPath: localFilePathSchema,
+});
+
+export interface ObjectDownloadResponse {
+  bytes: number;
 }
 
 export const cacheStatsSchema = z.object({

@@ -24,4 +24,5 @@ export const mongoCaps: Caps = {
   writable: true,
   transactions: false,
   cancel: true,
+  fileTransfer: false,
 };

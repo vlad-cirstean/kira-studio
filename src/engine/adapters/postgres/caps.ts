@@ -20,4 +20,5 @@ export const postgresCaps: Caps = {
   writable: true,
   transactions: true,
   cancel: true,
+  fileTransfer: false,
 };
