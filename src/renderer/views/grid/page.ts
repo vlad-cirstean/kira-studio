@@ -3,9 +3,12 @@ import { reactive } from 'vue';
 
 interface Entry {
   page: TabularPage;
-  /** Keyed `${row}:${col}`, cleared whenever the visible window moves or the page is replaced. */
-  decodeCache: Map<string, string>;
-  windowKey: string;
+  /** row -> col -> decoded text. Pruned, not cleared, whenever the visible window moves (P29 D7)
+   *  — only rows that actually left the window are evicted, and the window already includes the
+   *  overscan on both sides, so the entries thrown away are the ones about to be needed again. */
+  decodeCache: Map<number, Map<number, string>>;
+  windowStart: number;
+  windowEnd: number;
 }
 
 // Plain module state, NOT reactive — a Proxy around 600 000 cells is the frame budget (§2.1).
@@ -19,7 +22,7 @@ export function setPage(tabId: string, page: TabularPage): void {
   // A tripwire: any code that tries to mutate this fails loudly in dev instead of silently
   // diverging from `byteSize`.
   Object.freeze(page);
-  pages.set(tabId, { page, decodeCache: new Map(), windowKey: '' });
+  pages.set(tabId, { page, decodeCache: new Map(), windowStart: 0, windowEnd: 0 });
   pageVersion.n++;
 }
 
@@ -56,18 +59,19 @@ export function totalRetainedBytes(): number {
 }
 
 /**
- * Called by the grid on scroll: clears the decoded-string cache whenever the visible row
- * window moves off it, so only visible cells are ever decoded (§8a) rather than the whole page
- * up front, which would rebuild exactly the per-row JS objects D3 exists to avoid.
+ * Called by the grid on scroll: prunes the decoded-string cache to the visible row window
+ * (P29 D7) — evicting only the rows that left it, rather than clearing the whole cache on every
+ * boundary crossed, so a fling doesn't re-decode a window that mostly overlaps the last one.
  */
 export function setVisibleWindow(tabId: string, startRow: number, endRow: number): void {
   const entry = pages.get(tabId);
   if (!entry) return;
-  const key = `${startRow}:${endRow}`;
-  if (entry.windowKey !== key) {
-    entry.windowKey = key;
-    entry.decodeCache.clear();
+  if (entry.windowStart === startRow && entry.windowEnd === endRow) return;
+  for (const row of entry.decodeCache.keys()) {
+    if (row < startRow || row >= endRow) entry.decodeCache.delete(row);
   }
+  entry.windowStart = startRow;
+  entry.windowEnd = endRow;
 }
 
 export interface CellView {
@@ -83,11 +87,15 @@ export function cell(tabId: string, row: number, col: number): CellView {
   if (!chunk) return { text: '', isNull: true, truncated: false };
   if (isNull(chunk, row)) return { text: '', isNull: true, truncated: false };
 
-  const key = `${row}:${col}`;
-  let text = entry.decodeCache.get(key);
+  let rowCache = entry.decodeCache.get(row);
+  let text = rowCache?.get(col);
   if (text === undefined) {
     text = cellText(chunk, row, decoder);
-    entry.decodeCache.set(key, text);
+    if (!rowCache) {
+      rowCache = new Map();
+      entry.decodeCache.set(row, rowCache);
+    }
+    rowCache.set(col, text);
   }
   return { text, isNull: false, truncated: isTruncated(chunk, row) };
 }
