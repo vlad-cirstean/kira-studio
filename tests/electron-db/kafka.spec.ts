@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { encodeKafkaStreamFilter, type KafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { NodePath } from '@shared/domain/tree';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
 import { kafkaCaps } from '../../src/engine/adapters/kafka/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
+import { encodePageToken, requestFingerprint } from '../../src/engine/adapters/sql-text';
 import { cellText, isNull, type StreamPage } from '../../src/shared/protocol/page';
 import {
   CONSUMER_GROUP,
@@ -518,6 +520,156 @@ describe('kafka adapter (§9.1, P10)', () => {
       const row = rowAt(page, 0);
       assert.strictEqual(row.key, 'produced-key');
       assert.deepStrictEqual(JSON.parse(row.body), { seq: 999 });
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  // P32 D19/D30: scenarios 17-20 are the proof of the phase's second half — "skip the group-join"
+  // is otherwise unfalsifiable from the outside, since the code would look right and a regression
+  // (someone reintroducing subscribe()) would pass every scenario above. These assert the cause,
+  // not a timing.
+  test('17. a browse joins no consumer group (D19/D30)', async () => {
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // Several small pages, several consumers under the hood — the loop shape scenario 8 already
+      // exercises, just watched from the tree's side afterward.
+      const req = {
+        path: topicPath(ORDERS_TOPIC),
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 2,
+      };
+      let cursor: { mode: 'offset'; offset: number } | { mode: 'after'; token: string } = {
+        mode: 'offset',
+        offset: 0,
+      };
+      for (let guard = 0; guard < ORDERS_MESSAGE_COUNT + 2; guard++) {
+        const page = await readStream(adapter, { ...req, cursor }, makeCtx());
+        if (!page.position.hasMore) break;
+        const token = page.position.nextToken;
+        if (!token) throw new Error('expected a nextToken on a truncated page');
+        cursor = { mode: 'after', token };
+      }
+
+      const root = await adapter.children(path([]), makeCtx());
+      const groups = root.filter((n) => n.kind === 'consumerGroup').map((n) => n.name);
+      assert.deepStrictEqual(groups, [CONSUMER_GROUP]);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('18. a browse commits no offsets (D19/D30)', async () => {
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // Scenario 17 just paged ORDERS_TOPIC in full — the structural form of P10 D6's promise is
+      // that this left no trace in __consumer_offsets under the browse group's name: either the
+      // group itself was never created (E_NOT_FOUND), or it exists with no committed offsets for
+      // the topic that was browsed.
+      try {
+        const def = await adapter.definition(groupPath('kira-studio-browse'), makeCtx());
+        const offsets = def.sections.find((s) => s.title === 'Committed offsets');
+        const ordersOffsets =
+          offsets?.rows.filter((r) => r.name.startsWith(`${ORDERS_TOPIC}[`)) ?? [];
+        assert.strictEqual(ordersOffsets.length, 0);
+      } catch (err) {
+        assert.ok(err instanceof AdapterError);
+        assert.strictEqual(err.code, 'E_NOT_FOUND');
+      }
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('19. a timestamp filter still seeks (D20)', async () => {
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // Learn each seeded message's real timestamp rather than assuming a hand-picked value falls
+      // between two of them — kafka-console-producer sets CreateTime per message at send, which
+      // may or may not spread across seeded messages depending on broker/client clock resolution.
+      // The median of the observed timestamps is used as the seek boundary either way: "returned
+      // rows are exactly those at or after it" holds structurally even in the degenerate case
+      // where every message shares one timestamp (nothing gets excluded, and the assertion still
+      // matches what freshWindows should produce) — but a real split (the common case) is what
+      // actually exercises admin.fetchTopicOffsetsByTimestamp's seek.
+      const full = await readStream(
+        adapter,
+        {
+          path: topicPath(ORDERS_TOPIC),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: ORDERS_MESSAGE_COUNT,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      const rows = Array.from({ length: full.rowCount }, (_, r) => rowAt(full, r));
+      const timestamps = rows.map((r) => Date.parse(r.timestamp ?? '')).sort((a, b) => a - b);
+      const boundary = timestamps[Math.floor(timestamps.length / 2)];
+      const expectedCount = timestamps.filter((t) => t >= boundary).length;
+
+      const filter: KafkaStreamFilter = { offset: null, partitions: [], timestampMs: boundary };
+      const filtered = await readStream(
+        adapter,
+        {
+          path: topicPath(ORDERS_TOPIC),
+          projection: null,
+          filter: encodeKafkaStreamFilter(filter),
+          sort: null,
+          pageSize: ORDERS_MESSAGE_COUNT,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      assert.strictEqual(filtered.rowCount, expectedCount);
+      for (let r = 0; r < filtered.rowCount; r++) {
+        const row = rowAt(filtered, r);
+        assert.ok(Date.parse(row.timestamp ?? '') >= boundary);
+      }
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
+  test('20. an oversized start offset is refused, not truncated (D23)', async () => {
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      // Hand-crafted page token — no seed data needed, this exercises toNativeOffset's guard
+      // directly rather than any particular topic content.
+      const oversizedOffset = String(Number.MAX_SAFE_INTEGER + 1);
+      const windows = [
+        { partition: 0, next: oversizedOffset, end: String(Number.MAX_SAFE_INTEGER + 1000) },
+      ];
+      const req = {
+        path: topicPath(ORDERS_TOPIC),
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 10,
+      };
+      const fingerprint = requestFingerprint({
+        topic: ORDERS_TOPIC,
+        pageSize: req.pageSize,
+        filter: req.filter,
+      });
+      const token = encodePageToken([JSON.stringify(windows)], fingerprint);
+
+      await assert.rejects(
+        readStream(adapter, { ...req, cursor: { mode: 'after', token } }, makeCtx()),
+        (err: unknown) => {
+          assert.ok(err instanceof AdapterError);
+          assert.strictEqual(err.code, 'E_UNSUPPORTED');
+          assert.match(err.message, new RegExp(oversizedOffset));
+          return true;
+        },
+      );
     } finally {
       await adapter.disconnect();
     }

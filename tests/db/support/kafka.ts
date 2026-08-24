@@ -6,11 +6,15 @@ import { resolveDockerHost } from './docker';
 resolveDockerHost();
 
 // D15 (P10's plan doc): confluentinc/cp-kafka, not apache/kafka — the latter's listener never
-// opens under Testcontainers' bootstrap. 7.6.1 is old enough that KafkaContainer defaults to
-// embedded ZooKeeper unless KRaft is requested explicitly, so `.withKraft()` is required — a
-// single-container KRaft broker is both simpler and faster to boot than a two-container
+// opens under Testcontainers' bootstrap. `.withKraft()` is explicit rather than relying on
+// KafkaContainer's own `>=8.0.0` auto-enable (harmless either way, and explicit beats implicit) —
+// a single-container KRaft broker is both simpler and faster to boot than a two-container
 // broker+ZooKeeper pair.
-const IMAGE = 'confluentinc/cp-kafka:7.6.1';
+// P32 D25: bumped from 7.6.1 (Kafka 3.6) to the 8.0 line (Apache Kafka 4.0) — a phase whose entire
+// premise is Kafka 4 protocol compatibility (F8) that only ever ran against Kafka 3.6 verified
+// nothing. Pinned to the newest published 8.0.x patch at the time of this change, matching how
+// 7.6.1 was pinned; a later 8.x (4.1/4.2/4.3) is a deliberate future bump, not a drift.
+const IMAGE = 'confluentinc/cp-kafka:8.0.7';
 // KafkaContainer's own internal PLAINTEXT listener port — not exported by @testcontainers/kafka,
 // so pinned here (kafka-container.js's own `KAFKA_PORT` constant).
 const KAFKA_PORT = 9093;
