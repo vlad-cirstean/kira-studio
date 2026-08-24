@@ -471,19 +471,126 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(page.locator('[data-testid="search-incomplete-note"]')).toHaveCount(0);
   await expect(await findRow(page, WIDE_TABLE_PATH)).toBeVisible();
 
-  // --- filters: hide the analytics schema, no new op-log rows, persists across relaunch ---
+  // --- checkbox tree filter (P28 §5) --------------------------------------------------------
+  const filtersDialog = page.locator('[data-testid="filters-dialog"]');
+  function filterKindRow(kind: string) {
+    return page.locator(`[data-testid="filter-kind-row-${kind}"]`);
+  }
+  function filterKindCheckbox(kind: string) {
+    return filterKindRow(kind).locator('input[type="checkbox"]');
+  }
+  function filterObjectRow(path: string) {
+    return page.locator(`[data-testid="filter-object-row"][data-path="${path}"]`);
+  }
+  function filterObjectCheckbox(path: string) {
+    return filterObjectRow(path).locator('input[type="checkbox"]');
+  }
+  async function openFilters(path: string): Promise<void> {
+    await openRowMenu(page, path);
+    await page.click('[data-testid="menu-item-filters"]');
+    await expect(filtersDialog).toBeVisible();
+  }
+  async function saveFilters(): Promise<void> {
+    await page.locator('.dialog-footer button', { hasText: 'Save' }).click();
+    await expect(filtersDialog).toHaveCount(0);
+  }
+  async function cancelFilters(): Promise<void> {
+    await page.locator('.dialog-footer button', { hasText: 'Cancel' }).click();
+    await expect(filtersDialog).toHaveCount(0);
+  }
+
+  // --- opens focused on the invoking row (D20); issues no query while open (D21/D23); cancel
+  // discards (baseline parity) --------------------------------------------------------------
+  const opsBeforeDialog = await getOps(page);
+  await openFilters(APP_PATH);
+  // D20: the schema's ancestor (the database) is pre-expanded, so the schema's own row is
+  // listed without any manual expand click.
+  await expect(filterObjectRow(APP_PATH)).toBeVisible();
+  await expect(page.locator('[data-testid="filters-preview"]')).toBeVisible();
+  await expect(page.locator('.cached-note')).toContainText('Only cached nodes are listed');
+  // Expand one level deeper inside the dialog and untick a box — still zero queries while open.
+  await filterObjectRow(APP_PATH).locator('.twisty-btn').click();
+  await expect(filterObjectRow(WIDE_TABLE_PATH)).toBeVisible();
+  await filterObjectCheckbox(APP_PATH).click();
+  await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'off');
+  await cancelFilters();
+  expect(await getOps(page)).toHaveLength(opsBeforeDialog.length);
+  // Reopening shows the box still ticked — Cancel discarded the untick above. Focused on
+  // APP_PATH again so its ancestor (the database) is pre-expanded, revealing it without a
+  // manual expand click (D20).
+  await openFilters(APP_PATH);
+  await expect(filterObjectCheckbox(APP_PATH)).toBeChecked();
+  await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'on');
+  await cancelFilters();
+
+  // --- tri-state (D15): unticking both schemas of kira_test partials the database row;
+  // ticking the database row restores both and leaves the persisted path set empty -----------
+  // Focused on APP_PATH so the database (both schemas' shared parent) is pre-expanded,
+  // revealing both app and analytics without a manual expand click.
+  await openFilters(APP_PATH);
+  await filterObjectCheckbox(APP_PATH).click();
+  await filterObjectCheckbox(ANALYTICS_PATH).click();
+  await expect(filterObjectRow(DB_PATH)).toHaveAttribute('data-state', 'partial');
+  await filterObjectCheckbox(DB_PATH).click();
+  await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'on');
+  await expect(filterObjectRow(ANALYTICS_PATH)).toHaveAttribute('data-state', 'on');
+  await saveFilters();
+  expect(
+    (await page.evaluate((id) => window.kira.filtersList({ connectionId: id }), connectionId))
+      .hiddenPaths,
+  ).toEqual([]);
+
+  // --- unticking a type hides every object of that kind, and its P19 folder with it (D10/D14);
+  // a node hidden by its kind says so rather than silently unticking (D16); the consequence
+  // strip counts what the tree will show (D17) ------------------------------------------------
+  await openFilters(APP_PATH);
+  await filterKindCheckbox('sequence').click();
+  await expect(filterKindRow('sequence')).toHaveAttribute('data-state', 'off');
+  await filterObjectRow(APP_PATH).locator('.twisty-btn').click();
+  await expect(filterObjectCheckbox(SEQUENCE_PATH)).toBeDisabled();
+  await expect(filterObjectRow(SEQUENCE_PATH)).toHaveAttribute('data-state', 'off');
+  await expect(filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label')).toHaveAttribute(
+    'data-kira-tip',
+    /.+/,
+  );
+  const previewBefore = await page.locator('[data-testid="filters-preview"]').innerText();
+  const [shownBefore, totalBefore] = [...previewBefore.matchAll(/\d+/g)].map((m) => Number(m[0]));
+  await saveFilters();
+
+  expect(await page.locator(`[data-path="${SEQUENCE_PATH}"]`).count()).toBe(0);
+  expect(await page.locator(`[data-path="${SEQUENCES_FOLDER_PATH}"]`).count()).toBe(0);
+  await expect(await findRow(page, `${APP_PATH}#view`)).toBeVisible();
+  await expect(await findRow(page, `${APP_PATH}#function`)).toBeVisible();
+  // The strip's own count dropped below the connection's full cached total once sequences
+  // were unticked — the visible proof the number is live, not decorative.
+  expect(shownBefore).toBeLessThan(totalBefore);
+
+  // Un-hide sequences again so the rest of the suite (and later phases) see the tree unfiltered.
+  await openFilters(APP_PATH);
+  await filterKindCheckbox('sequence').click();
+  await saveFilters();
+  expect(await page.locator(`[data-path="${SEQUENCES_FOLDER_PATH}"]`).count()).toBeGreaterThan(0);
+
+  // --- the name filter is a substring, not a pattern (D17/D19) -------------------------------
+  await openFilters(DB_PATH);
+  await page.fill('[data-testid="filter-name-input"]', 'analyt');
+  await expect(filterObjectRow(ANALYTICS_PATH)).toBeVisible();
+  await expect(filterObjectRow(APP_PATH)).toHaveCount(0);
+  await page.fill('[data-testid="filter-name-input"]', '.*');
+  await expect(page.locator('[data-testid="filter-object-row"]')).toHaveCount(0);
+  await cancelFilters();
+
+  // --- unticking one schema hides exactly it, costs no query, and survives a relaunch
+  // (D10/D11/D23) ------------------------------------------------------------------------------
   const opsBeforeFilter = await getOps(page);
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-filters"]');
-  await expect(page.locator('[data-testid="filters-dialog"]')).toBeVisible();
-  await page.click('.add-rule');
-  const rule = page.locator('.rule-row').last();
-  await rule.locator('select').first().selectOption('schema');
-  await rule.locator('.pattern-input').fill('analytics');
-  await page.locator('.dialog-footer button', { hasText: 'Save' }).click();
-  await expect(page.locator('[data-testid="filters-dialog"]')).toHaveCount(0);
+  await openFilters('');
+  await filterObjectRow(DB_PATH).locator('.twisty-btn').click();
+  await filterObjectCheckbox(ANALYTICS_PATH).click();
+  await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'on');
+  await saveFilters();
 
   expect(await page.locator(`[data-path="${ANALYTICS_PATH}"]`).count()).toBe(0);
+  expect(await page.locator(`[data-path="${APP_PATH}"]`).count()).toBeGreaterThan(0);
   expect(await getOps(page)).toHaveLength(opsBeforeFilter.length);
 
   const { window: reopened } = await relaunch();
