@@ -8,6 +8,7 @@ import { registerIpc } from './ipc/registry';
 import { log, sweepOldLogs } from './log';
 import { buildMenu } from './menu';
 import { wireOplog } from './oplog';
+import { createSecretCipher } from './secret-cipher';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
@@ -56,6 +57,12 @@ function requestFlush(win: BrowserWindow): Promise<void> {
 
 async function main(): Promise<void> {
   await app.whenReady();
+
+  // Probed exactly once, here, before anything else touches `safeStorage` (P25 D1) — a pre-ready
+  // call would create the Keychain item under Chromium's own app name instead of this app's
+  // (electron/electron#45328), and `app.whenReady()` above is what makes `app.setName` at :18
+  // actually take effect for it.
+  createSecretCipher();
 
   ensureLayout();
   sweepOldLogs();
