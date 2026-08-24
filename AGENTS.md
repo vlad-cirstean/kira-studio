@@ -65,8 +65,30 @@
   `node -e "console.log(require('electron'))"` — it should print the binary path with no
   "Downloading Electron binary..." message. This unlocks real `xvfb-run -a bunx playwright test`
   runs for every spec that doesn't need a `tests/db/`-style container (confirmed:
-  `smoke.spec.ts`, `startup.spec.ts`, `workbench.spec.ts`, `connections.spec.ts` all pass) — most
-  other specs still `test.skip()` cleanly via `isDockerAvailable()` rather than fail, per the
-  Docker note above.
+  `smoke.spec.ts`, `startup.spec.ts`, `workbench.spec.ts`, `connections.spec.ts`,
+  `secrets.spec.ts` all pass) — most other specs still `test.skip()` cleanly via
+  `isDockerAvailable()` rather than fail, per the Docker note above.
+
+## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/ui/` specs, P25)
+
+- Credentials are encrypted via Electron's `safeStorage`, which is Keychain-backed on macOS and
+  has **no real backing store on Linux** — a bare Linux dev/CI container has no `gnome-keyring` or
+  `kwallet` daemon (no systemd, see the Docker note above), so `safeStorage.isEncryptionAvailable()`
+  is `false` there by default.
+- **On Claude Code's Linux web containers and any other Linux dev machine**: set
+  `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev` or the Playwright harness) to
+  opt into a Linux-only development fallback (Chromium's `basic_text` obfuscation — a hardcoded
+  key, not real encryption). `tests/ui/fixtures.ts` already sets this for every test by default,
+  so the normal `xvfb-run -a bun run test:ui` loop needs no extra step; it only matters for a
+  manual `bun run dev` session or a one-off `electron out/main/index.js` launch outside the test
+  harness.
+- **On macOS**, this variable is ignored outright — `safeStorage` uses the real Keychain and
+  `KIRA_INSECURE_SECRETS` can never weaken it, even if accidentally left set in an environment.
+  `tests/ui/secrets.spec.ts`'s scenario 1 is the guard that this stays true: it fails loudly
+  (never skips) if `available`/`backend` on `darwin` don't read `true`/`'keychain'`.
+- Without the variable, Linux resolves to secret storage being **unavailable** — a password-bearing
+  save fails visibly (the dialog's `connection-save-error`) rather than silently falling back to
+  plaintext. This is deliberate (see `docs/v1/plans/P25-credential-keychain-encryption.md` D13),
+  not a bug to work around.
 
 Full spec: `docs/v1/SPEC.md`.

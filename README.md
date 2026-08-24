@@ -11,10 +11,12 @@ Vue 3 — one workbench across seven database engines.
   [Development](#development) and [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md)).
 - **macOS 13+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
-  v1.
-- **Credentials are stored in plain text** in `~/.kira-studio/kira.sqlite`. Encryption at rest is
-  not implemented in v1 — do not store production credentials you are not comfortable having on
-  disk unencrypted.
+  v1. One consequence: because each new build is unsigned, macOS treats it as a different
+  application for Keychain ACL purposes, so the first launch after installing a new build may show
+  one "Kira Studio wants to use your confidential information stored in…" prompt — **Always
+  Allow** answers it permanently for that build.
+- **Credentials are encrypted at rest** via the macOS Keychain (`safeStorage`) — see
+  `docs/v1/SPEC.md` §6.
 
 ## Supported engines
 

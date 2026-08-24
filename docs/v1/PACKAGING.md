@@ -30,6 +30,14 @@ loop for cold-start and RSS measurements.
 - `mac.identity: '-'` (ad-hoc) with `mac.hardenedRuntime: false` — deliberately not `identity: null`
   (which skips signing entirely and gets killed by the kernel on Apple Silicon) or the
   hardened-runtime default (which needs an entitlements file for ad-hoc signing to launch).
+  **Keychain consequence (P25 D12):** `safeStorage`'s docs state the app "should be code signed
+  for `safeStorage` to behave consistently," and a stable Developer ID signature is exactly what
+  ad-hoc signing defers — so an unsigned build has no stable code-signing identity for macOS to
+  key a Keychain ACL grant on across builds. In practice: the first launch after installing a new
+  build may show one "Kira Studio wants to use your confidential information stored in…" prompt;
+  **Always Allow** answers it permanently for that build. This is the honest cost of deferring
+  signing rather than something worth working around with a private/bundled key, which would be
+  strictly worse security and would have to be unpicked once real signing lands.
 - Targets: `dmg` and `zip`, arm64 only, into `dist/` (already gitignored).
 - `npmRebuild: false` — every native dependency in the tree belongs to a devDependency; the
   production dependency set is pure JS.
@@ -142,10 +150,10 @@ nobody actually made.
 
 **Why `bun run test:db` is not in CI.** GitHub-hosted macOS runners have no Docker and no nested
 virtualization, so the Testcontainers-backed DB suite cannot run there at all. SPEC.md §9.1 already
-scoped this suite as local-only for v1. The consequence: of the 22 UI specs, only the four that need
-no container (`smoke`, `workbench`, `connections`, `startup`) really execute in `ui-smoke`; the other
-18 skip with `DOCKER_UNAVAILABLE_MESSAGE`, not a failure. **The DB suite and the 18 container-backed
-UI specs stay a local, pre-merge responsibility — CI does not replace them.**
+scoped this suite as local-only for v1. The consequence: of the 26 UI specs, only the five that need
+no container (`smoke`, `workbench`, `connections`, `startup`, `secrets` as of P25) really execute in
+`ui-smoke`; the rest skip with `DOCKER_UNAVAILABLE_MESSAGE`, not a failure. **The DB suite and the
+container-backed UI specs stay a local, pre-merge responsibility — CI does not replace them.**
 
 **Cutting a release** (`.github/workflows/release.yml`, triggered on tags matching `v*.*.*`):
 1. Bump `version` in `package.json`, commit it.
