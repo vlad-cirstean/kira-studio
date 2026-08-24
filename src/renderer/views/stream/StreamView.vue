@@ -19,6 +19,7 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
+import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
@@ -738,6 +739,7 @@ onUnmounted(() => {
         </template>
       </div>
     </ViewChrome>
+    <CellEditorDock :tab-id="tab.id" />
   </div>
 </template>
 

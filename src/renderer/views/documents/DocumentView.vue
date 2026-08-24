@@ -22,6 +22,7 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
+import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import { documentRow, fieldNamesOnPage, isIdNull, pageVersion } from './docPage';
@@ -722,6 +723,7 @@ onUnmounted(() => {
         </template>
       </div>
     </ViewChrome>
+    <CellEditorDock :tab-id="tab.id" />
   </div>
 </template>
 
