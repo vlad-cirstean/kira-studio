@@ -20,6 +20,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import { openContextMenu } from '../../workbench/state/contextMenu';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import DateTimePicker from '../shared/DateTimePicker.vue';
 import { setSearchFiltering } from '../shared/searchFilter';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
@@ -226,7 +227,27 @@ function currentFilterInput(): {
   };
 }
 
+// P31 D14/F17: an unparseable "since" timestamp used to be swallowed silently — Date.parse
+// returned NaN, isEmptyKafkaStreamFilter's `!== null` check didn't catch it, and the browse
+// quietly started at the low watermark while the invalid text sat in the field looking applied.
+// Validated here, on apply, so the read is never issued for it — state.ts's own NaN guard
+// (D14's second half) keeps the wire payload honest regardless of caller.
+const timestampError = ref<string | null>(null);
+function validateTimestamp(): boolean {
+  if (timestampText.value.trim() === '') {
+    timestampError.value = null;
+    return true;
+  }
+  if (Number.isNaN(Date.parse(timestampText.value.trim()))) {
+    timestampError.value = 'Not a recognizable timestamp';
+    return false;
+  }
+  timestampError.value = null;
+  return true;
+}
+
 async function onApplyFilter(): Promise<void> {
+  if (!validateTimestamp()) return;
   await applyStreamFilter(props.tab.id, currentFilterInput());
 }
 
@@ -234,6 +255,7 @@ async function onClearFilter(): Promise<void> {
   offsetText.value = '';
   selectedPartitions.value = [];
   timestampText.value = '';
+  timestampError.value = null;
   await applyStreamFilter(props.tab.id, { offset: null, partitions: [], timestamp: null });
 }
 
@@ -245,7 +267,25 @@ function onApplyFromHistory(
   offsetText.value = offset ?? '';
   selectedPartitions.value = [...partitions];
   timestampText.value = timestamp ?? '';
+  timestampError.value = null;
   void applyStreamFilter(props.tab.id, { offset, partitions, timestamp });
+}
+
+// P31 D12/D13: the same trigger arrangement TimestampPane.vue:117-134 already uses (calendar
+// IconButton + PopoverPanel + DateTimePicker) — DateTimePicker.vue moved to views/shared/ (D12)
+// since this is the second view that needs it and views/* may not import each other sideways
+// (§11). toISOString(), not P24's shape-preserving encodeTimestamp: this field is an input to a
+// query with no original spelling to preserve, and state.ts's load() feeds it straight to
+// Date.parse.
+const timestampCalendarOpen = ref(false);
+const timestampPickerDate = computed(() => {
+  if (timestampText.value.trim() === '') return new Date();
+  const ms = Date.parse(timestampText.value.trim());
+  return Number.isNaN(ms) ? new Date() : new Date(ms);
+});
+function onPickTimestamp(date: Date): void {
+  timestampText.value = date.toISOString();
+  void onApplyFilter();
 }
 
 // Item 1's partition popover — a checkbox list anchored to a button (mirrors ColumnsMenu.vue's
@@ -577,15 +617,43 @@ onUnmounted(() => {
             </div>
           </PopoverPanel>
         </div>
-        <div class="filter-field">
-          <TextField
-            v-model="timestampText"
-            prefix="since"
-            placeholder="ISO timestamp"
-            data-testid="stream-filter-timestamp"
-            @enter="onApplyFilter"
-            @blur="onApplyFilter"
-          />
+        <div class="timestamp-filter-field">
+          <div class="ts-input-row">
+            <TextField
+              v-model="timestampText"
+              prefix="since"
+              placeholder="ISO timestamp"
+              data-testid="stream-filter-timestamp"
+              :invalid="!!timestampError"
+              v-tooltip="timestampError ?? undefined"
+              @enter="onApplyFilter"
+              @blur="onApplyFilter"
+            />
+            <span class="ts-calendar-anchor">
+              <IconButton
+                icon="calendar"
+                data-testid="stream-filter-timestamp-calendar"
+                v-tooltip="'Pick a date and time'"
+                @click="timestampCalendarOpen = !timestampCalendarOpen"
+              />
+              <PopoverPanel
+                v-if="timestampCalendarOpen"
+                :width="228"
+                anchor="left"
+                test-id="stream-filter-timestamp-calendar-popover"
+                backdrop-testid="stream-filter-timestamp-calendar-backdrop"
+                @close="timestampCalendarOpen = false"
+              >
+                <DateTimePicker :model-value="timestampPickerDate" zone="local" @update:model-value="onPickTimestamp" />
+              </PopoverPanel>
+            </span>
+          </div>
+          <span
+            v-if="timestampError"
+            class="filter-field-error"
+            data-testid="stream-filter-timestamp-error"
+            >{{ timestampError }}</span
+          >
         </div>
         <AppButton data-testid="stream-filter-clear" v-tooltip="'Empty every field and refetch'" @click="onClearFilter">
           Clear
@@ -847,6 +915,37 @@ onUnmounted(() => {
 
 .filter-field :deep(.p-input) {
   width: 100%;
+}
+
+/* P31 D12/D13: the "since" field's own wrapper — not `.filter-field` (that class's fixed 160px
+   width and 100%-wide input are sized for a single bare TextField; this one also carries a
+   calendar trigger beside the input and an error line below it). */
+.timestamp-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ts-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-1);
+}
+
+.ts-input-row :deep(.p-input) {
+  width: 160px;
+}
+
+.ts-calendar-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filter-field-error {
+  color: var(--kira-error);
+  font-size: var(--kira-t-xs);
+  white-space: nowrap;
 }
 
 /* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */

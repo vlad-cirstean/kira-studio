@@ -76,10 +76,17 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   // Kafka-only (item 2); always null for SQS, since StreamView.vue never lets an SQS tab's three
   // filter fields become non-null in the first place — encodeKafkaStreamFilter itself would still
   // collapse them to null even if it did.
+  // P31 D14/F17: Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
+  // check doesn't catch it — a NaN would silently ride through encodeKafkaStreamFilter (JSON.
+  // stringify turns it into `null` on the wire, so the engine reads "no timestamp filter" while
+  // the field looks applied). StreamView.vue validates before ever calling load(), but this guard
+  // makes the wire payload honest regardless of caller.
+  const parsedTimestampMs =
+    tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter);
   const filter = encodeKafkaStreamFilter({
     offset: tab.state.offsetFilter,
     partitions: tab.state.partitions,
-    timestampMs: tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter),
+    timestampMs: Number.isNaN(parsedTimestampMs) ? null : parsedTimestampMs,
   });
 
   try {
