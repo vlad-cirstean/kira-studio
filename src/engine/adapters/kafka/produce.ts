@@ -1,4 +1,4 @@
-import type { Kafka } from 'kafkajs';
+import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
@@ -53,7 +53,7 @@ export function preview(plan: MutationPlan, topic: string): string[] {
 }
 
 export async function produce(
-  kafka: Kafka,
+  kafka: KafkaJS.Kafka,
   topic: string,
   readOnly: boolean,
   plan: MutationPlan,
@@ -62,7 +62,11 @@ export async function produce(
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mongo/mariadb).
   if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
 
-  const producer = kafka.producer();
+  // P32 D11: the library's own recommendation for this await-each-send shape (MIGRATION.md) —
+  // without it every staged message pays the default batching delay, which a user watching a
+  // one-message produce would read as the app being slow. acks/compression/timeout are
+  // per-producer, not per-send, and the adapter sets none of them, so nothing else moves.
+  const producer = kafka.producer({ 'linger.ms': 0 } as never);
   ctx.setCommand(preview(plan, topic).join(';\n'));
 
   let affectedRows = 0;

@@ -1,4 +1,4 @@
-import type { Admin, Kafka } from 'kafkajs';
+import { librdkafkaVersion } from '@confluentinc/kafka-javascript';
 import type { ObjectDefinition } from '../../../shared/domain/definition';
 import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
 import {
@@ -20,9 +20,8 @@ import type {
 import { AdapterError } from '../errors';
 import { kafkaCaps } from './caps';
 import * as catalog from './catalog';
-import { connectKafka } from './client';
+import { connectKafka, type KafkaClientHandle } from './client';
 import { buildGroupDefinition, buildTopicDefinition } from './definition';
-import { mapKafkaError } from './errors';
 import * as producer from './produce';
 import { countTopic, readTopic } from './read';
 
@@ -30,36 +29,31 @@ class KafkaAdapter implements Adapter {
   readonly kind = 'kafka' as const;
   readonly caps = kafkaCaps;
 
-  private kafka: Kafka | null = null;
-  private admin: Admin | null = null;
+  private handle: KafkaClientHandle | null = null;
   private readOnly = false;
 
   constructor(private readonly deps: AdapterDeps) {}
 
   async connect(cfg: ResolvedConnectionConfig): Promise<ConnectInfo> {
-    const { kafka, admin } = await connectKafka(cfg, this.deps.log);
-    let clusterId: string;
-    try {
-      ({ clusterId } = await admin.describeCluster());
-    } catch (err) {
-      await admin.disconnect().catch(() => {});
-      throw mapKafkaError(err);
-    }
-
-    this.kafka = kafka;
-    this.admin = admin;
+    const handle = await connectKafka(cfg, this.deps.log);
+    this.handle = handle;
     this.readOnly = cfg.readOnly;
 
+    // P32 D13/F11: no describeCluster() in this client — details loses `cluster` and gains
+    // `brokers`/`librdkafka` instead. `details` is free-form (adapter.ts) and currently unread by
+    // the renderer (only serverVersion is), so the swap costs the user nothing today.
     return {
       serverVersion: 'Kafka',
-      details: { cluster: clusterId },
+      details: {
+        brokers: String(handle.brokerCount),
+        librdkafka: librdkafkaVersion,
+      },
     };
   }
 
   async disconnect(): Promise<void> {
-    await this.admin?.disconnect().catch(() => {});
-    this.kafka = null;
-    this.admin = null;
+    await this.handle?.admin.disconnect().catch(() => {});
+    this.handle = null;
   }
 
   async children(path: NodePath): Promise<TreeNode[]> {
@@ -106,7 +100,7 @@ class KafkaAdapter implements Adapter {
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
     const topic = this.resolveTopicTarget(req.path);
-    return readTopic(this.requireKafka(), this.requireAdmin(), topic, req, ctx);
+    return readTopic(this.requireHandle(), topic, req, ctx);
   }
 
   async count(req: CountRequest, ctx: OpCtx): Promise<{ value: number; exact: boolean }> {
@@ -129,20 +123,25 @@ class KafkaAdapter implements Adapter {
     throw new AdapterError('E_UNSUPPORTED', 'kafka has no query console');
   }
 
-  // D6/D14: `ctx.signal.addEventListener('abort', () => consumer.stop())` inside read() is the
-  // sole cancel mechanism, mirroring P9's D7/D8 — this stays a permanent no-op.
+  // P32 D22 (was D6/D14): `ctx.signal.addEventListener('abort', () => consumer.disconnect())`
+  // inside read() is the sole cancel mechanism, mirroring P9's D7/D8 — this stays a permanent
+  // no-op. The mechanism changed shape (stop() no longer exists on this client, F14), not its
+  // effectiveness.
   async cancel(): Promise<boolean> {
     return false;
   }
 
-  private requireKafka(): Kafka {
-    if (!this.kafka) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.kafka;
+  private requireHandle(): KafkaClientHandle {
+    if (!this.handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
+    return this.handle;
   }
 
-  private requireAdmin(): Admin {
-    if (!this.admin) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.admin;
+  private requireKafka(): KafkaClientHandle['kafka'] {
+    return this.requireHandle().kafka;
+  }
+
+  private requireAdmin(): KafkaClientHandle['admin'] {
+    return this.requireHandle().admin;
   }
 
   private resolveTopicTarget(path: NodePath): string {
