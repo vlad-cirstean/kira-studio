@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import type { BeautifyMode } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
@@ -10,6 +9,8 @@ import { connectionsState } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
+import EditBufferActions from '../shared/EditBufferActions.vue';
+import { useEditBuffer } from '../shared/useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
@@ -99,23 +100,18 @@ const readOnlyChipTitle = computed(() => {
 });
 
 // The display buffer (D6): what Beautify/Reset act on. Never the stored value itself, which
-// stays reachable through `cell.value.value` for Reset.
-const doc = ref('');
-const beautifyFailure = ref<string | null>(null);
-
-// P24 D22: `formatted` is derived, not a flag every doc-writing call site has to remember to
-// clear — it reads 'indented'/'compact' only while the buffer still equals exactly what
-// applyBeautify last produced, and falls back to 'none' the instant doc changes by ANY other path
-// (a hand edit, a fresh cell, Reset, the decoded/timestamp panes). Otherwise the Beautify button
-// stayed lit over text that was no longer beautified, and `data-formatted` reported a formatting
-// the buffer no longer had.
-const formattedMode = ref<'indented' | 'compact'>('indented');
-const formattedForDoc = ref<string | null>(null);
-const formatted = computed<'none' | 'indented' | 'compact'>(() =>
-  formattedForDoc.value !== null && formattedForDoc.value === doc.value
-    ? formattedMode.value
-    : 'none',
-);
+// stays reachable through `cell.value.value` for Reset. P27 D26: the state machine itself
+// (dirty/beautify/bytes/revert) now lives in the shared useEditBuffer — this file only supplies
+// what it means for a cell (the stored value, the beautifier for the effective format).
+const buffer = useEditBuffer({
+  original: () => selectedCell.value.value ?? '',
+  beautifier: () =>
+    canBeautify(effectiveFormat.value)
+      ? (text, mode) => beautifyFor(effectiveFormat.value, text, mode)
+      : null,
+  onRevert: () => selectedCell.value.onRevert?.(),
+});
+const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
 
 let lastKey: string | null = null;
 let lastValue: string | null = null;
@@ -130,36 +126,9 @@ watch(
     if (key === lastKey && c.value === lastValue) return;
     lastKey = key;
     lastValue = c.value;
-    doc.value = c.value ?? '';
-    formattedForDoc.value = null;
-    beautifyFailure.value = null;
+    buffer.reseed();
   },
   { immediate: true },
-);
-
-const beautifyDisabledTitle = computed<string>(() =>
-  canBeautify(effectiveFormat.value)
-    ? ''
-    : 'Indented and compact formatting apply to JSON and XML/HTML.',
-);
-// Bug fix (tooltip audit follow-up): these two buttons previously had no title at all once
-// enabled — `beautifyDisabledTitle` was written to only ever describe the *disabled* case, so a
-// working Beautify/Minify pair had no hover hint explaining what "list-tree"/"list-flat" even do.
-const beautifyIndentedTitle = computed<string>(() =>
-  canBeautify(effectiveFormat.value)
-    ? 'Beautify — pretty-print with indentation'
-    : beautifyDisabledTitle.value,
-);
-const beautifyCompactTitle = computed<string>(() =>
-  canBeautify(effectiveFormat.value)
-    ? 'Minify — remove all whitespace'
-    : beautifyDisabledTitle.value,
-);
-// P24 D24/F7a: the enabled case previously had no title at all — beautifyIndentedTitle/
-// beautifyCompactTitle above already got this same fix in an earlier pass (see their own
-// comment); Reset was missed.
-const resetTitle = computed<string>(() =>
-  isDirty.value ? 'Reset to the stored value' : 'Already showing the stored value.',
 );
 
 // UUID generation: overwrites the buffer outright, same shape as applyBeautify's own "replace
@@ -221,64 +190,12 @@ watch(
   { immediate: true },
 );
 
-// P24 D20: the one write-guard both translate-pane update paths route through — only actually
-// writes `doc` when the candidate differs, and reports whether it did so the caller can decide
-// what side effect (if any) rides along. Replaces arming skipNextDecode unconditionally *before*
-// a write that might not happen: F7b — that left the flag permanently set once a no-op write
-// occurred (edit the decoded pane to text that re-encodes identically), silently swallowing the
-// *next* genuine edit with no way back except reselecting the cell.
-function writeDoc(next: string): boolean {
-  if (next === doc.value) return false;
-  doc.value = next;
-  return true;
-}
-
 function onDecodedInput(text: string): void {
   decodedDoc.value = text;
   if (!showDecodedPane.value) return;
   const next = encodeFromText(effectiveFormat.value as 'hex' | 'base64', text, doc.value);
   if (writeDoc(next)) skipNextDecode = true;
 }
-
-// P24 D21/F7d: acts on the buffer (`doc`), not the stored value — beautifying used to silently
-// discard a hand-edit, applying formatting to `c.value` and overwriting whatever the user had
-// just typed. The `formatted.value === mode` early return is also gone: with `formatted` now
-// derived (above), pressing Beautify twice on an unmodified buffer is merely a harmless re-run,
-// not the previously-permanent dead click that made re-formatting your own edit impossible.
-function applyBeautify(mode: BeautifyMode): void {
-  const c = selectedCell.value;
-  if (c.value === null || !canBeautify(effectiveFormat.value)) return;
-  const result = beautifyFor(effectiveFormat.value, doc.value, mode);
-  if (result.ok) {
-    formattedMode.value = mode;
-    formattedForDoc.value = result.text;
-    doc.value = result.text;
-    beautifyFailure.value = null;
-  } else {
-    // §6c: a failed beautify leaves the buffer and `formatted` alone.
-    beautifyFailure.value = result.reason ?? 'beautify failed';
-  }
-}
-
-// Bug fix: this used to only reset the local display buffer. Auto-stage-on-blur (onEditorBlur)
-// fires on the same click that opens this button — clicking Reset moves focus off the editor
-// first, which fires `focusout` (staging whatever was in the buffer as a pending edit) *before*
-// this handler runs — so the buffer looked reverted while the just-staged edit silently stayed
-// pending underneath it, which is what "Revert doesn't work, it commits the change" looked like.
-// `onRevert` (set by DataGrid.vue alongside onEdit) un-stages that pending edit outright, so the
-// order those two events fire in no longer matters — either way this call is what wins last.
-function resetBuffer(): void {
-  const c = selectedCell.value;
-  doc.value = c.value ?? '';
-  formattedForDoc.value = null;
-  beautifyFailure.value = null;
-  c.onRevert?.();
-}
-
-// The buffer diverging from the stored value is what "there's something to save" means — true
-// for a beautified reformat as much as for a hand-typed edit (D6: Save stages whatever's on
-// screen, exactly like `stageEdit`'s own "verbatim, formatting included" contract).
-const isDirty = computed(() => doc.value !== (selectedCell.value.value ?? ''));
 
 // Stages into the exact same pending-change set the grid's own inline edit and the toolbar's
 // Commit/Discard already operate on (§P5) — nothing here writes to the server directly, and
@@ -321,7 +238,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
     saveEdit();
   } else if (e.key === 'Escape') {
     e.preventDefault();
-    resetBuffer();
+    buffer.reset();
   }
 }
 
@@ -405,36 +322,10 @@ const statusLine = computed(() => {
           v-tooltip="uuidGenerateTitle"
           @click="generateUuid"
         />
-        <IconButton
-          icon="expand-all"
-          :active="formatted === 'indented'"
-          data-testid="cell-editor-beautify-indented"
-          :disabled="!canBeautify(effectiveFormat)"
-          v-tooltip="beautifyIndentedTitle"
-          @click="applyBeautify('indented')"
-        />
-        <IconButton
-          icon="collapse-all"
-          :active="formatted === 'compact'"
-          data-testid="cell-editor-beautify-compact"
-          :disabled="!canBeautify(effectiveFormat)"
-          v-tooltip="beautifyCompactTitle"
-          @click="applyBeautify('compact')"
-        />
-        <IconButton
-          icon="discard"
-          data-testid="cell-editor-beautify-reset"
-          :disabled="!isDirty"
-          v-tooltip="resetTitle"
-          @click="resetBuffer"
-        />
+        <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" />
       </span>
 
       <template #trailing>
-        <!-- P24 D25/F10: the mockup's own trailing chip when the buffer diverges from the stored
-             value — the only visible signal today that Ctrl+Enter (no focus change, so no other
-             feedback) did anything at all. -->
-        <span v-if="isDirty" class="p-chip warn" data-testid="cell-editor-modified">modified</span>
         <span v-if="readOnlyReason" class="p-chip warn" v-tooltip="readOnlyChipTitle">
           <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
