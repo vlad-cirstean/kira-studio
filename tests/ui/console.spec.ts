@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import type { ConnectionColor } from '@shared/domain/connection';
 import { expect, test } from './fixtures';
 import {
@@ -135,6 +135,26 @@ async function typeInto(view: Locator, page: Page, text: string): Promise<void> 
   await page.keyboard.type(text);
 }
 
+// Mirrors interaction.spec.ts's identically named helper: clicking the native Edit ▸ Undo/Redo
+// item exercises the exact role: 'undo'/'redo' path (main/menu.ts), distinct from the
+// history()/historyKeymap path a Control+Z keystroke exercises (P18 addendum F1).
+async function clickMenuItem(
+  app: ElectronApplication,
+  menuLabel: string,
+  itemLabel: string,
+): Promise<void> {
+  await app.evaluate(
+    ({ Menu }, args) => {
+      const menu = Menu.getApplicationMenu();
+      const top = menu?.items.find((i) => i.label === args.menuLabel);
+      const item = top?.submenu?.items.find((i) => i.label === args.itemLabel);
+      if (!item) throw new Error(`menu item not found: ${args.menuLabel} > ${args.itemLabel}`);
+      item.click();
+    },
+    { menuLabel, itemLabel },
+  );
+}
+
 test('Query console — open, run statement/all, errors, saved queries, session restore', async ({
   kira,
   relaunch,
@@ -142,7 +162,7 @@ test('Query console — open, run statement/all, errors, saved queries, session 
 }) => {
   test.setTimeout(300_000);
   if (!pg) throw new Error('postgres fixture did not start');
-  const { window: page } = kira;
+  const { app, window: page } = kira;
 
   const cfg = {
     host: pg.config.host,
@@ -285,6 +305,40 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(restoredView.locator('.cm-content')).toContainText('restore-check', {
     timeout: 15_000,
   });
+
+  // --- scenario 7: undo/redo (P18 addendum D15) ---------------------------------------------
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView5 = page.locator('[data-testid="console-view"]');
+  const editor5 = consoleView5.locator('.cm-content');
+
+  // A run of typed characters lands as one history step, not one per keystroke — a single
+  // Control+Z removes the whole statement, not its last character.
+  await typeInto(consoleView5, page, 'SELECT 1;');
+  await expect(editor5).toContainText('SELECT 1;');
+  await page.keyboard.press('Control+z');
+  await expect(editor5).toHaveText('');
+  await page.keyboard.press('Control+y');
+  await expect(editor5).toContainText('SELECT 1;');
+
+  // The Edit ▸ Undo/Redo menu items (role: 'undo'/'redo') reach the same history, and a further
+  // burst of typing groups as its own separate step rather than merging with the first.
+  await typeInto(consoleView5, page, ' -- more');
+  await expect(editor5).toContainText('SELECT 1; -- more');
+  await clickMenuItem(app, 'Edit', 'Undo');
+  await expect(editor5).toHaveText('SELECT 1;');
+  await clickMenuItem(app, 'Edit', 'Redo');
+  await expect(editor5).toContainText('SELECT 1; -- more');
+
+  // Undoing a saved-query load restores the previous text and leaves the cursor where typing was
+  // left off, not pinned at 0 in a document undo did not reset (P18 addendum acceptance
+  // checklist) — typing after undo appends at the end instead of landing at the front.
+  await page.click('[data-testid="console-saved-toggle"]');
+  await page.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }).click();
+  await expect(editor5).toContainText('SELECT 42 AS answer;');
+  await page.keyboard.press('Control+z');
+  await expect(editor5).toContainText('SELECT 1; -- more');
+  await page.keyboard.type('!');
+  await expect(editor5).toContainText('SELECT 1; -- more!');
 
   expect(consoleErrors).toEqual([]);
 });

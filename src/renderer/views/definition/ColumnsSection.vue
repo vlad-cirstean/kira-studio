@@ -70,11 +70,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               <CodiconIcon name="info" :size="12" />
             </span>
           </td>
-          <!-- Nullable stated only as the exception — repeating "NOT NULL" on every row (the
-               common case in a well-designed schema) added noise without adding information. -->
-          <td class="def-col-null">
-            <CodiconIcon v-if="col.nullable" name="close" :size="12" title="Nullable" />
-          </td>
+          <td class="def-col-null mono">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
           <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
           <td class="def-col-comment">{{ col.comment ?? '' }}</td>
         </tr>
@@ -169,7 +165,8 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-null {
-  width: 48px;
+  width: 76px;
+  white-space: nowrap;
   color: var(--kira-fg-muted);
 }
 

@@ -117,6 +117,35 @@ function logStats(label: string, values: number[]): void {
   console.log(`budgets.spec.ts ${label}: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`);
 }
 
+// P18 addendum D26. `measureClickToDom`'s "arm the observer and read `performance.now()` inside
+// one synchronous evaluate() call" trick doesn't transfer directly to a keystroke: unlike
+// `.click()`, there is no script-callable way to make an element genuinely receive typed input —
+// it has to go through Playwright's own `keyboard.press`, a real Node round trip. So this arms the
+// observer (and its start time) in one evaluate() call, triggers the press from Node, then reads
+// back a Promise that already resolved entirely in page time — every timestamp compared is
+// `performance.now()` inside the same page, so there's no cross-process clock skew, but the
+// Node-side round trip between arming and pressing does add some fixed overhead to every sample
+// (present equally in all 20, so p50 stays a meaningful comparison point even if slightly inflated
+// versus a real keystroke's dispatch latency).
+async function measureKeyToPopup(page: Page, key: string): Promise<number> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __kiraKeyProbe?: Promise<number>; __kiraKeyStart?: number };
+    w.__kiraKeyProbe = new Promise<number>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (!document.querySelector('.cm-tooltip-autocomplete')) return;
+        observer.disconnect();
+        resolve(performance.now() - (w.__kiraKeyStart as number));
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      w.__kiraKeyStart = performance.now();
+    });
+  });
+  await page.keyboard.press(key);
+  return page.evaluate(
+    () => (window as unknown as { __kiraKeyProbe: Promise<number> }).__kiraKeyProbe,
+  );
+}
+
 test('interaction budgets — scroll, cell→editor, cached tab switch, cached tree expand', async ({
   kira,
   consoleErrors,
@@ -306,6 +335,30 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   }
   logStats('cached tree expand', expandDeltas);
   expect(percentile(expandDeltas, 95)).toBeLessThanOrEqual(50);
+
+  // --- 5. console keystroke -> completion popup visible, p50 <= 50ms (P18 addendum D26) -------
+  await openRowMenu(page, DB_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const consoleView = page.locator('[data-testid="console-view"]');
+  await expect(consoleView).toBeVisible();
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await consoleView.locator('.cm-content').click();
+  await page.keyboard.type('SEL');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+
+  const keyDeltas: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press('Escape');
+    await expect(tooltip).toHaveCount(0);
+    await page.keyboard.press('Backspace');
+    keyDeltas.push(await measureKeyToPopup(page, 'l'));
+  }
+  logStats('console keystroke -> completion popup', keyDeltas);
+  // This is the one assertion that would have caught D17's own starting point — F2's
+  // `activateOnTypingDelay: 100` debounce — and the one that stops a future schema-aware source
+  // from quietly reintroducing it.
+  expect(percentile(keyDeltas, 50)).toBeLessThanOrEqual(50);
+  expect(Math.max(...keyDeltas)).toBeLessThanOrEqual(200);
 
   expect(consoleErrors).toEqual([]);
 });

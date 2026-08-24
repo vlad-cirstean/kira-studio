@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { ConnectionKind } from '@shared/domain/connection';
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectConnection, connectionsState } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
@@ -13,6 +15,8 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
+import { consoleCompletionSources } from './completion';
+import { consoleLintSource } from './lint';
 import { resultPageKey, run, runtime, setText, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
@@ -41,18 +45,68 @@ const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
 const targetTail = computed(() => pathTail(props.tab.path));
-const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+
+const connectionKind = computed<ConnectionKind | undefined>(() => {
   if (!props.tab.connectionId) return undefined;
-  const record = connectionsState.records.find((r) => r.id === props.tab.connectionId);
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return connectionsState.records.find((r) => r.id === props.tab.connectionId)?.kind;
 });
+
+const dialect = computed<'postgres' | 'mariadb' | undefined>(() =>
+  connectionKind.value === 'postgres' || connectionKind.value === 'mariadb'
+    ? connectionKind.value
+    : undefined,
+);
+
+// P18 addendum D23: realities #10's wart, fixed as a side effect of needing per-engine behaviour
+// at all — a Mongo shell command has been coloured by the SQL grammar since P5.5. `language`
+// (not a hardcoded "sql") now drives both highlighting and, via `completionSources`, what
+// autocomplete offers.
+const language = computed<EditorLanguageId>(() => {
+  if (connectionKind.value === 'mongodb') return 'mongo';
+  if (connectionKind.value === 'redis') return 'redis';
+  if (dialect.value !== undefined) return 'sql';
+  return 'plain';
+});
+
+// D21/D22: undefined for postgres/mariadb (lang-sql's own keyword source stays in charge) and for
+// any kind with no console at all, which a mounted ConsoleView never actually has (caps.sql
+// gates the tab) — `language.value !== 'plain'` covers both without special-casing kafka/sqs/s3.
+const completionSources = computed(() => {
+  if (!connectionKind.value || language.value === 'plain' || language.value === 'sql') {
+    return undefined;
+  }
+  return consoleCompletionSources(connectionKind.value, props.tab.connectionId, props.tab.path);
+});
+
+// D24: one lexical linter per engine, scoped to this console's own text — undefined for any tab
+// this view never actually mounts for (caps.sql gates the tab), so `connectionKind.value` is
+// always postgres/mariadb/mongodb/redis in practice.
+const lintSource = computed(() => consoleLintSource(connectionKind.value));
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
 
+// P18 addendum D20: the editor's own doc is a shallowRef, not `tab.state.text` directly — binding
+// the template to the tab's reactive text made this view's whole render effect (toolbar, strips,
+// status line, every mounted ConsoleResultGrid) re-run on every keystroke, for no benefit
+// CodeMirrorHost's own equality-guarded `doc` watcher didn't already provide. `lastEmitted` is a
+// plain variable, not a ref — comparing against it is what lets an external write (a saved-query
+// load, tab hydration) still reach the editor while a self-triggered echo does not.
+const localDoc = shallowRef(props.tab.state.text);
+let lastEmitted = props.tab.state.text;
+
 function onDocChange(text: string): void {
+  lastEmitted = text;
   setText(props.tab.id, text);
 }
+
+watch(
+  () => props.tab.state.text,
+  (text) => {
+    if (text === lastEmitted) return;
+    localDoc.value = text;
+  },
+);
 
 function runStatement(): void {
   const stmt = statementAtCursor(props.tab.state.text, cursorPos.value);
@@ -169,11 +223,13 @@ const statusLine = computed(() => {
 
       <div class="editor-body">
         <CodeMirrorHost
-          :doc="tab.state.text"
-          language="sql"
+          :doc="localDoc"
+          :language="language"
           :sql-dialect="dialect"
           :read-only="false"
-          :autocomplete="dialect !== undefined"
+          :autocomplete="language !== 'plain'"
+          :completion-sources="completionSources"
+          :lint-source="lintSource"
           @update:doc="onDocChange"
           @update:cursor="cursorPos = $event"
         />

@@ -72,6 +72,36 @@ export const kiraEditorTheme = EditorView.theme(
       color: 'var(--kira-syntax-function)',
       textDecoration: 'none',
     },
+    // P18 addendum D24/D25: the console's lint diagnostics — an underline plus this hover
+    // tooltip is the entire lint UI (no gutter, no panel). The library's own squiggle is a
+    // hard-coded raster SVG regardless of theme; replacing it with a themed wavy underline is the
+    // same "no un-themed chrome" reasoning D12 already applied to the completion popup above.
+    '.cm-lintRange-error': {
+      backgroundImage: 'none',
+      textDecoration: 'underline wavy var(--kira-error)',
+    },
+    '.cm-lintRange-warning': {
+      backgroundImage: 'none',
+      textDecoration: 'underline wavy var(--kira-warn)',
+    },
+    '.cm-tooltip-lint': {
+      backgroundColor: 'var(--kira-bg-elevated)',
+      border: 'var(--kira-border-width) solid var(--kira-border-strong)',
+      borderRadius: 'var(--kira-radius)',
+      boxShadow: 'var(--kira-shadow-dialog)',
+      fontFamily: 'var(--kira-font-family)',
+      fontSize: 'var(--kira-t-sm)',
+      overflow: 'hidden',
+    },
+    '.cm-diagnostic': {
+      color: 'var(--kira-fg)',
+    },
+    '.cm-diagnostic-error': {
+      borderLeft: '3px solid var(--kira-error)',
+    },
+    '.cm-diagnostic-warning': {
+      borderLeft: '3px solid var(--kira-warn)',
+    },
   },
   { dark: true },
 );

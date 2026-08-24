@@ -41,8 +41,13 @@ withDefaults(
 
 .corner-count {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  /* Anchored to the button's own right edge, vertically centred rather than pinned to the top —
+     a `top: -4px` offset used to push this outside a short toolbar's own bounds (the reported
+     "indicator floats above the toolbar" bug), since the button sits flush against the toolbar's
+     top edge and had no room above it to poke into. */
+  top: 50%;
+  right: -6px;
+  transform: translateY(-50%);
   height: 14px;
   min-width: 14px;
   font-size: 9px;

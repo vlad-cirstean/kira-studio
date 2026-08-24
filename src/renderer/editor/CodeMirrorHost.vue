@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap } from '@codemirror/commands';
+import {
+  acceptCompletion,
+  autocompletion,
+  type CompletionSource,
+  completionKeymap,
+} from '@codemirror/autocomplete';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
+import { type Diagnostic, linter } from '@codemirror/lint';
 import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
+import type { ConsoleDiagnostic } from './diagnostics';
 import { type EditorLanguageId, languageExtension } from './languages';
 import { kiraEditorTheme, kiraHighlightStyle } from './theme';
 
@@ -18,6 +25,15 @@ const props = defineProps<{
   /** P18 D10: off everywhere by default. On only for the query console on a SQL connection — the
    *  cell editor, definition viewer, document editor and op-log detail rows must not sprout a popup. */
   autocomplete?: boolean;
+  /** P18 addendum D21/D22/D23: replaces language-data completion sources
+   *  (autocompletion({ override })) — the Mongo/Redis consoles pass a tab-specific source here;
+   *  SQL passes nothing and keeps lang-sql's own keyword source. Ignored when `autocomplete` is
+   *  false. */
+  completionSources?: readonly CompletionSource[];
+  /** P18 addendum D24: pure text in, diagnostics out — the host owns linter()/its compartment/its
+   *  theming, so a caller (the console) never imports @codemirror/lint. Ignored (no linting) when
+   *  absent, which every prior host stays. */
+  lintSource?: (doc: string) => ConsoleDiagnostic[];
 }>();
 
 // Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
@@ -39,20 +55,77 @@ let view: EditorView | null = null;
 const languageCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 const autocompleteCompartment = new Compartment();
+const lintCompartment = new Compartment();
 
 function resolveLanguage(): ReturnType<typeof languageExtension> {
   return languageExtension(props.language, props.sqlDialect);
 }
 
+// P18 addendum D15: undo/redo lives here, not in a console special case, because History is a
+// general editor capability — every prior host was read-only, which is why this went unnoticed.
+// Folded into readOnlyCompartment (not a fifth compartment) and gated on !readOnly: undo is
+// already inert under EditorState.readOnly, but the state field would otherwise accumulate one
+// ChangeSet per programmatic doc swap in the definition viewer/cell editor/op-log rows, each
+// retaining the previous document, against §2.2's memory target.
+function resolveReadOnly(readOnly: boolean): Extension[] {
+  return [
+    EditorState.readOnly.of(readOnly),
+    // newGroupDelay: 500 is the library default (undocumented as such, restated here so the
+    // grouping window this editor relies on — a run of typed characters is one undo step, not one
+    // per keystroke — is a decision this file states rather than one it merely inherits) — every
+    // editable CodeMirrorHost (the query console, the cell editor) gets it from this one call.
+    ...(readOnly ? [] : [history({ newGroupDelay: 500 }), keymap.of(historyKeymap)]),
+  ];
+}
+
+// P18 addendum D18: completionKeymap's Enter is dropped and Tab takes over accepting a
+// suggestion — the console is multi-line, so Enter must stay a newline (D6 applied to this
+// surface); Escape/Ctrl-Space/Arrow/Page keys are the library's own.
+const CONSOLE_COMPLETION_KEYMAP = [
+  ...completionKeymap.filter((binding) => binding.key !== 'Enter'),
+  { key: 'Tab', run: acceptCompletion },
+];
+
 // P18 D10: autocompletion() activates lang-sql's own keyword completion source (already
-// registered as language data — languages.ts is unchanged), plus completionKeymap's standard
-// Ctrl+Space/Tab-accept/Escape-dismiss bindings. completionKeymap is Prec.highest internally, so
-// splitting it into its own keymap.of() call (rather than one array with defaultKeymap) still
-// keeps its Escape/Enter ahead of any conflicting default when active — and lets this whole
-// extension be swapped for [] when `autocomplete` is false, which the always-on prior version
-// could not do.
+// registered as language data — languages.ts is unchanged) when `completionSources` is empty, or
+// a tab-specific source (P18 addendum D21/D22/D23's Mongo/Redis consoles) when given one.
+// addendum D17: every source this app registers is a synchronous lookup over a static array or an
+// already-loaded list, so the library's default debounce (which exists to keep expensive/async
+// sources off the keystroke path) only adds latency here — zeroed out. `interactionDelay: 0` is
+// safe only because D18 moves accept off Enter onto Tab, which is never in flight while typing.
 function resolveAutocomplete(): Extension[] {
-  return props.autocomplete ? [autocompletion(), keymap.of(completionKeymap)] : [];
+  if (!props.autocomplete) return [];
+  return [
+    autocompletion({
+      activateOnTypingDelay: 0,
+      interactionDelay: 0,
+      maxRenderedOptions: 25,
+      defaultKeymap: false,
+      override: props.completionSources?.length ? [...props.completionSources] : undefined,
+    }),
+    keymap.of(CONSOLE_COMPLETION_KEYMAP),
+  ];
+}
+
+// D24/D25: no lint gutter, no lint panel/keymap — diagnostics show as an underline plus a hover
+// tooltip only (theme.ts's `.cm-lintRange-*`/`.cm-diagnostic*` rules). `delay: 400` mirrors D17's
+// reasoning in reverse: unlike completion, linting a whole document on every keystroke is not
+// obviously free, so this keeps the library's own debounce rather than zeroing it like D17 did.
+function resolveLint(): Extension[] {
+  if (!props.lintSource) return [];
+  const source = props.lintSource;
+  return [
+    linter(
+      (view): Diagnostic[] =>
+        source(view.state.doc.toString()).map((d) => ({
+          from: d.from,
+          to: d.to,
+          severity: d.severity,
+          message: d.message,
+        })),
+      { delay: 400 },
+    ),
+  ];
 }
 
 onMounted(() => {
@@ -64,10 +137,11 @@ onMounted(() => {
       EditorView.lineWrapping,
       keymap.of(defaultKeymap),
       autocompleteCompartment.of(resolveAutocomplete()),
+      lintCompartment.of(resolveLint()),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
-      readOnlyCompartment.of(EditorState.readOnly.of(props.readOnly)),
+      readOnlyCompartment.of(resolveReadOnly(props.readOnly)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('update:doc', update.state.doc.toString());
         if (update.docChanged || update.selectionSet) {
@@ -112,15 +186,23 @@ watch(
   () => props.readOnly,
   (readOnly) => {
     if (!view) return;
-    view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)) });
+    view.dispatch({ effects: readOnlyCompartment.reconfigure(resolveReadOnly(readOnly)) });
   },
 );
 
 watch(
-  () => props.autocomplete,
+  () => [props.autocomplete, props.completionSources],
   () => {
     if (!view) return;
     view.dispatch({ effects: autocompleteCompartment.reconfigure(resolveAutocomplete()) });
+  },
+);
+
+watch(
+  () => props.lintSource,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: lintCompartment.reconfigure(resolveLint()) });
   },
 );
 

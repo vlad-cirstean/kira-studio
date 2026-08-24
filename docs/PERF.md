@@ -22,6 +22,7 @@ documents the procedure to run and what to fill in.
 | Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tree node expand (cached) ≤ 50 ms | click twisty → child rows present, p95 over 20 collapse/expand cycles of an already-cached schema node | `tests/ui/budgets.spec.ts` | **asserted** |
+| Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → `.cm-tooltip-autocomplete` present, p50 over 20 keystrokes | `tests/ui/budgets.spec.ts` | **asserted** |
 | Any DB round-trip async/cancellable | — | covered by every adapter's cancel scenario (P1–P10) | n/a |
 | < 350 MB total RSS, 5 connections / 10 tabs | min of 10 `app.getAppMetrics()` sums over an idle window | `tests/ui/memory.spec.ts` | **asserted — currently failing; see §2.2 below** |
 | Same, packaged | `ps -o rss` sum for the same scenario | §3 procedure below | manual (macOS) |
@@ -38,10 +39,18 @@ documents the procedure to run and what to fill in.
 | Cell → editor | 1.7 ms | 4.9 ms | ≤ 50 ms (p95) | pass |
 | Cached tab switch | 5.3 ms | 6.9 ms | ≤ 50 ms (p95) | pass |
 | Cached tree expand | 1.8 ms | 2.8 ms | ≤ 50 ms (p95) | pass |
+| Console keystroke → completion popup (P18 addendum D26) | not yet run | not yet run | ≤ 50 ms (p50) | **not measured in this environment — see note below** |
 | Cell-editor populate latency (informational) | — | 41 ms | — | logged |
 | `perf.spec.ts` rAF scroll frame time | 16.7 ms | 16.8 ms | < 24 ms (secondary tripwire) | pass |
 | Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | ≤ 2500 ms | pass |
 | Cold start, restored (5 conns, 10 tabs) | wall 640 ms / in-app uptime 522 ms | — | ≤ 3000 ms | pass |
+
+**Console keystroke → completion popup — not run in this environment.** The block exists in
+`tests/ui/budgets.spec.ts` (P18 addendum D26) but this session's sandbox has no Docker/Colima, so
+the Postgres fixture `tests/ui/support/pg.ts` starts cannot run and the whole `budgets.spec.ts`
+suite (including the four rows above, whose numbers here predate this addendum) is skipped rather
+than re-measured. Run `xvfb-run -a bun run test:ui -- budgets` on a machine with Docker available
+and record the p50/p95 pair here.
 
 **Scroll-response methodology note (contradicts plan D6's assumption).** The plan expected scroll
 response to be gated on p95, the same way the other three interaction budgets are. In practice,

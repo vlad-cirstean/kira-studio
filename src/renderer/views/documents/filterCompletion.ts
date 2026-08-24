@@ -1,5 +1,6 @@
 // P18 D9: candidate lists for DocumentView.vue's filter/SORT boxes.
 import type { Completion } from '../../theme/primitives/completion';
+import { MONGO_QUERY_OPERATORS } from '../shared/mongoVocabulary';
 import { fieldNamesOnPage } from './docPage';
 
 // Mirrors engine/adapters/mongo/literal.ts's own bare-identifier tokenizer rule exactly — a field
@@ -27,30 +28,6 @@ function fieldCompletions(tabId: string): Completion[] {
     icon: 'symbol-field',
   }));
 }
-
-// find()'s filter document is the only thing the filter box reaches — aggregation-stage
-// operators ($group, $lookup, …) have no business here.
-const MONGO_QUERY_OPERATORS: readonly string[] = [
-  '$eq',
-  '$ne',
-  '$gt',
-  '$gte',
-  '$lt',
-  '$lte',
-  '$in',
-  '$nin',
-  '$exists',
-  '$type',
-  '$regex',
-  '$options',
-  '$and',
-  '$or',
-  '$nor',
-  '$not',
-  '$all',
-  '$elemMatch',
-  '$size',
-];
 
 export function mongoFilterCandidates(tabId: string): Completion[] {
   const operators = MONGO_QUERY_OPERATORS.map((label) => ({

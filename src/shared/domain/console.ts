@@ -9,3 +9,19 @@ export interface ConsoleRequest {
   path: NodePath;
   statements: string[];
 }
+
+// P18 addendum D21: the ten shell methods `mongo/console.ts` dispatches — shared with the
+// renderer's Mongo console completion source so the popup can never offer a method the parser
+// rejects (the two would drift as two separate lists otherwise).
+export const MONGO_CONSOLE_METHODS: readonly string[] = [
+  'find',
+  'findOne',
+  'insertOne',
+  'insertMany',
+  'updateOne',
+  'updateMany',
+  'deleteOne',
+  'deleteMany',
+  'countDocuments',
+  'aggregate',
+];

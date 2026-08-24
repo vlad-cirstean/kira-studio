@@ -149,8 +149,9 @@ const gridStyle = computed(() => ({
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);
   /* A little breathing room before the view's own breadcrumb (ViewHeader) — without it the tab
-     strip's border sat flush against the breadcrumb row with no visual separation at all. */
-  margin-bottom: var(--kira-s-2);
+     strip's border sat flush against the breadcrumb row with no visual separation at all.
+     `--kira-s-2` (4px) still read as almost no gap at all; `--kira-s-3` is the smallest step up. */
+  margin-bottom: var(--kira-s-3);
 }
 
 .main-view {

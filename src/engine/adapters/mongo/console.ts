@@ -1,5 +1,6 @@
 import { EJSON } from 'bson';
 import type { Collection, Db, Document } from 'mongodb';
+import { MONGO_CONSOLE_METHODS } from '../../../shared/domain/console';
 import {
   createDocumentPageBuilder,
   type DocumentPage,
@@ -21,18 +22,10 @@ interface ParsedStatement {
   args: unknown[];
 }
 
-const SUPPORTED_METHODS = new Set([
-  'find',
-  'findOne',
-  'insertOne',
-  'insertMany',
-  'updateOne',
-  'updateMany',
-  'deleteOne',
-  'deleteMany',
-  'countDocuments',
-  'aggregate',
-]);
+// P18 addendum D21: built from the shared list, not a second literal copy — the renderer's
+// console completion source reads the same list, so a method it offers can never be one this
+// dispatch rejects.
+const SUPPORTED_METHODS = new Set(MONGO_CONSOLE_METHODS);
 
 function parseStatement(text: string): ParsedStatement {
   const parser = new LiteralParser(text.trim());
