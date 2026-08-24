@@ -4,31 +4,74 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 
+interface KindLabel {
+  singular: string;
+  plural: string;
+}
+
+// P28 D14: the one place a kind gets a human name. Every NodeKind has an entry, not just the five
+// that get their own P19 folder — the checkbox filter's Object types section (P28) needs a label
+// for every kind present under a connection, and FiltersDialog.vue used to hardcode its own
+// three-entry map instead of reusing this one.
+const KIND_LABELS: Record<NodeKind, KindLabel> = {
+  connection: { singular: 'Connection', plural: 'Connections' },
+  database: { singular: 'Database', plural: 'Databases' },
+  schema: { singular: 'Schema', plural: 'Schemas' },
+  table: { singular: 'Table', plural: 'Tables' },
+  view: { singular: 'View', plural: 'Views' },
+  matview: { singular: 'Materialized view', plural: 'Materialized views' },
+  function: { singular: 'Function', plural: 'Functions' },
+  sequence: { singular: 'Sequence', plural: 'Sequences' },
+  column: { singular: 'Column', plural: 'Columns' },
+  collection: { singular: 'Collection', plural: 'Collections' },
+  namespace: { singular: 'Namespace', plural: 'Namespaces' },
+  key: { singular: 'Key', plural: 'Keys' },
+  topic: { singular: 'Topic', plural: 'Topics' },
+  partition: { singular: 'Partition', plural: 'Partitions' },
+  consumerGroup: { singular: 'Consumer group', plural: 'Consumer groups' },
+  queue: { singular: 'Queue', plural: 'Queues' },
+  bucket: { singular: 'Bucket', plural: 'Buckets' },
+  prefix: { singular: 'Prefix', plural: 'Prefixes' },
+  object: { singular: 'Object', plural: 'Objects' },
+};
+
+// Per-connection-kind overrides — one entry today: MariaDB's `function` nodes include stored
+// procedures, and §5.1 calls that level "routines".
+const KIND_LABEL_OVERRIDES: Partial<Record<NodeKind, Partial<Record<ConnectionKind, KindLabel>>>> =
+  {
+    function: { mariadb: { singular: 'Routine', plural: 'Routines' } },
+  };
+
+/** The display label for any node kind, per connection kind. Plural for a folder or a checkbox
+ *  row ("Views"), singular where a single object is named. The one place a kind gets a human
+ *  name — GROUPED_KINDS' own labels now derive from it rather than duplicating it. */
+export function labelForKind(
+  kind: NodeKind,
+  connectionKind: ConnectionKind,
+  form: 'singular' | 'plural' = 'plural',
+): string {
+  const override = KIND_LABEL_OVERRIDES[kind]?.[connectionKind];
+  return (override ?? KIND_LABELS[kind])[form];
+}
+
 // The complete, curated list of kinds that get their own folder, in render order. Any kind not
 // named here is never grouped and keeps its position — which is what leaves redis namespaces/keys
 // and s3 prefixes/objects exactly as they are today.
-export const GROUPED_KINDS: readonly {
-  kind: NodeKind;
-  label: string;
-  /** Per-connection-kind override. One entry today: MariaDB's `function` nodes include stored
-   *  procedures, and §5.1 calls that level "routines". */
-  labelFor?: Partial<Record<ConnectionKind, string>>;
-}[] = [
-  { kind: 'view', label: 'Views' },
-  { kind: 'matview', label: 'Materialized views' },
-  { kind: 'sequence', label: 'Sequences' },
-  { kind: 'function', label: 'Functions', labelFor: { mariadb: 'Routines' } },
+export const GROUPED_KINDS: readonly { kind: NodeKind }[] = [
+  { kind: 'view' },
+  { kind: 'matview' },
+  { kind: 'sequence' },
+  { kind: 'function' },
   // P23 D1 (revised): kafka follows the same rule as SQL — the primary kind (topics) shows first,
   // ungrouped, and only the auxiliary kind (consumer groups) folders. Topics are what a user
   // browses; a folder around them would bury the thing this tree exists to show.
-  { kind: 'consumerGroup', label: 'Consumer groups' },
+  { kind: 'consumerGroup' },
 ];
 
 const GROUPED_KIND_SET = new Set(GROUPED_KINDS.map((g) => g.kind));
 
 export function labelForGroup(kind: NodeKind, connectionKind: ConnectionKind): string {
-  const entry = GROUPED_KINDS.find((g) => g.kind === kind);
-  return entry?.labelFor?.[connectionKind] ?? entry?.label ?? kind;
+  return labelForKind(kind, connectionKind, 'plural');
 }
 
 // Splits an already-filtered child list into [ungrouped, folders] — ungrouped in adapter order
