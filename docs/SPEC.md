@@ -406,20 +406,27 @@ the document/cell viewer. SQS is poll-on-demand only (§5.1).
 
 Every one of these has a menu; the app has a single `ContextMenu` service so none is forgotten.
 
+Each item that has a keyboard shortcut prints it alongside its label, muted and right-aligned
+(P21). Keys are written Windows/Linux-first below; macOS renders the ⌘/⇧/⌥/⌫ glyph form, and where
+the two diverge the mac key follows a slash. See §8.16 for the binding table itself.
+
 | Target | Items |
 |---|---|
-| Connection | Connect, Disconnect, **Open query console**, Refresh, Edit, Duplicate, Copy name, Copy URI, Filters…, Color ▸, Read-only ✓, Delete |
-| Database / schema | **Open query console**, Refresh, Copy name, Filters…, (Postgres) Set as default |
-| Table / view / collection | Open data, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name, Copy qualified name, Count rows, Saved filters ▸ |
+| Connection | Connect, Disconnect, **Open query console**, Refresh, Edit `F2`, Duplicate `Ctrl/Cmd+D`, Copy name `Ctrl/Cmd+C`, Copy URI `Shift+Alt+C`/`⌥⌘C`, Filters…, Color ▸, Read-only ✓, Delete `Delete`/`⌘⌫` |
+| Database / schema | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default |
+| Table / view / collection | Open data `Enter`, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name `Ctrl/Cmd+C`, Copy qualified name, Count rows, Saved filters ▸ |
 | Object-kind folder (P19) | Refresh, Collapse all |
 | Column (definition view) | Copy name, Add to projection, Sort by |
-| Tab | Close, Close others, Close to the right, Close all, Duplicate tab, Copy name, Reveal in project panel |
-| Grid cell | Copy, Copy with header, Copy as JSON, Edit, Set NULL, Filter by this value, Go to referenced row |
-| Grid row | Copy row(s) ▸ (TSV/CSV/JSON/INSERT), Duplicate row, Delete row |
-| Grid header | Sort asc/desc, Clear sort, Hide column, Show all columns, Copy column name, Copy column values |
+| Tab | Close `Ctrl/Cmd+W`, Close others, Close to the right, Close all, Duplicate tab, Copy name, Reveal in project panel |
+| Grid cell | Copy `Ctrl/Cmd+C`, Copy with header, Copy as JSON, Paste `Ctrl/Cmd+V`, Edit `Enter`, Set NULL, Filter by this value, Go to referenced row |
+| Grid row | Copy row(s) ▸ (TSV `Ctrl/Cmd+C`/CSV/JSON/INSERT), Duplicate row `Ctrl/Cmd+D`, Delete row `Delete`/`⌘⌫` |
+| Grid header | Sort asc/desc, Clear sort, Hide column, Show all columns, Copy column name, Copy column values `Ctrl/Cmd+C` |
 | Document | Expand all, Collapse all, Copy document, Copy `_id`, Edit, Delete |
 | Operations log row | Copy command, Copy error, Re-run, Reveal originating tab, Cancel (if running) |
-| Empty tree background | New connection, Refresh all, Collapse all |
+| Empty tree background | New connection `Ctrl/Cmd+N`, Refresh all, Collapse all |
+
+A key is printed only where it genuinely runs that item. The tree's per-row **Refresh** shows
+nothing on purpose: `F5` is the *active tab's* refresh, a different command on a different object.
 
 ### 8.11 Definition view
 
@@ -485,8 +492,27 @@ Console contents are saved to `saved_queries`.
 ### 8.16 Keyboard shortcuts
 
 A **minimal, VS Code-flavoured** set only — command palette, tab switching/closing, panel toggles,
-find, refresh, run. **Not remappable in v1**; the binding table is a single data file so remapping
-is a later feature, not a rewrite.
+new connection, find, refresh, run, plus a handful of focus-scoped actions in the project tree and
+the SQL grid. **Not remappable in v1**; the binding table is a single data file
+(`src/shared/shortcuts.ts`, P21) so remapping is a later feature, not a rewrite.
+
+Every binding is one entry in that table, and three consumers derive from it: the native menu bar's
+Electron `accelerator` strings, the key printed next to a context-menu item (§8.10), and the local
+keydown handlers. A printed key and the key that runs therefore cannot drift apart.
+
+Entries are either **global** — emitted as an Electron accelerator, so they fire regardless of what
+has DOM focus (`Cmd/Ctrl+,` settings, `Cmd/Ctrl+N` new connection, `Cmd/Ctrl+B`/`Cmd/Ctrl+J` panel
+toggles, `Cmd/Ctrl+Shift+P` palette, `Cmd/Ctrl+F` find, `F5` refresh, `Cmd/Ctrl+Return` run,
+`Cmd/Ctrl+Shift+Return` run all, `Control+Tab`/`Control+Shift+Tab` tab nav, `Cmd/Ctrl+W` close tab,
+`Cmd/Ctrl+Shift+W` close window) — or **local**, owned by a DOM-focus-scoped keydown handler and
+deliberately never an accelerator, so the same key can mean the right thing in two surfaces. The
+local set is the grid's `Cmd/Ctrl+C`/`Cmd/Ctrl+V`/`Enter`/`Ctrl/Cmd+D`/`Delete` and the project
+tree's `Enter`/`Ctrl/Cmd+C`/`Shift+Alt+C`/`F2`/`Ctrl/Cmd+D`/`Delete`. This split is what
+`user-select: none` on `body` makes safe: outside a text field the native `role: 'copy'` accelerator
+has nothing to act on, so the keydown reaches the page.
+
+Keyboard scopes exist only where a focusable container and a selection already do — the project
+tree and the SQL grid. The document, key/value, stream and operations views are mouse-and-menu only.
 
 ---
 
@@ -553,6 +579,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P18 Autocomplete** | Field/identifier autocomplete in each connection kind's filter surface (the WHERE-clause-style input, and whatever the equivalent filter/query input is per engine), plus the same in the query console, plus basic SQL syntax (keyword) completion there | Implemented, scoped exactly to the four surfaces with a real free-text identifier grammar (SQL's WHERE/ORDER BY, Mongo's filter/SORT) plus the query console — Redis/Kafka/SQS/S3 have no such surface (local-page search, a structured multiselect, or nothing) and get nothing, per docs/plans/P18-autocomplete.md's D1. A new `AutocompleteField.vue` primitive owns its own `<input>` rather than wrapping `TextField.vue` (verified, not assumed, that a wrapper can't safely intercept Enter across two components — see the plan's §1); SQL columns are inserted dialect-quoted only when needed, Mongo fields as `field: ` with `_id` included and a curated `$`-operator vocabulary, and the console gets `@codemirror/autocomplete`'s keyword source gated to connections with a resolved SQL dialect so a Mongo/Redis shell console never offers SQL keywords |
 | **P19 Tree reorganization + generic object-definition view** | Tree shows tables first, ungrouped; every other object kind (functions, sequences, etc.) grouped into per-kind folders by default. Tables no longer expand to show columns in the tree — that moves into the definition view. The definition view (today's DDL tab) defaults to a nicely parsed structured display (columns/indexes/constraints) with a toggle to see the raw SQL text as it works today; gains a MongoDB implementation (indexes, and the collection's JSON Schema validator if set); renamed to a more generic term than "DDL" to fit non-SQL connections | Implemented, per `docs/plans/P19-tree-reorg-definition-view.md`: a renderer-only `GROUPED_KINDS` table (view/matview/sequence/function, MariaDB's function folder labelled "Routines") splits an already-fetched child list into ungrouped tables/collections plus collapsed per-kind folders — expanding one issues no IPC call and no op-log row. Tables/views/matviews/collections became tree leaves; both SQL adapters' `children()` return `[]` at that depth and the DB specs' column assertions moved to `describe()`. The DDL feature was renamed end to end (`Caps.ddl`→`Caps.definition`, the adapter method, IPC channel, tab kind, L1 cache key, `views/ddl/`→`views/definition/`), with a legacy `'ddl'`-row coercion on read so upgrading doesn't drop open tabs or blank the Operations panel. `ObjectDefinition` gained `language`/`constraints`/`documentSchema`: Postgres fills `constraints` from the `pg_constraint` query it already runs for its DDL text (zero extra round trips), MariaDB from one added `information_schema.TABLE_CONSTRAINTS` query on the definition path only. The definition tab is one view with a Structure/Source `<Segmented>` toggle (not the mockup's four-way split) — Structure stacks Columns/Indexes/Constraints (SQL) or Indexes/Validation (Mongo) sections with count badges, fed by a second, independently-cached `describe()` load; the tree's former column-row context menu (Copy name/Add to projection/Sort by) relocated into the Columns section. Mongo's `definition()` sources Source from the collection's creation-options document (EJSON-relaxed) and Validation from its `$jsonSchema` validator, rendered as a field table when it is one, else raw JSON, with an honest empty state when there's none |
 | **P20 Electrobun migration spike** | On a branch cut from this point, migrate the app off Electron onto Electrobun; then run the full automated perf suite (`tests/ui/budgets.spec.ts`, `perf.spec.ts`, `memory.spec.ts`, `startup.spec.ts` — see `docs/PERF.md`) on both branches and record the results side by side. Run each branch's suite multiple times, not once — these tests have real run-to-run variability (see `docs/PERF.md` §2.1's methodology note), so a single sample per branch isn't sufficient to call a difference real | **Blocked at Stage 0 — see `docs/plans/P20-electrobun-spike.md`.** The Electrobun runtime/SDK (as opposed to its npm CLI bootstrapper) is served only from `hutch.blackboard.sh`/`electrobun-artifacts.blackboard.sh`, both unreachable from this environment (403), and the existing perf suite is Electron-`_electron.launch`-bound so it cannot run against a non-Electron build regardless. The plan's own §0.4 verdict: the literal deliverable is not producible here on any hardware this project has had access to; a scoped down spike (throwaway shell, OS-level neutral harness) is possible in principle but needs a macOS 14+ arm64 machine with unrestricted egress, which has not been available (`docs/PERF.md` §3). Implementation is intentionally not started — the plan's own ground rules hold it pending answers to its §8 open questions |
+| **P21 Menu shortcut hints** | Every context-menu item that has a keyboard shortcut prints it alongside its label, VS Code style — muted and right-aligned. A single shared binding table (`src/shared/shortcuts.ts`) becomes the one source of truth §8.16 already promised, feeding the native menu bar's accelerators, the context menus' displayed keys, and the local DOM-scoped keydown handlers alike, so a printed key and the key that runs can no longer drift. Audits all 104 context-menu rows across 21 builders, surfaces 5 bindings that already worked but were never shown (the grid's `Cmd/Ctrl+C` over cell/row/column selections, its `Enter`-to-edit, and the tab strip's `Cmd/Ctrl+W`), and adds 9 new ones following VS Code's own conventions — `F2` rename, `Delete`/`⌘⌫` delete, `Ctrl/Cmd+C` copy, `Ctrl/Cmd+N` new, `Enter` open, `Shift+Alt+C` copy path, plus duplicate on `Ctrl/Cmd+D` — scoped to the two surfaces that already have focus and a selection, the project tree and the SQL grid. See `docs/plans/P21-menu-shortcut-hints.md` | The right-click matrix (P6) and every view that feeds it are complete, so the audit can be exhaustive rather than provisional; and the binding table has to exist before shortcuts can be shown, let alone remapped |
 
 ---
 
