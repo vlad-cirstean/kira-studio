@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { cellSelectionState } from '../state/cellSelection';
+import { selectedCellFor } from '../state/cellSelection';
+import { tabsState } from '../state/tabs';
 import PanelSplitter from './PanelSplitter.vue';
 import CellEditorPanel from './panels/CellEditorPanel.vue';
 import MainView from './panels/MainView.vue';
@@ -20,7 +21,9 @@ const projectVisible = computed(() => layoutState.panel.project.visible);
 // selected cell, so it only makes sense to be on screen while one is selected. There's no longer
 // a toggle to disagree with this, so the old `layoutState.panel.cellEditor.visible` flag was
 // removed rather than kept alongside as a second, now-unreachable gate.
-const cellVisible = computed(() => cellSelectionState.current !== null);
+const cellVisible = computed(
+  () => !!tabsState.activeId && selectedCellFor(tabsState.activeId) !== null,
+);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
 
 const gridStyle = computed(() => ({

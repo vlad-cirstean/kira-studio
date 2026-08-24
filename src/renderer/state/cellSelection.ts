@@ -34,17 +34,26 @@ export interface SelectedCell {
   onRevert?: () => void;
 }
 
-export const cellSelectionState = reactive<{ current: SelectedCell | null }>({ current: null });
+// P26 D2/D3: one record per tab rather than one global slot — the dock that renders a tab's
+// selection is now mounted by the view that owns that tab, so "which cell is selected" is
+// per-tab state like every other piece of tab state (views/*/state.ts's runtimes).
+const cellSelectionState = reactive<{ byTab: Record<string, SelectedCell> }>({ byTab: {} });
 
-// Replaces `current` wholesale — never mutates the existing object. Downstream watchers compare
-// on `cellKey` plus `value`, so an in-place mutation would be invisible to them.
-export function publishSelectedCell(cell: SelectedCell | null): void {
-  cellSelectionState.current = cell;
+export function selectedCellFor(tabId: string): SelectedCell | null {
+  return cellSelectionState.byTab[tabId] ?? null;
 }
 
-/** Called from tabs.ts beside every dropPage(): a closed tab has no selected cell. */
+// Replaces the tab's record wholesale — never mutates the existing object. CellEditorView
+// compares on `cellKey` plus `value`, so an in-place mutation would be invisible to it.
+export function publishSelectedCell(cell: SelectedCell): void {
+  cellSelectionState.byTab[cell.tabId] = cell;
+}
+
+/** No cell is selected in this tab any more — a cleared selection, a row/column selection with
+ *  no single cell in it, a page whose rows no longer reach the selected index, or a closed tab
+ *  (state/tabs.ts's four close paths). All the same operation. */
 export function clearSelectedCellFor(tabId: string): void {
-  if (cellSelectionState.current?.tabId === tabId) cellSelectionState.current = null;
+  delete cellSelectionState.byTab[tabId];
 }
 
 /** Stable identity of a selection, for `data-cell-key` and for change detection. */

@@ -4,10 +4,9 @@ import { computed, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
-import { cellKey, cellSelectionState } from '../../state/cellSelection';
+import { cellKey, type SelectedCell } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import { type BeautifyMode, beautify } from './beautify';
@@ -27,18 +26,22 @@ import TimestampPane from './TimestampPane.vue';
 // path (§2.1), and a stateless TextEncoder never needs to be reallocated per keystroke.
 const statusEncoder = new TextEncoder();
 
-const cell = computed(() => cellSelectionState.current);
+// P26 D4: the dock decides whether there is a cell to render at all (its own v-if) — this
+// component is only ever mounted with one, so no downstream code needs to null-guard it. Named
+// `selectedCell` rather than `cell` to avoid colliding with the `cell` prop itself.
+const props = defineProps<{ cell: SelectedCell }>();
+const selectedCell = computed(() => props.cell);
 
-const override = computed<CellFormat | null>(() => (cell.value ? overrideFor(cell.value) : null));
+const override = computed<CellFormat | null>(() => overrideFor(selectedCell.value));
 
-const isNullValue = computed(() => cell.value !== null && cell.value.value === null);
-const isEmptyValue = computed(() => cell.value !== null && cell.value.value === '');
-const isTruncatedValue = computed(() => cell.value?.truncated ?? false);
+const isNullValue = computed(() => selectedCell.value.value === null);
+const isEmptyValue = computed(() => selectedCell.value.value === '');
+const isTruncatedValue = computed(() => selectedCell.value.truncated);
 
 // §5a: a NULL value runs no detector at all.
 const detected = computed<FormatGuess[]>(() => {
-  const c = cell.value;
-  if (!c || c.value === null) return [];
+  const c = selectedCell.value;
+  if (c.value === null) return [];
   return detectFormat({
     text: c.value,
     typeClass: c.column.typeClass,
@@ -53,20 +56,20 @@ const effectiveFormat = computed<CellFormat>(() => override.value ?? detectedFor
 const language = computed<EditorLanguageId>(() => FORMAT_LANGUAGE[effectiveFormat.value]);
 
 const sqlDialect = computed<'postgres' | 'mariadb' | undefined>(() => {
-  const c = cell.value;
-  if (!c?.connectionId) return undefined;
+  const c = selectedCell.value;
+  if (!c.connectionId) return undefined;
   const record = connectionsState.records.find((r) => r.id === c.connectionId);
   return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
 });
 
-const readOnlyReason = computed(() => (cell.value ? readOnlyReasonFor(cell.value) : null));
+const readOnlyReason = computed(() => readOnlyReasonFor(selectedCell.value));
 
 // D4 (revised): editable only when the cell is genuinely writable (`readOnlyReason === null`)
 // *and* whoever published it handed over a way to stage the write (`cell.onEdit`, today set only
 // by `DataGrid.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
 // Console — keeps its cells read-only here even once `readOnlyReasonFor()` says nothing's wrong,
 // since there'd be nowhere for a save to go.
-const isEditable = computed(() => readOnlyReason.value === null && !!cell.value?.onEdit);
+const isEditable = computed(() => readOnlyReason.value === null && !!selectedCell.value.onEdit);
 const readOnlyChipText = computed(() => {
   switch (readOnlyReason.value) {
     case 'connection-read-only':
@@ -120,13 +123,8 @@ let lastValue: string | null = null;
 // a no-op — a background page refresh must not silently undo a user's beautify. Changing the
 // format override recomputes `effectiveFormat`/`language` above without touching this watch.
 watch(
-  cell,
+  selectedCell,
   (c) => {
-    if (!c) {
-      lastKey = null;
-      lastValue = null;
-      return;
-    }
     const key = cellKey(c);
     if (key === lastKey && c.value === lastValue) return;
     lastKey = key;
@@ -247,8 +245,8 @@ function onDecodedInput(text: string): void {
 // derived (above), pressing Beautify twice on an unmodified buffer is merely a harmless re-run,
 // not the previously-permanent dead click that made re-formatting your own edit impossible.
 function applyBeautify(mode: BeautifyMode): void {
-  const c = cell.value;
-  if (!c || c.value === null || !canBeautify(effectiveFormat.value)) return;
+  const c = selectedCell.value;
+  if (c.value === null || !canBeautify(effectiveFormat.value)) return;
   const result = beautify(doc.value, effectiveFormat.value, mode);
   if (result.ok) {
     formattedMode.value = mode;
@@ -269,8 +267,7 @@ function applyBeautify(mode: BeautifyMode): void {
 // `onRevert` (set by DataGrid.vue alongside onEdit) un-stages that pending edit outright, so the
 // order those two events fire in no longer matters — either way this call is what wins last.
 function resetBuffer(): void {
-  const c = cell.value;
-  if (!c) return;
+  const c = selectedCell.value;
   doc.value = c.value ?? '';
   formattedForDoc.value = null;
   beautifyFailure.value = null;
@@ -280,14 +277,14 @@ function resetBuffer(): void {
 // The buffer diverging from the stored value is what "there's something to save" means — true
 // for a beautified reformat as much as for a hand-typed edit (D6: Save stages whatever's on
 // screen, exactly like `stageEdit`'s own "verbatim, formatting included" contract).
-const isDirty = computed(() => cell.value !== null && doc.value !== (cell.value.value ?? ''));
+const isDirty = computed(() => doc.value !== (selectedCell.value.value ?? ''));
 
 // Stages into the exact same pending-change set the grid's own inline edit and the toolbar's
 // Commit/Discard already operate on (§P5) — nothing here writes to the server directly, and
 // there is no separate "commit" action in this panel.
 function saveEdit(): void {
-  const c = cell.value;
-  if (!c || !isEditable.value || !c.onEdit) return;
+  const c = selectedCell.value;
+  if (!isEditable.value || !c.onEdit) return;
   c.onEdit(doc.value);
 }
 
@@ -319,15 +316,13 @@ function onEditorKeydown(e: KeyboardEvent): void {
 }
 
 function onFormatSelect(e: Event): void {
-  const c = cell.value;
-  if (!c) return;
+  const c = selectedCell.value;
   const value = (e.target as HTMLSelectElement).value;
   setOverride(c, value === 'auto' ? null : (value as CellFormat));
 }
 
 const targetLabel = computed(() => {
-  const c = cell.value;
-  if (!c) return '';
+  const c = selectedCell.value;
   const tail = pathTail(c.path);
   return `${tail?.name ?? c.path}.${c.column.name}`;
 });
@@ -340,8 +335,6 @@ const targetLabel = computed(() => {
 // P24 D23/F7e: reads the buffer, not the stored value — the timestamp reading beside it already
 // read the buffer, so the two disagreeing the moment you typed was the bug.
 const statusLine = computed(() => {
-  const c = cell.value;
-  if (!c) return '';
   if (isNullValue.value) return 'NULL';
   const value = doc.value;
   const parts: string[] = [];
@@ -355,12 +348,10 @@ const statusLine = computed(() => {
 </script>
 
 <template>
-  <EmptyState v-if="!cell" icon="edit" label="No cell selected" data-testid="cell-editor-empty" />
   <div
-    v-else
     class="cell-editor"
     data-testid="cell-editor-panel"
-    :data-cell-key="cellKey(cell)"
+    :data-cell-key="cellKey(selectedCell)"
     :data-format="effectiveFormat"
     :data-detected="detectedFormat"
     :data-read-only-reason="readOnlyReason"
@@ -373,10 +364,10 @@ const statusLine = computed(() => {
          `name` itself (cell-editor-target's toContainText assertions don't care about styling). -->
     <ViewHeader
       icon="symbol-string"
-      :name="`${targetLabel} · row ${cell.row + 1}`"
+      :name="`${targetLabel} · row ${selectedCell.row + 1}`"
       target-testid="cell-editor-target"
     >
-      <span class="p-badge">{{ cell.column.dataType }}</span>
+      <span class="p-badge">{{ selectedCell.column.dataType }}</span>
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>

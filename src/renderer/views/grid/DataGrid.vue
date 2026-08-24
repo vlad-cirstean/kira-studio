@@ -471,12 +471,12 @@ watch(
     const t = tab();
     const target = selectionTarget();
     if (!p || !t || !target || target.row < 0 || target.row >= p.rowCount) {
-      publishSelectedCell(null);
+      clearSelectedCellFor(props.tabId);
       return;
     }
     const pageCol = pageColumnIndexFor(p, columnOrder.value, target.col);
     if (pageCol < 0) {
-      publishSelectedCell(null);
+      clearSelectedCellFor(props.tabId);
       return;
     }
     const view = cell(props.tabId, target.row, pageCol);

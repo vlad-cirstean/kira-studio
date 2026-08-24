@@ -374,7 +374,7 @@ watch(
     const row = rt.value?.selectedRow;
     const doc = row === null || row === undefined ? null : rowAt(row);
     if (row === null || row === undefined || !doc) {
-      publishSelectedCell(null);
+      clearSelectedCellFor(props.tab.id);
       return;
     }
     const column: ColumnDescriptor = {
