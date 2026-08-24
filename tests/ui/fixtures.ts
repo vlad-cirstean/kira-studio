@@ -10,10 +10,17 @@ export interface KiraApp {
   window: Page;
 }
 
+interface RelaunchOptions {
+  /** Overlaid onto the default launch env; a value of `undefined` deletes that key from the
+   *  merged env instead of setting it (P25 D16 — this is how a scenario turns the Linux
+   *  development secrets fallback off to exercise the Keychain-unavailable path). */
+  env?: Record<string, string | undefined>;
+}
+
 interface KiraFixtures {
   kiraHome: string;
   consoleErrors: string[];
-  relaunch: () => Promise<KiraApp>;
+  relaunch: (options?: RelaunchOptions) => Promise<KiraApp>;
   kira: KiraApp;
 }
 
@@ -38,13 +45,26 @@ export const test = base.extend<KiraFixtures>({
 
     let current: KiraApp | undefined;
 
-    const launch = async (): Promise<KiraApp> => {
+    const launch = async (options?: RelaunchOptions): Promise<KiraApp> => {
       if (current) await current.app.close();
 
-      const app = await _electron.launch({
-        args: [mainEntry],
-        env: { ...process.env, KIRA_HOME: kiraHome, NODE_ENV: 'test' },
-      });
+      // KIRA_INSECURE_SECRETS is the Linux-only development fallback (P25 D13) that lets this
+      // suite assert one observable secret-storage contract on both platforms instead of a
+      // Linux-only degraded one; it's a no-op on darwin. `undefined` entries in the overlay
+      // delete the key rather than set it, so a scenario can turn the fallback off entirely.
+      const merged: Record<string, string | undefined> = {
+        ...process.env,
+        KIRA_HOME: kiraHome,
+        NODE_ENV: 'test',
+        KIRA_INSECURE_SECRETS: '1',
+        ...options?.env,
+      };
+      const env: Record<string, string> = {};
+      for (const [key, value] of Object.entries(merged)) {
+        if (value !== undefined) env[key] = value;
+      }
+
+      const app = await _electron.launch({ args: [mainEntry], env });
       const window = await app.firstWindow();
       window.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(msg.text());
