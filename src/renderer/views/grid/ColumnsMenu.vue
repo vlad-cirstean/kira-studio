@@ -87,8 +87,19 @@ function close(): void {
   if (!sameProjection(nextProjection, currentProjection())) {
     void setProjection(props.tabId, nextProjection);
   }
-  if (!sameOrder(order.value, currentColumnOrder())) {
-    setColumnOrder(props.tabId, order.value);
+  // A columnOrder is only ever stored non-null when it actually diverges from the column set's
+  // own natural order. Comparing only against currentColumnOrder() (as this used to) meant simply
+  // opening the menu and closing it without dragging anything would stage the default order as a
+  // "custom" one the first time (currentColumnOrder() starts null, and sameOrder(_, null) is
+  // always false) — stamping DataToolbar's Columns button with a "changed" dot for a change that
+  // never happened.
+  const nextOrder = sameOrder(order.value, columnNames.value) ? null : order.value;
+  const current = currentColumnOrder();
+  const orderChanged =
+    (nextOrder === null) !== (current === null) ||
+    (nextOrder !== null && !sameOrder(nextOrder, current));
+  if (orderChanged) {
+    setColumnOrder(props.tabId, nextOrder);
   }
   emit('close');
 }

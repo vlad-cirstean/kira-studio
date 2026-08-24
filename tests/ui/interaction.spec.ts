@@ -406,6 +406,17 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   );
   await discardChanges(page);
 
+  // Revert row(s) un-stages a single row's pending edit, without a tab-wide Discard.
+  const row0OriginalName = await cellText(page, 0, 'name');
+  await gridCell(page, 0, 'name').dblclick();
+  await page.locator('[data-testid="grid-cell-input"]').fill('reverted via row menu');
+  await page.keyboard.press('Enter');
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  await rightClick(gutterCell(page, 0));
+  await page.click('[data-testid="menu-item-revert-row"]');
+  await expect(gridCell(page, 0, 'name')).not.toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'name')).toBe(row0OriginalName);
+
   // =============================================================================================
   // D7/D8: header context menu — Sort asc/desc/Clear sort, Hide column/Show all columns,
   // Copy column name/values.

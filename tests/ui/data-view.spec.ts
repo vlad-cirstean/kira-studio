@@ -232,6 +232,14 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.click('[data-testid="pager-first"]');
   await expect.poll(() => firstGutterNumber(page)).toBe('1');
 
+  // --- Columns button: opening/closing the menu without changing anything must not stamp a
+  // "changed" badge on the button (P16's own bug: a stray columnOrder identical to the default
+  // got persisted just from touching the menu, tripping this dot for a change that never happened).
+  await page.click('[data-testid="toolbar-columns"]');
+  await expect(page.locator('[data-testid="columns-menu"]')).toBeVisible();
+  await page.click('[data-testid="columns-menu-backdrop"]');
+  await expect(page.locator('[data-testid="toolbar-columns"] .corner-count')).toHaveCount(0);
+
   // --- projection: half the columns, header shrinks, op command carries only those ---------
   await page.click('[data-testid="toolbar-columns"]');
   await expect(page.locator('[data-testid="columns-menu"]')).toBeVisible();

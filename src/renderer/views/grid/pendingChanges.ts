@@ -96,6 +96,17 @@ export function discardCellEdit(tabId: string, row: number, column: string): voi
   else p?.edits.set(row, { row, changes: rest });
 }
 
+// The row menu's "Revert row(s)" — un-stages a whole row's pending edit and/or pending delete in
+// one go, sibling to discardCellEdit (one column) and discardPending (the whole tab). A row that
+// was never staged is a silent no-op, so callers can run this over an arbitrary selection without
+// first checking which of those rows actually have something to revert.
+export function discardRowChange(tabId: string, row: number): void {
+  const p = pendingState[tabId];
+  if (!p) return;
+  p.edits.delete(row);
+  p.deletes.delete(row);
+}
+
 // D4: the cell menu's "Set NULL" — sibling to stageEdit, skipping the inline <input> (which can
 // only ever produce a string) to stage an actual SQL NULL directly.
 export function stageNull(tabId: string, row: number, column: string): void {

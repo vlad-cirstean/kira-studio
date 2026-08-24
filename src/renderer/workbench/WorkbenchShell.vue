@@ -145,6 +145,12 @@ const gridStyle = computed(() => ({
 
 .tab-strip {
   height: var(--kira-h-lg);
+  /* `.editor-area` is a column flexbox, so this row is itself a flex item on the vertical axis —
+     without `min-height: 0` its default `min-height: auto` lets the tab buttons' own intrinsic
+     height push it taller than the `height` above, which is what let individual tabs render past
+     this row's bottom edge and over the gap/breadcrumb below despite that gap existing. */
+  min-height: 0;
+  overflow: hidden;
   flex-shrink: 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);

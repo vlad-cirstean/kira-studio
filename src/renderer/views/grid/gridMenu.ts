@@ -11,7 +11,13 @@ import {
   rowsToJson,
   rowsToTsv,
 } from './clipboardFormats';
-import { duplicateAsInsert, stageNull, toggleDelete } from './pendingChanges';
+import {
+  discardRowChange,
+  duplicateAsInsert,
+  pendingFor,
+  stageNull,
+  toggleDelete,
+} from './pendingChanges';
 import { setFilter, setProjection, setSort } from './state';
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
@@ -236,8 +242,14 @@ export interface RowMenuContext {
   canEdit: boolean;
 }
 
-// D6: Copy row(s) ▸ TSV/CSV/JSON/INSERT, Duplicate row(s), Delete row(s) — all three act on the
-// full row selection.
+function hasPendingChange(ctx: RowMenuContext): boolean {
+  const p = pendingFor(ctx.tabId);
+  if (!p) return false;
+  return ctx.rows.some((row) => p.edits.has(row) || p.deletes.has(row));
+}
+
+// D6: Copy row(s) ▸ TSV/CSV/JSON/INSERT, Duplicate row(s), Revert row(s), Delete row(s) — all act
+// on the full row selection.
 export function rowMenu(ctx: RowMenuContext): MenuItem[] {
   const snapshots = ctx.rows.map(ctx.snapshot);
   return [
@@ -285,6 +297,18 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       shortcut: 'grid.duplicateRows',
       run: () => {
         for (const row of ctx.rows) duplicateAsInsert(ctx.tabId, row);
+      },
+    },
+    {
+      type: 'item',
+      id: 'revert-row',
+      label: 'Revert row(s)',
+      icon: 'discard',
+      // Only offered when at least one row in the selection actually has something staged
+      // (an edit and/or a pending delete) — otherwise "Revert" would be a no-op every time.
+      disabled: !hasPendingChange(ctx),
+      run: () => {
+        for (const row of ctx.rows) discardRowChange(ctx.tabId, row);
       },
     },
     {
