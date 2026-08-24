@@ -22,6 +22,10 @@ import {
 import { overrideFor, readOnlyReasonFor, setOverride } from './state';
 import TimestampPane from './TimestampPane.vue';
 
+// P24 D23: hoisted out of statusLine's own recompute — this sits on the 50 ms cell-selection
+// path (§2.1), and a stateless TextEncoder never needs to be reallocated per keystroke.
+const statusEncoder = new TextEncoder();
+
 const cell = computed(() => cellSelectionState.current);
 
 const override = computed<CellFormat | null>(() => (cell.value ? overrideFor(cell.value) : null));
@@ -66,6 +70,8 @@ const readOnlyChipText = computed(() => {
   switch (readOnlyReason.value) {
     case 'connection-read-only':
       return 'Connection is read-only';
+    case 'value-truncated':
+      return 'truncated — not editable';
     case 'no-primary-key':
       return 'No primary key';
     default:
@@ -76,6 +82,10 @@ const readOnlyChipTitle = computed(() => {
   switch (readOnlyReason.value) {
     case 'connection-read-only':
       return undefined;
+    case 'value-truncated':
+      // P24 D27: the value stays fully readable and copyable — only writing it back is refused,
+      // since the buffer only ever holds the first 64 KB (§0 note 9).
+      return 'Only the first 64 KB was fetched — committing it would overwrite the full value.';
     case 'no-primary-key':
       return "This table has no primary key, so a row can't be identified to write.";
     default:
@@ -86,8 +96,21 @@ const readOnlyChipTitle = computed(() => {
 // The display buffer (D6): what Beautify/Reset act on. Never the stored value itself, which
 // stays reachable through `cell.value.value` for Reset.
 const doc = ref('');
-const formatted = ref<'none' | 'indented' | 'compact'>('none');
 const beautifyFailure = ref<string | null>(null);
+
+// P24 D22: `formatted` is derived, not a flag every doc-writing call site has to remember to
+// clear — it reads 'indented'/'compact' only while the buffer still equals exactly what
+// applyBeautify last produced, and falls back to 'none' the instant doc changes by ANY other path
+// (a hand edit, a fresh cell, Reset, the decoded/timestamp panes). Otherwise the Beautify button
+// stayed lit over text that was no longer beautified, and `data-formatted` reported a formatting
+// the buffer no longer had.
+const formattedMode = ref<'indented' | 'compact'>('indented');
+const formattedForDoc = ref<string | null>(null);
+const formatted = computed<'none' | 'indented' | 'compact'>(() =>
+  formattedForDoc.value !== null && formattedForDoc.value === doc.value
+    ? formattedMode.value
+    : 'none',
+);
 
 let lastKey: string | null = null;
 let lastValue: string | null = null;
@@ -108,7 +131,7 @@ watch(
     lastKey = key;
     lastValue = c.value;
     doc.value = c.value ?? '';
-    formatted.value = 'none';
+    formattedForDoc.value = null;
     beautifyFailure.value = null;
   },
   { immediate: true },
@@ -132,8 +155,11 @@ const beautifyCompactTitle = computed<string>(() =>
     ? 'Minify — remove all whitespace'
     : beautifyDisabledTitle.value,
 );
-const resetDisabledTitle = computed<string | undefined>(() =>
-  isDirty.value ? undefined : 'Already showing the stored value.',
+// P24 D24/F7a: the enabled case previously had no title at all — beautifyIndentedTitle/
+// beautifyCompactTitle above already got this same fix in an earlier pass (see their own
+// comment); Reset was missed.
+const resetTitle = computed<string>(() =>
+  isDirty.value ? 'Reset to the stored value' : 'Already showing the stored value.',
 );
 
 // UUID generation: overwrites the buffer outright, same shape as applyBeautify's own "replace
@@ -214,14 +240,19 @@ function onDecodedInput(text: string): void {
   if (writeDoc(next)) skipNextDecode = true;
 }
 
+// P24 D21/F7d: acts on the buffer (`doc`), not the stored value — beautifying used to silently
+// discard a hand-edit, applying formatting to `c.value` and overwriting whatever the user had
+// just typed. The `formatted.value === mode` early return is also gone: with `formatted` now
+// derived (above), pressing Beautify twice on an unmodified buffer is merely a harmless re-run,
+// not the previously-permanent dead click that made re-formatting your own edit impossible.
 function applyBeautify(mode: BeautifyMode): void {
   const c = cell.value;
   if (!c || c.value === null || !canBeautify(effectiveFormat.value)) return;
-  if (formatted.value === mode) return; // pressing the same button twice is a no-op
-  const result = beautify(c.value, effectiveFormat.value, mode);
+  const result = beautify(doc.value, effectiveFormat.value, mode);
   if (result.ok) {
+    formattedMode.value = mode;
+    formattedForDoc.value = result.text;
     doc.value = result.text;
-    formatted.value = mode;
     beautifyFailure.value = null;
   } else {
     // §6c: a failed beautify leaves the buffer and `formatted` alone.
@@ -240,7 +271,7 @@ function resetBuffer(): void {
   const c = cell.value;
   if (!c) return;
   doc.value = c.value ?? '';
-  formatted.value = 'none';
+  formattedForDoc.value = null;
   beautifyFailure.value = null;
   c.onRevert?.();
 }
@@ -271,10 +302,18 @@ function onEditorBlur(): void {
 // mirrors the same chord's common meaning elsewhere (submit/run). Caught on the wrapping div:
 // CodeMirror's own keymap binds Enter for newlines, never Ctrl/Cmd+Enter, so the event still
 // bubbles here unconsumed.
+//
+// P24 D26: Escape reverts the buffer, mirroring DataGrid.vue's own inline editor. CodeMirror's
+// defaultKeymap binds Escape to simplifySelection, which calls preventDefault but does not stop
+// propagation, so this handler still receives it — the same mechanism Ctrl/Cmd+Enter above
+// already relies on.
 function onEditorKeydown(e: KeyboardEvent): void {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     saveEdit();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    resetBuffer();
   }
 }
 
@@ -297,13 +336,15 @@ const targetLabel = computed(() => {
 // "X (manual)" segment here would just repeat what's a few pixels to the right. A timestamp
 // reading runs in its own translate pane below (TimestampPane) rather than sharing this badge —
 // it was crowding out the byte count and truncation/beautify notes that live here.
+// P24 D23/F7e: reads the buffer, not the stored value — the timestamp reading beside it already
+// read the buffer, so the two disagreeing the moment you typed was the bug.
 const statusLine = computed(() => {
   const c = cell.value;
   if (!c) return '';
   if (isNullValue.value) return 'NULL';
-  const value = c.value ?? '';
+  const value = doc.value;
   const parts: string[] = [];
-  parts.push(`${new TextEncoder().encode(value).length} bytes`);
+  parts.push(`${statusEncoder.encode(value).length} bytes`);
   const reading = describeValue(effectiveFormat.value, value);
   if (reading) parts.push(reading);
   if (isTruncatedValue.value) parts.push('showing the first 64 KB');
@@ -323,6 +364,7 @@ const statusLine = computed(() => {
     :data-detected="detectedFormat"
     :data-read-only-reason="readOnlyReason"
     :data-formatted="formatted"
+    :data-dirty="isDirty"
   >
     <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
          badges, then this panel's own controls, then the trailing group pushed to the edge.
@@ -385,12 +427,16 @@ const statusLine = computed(() => {
           :size="14"
           data-testid="cell-editor-beautify-reset"
           :disabled="!isDirty"
-          v-tooltip="resetDisabledTitle"
+          v-tooltip="resetTitle"
           @click="resetBuffer"
         />
       </span>
 
       <template #trailing>
+        <!-- P24 D25/F10: the mockup's own trailing chip when the buffer diverges from the stored
+             value — the only visible signal today that Ctrl+Enter (no focus change, so no other
+             feedback) did anything at all. -->
+        <span v-if="isDirty" class="p-chip warn" data-testid="cell-editor-modified">modified</span>
         <span v-if="readOnlyReason" class="p-chip warn" v-tooltip="readOnlyChipTitle">
           <CodiconIcon name="lock" :size="12" />
           {{ readOnlyChipText }}

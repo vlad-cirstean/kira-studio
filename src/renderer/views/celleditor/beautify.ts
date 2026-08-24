@@ -517,10 +517,12 @@ function beautifyXml(text: string, mode: BeautifyMode): BeautifyResult {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Always applied to the *stored* value, never to the current buffer (D6/§6c) — that is what
- * makes the two modes mutually reversible and Reset trivial. Offered for `json` and `xml` only
- * (D11); every other format has no lossless formatter and the caller must not invoke this for
- * one (see `canBeautify` in formats.ts).
+ * Applied to whatever `text` the caller passes in — CellEditorView.vue passes the *current
+ * buffer* (P24 D21), so hand-editing then beautifying formats the edit instead of discarding it.
+ * Reversibility (indented <-> compact) comes from both modes being lossless, not from always
+ * starting over at the stored value; Reset still restores the stored value outright regardless.
+ * Offered for `json` and `xml` only (D11); every other format has no lossless formatter and the
+ * caller must not invoke this for one (see `canBeautify` in formats.ts).
  */
 export function beautify(text: string, format: CellFormat, mode: BeautifyMode): BeautifyResult {
   if (format === 'json') return beautifyJson(text, mode);

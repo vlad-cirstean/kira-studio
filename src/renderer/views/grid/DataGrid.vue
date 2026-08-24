@@ -574,6 +574,9 @@ function isEditing(row: number, displayCol: number): boolean {
 function startEdit(row: number, displayCol: number): void {
   if (!canEditTable.value || isDeleted(row)) return;
   const current = displayCell(row, displayCol);
+  // P24 D27: a value the engine cut at MAX_CELL_BYTES is not editable — committing the buffer
+  // verbatim (stageEdit's own contract) would write the truncated text over the real value.
+  if (current.truncated) return;
   editingCell.value = { row, col: displayCol };
   editingBuffer.value = current.isNull ? '' : current.text;
 }
