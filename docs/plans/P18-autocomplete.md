@@ -378,3 +378,319 @@ docs/
 4. **`ILIKE`/`SIMILAR TO`, `NULLS FIRST/LAST` — are dialect-conditional vocabularies worth it (D8),
    or should both SQL dialects share one list?** Splitting them is more correct and slightly more
    code; sharing risks suggesting `ILIKE` on MariaDB, where it is a syntax error.
+
+## 9. Addendum — the console follow-ups: undo/redo, completion latency, uppercase keywords, Mongo/Redis completion, linting
+
+> Filed under P18, not as a new phase: every item below is either a defect in what §4 step 4
+> shipped or the other half of a line this plan already owns ("plus the same in the query console").
+> D10/D11 and §5's "Mongo shell / Redis command completion in the console" bullet are the entries
+> this addendum revisits by name; §3's D1–D14 otherwise stand unchanged, and nothing here touches
+> the four plain-text boxes. The ask, verbatim: *"cmd z doesn't work in query console, and the
+> autocomplete is slow. not only this, but keywords should be uppercase. also add autocomplete for
+> the rest of the connections that have a query console too. make sure all of these are fast and
+> smooth. add linting too"*.
+
+### 9.1 Findings (verified against the tree and `node_modules`, not assumed)
+
+**F1 — undo has two independent things wrong with it, and one fix covers both.**
+`CodeMirrorHost.vue`'s `onMounted` extension list is `lineNumbers`, `highlightSpecialChars`,
+`lineWrapping`, `keymap.of(defaultKeymap)`, the autocomplete compartment, `syntaxHighlighting`,
+`kiraEditorTheme`, two more compartments and one `updateListener` — no `history()` state field
+anywhere, and `defaultKeymap` contains no `Mod-z`: undo/redo live in a *separate* export,
+`historyKeymap` (`@codemirror/commands/dist/index.js:569-575` — `Mod-z`, `Mod-y`/`Mod-Shift-z`,
+`Mod-u`). Both come from `@codemirror/commands@6.11.0`, already a direct devDependency, so no new
+package. Nothing else supplies a history: `theme.ts` is `EditorView.theme` + `HighlightStyle` only,
+`languages.ts` is four grammars, and the renderer registers no global `keydown` handler that could
+be swallowing the key (the only four are `ContextMenu.vue`, `Popover.vue`, `DialogFrame.vue` and
+`ErrorPopover.vue`, all Escape/arrow handlers on open overlays). The second problem is that
+`main/menu.ts:36-37` carries `{ role: 'undo' }` / `{ role: 'redo' }`, which on macOS claim
+Cmd+Z/Cmd+Shift+Z as menu key equivalents *before* the keystroke reaches the page — so
+`historyKeymap` alone would not be reached there. It does not need to be: `history()` itself
+installs `EditorView.domEventHandlers({ beforeinput })` that maps `inputType: "historyUndo"` /
+`"historyRedo"` onto its own `undo`/`redo` and calls `preventDefault()`
+(`@codemirror/commands/dist/index.js:262-275`), and `webContents.undo()` — what the `undo` role
+invokes — is exactly what produces that `beforeinput` in a contenteditable. Adding `history()`
+therefore fixes the menu path and the direct-key path at once, with no change to `main/menu.ts`.
+This has gone unnoticed because every other host in the app is `read-only: true` (the file's own
+comment at line 23 says so).
+
+**F2 — the completion latency is not compute. It is `autocompletion()`'s own debounce.**
+Measured on this machine against the real word lists: PostgreSQL's dialect has 831 entries (MySQL
+559, StandardSQL 295); for the worst realistic case — a one-character prefix, 311 matches — a full
+scan costs 0.055 ms and the `localeCompare` sort of the matches costs 0.039 ms. That is two orders
+of magnitude inside §2.1's budgets; the source is not the problem. The delay is
+`activateOnTypingDelay: 100` (`@codemirror/autocomplete/dist/index.js:379`), and the completion
+plugin **clears and re-arms that timer on every editor update** (ibid. 1176-1182), so for as long
+as you keep typing the source never runs at all — the popup appears 100 ms after you *stop*. That
+is precisely the reported feel. Only the first open pays it: `completeFromList` returns
+`validFor: /\w*$/` (ibid. 121-127), so subsequent keystrokes refilter synchronously without
+re-querying. Two secondary knobs contribute: `interactionDelay: 75` makes ArrowUp/ArrowDown and
+accept return `false` for 75 ms after the popup opens (ibid. 1077, 1099), and
+`maxRenderedOptions: 100` rebuilds up to 100 `<li>` nodes on each re-open (`rangeAroundSelected`,
+ibid. 521 and 571).
+
+**F2b — the only per-keystroke Vue work in the editable path is pure waste.** `onDocChange` →
+`setText` → `patchConsoleTabState` → `Object.assign(target.state, patch)` on the reactive tab
+record. `ConsoleView.vue`'s template reads `tab.state.text` at line 172, so its render effect
+re-runs on *every* keystroke, re-diffing the toolbar, the strips, the status line and every mounted
+`ConsoleResultGrid`. `CodeMirrorHost`'s own `doc` watcher then hits its equality guard and returns
+— the editor is untouched. Persistence is already debounced separately (`saveDebounced`, 1 s,
+`state/tabs.ts:107-113`), so the reactive write buys nothing per keystroke that the render costs.
+
+**F3 — uppercase is a single documented config flag.** `sql()` forwards `config.upperCaseKeywords`
+into `keywordCompletionSource(lang, upperCase, build)` → `completeKeywords(words, upperCase, build)`
+→ `build(upperCase ? keyword.toUpperCase() : keyword, …)`
+(`@codemirror/lang-sql/dist/index.js:598-601, 691-692, 717`; the option is typed at
+`index.d.ts:166`). Note that `dialect.words` is built from `spec.keywords + spec.types +
+spec.builtin` (ibid. 674), so the flag uppercases type names and builtins too, not only reserved
+words. CodeMirror's `FuzzyMatcher` case-folds (with a `Penalty.CaseFold` score, ibid. 360-371), so
+typing `sel` still matches `SELECT`. The four plain-text boxes P18 already shipped are uppercase by
+construction (`WHERE_KEYWORDS` / `ORDER_BY_KEYWORDS` in `views/grid/filterCompletion.ts`) — the
+console is the only lowercase completion surface left in the app.
+
+**F4 — what the Mongo and Redis consoles actually accept.** Read, not guessed:
+`engine/adapters/mongo/console.ts`'s `parseStatement` requires literally
+`db.<collection>.<method>(<args>)` — `expectIdent('db')`, `.`, ident, `.`, ident, `(`, a
+comma-separated `parseValue()` list, `)`, then end-of-input — with `method` drawn from a
+ten-element `SUPPORTED_METHODS` set (`find`, `findOne`, `insertOne`, `insertMany`, `updateOne`,
+`updateMany`, `deleteOne`, `deleteMany`, `countDocuments`, `aggregate`); anything else is
+`E_UNSUPPORTED`. `engine/adapters/redis/console.ts`'s `tokenize` is flat whitespace-separated
+tokens with `'`/`"` quoting and backslash escapes inside quotes, then `conn.call(command, ...args)`
+— i.e. **any** command the server accepts, with a generic RESP-to-page formatter. Neither is SQL,
+and `ConsoleView.vue:173` hard-codes `language="sql"` for both (realities #10's wart, still there).
+
+**F5 — Mongo collection names are already in renderer memory; Redis key names are not, and must
+not be.** `project/state/tree.ts`'s `treeState.children[rowKey(connectionId, 'database:<db>')]`
+holds the collection `TreeNode[]` whenever that database node has been expanded, and P19's group
+rows are a pure view over that same array (`toggleGroup`'s own comment), so the flat list is still
+there. A console opened from a collection node also names its target in `tab.path`. Redis has no
+cheap equivalent: `redis/index.ts`'s `children()` is a SCAN-family walk per namespace level
+(`catalog.listNamespaceChildren`), so key-name completion would be an unbounded scan per keystroke
+— ruled out by this plan's ground rule #2 and by §2.1.
+
+**F6 — a Mongo/Redis highlighting mode needs no new package, and a per-tab completion source needs
+no language surgery.** `StreamLanguage` and `StreamParser` (including `StreamParser.languageData`)
+are exported from the already-installed `@codemirror/language@6.12.4` (`index.d.ts:1194`, `1170`).
+Separately, `autocompletion({ override })` (config key at `@codemirror/autocomplete/dist/index.js:381`)
+replaces language-data sources entirely — which is what lets a tab-specific source (this console's
+collection names) arrive as a prop instead of being baked into a language definition that would
+then have to be redefined whenever the tree loads.
+
+**F7 — `@codemirror/lint` is not installed at any depth.** `node_modules/@codemirror/` contains
+exactly `autocomplete`, `commands`, `lang-json`, `lang-sql`, `lang-xml`, `language`, `state`,
+`view`; `bun.lock` has no entry. Latest is `6.9.7`, and its only dependencies are
+`@codemirror/state ^6.0.0`, `@codemirror/view ^6.42.0` and `crelt ^1.0.5` — all satisfied by the
+pinned `6.7.1` / `6.43.9`. It is a genuine new direct dependency, not a promotion like D10's.
+
+**F8 — Enter currently means two things in the console, and the wrong one wins.** `completionKeymap`
+binds `Enter` to `acceptCompletion` at `Prec.highest`
+(`@codemirror/autocomplete/dist/index.js:2063-2073`) and `selectOnOpen` defaults to `true`
+(ibid. 380), so a popup standing open turns the next Enter into an insertion instead of a newline —
+in a *multi-line* editor, which the four plain-text boxes are not. D6 deliberately chose the
+opposite rule for those boxes; the console shipped with the library default and is inconsistent with
+its own plan. `Tab` is free: `indentWithTab` is a separate `@codemirror/commands` export
+(`dist/index.js:1824`) and is not part of `defaultKeymap`.
+
+**F9 — one existing assertion is about to become wrong on purpose.**
+`tests/ui/autocomplete.spec.ts:261-287` asserts a Mongo console shows **no** popup, citing D10. D19
+below reverses that deliberately; the test is rewritten, not deleted.
+
+**F10 — a pre-existing splitter bug, found here and deliberately not fixed here.**
+`ConsoleView.vue` splits *every* engine's console text with `splitSqlStatements`, which splits on
+`;`. Two Redis commands on two lines therefore arrive at `redis/console.ts` as a single statement,
+and `tokenize` (whose whitespace class includes `\n`) flattens them into one `conn.call` with the
+wrong arity. §9.5 records it as out of scope; D24's Redis rule set is shaped so it warns about the
+shape rather than pretending to fix it.
+
+### 9.2 Decisions
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D15 | **Add `history()` and `keymap.of(historyKeymap)` to `CodeMirrorHost.vue`, inside the existing `readOnlyCompartment`** — that compartment's contents become `[EditorState.readOnly.of(ro), ...(ro ? [] : [history(), keymap.of(historyKeymap)])]`. `main/menu.ts` is **not** touched. | History is a general editor capability, not a console special case, so it belongs in the host (F1). Gating it on `readOnly` is not cosmetic: undo is already inert under `EditorState.readOnly` (`cmd()` bails on `state.readOnly`), but the state field would still accumulate one `ChangeSet` per programmatic doc swap in the definition viewer, the cell editor and the op-log rows — each retaining the previous document — against §2.2's 350 MB target. Reusing the compartment that already exists (rather than a fifth one) keeps one watcher for one concept; the console never flips `readOnly`, so the reset-on-flip is unreachable in practice. Leaving `main/menu.ts` alone is also what keeps this addendum clear of the concurrent P21/P22 menu work. |
+| D16 | **Contingency, only if step 1's manual check fails:** if Cmd+Z is still dead on macOS because Blink's own undo stack was empty and `webContents.undo()` dispatched no `beforeinput`, replace `{ role: 'undo' }` / `{ role: 'redo' }` with explicit items that `sendToFocusedWindow(IPC.editUndo / IPC.editRedo)`, add the two channels to `shared/protocol/ipc.ts` and the preload bridge, and route them through `runCommand('edit.undo' / 'edit.redo')`, which `CodeMirrorHost.vue` registers on mount exactly as `ConsoleView.vue` already registers `view.run` / `view.run-all`. | F1's `beforeinput` path is the documented mechanism and is why D15 should be enough, but "should" is not "verified on a Mac", and this environment cannot verify it. Naming the fallback in full — rather than implementing it speculatively — keeps the common case a two-line change and keeps `main/menu.ts` (owned this cycle by the concurrent context-menu-shortcut phase) untouched unless it must be. If it must be, coordinate with that phase before editing the file. |
+| D17 | **Tune `autocompletion()` explicitly rather than taking its defaults**: `{ activateOnTypingDelay: 0, interactionDelay: 0, maxRenderedOptions: 25, defaultKeymap: false }`. | Each knob answers a measured cost from F2. `activateOnTypingDelay: 0` is the fix for the actual complaint — the debounce exists to keep *expensive or async* sources off the keystroke path, and every source this app registers is a synchronous lookup over a static array or an already-loaded `TreeNode[]` (0.055 ms + 0.039 ms measured at the worst prefix), with no I/O of any kind. `interactionDelay: 0` is safe only because D18 moves accept off Enter onto Tab: the mis-accept the delay guards against needs a *printing* key to have been in flight, and Tab is not one. `maxRenderedOptions: 25` cuts the per-open DOM build 4× at no cost to the user (the option list is a scrolling window either way, and nobody reads past the 25th SQL keyword). If schema-aware completion is ever added (D11, still out of scope), `activateOnTypingDelay` must be revisited in the same commit — one line at the config site says so. |
+| D18 | **`defaultKeymap: false` plus a curated `consoleCompletionKeymap`**: `completionKeymap` minus its `Enter` entry, with `{ key: 'Tab', run: acceptCompletion }` added. Enter keeps meaning newline; Escape, Ctrl-Space/Alt-i, Arrow and Page keys are unchanged. | This is D6 applied to the fifth surface. The console is multi-line — Enter is a text-editing key there in a way it is not in a one-line filter box — and with `selectOnOpen` there is *always* a highlighted option, so the library default silently converts a newline into an insertion after any typing pause (F8). Tab is unbound in the console today (F8), reads as "complete" in every editor a user of this app has met, and matches the `Tab` accept the four plain-text boxes already ship (D6). `Cmd+Return` / `Cmd+Shift+Return` (Run / Run all) are unaffected — they are menu accelerators, not editor keys. |
+| D19 | **`languages.ts`'s `sql()` call gains `upperCaseKeywords: true`.** One option, applied for every dialect including `undefined`/StandardSQL. | F3: this is the documented API for exactly this request, it changes both the rendered label and the inserted text, and it is the only place `sql()` is constructed. It uppercases type names and builtins too (`VARCHAR`, `NOW`), which is conventional SQL house style and is what the four plain-text boxes already do. The `keywordCompletion` build callback is the escape hatch if keyword-only uppercasing is ever wanted; noted, not taken. `sql()` is also used by the read-only definition viewer and cell editor, where completion is off (D10), so the flag is inert there. |
+| D20 | **`ConsoleView.vue` stops rendering off `tab.state.text`**: `:doc` binds a local `shallowRef` seeded from `tab.state.text`; `onDocChange` writes through `setText` as it does today *and* records the emitted string in a plain module-scope `let`; a `watch(() => props.tab.state.text)` assigns the shallowRef only when the incoming value differs from that last-emitted string. `runStatement`/`runAll` keep reading `props.tab.state.text`. | F2b. The write to tab state stays synchronous, so persistence, `onFlushBeforeClose`, session restore and `ConsoleSavedMenu`'s "save current text" are all bit-for-bit unchanged — the only thing removed is the render effect's dependency on a value that changes on every keystroke. This is §0's no-reactivity rule (D4) applied to the one editable host in the app; a debounced `setText` was considered and rejected because it would put the last few hundred milliseconds of typing at risk on window close for a smaller win. The watcher still exists (external writers — `ConsoleSavedMenu`'s load at line 65, hydration — must still reach the editor) but its callback early-returns, which costs a comparison instead of a subtree diff. |
+| D21 | **Mongo console completion**, via a new `'mongo'` `EditorLanguageId` (a `StreamLanguage` for highlighting only) plus a tab-specific source passed as a prop. Candidates are **contextual, in three positions**: after `db.` → collection names; after `db.<collection>.` → the ten supported methods; inside an argument document, on a `$`-prefixed token → the query-operator vocabulary. | The grammar is small, closed and already written down twice (F4), so the completion can be exactly as narrow as the parser — offering a method the engine will reject with `E_UNSUPPORTED` would be worse than offering nothing. Collection names come from `treeState.children` (F5), so there is no new round trip and no new cache; when the database node has not been expanded the source simply returns the methods and operators, which is the honest degradation. The method list moves to `shared/domain/console.ts` as `MONGO_CONSOLE_METHODS` and `engine/adapters/mongo/console.ts` builds `SUPPORTED_METHODS` from it, so the popup and the parser cannot drift. The `$`-operator table moves from `views/documents/filterCompletion.ts` into `views/shared/mongoVocabulary.ts` (the `views/shared/sqlIdent.ts` precedent) and gains a second consumer rather than a second copy. |
+| D22 | **Redis console completion**: a new `'redis'` `EditorLanguageId` (`StreamLanguage`, highlighting only) plus a static curated `REDIS_COMMANDS` table — command name, plus a short argument-shape hint as `detail` (`GET key`, `SETEX key seconds value`) — offered **only for the first token of a statement**. **No key-name completion, and no argument completion.** | Commands are the whole vocabulary a `conn.call(command, ...args)` console has (F4), and the arity hint is the part a user actually cannot remember. Restricting to the first token is what keeps the popup out of the way while typing a key or a value — the tokenizer position is trivially derivable from the text before the caret, and it is the difference between a helpful list and a popup over every word. Key names are excluded on measured grounds, not taste: Redis's own tree children are a SCAN walk (F5), and this plan's ground rule #2 forbids the round trip; §9.5 records it. |
+| D23 | **Both new modes are `StreamLanguage`s carrying highlighting only** — token classes for strings, numbers, comments, the `db` root, method/command names and `$`-operators — and both are wired **through the same `languageCompartment` that already exists**, by replacing `ConsoleView.vue`'s hard-coded `language="sql"` with a computed that maps the connection kind to `'sql' \| 'mongo' \| 'redis' \| 'plain'`. Completion sources arrive separately, as a new `completionSources?: readonly CompletionSource[]` prop feeding `autocompletion({ override })`. | Fixes realities #10's wart as a side effect of needing per-engine behaviour at all: a Mongo shell command has been coloured by the SQL grammar since P5.5, which mis-highlights `find`/`count` as keywords. `StreamLanguage` needs no new package (F6) and a ~30-line tokenizer per engine is proportionate to grammars this small. Keeping completion *out* of `StreamParser.languageData` and in a prop is what lets the Mongo source depend on the tab's own collection list without redefining a language every time the tree loads (F6); the SQL path keeps using language data (`override` absent), so D10's wiring is untouched. |
+| D24 | **Linting means inline CodeMirror diagnostics for the console's own statement text, scoped per engine and deliberately lexical/shape-level only.** New direct dependency `@codemirror/lint@6.9.7`. A new `lintSource?: (doc: string) => ConsoleDiagnostic[]` prop on `CodeMirrorHost.vue` (plain strings in, `{from, to, severity, message}` out — the host wraps it in `linter(..., { delay: 400 })` in a fourth compartment). Rules: **SQL** — unterminated `'…'`, `"…"`, `` `…` ``, `$tag$…$tag$` and `/* … */`; unbalanced parentheses within a statement. **Mongo** — statement must match `db.<ident>.<ident>( … )`; method must be in `MONGO_CONSOLE_METHODS`; brackets/quotes balanced. **Redis** — unterminated quoted string; a warning when one `;`-separated statement spans more than one non-empty line. | This is a query editor, so "linting" can only mean "tell me my statement is broken before I run it" — biome already lints the app's own source (`bun run lint`) and has nothing to do with the text in this box. The rules are drawn from what the engines themselves reject (`redis/console.ts` throws exactly `unterminated quoted string`; `mongo/console.ts` throws exactly `unsupported console method: db.x.y()`, and the diagnostic reuses that wording so the inline message and the error strip agree), so a diagnostic can never contradict the adapter. **Deliberately not used: the Lezer SQL tree's error nodes.** One grammar serves every dialect — `SQLDialect.define` varies only the tokenizer's word list (`lang-sql/dist/index.js:668-684`) — so error nodes would flag valid dialect-specific syntax the grammar does not model, and a false red squiggle on working SQL is worse than no squiggle at all. A purely lexical check cannot false-positive on valid SQL of any dialect. **Also deliberately not done: validating Mongo argument documents.** That parser is `engine/adapters/mongo/literal.ts`, which the renderer must not import (§2.1's "the renderer never imports a database driver and never parses a wire protocol" and the process boundary generally); re-implementing it renderer-side would be a second grammar to keep in sync, which is exactly the drift D21 avoids for methods. |
+| D25 | **No lint gutter** (`lintGutter()` is not used) and **no lint panel/keymap**; diagnostics show as an underline plus a hover tooltip. Both are themed by extending `kiraEditorTheme` with `.cm-lintRange-error` / `.cm-lintRange-warning` / `.cm-diagnostic*` / `.cm-tooltip-lint` rules bound to `--kira-error`, `--kira-warn` and `--kira-bg-elevated`, using `textDecoration: underline wavy` with `backgroundImage: none` rather than the library's hard-coded SVG data-URI squiggle. | Same reasoning as D12, and as the "there is no editor status line" law: a second gutter beside `lineNumbers()` costs permanent horizontal space for information an underline already carries, and the library's default squiggle is a fixed-colour raster that would be the one piece of un-themed chrome in the editor. Verify the exact base-theme selectors against the installed package when the dependency lands — they are the one thing here that could not be read ahead of time (F7). |
+| D26 | **A fifth block in `tests/ui/budgets.spec.ts`: "console keystroke → completion popup visible"**, measured the same way as the existing four (last keypress → `.cm-tooltip-autocomplete` present in the DOM, 20 samples), asserted at **p50 ≤ 50 ms** against §2.1's interaction class, with p95 logged for `docs/PERF.md` and a max-sample regression guard. | "Fast and smooth" is only a requirement if it is a number someone can fail. This is the one assertion that would have caught the 100 ms debounce, and it is the one that stops a future schema-aware source from quietly reintroducing it. It belongs in `budgets.spec.ts` (real §2.1 measurements) rather than `perf.spec.ts` (cheap tripwires), per that file's own P12 D7 split. |
+
+### 9.3 Shapes introduced
+
+```ts
+// src/renderer/editor/CodeMirrorHost.vue — three new props, all defaulting off
+/** Replaces language-data sources when non-empty (autocompletion({ override })) — the Mongo/Redis
+ *  consoles pass a tab-specific source here; SQL passes nothing and keeps lang-sql's own. */
+completionSources?: readonly CompletionSource[];
+/** Pure text in, diagnostics out. The host owns linter()/compartment/theming — callers never see
+ *  an EditorView. */
+lintSource?: (doc: string) => ConsoleDiagnostic[];
+```
+
+```ts
+// src/renderer/editor/diagnostics.ts
+export interface ConsoleDiagnostic {
+  from: number;
+  to: number;
+  severity: 'error' | 'warning';
+  message: string;
+}
+```
+
+```ts
+// src/shared/domain/console.ts  (additions — engine and renderer share one list, D21)
+/** The shell methods mongo/console.ts dispatches. Its SUPPORTED_METHODS is built from this, so a
+ *  completion can never offer a method the parser rejects. */
+export const MONGO_CONSOLE_METHODS: readonly string[];
+```
+
+```ts
+// src/renderer/views/shared/mongoVocabulary.ts   ($-operators move here from views/documents/)
+export const MONGO_QUERY_OPERATORS: readonly string[];
+```
+
+```ts
+// src/renderer/views/console/completion.ts
+/** null for postgres/mariadb (lang-sql's own language-data source stays in charge, D23). */
+export function consoleCompletionSources(
+  kind: ConnectionKind, connectionId: string | null, path: string,
+): readonly CompletionSource[] | undefined;
+```
+
+```ts
+// src/renderer/views/console/lint.ts        dispatches on engine kind
+// src/shared/domain/sql-lint.ts             lexical SQL checks (D24) — sibling of sql-split.ts,
+//                                           same lexical states, no grammar
+```
+
+### 9.4 Implementation order
+
+Each step is independently verifiable; run `bun run lint`, `bun run typecheck` and `bun run build`
+after every one, and `xvfb-run -a bun run test:ui` from step 6 on. No adapter behaviour changes, so
+`bun run test:db` stays green throughout — but step 5 edits `mongo/console.ts`, so run it there.
+
+1. **Undo/redo (D15).** `CodeMirrorHost.vue` only: import `history`, `historyKeymap` from
+   `@codemirror/commands`, fold them into `readOnlyCompartment`'s contents and its `watch`.
+   *Verify by hand:* type in a console, Cmd+Z (menu **and** keystroke), Cmd+Shift+Z; confirm the
+   definition viewer and cell editor are unaffected. If the menu path is dead, stop and take D16
+   before continuing — and coordinate on `main/menu.ts` first.
+2. **Completion tuning + keymap (D17/D18).** `resolveAutocomplete()` in `CodeMirrorHost.vue`: the
+   config object, `defaultKeymap: false`, and `consoleCompletionKeymap`. Still SQL-only at this
+   point. *Verify by hand:* the popup now tracks typing instead of trailing it; Enter inserts a
+   newline with the popup open; Tab accepts; Escape dismisses; Cmd+Return still runs.
+3. **Uppercase (D19).** One line in `languages.ts`.
+4. **Console render decoupling (D20).** `ConsoleView.vue` only.
+5. **Per-engine language + completion (D21/D22/D23).** In order: `MONGO_CONSOLE_METHODS` into
+   `shared/domain/console.ts` and `mongo/console.ts` rebuilt on it (no behaviour change — assert
+   with `bun run test:db`); `views/shared/mongoVocabulary.ts` extracted and
+   `views/documents/filterCompletion.ts` re-pointed at it (no behaviour change); the two
+   `StreamLanguage`s and the two new `EditorLanguageId`s in `languages.ts`; the
+   `completionSources` prop and its compartment in `CodeMirrorHost.vue`;
+   `views/console/completion.ts`; `ConsoleView.vue`'s `language` computed replacing the hard-coded
+   `"sql"`.
+6. **Tests for steps 1–5.** Rewrite `tests/ui/autocomplete.spec.ts`'s fourth block (F9) from "Mongo
+   shows no popup" to "Mongo completes collection names and methods"; add a Redis block; add an
+   undo/redo block to `tests/ui/console.spec.ts`. `mongo.spec.ts` and `redis.spec.ts` need no edits
+   — both drive the console with `.type()` + a Run **click**, never Enter (checked).
+7. **Lint (D24/D25).** Add `@codemirror/lint@6.9.7` to `devDependencies`; `editor/diagnostics.ts`;
+   `shared/domain/sql-lint.ts`; `views/console/lint.ts`; the `lintSource` prop, its compartment and
+   the `linter(..., { delay: 400 })` wiring in `CodeMirrorHost.vue`; the theme rules in `theme.ts`
+   (verify the base-theme selectors against the newly installed package). Then a lint block in
+   `tests/ui/autocomplete.spec.ts` per engine.
+8. **The budget assertion (D26)** in `tests/ui/budgets.spec.ts`, and a line in `docs/PERF.md` if
+   that file records the other four.
+9. **Docs.** SPEC.md §8.15 and the P18 phasing row edited **in place** (the row currently claims
+   the console's completion is "gated to connections with a resolved SQL dialect so a Mongo/Redis
+   shell console never offers SQL keywords", which D21/D22 make false). No new phasing row, no new
+   plan file.
+
+### 9.5 Explicitly out of scope
+
+- **Schema-aware `table.column` completion in the console.** D11 and §8's open question 3 stand
+  unchanged; nothing here forecloses it, and D17 names the one knob that must be revisited with it.
+- **Redis key-name completion** (D22/F5) and **Mongo field-name completion inside a console filter
+  document.** The first needs a SCAN walk per keystroke; the second needs a loaded page, which a
+  console tab does not have (`runtime[tabId]` holds result `Page[]`, not a described collection) —
+  the document *view*'s filter box already has it (D9) because it does.
+- **`ConsoleView.vue`'s SQL-only statement splitter (F10).** Redis commands on separate lines are
+  flattened into one wrong-arity `conn.call`; Mongo's `;` splitting happens to be right. Fixing it
+  means a per-engine `splitStatements(kind, text)` and a matching `statementAtCursor`, which
+  changes what Run/Run all *execute* — a behaviour change with its own test surface, and not what
+  was asked for. D24's Redis warning tells the user about the shape without pretending to fix it.
+- **Any adapter, IPC, storage or tab-schema change.** Step 5's `mongo/console.ts` edit rebuilds
+  `SUPPORTED_METHODS` from a shared constant containing the same ten strings; nothing else in
+  `src/engine` or `src/main` is touched (D16's contingency excepted, and only if forced).
+- **Undo history that survives a tab switch.** `MainView.vue` keys the console by `tab.id`, so the
+  editor remounts and the history starts fresh. Persisting it would mean serialising `historyField`
+  into `ConsoleTabState` — a tab-schema change, and one nobody asked for.
+- **Linting anything but the console.** The `lintSource` prop defaults to undefined, so the
+  definition viewer, cell editor, document editors and op-log rows stay exactly as they are.
+- **Semantic SQL validation of any kind** (unknown table/column, type checking, "did you mean"),
+  Mongo argument-document validation, and Redis unknown-command/arity checks (D24). The server is
+  the authority on all three, and a curated Redis command list would flag valid module and
+  version-specific commands as errors.
+- **A Settings toggle for completion or linting.** Neither is configurable; if that is wanted it is
+  a settings-schema change, not part of this.
+- **The four plain-text boxes.** `AutocompleteField.vue`, both `filterCompletion.ts` files and
+  `completion.ts` change only where step 5 moves `MONGO_QUERY_OPERATORS` out of one of them, with
+  no behaviour change.
+
+### 9.6 Verification checklist
+
+- [ ] Cmd+Z / Ctrl+Z undoes in the query console, from **both** the keystroke and the Edit ▸ Undo
+      menu item; Cmd+Shift+Z (and Ctrl+Y on non-mac) redoes; undo is grouped sanely (a run of typed
+      characters is one step, not one per character).
+- [ ] Undo after loading a saved query restores the previous console text, and does not leave the
+      cursor at 0 in a document it did not reset.
+- [ ] The definition viewer, cell editor, document editors and op-log detail rows are unchanged —
+      no history field, no popup, no diagnostics.
+- [ ] The completion popup appears **while** typing, not after a pause, on Postgres and MariaDB;
+      `budgets.spec.ts`'s new block reports p50 ≤ 50 ms.
+- [ ] ArrowDown/ArrowUp respond immediately on the first frame the popup is visible (D17's
+      `interactionDelay`).
+- [ ] Keyword and type completions insert **UPPERCASE** (`SELECT`, `VARCHAR`), and typing lowercase
+      `sel` still matches `SELECT`.
+- [ ] With the popup open, **Enter inserts a newline**; Tab accepts; Escape dismisses; Ctrl-Space
+      opens explicitly; `Cmd+Return` / `Cmd+Shift+Return` still run.
+- [ ] A **Mongo** console completes collection names after `db.`, the ten supported methods after
+      `db.<collection>.`, and `$`-operators on a `$` token — and offers **no SQL keywords anywhere**.
+- [ ] A Mongo console whose database node was never expanded still completes methods and operators
+      (F5's degradation), with no error and no round trip.
+- [ ] A **Redis** console completes command names on the first token of a statement only, with the
+      argument hint as detail, and offers nothing on later tokens.
+- [ ] Mongo and Redis console text is highlighted by its own mode — `find` is no longer coloured as
+      a SQL keyword.
+- [ ] Diagnostics: an unterminated `'` and an unbalanced `(` are flagged in SQL; `db.x.fnid(` and
+      `db.x.upsert({})` are flagged in Mongo, with `upsert` reported in the same words the adapter
+      uses; an unterminated quote is flagged in Redis and a two-line statement warns.
+- [ ] No diagnostic appears on any statement that then runs successfully — checked against the
+      statements `console.spec.ts`, `mongo.spec.ts` and `redis.spec.ts` already execute.
+- [ ] The lint underline and its tooltip follow the app's colour tokens and the Settings font; there
+      is exactly one gutter (line numbers).
+- [ ] `tests/ui/autocomplete.spec.ts`'s Mongo block asserts the new behaviour (F9); `mongo.spec.ts`,
+      `redis.spec.ts`, `console.spec.ts` and `data-view.spec.ts` need no edits beyond the new
+      console.spec.ts undo block.
+- [ ] `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` clean;
+      `xvfb-run -a bun run test:ui` and `bun run test:db` green.
+- [ ] `package.json`/`bun.lock` show exactly one added dependency (`@codemirror/lint`).
+
+### 9.7 Open questions for the user
+
+1. **Tab, not Enter, accepts a completion in the console (D18) — confirm.** It is what makes the
+   console obey this plan's own D6 and what keeps Enter usable as a newline in a multi-line editor,
+   but it is one keystroke different from VS Code's default, where Enter also accepts.
+2. **`upperCaseKeywords: true` uppercases type names and builtins too** (`VARCHAR`, `NOW`, `COALESCE`),
+   not only reserved words (F3). That is conventional SQL style and matches the WHERE box, but if
+   only reserved words should be uppercased, say so — it is a custom `keywordCompletion` build
+   callback rather than a flag, and worth deciding before it ships rather than after.
+3. **Is the Redis splitter bug (F10) wanted as a follow-up?** Today a Redis console only works with
+   `;` between commands, and a newline silently produces a wrong-arity call. It is a real defect,
+   it is adjacent to this work, and it is deliberately left alone here because fixing it changes
+   what Run executes.
+4. **Should the console's diagnostics be surfaceable as a list**, not just as underlines? D25 says
+   no gutter and no lint panel. For a query box that is almost always a handful of lines that seems
+   right; for a long "Run all" script it may not be.
