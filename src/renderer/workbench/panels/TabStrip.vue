@@ -57,7 +57,16 @@ function onClose(e: MouseEvent, tab: TabRecord): void {
 // Copy name · Reveal in project panel (D22).
 function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   openContextMenu(e, [
-    { type: 'item', id: 'close', label: 'Close', icon: 'close', run: () => closeTab(tab.id) },
+    {
+      type: 'item',
+      id: 'close',
+      label: 'Close',
+      icon: 'close',
+      // P21 D13: `tab.close` always closes the *active* tab, not the clicked one — printed anyway
+      // (VS Code does the same on this exact row) since it's the keyboard route to this command.
+      shortcut: 'tab.close',
+      run: () => closeTab(tab.id),
+    },
     {
       type: 'item',
       id: 'close-others',

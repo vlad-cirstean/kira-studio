@@ -3,6 +3,7 @@ import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
+import { shortcutFor } from '../../shortcuts/keys';
 import {
   clearSelectedCellFor,
   publishSelectedCell,
@@ -14,7 +15,7 @@ import { findDataTab, patchDataTabState } from '../../state/tabs';
 import Codicon from '../../theme/Codicon.vue';
 import { cellClass } from '../../theme/cellClass';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import { type MenuItem, openContextMenu } from '../../workbench/state/contextMenu';
+import { type MenuItem, openContextMenu, runMenuShortcut } from '../../workbench/state/contextMenu';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
   alignmentFor,
@@ -742,6 +743,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       canEdit: canEditTable.value,
       isDeleted: isDeleted(row),
       startEdit: () => startEdit(row, displayCol),
+      onPaste: () => void onPaste(),
       meta: rt()?.meta ?? null,
       connectionId: t?.connectionId ?? '',
       rowValues: rowSnapshot(row).values,
@@ -893,6 +895,28 @@ function onKeydown(e: KeyboardEvent): void {
   if ((e.ctrlKey || e.metaKey) && key === 'v') {
     e.preventDefault();
     void onPaste();
+    return;
+  }
+
+  // P21 D5: dispatched through rowMenu() itself (the same builder onGutterContextMenu calls) so
+  // the printed shortcut and the executed action can't drift, and `disabled: !canEdit` is honoured
+  // for free — inert on a read-only table without restating that guard here. Only a row selection
+  // has a rowMenu to dispatch into; a cell/range selection leaves Delete/Cmd+D inert by falling
+  // through (the switch below has no case for either key).
+  const rowShortcut = shortcutFor(e, ['grid.duplicateRows', 'grid.deleteRows']);
+  if (rowShortcut && runtimeEntry.selection?.kind === 'row') {
+    const { rows } = runtimeEntry.selection;
+    const ran = runMenuShortcut(
+      rowMenu({
+        tabId: props.tabId,
+        rows,
+        qualifiedName: qualifiedName(),
+        snapshot: rowSnapshot,
+        canEdit: canEditTable.value,
+      }),
+      rowShortcut,
+    );
+    if (ran) e.preventDefault();
     return;
   }
 

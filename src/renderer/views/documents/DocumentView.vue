@@ -398,12 +398,14 @@ watch(
 );
 
 let unregisterCommand: (() => void) | null = null;
+let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
   unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
+  unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
 // The tab-id guard inside clearSelectedCellFor is load-bearing here too (DataGrid.vue's own
@@ -411,6 +413,7 @@ onMounted(() => {
 // and mounts another in an order this can't rely on.
 onUnmounted(() => {
   unregisterCommand?.();
+  unregisterFindCommand?.();
   clearSelectedCellFor(props.tab.id);
 });
 </script>

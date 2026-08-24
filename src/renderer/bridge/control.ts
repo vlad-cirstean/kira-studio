@@ -46,6 +46,7 @@ export const control = {
   engineStatus: (): Promise<EngineStatus> => kira.engineStatus(),
   onEngineState: (cb: (status: EngineStatus) => void): (() => void) => kira.onEngineState(cb),
   onOpenSettings: (cb: () => void): (() => void) => kira.onOpenSettings(cb),
+  onNewConnection: (cb: () => void): (() => void) => kira.onNewConnection(cb),
   onToggleProjectPanel: (cb: () => void): (() => void) => kira.onToggleProjectPanel(cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => kira.onToggleOperationsPanel(cb),
   onCommandPalette: (cb: () => void): (() => void) => kira.onCommandPalette(cb),

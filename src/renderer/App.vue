@@ -5,7 +5,7 @@ import ConnectionDialog from './project/ConnectionDialog.vue';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { togglePalette } from './shortcuts/state';
-import { connectionsState } from './state/connections';
+import { connectionsState, openCreateDialog } from './state/connections';
 import { settingsOpen } from './state/settings';
 import { activateNextTab, activatePrevTab, closeTab, tabsState } from './state/tabs';
 import ContextMenu from './workbench/ContextMenu.vue';
@@ -25,6 +25,7 @@ onMounted(() => {
     control.onOpenSettings(() => {
       settingsOpen.value = true;
     }),
+    control.onNewConnection(() => openCreateDialog()),
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
     control.onCommandPalette(togglePalette),

@@ -26,6 +26,7 @@ export const IPC = {
   port: 'kira:port',
   engineState: 'kira:engine:state',
   openSettings: 'kira:open-settings',
+  newConnection: 'kira:menu:new-connection',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
   commandPalette: 'kira:menu:command-palette',
@@ -123,6 +124,7 @@ export interface KiraApi {
   engineStatus(): Promise<EngineStatus>;
   onEngineState(cb: (status: EngineStatus) => void): () => void;
   onOpenSettings(cb: () => void): () => void;
+  onNewConnection(cb: () => void): () => void;
   onToggleProjectPanel(cb: () => void): () => void;
   onToggleOperationsPanel(cb: () => void): () => void;
   onCommandPalette(cb: () => void): () => void;

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import { IPC } from '../shared/protocol/ipc';
+import { accelerator } from '../shared/shortcuts';
 
 function sendToFocusedWindow(channel: string): void {
   const window = BrowserWindow.getFocusedWindow();
@@ -15,8 +16,13 @@ export function buildMenu(): Menu {
       { role: 'about' },
       { type: 'separator' },
       {
+        label: 'New Connection',
+        accelerator: accelerator('app.newConnection'),
+        click: () => sendToFocusedWindow(IPC.newConnection),
+      },
+      {
         label: 'Settings…',
-        accelerator: 'CmdOrCtrl+,',
+        accelerator: accelerator('app.settings'),
         click: () => sendToFocusedWindow(IPC.openSettings),
       },
       { type: 'separator' },
@@ -48,38 +54,38 @@ export function buildMenu(): Menu {
     submenu: [
       {
         label: 'Toggle Project Panel',
-        accelerator: 'CmdOrCtrl+B',
+        accelerator: accelerator('view.toggleProjectPanel'),
         click: () => sendToFocusedWindow(IPC.toggleProjectPanel),
       },
       {
         label: 'Toggle Operations Panel',
-        accelerator: 'CmdOrCtrl+J',
+        accelerator: accelerator('view.toggleOperationsPanel'),
         click: () => sendToFocusedWindow(IPC.toggleOperationsPanel),
       },
       { type: 'separator' },
       {
         label: 'Command Palette…',
-        accelerator: 'CmdOrCtrl+Shift+P',
+        accelerator: accelerator('view.commandPalette'),
         click: () => sendToFocusedWindow(IPC.commandPalette),
       },
       {
         label: 'Find',
-        accelerator: 'CmdOrCtrl+F',
+        accelerator: accelerator('view.find'),
         click: () => sendToFocusedWindow(IPC.viewFind),
       },
       {
         label: 'Refresh',
-        accelerator: 'F5',
+        accelerator: accelerator('view.refresh'),
         click: () => sendToFocusedWindow(IPC.viewRefresh),
       },
       {
         label: 'Run Statement',
-        accelerator: 'CmdOrCtrl+Return',
+        accelerator: accelerator('view.run'),
         click: () => sendToFocusedWindow(IPC.viewRun),
       },
       {
         label: 'Run All',
-        accelerator: 'CmdOrCtrl+Shift+Return',
+        accelerator: accelerator('view.runAll'),
         click: () => sendToFocusedWindow(IPC.viewRunAll),
       },
       ...(isDev
@@ -97,17 +103,17 @@ export function buildMenu(): Menu {
     submenu: [
       {
         label: 'Next Tab',
-        accelerator: 'Control+Tab',
+        accelerator: accelerator('tab.next'),
         click: () => sendToFocusedWindow(IPC.tabNext),
       },
       {
         label: 'Previous Tab',
-        accelerator: 'Control+Shift+Tab',
+        accelerator: accelerator('tab.prev'),
         click: () => sendToFocusedWindow(IPC.tabPrev),
       },
       {
         label: 'Close Tab',
-        accelerator: 'CmdOrCtrl+W',
+        accelerator: accelerator('tab.close'),
         click: () => sendToFocusedWindow(IPC.tabClose),
       },
       { type: 'separator' },
@@ -115,7 +121,7 @@ export function buildMenu(): Menu {
       { role: 'zoom' },
       // role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" above already claims — moved
       // to Shift+W (browser-tab convention: plain W closes the active tab, Shift+W the window).
-      { role: 'close', accelerator: 'CmdOrCtrl+Shift+W' },
+      { role: 'close', accelerator: accelerator('window.close') },
     ],
   };
 

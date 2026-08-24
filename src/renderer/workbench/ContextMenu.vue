@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { formatShortcut } from '../shortcuts/keys';
 import Codicon from '../theme/Codicon.vue';
 import { connColorVar } from '../theme/connColor';
 import { closeContextMenu, contextMenuState, type MenuItem } from './state/contextMenu';
@@ -101,6 +102,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
             <Codicon v-else-if="item.icon" :name="item.icon" :size="12" class="item-icon" />
           </span>
           <span class="label">{{ item.label }}</span>
+          <span
+            v-if="item.shortcut"
+            class="shortcut"
+            :data-testid="`menu-item-${item.id}-shortcut`"
+            >{{ formatShortcut(item.shortcut) }}</span
+          >
           <span v-if="item.checked" class="icon-box"><Codicon name="check" :size="12" /></span>
         </div>
 
@@ -131,6 +138,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
                   <Codicon v-else-if="sub.icon" :name="sub.icon" :size="12" class="item-icon" />
                 </span>
                 <span class="label">{{ sub.label }}</span>
+                <span
+                  v-if="sub.type === 'item' && sub.shortcut"
+                  class="shortcut"
+                  :data-testid="`menu-item-${sub.id}-shortcut`"
+                  >{{ formatShortcut(sub.shortcut) }}</span
+                >
                 <span v-if="sub.type === 'item' && sub.checked" class="icon-box">
                   <Codicon name="check" :size="12" />
                 </span>
@@ -198,6 +211,16 @@ async function onItemClick(item: MenuItem): Promise<void> {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.shortcut {
+  margin-left: var(--kira-s-4);
+  color: var(--kira-fg-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.row.is-disabled .shortcut {
+  color: var(--kira-fg-disabled);
 }
 
 .caret {

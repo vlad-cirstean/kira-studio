@@ -137,13 +137,15 @@ export interface CellMenuContext {
   canEdit: boolean;
   isDeleted: boolean;
   startEdit: () => void;
+  /** P21 D12: DataGrid.vue's own onPaste — an existing, guarded handler this menu had no row for. */
+  onPaste: () => void;
   meta: ObjectMeta | null;
   connectionId: string;
   rowValues: Record<string, string | null>;
 }
 
-// D4: Copy / Copy with header / Copy as JSON / Edit / Set NULL / Filter by this value / Go to
-// referenced row / Referenced by (P7).
+// D4: Copy / Copy with header / Copy as JSON / Paste / Edit / Set NULL / Filter by this value / Go
+// to referenced row / Referenced by (P7).
 export function cellMenu(ctx: CellMenuContext): MenuItem[] {
   const editDisabled = !ctx.canEdit || ctx.isDeleted;
   const filterExpr = ctx.isNull
@@ -167,6 +169,10 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       id: 'copy',
       label: 'Copy',
       icon: 'copy',
+      // P21 D5: display-only — DataGrid.vue's onKeydown already binds Cmd/Ctrl+C, but its
+      // behavior branches on selection kind (cell/range/row/column) in a way one menu row can't
+      // express, so this is tagged for its printed key without being dispatched through here.
+      shortcut: 'grid.copy',
       run: () => copyText(ctx.isNull ? '' : ctx.text),
     },
     {
@@ -183,6 +189,15 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       icon: 'copy',
       run: () => copyText(JSON.stringify(ctx.isNull ? null : ctx.text)),
     },
+    {
+      type: 'item',
+      id: 'paste',
+      label: 'Paste',
+      icon: 'clippy',
+      disabled: !ctx.canEdit,
+      shortcut: 'grid.paste',
+      run: () => ctx.onPaste(),
+    },
     { type: 'separator' },
     {
       type: 'item',
@@ -190,6 +205,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       label: 'Edit',
       icon: 'edit',
       disabled: editDisabled,
+      shortcut: 'grid.edit',
       run: () => ctx.startEdit(),
     },
     {
@@ -235,6 +251,9 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           type: 'item',
           id: 'copy-rows-tsv',
           label: 'TSV',
+          // Display-only (P21 D5) — the row-selection branch of DataGrid.vue's onCopy already
+          // produces this exact TSV output on Cmd/Ctrl+C.
+          shortcut: 'grid.copy',
           run: () => copyText(rowsToTsv(snapshots)),
         },
         {
@@ -263,6 +282,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       label: 'Duplicate row(s)',
       icon: 'copy',
       disabled: !ctx.canEdit,
+      shortcut: 'grid.duplicateRows',
       run: () => {
         for (const row of ctx.rows) duplicateAsInsert(ctx.tabId, row);
       },
@@ -274,6 +294,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       icon: 'trash',
       danger: true,
       disabled: !ctx.canEdit,
+      shortcut: 'grid.deleteRows',
       run: () => toggleDelete(ctx.tabId, ctx.rows),
     },
   ];
@@ -352,6 +373,10 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       id: 'copy-column-values',
       label: 'Copy column values',
       icon: 'copy',
+      // Display-only (P21 D5): onHeaderContextMenu sets a `column` selection before this menu
+      // opens, and onCopy's final branch already copies that column's loaded values on
+      // Cmd/Ctrl+C — a binding that worked before this phase but was never shown anywhere.
+      shortcut: 'grid.copy',
       run: () => copyText(ctx.columnValues().join('\n')),
     },
   ];

@@ -49,6 +49,11 @@ const kiraApi: KiraApi = {
     ipcRenderer.on(IPC.openSettings, listener);
     return () => ipcRenderer.off(IPC.openSettings, listener);
   },
+  onNewConnection: (cb: () => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on(IPC.newConnection, listener);
+    return () => ipcRenderer.off(IPC.newConnection, listener);
+  },
   onToggleProjectPanel: (cb: () => void) => {
     const listener = (): void => cb();
     ipcRenderer.on(IPC.toggleProjectPanel, listener);

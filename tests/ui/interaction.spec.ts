@@ -284,11 +284,19 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
     'copy',
     'copy-with-header',
     'copy-as-json',
+    'paste',
     '--separator--',
     'edit',
     'set-null',
     'filter-by-value',
   ]);
+
+  // P21: shortcut hints — the grid's already-working Cmd/Ctrl+C/Enter print their key next to
+  // the menu label.
+  await expect(page.locator('[data-testid="menu-item-copy-shortcut"]')).toHaveText(
+    /^(⌘C|Ctrl\+C)$/,
+  );
+  await expect(page.locator('[data-testid="menu-item-edit-shortcut"]')).toHaveText(/^(⏎|Enter)$/);
 
   await page.click('[data-testid="menu-item-copy"]');
   expect(await clipboardText(page)).toBe(row0Name);
@@ -473,6 +481,98 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
   await expect(pastedInsertInputs.nth(1)).toHaveValue('3');
   await expect(pastedInsertInputs.nth(2)).toHaveValue('brand new row');
   await discardChanges(page);
+
+  // =============================================================================================
+  // P21: the grid cell's new Paste row (D12) — an existing Cmd/Ctrl+V handler with no menu row
+  // before this phase.
+  // =============================================================================================
+  await page.evaluate(() => navigator.clipboard.writeText('typed via paste menu'));
+  await rightClick(gridCell(page, 0, 'name'));
+  await expect(page.locator('[data-testid="menu-item-paste-shortcut"]')).toHaveText(
+    /^(⌘V|Ctrl\+V)$/,
+  );
+  await page.click('[data-testid="menu-item-paste"]');
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'name')).toBe('typed via paste menu');
+  await discardChanges(page);
+
+  // =============================================================================================
+  // P21: the row menu's new Duplicate/Delete shortcuts — dispatched through the exact same
+  // rowMenu() builder a right-click uses (runMenuShortcut), so a real keypress produces the same
+  // pending-change state the menu item does.
+  // =============================================================================================
+  await rightClick(gutterCell(page, 1));
+  await expect(page.locator('[data-testid="menu-item-delete-row-shortcut"]')).toHaveText(
+    /^(Delete|⌘⌫)$/,
+  );
+  await expect(page.locator('[data-testid="menu-item-duplicate-row-shortcut"]')).toHaveText(
+    /^(Ctrl\+D|⌘D)$/,
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  await gutterCell(page, 1).click();
+  await grid.focus();
+  await page.keyboard.press('Delete');
+  await expect(page.locator('[data-testid="grid-row"][data-row="1"]')).toHaveClass(
+    /pending-delete/,
+  );
+  await discardChanges(page);
+
+  await gutterCell(page, 0).click();
+  await grid.focus();
+  await page.keyboard.press('Control+d');
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(1);
+  await discardChanges(page);
+
+  // =============================================================================================
+  // P21 D13: a tab-scoped shortcut prints on the tab menu even though the key acts on the
+  // *active* tab, not the one right-clicked.
+  // =============================================================================================
+  await page.locator('[data-testid="tab"]').first().click({ button: 'right' });
+  await expect(page.locator('[data-testid="menu-item-close-shortcut"]')).toHaveText(
+    /^(⌘W|Ctrl\+W)$/,
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  // =============================================================================================
+  // P21: the project tree's own local keyboard shortcuts — Copy name, F2 rename, Ctrl/Cmd+D
+  // duplicate — dispatch through menuForRow(), the same builder a right-click uses. D8's own
+  // guard: the tree's per-row Refresh never prints a shortcut, since F5 is the *active tab's*
+  // refresh, a different command on a different object.
+  // =============================================================================================
+  await openRowMenu(page, '');
+  await expect(page.locator('[data-testid="menu-item-refresh-shortcut"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  const connectionRow = page
+    .locator('[data-testid="tree-row"][data-kind="connection"]')
+    .filter({ hasText: 'Interaction DB' });
+  await expect(connectionRow).toHaveCount(1);
+  await connectionRow.click();
+  await expect(connectionRow).toHaveClass(/selected/);
+  await page.keyboard.press('Control+c');
+  expect(await clipboardText(page)).toBe('Interaction DB');
+
+  await connectionRow.click();
+  await page.keyboard.press('F2');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await page.click('[data-testid="connection-cancel"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  // Ctrl/Cmd+D last — it's the one assertion here that leaves an extra connection row behind
+  // (the duplicate), which would otherwise make `connectionRow`'s own filter ambiguous for
+  // anything after it.
+  const connectionCountBefore = await page
+    .locator('[data-testid="tree-row"][data-kind="connection"]')
+    .count();
+  await connectionRow.click();
+  await page.keyboard.press('Control+d');
+  await expect(page.locator('[data-testid="tree-row"][data-kind="connection"]')).toHaveCount(
+    connectionCountBefore + 1,
+  );
 
   // =============================================================================================
   // D10: Operations panel context menu additions — copy-command, copy-error, Re-run, Cancel.

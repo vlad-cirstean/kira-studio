@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { shortcutFor } from '../shortcuts/keys';
 import { settingsState } from '../state/settings';
 import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
 import { reload as reloadDocumentTab } from '../views/documents/state';
 import { reload as reloadDataTab } from '../views/grid/state';
 import { reload as reloadKeyValueTab } from '../views/keyvalue/state';
 import { reload as reloadStreamTab } from '../views/stream/state';
-import { openContextMenu } from '../workbench/state/contextMenu';
+import { openContextMenu, runMenuShortcut } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {
@@ -122,11 +123,47 @@ function onBackgroundContextMenu(event: MouseEvent): void {
   // the empty area below/around the rows (the virtual list's spacer divs) ever reaches here.
   openContextMenu(event, emptyBackgroundMenu());
 }
+
+const TREE_SHORTCUTS = [
+  'tree.open',
+  'tree.copyName',
+  'tree.copyUri',
+  'tree.rename',
+  'tree.duplicate',
+  'tree.delete',
+] as const;
+
+// P21 D6/D9: fires only while a tree row holds real DOM focus (the roving tabindex TreeRow.vue
+// already sets) — this is a descendant of ProjectPanel's own type-ahead keydown handler, so it
+// runs first on the bubble path, and every key it claims (Enter, a Cmd/Ctrl combo, F2, Delete) is
+// one the type-ahead handler already ignores (its own single-printable-character guard).
+function onTreeKeydown(e: KeyboardEvent): void {
+  if (e.defaultPrevented || e.isComposing) return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+  const id = shortcutFor(e, TREE_SHORTCUTS);
+  if (!id) return;
+  const row = visibleRows.value.find((r) => r.key === treeState.selected);
+  if (!row) return;
+  if (id === 'tree.open') {
+    // Enter is the row's primary action, not a menu item — the same action double-click
+    // performs, so it dispatches directly rather than through runMenuShortcut.
+    e.preventDefault();
+    onOpen(row);
+    return;
+  }
+  if (runMenuShortcut(menuForRow(row), id)) e.preventDefault();
+}
 </script>
 
 <template>
   <div class="project-tree">
-    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+    <div
+      class="tree-body"
+      data-testid="tree-background"
+      @contextmenu.prevent="onBackgroundContextMenu"
+      @keydown="onTreeKeydown"
+    >
       <VirtualList ref="virtualListRef" :items="visibleRows" :row-height="rowHeight">
         <template #default="{ item }">
           <TreeRow

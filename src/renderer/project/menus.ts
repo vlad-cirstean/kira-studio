@@ -147,6 +147,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'edit',
       label: 'Edit…',
       icon: 'edit',
+      shortcut: 'tree.rename',
       run: () => openEditDialog(row.connectionId),
     },
     {
@@ -154,6 +155,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'duplicate',
       label: 'Duplicate',
       icon: 'copy',
+      shortcut: 'tree.duplicate',
       run: async () => {
         await duplicateConnection(row.connectionId);
       },
@@ -163,6 +165,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
     {
@@ -170,6 +173,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-uri',
       label: 'Copy URI',
       icon: 'link',
+      shortcut: 'tree.copyUri',
       // Always passwordless (D7) — for a fields-mode connection there is no stored URI, so
       // one is synthesised from the fields, matching what the dialog itself would generate.
       run: () => {
@@ -227,6 +231,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Delete',
       icon: 'trash',
       danger: true,
+      shortcut: 'tree.delete',
       run: async () => {
         if (!window.confirm(`Delete connection "${row.name}"?`)) return;
         await deleteConnection(row.connectionId);
@@ -267,6 +272,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
     {
@@ -289,6 +295,9 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-data',
       label: 'Open data',
       icon: 'table',
+      // Display-only (P21 D5): Enter fires ProjectTree.vue's onOpen(row) directly (the same
+      // action double-click performs), not this run() via runMenuShortcut.
+      shortcut: 'tree.open',
       run: () => {
         openDataTab(row.connectionId, row.path);
       },
@@ -329,6 +338,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
     {
@@ -371,6 +381,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-document',
       label: 'Open',
       icon: 'json',
+      shortcut: 'tree.open',
       run: () => {
         openDocumentTab(row.connectionId, row.path);
       },
@@ -411,6 +422,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
     {
@@ -474,6 +486,7 @@ function namespaceMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
   ];
@@ -489,6 +502,7 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-keyvalue',
       label: 'Open',
       icon: 'symbol-key',
+      shortcut: 'tree.open',
       run: () => {
         openKeyValueTab(row.connectionId, row.path);
       },
@@ -507,6 +521,7 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
   ];
@@ -524,6 +539,7 @@ function objectMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-keyvalue',
       label: 'Open',
       icon: nodeIcon(row.kind),
+      shortcut: 'tree.open',
       run: () => {
         openKeyValueTab(row.connectionId, row.path);
       },
@@ -542,6 +558,7 @@ function objectMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
   ];
@@ -556,6 +573,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
       id: 'open-stream',
       label: 'Open',
       icon: nodeIcon(row.kind),
+      shortcut: 'tree.open',
       run: () => {
         openStreamTab(row.connectionId, row.path);
       },
@@ -574,6 +592,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
   ];
@@ -615,6 +634,7 @@ function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
+      shortcut: 'tree.copyName',
       run: () => copyText(row.name),
     },
     {
@@ -687,6 +707,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
       id: 'new-connection',
       label: 'New connection',
       icon: 'add',
+      shortcut: 'app.newConnection',
       run: () => openCreateDialog(),
     },
     {

@@ -361,16 +361,19 @@ const statusLine = computed(() => {
 });
 
 let unregisterCommand: (() => void) | null = null;
+let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
   unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
+  unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
 onUnmounted(() => {
   unregisterCommand?.();
+  unregisterFindCommand?.();
 });
 </script>
 
