@@ -15,7 +15,8 @@ const statements = ref<string[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-const doc = computed(() => statements.value.join(';\n') + (statements.value.length ? ';' : ''));
+// P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.
+const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
 const sqlDialect = computed<'postgres' | 'mariadb' | undefined>(() => {
   const tab = findDataTab(props.tabId);

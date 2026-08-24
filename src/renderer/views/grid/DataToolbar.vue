@@ -132,17 +132,17 @@ const columnCountLabel = computed(() => {
   return `${projection ? projection.length : total} / ${total}`;
 });
 
-// The Columns button's own corner badge (IconButton's `count` prop) — shown only when the tab's
-// column set deviates from default (some columns hidden, or the order was dragged), so the icon
-// stays clean until there's actually something to flag. A hidden-column deviation gets the
-// existing "N / M" count; an order-only deviation (every column still shown) gets a plain dot,
-// since "M / M" would look like a count but say nothing.
-const columnsBadge = computed(() => {
+// P31 D38/F35: the Columns button's own corner mark — shown only when the tab's column set
+// deviates from default (some columns hidden, or the order was dragged), so the icon stays clean
+// until there's actually something to flag. A plain dot, not a count: "5 / 5" (every column still
+// shown, only the order changed) reads as a count that says nothing, and a four-character label
+// in a 22px button's corner was never going to fit regardless of which deviation triggered it —
+// the exact numbers already live in the tooltip below (columnCountLabel), which is where every
+// other detail in this icon-only toolbar lives.
+const columnsIndicator = computed(() => {
   const state = tab.value?.state;
-  if (!state) return undefined;
-  if (state.projection !== null) return columnCountLabel.value ?? undefined;
-  if (state.columnOrder !== null) return '•';
-  return undefined;
+  if (!state) return false;
+  return state.projection !== null || state.columnOrder !== null;
 });
 
 // P16 design system's warn chip: "N rows edited" — the count is already tracked per-tab by
@@ -306,7 +306,8 @@ function onDiscard(): void {
         <IconButton
           icon="list-selection"
           data-testid="toolbar-columns"
-          :count="columnsBadge"
+          :indicator="columnsIndicator"
+          :active="columnsOpen"
           v-tooltip="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
           @click="columnsOpen = !columnsOpen"
         />

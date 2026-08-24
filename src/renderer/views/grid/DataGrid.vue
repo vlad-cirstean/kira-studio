@@ -1263,6 +1263,7 @@ defineExpose({ scrollCellIntoView });
           class="header-cell"
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
+          :data-sort="currentSortDirection(columnOrder[c]) ?? undefined"
           v-tooltip="headerTitleFor(columnOrder[c])"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
@@ -1278,12 +1279,19 @@ defineExpose({ scrollCellIntoView });
             :class="{ 'is-fk': keyLabelFor(c) === 'FK' }"
             >{{ keyLabelFor(c) }}</span
           >
-          <span v-if="currentSortDirection(columnOrder[c])" class="sort-chevron">{{
-            currentSortDirection(columnOrder[c]) === 'asc' ? '▲' : '▼'
-          }}</span>
-          <span v-if="sortOrderIndex(columnOrder[c])" class="sort-order">{{
-            sortOrderIndex(columnOrder[c])
-          }}</span>
+          <!-- P31 D34/F33: a 13px codicon pinned to the cell's right edge, out of the label's own
+               flow (LAW 02 — every other state indicator in the app is a codicon; this was the
+               last text-drawn one). Rendered in a font-independent glyph, unlike the old ▲/▼
+               characters, which sized and reshaped with item 3's data-font setting. -->
+          <span v-if="currentSortDirection(columnOrder[c])" class="sort-indicator">
+            <span v-if="sortOrderIndex(columnOrder[c])" class="sort-order">{{
+              sortOrderIndex(columnOrder[c])
+            }}</span>
+            <CodiconIcon
+              :name="currentSortDirection(columnOrder[c]) === 'asc' ? 'arrow-up' : 'arrow-down'"
+              :size="13"
+            />
+          </span>
           <span
             role="button"
             aria-label="Select column"
@@ -1484,10 +1492,15 @@ defineExpose({ scrollCellIntoView });
   color: var(--kira-info);
 }
 
-.sort-chevron {
-  color: var(--kira-accent);
-  font-size: var(--kira-t-xs);
+/* P31 D34: pinned to the header cell's right edge, out of .header-label's flow, so a long/
+   truncated column name never has to share space with it. */
+.sort-indicator {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
   flex-shrink: 0;
+  color: var(--kira-accent);
 }
 
 .sort-order {

@@ -12,8 +12,13 @@ withDefaults(
     /** A small corner badge (a live count, e.g. "5/12") — for an icon-only toolbar button that
      * still needs to surface a number without falling back to a text label. */
     count?: string | number;
+    /** P31 D38: a plain 5px accent dot in the button's top-right corner — for a button whose
+     * "is this active/filtering?" state needs surfacing without a number to show for it (the
+     * exact counts belong in the button's own tooltip instead). Mutually exclusive with `count`
+     * in practice, though nothing here enforces that. */
+    indicator?: boolean;
   }>(),
-  { size: 13, active: false, tone: 'default' },
+  { size: 13, active: false, tone: 'default', indicator: false },
 );
 </script>
 
@@ -21,7 +26,11 @@ withDefaults(
   <button
     type="button"
     class="p-iconbtn"
-    :class="{ 'is-active': active, 'is-primary': tone === 'primary' }"
+    :class="{
+      'is-active': active,
+      'is-primary': tone === 'primary',
+      'has-indicator': indicator,
+    }"
     :style="tone === 'danger' ? { color: 'var(--kira-error)' } : undefined"
   >
     <CodiconIcon :name="icon" :size="size" />
@@ -60,5 +69,18 @@ withDefaults(
      is vertical" bug. Every other `:count` consumer is a single unbroken token (e.g. "42",
      "~1,234"), which never wrapped, so nowrap changes nothing for them. */
   white-space: nowrap;
+}
+
+/* P31 D38: a plain dot, not a number — "is this deviating from default?" doesn't need a count on
+   the icon itself, only in the tooltip a caller already supplies. */
+.p-iconbtn.has-indicator::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--kira-accent);
 }
 </style>

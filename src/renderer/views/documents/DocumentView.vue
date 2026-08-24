@@ -571,7 +571,8 @@ onUnmounted(() => {
             <IconButton
               icon="list-selection"
               data-testid="document-toolbar-projection"
-              :count="tab.state.projection !== null ? (projectionCountLabel ?? undefined) : undefined"
+              :indicator="tab.state.projection !== null"
+              :active="projectionOpen"
               v-tooltip="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
               @click="projectionOpen = !projectionOpen"
             />
