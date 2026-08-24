@@ -5,6 +5,7 @@ import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
   type PgFixture,
+  seedScrollFixture,
   startPostgres,
 } from './support/pg';
 import { expandRow, findRow, openRowMenu } from './support/tree';
@@ -23,6 +24,7 @@ test.beforeAll(async () => {
     return;
   }
   pg = await startPostgres();
+  await seedScrollFixture(pg.uri);
 });
 
 test.afterAll(async () => {
@@ -33,6 +35,11 @@ const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
 const BIG_ROWS_PATH = `${APP_PATH}/table:big_rows`;
 const WIDE_TABLE_PATH = `${APP_PATH}/table:wide_table`;
+const SCROLL_GRID_PATH = `${APP_PATH}/table:scroll_grid`;
+
+// Mirrors DataGrid.vue's own OVERSCAN_PX (P29 D2) — the coverage below is the deterministic proof
+// that both axes actually render this much buffer, not a re-statement of the app's own constant.
+const OVERSCAN_PX = 560;
 
 // A script-driven `scrollTop` assignment's native `scroll` event is deferred to Chromium's next
 // "update the rendering" step (the same per-frame cadence requestAnimationFrame uses — see
@@ -131,6 +138,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await bigRowsRow.dblclick();
   const grid = page.locator('[data-testid="data-grid"]');
   await expect(grid).toBeVisible();
+  // Captured while big_rows is still the only open tab — 1b below opens scroll_grid in a second
+  // tab and must switch back to this one before item 2 continues.
+  const bigRowsFirstTabId = await page
+    .locator('[data-testid="tab"]')
+    .first()
+    .getAttribute('data-tab-id');
   await page.click('[data-testid="page-size-10000"]');
   // A plain "some gutter cell exists" poll is already true from the pre-click page-size-100
   // render, so it passes before the 10000-row page has actually loaded — scrollHeight only grows
@@ -157,6 +170,167 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // Still a real regression guard: no sample may run past several frame periods worth of
   // dispatch-plus-work, which would indicate the app itself — not frame scheduling — is slow.
   expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(50);
+
+  // --- 1b. scroll_grid (60 cols x 5000 rows, P29 D14): the wide-AND-tall shape neither big_rows
+  // nor wide_table alone can show (F8) — horizontal response, vertical response on a wide table,
+  // the deterministic overscan-coverage invariant on both axes, a DOM-size bound, and the direct
+  // proof that a sub-row scroll mutates nothing. -----------------------------------------------
+  await openRowMenu(page, SCROLL_GRID_PATH);
+  await page.click('[data-testid="menu-item-open-data-new-tab"]');
+  const scrollGrid = page.locator('[data-testid="data-grid"]');
+  await expect(scrollGrid).toBeVisible();
+  // Closed at the end of this block, below — item 3 asserts an exact tab count of 2, and this
+  // tab must not still be open by the time it runs.
+  const scrollGridTabId = await page
+    .locator('[data-testid="tab"].is-active')
+    .getAttribute('data-tab-id');
+  await expect
+    .poll(() => scrollGrid.evaluate((el) => el.scrollWidth), { timeout: 15_000 })
+    .toBeGreaterThan(2000);
+
+  const horizontalDeltas = await measureScrollResponses(
+    page,
+    '[data-testid="data-grid"]',
+    20,
+    'horizontal',
+  );
+  logStats('scroll response (horizontal)', horizontalDeltas);
+  expect(percentile(horizontalDeltas, 50)).toBeLessThanOrEqual(8);
+  expect(Math.max(...horizontalDeltas)).toBeLessThanOrEqual(50);
+
+  await scrollGrid.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  const wideVerticalDeltas = await measureScrollResponses(page, '[data-testid="data-grid"]', 20);
+  logStats('scroll response (vertical, wide table)', wideVerticalDeltas);
+  expect(percentile(wideVerticalDeltas, 50)).toBeLessThanOrEqual(8);
+  expect(Math.max(...wideVerticalDeltas)).toBeLessThanOrEqual(50);
+
+  // The rendered column window extends >= OVERSCAN_PX beyond both viewport edges at every
+  // position, clamped at the table's own edges — this is the assertion that fails against the
+  // pre-P29 code (zero column overscan) and passes once the buffer is symmetric with the row axis.
+  const colPositions = 10;
+  const { scrollWidth, clientWidth } = await scrollGrid.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
+  for (let i = 0; i <= colPositions; i++) {
+    const target = Math.round((maxScrollLeft * i) / colPositions);
+    await scrollGrid.evaluate((el, t) => {
+      el.scrollLeft = t;
+    }, target);
+    await page.waitForTimeout(50);
+    // offsetLeft/offsetWidth, not getBoundingClientRect — a header cell's own `left` CSS value
+    // (what these read) is in the same content-space coordinate system scrollLeft already is,
+    // with no viewport/scroll conversion needed; a bounding-rect read would need one and is easy
+    // to get backwards.
+    const bounds = await page.evaluate(() => {
+      const els = Array.from(
+        document.querySelectorAll('[data-testid="grid-header-cell"]'),
+      ) as HTMLElement[];
+      if (els.length === 0) return null;
+      let left = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      for (const el of els) {
+        if (el.offsetLeft < left) left = el.offsetLeft;
+        if (el.offsetLeft + el.offsetWidth > right) right = el.offsetLeft + el.offsetWidth;
+      }
+      return { left, right };
+    });
+    if (!bounds) throw new Error('no header cells rendered');
+    expect(bounds.left).toBeLessThanOrEqual(Math.max(0, target - OVERSCAN_PX) + 1);
+    expect(bounds.right).toBeGreaterThanOrEqual(
+      Math.min(scrollWidth, target + clientWidth + OVERSCAN_PX) - 1,
+    );
+  }
+
+  // The same invariant on the row axis, so the two axes are provably symmetric.
+  await scrollGrid.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  const rowPositions = 10;
+  const { scrollHeight, clientHeight } = await scrollGrid.evaluate((el) => ({
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+  }));
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
+  for (let i = 0; i <= rowPositions; i++) {
+    const target = Math.round((maxScrollTop * i) / rowPositions);
+    await scrollGrid.evaluate((el, t) => {
+      el.scrollTop = t;
+    }, target);
+    await page.waitForTimeout(50);
+    // offsetTop/offsetHeight, same reasoning as the column block above — a row's own `top` CSS
+    // value is already in scrollTop's coordinate space.
+    const rowBounds = await page.evaluate(() => {
+      const els = Array.from(
+        document.querySelectorAll('[data-testid="grid-row"]'),
+      ) as HTMLElement[];
+      if (els.length === 0) return null;
+      let top = Number.POSITIVE_INFINITY;
+      let bottom = Number.NEGATIVE_INFINITY;
+      for (const el of els) {
+        if (el.offsetTop < top) top = el.offsetTop;
+        if (el.offsetTop + el.offsetHeight > bottom) bottom = el.offsetTop + el.offsetHeight;
+      }
+      return { top, bottom };
+    });
+    if (!rowBounds) throw new Error('no grid rows rendered');
+    expect(rowBounds.top).toBeLessThanOrEqual(Math.max(0, target - OVERSCAN_PX) + 1);
+    expect(rowBounds.bottom).toBeGreaterThanOrEqual(
+      Math.min(scrollHeight, target + clientHeight + OVERSCAN_PX) - 1,
+    );
+
+    // The DOM stays bounded even at the overscan's own worst case (D3).
+    const cellCount = await page.locator('[data-testid="grid-cell"]').count();
+    expect(cellCount).toBeLessThan(2500);
+  }
+
+  // A sub-row scroll mutates nothing (D4); crossing a row boundary does.
+  await scrollGrid.evaluate((el) => {
+    el.scrollTop = 1000;
+  });
+  await page.waitForTimeout(100);
+  const subRowMutations = await scrollGrid.evaluate(async (el) => {
+    let count = 0;
+    const observer = new MutationObserver((records) => {
+      count += records.length;
+    });
+    observer.observe(el, { childList: true, subtree: true, attributes: true });
+    el.scrollTop += 4; // well under a 28px row
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    observer.disconnect();
+    return count;
+  });
+  expect(subRowMutations).toBe(0);
+
+  const rowHeight = await scrollGrid.evaluate((el) => {
+    const row = el.querySelector('[data-testid="grid-row"]');
+    return row ? row.getBoundingClientRect().height : 28;
+  });
+  const crossRowMutations = await scrollGrid.evaluate(async (el, delta) => {
+    let count = 0;
+    const observer = new MutationObserver((records) => {
+      count += records.length;
+    });
+    observer.observe(el, { childList: true, subtree: true, attributes: true });
+    el.scrollTop += delta;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    observer.disconnect();
+    return count;
+  }, rowHeight);
+  expect(crossRowMutations).toBeGreaterThan(0);
+
+  // Close this tab and reactivate big_rows — every remaining item in this test assumes it's the
+  // only, active tab (item 3 asserts an exact count of 2 once it opens its own second tab).
+  if (!scrollGridTabId || !bigRowsFirstTabId) throw new Error('tab ids not found');
+  await page
+    .locator(`[data-testid="tab"][data-tab-id="${scrollGridTabId}"] [data-testid="tab-close"]`)
+    .click();
+  await page.click(`[data-testid="tab"][data-tab-id="${bigRowsFirstTabId}"]`);
+  await expect(page.locator('[data-testid="grid-header-cell"][data-column="hash"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
 
   // --- 2. cell selection -> editor populated, p95 <= 50ms -----------------------------------
   await page.click('[data-testid="page-size-100"]');

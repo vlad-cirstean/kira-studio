@@ -152,16 +152,25 @@ export function measureClickToDom(
  * reintroducing exactly the vsync floor D6 says a rAF-based measurement "can never" escape.
  * Starting the clock at the trigger itself avoids the same floor `measureClickToDom` avoids.
  */
+// P29 D13: one axis parameter, not a second function — this file's own header rule is that
+// budgets.spec.ts/memory.spec.ts/startup.spec.ts must all produce numbers with identical
+// instrumentation so they stay comparable. Default 'vertical' keeps the existing call site
+// (scrollTop) byte-for-byte unchanged.
 export function measureScrollResponses(
   page: Page,
   gridSelector: string,
   steps: number,
+  axis: 'vertical' | 'horizontal' = 'vertical',
 ): Promise<number[]> {
   return page.evaluate(
-    ({ gridSelector, steps }) => {
+    ({ gridSelector, steps, axis }) => {
       const el = document.querySelector<HTMLElement>(gridSelector);
       if (!el) throw new Error(`measureScrollResponses: ${gridSelector} not found`);
-      const total = Math.max(0, el.scrollHeight - el.clientHeight);
+      const prop = axis === 'horizontal' ? 'scrollLeft' : 'scrollTop';
+      const total =
+        axis === 'horizontal'
+          ? Math.max(0, el.scrollWidth - el.clientWidth)
+          : Math.max(0, el.scrollHeight - el.clientHeight);
 
       function step(target: number): Promise<number> {
         return new Promise((resolve, reject) => {
@@ -178,7 +187,7 @@ export function measureScrollResponses(
           observer.observe(el as HTMLElement, { childList: true, subtree: true, attributes: true });
 
           const start = performance.now();
-          (el as HTMLElement).scrollTop = target;
+          (el as HTMLElement)[prop] = target;
         });
       }
 
@@ -190,7 +199,7 @@ export function measureScrollResponses(
         return results;
       })();
     },
-    { gridSelector, steps },
+    { gridSelector, steps, axis },
   );
 }
 
