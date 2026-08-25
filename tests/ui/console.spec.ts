@@ -227,13 +227,18 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(results1.first()).toContainText('20');
   await expect(results1.first()).not.toContainText('10');
 
+  // P40 D2: one result set is mounted at a time, chosen by the result-set strip — "Run all"
+  // still produces two result sets, now as two chips rather than two stacked grids.
   await page.click('[data-testid="console-run-all"]');
-  await expect(results1).toHaveCount(2);
+  await expect(results1).toHaveCount(1);
+  const resultTabs1 = consoleView1.locator('[data-testid="console-result-tab"]');
+  await expect(resultTabs1).toHaveCount(2);
   await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText(
     '2 result sets',
   );
-  await expect(results1.nth(0)).toContainText('10');
-  await expect(results1.nth(1)).toContainText('20');
+  await expect(results1.first()).toContainText('10');
+  await resultTabs1.nth(1).click();
+  await expect(results1.first()).toContainText('20');
 
   // --- scenario 4: an adapter error is surfaced verbatim, not swallowed -----------------------
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);

@@ -713,7 +713,9 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
 
   await typeInto(activeConsole, page, '\nSELECT 8 AS via_menu_all;');
   await clickMenuItem(app, 'View', 'Run All');
-  await expect(activeConsole.locator('[data-testid="console-result-grid"]')).toHaveCount(2, {
+  // P40 D2: one result grid is mounted at a time — "Run All" now shows as two chips in the
+  // result-set strip rather than two stacked grids.
+  await expect(activeConsole.locator('[data-testid="console-result-tab"]')).toHaveCount(2, {
     timeout: 10_000,
   });
 

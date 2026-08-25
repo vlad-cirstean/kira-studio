@@ -8,6 +8,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
@@ -19,7 +20,7 @@ import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
 import { consoleLintSource } from './lint';
-import { run, runtime, setText, stop } from './state';
+import { closeResult, run, runtime, setActiveResult, setText, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -231,30 +232,46 @@ const statusLine = computed(() => {
       </div>
 
       <div v-if="rt && rt.results.length > 0" class="results-body" data-testid="console-results">
-        <!-- Console.html's Result/Messages/Plan segmented switcher and per-statement text/SELECT
-             badge assume one active result at a time; this view stacks every statement's page
-             instead (no "which statement produced this" or verb metadata is tracked per page),
-             so each panel keeps only what it actually has: its index and row count. -->
-        <div v-for="(result, i) in rt.results" :key="result.key" class="result-panel">
-          <div class="result-head">
-            <span class="p-badge">Result {{ i + 1 }}</span>
-            <span class="p-sm muted"
-              >{{ result.rowCount }} row{{ result.rowCount === 1 ? '' : 's' }}</span
+        <!-- Console.html's own console body shows one result at a time behind a strip, rather
+             than stacking every statement's page — D2. Each chip is a result *set*, addressed by
+             its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
+             doesn't re-key its siblings. -->
+        <div class="result-strip p-toolbar" data-testid="console-result-strip">
+          <button
+            v-for="(result, i) in rt.results"
+            :key="result.key"
+            type="button"
+            class="p-tab"
+            :class="{ 'is-active': result.key === rt.activeKey }"
+            data-testid="console-result-tab"
+            :data-active="result.key === rt.activeKey"
+            @click="setActiveResult(tab.id, result.key)"
+          >
+            Result {{ i + 1 }}
+            <span
+              class="result-close"
+              role="button"
+              aria-label="Close result"
+              data-testid="console-result-close"
+              @click.stop="closeResult(tab.id, result.key)"
             >
-          </div>
-          <div class="result-grid">
-            <ConsoleResultGrid
-              :page-key="result.key"
-              :tab-id="tab.id"
-              :connection-id="tab.connectionId"
-              :path="tab.path"
-            />
-          </div>
+              <CodiconIcon name="close" :size="13" />
+            </span>
+          </button>
+          <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
+        </div>
+        <div class="result-grid">
+          <ConsoleResultGrid
+            v-if="rt.activeKey"
+            :page-key="rt.activeKey"
+            :tab-id="tab.id"
+            :connection-id="tab.connectionId"
+            :path="tab.path"
+          />
         </div>
       </div>
 
       <CellEditorDock :tab-id="tab.id" />
-      <div class="status-line" data-testid="console-status">{{ statusLine }}</div>
     </ViewChrome>
   </div>
 </template>
@@ -284,53 +301,37 @@ const statusLine = computed(() => {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* P40 D7: flex:1 (not a fixed height) so the active result's grid always reaches the panel's
+   bottom edge — DataView.vue's own .grid-area rule (F1: the fixed-height .result-panel this used
+   to be left an empty band below the last row whenever a result had fewer rows than that height). */
 .results-body {
   flex: 1 1 60%;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
 
-.result-panel {
-  flex-shrink: 0;
-  height: 260px;
-  display: flex;
-  flex-direction: column;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+/* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
+   TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
+   here. The trailing status text keeps data-testid="console-status": the "N result sets" /
+   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4). */
+.result-strip {
+  gap: var(--kira-s-2);
 }
 
-/* Console.html's own result-head: h-md, s-4 padding, border on both edges, elevated background —
-   not a shared primitive (the grid/kv/stream headers are p-thead), just this screen's chrome
-   for the strip that labels each stacked result. */
-.result-head {
-  height: var(--kira-h-md);
-  flex-shrink: 0;
-  display: flex;
+.result-close {
+  display: inline-flex;
   align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4);
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-elevated);
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+}
+
+.result-close:hover {
+  background: var(--kira-hover);
 }
 
 .result-grid {
   flex: 1;
   min-height: 0;
-}
-
-/* D: "there is no editor status line" law folds this into the toolbar's run-state above; kept
-   here (data-testid="console-status") only because it is still asserted on directly. */
-.status-line {
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-4);
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  color: var(--kira-fg-disabled);
-  font-size: var(--kira-t-xs);
-  line-height: var(--kira-h-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

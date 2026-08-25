@@ -1,8 +1,9 @@
+import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { drop as dropPage, setPage } from './resultPages';
+import { bumpPageVersion, drop as dropPage, getPage, setPage } from './resultPages';
 
 /** One result set of a run. `key` is identity and never changes while the result is open — the
  *  "Result N" label the strip prints (P40) is its *position*, which renumbers when a sibling
@@ -17,11 +18,12 @@ export interface ConsoleViewRuntime {
   error: { code: string; message: string } | null;
   opId: string | null; // the in-flight op, for the stop button
   results: ConsoleResult[]; // the last run's result sets — runtime-only, never saved (§8.4)
+  activeKey: string | null; // which result set the single mounted grid shows (P40 D2)
   nextSeq: number; // per-tab monotonic result-set counter (P40 D1) — never reused
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
-  return { status: 'idle', error: null, opId: null, results: [], nextSeq: 0 };
+  return { status: 'idle', error: null, opId: null, results: [], activeKey: null, nextSeq: 0 };
 }
 
 const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
@@ -48,6 +50,40 @@ function dropResults(tabId: string): void {
   if (!rt) return;
   for (const result of rt.results) dropPage(result.key);
   rt.results = [];
+  rt.activeKey = null;
+}
+
+/** The strip's ×  (P40 D5) — drops the result's page (so the retained-byte guard, F21, sees it
+ *  freed), removes its entry, and re-selects a neighbour: the next result, else the previous,
+ *  else none, mirroring what happens today when a tab ends up with zero results. */
+export function closeResult(tabId: string, key: string): void {
+  const rt = runtime[tabId];
+  if (!rt) return;
+  const index = rt.results.findIndex((r) => r.key === key);
+  if (index === -1) return;
+  dropPage(key);
+  rt.results.splice(index, 1);
+  if (rt.activeKey === key) {
+    rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
+  }
+}
+
+/** Selects which result set the single mounted grid shows (P40 D2). Bumps resultPages'
+ *  pageVersion (D9): to every reader of that store — the find toolbar above all — "the page this
+ *  scope resolves to has changed" is the same event as a page being replaced under a key. */
+export function setActiveResult(tabId: string, key: string): void {
+  const rt = runtime[tabId];
+  if (!rt) return;
+  rt.activeKey = key;
+  bumpPageVersion();
+}
+
+/** The page the tab's active result set holds — the console's answer to the other three views'
+ *  `getPage(tabId)`, and the one place "which of this tab's N pages" is resolved (D9). */
+export function activePage(tabId: string): Page | null {
+  const rt = runtime[tabId];
+  if (!rt?.activeKey) return null;
+  return getPage(rt.activeKey);
 }
 
 export function setText(tabId: string, text: string): void {
@@ -83,6 +119,7 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       setPage(key, page);
       return { key, rowCount: page.rowCount };
     });
+    rt.activeKey = rt.results[0]?.key ?? null;
     rt.status = 'idle';
     rt.opId = null;
   } catch (err) {

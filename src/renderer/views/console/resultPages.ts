@@ -31,6 +31,13 @@ function cached(entry: Entry, key: string, decode: (decoder: TextDecoder) => str
 
 export const pageVersion = reactive({ n: 0 });
 
+/** The `pageVersion.n++` setPage/drop/dropForTab each already do inline, named — so state.ts's
+ *  setActiveResult (P40 D9) can raise the same "the page this scope resolves to changed" signal
+ *  without reaching into the counter directly. */
+export function bumpPageVersion(): void {
+  pageVersion.n++;
+}
+
 export function setPage(key: string, page: Page): void {
   Object.freeze(page);
   pages.set(key, { page, decodeCache: new Map(), windowKey: '' });
