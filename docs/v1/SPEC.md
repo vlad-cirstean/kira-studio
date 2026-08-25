@@ -511,6 +511,14 @@ instance). A view kind opts out simply by not mounting it (P26).
   immediately. The panel is forced read-only when the connection is marked read-only, and likewise
   when the cell's value was truncated on load — a partial value can be read and copied, but never
   staged as a write over the full one.
+- **Viewer mode** (P40): the query console's dock passes `readOnly` — a distinct, stronger flag
+  than the two above. Those explain a *refusal* (a real write exists but is blocked), and keep
+  their reason chip and full staging UI to say so; viewer mode means there was never a write on
+  offer at all (a console result has no addressable row to write back to), so it shows no reason
+  chip and hides every affordance that exists only to serve staging one — UUID-generate, the
+  `modified` chip, the byte badge, Beautify, Revert. Facts about the value (type, NULL/empty/
+  truncated badges, the format select, both translate panes) still show; only ways to *write* it
+  are hidden.
 
 ### 8.7 Document view (Mongo, and any document-shaped page)
 
@@ -736,6 +744,19 @@ for Postgres/MariaDB, collection names and supported shell methods for Mongo, co
 Redis — and shows inline syntax diagnostics for the statement under the cursor. Console contents
 are saved to `saved_queries`.
 
+**One result set is shown at a time, chosen by a strip of chips** above it (P40) — a "Run all"
+producing several result sets no longer stacks a fixed-height panel per statement; each chip reads
+"Result N" (its position, which renumbers as siblings close) and closes with its own ×, dropping
+that result's cached page. A toolbar toggle decides whether the next run **replaces** the current
+result sets (the default) or **appends** a new one alongside them — a per-tab preference, so
+accumulating results across runs is opt-in. The active result's grid always fills the panel down to
+its own bottom edge (no fixed-height band left empty below a short result). The same shared find
+toolbar the grid/document/key-value views use (§8.5) docks above the active result, scoped to the
+console tab and resolving to whichever result is currently active — switching the active result
+re-scans the toolbar's own query against it rather than leaving a stale match list pointing at rows
+no longer on screen. The result grid's header shows a column's type in its hover tooltip (name,
+type, glossary description), matching the main data grid, rather than a badge in the header row.
+
 ### 8.16 Keyboard shortcuts
 
 A **minimal, VS Code-flavoured** set only — command palette, tab switching/closing, panel toggles,
@@ -924,7 +945,7 @@ other's — Biome's `noRestrictedImports` options do not merge across overlappin
 careless broad override placed after a narrow one can silently delete the narrow one's rules while
 `lint` stays green. `lint`/`typecheck` (all four projects)/`build` green after every commit; `bun
 test tests/db` reproduces the pre-existing 12 pass/10 fail baseline; every `data-testid` unchanged |
-| **P40 Query console UX and cell-editor read-only mode** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: a toolbar toggle for opening a run's result in a new result tab vs. reusing the current one; the shared find/search toolbar (already in grid/documents/keyvalue) added to console results; a result-set strip ("N result sets", each closable with an ×) for console's multi-statement runs; the empty gap between the last row and the panel's bottom edge when the cell editor is closed; a real read-only mode for the cell editor — hiding Format/Beautify and other edit-only affordances and the primary-key label when nothing on screen is editable, which the query console's own cell editor (always read-only, §8.14) currently doesn't do; the console's SQL cell view brought visually in line with the main grid's cell view, dropping the data-type badge from its header | The user's own framing: a set of console-specific UX gaps found by using the feature, queued ahead of the broader functionality review | Not yet planned — queued |
+| **P40 Query console UX and cell-editor read-only mode** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: a toolbar toggle for opening a run's result in a new result tab vs. reusing the current one; the shared find/search toolbar (already in grid/documents/keyvalue) added to console results; a result-set strip ("N result sets", each closable with an ×) for console's multi-statement runs; the empty gap between the last row and the panel's bottom edge when the cell editor is closed; a real read-only mode for the cell editor — hiding Format/Beautify and other edit-only affordances and the primary-key label when nothing on screen is editable, which the query console's own cell editor (always read-only, §8.14) currently doesn't do; the console's SQL cell view brought visually in line with the main grid's cell view, dropping the data-type badge from its header | The user's own framing: a set of console-specific UX gaps found by using the feature, queued ahead of the broader functionality review | Implemented per `docs/v1/plans/P40-query-console-ux-and-readonly-cell-editor.md`, eight commits. A result set gets a stable key (`views/console/state.ts`'s `resultPageKey(tabId, seq)`, the tab's own monotonic `nextSeq`, never an array index) so closing one never re-keys its siblings. One result set is shown at a time behind a `.p-tab`-chip strip (`console-result-strip`/`console-result-tab`/`console-result-close`), replacing the old stacked-panel-per-statement layout the view's own comment had recorded as a deviation from the design system since P5.5 — this also fixed the empty band below the last row when the cell editor is closed (the fixed `height: 260px` `.result-panel` is gone; the active grid is `flex: 1`, same as the data grid's own `.grid-area`). A toolbar toggle (`console-new-result-toggle`) decides append-vs-replace, persisted per tab as `consoleTabStateSchema.newResultSet` (`.default(false)`, so an already-saved tab restores unchanged). `views/console/search.ts` is the fourth `createPageSearch` call site (after grid/documents/keyvalue) — its `activePage(tabId)` in `state.ts` is the one place "which of this tab's N result sets" is resolved, so `views/shared/page/`'s two shared cleanup handlers never had to learn a per-result-set key scheme; `setActiveResult` bumps `resultPages.ts`'s `pageVersion` so an open find re-scans the newly active result. `CellEditorDock`/`CellEditorView` gained an optional `readOnly` prop (defaulting to `false`, so the other four mounts are unchanged) — true "viewer mode": no reason chip (`data-read-only="true"`, no `data-read-only-reason`, since there was never a write on offer to refuse) and none of UUID-generate/`modified`/byte-badge/Beautify/Revert, which either did nothing meaningful on a console cell or lied about why. `ConsoleResultGrid.vue`'s header dropped its `p-badge` data-type badge for the same hover tooltip (name/type/glossary description) `DataGrid.vue`'s own header cell has carried since P31, plus row-hover and `tabular-nums` parity. Two real defects found on the way were written up and deliberately left untouched, handed to P42: `stream`/`documents` mount the cell editor with the same no-write-path gap the console had (F14); `resultPages.ts`'s `setVisibleWindow` has no caller anywhere (F22), so the console's decode cache is never pruned the way the grid's is. `bun run lint`/`typecheck` (all four projects)/`build` clean after every commit; `tests/ui/sqlite.spec.ts` (the one console-touching spec that runs without Docker in this sandbox) exercises the toggle/strip/×/find toolbar for real and passes; `console.spec.ts`/`interaction.spec.ts`'s two stacked-grid-count assertions were updated to the new chip model in the same commits that changed the behavior, and `console.spec.ts` gained its own dedicated result-set/find-toolbar test plus a viewer-mode block in `cell-editor.spec.ts`'s existing console step — all Postgres-backed and **not run in this sandbox** (Docker image pulls are blocked here); they typecheck/lint clean and need a real run in CI or on the macOS/Colima box before this phase is fully verified. |
 | **P41 Redis/S3 tree navigation and the sticky header fix** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: Redis and S3 connections currently expand their full key/object tree inline in the project panel; this phase keeps only the top-level containers (buckets for S3, databases for Redis) in the connection tree and adds a dedicated panel for the actual — potentially infinitely nested — key/object navigation. Also fixes the sticky ancestor-band header (P28's `stickyBand.ts`): the top band does not stick on scroll while a bottom one incorrectly does and duplicates rows | The user's own framing: the sticky header is a real, currently-broken bug, and unbounded Redis/S3 nesting in the connection tree is a scalability problem worth fixing before the broader functionality review | Not yet planned — queued |
 | **P42 Functionality review** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, run as **three iterations** like P39: an in-depth review of the app's actual behavior (data handling, panel-to-panel communication, whether a state change is reflected everywhere it should be, error handling and how errors reach the user), frontend or engine/main, followed by real fixes — unlike P39, this phase is explicitly allowed to change behavior | The user's own framing: "practically anything that could be a bug should be found and fixed no matter if it be FE or in between" | Not yet planned — queued |
 | **P43 Unit tests** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: add unit tests, but sparingly — only where there is enough logic to justify one, and only where a unit test is the better fit than the existing UI (Playwright) coverage when both could apply. `tests/db/` is explicitly out of scope | The user's own framing: be scarce with new tests, prioritize unit over UI when both would work, never touch the DB suites | Not yet planned — queued |
@@ -1044,6 +1065,17 @@ src/
                     context menu, P19 D9) moved here from project/menus.ts — it has belonged to the
                     Columns section since P19 moved columns there, and only the import direction
                     (state/viewCommands.ts now closes it) kept it in project/ until this iteration
+      console/      (P40) a result set is addressed by a stable key (state.ts's resultPageKey,
+                    keyed by the tab's own monotonic nextSeq, not an array index) rather than
+                    position, so the result-set strip's × can close one without re-keying its
+                    siblings; setActiveResult/closeResult/activePage are the console's own
+                    "which of this tab's N result sets" resolution. search.ts is the fourth
+                    createPageSearch call site (after grid/documents/keyvalue, shared/page/
+                    below) — it alone resolves that same "which result" question for the find
+                    toolbar via activePage(tabId), so views/shared/page/'s two cleanup handlers
+                    never needed a per-result-set key scheme. resultPages.ts gained
+                    bumpPageVersion(), called by setActiveResult so an open find re-scans the
+                    newly active result the same way a replaced page already triggers a re-scan.
       shared/       cross-view Vue helpers with a second consumer (never view-specific):
                     FilterHistoryMenu.vue, mongoVocabulary.ts, sqlIdent.ts, and (P27)
                     useEditBuffer.ts (the dirty/beautify/bytes/revert state machine) plus
@@ -1067,7 +1099,9 @@ src/
                     prefix, the same un-prefixing iteration 1's own D24 did inside each view folder:
                     store.ts (the page store three of the four data views share verbatim), scan.ts
                     (the chunked scanner) + search.ts (per-tab search state + the generic find-widget
-                    API factory) + SearchToolbar.vue (the find widget grid/documents/keyvalue share
+                    API factory) + SearchToolbar.vue (the find widget grid/documents/keyvalue share,
+                    joined by console (P40), which supplies its own runSearch/pageVersion/
+                    loadedRowCount from views/console/search.ts without this folder changing at all
                     — stream's own scanner and toolbar are deliberately simpler and stay in stream/),
                     searchFilter.ts (the "hide non-matching rows" toggle + matched-row derivation
                     every in-page find widget shares), sizes.ts (one page-size table, four testid
