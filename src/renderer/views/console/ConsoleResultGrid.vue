@@ -466,7 +466,11 @@ function selectKeyValueRow(row: number): void {
 }
 
 /* Matches DataGrid.vue's .grid-cell.selected look (P8/P10 publish into the same cellSelection.ts
-   slot the cell editor panel reads, so the same visual language applies here). */
+   slot the cell editor panel reads, so the same visual language applies here). P42 D22: left as a
+   plain `outline` rather than picking up DataGrid.vue's own shared-edge box-shadow fix — `selected`
+   here is a single `{row, col}` ref (:94-98 above), so two cells can never be selected here at
+   once and the doubled-border defect (F15) is unreachable; adding edge computation for a
+   selection this grid can't build would be dead code wearing the appearance of a guarantee. */
 .cell.selected {
   background: var(--kira-select);
   outline: var(--kira-border-width) solid var(--kira-focus);

@@ -150,6 +150,32 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await page.mouse.up();
   await expect(grid.locator('.grid-cell.selected')).toHaveCount(9);
 
+  // --- P42 D21/F15: only the selection's own outer perimeter draws an edge — a seam shared with
+  // a selected neighbour draws none, so a 3x3 block shows one uniform border, not doubled lines
+  // at the internal seams. -------------------------------------------------------------------
+  await expect(cellTopLeft).toHaveClass(/sel-t/);
+  await expect(cellTopLeft).toHaveClass(/sel-l/);
+  await expect(cellTopLeft).not.toHaveClass(/sel-r/);
+  await expect(cellTopLeft).not.toHaveClass(/sel-b/);
+  await expect(cellBottomRight).toHaveClass(/sel-b/);
+  await expect(cellBottomRight).toHaveClass(/sel-r/);
+  await expect(cellBottomRight).not.toHaveClass(/sel-t/);
+  await expect(cellBottomRight).not.toHaveClass(/sel-l/);
+  const middleCell = page.locator(
+    '[data-testid="grid-cell"][data-row="1"][data-column="order_id"]',
+  );
+  await expect(middleCell).not.toHaveClass(/sel-t/);
+  await expect(middleCell).not.toHaveClass(/sel-r/);
+  await expect(middleCell).not.toHaveClass(/sel-b/);
+  await expect(middleCell).not.toHaveClass(/sel-l/);
+
+  // A single selected cell (no selected neighbour in any direction) still draws all four edges.
+  await cellTopLeft.click();
+  await expect(cellTopLeft).toHaveClass(/sel-t/);
+  await expect(cellTopLeft).toHaveClass(/sel-r/);
+  await expect(cellTopLeft).toHaveClass(/sel-b/);
+  await expect(cellTopLeft).toHaveClass(/sel-l/);
+
   // Shift-click still extends a range exactly as it did before drag-select existed.
   await cellTopLeft.click();
   await cellBottomRight.click({ modifiers: ['Shift'] });

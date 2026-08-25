@@ -995,6 +995,7 @@ const renderRows = computed<RowVM[]>(() => {
       const name = names[c] ?? '';
       const dc = displayCell(row, c);
       const nav = cellNavEntry(row, c, navCache);
+      const selected = isSelected(row, c);
       cells.push({
         col: c,
         name,
@@ -1008,7 +1009,14 @@ const renderRows = computed<RowVM[]>(() => {
         navKind: nav?.kind ?? null,
         classes: cellClass({
           alignRight: alignFor(c) === 'right',
-          selected: isSelected(row, c),
+          selected,
+          // P42 D21: an edge is drawn only where it sits on the selection's own outer
+          // perimeter — computed only for a selected cell, since an unselected one never draws
+          // any of these regardless.
+          selEdgeTop: selected && !isSelected(row - 1, c),
+          selEdgeRight: selected && !isSelected(row, c + 1),
+          selEdgeBottom: selected && !isSelected(row + 1, c),
+          selEdgeLeft: selected && !isSelected(row, c - 1),
           searchMatch: isSearchMatch(row, c),
           searchMatchCurrent: isCurrentSearchMatch(row, c),
           pendingEdit: dc.staged,
@@ -1807,10 +1815,42 @@ defineExpose({ scrollCellIntoView });
   padding-right: calc(var(--kira-s-4) + 18px);
 }
 
+/* P42 D21/F15: a per-cell `outline` drew a complete ring around every selected cell — two
+   adjacent selected cells' touching edges were two separate 1px lines, one pixel apart, both
+   focus-coloured. Each of the four sides is now its own inset box-shadow layer, switched on only
+   when that side sits on the selection's own outer perimeter (.sel-t/.sel-r/.sel-b/.sel-l,
+   renderRows above) — an internal seam between two selected cells gets no shadow from either
+   side, so the selection's outer boundary reads as one uniform 1px line. Custom properties (not
+   four separate declarations) are what make this compose: box-shadow's four layers are always
+   present, each independently no-op (transparent, zero-sized) until its own edge class overrides
+   just that one variable. */
 .grid-cell.selected {
   background: var(--kira-select);
-  outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: -1px;
+  --sel-t: 0 0 0 0 transparent;
+  --sel-r: 0 0 0 0 transparent;
+  --sel-b: 0 0 0 0 transparent;
+  --sel-l: 0 0 0 0 transparent;
+  box-shadow:
+    inset var(--sel-t),
+    inset var(--sel-r),
+    inset var(--sel-b),
+    inset var(--sel-l);
+}
+
+.grid-cell.selected.sel-t {
+  --sel-t: 0 var(--kira-border-width) 0 0 var(--kira-focus);
+}
+
+.grid-cell.selected.sel-r {
+  --sel-r: calc(-1 * var(--kira-border-width)) 0 0 0 var(--kira-focus);
+}
+
+.grid-cell.selected.sel-b {
+  --sel-b: 0 calc(-1 * var(--kira-border-width)) 0 0 var(--kira-focus);
+}
+
+.grid-cell.selected.sel-l {
+  --sel-l: var(--kira-border-width) 0 0 0 var(--kira-focus);
 }
 
 .grid-cell.search-match {

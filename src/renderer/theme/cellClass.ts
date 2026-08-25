@@ -13,6 +13,14 @@ export interface CellClassFlags {
   isNull?: boolean;
   /** Part of the current selection (single cell, range, row, or column). */
   selected?: boolean;
+  /** P42 D21: this edge sits on the selection's own outer perimeter — the neighbour in that
+   *  direction isn't selected, or there isn't one. Four independent flags, since a selection is
+   *  a rectangle (or, for a row/column selection, effectively one): only its outer boundary gets
+   *  a border, never a seam shared with a selected neighbour (F15's doubled-border bug). */
+  selEdgeTop?: boolean;
+  selEdgeRight?: boolean;
+  selEdgeBottom?: boolean;
+  selEdgeLeft?: boolean;
   /** Matched by an in-progress search, but not the current match. */
   searchMatch?: boolean;
   /** The current (focused) search match. */
@@ -29,6 +37,10 @@ const FLAG_CLASS_NAMES: { [K in keyof CellClassFlags]-?: string } = {
   alignRight: 'align-right',
   isNull: 'null',
   selected: 'selected',
+  selEdgeTop: 'sel-t',
+  selEdgeRight: 'sel-r',
+  selEdgeBottom: 'sel-b',
+  selEdgeLeft: 'sel-l',
   searchMatch: 'search-match',
   searchMatchCurrent: 'search-match-current',
   pendingEdit: 'pending-edit',
