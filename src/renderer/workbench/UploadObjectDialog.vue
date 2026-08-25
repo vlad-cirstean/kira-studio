@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/object-store';
-import { pathTail } from '@shared/domain/tree';
+import { decodePath } from '@shared/domain/tree';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
@@ -23,11 +23,20 @@ const contentType = ref('');
 const saving = ref(false);
 const error = ref<string | null>(null);
 
-// The container's own trailing path segment, if it's a prefix (a bucket has none) — prefilled
-// ahead of the chosen file's own name, mirroring how the tree already nests objects under it.
+// P43 F1/D1: every ancestor `prefix` segment of the container path, joined — not just the last
+// one. A bucket has none; a one-level-nested container has one; `bucket/prefix:a/prefix:b` joins
+// to `a/b/`. The old `pathTail`-only version silently dropped every segment above the immediate
+// parent, so an upload two or more levels deep prefilled a key that was missing its own ancestry
+// and landed at the wrong place in the bucket. Mirrors `s3/catalog.ts`'s own
+// `prefixSegments.join('/') + '/'` reconstruction on the engine side, so the two agree by
+// construction rather than by coincidence.
 const containerPrefix = computed(() => {
-  const tail = pathTail(uploadDialogState.containerPath);
-  return tail?.kind === 'prefix' ? `${tail.name}/` : '';
+  const { connectionId, containerPath } = uploadDialogState;
+  if (!connectionId || containerPath === '') return '';
+  const prefixes = decodePath(connectionId, containerPath).segments.filter(
+    (s) => s.kind === 'prefix',
+  );
+  return prefixes.length > 0 ? `${prefixes.map((s) => s.name).join('/')}/` : '';
 });
 
 async function chooseFile(): Promise<void> {

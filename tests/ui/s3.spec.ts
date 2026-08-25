@@ -673,5 +673,40 @@ test('s3 — browse tab: descend to reports, upload from a prefix level, no pref
   const uploadedRow = browseView.locator(`[data-testid="browse-row"][data-path="${uploadedPath}"]`);
   await expect(uploadedRow).toBeVisible();
 
+  // --- P43 F1/D1: a *two*-level-nested container joins every ancestor prefix segment, not just
+  //     the immediate parent — the bug the one-level case above cannot see, since a single-segment
+  //     join happens to equal pathTail's own (wrong in general) answer. ------------------------
+  const nestedRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${NESTED_PREFIX_PATH}"]`,
+  );
+  await nestedRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', NESTED_PREFIX_PATH);
+
+  const nestedSourcePath = join(tmpDir, 'note2.txt');
+  const nestedSourceBody = 'uploaded from a two-level-nested browse-panel prefix';
+  await writeFile(nestedSourcePath, nestedSourceBody, 'utf8');
+  await kira.app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, nestedSourcePath);
+
+  await browseView.locator('[data-testid="browse-upload"]').click();
+  await expect(dialog).toBeVisible();
+  await dialog.locator('[data-testid="upload-choose-file"]').click();
+  // Every ancestor segment joined — 'reports/2024/', not just '2024/' (the bug: pathTail alone
+  // only ever sees the immediate parent).
+  await expect(dialog.locator('[data-testid="upload-key"]')).toHaveValue('reports/2024/note2.txt');
+  await dialog.locator('[data-testid="upload-submit"]').click();
+  await expect(dialog).toHaveCount(0);
+
+  const nestedUploadedPath = `${NESTED_PREFIX_PATH}/object:${encodeURIComponent('reports/2024/note2.txt')}`;
+  const nestedView = page.locator(
+    `[data-testid="keyvalue-view"][data-path="${nestedUploadedPath}"]`,
+  );
+  await expect(nestedView).toBeVisible();
+  await expect(bodyRowOf(page, nestedView).locator('[data-testid="keyvalue-value"]')).toContainText(
+    nestedSourceBody,
+    { timeout: 15_000 },
+  );
+
   expect(consoleErrors).toEqual([]);
 });
