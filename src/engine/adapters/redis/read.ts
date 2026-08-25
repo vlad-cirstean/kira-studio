@@ -11,7 +11,6 @@ import { mapError } from './errors';
 
 // Never an unbudgeted SCAN (ground rules) — same per-round-trip COUNT hint as catalog.ts.
 const SCAN_COUNT = 1000;
-const LIST_WINDOW = 500; // LRANGE window cap, mirrors MAX_PAGE_SIZE discipline
 
 interface KeyMeta {
   redisType: KeyValuePage['redisType'] | 'none';
@@ -225,10 +224,14 @@ async function readList(
     throw new AdapterError('E_UNSUPPORTED', 'redis list pagination only supports offset paging');
   }
   const offset = req.cursor.offset;
-  const limit = Math.min(req.pageSize, LIST_WINDOW);
+  // P43 iter2 D25: honours req.pageSize directly — it is already a closed union of four
+  // literals validated at the wire (shared/protocol/data-ops.ts), and clamping below what the
+  // caller asked for (the deleted LIST_WINDOW) silently dropped up to 95% of a list at page
+  // size 10000 while reporting the unclamped size back (F18). LRANGE over 10000 elements is one
+  // round trip, not a crawl.
   let elements: string[];
   try {
-    elements = await conn.lrange(key, offset, offset + limit - 1);
+    elements = await conn.lrange(key, offset, offset + req.pageSize - 1);
   } catch (err) {
     throw mapError(err);
   }

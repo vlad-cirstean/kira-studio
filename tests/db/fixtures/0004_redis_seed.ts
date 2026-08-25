@@ -15,6 +15,10 @@ export const ZSET_MEMBERS: Array<[member: string, score: number]> = [
 export const HASH_FIELDS: Record<string, string> = { age: '30', city: 'NYC' };
 export const STREAM_ENTRY_COUNT = 5;
 export const LIST_KEY = 'queue:jobs';
+// P43 iter2 F18/D25: longer than the old (deleted) LIST_WINDOW clamp of 500, so a page 0 read at
+// pageSize 1000 genuinely exercises the boundary that clamp used to cut short.
+export const BIG_LIST_KEY = 'queue:big-jobs';
+export const BIG_LIST_LENGTH = 1200;
 export const SET_KEY = 'tags:featured';
 export const ZSET_KEY = 'leaderboard';
 export const STREAM_KEY = 'events:log';
@@ -39,6 +43,9 @@ export async function seedRedis(conn: Redis): Promise<void> {
 
   const jobs = Array.from({ length: LIST_LENGTH }, (_, i) => `job-${i}`);
   await conn.rpush(LIST_KEY, ...jobs);
+
+  const bigJobs = Array.from({ length: BIG_LIST_LENGTH }, (_, i) => `big-job-${i}`);
+  await conn.rpush(BIG_LIST_KEY, ...bigJobs);
 
   await conn.sadd(SET_KEY, ...SET_MEMBERS);
 

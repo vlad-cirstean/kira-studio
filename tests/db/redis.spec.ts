@@ -8,6 +8,8 @@ import { redisCaps } from '../../src/engine/adapters/redis/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { handleMutate, handleRead } from '../../src/engine/data';
 import {
+  BIG_LIST_KEY,
+  BIG_LIST_LENGTH,
   HASH_FIELDS,
   HASH_KEY,
   LIST_KEY,
@@ -682,8 +684,55 @@ describe('redis adapter (§9.1, P9)', () => {
     } finally {
       deleteLiveAdapter(connectionId);
       await adapter.disconnect();
-      // Leaves 'counter' at '43' for the rest of this suite — no other test reads it after this
-      // one runs (test order is declaration order, and this is the last test in the file).
+      // Leaves 'counter' at '43' for the rest of this suite — no other test reads 'counter' after
+      // this one runs (test order is declaration order).
+    }
+  });
+
+  // P43 iter2 F18/D25: LIST_WINDOW used to clamp a list read to 500 elements regardless of the
+  // caller's own req.pageSize, silently dropping everything between the clamp and the requested
+  // page size while still reporting the unclamped size back. BIG_LIST_LENGTH (1200) is well past
+  // the old clamp, so this genuinely exercises the boundary it used to cut short.
+  test('23. read: a list page honours the full requested page size (D25)', async () => {
+    const adapter = await createAdapter('redis', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const page0 = await readKeyValue(
+        adapter,
+        {
+          path: keyPath(BIG_LIST_KEY),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 1000,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page0.rowCount).toBe(1000);
+      expect(page0.position.hasMore).toBe(true);
+      // Element 500 is exactly where the old 500-wide clamp would have cut the page short.
+      expect(kvValueAt(page0, 500)).toBe('big-job-500');
+      expect(kvValueAt(page0, 999)).toBe('big-job-999');
+
+      const page1 = await readKeyValue(
+        adapter,
+        {
+          path: keyPath(BIG_LIST_KEY),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 1000,
+          cursor: { mode: 'offset', offset: 1000 },
+        },
+        makeCtx(),
+      );
+      expect(page1.rowCount).toBe(BIG_LIST_LENGTH - 1000);
+      expect(page1.position.hasMore).toBe(false);
+      // Not 'big-job-500' — the element the old clamp would have silently repeated at this offset.
+      expect(kvValueAt(page1, 0)).toBe('big-job-1000');
+    } finally {
+      await adapter.disconnect();
     }
   });
 });
