@@ -78,8 +78,3 @@ export function decodePageToken(token: string, expectedFingerprint: string): str
 export function requestFingerprint(parts: unknown): string {
   return createHash('sha1').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
 }
-
-/** '0x…' for a binary column value — the one convention both the grid and P3 rely on. */
-export function hexPreview(bytes: Uint8Array): string {
-  return `0x${Buffer.from(bytes).toString('hex')}`;
-}

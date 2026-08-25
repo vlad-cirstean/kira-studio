@@ -603,13 +603,3 @@ export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyRes
   else renderShellCompact(r.node, out);
   return { text: out.join(''), ok: true };
 }
-
-const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
-
-/** ObjectId's own embedded timestamp, for the type tooltip (F16's NoSQLBooster precedent).
- *  `null` when the hex is not a well-formed 24-character ObjectId. */
-export function objectIdCreatedAt(hex: string): Date | null {
-  if (!OBJECT_ID_RE.test(hex)) return null;
-  const seconds = Number.parseInt(hex.slice(0, 8), 16);
-  return new Date(seconds * 1000);
-}

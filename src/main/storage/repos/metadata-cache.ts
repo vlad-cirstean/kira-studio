@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { metadataCache } from '../schema/metadata-cache';
@@ -96,12 +96,4 @@ export async function dropCached(db: KiraDb, connectionId: string, path?: string
       .delete(metadataCache)
       .where(and(eq(metadataCache.connectionId, connectionId), eq(metadataCache.path, path)));
   }
-}
-
-export async function countCached(db: KiraDb, connectionId: string): Promise<number> {
-  const rows = await db
-    .select({ n: count() })
-    .from(metadataCache)
-    .where(eq(metadataCache.connectionId, connectionId));
-  return rows[0]?.n ?? 0;
 }

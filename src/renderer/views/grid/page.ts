@@ -34,22 +34,8 @@ export function drop(tabId: string): void {
   if (pages.delete(tabId)) pageVersion.n++;
 }
 
-/**
- * Drops every entry keyed `tabId` itself or `${tabId}:...` — a data/definition tab has at most the
- * former, a console tab (P5.5) has N of the latter (one per result set, keyed by
- * `views/console/state.ts`'s `resultPageKey`). Closing a tab must free all of them in one call
- * rather than the caller knowing how many result pages a console tab happened to have.
- */
 export function dropForTab(tabId: string): void {
-  let changed = false;
-  const prefix = `${tabId}:`;
-  for (const key of pages.keys()) {
-    if (key === tabId || key.startsWith(prefix)) {
-      pages.delete(key);
-      changed = true;
-    }
-  }
-  if (changed) pageVersion.n++;
+  drop(tabId);
 }
 
 export function totalRetainedBytes(): number {

@@ -290,36 +290,3 @@ export function fromEditableText(text: string, zone: 'local' | 'utc'): Date | nu
       : new Date(Number(y), monthN - 1, dayN, hN, miN, sN, ms);
   return Number.isNaN(d.getTime()) ? null : d;
 }
-
-// --- kept for the transitional native <input type="datetime-local"> path (deleted in P24
-//     step 6, when TimestampPane/DateTimePicker replace it) --------------------------------
-
-/** The Date a timestamp-shaped cell's text represents, or null if it doesn't parse. */
-export function parseTimestampValue(format: CellFormat, text: string): Date | null {
-  return parseTimestamp(format, text)?.date ?? null;
-}
-
-// `<input type="datetime-local">`'s own value shape: local wall-clock time, no offset.
-export function toDatetimeLocalValue(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-const DATETIME_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
-
-// Parses a datetime-local input's value from its components, not via `new Date(str)` — a bare
-// "YYYY-MM-DDTHH:mm:ss" string is ambiguous across engines (UTC vs. local). Constructing from
-// components pins it to local time unambiguously, matching what the picker's own clock face shows.
-export function fromDatetimeLocalValue(value: string): Date | null {
-  const m = DATETIME_LOCAL_RE.exec(value);
-  if (!m) return null;
-  const [, y, mo, day, h, mi, s] = m;
-  const d = new Date(
-    Number(y),
-    Number(mo) - 1,
-    Number(day),
-    Number(h),
-    Number(mi),
-    Number(s ?? '0'),
-  );
-  return Number.isNaN(d.getTime()) ? null : d;
-}
