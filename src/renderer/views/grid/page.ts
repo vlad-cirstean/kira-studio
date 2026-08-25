@@ -34,10 +34,6 @@ export function drop(tabId: string): void {
   if (pages.delete(tabId)) pageVersion.n++;
 }
 
-export function dropForTab(tabId: string): void {
-  drop(tabId);
-}
-
 export function totalRetainedBytes(): number {
   let total = 0;
   for (const entry of pages.values()) total += entry.page.byteSize;

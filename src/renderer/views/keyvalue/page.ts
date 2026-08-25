@@ -9,10 +9,6 @@ export const getPage = store.getPage;
 export const drop = store.drop;
 export const totalRetainedBytes = store.totalRetainedBytes;
 
-export function dropForTab(tabId: string): void {
-  drop(tabId);
-}
-
 export interface KeyValueRow {
   field: string;
   value: string;

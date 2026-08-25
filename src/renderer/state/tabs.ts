@@ -26,11 +26,11 @@ import {
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
-import { dropForTab as dropDocumentPagesForTab } from '../views/documents/page';
-import { dropForTab } from '../views/grid/page';
+import { drop as dropDocumentPagesForTab } from '../views/documents/page';
+import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
-import { dropForTab as dropKeyValuePagesForTab } from '../views/keyvalue/page';
-import { dropForTab as dropStreamPagesForTab } from '../views/stream/page';
+import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
+import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { clearSelectedCellFor } from './cellSelection';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
@@ -42,7 +42,7 @@ import { cleanupTabRuntime } from './tabRuntime';
 // every view's per-tab runtime record via the leaf registry (state/tabRuntime.ts) — every call
 // site below that drops a tab's pages permanently closes that tab, so all of them need this.
 function dropAllPagesForTab(id: string): void {
-  dropForTab(id);
+  dropGridPagesForTab(id);
   dropConsoleResultPagesForTab(id);
   dropDocumentPagesForTab(id);
   dropKeyValuePagesForTab(id);
