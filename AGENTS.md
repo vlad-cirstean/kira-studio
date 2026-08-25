@@ -176,4 +176,42 @@
   `xvfb-run -a bunx playwright test tests/ui/clickhouse.spec.ts` run for real, failing only at the
   same Docker image-pull step every other Docker-gated spec hits here.
 
+## RabbitMQ adapter (HTTP management API, P37)
+
+- **No dependency at all** — the adapter speaks only the `rabbitmq_management` plugin's HTTP API
+  over the platform's own `fetch`. This is because AMQP 0-9-1 itself has no way to enumerate
+  anything (no list-queues, no list-exchanges, no list-bindings in the protocol), so the wire
+  protocol was never a candidate; adding an AMQP client on top would be a second protocol for zero
+  enumeration benefit, not a shortcut. Nothing in the native-Electron-rebuild section above applies
+  here — there is no native module and no build step to add one.
+- **The image must carry `-management` in its tag.** `rabbitmq:4` (the plain image) has no
+  management plugin at all, so the adapter cannot reach a broker started from it — there is no
+  fallback protocol to fall back to. Both `tests/db/support/rabbitmq.ts` and the demo compose
+  service pin `rabbitmq:4.3.5-management-alpine`.
+- **The default vhost is literally named `/`, and must reach the wire as `%2F`.** The management
+  API's own path convention (`GET /api/queues/%2F/<name>`) — every path segment the adapter builds
+  goes through one `encodeSegment()` function in `query.ts` specifically so this rule can't be
+  forgotten at a second call site.
+- **`tests/db/rabbitmq.spec.ts` needs Docker** (`@testcontainers/rabbitmq`, image
+  `rabbitmq:4.3.5-management-alpine`) — same `isDockerAvailable()` gate and the same image-pull
+  limitation as every other Testcontainers spec in this sandbox (Docker's daemon is reachable, but
+  pulling images through the outbound proxy returns `403`). `tests/ui/rabbitmq.spec.ts` is
+  Docker-gated the same way, not unconditional like SQLite's — there is no local-file equivalent
+  for a message broker.
+- **`canUpdate`/`canDelete` are permanently `false`** (`caps.ts`) — a RabbitMQ message has no
+  broker-assigned identity at all (`message_id` is an optional, publisher-set AMQP property, never
+  one the broker itself assigns), and AMQP has no per-message update or delete at any protocol
+  version. This is a structural fact about the protocol, not a gap to fill in later — don't add a
+  TODO near it. `mutate()` accepts only `insert` (a publish through an exchange).
+- **A poll requeues, it does not consume.** `read()` always uses `ackmode: reject_requeue_true` —
+  nothing this adapter does removes a message from a queue. The stream view's own warning strip
+  says so in RabbitMQ's own words, not SQS's "consumes" wording, which would be a false statement
+  about this engine.
+- Verified in this sandbox the same way ClickHouse's own hard-to-run pieces were: a standalone
+  esbuild bundle exercised against a mocked `fetch` (connect/probe classification, vhost scoping
+  and the `%2F` decode, the default-exchange filter, the exact stream-column mapping, publish
+  round-trips, every mutation refusal), and
+  `xvfb-run -a bunx playwright test tests/ui/rabbitmq.spec.ts` run for real, failing only at the
+  same Docker image-pull step every other Docker-gated spec hits here.
+
 Full spec: `docs/v1/SPEC.md`.
