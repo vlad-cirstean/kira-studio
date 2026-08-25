@@ -22,6 +22,17 @@ team works, and how to run things in whichever box a session happens to be on.
 - **The loop per phase:** check for a plan → spawn an Opus subagent to write one if missing →
   Sonnet implements the whole phase → **stop**. Do not roll on into the next phase automatically;
   each phase boundary is a checkpoint.
+- **A phase asked for in multiple passes/iterations/rounds means repeat that whole loop that many
+  times**, not run it once and call the extra passes optional. Each pass is its own
+  Opus-research-then-Sonnet-fix cycle, in order, each one written and implemented against the
+  *current* state of the tree (i.e. on top of everything the previous pass already landed) —
+  never against the pre-phase state, and never batched into one plan up front. Give each pass's
+  plan its own file under `docs/v1/plans/` (e.g. a phase's plan plus `-iter2`/`-iter3` suffixes) so
+  the history of what each round found and fixed stays legible on its own. The point of more than
+  one pass is that later rounds find what earlier rounds missed or newly created — an Opus session
+  planning pass N should actually re-read the current source rather than trust pass N-1's own
+  target-tree/summary prose, and should say plainly when a pass turns up nothing real rather than
+  manufacturing a finding to fill it.
 - No per-phase PRs. One feature branch for all of v1.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`,
   no skipped validation to make something demo. Scope left out of a phase is left out entirely,
