@@ -1,7 +1,7 @@
 import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
-import { setAllExpanded, toggleExpanded } from './state';
+import { setActionError, setAllExpanded, toggleExpanded } from './state';
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
 // shared by the per-row context menu and (expand/collapse all only) the toolbar.
@@ -67,9 +67,16 @@ export function rowMenu(
       id: 'delete-document',
       label: 'Delete',
       danger: true,
-      run: () => {
+      // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
+      // rejection there is guaranteed, not merely possible, so the catch belongs here.
+      run: async () => {
         if (!window.confirm(`Delete this document (_id: ${id})?`)) return;
-        void deleteDocument(tabId, id);
+        try {
+          await deleteDocument(tabId, id);
+          setActionError(tabId, null);
+        } catch (err) {
+          setActionError(tabId, err instanceof Error ? err.message : String(err));
+        }
       },
     },
   ];

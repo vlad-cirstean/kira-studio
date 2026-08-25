@@ -190,6 +190,10 @@ onMounted(() => {
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="browse-error">
           {{ rt.error.message }}
         </MessageStrip>
+        <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
+        <MessageStrip v-if="rt?.actionError" tone="err" data-testid="browse-action-error">
+          {{ rt.actionError }}
+        </MessageStrip>
       </template>
 
       <div class="p-panel body-panel">

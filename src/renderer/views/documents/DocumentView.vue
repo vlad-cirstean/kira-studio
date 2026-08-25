@@ -64,6 +64,7 @@ import {
   runCount,
   runtime,
   selectRow,
+  setActionError,
   setAllExpanded,
   setPageSize,
   setSearch,
@@ -247,9 +248,14 @@ function cancelCreate(): void {
 }
 
 async function commitCreate(): Promise<void> {
-  await saveNewDocument(props.tab.id, newBuffer.doc.value);
-  creatingNew.value = false;
-  newBuffer.reseed();
+  try {
+    await saveNewDocument(props.tab.id, newBuffer.doc.value);
+    setActionError(props.tab.id, null);
+    creatingNew.value = false;
+    newBuffer.reseed();
+  } catch (err) {
+    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+  }
 }
 
 function onToggleSearch(): void {
@@ -406,8 +412,13 @@ function cancelEdit(): void {
 async function commitEdit(): Promise<void> {
   const id = editingId.value;
   if (id === null) return;
-  await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
-  editingId.value = null;
+  try {
+    await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
+    setActionError(props.tab.id, null);
+    editingId.value = null;
+  } catch (err) {
+    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+  }
 }
 
 function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
@@ -423,7 +434,11 @@ function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
 // (documents/menu.ts) — one delete path, not two.
 function onDeleteRow(id: string): void {
   if (!window.confirm(`Delete this document (_id: ${id})?`)) return;
-  void deleteDocument(props.tab.id, id);
+  deleteDocument(props.tab.id, id)
+    .then(() => setActionError(props.tab.id, null))
+    .catch((err: unknown) => {
+      setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    });
 }
 
 function onStop(): void {
@@ -669,6 +684,11 @@ onUnmounted(() => {
       <template #strips>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
+        </MessageStrip>
+        <!-- P43 F6/D7: a failed insert/edit/delete, distinct from a failed load above — the list
+             is still showing a perfectly valid page, only the write was refused. -->
+        <MessageStrip v-if="rt?.actionError" tone="err" data-testid="document-action-error">
+          {{ rt.actionError }}
         </MessageStrip>
         <!-- Below the filter/sort row, above the list it searches — views/shared/page/SearchToolbar.vue's own
              "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->

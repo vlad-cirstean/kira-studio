@@ -18,6 +18,10 @@ import { recordStreamFilterUse } from './streamFilterHistory';
 export interface StreamViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
+  /** P43 F6/D7: the last *action* (SQS delete) that failed, verbatim from the server — sibling to
+   *  `error` (a failed *load*), never a reuse of it. Cleared by the next successful action or
+   *  load. */
+  actionError: string | null;
   opId: string | null;
   count: { value: number; exact: boolean; stale: boolean } | null;
   rowCount: number;
@@ -36,6 +40,7 @@ function defaultRuntime(): StreamViewRuntime {
   return {
     status: 'idle',
     error: null,
+    actionError: null,
     opId: null,
     count: null,
     rowCount: 0,
@@ -57,6 +62,13 @@ registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
 
+/** P43 F6/D7: written by StreamView.vue's own catch around onDeleteMessage (SQS only — Kafka/
+ *  RabbitMQ have no addressable delete). */
+export function setActionError(tabId: string, message: string | null): void {
+  const rt = runtime[tabId];
+  if (rt) rt.actionError = message;
+}
+
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findStreamTab(tabId);
   if (!tab?.connectionId) return;
@@ -66,6 +78,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   rt.status = 'loading';
   rt.opId = opId;
   rt.error = null;
+  rt.actionError = null;
   rt.polled = true;
 
   // Kafka-only (item 2); always null for SQS, since StreamView.vue never lets an SQS tab's three

@@ -11,6 +11,10 @@ import { classifyLoadError, createRuntimeStore } from '../shared/viewOp';
 export interface BrowseViewRuntime {
   status: 'idle' | 'loading' | 'error';
   error: { code: string; message: string } | null;
+  /** P43 F6/D7: the last *action* (a key/object delete from this level) that failed, verbatim
+   *  from the server — sibling to `error` (a failed *load*), never a reuse of it. Cleared by the
+   *  next successful action or load. */
+  actionError: string | null;
   nodes: TreeNode[];
   /** Substring filter over `nodes` (D18), runtime-only — mirrors grid/state.ts's `searchOpen`. */
   filter: string;
@@ -19,7 +23,7 @@ export interface BrowseViewRuntime {
 }
 
 function defaultRuntime(): BrowseViewRuntime {
-  return { status: 'idle', error: null, nodes: [], filter: '', selected: null };
+  return { status: 'idle', error: null, actionError: null, nodes: [], filter: '', selected: null };
 }
 
 const { runtime, ensureRuntime } = createRuntimeStore<BrowseViewRuntime>(defaultRuntime);
@@ -29,6 +33,12 @@ export { runtime };
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
+
+/** P43 F6/D7: written by browse/menu.ts's own catch around a row's Delete item. */
+export function setActionError(tabId: string, message: string | null): void {
+  const rt = runtime[tabId];
+  if (rt) rt.actionError = message;
+}
 
 /** The level a tab is currently showing — `''` in session state means "the tab's own container
  *  path" (D14), so a freshly opened tab and one restored at its root agree. */
@@ -46,6 +56,7 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   const rt = ensureRuntime(tabId);
   rt.status = 'loading';
   rt.error = null;
+  rt.actionError = null;
   try {
     const result = await control.treeChildren(tab.connectionId, level, opts?.refresh ?? false);
     rt.nodes = result.nodes;

@@ -40,6 +40,7 @@ import {
   runCount,
   runtime,
   selectRow,
+  setActionError,
   setPageSize,
   stop,
 } from './state';
@@ -340,7 +341,12 @@ async function onDeleteMessage(): Promise<void> {
   const row = rowAt(selectedRow);
   if (!row?.key) return;
   if (!window.confirm(`Delete this message (id: ${row.key})? This cannot be undone.`)) return;
-  await deleteSqsMessage(props.tab.id, row.key);
+  try {
+    await deleteSqsMessage(props.tab.id, row.key);
+    setActionError(props.tab.id, null);
+  } catch (err) {
+    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+  }
 }
 
 // Item 5: toggles the client-side, current-page-only search bar (DataView.vue's same pattern).
@@ -666,6 +672,11 @@ onUnmounted(() => {
 
       <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" :icon-size="13" data-testid="stream-error">
         <span>{{ rt.error.message }}</span>
+      </MessageStrip>
+
+      <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
+      <MessageStrip v-if="rt?.actionError" tone="err" icon="error" :icon-size="13" data-testid="stream-action-error">
+        <span>{{ rt.actionError }}</span>
       </MessageStrip>
 
       <StreamSearchToolbar

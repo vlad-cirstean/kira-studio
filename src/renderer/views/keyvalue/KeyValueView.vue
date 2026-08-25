@@ -33,7 +33,17 @@ import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow, pageVersion } from './page';
 import { type Match, matchedRows, pageSearchApi, searchState } from './search';
-import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
+import {
+  goNext,
+  goPrev,
+  load,
+  reload,
+  runCount,
+  runtime,
+  setActionError,
+  setPageSize,
+  stop,
+} from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
 const props = defineProps<{ tab: KeyValueTabRecord }>();
@@ -323,13 +333,18 @@ async function onDeleteKey(): Promise<void> {
   if (!window.confirm(`Delete ${label} "${keyName.value}"? This removes the entire ${label}.`)) {
     return;
   }
-  if (isSingleObjectPage.value) {
-    if (!props.tab.connectionId) return;
-    await deleteObject(props.tab.connectionId, props.tab.path, props.tab.id);
-    await reload(props.tab.id);
-    return;
+  try {
+    if (isSingleObjectPage.value) {
+      if (!props.tab.connectionId) return;
+      await deleteObject(props.tab.connectionId, props.tab.path, props.tab.id);
+      await reload(props.tab.id);
+    } else {
+      await deleteKey(props.tab.id, keyName.value);
+    }
+    setActionError(props.tab.id, null);
+  } catch (err) {
+    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
-  await deleteKey(props.tab.id, keyName.value);
 }
 
 // --- download: a read, never blocked by read-only (D18) — enabled regardless of canUpdate/
@@ -732,6 +747,12 @@ onUnmounted(() => {
       <template #strips>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
           {{ rt.error.message }}
+        </MessageStrip>
+        <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
+             inline (editError/objectSaveError/addError below); delete has no popover of its own
+             to hold one, so it uses the shared per-tab field every other view's own strip does. -->
+        <MessageStrip v-if="rt?.actionError" tone="err" data-testid="keyvalue-action-error">
+          {{ rt.actionError }}
         </MessageStrip>
         <!-- P33 D4: an object over OBJECT_BODY_PREVIEW_BYTES has no Body row at all — this is the
              renderer's own honest explanation of that absence, gated on the same shared constant
