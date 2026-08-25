@@ -2,6 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
+import { tryParseShellText } from '../shared/document/ejson';
 import { sqlDialectFor } from '../shared/sqlIdent';
 
 function lintSqlConsole(text: string): ConsoleDiagnostic[] {
@@ -73,10 +74,77 @@ function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
   return issues;
 }
 
+// P42 D12: finds the matching ')' for the '(' at `openPos` — trusted to exist and to be well
+// nested, since this only ever runs after lintMongoBrackets has already found the statement's
+// brackets balanced (the same short-circuit lintMongoConsole itself observes below).
+function findMatchingParen(text: string, openPos: number): number {
+  let depth = 0;
+  for (let i = openPos; i < text.length; i++) {
+    const c = text[i];
+    if (c === "'" || c === '"') {
+      const quote = c;
+      i++;
+      while (i < text.length && text[i] !== quote) {
+        if (text[i] === '\\') i++;
+        i++;
+      }
+      continue;
+    }
+    if (c === '(') depth++;
+    else if (c === ')') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return text.length;
+}
+
+// Splits text[start:end) on commas outside any bracket/quote nesting — one span per top-level
+// argument, each still carrying its own leading/trailing whitespace (the caller trims).
+function splitTopLevelArgs(
+  text: string,
+  start: number,
+  end: number,
+): Array<{ text: string; from: number }> {
+  const args: Array<{ text: string; from: number }> = [];
+  let depth = 0;
+  let argStart = start;
+  let i = start;
+  while (i < end) {
+    const c = text[i];
+    if (c === "'" || c === '"') {
+      const quote = c;
+      i++;
+      while (i < end && text[i] !== quote) {
+        if (text[i] === '\\') i++;
+        i++;
+      }
+      i++;
+      continue;
+    }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth--;
+    else if (c === ',' && depth === 0) {
+      args.push({ text: text.slice(argStart, i), from: argStart });
+      argStart = i + 1;
+      i++;
+      continue;
+    }
+    i++;
+  }
+  if (argStart < end) args.push({ text: text.slice(argStart, end), from: argStart });
+  return args;
+}
+
 // D24: the shape check and the method-membership check reuse the exact same regex and the same
 // MONGO_CONSOLE_METHODS list mongo/console.ts's own parser and SUPPORTED_METHODS are built from
 // (D21), and the unsupported-method message matches mongo/console.ts's own wording verbatim so a
 // diagnostic can never contradict the adapter.
+//
+// D12: once the shape and the method are known good, each top-level argument gets validated
+// against this app's own Mongo shell-literal grammar (views/shared/document/ejson.ts's
+// tryParseShellText) — not JSON.parse, which would reject valid shell input this console actually
+// accepts (unquoted keys, single quotes, ObjectId(…)/ISODate(…) constructor calls).
 function lintMongoConsole(text: string): ConsoleDiagnostic[] {
   if (text.trim().length === 0) return [];
   const bracketIssues = lintMongoBrackets(text);
@@ -104,6 +172,26 @@ function lintMongoConsole(text: string): ConsoleDiagnostic[] {
         message: `unsupported console method: db.${collection}.${method}()`,
       },
     ];
+  }
+
+  const openParen = match.index + full.length - 1;
+  const closeParen = findMatchingParen(text, openParen);
+  for (const arg of splitTopLevelArgs(text, openParen + 1, closeParen)) {
+    const leading = arg.text.search(/\S/);
+    if (leading === -1) continue; // an empty argument (or trailing comma) is not this check's job
+    const trimmed = arg.text.trim();
+    const result = tryParseShellText(trimmed);
+    if (!result.ok) {
+      const from = arg.from + leading;
+      return [
+        {
+          from,
+          to: from + trimmed.length,
+          severity: 'error',
+          message: `invalid argument at offset ${result.offset}`,
+        },
+      ];
+    }
   }
   return [];
 }

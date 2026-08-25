@@ -506,6 +506,28 @@ test('console lint — Mongo diagnostics (D24)', async ({ kira, consoleErrors })
   await expect(underline).toHaveCount(1, { timeout: 5_000 });
   await expect(underline).toContainText('upsert');
 
+  // --- P42 D12: the argument itself is validated against this app's own Mongo shell-literal
+  // grammar — not JSON.parse, which would reject valid shell input this console accepts. -------
+  await openRowMenu(page, DB_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const brokenArgConsole = page.locator('[data-testid="console-view"]');
+  await expect(brokenArgConsole).toBeVisible();
+  await brokenArgConsole.locator('.cm-content').click();
+  await page.keyboard.type('db.widgets.find({a:})');
+  await expect(brokenArgConsole.locator('.cm-lintRange-error')).toHaveCount(1, { timeout: 5_000 });
+
+  await openRowMenu(page, DB_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  const shellLiteralConsole = page.locator('[data-testid="console-view"]');
+  await expect(shellLiteralConsole).toBeVisible();
+  await shellLiteralConsole.locator('.cm-content').click();
+  // A shell constructor call and an unquoted key are both valid shell literals, even though
+  // neither would survive a plain JSON.parse — the not-JSON.parse guarantee.
+  await page.keyboard.type('db.widgets.find({_id: ObjectId("507f191e810c19729de860ea")})');
+  await expect(shellLiteralConsole.locator('.cm-lintRange-error')).toHaveCount(0, {
+    timeout: 5_000,
+  });
+
   expect(consoleErrors).toEqual([]);
 });
 
