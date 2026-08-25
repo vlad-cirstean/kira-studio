@@ -11,13 +11,13 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
+import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import { type MenuItem, openContextMenu, runMenuShortcut } from '../../workbench/state/contextMenu';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {

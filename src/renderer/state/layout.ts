@@ -1,6 +1,6 @@
 import { defaultLayout, type Layout, type LayoutPatch } from '@shared/layout';
 import { reactive } from 'vue';
-import { control } from '../../bridge/control';
+import { control } from '../bridge/control';
 
 const WRITE_DEBOUNCE_MS = 150;
 

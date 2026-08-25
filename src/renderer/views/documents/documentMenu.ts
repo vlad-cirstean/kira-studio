@@ -1,4 +1,4 @@
-import type { MenuItem } from '../../workbench/state/contextMenu';
+import type { MenuItem } from '../../state/contextMenu';
 import { deleteDocument } from './documentMutations';
 import { parseIdLabel, toShellText } from './ejson';
 import { setAllExpanded, toggleExpanded } from './state';

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { selectedCellFor } from '../../state/cellSelection';
+import { layoutState, setCellEditorHeight } from '../../state/layout';
 import PanelSplitter from '../../workbench/PanelSplitter.vue';
-import { layoutState, setCellEditorHeight } from '../../workbench/state/layout';
 import CellEditorView from './CellEditorView.vue';
 
 // Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.

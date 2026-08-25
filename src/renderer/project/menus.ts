@@ -15,6 +15,7 @@ import {
   setConnectionReadOnly,
 } from '../state/connections';
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
+import type { MenuItem } from '../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../state/objectStore';
 import {
   activeTab,
@@ -28,7 +29,6 @@ import {
 } from '../state/tabs';
 import { runCount as runDocumentCount } from '../views/documents/state';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
-import type { MenuItem } from '../workbench/state/contextMenu';
 import { nodeIcon } from './icons';
 import {
   collapseAll,

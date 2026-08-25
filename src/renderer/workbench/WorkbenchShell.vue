@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { layoutState, setOperationsHeight, setProjectWidth } from '../state/layout';
 import PanelSplitter from './PanelSplitter.vue';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
-import { layoutState, setOperationsHeight, setProjectWidth } from './state/layout';
 
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);

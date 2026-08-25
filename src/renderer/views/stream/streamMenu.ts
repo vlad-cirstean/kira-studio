@@ -1,5 +1,5 @@
 import { copyText } from '../../clipboard';
-import type { MenuItem } from '../../workbench/state/contextMenu';
+import type { MenuItem } from '../../state/contextMenu';
 
 // Read-only view (P10's D13) — copy-only per-row menu, no edit/delete rows anywhere. Mirrors
 // keyvalue/keyValueMenu.ts; key/body only (headers/attrs/timestamp are visible inline but rarely

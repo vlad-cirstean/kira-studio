@@ -7,6 +7,7 @@ import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionsState } from '../../state/connections';
+import { type MenuItem, openContextMenu } from '../../state/contextMenu';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -17,7 +18,6 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
 import { sqlDialectFor } from '../../views/shared/sqlIdent';
-import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
 
 interface OpsListItem {

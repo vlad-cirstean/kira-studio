@@ -1,6 +1,6 @@
 import type { KeyValuePage } from '@shared/protocol/page';
 import { copyText } from '../../clipboard';
-import type { MenuItem } from '../../workbench/state/contextMenu';
+import type { MenuItem } from '../../state/contextMenu';
 
 // Copy is always available; Download/Edit/Delete are appended only when the connection's caps say
 // so (KeyValueView.vue's `caps.fileTransfer`/`canUpdate`/`canDelete`, mirroring DataToolbar's

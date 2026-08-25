@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
+import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
 import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
 import { reload as reloadDocumentTab } from '../views/documents/state';
 import { reload as reloadDataTab } from '../views/grid/state';
 import { reload as reloadKeyValueTab } from '../views/keyvalue/state';
 import { reload as reloadStreamTab } from '../views/stream/state';
-import { openContextMenu, runMenuShortcut } from '../workbench/state/contextMenu';
 import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {

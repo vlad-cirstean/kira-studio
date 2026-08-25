@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
+import { closeContextMenu, contextMenuState, type MenuItem } from '../state/contextMenu';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
-import { closeContextMenu, contextMenuState, type MenuItem } from './state/contextMenu';
 
 const SUBMENU_OPEN_DELAY_MS = 150;
 

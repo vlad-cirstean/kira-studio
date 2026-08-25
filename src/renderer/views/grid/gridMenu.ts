@@ -1,8 +1,8 @@
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
+import type { MenuItem } from '../../state/contextMenu';
 import { openDataTab } from '../../state/tabs';
-import type { MenuItem } from '../../workbench/state/contextMenu';
 import { quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   type RowSnapshot,

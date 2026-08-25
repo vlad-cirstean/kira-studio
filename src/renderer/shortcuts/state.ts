@@ -1,8 +1,8 @@
 import { reactive } from 'vue';
 import { openCreateDialog } from '../state/connections';
+import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import { activateNextTab, activatePrevTab, closeTab, tabsState } from '../state/tabs';
-import { toggleOperationsPanel, toggleProjectPanel } from '../workbench/state/layout';
 import { runCommand } from './commands';
 
 export interface PaletteCommand {

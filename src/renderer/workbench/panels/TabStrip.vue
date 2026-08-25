@@ -6,6 +6,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { revealPath } from '../../project/state/tree';
 import { connectionsState } from '../../state/connections';
+import { openContextMenu } from '../../state/contextMenu';
 import {
   activateTab,
   closeAll,
@@ -17,7 +18,6 @@ import {
 } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
-import { openContextMenu } from '../state/contextMenu';
 
 function colorFor(tab: TabRecord): string | undefined {
   return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;

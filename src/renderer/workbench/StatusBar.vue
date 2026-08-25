@@ -2,11 +2,11 @@
 import { computed } from 'vue';
 import { formatBytes } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
+import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import { engineState } from './state/engine';
-import { layoutState, toggleOperationsPanel, toggleProjectPanel } from './state/layout';
 
 const cacheTitle = computed(() => {
   const stats = cacheStatsState.stats;
