@@ -4,15 +4,15 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { isSearchFiltering, setSearchFiltering } from '../shared/searchFilter';
-import { getPage, pageVersion } from './streamPage';
+import { getPage, pageVersion } from './page';
 import {
-  clearStreamSearchState,
+  clearSearchState,
   goToNextMatch,
   goToPrevMatch,
   matchedRows,
   runStreamSearch,
-  streamSearchState,
-} from './streamSearch';
+  searchState,
+} from './search';
 
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
@@ -33,7 +33,7 @@ function toggleFilter(): void {
 }
 
 const query = ref('');
-const entry = computed(() => streamSearchState[props.tabId]);
+const entry = computed(() => searchState[props.tabId]);
 
 // See views/grid/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
 // target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
@@ -42,7 +42,7 @@ const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 watch(query, (q) => {
   runStreamSearch(props.tabId, q);
-  const e = streamSearchState[props.tabId];
+  const e = searchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
 });
 
@@ -66,7 +66,7 @@ function prev(): void {
 }
 
 function close(): void {
-  clearStreamSearchState(props.tabId);
+  clearSearchState(props.tabId);
   // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
   setSearchFiltering(props.tabId, false);
   emit('close');
@@ -86,7 +86,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  clearStreamSearchState(props.tabId);
+  clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too (mirrors grid/SearchToolbar.vue's own note).
   setSearchFiltering(props.tabId, false);

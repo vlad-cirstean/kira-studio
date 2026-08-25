@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { isSearchFiltering } from '../shared/searchFilter';
-import { getPage, streamRow } from './streamPage';
+import { getPage, streamRow } from './page';
 
 // Item 5's precedent (grid/search.ts): filters purely client-side against the already-fetched
 // page, never a fresh server call — `getPage`'s rowCount is the only thing this ever iterates.
@@ -17,19 +17,19 @@ export interface StreamSearchState {
   index: number; // position within `matches`, or -1 when there are none
 }
 
-export const streamSearchState = reactive({} as Record<string, StreamSearchState>);
+export const searchState = reactive({} as Record<string, StreamSearchState>);
 
-export function clearStreamSearchState(tabId: string): void {
-  delete streamSearchState[tabId];
+export function clearSearchState(tabId: string): void {
+  delete searchState[tabId];
 }
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here,
 // mirrors grid/search.ts's own registration.
-registerTabRuntimeCleanup(clearStreamSearchState);
+registerTabRuntimeCleanup(clearSearchState);
 
 export function runStreamSearch(tabId: string, query: string): void {
   if (query === '') {
-    clearStreamSearchState(tabId);
+    clearSearchState(tabId);
     return;
   }
   const page = getPage(tabId);
@@ -43,26 +43,26 @@ export function runStreamSearch(tabId: string, query: string): void {
       if (haystack.toLowerCase().includes(needle)) matches.push(row);
     }
   }
-  streamSearchState[tabId] = { query, matches, index: matches.length > 0 ? 0 : -1 };
+  searchState[tabId] = { query, matches, index: matches.length > 0 ? 0 : -1 };
 }
 
-// P31 D16: streamSearch's own matches are already ascending, distinct row indices (one entry
+// P31 D16: this module's own matches are already ascending, distinct row indices (one entry
 // per matching row, built by a single `row` loop) — filtering just gates them on the toggle,
 // with no de-dup pass needed the way matchedRowsOf's Match[]-shaped callers need one.
 export function matchedRows(tabId: string): number[] | null {
   if (!isSearchFiltering(tabId)) return null;
-  return streamSearchState[tabId]?.matches ?? null;
+  return searchState[tabId]?.matches ?? null;
 }
 
 export function goToNextMatch(tabId: string): number | null {
-  const s = streamSearchState[tabId];
+  const s = searchState[tabId];
   if (!s || s.matches.length === 0) return null;
   s.index = (s.index + 1) % s.matches.length;
   return s.matches[s.index];
 }
 
 export function goToPrevMatch(tabId: string): number | null {
-  const s = streamSearchState[tabId];
+  const s = searchState[tabId];
   if (!s || s.matches.length === 0) return null;
   s.index = (s.index - 1 + s.matches.length) % s.matches.length;
   return s.matches[s.index];

@@ -29,20 +29,20 @@ import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentTree from './DocumentTree.vue';
-import { documentRow, fieldNamesOnPage, pageVersion } from './docPage';
+import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
+import { beautifyShellText, toShellText } from './ejson';
+import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
+import { documentMenu } from './menu';
+import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
+import ProjectionMenu from './ProjectionMenu.vue';
+import { documentRow, fieldNamesOnPage, pageVersion } from './page';
 import {
   searchState as docSearchState,
   type Match,
   matchedRows,
   pageSearchApi,
   previewLineFor,
-} from './docSearch';
-import { documentMenu } from './documentMenu';
-import { deleteDocument, saveDocumentEdit, saveNewDocument } from './documentMutations';
-import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
-import { beautifyShellText, toShellText } from './ejson';
-import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
-import ProjectionMenu from './ProjectionMenu.vue';
+} from './search';
 import {
   goFirst,
   goLast,
@@ -342,9 +342,9 @@ const rows = computed<DocumentRowEntry[]>(() => {
 });
 
 // P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
-// matched substring wrapped in <mark> inside a preview line built with docSearch's own
+// matched substring wrapped in <mark> inside a preview line built with search.ts's own
 // previewLineFor, so the highlighted offsets can never disagree with what the scanner matched
-// against. Keyed by row (docSearch's Match has no column, unlike the grid/keyvalue's).
+// against. Keyed by row (search.ts's Match has no column, unlike the grid/keyvalue's).
 const docMatchIndex = computed(() => {
   const entry = docSearchState[props.tab.id];
   if (!entry) return null;
@@ -369,7 +369,7 @@ interface PreviewSegment {
 }
 
 // Splits the same string the scanner matched against into matched/unmatched runs, in order —
-// docSearch.ts's Match.start/end are offsets into exactly this string (previewLineFor(body)), so
+// documents/search.ts's Match.start/end are offsets into exactly this string (previewLineFor(body)), so
 // there is no separate "what did it match" computation to keep in sync.
 function previewSegments(row: number, body: string): PreviewSegment[] {
   const matches = docMatchIndex.value?.byRow.get(row);
@@ -404,7 +404,7 @@ const rowHeights = computed<number[]>(() => {
   });
 });
 
-// A search match names a row index into the currently loaded page (docSearch.ts) — jumping to it
+// A search match names a row index into the currently loaded page (documents/search.ts) — jumping to it
 // expands that document (if it wasn't already) and scrolls it into view via VirtualList's own
 // offset-aware scrollToIndex (D8) rather than querySelector + scrollIntoView, which silently did
 // nothing for a match outside the rendered window (F10). scrollToIndex takes a position in
@@ -449,7 +449,7 @@ function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
 }
 
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
-// (documentMenu.ts) — one delete path, not two.
+// (documents/menu.ts) — one delete path, not two.
 function onDeleteRow(id: string): void {
   if (!window.confirm(`Delete this document (_id: ${id})?`)) return;
   void deleteDocument(props.tab.id, id);
@@ -817,7 +817,7 @@ onUnmounted(() => {
               </div>
               <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
                    collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
-                   substring in <mark> inside the same string docSearch.ts's scanner matched
+                   substring in <mark> inside the same string documents/search.ts's scanner matched
                    against, so it cannot disagree with the offsets. Only while collapsed: an
                    expanded document's own body is out of scope (§6). -->
               <div

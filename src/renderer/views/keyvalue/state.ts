@@ -5,7 +5,7 @@ import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
 import { classifyLoadError, stopOp } from '../shared/viewOp';
-import { setPage } from './kvPage';
+import { setPage } from './page';
 
 // Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
 // memory (still no nesting to remember — a redis key's rows are always flat). `searchOpen`

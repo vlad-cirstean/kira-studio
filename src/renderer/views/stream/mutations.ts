@@ -2,7 +2,7 @@ import { data } from '../../bridge/data';
 import { findStreamTab } from '../../state/tabs';
 import { reload } from './state';
 
-// Item 3/4: mutate immediately, no staging/preview step — documentMutations.ts's precedent
+// Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
 // (P8's ground rules), extended to streams. Each op uses the `$`-prefixed sentinel fields
 // kafka/produce.ts and sqs/mutate.ts's adapters agree on (mirrors mongo/mutate.ts's `$document`).
 

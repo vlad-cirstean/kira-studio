@@ -29,10 +29,10 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
-import { keyValueMenu } from './keyValueMenu';
-import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
-import { getPage, keyValueRow, pageVersion } from './kvPage';
-import { type Match, matchedRows, pageSearchApi, searchState } from './kvSearch';
+import { keyValueMenu } from './menu';
+import { addKey, deleteKey, saveValueEdit } from './mutations';
+import { getPage, keyValueRow, pageVersion } from './page';
+import { type Match, matchedRows, pageSearchApi, searchState } from './search';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -249,7 +249,7 @@ const objectEditGate = computed<ObjectEditGate>(() => {
 });
 
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
-// immediately on Save (no staged/pending edit set — mirrors documentMutations.ts). -----------
+// immediately on Save (no staged/pending edit set — mirrors documents/mutations.ts). -----------
 const editOpen = ref(false);
 const editDraft = ref('');
 const editSaving = ref(false);
@@ -331,8 +331,8 @@ async function saveObjectEdit(): Promise<void> {
 }
 
 // --- delete: type-agnostic (DEL works for any of the six types) — confirmed inline, mirrors
-// documentMenu.ts's window.confirm() precedent for a destructive, un-staged action. S3's object
-// delete rides state/objectStore.ts's deleteObject() instead of keyValueMutations' deleteKey(),
+// documents/menu.ts's window.confirm() precedent for a destructive, un-staged action. S3's object
+// delete rides state/objectStore.ts's deleteObject() instead of mutations.ts's deleteKey(),
 // since it needs the object's whole path (not just its key name) to satisfy s3/mutate.ts's
 // bucket-rooted MutationPlan.path. ----------------------------------------------------------
 async function onDeleteKey(): Promise<void> {
@@ -482,7 +482,7 @@ function onRowClick(i: number): void {
 }
 
 // --- search: filters the already-loaded page only, never a new query (mirrors
-// views/grid/search.ts's discipline exactly — see kvSearch.ts). ------------------------------
+// views/grid/search.ts's discipline exactly — see keyvalue/search.ts). ------------------------------
 function onToggleSearch(): void {
   const r = rt.value;
   if (r) r.searchOpen = !r.searchOpen;

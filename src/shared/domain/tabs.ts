@@ -81,7 +81,7 @@ export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
 // token to advance by (P9's read.ts uses plain LRANGE offsets for lists). `pageSize` mirrors
 // DataTabState's own field (same `pageSizeSchema` literal set — the wire request already accepts
 // it for every engine, so this is pure renderer state). Edits/deletes/inserts mutate immediately
-// (documentMutations.ts's precedent, extended to keyvalue) rather than staging anything, so
+// (documents/mutations.ts's precedent, extended to keyvalue) rather than staging anything, so
 // there is still no edit/expand memory to persist beyond these two fields.
 export const keyValueTabStateSchema = z.object({
   pageIndex: z.number().int().min(0),

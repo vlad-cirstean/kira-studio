@@ -5,7 +5,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { produceKafkaMessage, publishRabbitMessage, sendSqsMessage } from './streamMutations';
+import { produceKafkaMessage, publishRabbitMessage, sendSqsMessage } from './mutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
 // sentinel fields); SQS gets body/headers but no key (SendMessage has no key concept on this

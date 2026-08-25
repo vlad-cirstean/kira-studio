@@ -11,10 +11,10 @@ import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { hydrateSettings } from './state/settings';
 import { totalRetainedBytes as consoleRetainedBytes } from './views/console/resultPages';
-import { totalRetainedBytes as documentRetainedBytes } from './views/documents/docPage';
+import { totalRetainedBytes as documentRetainedBytes } from './views/documents/page';
 import { totalRetainedBytes } from './views/grid/page';
-import { totalRetainedBytes as keyValueRetainedBytes } from './views/keyvalue/kvPage';
-import { totalRetainedBytes as streamRetainedBytes } from './views/stream/streamPage';
+import { totalRetainedBytes as keyValueRetainedBytes } from './views/keyvalue/page';
+import { totalRetainedBytes as streamRetainedBytes } from './views/stream/page';
 import { vTooltip } from './workbench/state/tooltip';
 
 declare global {

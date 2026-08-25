@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import { findDocumentTab } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
-import { fieldNamesOnPage } from './docPage';
+import { fieldNamesOnPage } from './page';
 import { setProjection } from './state';
 
 // Mirrors views/grid/ColumnsMenu.vue's UI pattern exactly (same header buttons, same list, same

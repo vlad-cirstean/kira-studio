@@ -1,12 +1,12 @@
 // The row model the virtualized document list reads: one memoized parse per page row, the
 // per-path expansion set, and the exact row height. Plain Maps/Sets keyed by row and by path —
-// never reactive (§0, D21) — with `rowsVersion` as the one reactive surface, mirroring docPage.ts's
+// never reactive (§0, D21) — with `rowsVersion` as the one reactive surface, mirroring documents/page.ts's
 // own `pageVersion`. A `reactive()` tree here would put a Proxy around every node of every document
 // on the page, which is exactly the frame budget this phase exists to protect.
 import { reactive } from 'vue';
 import { formatBytes } from '../../format';
-import { documentRow } from './docPage';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';
+import { documentRow } from './page';
 
 export interface DocumentRowView {
   index: number;
@@ -155,9 +155,9 @@ const EDITING_H = 220; // the fixed editor panel height (unchanged from the pre-
  * either, so it gets the same fixed allowance rather than a false claim of precision).
  *
  * `isExpanded` is supplied by the caller (state.ts's `isDocumentExpanded`) rather than looked up
- * here — this module and state.ts would otherwise import each other (docPage.ts already does,
+ * here — this module and state.ts would otherwise import each other (documents/page.ts already does,
  * below, for `resetRows`), and one circular edge is enough. `hasSearchPreview` is the same kind
- * of caller-supplied flag (P31 D20): DocumentView.vue's own docSearch.ts-derived state, adding
+ * of caller-supplied flag (P31 D20): DocumentView.vue's own documents/search.ts-derived state, adding
  * one line's worth of height for the collapsed row's `<mark>`-highlighted preview line.
  */
 export function rowHeight(

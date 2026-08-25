@@ -3,7 +3,7 @@ import { data } from '../../bridge/data';
 import { findKeyValueTab, openKeyValueTab } from '../../state/tabs';
 import { reload } from './state';
 
-// Keyvalue mutates immediately (mirrors views/documents/documentMutations.ts's discipline
+// Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline
 // exactly) — no pendingChanges.ts-style staged plan, no preview step. Every action calls
 // data.mutate directly and reloads the tab's current page on success so the view reflects the
 // server's own state rather than an optimistic local patch.

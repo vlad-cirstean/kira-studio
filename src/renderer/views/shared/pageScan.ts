@@ -2,10 +2,10 @@ import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { matchedRowsOf } from './searchFilter';
 
-// P39 F10: grid/search.ts, documents/docSearch.ts and keyvalue/kvSearch.ts declared the same
+// P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
 // cancel/zero-width-match/onProgress/resolve semantics, differing only in the per-row scan body.
-// stream/streamSearch.ts is deliberately NOT built on this — it is a simpler, different scanner
+// stream/search.ts is deliberately NOT built on this — it is a simpler, different scanner
 // (one case-insensitive substring match across five fixed columns, no case/word/regex toggles).
 
 export interface SearchQuery {

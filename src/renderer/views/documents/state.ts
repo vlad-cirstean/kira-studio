@@ -6,7 +6,7 @@ import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDocumentTab, patchDocumentTabState, unmarkHydrated } from '../../state/tabs';
 import { classifyLoadError, stopOp } from '../shared/viewOp';
-import { setPage } from './docPage';
+import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
 // pageSize now live on DocumentTabState (mirroring DataTabState) rather than being grid-only, so

@@ -6,7 +6,7 @@ import {
   type SearchQuery,
 } from '../shared/pageScan';
 import type { PageSearchApi } from '../shared/pageSearch';
-import { getPage, pageVersion } from './kvPage';
+import { getPage, pageVersion } from './page';
 
 export type { SearchHandle, SearchQuery };
 

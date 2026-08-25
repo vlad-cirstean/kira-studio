@@ -23,9 +23,13 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
+import { streamMenu } from './menu';
+import { deleteSqsMessage } from './mutations';
+import { getPage, pageVersion, streamRow } from './page';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
+import { matchedRows, searchState } from './search';
 import {
   applyStreamFilter,
   goNext,
@@ -38,10 +42,6 @@ import {
   setPageSize,
   stop,
 } from './state';
-import { streamMenu } from './streamMenu';
-import { deleteSqsMessage } from './streamMutations';
-import { getPage, pageVersion, streamRow } from './streamPage';
-import { matchedRows, streamSearchState } from './streamSearch';
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -350,7 +350,7 @@ const composeOpen = ref(false);
 
 // Item 4: SQS-only Delete, gated on canDelete and on a row actually being selected (item 6's
 // click-to-select doubles as this button's target — there is no separate per-row delete
-// affordance, since streamMenu.ts's context menu stays copy-only for every engine per P10's D13).
+// affordance, since stream/menu.ts's context menu stays copy-only for every engine per P10's D13).
 async function onDeleteMessage(): Promise<void> {
   const selectedRow = rt.value?.selectedRow;
   if (selectedRow === null || selectedRow === undefined) return;
@@ -366,9 +366,9 @@ function onToggleSearch(): void {
   if (r) r.searchOpen = !r.searchOpen;
 }
 
-const matchSet = computed(() => new Set(streamSearchState[props.tab.id]?.matches ?? []));
+const matchSet = computed(() => new Set(searchState[props.tab.id]?.matches ?? []));
 const currentMatchRow = computed(() => {
-  const s = streamSearchState[props.tab.id];
+  const s = searchState[props.tab.id];
   return s && s.index >= 0 ? (s.matches[s.index] ?? null) : null;
 });
 

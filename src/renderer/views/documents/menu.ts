@@ -1,6 +1,6 @@
 import type { MenuItem } from '../../state/contextMenu';
-import { deleteDocument } from './documentMutations';
 import { parseIdLabel, toShellText } from './ejson';
+import { deleteDocument } from './mutations';
 import { setAllExpanded, toggleExpanded } from './state';
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
@@ -12,7 +12,7 @@ export function documentMenu(
   allIds: string[],
   onEdit: () => void,
   // Edit is shown but disabled — with a label saying why — rather than omitted, mirroring
-  // keyValueMenu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
+  // keyvalue/menu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
   // agree, or right-clicking would offer an action the toolbar button already refused.
   editGate: { editable: boolean; label: string },
 ): MenuItem[] {

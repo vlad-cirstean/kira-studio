@@ -1,7 +1,7 @@
 // P18 D9: candidate lists for DocumentView.vue's filter/SORT boxes.
 import type { Completion } from '../../theme/primitives/completion';
 import { MONGO_QUERY_OPERATORS, MONGO_VALUE_CONSTRUCTORS } from '../shared/mongoVocabulary';
-import { fieldNamesOnPage } from './docPage';
+import { fieldNamesOnPage } from './page';
 
 // Mirrors engine/adapters/mongo/literal.ts's own bare-identifier tokenizer rule exactly — a field
 // outside it must be quoted to parse as a filter/sort-document key.

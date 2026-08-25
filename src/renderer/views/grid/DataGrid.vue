@@ -35,7 +35,7 @@ import {
   rangeToTsv,
   rowsToTsv,
 } from './clipboardFormats';
-import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './gridMenu';
+import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './menu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
   addInsertRow,
@@ -731,11 +731,11 @@ function rowSnapshot(row: number): RowSnapshot {
 }
 
 // P29 D6: the cheap precheck that makes cellNavEntry affordable — exactly the two predicates
-// gridMenu.ts already applies (foreignKeyNavItems filters on `fk.columns.includes(columnName)`;
+// grid/menu.ts already applies (foreignKeyNavItems filters on `fk.columns.includes(columnName)`;
 // referencedByItems requires `meta.primaryKey.includes(columnName)` and a non-empty
 // `referencedBy`), so a column outside both sets provably yields no items, with no snapshot
 // built. `valueNames` is the union of `columns` over BOTH edge lists — the only names
-// foreignKeyValueFilter (gridMenu.ts) ever reads out of a row's values.
+// foreignKeyValueFilter (grid/menu.ts) ever reads out of a row's values.
 const navColumns = computed<{ fk: Set<string>; pk: Set<string>; valueNames: string[] }>(() => {
   const meta = rt()?.meta ?? null;
   const fk = new Set<string>();

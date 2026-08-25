@@ -26,11 +26,11 @@ import {
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
-import { dropForTab as dropDocumentPagesForTab } from '../views/documents/docPage';
+import { dropForTab as dropDocumentPagesForTab } from '../views/documents/page';
 import { dropForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
-import { dropForTab as dropKeyValuePagesForTab } from '../views/keyvalue/kvPage';
-import { dropForTab as dropStreamPagesForTab } from '../views/stream/streamPage';
+import { dropForTab as dropKeyValuePagesForTab } from '../views/keyvalue/page';
+import { dropForTab as dropStreamPagesForTab } from '../views/stream/page';
 import { clearSelectedCellFor } from './cellSelection';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';

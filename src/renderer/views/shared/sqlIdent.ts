@@ -1,6 +1,6 @@
-// D7 (P18): quoteIdent moves here from grid/gridMenu.ts to gain a second consumer
+// D7 (P18): quoteIdent moves here from grid/menu.ts to gain a second consumer
 // (grid/filterCompletion.ts) — one shared definition beats two that can drift on the
-// backtick/double-quote split. Same trust boundary gridMenu.ts's own comment already states:
+// backtick/double-quote split. Same trust boundary grid/menu.ts's own comment already states:
 // generated as literal SQL text once, never validated against the column's type.
 //
 // P34 D17: a quoting-and-grammar *family*, not a product — MariaDB and MySQL share one dialect
@@ -10,7 +10,7 @@
 // `record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined`, and any
 // kind missing from that inline check silently fell to `undefined` — which quoteIdent below reads
 // as "double-quote it", not "this isn't SQL". A MySQL connection that wasn't added to every one
-// of those twelve sites would emit invalid double-quoted identifiers into `gridMenu.ts`'s
+// of those twelve sites would emit invalid double-quoted identifiers into `grid/menu.ts`'s
 // generated *Filter by this value* and FK-navigation predicates (P34 F22). sqlDialectFor is the
 // one place that decision is made now.
 import type { ConnectionKind } from '@shared/domain/connection';

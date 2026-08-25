@@ -7,8 +7,8 @@ import { connectionsState } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findStreamTab, patchStreamTabState, unmarkHydrated } from '../../state/tabs';
 import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { setPage } from './page';
 import { recordStreamFilterUse } from './streamFilterHistory';
-import { setPage } from './streamPage';
 
 // Mirrors views/keyvalue/state.ts's KeyValueViewRuntime shape, minus pageIndex (StreamTabState
 // is deliberately empty, §tabs.ts — offsetWindow is always token-driven, batch has no position
@@ -28,7 +28,7 @@ export interface StreamViewRuntime {
   /** Mirrors grid/state.ts's own field — a runtime UI flag, never session state (item 5). */
   searchOpen: boolean;
   /** The row last clicked, for the cell-editor preview (item 6) and — for SQS — Delete message's
-   *  target; `null` once the page reloads out from under it (see streamPage.ts's pageVersion). */
+   *  target; `null` once the page reloads out from under it (see stream/page.ts's pageVersion). */
   selectedRow: number | null;
 }
 

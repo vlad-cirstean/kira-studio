@@ -5,7 +5,7 @@ import {
   type SearchQuery,
 } from '../shared/pageScan';
 import type { PageSearchApi } from '../shared/pageSearch';
-import { documentRow, getPage, pageVersion } from './docPage';
+import { documentRow, getPage, pageVersion } from './page';
 
 export type { SearchHandle, SearchQuery };
 
@@ -23,7 +23,7 @@ export { clearSearchState, matchedRows, searchState };
 
 // P27 D9/P31 D20: DocumentView.vue's collapsed row shows only the `_id` until expanded (D1) —
 // exported so the view can build the *same* string a search matched against, and wrap the
-// matched substring using docSearch's own start/end offsets without the two ever disagreeing.
+// matched substring using search.ts's own start/end offsets without the two ever disagreeing.
 // This searches the whole document body regardless, whitespace collapsed and never truncated, so
 // a match can exist even though the un-searched row shows none of that text.
 export function previewLineFor(body: string): string {
