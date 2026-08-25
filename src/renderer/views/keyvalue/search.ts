@@ -1,5 +1,5 @@
 import { cellText } from '@shared/protocol/page';
-import { runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
+import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
 import { createPageSearch } from '../shared/pageSearch';
 import { getPage, pageVersion } from './page';
 
@@ -36,13 +36,7 @@ export function runSearch(
     page.rowCount,
     (row, pattern, out) => {
       function scanCell(col: 'field' | 'value', text: string): void {
-        pattern.lastIndex = 0;
-        let m = pattern.exec(text);
-        while (m) {
-          out.push({ row, col, start: m.index, end: m.index + m[0].length });
-          if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
-          m = pattern.exec(text);
-        }
+        eachMatch(pattern, text, (start, end) => out.push({ row, col, start, end }));
       }
       scanCell('field', cellText(fields, row, decoder));
       scanCell('value', cellText(values, row, decoder));

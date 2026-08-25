@@ -26,13 +26,31 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Throws SyntaxError synchronously for an invalid regex, before any scan starts — the contract
- *  every search toolbar depends on to show the error inline rather than as a rejected scan. */
-export function compilePattern(q: SearchQuery): RegExp {
+/** Throws SyntaxError synchronously for an invalid regex, before any scan starts. Only called from
+ *  runChunkedScan below; the SyntaxError still surfaces to a toolbar through runSearch → this. */
+function compilePattern(q: SearchQuery): RegExp {
   const flags = q.matchCase ? 'g' : 'gi';
   return q.regex
     ? new RegExp(q.text, flags)
     : new RegExp(q.wholeWord ? `\\b${escapeRegExp(q.text)}\\b` : escapeRegExp(q.text), flags);
+}
+
+/** Walks every match of `pattern` in `text`, calling `emit(start, end)` for each — the zero-width
+ *  match guard (a pattern like `x*` or `(?:)` that can match an empty string) that
+ *  grid/documents/keyvalue's per-row scan bodies each wrote out identically. `pattern.lastIndex`
+ *  is reset first so a shared RegExp scans from the start. */
+export function eachMatch(
+  pattern: RegExp,
+  text: string,
+  emit: (start: number, end: number) => void,
+): void {
+  pattern.lastIndex = 0;
+  let m = pattern.exec(text);
+  while (m) {
+    emit(m.index, m.index + m[0].length);
+    if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
+    m = pattern.exec(text);
+  }
 }
 
 // §8.5 (D28): searches the loaded page only, never the server. Iterates in chunks of 2 000 rows

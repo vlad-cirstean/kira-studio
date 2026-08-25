@@ -1,4 +1,4 @@
-import { runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
+import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
 import { createPageSearch } from '../shared/pageSearch';
 import { documentRow, getPage, pageVersion } from './page';
 
@@ -40,13 +40,7 @@ export function runSearch(
       const doc = documentRow(tabId, row);
       if (!doc) return;
       const text = previewLineFor(doc.body);
-      pattern.lastIndex = 0;
-      let m = pattern.exec(text);
-      while (m) {
-        out.push({ row, start: m.index, end: m.index + m[0].length });
-        if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
-        m = pattern.exec(text);
-      }
+      eachMatch(pattern, text, (start, end) => out.push({ row, start, end }));
     },
     q,
     onProgress,
