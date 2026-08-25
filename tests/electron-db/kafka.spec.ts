@@ -135,6 +135,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     assert.strictEqual(kafkaCaps.canDelete, false);
     assert.strictEqual(kafkaCaps.writable, true);
     assert.strictEqual(kafkaCaps.cancel, true);
+    assert.strictEqual(kafkaCaps.fileTransfer, false);
   });
 
   test('3. tree enumeration: root is topics + consumer groups, siblings', async () => {

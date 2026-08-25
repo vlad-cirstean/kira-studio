@@ -399,6 +399,7 @@ describe('postgres adapter (§9.1)', () => {
 
   test('8. cap honesty', () => {
     expect(postgresCaps.cancel).toBe(true);
+    expect(postgresCaps.fileTransfer).toBe(false);
   });
 
   test('9. children of a leaf', async () => {

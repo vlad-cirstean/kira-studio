@@ -147,6 +147,7 @@ describe('sqs adapter (§9.1, P10)', () => {
     expect(sqsCaps.canDelete).toBe(true);
     expect(sqsCaps.writable).toBe(true);
     expect(sqsCaps.cancel).toBe(true);
+    expect(sqsCaps.fileTransfer).toBe(false);
   });
 
   test('4. tree enumeration: root is a flat queue list', async () => {

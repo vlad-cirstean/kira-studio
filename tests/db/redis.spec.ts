@@ -158,6 +158,7 @@ describe('redis adapter (§9.1, P9)', () => {
     expect(redisCaps.pagination).toBe('cursor');
     expect(redisCaps.cancel).toBe(true);
     expect(redisCaps.writable).toBe(true);
+    expect(redisCaps.fileTransfer).toBe(false);
   });
 
   test('5. children of a leaf', async () => {

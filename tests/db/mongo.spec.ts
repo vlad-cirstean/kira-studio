@@ -126,6 +126,7 @@ describe('mongo adapter (§9.1, P8)', () => {
     expect(mongoCaps.pagination).toBe('cursor');
     expect(mongoCaps.cancel).toBe(true);
     expect(mongoCaps.writable).toBe(true);
+    expect(mongoCaps.fileTransfer).toBe(false);
   });
 
   test('5. children of a leaf', async () => {

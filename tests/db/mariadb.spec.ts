@@ -410,6 +410,7 @@ describe('mariadb adapter (§9.1)', () => {
 
   test('8. cap honesty', () => {
     expect(mariadbCaps.cancel).toBe(true);
+    expect(mariadbCaps.fileTransfer).toBe(false);
   });
 
   test('9. children of a leaf', async () => {
