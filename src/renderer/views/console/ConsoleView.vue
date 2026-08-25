@@ -15,12 +15,14 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
 import { consoleLintSource } from './lint';
+import { type Match, pageSearchApi } from './search';
 import {
   closeResult,
   run,
@@ -128,12 +130,29 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+// --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
+// KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
+function onToggleSearch(): void {
+  const r = rt.value;
+  if (r) r.searchOpen = !r.searchOpen;
+}
+function onCloseSearch(): void {
+  const r = rt.value;
+  if (r) r.searchOpen = false;
+}
+
+const resultGridRef = ref<{ goToMatch: (match: Match) => void } | null>(null);
+function onGoToMatch(match: Match): void {
+  resultGridRef.value?.goToMatch(match);
+}
+
 let unregisterCommands: Array<() => void> = [];
 
 onMounted(() => {
   unregisterCommands = [
     registerCommand('view.run', runStatement),
     registerCommand('view.run-all', runAll),
+    registerCommand('view.find', onToggleSearch),
   ];
 });
 
@@ -229,6 +248,14 @@ const statusLine = computed(() => {
                its button, the same shape every other toolbar menu already uses, fixes that. -->
           <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
         </div>
+        <div class="sep"></div>
+        <IconButton
+          icon="search"
+          :active="!!rt?.searchOpen"
+          v-tooltip="'Find in the active result set'"
+          data-testid="console-search"
+          @click="onToggleSearch"
+        />
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
@@ -284,9 +311,19 @@ const statusLine = computed(() => {
           </button>
           <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
         </div>
+        <SearchToolbar
+          v-if="rt.searchOpen"
+          :tab-id="tab.id"
+          testid-prefix="console-"
+          row-noun="rows"
+          :api="pageSearchApi"
+          @go-to-match="onGoToMatch"
+          @close="onCloseSearch"
+        />
         <div class="result-grid">
           <ConsoleResultGrid
             v-if="rt.activeKey"
+            ref="resultGridRef"
             :page-key="rt.activeKey"
             :tab-id="tab.id"
             :connection-id="tab.connectionId"

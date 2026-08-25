@@ -19,11 +19,20 @@ export interface ConsoleViewRuntime {
   opId: string | null; // the in-flight op, for the stop button
   results: ConsoleResult[]; // the last run's result sets — runtime-only, never saved (§8.4)
   activeKey: string | null; // which result set the single mounted grid shows (P40 D2)
+  searchOpen: boolean; // mirrors views/{grid,documents,keyvalue}/state.ts's own flag (P40 D8)
   nextSeq: number; // per-tab monotonic result-set counter (P40 D1) — never reused
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
-  return { status: 'idle', error: null, opId: null, results: [], activeKey: null, nextSeq: 0 };
+  return {
+    status: 'idle',
+    error: null,
+    opId: null,
+    results: [],
+    activeKey: null,
+    searchOpen: false,
+    nextSeq: 0,
+  };
 }
 
 const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);

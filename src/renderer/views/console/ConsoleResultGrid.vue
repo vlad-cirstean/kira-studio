@@ -7,6 +7,7 @@ import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
+import { type Match, matchedRows, searchState } from './search';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
 // result has no pager, no sort, no pending-changes, no persisted column widths/order: every one
@@ -52,7 +53,15 @@ const totalWidth = computed(() => {
   if (p?.kind !== 'tabular') return 0;
   return p.columns.reduce((sum, c) => sum + (widths.value[c.name] ?? 96), 56);
 });
-const rowIndices = computed(() => Array.from({ length: page.value?.rowCount ?? 0 }, (_, i) => i));
+
+// P40 D10/D17: the same "hide non-matching rows" toggle grid/documents/keyvalue share (P24 D2) —
+// a filtered row keeps its real page-row number in the gutter, same as those views.
+const displayRows = computed<number[] | null>(() => matchedRows(props.tabId));
+const rowIndices = computed(() => {
+  void pageVersion.n;
+  if (displayRows.value) return displayRows.value;
+  return Array.from({ length: page.value?.rowCount ?? 0 }, (_, i) => i);
+});
 
 function cellAt(row: number, col: number) {
   return cell(props.pageKey, row, col);
@@ -75,6 +84,33 @@ const selected = ref<{ row: number; col: number } | null>(null);
 function isSelected(row: number, col: number): boolean {
   return selected.value?.row === row && selected.value?.col === col;
 }
+
+// P40 D10: rebuilt only when the search result changes (a completed scan or prev/next), not per
+// cell — mirrors KeyValueView.vue's own matchIndex.
+const matchIndex = computed(() => {
+  const entry = searchState[props.tabId];
+  if (!entry) return null;
+  const set = new Set<string>();
+  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
+  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
+});
+function isSearchMatch(row: number, col: number): boolean {
+  return matchIndex.value?.set.has(`${row}:${col}`) ?? false;
+}
+function isCurrentSearchMatch(row: number, col: number): boolean {
+  const current = matchIndex.value?.current;
+  return !!current && current.row === row && current.col === col;
+}
+
+// The find toolbar's go-to-match (P40 D10) — rowIndices is the *filtered* array when the filter
+// toggle is on, so a match's page-row number has to be looked up by position rather than assumed
+// to equal it, same as DocumentView.vue's own onGoToMatch.
+const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
+function goToMatch(match: Match): void {
+  const index = rowIndices.value.indexOf(match.row);
+  if (index >= 0) listRef.value?.scrollToIndex(index);
+}
+defineExpose({ goToMatch });
 
 function publish(selectedCell: Omit<SelectedCell, 'tabId' | 'connectionId' | 'path'>): void {
   publishSelectedCell({
@@ -154,8 +190,14 @@ function selectKeyValueRow(row: number): void {
 <template>
   <div class="console-result-grid" data-testid="console-result-grid">
     <div v-if="!page || page.rowCount === 0" class="no-rows">{{ page ? 'No rows' : '' }}</div>
+    <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
+         data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
+    <div v-else-if="rowIndices.length === 0" class="no-rows" data-testid="console-no-matching-rows">
+      No matching rows
+    </div>
     <VirtualList
       v-else-if="page.kind === 'tabular'"
+      ref="listRef"
       :items="rowIndices"
       :row-height="rowHeight"
       class="body"
@@ -177,7 +219,12 @@ function selectKeyValueRow(row: number): void {
         </div>
       </template>
       <template #default="{ item: r }">
-        <div class="row" data-testid="console-result-row" :style="{ height: `${rowHeight}px` }">
+        <div
+          class="row"
+          data-testid="console-result-row"
+          :data-row="r"
+          :style="{ height: `${rowHeight}px` }"
+        >
           <div class="gutter-cell p-td gutter">{{ r + 1 }}</div>
           <div
             v-for="(col, c) in page.columns"
@@ -185,7 +232,14 @@ function selectKeyValueRow(row: number): void {
             class="cell p-td"
             data-testid="console-result-cell"
             :data-null="cellAt(r, c).isNull"
-            :class="cellClass({ alignRight: alignmentFor(col) === 'right', selected: isSelected(r, c) })"
+            :class="
+              cellClass({
+                alignRight: alignmentFor(col) === 'right',
+                selected: isSelected(r, c),
+                searchMatch: isSearchMatch(r, c),
+                searchMatchCurrent: isCurrentSearchMatch(r, c),
+              })
+            "
             :style="{ width: `${widths[col.name]}px` }"
             @click="selectTabularCell(r, c)"
           >
@@ -205,12 +259,23 @@ function selectKeyValueRow(row: number): void {
         </div>
       </template>
     </VirtualList>
-    <VirtualList v-else-if="page.kind === 'document'" :items="rowIndices" :row-height="96" class="body doc-body">
+    <VirtualList
+      v-else-if="page.kind === 'document'"
+      ref="listRef"
+      :items="rowIndices"
+      :row-height="96"
+      class="body doc-body"
+    >
       <template #default="{ item: r }">
         <div
           class="doc-row"
           data-testid="console-result-doc-row"
-          :class="{ selected: isSelected(r, 0) }"
+          :data-row="r"
+          :class="{
+            selected: isSelected(r, 0),
+            'search-match': isSearchMatch(r, 0),
+            'search-match-current': isCurrentSearchMatch(r, 0),
+          }"
           @click="selectDocumentRow(r)"
         >
           <div class="doc-id">{{ docRowAt(r).id }}</div>
@@ -218,17 +283,34 @@ function selectKeyValueRow(row: number): void {
         </div>
       </template>
     </VirtualList>
-    <VirtualList v-else :items="rowIndices" :row-height="rowHeight" class="body">
+    <VirtualList v-else ref="listRef" :items="rowIndices" :row-height="rowHeight" class="body">
       <template #default="{ item: r }">
         <div
           class="row"
           data-testid="console-result-kv-row"
+          :data-row="r"
           :class="{ selected: isSelected(r, 0) }"
           :style="{ height: `${rowHeight}px` }"
           @click="selectKeyValueRow(r)"
         >
-          <div class="cell kv-field">{{ kvRowAt(r).field }}</div>
-          <div class="cell kv-value">{{ kvRowAt(r).value }}</div>
+          <div
+            class="cell kv-field"
+            :class="{
+              'search-match': isSearchMatch(r, 0),
+              'search-match-current': isCurrentSearchMatch(r, 0),
+            }"
+          >
+            {{ kvRowAt(r).field }}
+          </div>
+          <div
+            class="cell kv-value"
+            :class="{
+              'search-match': isSearchMatch(r, 1),
+              'search-match-current': isCurrentSearchMatch(r, 1),
+            }"
+          >
+            {{ kvRowAt(r).value }}
+          </div>
         </div>
       </template>
     </VirtualList>
@@ -291,6 +373,16 @@ function selectKeyValueRow(row: number): void {
 .cell-null {
   color: var(--kira-fg-disabled);
   font-style: italic;
+}
+
+/* P40 D10: same tokens grid/keyvalue's own search highlighting uses. */
+.search-match {
+  background: var(--kira-search-match);
+}
+
+.search-match-current {
+  background: var(--kira-search-match-current);
+  color: var(--kira-bg);
 }
 
 .truncated-marker {
