@@ -108,7 +108,6 @@ interface SystemColumnRow {
   default_kind: string;
   default_expression: string;
   comment: string;
-  is_in_primary_key: number;
 }
 
 async function listColumnsRaw(
@@ -117,7 +116,7 @@ async function listColumnsRaw(
   table: string,
 ): Promise<SystemColumnRow[]> {
   return exec<SystemColumnRow>(
-    `SELECT name, type, position, default_kind, default_expression, comment, is_in_primary_key
+    `SELECT name, type, position, default_kind, default_expression, comment
      FROM system.columns
      WHERE database = {db:String} AND table = {tbl:String}
      ORDER BY position`,
@@ -128,6 +127,14 @@ async function listColumnsRaw(
 // F15/D28: nullability lives inside the type string (Nullable(T), possibly wrapped again in
 // LowCardinality), not a separate column — read.ts's own unwrapType is the one parser for it,
 // reused here rather than duplicated.
+//
+// D18/D23: isPrimaryKey is always false here, deliberately not read from
+// system.columns.is_in_primary_key — that flag tracks the sparse index's own membership, and a
+// "PK" badge means something specific everywhere else in this app: a unique, addressable row
+// identity. Showing it on a ClickHouse column would claim exactly the uniqueness F16 says does not
+// exist, undoing the same honesty ObjectMeta.primaryKey: null already commits to. The sorting/
+// primary key expression is still shown in full, verbatim, in the definition view's Table
+// properties section (D22) — the truthful place for it.
 function toColumnMeta(row: SystemColumnRow): ColumnMeta {
   const { nullable } = unwrapType(row.type);
   return {
@@ -136,7 +143,7 @@ function toColumnMeta(row: SystemColumnRow): ColumnMeta {
     dataType: row.type,
     nullable,
     defaultExpr: row.default_expression || null,
-    isPrimaryKey: row.is_in_primary_key === 1,
+    isPrimaryKey: false,
     comment: row.comment || null,
   };
 }

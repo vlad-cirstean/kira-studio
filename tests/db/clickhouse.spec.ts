@@ -250,8 +250,11 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       expect(quantity).toMatchObject({ nullable: false, defaultExpr: '1' });
       expect(quantity?.dataType).toMatch(/UInt32/);
 
+      // D18/D23: never a "PK" badge on a column either — that would claim the same uniqueness
+      // ObjectMeta.primaryKey: null already refuses to. The sorting/primary key expression is
+      // shown in full in the definition view's Table properties section instead (D22).
       const idColumn = orderItems.columns.find((c) => c.name === 'id');
-      expect(idColumn?.isPrimaryKey).toBe(true);
+      expect(idColumn?.isPrimaryKey).toBe(false);
 
       const primaryIndex = orderItems.indexes.find((i) => i.primary);
       expect(primaryIndex).toMatchObject({ unique: false, primary: true, columns: ['id'] });
