@@ -1,5 +1,5 @@
 import { json } from '@codemirror/lang-json';
-import { MySQL, PostgreSQL, SQLite, sql } from '@codemirror/lang-sql';
+import { MySQL, PostgreSQL, SQLDialect, SQLite, sql } from '@codemirror/lang-sql';
 import { xml } from '@codemirror/lang-xml';
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
@@ -103,6 +103,38 @@ const redisLanguage = StreamLanguage.define<RedisTokenState>({
   token: redisToken,
 });
 
+// P36 D30: a third shape in this file, beside "map to a vendored @codemirror/lang-sql dialect"
+// (postgres/mysql/sqlite above) and "hand-write a StreamLanguage" (mongo/redis above) — ClickHouse
+// has no vendored dialect, but its grammar is close enough to standard SQL that SQLDialect.define
+// still fits; only a StandardSQL-shaped config, not a bespoke tokenizer, is needed. Curated, not
+// exhaustive — the same "most likely to collide" judgement sqlIdent.ts's own COMMON_RESERVED set
+// makes, not a transcription of ClickHouse's full grammar.
+const ClickHouseDialect = /*@__PURE__*/ SQLDialect.define({
+  // F27: string literals use backslash escapes (verified empirically, mutate.ts's own D6 note).
+  backslashEscapes: true,
+  // ClickHouse accepts both `--` (StandardSQL default) and `#`/`#!` as a line comment.
+  hashComments: true,
+  // Double quotes quote an *identifier* here (like Postgres), never a string — the opposite of
+  // MySQL's own doubleQuotedStrings: true above; identifierQuotes below adds backtick alongside it
+  // (F28: create_table_query's own output backtick-quotes, D29).
+  doubleQuotedStrings: false,
+  identifierQuotes: '`"',
+  keywords:
+    'select from where group by order having limit offset with as distinct into values ' +
+    'insert update delete alter create drop table database view materialized dictionary ' +
+    'engine order primary key partition sample ttl settings format prewhere final sample ' +
+    'array join left right inner full cross global any all asof using on and or not in is ' +
+    'null between like exists case when then else end union all describe desc show exists ' +
+    'attach detach optimize truncate rename kill system cluster replace if not exists ' +
+    'with fill step interpolate limit by offset settings',
+  types:
+    'string fixedstring uint8 uint16 uint32 uint64 uint128 uint256 int8 int16 int32 int64 ' +
+    'int128 int256 float32 float64 decimal decimal32 decimal64 decimal128 decimal256 bool ' +
+    'boolean date date32 datetime datetime64 time time64 uuid ipv4 ipv6 enum enum8 enum16 ' +
+    'array tuple map nested lowcardinality nullable json dynamic variant point ring polygon ' +
+    'multipolygon aggregatefunction simpleaggregatefunction',
+});
+
 /**
  * Static imports, not dynamic — the grammars are small, and an `await import()` in the
  * middle of the 50 ms selection path (SPEC §2.1) would buy nothing and would race two rapid
@@ -127,7 +159,9 @@ export function languageExtension(id: EditorLanguageId, dialect?: SqlDialect): E
               ? MySQL
               : dialect === 'sqlite'
                 ? SQLite
-                : undefined,
+                : dialect === 'clickhouse'
+                  ? ClickHouseDialect
+                  : undefined,
         upperCaseKeywords: true,
       });
     case 'mongo':

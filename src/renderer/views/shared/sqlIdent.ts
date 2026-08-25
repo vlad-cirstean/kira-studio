@@ -19,18 +19,26 @@ import type { ConnectionKind } from '@shared/domain/connection';
 // (already quoteIdent's own default branch below) but is a genuinely different grammar with its
 // own CodeMirror lang-sql dialect (languages.ts), so mapping it to 'postgres' would be a lie the
 // next reader has to decode.
-export type SqlDialect = 'postgres' | 'mysql' | 'sqlite';
+// P36 D29: ClickHouse is a fourth member for the same reason SQLite is — it backtick-quotes like
+// mysql (BACKTICK_DIALECTS below) but is its own grammar, with its own languages.ts dialect.
+export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'clickhouse';
 
 /** undefined for a kind with no SQL surface (mongodb, redis, kafka, sqs, s3) or no connection. */
 export function sqlDialectFor(kind: ConnectionKind | undefined): SqlDialect | undefined {
   if (kind === 'postgres') return 'postgres';
   if (kind === 'mariadb' || kind === 'mysql') return 'mysql';
   if (kind === 'sqlite') return 'sqlite';
+  if (kind === 'clickhouse') return 'clickhouse';
   return undefined;
 }
 
+// P36 D29: ClickHouse quotes identifiers with backticks too (its own create_table_query output
+// confirms it, F28) — a set rather than a second `=== 'mysql'` check, so a future backtick dialect
+// only ever needs one line added here.
+const BACKTICK_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
+
 export function quoteIdent(dialect: SqlDialect | undefined, name: string): string {
-  if (dialect === 'mysql') return `\`${name.replace(/`/g, '``')}\``;
+  if (dialect && BACKTICK_DIALECTS.has(dialect)) return `\`${name.replace(/`/g, '``')}\``;
   return `"${name.replace(/"/g, '""')}"`;
 }
 
