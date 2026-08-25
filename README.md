@@ -3,7 +3,7 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across nine database engines.
+Vue 3 — one workbench across ten database engines.
 
 ## Status
 
@@ -26,6 +26,7 @@ Vue 3 — one workbench across nine database engines.
 | MariaDB | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MySQL² | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | SQLite³ | Grid | yes (SQL) | yes | yes | yes | yes | keyset (+ rowid) | yes |
+| ClickHouse⁴ | Grid | yes (SQL) | yes | yes | yes | yes | offset only | insert only |
 | MongoDB | Documents | yes (shell-style) | yes | yes | yes | estimate only | cursor | yes |
 | Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | yes (string keys only) |
 | Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
@@ -45,6 +46,13 @@ the first time a given user authenticates, or the server refuses to send its RSA
 one: `node:sqlite` has no `sqlite3_interrupt` and its whole API is synchronous, so a running
 statement blocks the event loop and an abort could never be delivered while one runs. A SQLite
 connection points at a file (Fields mode's Database file field) rather than a host/port.
+
+⁴ ClickHouse's own `PRIMARY KEY` is a sparse index over MergeTree parts, not a unique row key —
+there is no addressable row to update or delete, so `canUpdate`/`canDelete` stay permanently
+`false` (the same structural reason Kafka's own write flags do) and only `+ row` inserts. Pagination
+is offset-only for the same reason: no unique key exists to build a keyset cursor on. Uses
+`@clickhouse/client` (npm), the app's first added dependency since the Kafka client migration —
+pure JS, no native build step.
 
 A couple of things worth knowing up front:
 
@@ -167,9 +175,9 @@ engines and a real UI instead.
 - **`bun run test:ui`** — Playwright driving the built Electron app via `_electron.launch()`. It
   builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:ui`.
 - **Local fixture databases for manual testing** — see
-  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): all seven engines, a ~20k-row
-  e-commerce dataset for the four relational/document/key-value stores plus a small backlog for
-  Kafka/SQS/S3, via Colima + Docker Compose.
+  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): nine of the ten engines (SQLite needs
+  no container), a ~20k-row e-commerce dataset for the relational/document/key-value stores plus a
+  small backlog for Kafka/SQS/S3, via Colima + Docker Compose.
 
 ## Architecture
 

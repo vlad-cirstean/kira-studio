@@ -149,4 +149,31 @@
   P32's Kafka smoke-testing established for "the target runtime differs from the one `bun test`
   would use."
 
+## ClickHouse adapter (`@clickhouse/client`, P36)
+
+- `@clickhouse/client` (npm) is the app's **first added dependency since the P32 Kafka client
+  migration**. Unlike that one, it needs no native build step at all — it's a plain JS client
+  talking HTTP, so nothing in the native-Electron-rebuild section above applies to it.
+- The client's HTTP interface has **no per-request `database` override** — `database` is set once
+  at client construction and embedded in every request's URL query string automatically. Every
+  statement the adapter issues relies on that one construction-time default plus fully-qualified
+  `` `db`.`table` `` identifiers; don't reintroduce a per-call `database` option, the client's own
+  types don't have one.
+- **`tests/db/clickhouse.spec.ts` needs Docker** (`@testcontainers/clickhouse`, image
+  `clickhouse/clickhouse-server`) — same `isDockerAvailable()` gate as every other Testcontainers
+  spec, and the same image-pull limitation applies here as elsewhere in this sandbox (Docker's
+  daemon is reachable, but pulling images from Docker Hub through the outbound proxy returns
+  `403`). `tests/ui/clickhouse.spec.ts` is Docker-gated the same way, not unconditional like
+  SQLite's — ClickHouse needs a real server, there's no local-file equivalent.
+- **`canUpdate`/`canDelete` are permanently `false`** for this adapter (`caps.ts`) — a MergeTree
+  `PRIMARY KEY` is a sparse index over parts, not a unique row key, so there is no addressable row
+  to target. This is a structural fact about the engine, not a gap to fill in later; don't add a
+  TODO or a "not yet implemented" framing near it. The grid's `− row` button and inline cell
+  editing are both disabled for this connection kind for the same reason, with a tooltip naming it.
+- Verified in this sandbox the same way SQLite's own hard-to-run pieces were: real, targeted checks
+  against actual dependencies where a live container wasn't reachable — `splitSqlStatements` run
+  standalone against both new SQL fixture files via an esbuild-bundled script, and
+  `xvfb-run -a bunx playwright test tests/ui/clickhouse.spec.ts` run for real, failing only at the
+  same Docker image-pull step every other Docker-gated spec hits here.
+
 Full spec: `docs/v1/SPEC.md`.
