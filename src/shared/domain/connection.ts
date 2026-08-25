@@ -6,12 +6,13 @@ export const connectionKindSchema = z.enum([
   'mariadb',
   'mysql',
   'sqlite',
+  'clickhouse',
   'mongodb',
   'redis',
   'kafka',
   'sqs',
   's3',
-]); // all v1 kinds; every one has an adapter as of P35
+]); // all v1 kinds; every one has an adapter as of P36
 export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 
 // The connection dialog's default port per kind (D27's "kind-driven default port", not a
@@ -20,6 +21,9 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   postgres: 5432,
   mariadb: 3306,
   mysql: 3306,
+  // P36 D10: the HTTP interface, not the native protocol's 9000 — the only port the app's driver
+  // (@clickhouse/client, HTTP-only) can ever speak to.
+  clickhouse: 8123,
   mongodb: 27017,
   redis: 6379,
   kafka: 9092,
