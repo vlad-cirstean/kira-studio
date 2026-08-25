@@ -48,6 +48,7 @@
     "@lezer/highlight": "1.2.3",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
+    "@testcontainers/clickhouse": "12.1.0",
     "@testcontainers/kafka": "12.1.0",
     "@testcontainers/localstack": "12.1.0",
     "@testcontainers/mariadb": "12.1.0",
