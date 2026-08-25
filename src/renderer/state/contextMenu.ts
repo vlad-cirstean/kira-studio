@@ -12,6 +12,10 @@ export type MenuItem =
       danger?: boolean;
       disabled?: boolean;
       checked?: boolean;
+      /** P42 D27: a hover explanation for this one row (e.g. the cell editor's format picker) —
+       *  rendered as a plain v-tooltip, so it inherits every existing tooltip behavior (delay,
+       *  a11y mirror) for free rather than the row inventing its own. */
+      hint?: string;
       /** P21: names a binding in shared/domain/shortcuts.ts by id, never a display string — a typo is a
        *  type error, and the printed key can never drift from the key that actually runs `run()`. */
       shortcut?: ShortcutId;

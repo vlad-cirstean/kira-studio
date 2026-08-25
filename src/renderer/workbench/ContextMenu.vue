@@ -89,6 +89,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
           class="p-row row"
           :class="{ 'is-disabled': item.disabled, danger: item.danger }"
           :data-testid="`menu-item-${item.id}`"
+          v-tooltip="item.hint"
           @mouseenter="onRowEnter(item)"
           @click="onItemClick(item)"
         >

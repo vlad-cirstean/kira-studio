@@ -154,6 +154,13 @@ async function kindOf(page: Page, row: number): Promise<string> {
   return cellText(page, row, 'kind');
 }
 
+/** P42 D27: the format picker is an app-drawn menu now, not a native <select> — 'auto' or a
+ *  CellFormat key opens the trigger and clicks the matching row. */
+async function selectFormat(page: Page, format: string): Promise<void> {
+  await page.click('[data-testid="cell-editor-format"]');
+  await page.click(`[data-testid="menu-item-format-${format}"]`);
+}
+
 /** `json-invalid` is the only fixture kind whose expected detection differs from its own name. */
 // P42 D23: uuid and url are gone as detected formats (F19 — both were inert on selection) — the
 // fixture's own 'uuid'/'url' sample rows now detect as plain text, same as any other string with
@@ -321,7 +328,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   // --- scenario 6: manual override sticks per column, for the session --------------------
   await selectCell(page, jsonRow, 'sample');
-  await page.selectOption('[data-testid="cell-editor-format"]', 'text');
+  await selectFormat(page, 'text');
   await expect(panel).toHaveAttribute('data-format', 'text');
 
   for (const row of [1, 2]) {
@@ -359,8 +366,55 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   expect(kindFormat).toBe(kindDetected);
 
   await selectCell(page, jsonRow, 'sample');
-  await page.selectOption('[data-testid="cell-editor-format"]', 'auto');
+  await selectFormat(page, 'auto');
   await expect(panel).toHaveAttribute('data-format', 'json');
+
+  // --- scenario 6b: the format picker validates for real, and explains itself (D26/D28) ---
+  const invalidChip = page.locator('[data-testid="cell-editor-invalid"]');
+  await expect(invalidChip).toHaveCount(0);
+
+  // An explicit override to 'json' (not auto-detection, which would just re-classify broken
+  // JSON as plain text) makes a hand-typed syntax error surface as "broken JSON, invalid at
+  // offset N" rather than silently falling back to a format with no opinion on validity.
+  await selectFormat(page, 'json');
+  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type('{"a":}');
+  await expect(invalidChip).toBeVisible();
+  await expect(invalidChip).toHaveAttribute(
+    'data-kira-tip',
+    /^broken JSON, invalid at offset \d+$/,
+  );
+
+  await page.click('[data-testid="cell-editor-beautify-reset"]');
+  await expect(invalidChip).toHaveCount(0);
+
+  // A plain-text value overridden to iso8601 is exactly the "my timestamp is wrong" case —
+  // no edit needed, the stored value alone is not a parseable timestamp.
+  await selectCell(page, textRowIndex, 'sample');
+  await selectFormat(page, 'iso8601');
+  await expect(panel).toHaveAttribute('data-format', 'iso8601');
+  await expect(invalidChip).toBeVisible();
+  await expect(invalidChip).toHaveAttribute(
+    'data-kira-tip',
+    'not a valid timestamp for this format',
+  );
+
+  // Every row in the picker explains itself on hover (D28), reading from the same FORMAT_HELP
+  // the trigger's own tooltip uses — updateTip() writes data-kira-tip on mount, so the row need
+  // not actually be hovered to assert its content.
+  await page.click('[data-testid="cell-editor-format"]');
+  await expect(page.locator('[data-testid="menu-item-format-iso8601"]')).toHaveAttribute(
+    'data-kira-tip',
+    'A calendar date and time, spelled as an ISO-8601 timestamp.',
+  );
+  await expect(page.locator('[data-testid="menu-item-format-json"]')).toHaveAttribute(
+    'data-kira-tip',
+    'A JSON document — objects and arrays get syntax highlighting and Beautify.',
+  );
+  await page.click('[data-testid="menu-item-format-auto"]');
+  await expect(panel).toHaveAttribute('data-format', 'text');
+  await expect(invalidChip).toHaveCount(0);
 
   // --- scenario 7: NULL, empty, truncated -------------------------------------------------
   const nullsRow = await findRow(page, NULLS_PATH);
@@ -847,7 +901,7 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
 
   // A manual format override, set now so step (7) below can assert it survives the moves ahead
   // untouched (D13 — the override map is keyed by (connection, path, column), not by tab).
-  await page.selectOption('[data-testid="cell-editor-format"]', 'text');
+  await selectFormat(page, 'text');
   await expect(panel).toHaveAttribute('data-format', 'text');
 
   // (2) Ownership: the panel lives inside the tab's own view subtree, not beside it — this is

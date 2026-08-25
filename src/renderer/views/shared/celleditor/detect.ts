@@ -284,7 +284,9 @@ function splitCsvLine(line: string, delim: string): string[] | null {
   return fields;
 }
 
-function pickCsvShape(lines: string[]): { delim: string; fieldCount: number } | null {
+// P42 D26: exported so validate.ts can answer "is this really CSV" for an overridden format
+// with the exact same shape rule the detector itself uses, rather than a second implementation.
+export function pickCsvShape(lines: string[]): { delim: string; fieldCount: number } | null {
   for (const delim of [',', '\t', ';']) {
     const rows = lines.map((l) => splitCsvLine(l, delim));
     if (rows.some((r) => r === null)) continue;

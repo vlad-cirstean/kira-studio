@@ -6,6 +6,7 @@ import type { EditorLanguageId } from '../../../editor/languages';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
 import { connectionRecord } from '../../../state/connections';
+import { type MenuItem, openContextMenu } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import IconButton from '../../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
@@ -16,14 +17,16 @@ import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
   beautifyFor,
-  CELL_FORMATS,
   type CellFormat,
   canBeautify,
+  FORMAT_GROUPS,
+  FORMAT_HELP,
   FORMAT_LABEL,
   FORMAT_LANGUAGE,
 } from './formats';
 import { overrideFor, readOnlyReasonFor, setOverride } from './state';
 import TimestampPane from './TimestampPane.vue';
+import { validateFormat } from './validate';
 
 // P24 D23: hoisted out of statusLine's own recompute — this sits on the 50 ms cell-selection
 // path (§2.1), and a stateless TextEncoder never needs to be reallocated per keystroke.
@@ -255,10 +258,50 @@ function closePanel(): void {
   clearSelectedCellFor(selectedCell.value.tabId);
 }
 
-function onFormatSelect(e: Event): void {
-  const c = selectedCell.value;
-  const value = (e.target as HTMLSelectElement).value;
-  setOverride(c, value === 'auto' ? null : (value as CellFormat));
+// P42 D26: validated against the *effective* format, on the live buffer — a value that fails
+// says so right beside the status badge, whether the format was auto-detected or overridden.
+const formatProblem = computed(() =>
+  isNullValue.value ? null : validateFormat(effectiveFormat.value, doc.value),
+);
+
+// P42 D28: the trigger's own tooltip explains the effective format, the same map the picker's
+// own rows read (FORMAT_HELP) — one source, two surfaces, no way to drift.
+const formatHint = computed(() => FORMAT_HELP[effectiveFormat.value]);
+
+function setFormat(format: CellFormat | null): void {
+  setOverride(selectedCell.value, format);
+}
+
+// P42 D27: an app-drawn picker, not a native <select> — the only way a per-row hover explanation
+// (item 16) can exist at all, since a native <option> is drawn outside the DOM elementFromPoint
+// can reach. An "Auto — X" row first, then FORMAT_GROUPS' own three groups separated, `checked`
+// on whichever is effective right now.
+function openFormatMenu(e: MouseEvent): void {
+  if (isNullValue.value) return;
+  const rows: MenuItem[] = [
+    {
+      type: 'item',
+      id: 'format-auto',
+      label: `Auto — ${FORMAT_LABEL[detectedFormat.value]}`,
+      checked: override.value === null,
+      hint: detectedReason.value || undefined,
+      run: () => setFormat(null),
+    },
+  ];
+  FORMAT_GROUPS.forEach((group, i) => {
+    if (i > 0) rows.push({ type: 'separator' });
+    for (const f of group) {
+      rows.push({
+        type: 'item',
+        id: `format-${f}`,
+        label: FORMAT_LABEL[f],
+        checked: override.value === f,
+        hint: FORMAT_HELP[f],
+        run: () => setFormat(f),
+      });
+    }
+  });
+  openContextMenu(e, rows);
 }
 
 const targetLabel = computed(() => {
@@ -298,6 +341,7 @@ const statusLine = computed(() => {
     :data-read-only-reason="readOnlyReason"
     :data-formatted="formatted"
     :data-dirty="isDirty"
+    :data-invalid="!!formatProblem || undefined"
   >
     <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
          badges, then this panel's own controls, then the trailing group pushed to the edge.
@@ -315,19 +359,29 @@ const statusLine = computed(() => {
       <span class="p-badge status-badge" v-tooltip="statusLine" data-testid="cell-editor-status">{{
         statusLine
       }}</span>
+      <span
+        v-if="formatProblem"
+        class="p-chip warn"
+        data-testid="cell-editor-invalid"
+        v-tooltip="formatProblem.message"
+        >invalid</span
+      >
 
       <span class="format-group">
-        <select
+        <button
+          type="button"
           class="p-select bordered format-select"
           data-testid="cell-editor-format"
+          :class="{ 'is-invalid': !!formatProblem }"
           :disabled="isNullValue"
-          :value="override ?? 'auto'"
-          v-tooltip="detectedReason"
-          @change="onFormatSelect"
+          v-tooltip="formatHint"
+          @click="openFormatMenu"
         >
-          <option value="auto">Auto — {{ FORMAT_LABEL[detectedFormat] }}</option>
-          <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
-        </select>
+          <span class="format-select-label">{{
+            override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
+          }}</span>
+          <CodiconIcon name="chevron-down" :size="12" />
+        </button>
 
         <!-- P40 D13: EditBufferActions' own modified chip/byte badge/Beautify/Revert describe an
              edit buffer that, in a viewer, can never be dirty. (P42: the UUID-generate button
@@ -435,15 +489,31 @@ const statusLine = computed(() => {
   flex-shrink: 0;
 }
 
+/* P42 D27: an app-drawn menu trigger, not a native <select> — border/background/padding/cursor
+   still come from .p-select.bordered (plain CSS, unaffected by the element swap); its own
+   appearance:base-select/::picker(select)/option rules are select-only and simply don't match a
+   <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
   max-width: 160px;
   /* .p-select.bordered defaults to --kira-h-md (26px) — taller than the IconButtons/28px header
      row it sits in here; match --kira-h-sm like everything else alongside it. */
   height: var(--kira-h-sm);
+  font-family: var(--kira-font-family);
+}
+
+.format-select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .format-select:disabled {
   color: var(--kira-fg-disabled);
+  cursor: default;
+}
+
+.format-select.is-invalid {
+  border-color: var(--kira-error);
 }
 
 /* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation
