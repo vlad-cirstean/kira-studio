@@ -284,6 +284,13 @@ export async function setProjection(tabId: string, projection: string[] | null):
 
 export async function setFilter(tabId: string, filter: string | null): Promise<void> {
   resetTokens(tabId);
+  // P43 F7/D10: a count taken under the previous WHERE is an answer to a different question, not
+  // a drifted answer to this one — `stale` (§7) would still leave a wrong `of M` in the pager and
+  // still let ⏭ page past the end. Clearing it (not staling it) returns the pager to "page N" with
+  // no total, exactly what an un-counted state already looks like. Projection/sort setters below
+  // don't do this: neither changes which rows match.
+  const rt = ensureRuntime(tabId);
+  rt.count = null;
   patchDataTabState(tabId, { filter, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }

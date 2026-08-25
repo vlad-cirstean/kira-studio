@@ -211,7 +211,23 @@ export async function goToPage(tabId: string, n: number): Promise<void> {
   await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize });
 }
 
+// P43 F8/D11: mirrors views/grid/state.ts's own resetTokens exactly — a keyset token is only
+// meaningful under the query that produced it. On the happy path the very next load() overwrites
+// nextToken/prevToken anyway, which is why this gap was never seen; when that load fails or is
+// superseded (load()'s own `if (rt.opId !== opId) return`), goNext/goPrev would otherwise send a
+// cursor built under the *old* filter/sort/projection. The grid already guards this; this view
+// didn't.
+function resetTokens(tabId: string): void {
+  const rt = ensureRuntime(tabId);
+  rt.nextToken = null;
+  rt.prevToken = null;
+}
+
 export function setSearch(tabId: string, text: string): void {
+  resetTokens(tabId);
+  // P43 F7/D10: same reasoning as views/grid/state.ts's setFilter — a count taken under the
+  // previous search text answers a different question, not a drifted answer to this one.
+  ensureRuntime(tabId).count = null;
   patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
   void load(tabId);
 }
@@ -223,16 +239,19 @@ export function setSearch(tabId: string, text: string): void {
 // read.ts's D6 keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
 // goNext/goPrev (above) use to compute that offset.
 export function setProjection(tabId: string, projection: string[] | null): void {
+  resetTokens(tabId);
   patchDocumentTabState(tabId, { projection, pageIndex: 0 });
   void load(tabId);
 }
 
 export function setSort(tabId: string, sort: SortSpec | null): void {
+  resetTokens(tabId);
   patchDocumentTabState(tabId, { sort, pageIndex: 0 });
   void load(tabId);
 }
 
 export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize']): void {
+  resetTokens(tabId);
   patchDocumentTabState(tabId, { pageSize, pageIndex: 0 });
   void load(tabId);
 }

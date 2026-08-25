@@ -261,7 +261,7 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
 // P43: a second, focused test rather than growing the scenario above — this is the one Docker-free
 // spec that can give commits 5/7/8/9's own findings real, executed coverage (§5).
-test('sqlite — a failed commit reports the server error, verbatim', async ({
+test('sqlite — a failed commit reports the server error, verbatim; a filter change invalidates the count', async ({
   kira,
   consoleErrors,
 }) => {
@@ -311,4 +311,26 @@ test('sqlite — a failed commit reports the server error, verbatim', async ({
   // The last assertion that actually proves the unhandled rejection is gone, not merely
   // accompanied by a strip.
   expect(consoleErrors).toEqual([]);
+
+  // --- P43 F7/D10: a filter change invalidates the tab's count, rather than leaving a stale
+  // total (and a ⏭ that can page past the end) pointing at the previous WHERE's row set. ---------
+  const countButton = page.locator('[data-testid="toolbar-count"]');
+  await countButton.click();
+  await expect(countButton).toHaveAttribute('data-kira-tip', /Σ/, { timeout: 10_000 });
+  const beforeTip = await countButton.getAttribute('data-kira-tip');
+  expect(beforeTip).toMatch(/Σ\s*\d/);
+  const pagerLast = page.locator('[data-testid="pager-last"]');
+  await expect(pagerLast).toBeEnabled();
+
+  const whereInput = page.locator('[data-testid="filter-where-input"]');
+  await whereInput.fill('id = 1');
+  await whereInput.press('Enter');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+
+  await expect(countButton).toHaveAttribute('data-kira-tip', 'Count all rows');
+  await expect(pagerLast).toBeDisabled();
+
+  await countButton.click();
+  await expect(countButton).toHaveAttribute('data-kira-tip', /Σ\s*1(?!\d)/, { timeout: 10_000 });
+  await expect(pagerLast).toBeEnabled();
 });

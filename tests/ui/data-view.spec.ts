@@ -186,6 +186,37 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
     .poll(async () => ofKind(await getOps(page, connectionId), 'count').length)
     .toBe(ofKind(opsBeforeCountRefresh, 'count').length + 1);
 
+  // --- P43 F7/D10: a filter change invalidates the count — not merely a stale total, which
+  // would also leave ⏭ pointing past the filtered row set's actual end. ---------------------
+  await page.fill('[data-testid="filter-where-input"]', 'id <= 5');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    'Count all rows',
+  );
+  await expect(page.locator('[data-testid="pager-last"]')).toBeDisabled();
+  await page.click('[data-testid="toolbar-count"]');
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    /Σ\s*5(?!\d)/,
+    { timeout: 15_000 },
+  );
+  await expect(page.locator('[data-testid="pager-last"]')).toBeEnabled();
+
+  // Back to the unfiltered 1,000,000-row set the rest of this test assumes.
+  await page.fill('[data-testid="filter-where-input"]', '');
+  await page.press('[data-testid="filter-where-input"]', 'Enter');
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    'Count all rows',
+  );
+  await page.click('[data-testid="toolbar-count"]');
+  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
+    'data-kira-tip',
+    /1,000,000/,
+    { timeout: 15_000 },
+  );
+
   // The page input only reacts to a native `change` event (@change="onJump"), which Enter does
   // not fire on its own — Tab moves focus away and blurs it, which does.
   await page.fill('[data-testid="pager-page-input"]', '100000');
