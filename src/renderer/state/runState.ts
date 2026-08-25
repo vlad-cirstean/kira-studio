@@ -35,7 +35,16 @@ export function useRunState(tabId: () => string | null | undefined): ComputedRef
   return computed(() => {
     const id = tabId();
     if (!id) return IDLE;
-    const record = opsState.records.find((r) => r.tabId === id);
+    // P43 iter2 F14/D19: opsState.records is newest-started-first (state/ops.ts), so a plain
+    // `.find` picks whichever of two concurrent ops on the same tab started last — a fast op
+    // (e.g. a page read) finishing first then reads as "idle" while a slower sibling (e.g. Σ) is
+    // still running, and the toolbar's ring goes dark mid-query. Preferring a running record over
+    // any newer finished one answers the question the ring actually asks: is *anything* for this
+    // tab still waiting on the server. Falls back to the newest record when none is running, so
+    // the idle slot's duration is unchanged from before.
+    const record =
+      opsState.records.find((r) => r.tabId === id && r.status === 'running') ??
+      opsState.records.find((r) => r.tabId === id);
     if (!record) return IDLE;
     if (record.status === 'running') {
       return { status: 'running', elapsedMs: now.value - new Date(record.startedAt).getTime() };
