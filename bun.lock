@@ -36,6 +36,7 @@
         "@testcontainers/kafka": "12.1.0",
         "@testcontainers/localstack": "12.1.0",
         "@testcontainers/mariadb": "12.1.0",
+        "@testcontainers/mysql": "12.1.0",
         "@testcontainers/postgresql": "12.1.0",
         "@testcontainers/redis": "12.1.0",
         "@types/node": "26.2.0",
@@ -433,6 +434,8 @@
     "@testcontainers/localstack": ["@testcontainers/localstack@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-nemXUXGpb0SwY4ZntJMGo/0pv8/1Wdlmv8DwFX8ucxzzvXR+gr5eNaq+gGtKBqgIL7q3hsCubxE6eOeVy2BgRw=="],
 
     "@testcontainers/mariadb": ["@testcontainers/mariadb@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-Py/NPQnOyRXdaRybdxe8D6JdmRXit2hhVVr/EwBoSuGNfm0Ew407N8ocWAAEB0vi8dirvwy/v+9/rczWigOaxQ=="],
+
+    "@testcontainers/mysql": ["@testcontainers/mysql@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-fNuN+Fs2N0EQBSk6HVplSl7qxFGUX9gzNw0ljr903PbBhvy2BM3Wl4kVAa1lFpizb8cY8mKYAs0C8cDL5JRIAg=="],
 
     "@testcontainers/postgresql": ["@testcontainers/postgresql@12.1.0", "", { "dependencies": { "testcontainers": "^12.1.0" } }, "sha512-Pjf2VSVNirEPfz36nidyrVAnZvc2YhajOznY4VgyEsvfTd5qiMNOuPq96drREvxAUtXl5SFLX7vXj7sSq4aTcA=="],
 

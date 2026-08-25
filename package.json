@@ -51,6 +51,7 @@
     "@testcontainers/kafka": "12.1.0",
     "@testcontainers/localstack": "12.1.0",
     "@testcontainers/mariadb": "12.1.0",
+    "@testcontainers/mysql": "12.1.0",
     "@testcontainers/postgresql": "12.1.0",
     "@testcontainers/redis": "12.1.0",
     "@types/node": "26.2.0",
