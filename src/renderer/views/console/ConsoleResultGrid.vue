@@ -15,6 +15,7 @@ import {
   togglePath,
 } from '../shared/document/rows';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import { typeDescription } from '../shared/typeGlossary';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
@@ -89,6 +90,24 @@ const rowIndices = computed(() => {
 
 function cellAt(row: number, col: number) {
   return cell(props.pageKey, row, col);
+}
+
+// P42 D39: search state here is keyed by tabId (D9), same as every runSearch below — VirtualList
+// reports positions within `rowIndices`/`documentRows`, which are ascending but, while filtering,
+// non-contiguous page-row indices (same reasoning as DocumentView.vue's own onVisibleRange).
+function onVisibleRangeIndices(range: { start: number; end: number }): void {
+  const list = rowIndices.value;
+  const from = list[range.start];
+  const to = list[Math.max(range.start, range.end - 1)];
+  if (from === undefined || to === undefined) return;
+  setVisibleRows(props.tabId, from, to + 1);
+}
+function onVisibleRangeDocs(range: { start: number; end: number }): void {
+  const list = documentRows.value;
+  const from = list[range.start]?.index;
+  const to = list[Math.max(range.start, range.end - 1)]?.index;
+  if (from === undefined || to === undefined) return;
+  setVisibleRows(props.tabId, from, to + 1);
 }
 
 // P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
@@ -260,6 +279,7 @@ function selectKeyValueRow(row: number): void {
       :row-height="rowHeight"
       class="body"
       :style="{ '--total-width': `${totalWidth}px` }"
+      @visible-range="onVisibleRangeIndices"
     >
       <template #header>
         <div class="row header-row p-thead" :style="{ height: `${rowHeight}px` }">
@@ -324,6 +344,7 @@ function selectKeyValueRow(row: number): void {
       :row-height="26"
       :row-heights="documentRowHeights"
       class="body doc-body"
+      @visible-range="onVisibleRangeDocs"
     >
       <template #default="{ item: view }">
         <div
@@ -378,7 +399,14 @@ function selectKeyValueRow(row: number): void {
         </div>
       </template>
     </VirtualList>
-    <VirtualList v-else ref="listRef" :items="rowIndices" :row-height="rowHeight" class="body">
+    <VirtualList
+      v-else
+      ref="listRef"
+      :items="rowIndices"
+      :row-height="rowHeight"
+      class="body"
+      @visible-range="onVisibleRangeIndices"
+    >
       <template #default="{ item: r }">
         <div
           class="row"

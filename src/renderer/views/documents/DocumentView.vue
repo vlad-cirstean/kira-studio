@@ -37,6 +37,7 @@ import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
@@ -298,6 +299,19 @@ const rows = computed<DocumentRowEntry[]>(() => {
   }
   return out;
 });
+
+// P42 D39: VirtualList reports positions *within* `rows` (§ above) — while filtering, that array
+// is a non-contiguous subset of page-row indices, so the reported bounds are resolved back to
+// real page rows through each end's own `view.index` rather than assumed to equal it. `rows` is
+// itself always ascending (matchedRows' own ascending-de-duplicated contract), so the first and
+// last entries of the slice are its min/max.
+function onVisibleRange(range: { start: number; end: number }): void {
+  const list = rows.value;
+  const from = list[range.start]?.view.index;
+  const to = list[Math.max(range.start, range.end - 1)]?.view.index;
+  if (from === undefined || to === undefined) return;
+  setVisibleRows(props.tab.id, from, to + 1);
+}
 
 // P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
 // matched substring wrapped in <mark> inside a preview line built with search.ts's own
@@ -711,6 +725,7 @@ onUnmounted(() => {
           :items="rows"
           :row-height="26"
           :row-heights="rowHeights"
+          @visible-range="onVisibleRange"
         >
           <template #default="{ item, index }">
             <div

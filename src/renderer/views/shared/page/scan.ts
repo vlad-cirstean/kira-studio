@@ -51,32 +51,62 @@ export function eachMatch(
 
 // §8.5 (D28): searches the loaded page only, never the server. Iterates in chunks of 2 000 rows
 // per animation frame; a new keystroke cancels and restarts.
+//
+// P42 D37: `opts.priority`, when given, is scanned first — in its own frame, reported through
+// `onProgress` — before the ordinary ascending pass starts from row 0. That ascending pass always
+// rebuilds `matches` from scratch and is what `done` resolves to, so the final array is strictly
+// ascending regardless of where the priority window sat (F30's contract); the window's own rows
+// are therefore scanned twice, which is free next to a page of thousands. `onProgress`'s 4th
+// argument is the matches found so far — for the priority tick, that window's own matches only
+// (never folded into `matches` itself); for every tick after, `matches` itself, as a fresh
+// ascending slice. Omitting `opts` is byte-for-byte today's behaviour.
 export function runChunkedScan<M>(
   totalRows: number,
   scanRow: (row: number, pattern: RegExp, out: M[]) => void,
   q: SearchQuery,
-  onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
+  onProgress: (found: number, rowsScanned: number, totalRows: number, soFar: readonly M[]) => void,
+  opts?: { priority?: { from: number; to: number } },
 ): SearchHandle<M> {
   const pattern = compilePattern(q);
   let cancelled = false;
   const matches: M[] = [];
 
   const done = new Promise<M[]>((resolve) => {
-    let row = 0;
-    function step(): void {
-      if (cancelled) {
-        resolve(matches);
-        return;
+    function runMainPass(): void {
+      let row = 0;
+      function step(): void {
+        if (cancelled) {
+          resolve(matches);
+          return;
+        }
+        const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
+        for (; row < chunkEnd; row++) {
+          scanRow(row, pattern, matches);
+        }
+        onProgress(matches.length, row, totalRows, matches);
+        if (row < totalRows) requestAnimationFrame(step);
+        else resolve(matches);
       }
-      const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
-      for (; row < chunkEnd; row++) {
-        scanRow(row, pattern, matches);
-      }
-      onProgress(matches.length, row, totalRows);
-      if (row < totalRows) requestAnimationFrame(step);
-      else resolve(matches);
+      requestAnimationFrame(step);
     }
-    requestAnimationFrame(step);
+
+    const priority = opts?.priority;
+    const from = priority ? Math.max(0, priority.from) : 0;
+    const to = priority ? Math.min(totalRows, priority.to) : 0;
+    if (to > from) {
+      requestAnimationFrame(() => {
+        if (cancelled) {
+          resolve(matches);
+          return;
+        }
+        const priorityMatches: M[] = [];
+        for (let row = from; row < to; row++) scanRow(row, pattern, priorityMatches);
+        onProgress(priorityMatches.length, 0, totalRows, priorityMatches);
+        runMainPass();
+      });
+    } else {
+      runMainPass();
+    }
   });
 
   return {

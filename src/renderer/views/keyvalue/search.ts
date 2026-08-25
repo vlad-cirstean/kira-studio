@@ -6,6 +6,7 @@ import {
   type SearchQuery,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
+import { visibleRowsOf } from '../shared/page/visibleRows';
 import { getPage, pageVersion } from './page';
 
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns
@@ -24,7 +25,12 @@ export interface Match {
 export function runSearch(
   tabId: string,
   q: SearchQuery,
-  onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
+  onProgress: (
+    found: number,
+    rowsScanned: number,
+    totalRows: number,
+    soFar: readonly Match[],
+  ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
   if (!page || q.text === '') {
@@ -46,6 +52,11 @@ export function runSearch(
     },
     q,
     onProgress,
+    // P42 D39: KeyValueView.vue renders every loaded row directly (no VirtualList), so nothing
+    // ever calls setVisibleRows for this tab and this always resolves to `undefined` — the same
+    // plain ascending scan as before D37. Still gains D38's progressive publication, which needs
+    // no visible-window input at all.
+    { priority: visibleRowsOf(tabId) ?? undefined },
   );
 }
 

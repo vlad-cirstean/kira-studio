@@ -77,8 +77,13 @@ function startSearch(autoScroll = true): void {
         wholeWord: wholeWord.value,
         regex: regex.value,
       },
-      (found) => {
+      // P42 D38: every tick — the priority window's own pre-scan included — publishes into
+      // searchState itself, not just this toolbar's local counter, so highlighting updates as the
+      // scan runs rather than only once at the end (F29). `pending: true` is what tells
+      // matchedRows() (search.ts) not to filter on an answer the scan hasn't finished yet.
+      (found, _rowsScanned, _totalRows, soFar) => {
         foundSoFar.value = found;
+        props.api.searchState[props.tabId] = { matches: [...soFar], index: -1, pending: true };
       },
     );
   } catch (err) {
@@ -232,11 +237,15 @@ onUnmounted(() => {
       >{{ errorMessage }}</span
     >
     <template v-else>
+      <!-- P42 D38: `scanning` now wins over a non-empty `entry` — a scan in progress publishes
+           partial matches into searchState too (so highlighting can show them immediately), and
+           without this order swap that partial entry's own non-zero length would make the branch
+           above print a growing, and misleading, "0 of N" instead of "N…". -->
       <span class="p-sm muted search-count" :data-testid="`${testidPrefix}search-count`">
-        <template v-if="entry && entry.matches.length > 0">
+        <template v-if="scanning">{{ foundSoFar }}…</template>
+        <template v-else-if="entry && entry.matches.length > 0">
           <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
         </template>
-        <template v-else-if="scanning">{{ foundSoFar }}…</template>
         <template v-else>0 of 0</template>
       </span>
       <IconButton

@@ -5,6 +5,7 @@ import {
   type SearchQuery,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
+import { visibleRowsOf } from '../shared/page/visibleRows';
 import { documentRow, getPage, pageVersion } from './page';
 
 export interface Match {
@@ -30,7 +31,12 @@ export function previewLineFor(body: string): string {
 export function runSearch(
   tabId: string,
   q: SearchQuery,
-  onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
+  onProgress: (
+    found: number,
+    rowsScanned: number,
+    totalRows: number,
+    soFar: readonly Match[],
+  ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
   if (!page || q.text === '') {
@@ -47,6 +53,8 @@ export function runSearch(
     },
     q,
     onProgress,
+    // P42 D39: the rows DocumentView.vue's VirtualList currently has on screen (D37).
+    { priority: visibleRowsOf(tabId) ?? undefined },
   );
 }
 

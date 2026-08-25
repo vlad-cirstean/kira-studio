@@ -27,6 +27,7 @@ import {
   visibleColumnRange,
 } from '../shared/page/columns';
 import { setSearchFiltering } from '../shared/page/searchFilter';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { typeDescription } from '../shared/typeGlossary';
 import {
@@ -386,6 +387,13 @@ const visiblePageRowBounds = computed(() => {
   return { start: min, end: max + 1 };
 });
 watch(visiblePageRowBounds, (r) => setVisibleWindow(props.tabId, r.start, r.end));
+// P42 D39: the same bounds, reported into the search-priority registry too — a decode-cache hint
+// and a scan's own starting point are different concerns (F31a) even though they share an input.
+// `immediate: true` (unlike the cache-hint watch above) so a search started before the first
+// scroll event still has a real window to prioritize, rather than falling back to none.
+watch(visiblePageRowBounds, (r) => setVisibleRows(props.tabId, r.start, r.end), {
+  immediate: true,
+});
 
 const visibleColumnIndices = computed(() => {
   const out: number[] = [];

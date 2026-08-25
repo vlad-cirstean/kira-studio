@@ -389,6 +389,48 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   // --- stop: a filtered read cancelled mid-flight, previous page stays on screen -----------
   await page.click('[data-testid="page-size-10000"]');
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('10000');
+
+  // --- P42 D37/D38: viewport-first search — the rows on screen highlight before the full scan
+  // finishes, and the filter toggle waits for a *completed* scan before it hides anything. Not a
+  // timing race: runChunkedScan's priority window is scanned in its own animation frame before the
+  // ordinary ascending pass even starts, and that pass alone needs 5 more frame boundaries to walk
+  // all 10 000 rows at CHUNK_ROWS=2000 — so ".search-match" appearing here is always well ahead of
+  // "search-count" finishing, on any machine speed. -------------------------------------------
+  await scrollGridToBottom(page);
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.fill('[data-testid="search-input"]', '^9999$'); // id=9999 — one row, near the bottom
+
+  await expect(page.locator('.search-match')).toBeVisible({ timeout: 2_000 });
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('…');
+
+  // D38: a filter toggled on mid-scan hides nothing — matchedRows() reads null while pending.
+  await filterToggle.click();
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(10000);
+
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 1', {
+    timeout: 15_000,
+  });
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1); // now filtering applies
+  await filterToggle.click(); // back off, for the ascending check below
+
+  // F30: the completed match list stays strictly ascending regardless of where the priority
+  // window sat — three rows spread across the loaded page, driven with next/next/next.
+  await page.fill('[data-testid="search-input"]', '^(100|5000|9000)$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3', {
+    timeout: 15_000,
+  });
+  let lastMatchRow = -1;
+  for (let i = 0; i < 3; i++) {
+    const row = Number(await page.locator('.search-match-current').getAttribute('data-row'));
+    expect(row).toBeGreaterThan(lastMatchRow);
+    lastMatchRow = row;
+    await page.click('[data-testid="search-next"]');
+  }
+
+  await page.click('[data-testid="search-close"]');
+  await expect(searchToolbar).toHaveCount(0);
+
   const firstBeforeStop = await firstGutterNumber(page);
   // `(SELECT pg_sleep(2)) IS NULL` is an uncorrelated subquery — Postgres hoists it into a
   // one-shot InitPlan regardless of row count, giving this filtered read a flat, deterministic

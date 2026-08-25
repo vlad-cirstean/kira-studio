@@ -6,6 +6,7 @@ import {
   type SearchQuery,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
+import { visibleRowsOf } from '../shared/page/visibleRows';
 import { pageVersion } from './resultPages';
 import { activePage } from './state';
 
@@ -40,7 +41,12 @@ function scanChunk(
 export function runSearch(
   tabId: string,
   q: SearchQuery,
-  onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
+  onProgress: (
+    found: number,
+    rowsScanned: number,
+    totalRows: number,
+    soFar: readonly Match[],
+  ) => void,
 ): SearchHandle<Match> {
   const page = activePage(tabId);
   if (!page || q.text === '') {
@@ -48,6 +54,10 @@ export function runSearch(
   }
 
   const decoder = new TextDecoder();
+  // P42 D39: the rows ConsoleResultGrid.vue's VirtualList currently has on screen (D37) — keyed
+  // by tabId like every other search.ts/PageSearchApi entry point here (D9), not by result key,
+  // since only the active result set is ever rendered (and therefore reportable) at a time.
+  const priority = { priority: visibleRowsOf(tabId) ?? undefined };
 
   if (page.kind === 'tabular') {
     const colCount = page.columns.length;
@@ -62,6 +72,7 @@ export function runSearch(
       },
       q,
       onProgress,
+      priority,
     );
   }
 
@@ -72,6 +83,7 @@ export function runSearch(
       (row, pattern, out) => scanChunk(row, 0, bodies, decoder, pattern, out),
       q,
       onProgress,
+      priority,
     );
   }
 
@@ -89,6 +101,7 @@ export function runSearch(
     },
     q,
     onProgress,
+    priority,
   );
 }
 

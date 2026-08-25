@@ -20,7 +20,13 @@ const props = withDefaults(
 // (project/stickyBand.ts) needs both to compute which ancestor rows are pinned and where, but
 // VirtualList itself stays ignorant of what an ancestor is; ProjectTree is the only consumer that
 // understands `depth`.
-const emit = defineEmits<{ scrollstate: [{ scrollTop: number; viewportHeight: number }] }>();
+// P42 D39: startIndex/endIndex is exactly the "what's on screen" window a search wants to
+// prioritize (F31) — every VirtualList-based paged view can report it with one watch, the same
+// way this component already reports scrollstate.
+const emit = defineEmits<{
+  scrollstate: [{ scrollTop: number; viewportHeight: number }];
+  'visible-range': [{ start: number; end: number }];
+}>();
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
@@ -90,6 +96,13 @@ const endIndex = computed(() => {
     Math.ceil((scrollTop.value + viewportHeight.value) / props.rowHeight) + props.overscan,
   );
 });
+// P42 D39: mirrors the scrollstate watch above — includes overscan, same as DataGrid.vue's own
+// visiblePageRowBounds (rowStart/rowEnd), so a search's priority window and what's actually
+// rendered agree.
+watch([startIndex, endIndex], ([start, end]) => emit('visible-range', { start, end }), {
+  immediate: true,
+});
+
 const visible = computed(() =>
   props.items
     .slice(startIndex.value, endIndex.value)
