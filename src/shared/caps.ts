@@ -109,4 +109,5 @@ export const capsSchema = z.object({
  * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no         | no          |
  * | sqs      | region → queues                                                           | stream          | batch         | no (approx)    | SDK AbortSignal                          | no  | no         | no          |
  * | s3       | account → bucket → prefix/object (lazy, '/'-delimited)                   | keyvalue        | token         | no             | SDK AbortController                      | no  | no         | no          |
+ * | rabbitmq | vhost (database) → queues (ungrouped), exchanges (folder); bindings live in the definition view | stream | batch | no (messages is a snapshot) | AbortSignal on the HTTP request | no | yes | no (no FK concept) |
  */

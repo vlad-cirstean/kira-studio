@@ -33,16 +33,22 @@ const KIND_LABELS: Record<NodeKind, KindLabel> = {
   bucket: { singular: 'Bucket', plural: 'Buckets' },
   prefix: { singular: 'Prefix', plural: 'Prefixes' },
   object: { singular: 'Object', plural: 'Objects' },
+  exchange: { singular: 'Exchange', plural: 'Exchanges' },
 };
 
-// Per-connection-kind overrides — one entry today: MariaDB's and MySQL's `function` nodes include
-// stored procedures (P34 F21b: MySQL calls them stored routines too, from the same
-// information_schema.ROUTINES source), and §5.1 calls that level "routines".
+// Per-connection-kind overrides — MariaDB's and MySQL's `function` nodes include stored procedures
+// (P34 F21b: MySQL calls them stored routines too, from the same information_schema.ROUTINES
+// source), and §5.1 calls that level "routines". RabbitMQ's `database` node is a vhost, not a
+// database (P37 D15) — reusing the kind gets sticky-header pinning, the checkbox filter and the
+// container menu for free, but the label has to say what it actually is.
 const KIND_LABEL_OVERRIDES: Partial<Record<NodeKind, Partial<Record<ConnectionKind, KindLabel>>>> =
   {
     function: {
       mariadb: { singular: 'Routine', plural: 'Routines' },
       mysql: { singular: 'Routine', plural: 'Routines' },
+    },
+    database: {
+      rabbitmq: { singular: 'Virtual host', plural: 'Virtual hosts' },
     },
   };
 
@@ -70,6 +76,9 @@ export const GROUPED_KINDS: readonly { kind: NodeKind }[] = [
   // ungrouped, and only the auxiliary kind (consumer groups) folders. Topics are what a user
   // browses; a folder around them would bury the thing this tree exists to show.
   { kind: 'consumerGroup' },
+  // P37 D15: the same rule again — queues (the primary kind) show first, ungrouped; exchanges
+  // (auxiliary) folder.
+  { kind: 'exchange' },
 ];
 
 const GROUPED_KIND_SET = new Set(GROUPED_KINDS.map((g) => g.kind));

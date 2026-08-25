@@ -31,6 +31,7 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   kafka: 'Kafka',
   sqs: 'SQS',
   s3: 'S3',
+  rabbitmq: 'RabbitMQ',
 };
 // P34 D19: 'teal' is unused elsewhere in the rail and is the furthest free hue from MariaDB's
 // own 'blue' — the two engines a MySQL connection most often sits beside. P35 D29: 'violet' is
@@ -38,6 +39,9 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
 // 'orange' is ClickHouse's own identity colour and sits apart from every other SQL engine's
 // blue/cyan/teal/violet hues (Kafka's amber is the nearest neighbour, and belongs to a stream
 // engine that never sits beside a SQL connection in the same list).
+// P37 D33: 'indigo' — RabbitMQ's own orange went to ClickHouse in P36, and of the two remaining
+// free hues 'indigo' is the one that doesn't read as "no colour assigned" the way 'grey' does
+// beside the palette's own 'none' swatch.
 const KIND_ACCENT: Record<ConnectionKind, string> = {
   postgres: 'cyan',
   mariadb: 'blue',
@@ -49,7 +53,10 @@ const KIND_ACCENT: Record<ConnectionKind, string> = {
   kafka: 'amber',
   sqs: 'magenta',
   s3: 'olive',
+  rabbitmq: 'indigo',
 };
+// P37: rabbitmq isn't listed here yet — its tile lands once EngineIcon.vue has a real mark for it
+// (see the commit that adds both together), not before.
 const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
   'mariadb',
