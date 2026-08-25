@@ -1,6 +1,5 @@
 import type { SortDirection } from '@shared/domain/queries';
 import type { ColumnMeta } from '@shared/domain/tree';
-import type { SortSpec } from '@shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
@@ -13,6 +12,7 @@ import { AdapterError } from '../errors';
 import {
   buildKeysetPredicate,
   buildOrderBy,
+  computeEffectiveOrder,
   decodePageToken,
   encodePageToken,
   requestFingerprint,
@@ -67,66 +67,6 @@ function resolveKeysetColumnMeta(target: ReadTarget, name: string): ColumnMeta {
   throw new AdapterError('E_QUERY', `keyset tiebreaker column not found: ${name}`);
 }
 
-interface EffectiveOrder {
-  terms: { column: string; direction: SortDirection }[];
-  keysetEligible: boolean;
-  keysetColumns: string[];
-  keysetDirection: SortDirection;
-}
-
-// D22: the fallback chain is primary key, else a unique (all-NOT-NULL) index, else — a step
-// further than the other SQL adapters can offer — the table's own implicit rowid (F23), which
-// every rowid table has for free regardless of whether it declares a primary key at all.
-function computeEffectiveOrder(sort: SortSpec | null, target: ReadTarget): EffectiveOrder {
-  if (sort?.kind === 'text') {
-    return { terms: [], keysetEligible: false, keysetColumns: [], keysetDirection: 'asc' };
-  }
-
-  const requestedTerms = sort?.kind === 'structured' ? sort.terms : [];
-  if (requestedTerms.length > 0) {
-    const byName = new Set(target.columns.map((c) => c.name));
-    for (const t of requestedTerms) {
-      if (!byName.has(t.column)) {
-        throw new AdapterError('E_NOT_FOUND', `unknown column in sort: ${t.column}`);
-      }
-    }
-  }
-
-  const uniform =
-    requestedTerms.length === 0 ||
-    requestedTerms.every((t) => t.direction === requestedTerms[0].direction);
-  if (!uniform) {
-    return {
-      terms: requestedTerms,
-      keysetEligible: false,
-      keysetColumns: [],
-      keysetDirection: 'asc',
-    };
-  }
-  const direction: SortDirection = requestedTerms[0]?.direction ?? 'asc';
-
-  const tiebreaker =
-    target.primaryKey ?? target.uniqueKeys[0] ?? (target.rowidColumn ? [target.rowidColumn] : null);
-  if (!tiebreaker) {
-    return {
-      terms: requestedTerms,
-      keysetEligible: false,
-      keysetColumns: [],
-      keysetDirection: direction,
-    };
-  }
-
-  const already = new Set(requestedTerms.map((t) => t.column));
-  const extra = tiebreaker.filter((c) => !already.has(c));
-  const terms = [...requestedTerms, ...extra.map((column) => ({ column, direction }))];
-  return {
-    terms,
-    keysetEligible: true,
-    keysetColumns: terms.map((t) => t.column),
-    keysetDirection: direction,
-  };
-}
-
 export function readPage(
   h: SqliteHandle,
   ctx: OpCtx,
@@ -134,7 +74,12 @@ export function readPage(
   req: Omit<ReadRequest, 'path'>,
 ): TabularPage {
   const projectedColumns = resolveProjection(target.columns, req.projection);
-  const order = computeEffectiveOrder(req.sort, target);
+  // D22: the fallback chain is primary key, else a unique (all-NOT-NULL) index, else — a step
+  // further than the other SQL adapters can offer — the table's own implicit rowid (F23), which
+  // every rowid table has for free regardless of whether it declares a primary key at all.
+  const tiebreaker =
+    target.primaryKey ?? target.uniqueKeys[0] ?? (target.rowidColumn ? [target.rowidColumn] : null);
+  const order = computeEffectiveOrder(req.sort, target.columns, tiebreaker);
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';
 

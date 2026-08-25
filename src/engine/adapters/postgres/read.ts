@@ -1,5 +1,4 @@
 import type { SortDirection } from '@shared/domain/queries';
-import type { SortSpec } from '@shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
@@ -13,6 +12,7 @@ import { AdapterError } from '../errors';
 import {
   buildKeysetPredicate,
   buildOrderBy,
+  computeEffectiveOrder,
   decodePageToken,
   encodePageToken,
   requestFingerprint,
@@ -53,65 +53,6 @@ export function normalizeCellText(value: string, typeClass: TypeClass): string {
   return value;
 }
 
-interface EffectiveOrder {
-  terms: { column: string; direction: SortDirection }[];
-  keysetEligible: boolean;
-  keysetColumns: string[];
-  keysetDirection: SortDirection;
-}
-
-// D7: keyset iff the sort is absent or structured, every term shares one direction, and the
-// relation has a tiebreaker (PK, else a unique all-NOT-NULL index) to append. A `text` sort is
-// always ineligible — free text is opaque to the adapter.
-function computeEffectiveOrder(sort: SortSpec | null, target: ReadTarget): EffectiveOrder {
-  if (sort?.kind === 'text') {
-    return { terms: [], keysetEligible: false, keysetColumns: [], keysetDirection: 'asc' };
-  }
-
-  const requestedTerms = sort?.kind === 'structured' ? sort.terms : [];
-  if (requestedTerms.length > 0) {
-    const byName = new Set(target.columns.map((c) => c.name));
-    for (const t of requestedTerms) {
-      if (!byName.has(t.column)) {
-        throw new AdapterError('E_NOT_FOUND', `unknown column in sort: ${t.column}`);
-      }
-    }
-  }
-
-  const uniform =
-    requestedTerms.length === 0 ||
-    requestedTerms.every((t) => t.direction === requestedTerms[0].direction);
-  if (!uniform) {
-    return {
-      terms: requestedTerms,
-      keysetEligible: false,
-      keysetColumns: [],
-      keysetDirection: 'asc',
-    };
-  }
-  const direction: SortDirection = requestedTerms[0]?.direction ?? 'asc';
-
-  const tiebreaker = target.primaryKey ?? target.uniqueKeys[0] ?? null;
-  if (!tiebreaker) {
-    return {
-      terms: requestedTerms,
-      keysetEligible: false,
-      keysetColumns: [],
-      keysetDirection: direction,
-    };
-  }
-
-  const already = new Set(requestedTerms.map((t) => t.column));
-  const extra = tiebreaker.filter((c) => !already.has(c));
-  const terms = [...requestedTerms, ...extra.map((column) => ({ column, direction }))];
-  return {
-    terms,
-    keysetEligible: true,
-    keysetColumns: terms.map((t) => t.column),
-    keysetDirection: direction,
-  };
-}
-
 export async function readPage(
   client: Client,
   ctx: OpCtx,
@@ -120,7 +61,11 @@ export async function readPage(
   req: Omit<ReadRequest, 'path'>,
 ): Promise<TabularPage> {
   const projectedColumns = resolveProjection(target.columns, req.projection);
-  const order = computeEffectiveOrder(req.sort, target);
+  const order = computeEffectiveOrder(
+    req.sort,
+    target.columns,
+    target.primaryKey ?? target.uniqueKeys[0] ?? null,
+  );
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';
 

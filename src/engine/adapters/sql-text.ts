@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { SortDirection } from '@shared/domain/queries';
+import type { SortDirection, SortSpec } from '@shared/domain/queries';
 import type { ColumnMeta } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
@@ -148,4 +148,68 @@ export function singleStatusPage(text: string, dataType: string): TabularPage {
     strategy: 'offset',
   };
   return builder.finish(position);
+}
+
+export interface EffectiveOrder {
+  terms: { column: string; direction: SortDirection }[];
+  keysetEligible: boolean;
+  keysetColumns: string[];
+  keysetDirection: SortDirection;
+}
+
+// P39 iter3 F14/D16: postgres/mysql-family/sqlite each declared this same D7 keyset-eligibility
+// rule — byte-identical except for how each computes its own tiebreaker (a table's primary key,
+// else a unique all-NOT-NULL index, plus — sqlite only — the implicit rowid fallback, F23). Takes
+// the column list and the caller's already-resolved tiebreaker, mirroring resolveProjection's own
+// signature transformation, rather than each adapter's own ReadTarget, which genuinely differs.
+export function computeEffectiveOrder(
+  sort: SortSpec | null,
+  columns: ColumnMeta[],
+  tiebreaker: string[] | null,
+): EffectiveOrder {
+  if (sort?.kind === 'text') {
+    return { terms: [], keysetEligible: false, keysetColumns: [], keysetDirection: 'asc' };
+  }
+
+  const requestedTerms = sort?.kind === 'structured' ? sort.terms : [];
+  if (requestedTerms.length > 0) {
+    const byName = new Set(columns.map((c) => c.name));
+    for (const t of requestedTerms) {
+      if (!byName.has(t.column)) {
+        throw new AdapterError('E_NOT_FOUND', `unknown column in sort: ${t.column}`);
+      }
+    }
+  }
+
+  const uniform =
+    requestedTerms.length === 0 ||
+    requestedTerms.every((t) => t.direction === requestedTerms[0].direction);
+  if (!uniform) {
+    return {
+      terms: requestedTerms,
+      keysetEligible: false,
+      keysetColumns: [],
+      keysetDirection: 'asc',
+    };
+  }
+  const direction: SortDirection = requestedTerms[0]?.direction ?? 'asc';
+
+  if (!tiebreaker) {
+    return {
+      terms: requestedTerms,
+      keysetEligible: false,
+      keysetColumns: [],
+      keysetDirection: direction,
+    };
+  }
+
+  const already = new Set(requestedTerms.map((t) => t.column));
+  const extra = tiebreaker.filter((c) => !already.has(c));
+  const terms = [...requestedTerms, ...extra.map((column) => ({ column, direction }))];
+  return {
+    terms,
+    keysetEligible: true,
+    keysetColumns: terms.map((t) => t.column),
+    keysetDirection: direction,
+  };
 }
