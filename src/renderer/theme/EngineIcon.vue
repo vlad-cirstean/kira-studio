@@ -128,6 +128,15 @@ const iconSize = computed(() => props.size ?? 16);
       d="M1.35 1.9h2.1v12.2h-2.1zM4.2 1.9h2.1v12.2H4.2zM7.05 1.9h2.1v12.2h-2.1zM9.9 1.9H12v12.2H9.9zM12.75 6.95h2.1v2.1h-2.1z"
     />
 
+    <!-- P37 D33: a rabbit silhouette (two ears + head), redrawn — not the vendored RabbitMQ mark —
+         mirroring every other engine's currentColor line-art convention. 1:1 with
+         parts/_icons.html's i-rabbitmq. -->
+    <template v-if="kind === 'rabbitmq'">
+      <ellipse cx="5.7" cy="4.5" rx="1.15" ry="3.35" transform="rotate(-16 5.7 4.5)" fill="currentColor" />
+      <ellipse cx="10.3" cy="4.5" rx="1.15" ry="3.35" transform="rotate(16 10.3 4.5)" fill="currentColor" />
+      <circle cx="8" cy="10.3" r="3.5" fill="currentColor" />
+    </template>
+
     <path
       v-if="kind === 's3'"
       fill="none"

@@ -55,8 +55,6 @@ const KIND_ACCENT: Record<ConnectionKind, string> = {
   s3: 'olive',
   rabbitmq: 'indigo',
 };
-// P37: rabbitmq isn't listed here yet — its tile lands once EngineIcon.vue has a real mark for it
-// (see the commit that adds both together), not before.
 const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
   'mariadb',
@@ -68,6 +66,7 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'kafka',
   'sqs',
   's3',
+  'rabbitmq',
 ]);
 const kinds = connectionKindSchema.options;
 
