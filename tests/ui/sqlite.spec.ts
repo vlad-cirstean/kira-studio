@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { type SqliteFixture, startSqlite } from './support/sqlite';
-import { expandRow, findRow, openRowMenu } from './support/tree';
+import { expandRow, findRow, openRowMenu, treeContainer } from './support/tree';
 
 // The fourth SQL engine through the real UI, and the only one that runs unconditionally (D35):
 // no Docker gate, no container, no timeout budget for a healthcheck to pass — a temp-file
@@ -83,6 +83,32 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   const viewsFolder = await findRow(page, VIEWS_FOLDER_PATH);
   await expect(viewsFolder).toBeVisible();
   await expect(viewsFolder).toContainText('Views');
+
+  // --- P41 D4: the sticky ancestor band pins to the *top* of the scrollport — verified for real
+  // here, since this is the one project-tree-touching spec that runs without Docker in this
+  // sandbox. An inline height override on the scroll container itself (highest specificity, so it
+  // wins over the CSS `height: 100%` chain) is what forces main's 16 tables + Views folder to
+  // overflow deterministically, rather than depending on the fixture's default 1440x960 window —
+  // roomy enough to fit them all without scrolling — or on window.ts's own 600px minHeight, which
+  // would clamp a resize attempt short of forcing overflow anyway.
+  const treeScroll = treeContainer(page);
+  await treeScroll.evaluate((el) => {
+    el.style.height = '150px';
+  });
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = 3 * 28; // ProjectTree.vue's own row-height literal (comfortable density)
+  });
+  await page.waitForTimeout(100);
+  const stickyRows = page.locator('[data-testid="tree-sticky-row"]');
+  await expect(stickyRows).toHaveCount(2); // connection + database — sqlite has no schema level
+  const treeScrollBox = await treeScroll.boundingBox();
+  const firstStickyBox = await stickyRows.first().boundingBox();
+  if (!treeScrollBox || !firstStickyBox) throw new Error('expected both boxes to be measurable');
+  expect(Math.abs(firstStickyBox.y - treeScrollBox.y)).toBeLessThanOrEqual(1);
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = 0;
+    el.style.height = '';
+  });
 
   // --- D28: the load-bearing assertion — Filter by this value must double-quote, mirroring the
   // MySQL spec's own backtick assertion ---------------------------------------------------------

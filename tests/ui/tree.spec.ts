@@ -326,6 +326,32 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(stickyRows.nth(1)).toHaveAttribute('data-depth', '1');
   await expect(stickyRows.nth(2)).toHaveAttribute('data-depth', '2');
 
+  // P41 F1/D1/D4: the band pins to the *top* of the scrollport, not its bottom — no earlier
+  // assertion in this suite ever compared a sticky row's own viewport box to the scrollport's, so
+  // this is the one that would have failed against the pre-fix "sticky slot is the last child"
+  // layout (it rendered at the end of the content instead of pinning at all).
+  const treeScrollBox = await treeScroll.boundingBox();
+  const firstStickyBox = await stickyRows.first().boundingBox();
+  if (!treeScrollBox || !firstStickyBox) throw new Error('expected both boxes to be measurable');
+  expect(Math.abs(firstStickyBox.y - treeScrollBox.y)).toBeLessThanOrEqual(1);
+
+  // Scrolled to the very end of the content: no sticky row sits below the scrollport (P41 F2 —
+  // the pre-fix bug's own symptom was one to three ancestor rows duplicated at the bottom).
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(100);
+  const scrollportBottom = treeScrollBox.y + treeScrollBox.height;
+  for (const row of await stickyRows.all()) {
+    const box = await row.boundingBox();
+    if (!box) throw new Error('expected a sticky row box to be measurable');
+    expect(box.y + box.height).toBeLessThanOrEqual(scrollportBottom + 1);
+  }
+  await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
+    el.scrollIntoView({ block: 'start' }),
+  );
+  await page.waitForTimeout(100);
+
   // The band never exceeds the cap: scrolled into the (depth-3) Sequences folder, still exactly
   // three rows, and the folder itself is not among them.
   await sequenceRow.evaluate((el) => el.scrollIntoView({ block: 'start' }));

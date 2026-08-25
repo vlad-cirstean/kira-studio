@@ -135,6 +135,19 @@ defineExpose({ scrollToIndex });
 
 <template>
   <div ref="containerRef" class="virtual-list" data-testid="virtual-list" @scroll="onScroll">
+    <!-- P41 D1: must be the *first* child of the scroll content, not the last. A `position: sticky;
+         top: 0` box is only ever offset downward, by just enough to keep its top edge `>= 0` from
+         the scrollport's top — a box already at flow position 0 needs no offset once scrollTop > 0
+         and so pins correctly, while a box at the *end* of the content (after topSpacer/bottomSpacer
+         below) is never above the scrollport top for any reachable scrollTop and so never pins at
+         all (F1). Zero-height either way: contributes no layout, so topSpacer/bottomSpacer below
+         keep their meaning exactly and startIndex/endIndex never need to account for it.
+         `position: sticky` inside the scroll container's own content box is what makes it an
+         overlay rather than the in-flow #header slot below — it spans the rows and stops short of
+         the scrollbar (P28 D2). Only ProjectTree.vue passes this today. -->
+    <div v-if="$slots.sticky" class="virtual-list-sticky" data-testid="virtual-list-sticky">
+      <slot name="sticky" />
+    </div>
     <!-- Sticky, not fixed: it stays in normal flow (so scrollTop-based indexing below is only
          off by its own height, well inside the default overscan) while visually pinning during
          vertical scroll — the console result grid's header row (§8.14) is the only caller that
@@ -147,14 +160,6 @@ defineExpose({ scrollToIndex });
       <slot :item="row.item" :index="row.index" />
     </template>
     <div :style="{ height: `${bottomSpacer}px` }" />
-    <!-- Zero-height: contributes no layout, so topSpacer/bottomSpacer above keep their meaning
-         exactly and startIndex/endIndex never need to account for it. `position: sticky` inside
-         the scroll container's own content box is what makes it an overlay rather than the
-         in-flow #header slot above — it spans the rows and stops short of the scrollbar
-         (P28 D2). Only ProjectTree.vue passes this today. -->
-    <div v-if="$slots.sticky" class="virtual-list-sticky" data-testid="virtual-list-sticky">
-      <slot name="sticky" />
-    </div>
   </div>
 </template>
 
