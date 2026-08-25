@@ -40,4 +40,8 @@ echo "==> S3 (LocalStack — same container as SQS)"
 docker exec -i kira-sqs bash < "${SCRIPT_DIR}/s3/seed.sh"
 
 echo
+echo "==> SQLite (no container — a file on disk, built directly)"
+bun "${SCRIPT_DIR}/sqlite/seed.ts"
+
+echo
 echo "All seeds complete."

@@ -157,3 +157,8 @@ playwright-report/
 # canvas editor). Rebuild it with docs/v1/design/kira-design-system/build.mjs
 # and the design skill's seed-canvas.mjs; the design itself lives in parts/.
 docs/v1/design/*/[a-z]*-design-system.html
+
+# SQLite demo database — a build product of scripts/demo-dbs/sqlite/seed.ts,
+# regenerated on demand (P35 D36); the other seven engines' demo data lives
+# in containers instead, so this is the one on-disk artifact of the set.
+scripts/demo-dbs/sqlite/*.sqlite

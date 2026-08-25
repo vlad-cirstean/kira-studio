@@ -1,10 +1,14 @@
 # Kira Studio — local database fixtures
 
-Spins up all eight of Kira Studio's supported engines (PostgreSQL, MariaDB, MySQL, MongoDB, Redis,
-Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The five
+Spins up eight of Kira Studio's nine supported engines (PostgreSQL, MariaDB, MySQL, MongoDB,
+Redis, Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The five
 relational/document/key-value stores get a full schema, foreign keys, indexes, and ~20k rows of
 seed data; Kafka/SQS/S3 get a handful of topics/queues/buckets with a small backlog — enough to
 exercise every tree view without waiting on a multi-minute seed.
+
+The ninth engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
+needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
+`node:sqlite` module the app's own adapter reads it with. See its own section below.
 
 Kafka uses the same image/mode as the `@testcontainers/kafka` harness under `bun run test:db`
 (confluentinc/cp-kafka in KRaft mode) — see `tests/db/support/kafka.ts`. SQS and S3 share one
@@ -15,6 +19,7 @@ see `tests/db/support/sqs.ts` and `tests/db/support/s3.ts`.
 
 - [Colima](https://github.com/abiosoft/colima) running with the Docker runtime
 - `docker` and `docker-compose` on the PATH
+- For SQLite only: a `bun` with `node:sqlite` (1.4+), or Electron/Node 22.5+ — no Docker needed
 
 ## Start the databases
 
@@ -38,6 +43,9 @@ The schema is applied automatically on first container start (via
 `/docker-entrypoint-initdb.d`). The seed step is separate and can be re-run any
 time to reset data — safe to re-run for the four relational/document/key-value stores; for Kafka
 and SQS it appends another batch of messages rather than resetting (see the Model section below).
+`seed.sh`'s SQLite step needs no `up -d` first — it deletes and rebuilds
+`sqlite/kira-demo.sqlite` directly, so it's safe to re-run on its own too:
+`bun scripts/demo-dbs/sqlite/seed.ts`.
 
 ## Connections
 
@@ -51,6 +59,7 @@ and SQS it appends another batch of messages rather than resetting (see the Mode
 | Kafka    | localhost | 9092 | — | — | — |
 | SQS (LocalStack) | — (URI mode) | — | `test` | `test` | region `us-east-1` |
 | S3 (LocalStack)  | — (URI mode) | — | `test` | `test` | region `us-east-1` |
+| SQLite   | — (no network) | — | — | — | `scripts/demo-dbs/sqlite/kira-demo.sqlite` |
 
 Connection strings:
 
@@ -72,6 +81,13 @@ URI's query string — see `src/shared/domain/uri.ts`):
 ```sh
 sqs://test:test@us-east-1?endpoint=http://localhost:4566
 s3://test:test@us-east-1?endpoint=http://localhost:4566
+```
+
+SQLite has no network fields at all — in the connection dialog, Fields mode's **Database file**
+field takes the absolute path printed by `sqlite/seed.ts` (or **Browse…** to it):
+
+```
+scripts/demo-dbs/sqlite/kira-demo.sqlite
 ```
 
 ## Model
@@ -120,6 +136,15 @@ loop. `kira-uploads-bucket` is empty — the upload target, and the case of a bu
 in it to open an object from (Upload has to be reachable from the bucket row itself).
 `kira-empty-bucket` stays empty too, unrelated to uploads.
 
+SQLite gets the same e-commerce model as the four relational engines above — `customers` (20k),
+`customer_addresses` (20k), `categories` (20k, self-referencing), `products` (20k), `orders`
+(20k), `order_items` (80k), `reviews` (20k), and a one-row `data_types_demo` — built with plain JS
+loops rather than a `WITH RECURSIVE` numbers CTE (there's no client round trip to save, so a loop
+reads the same either way). `data_types_demo` shows SQLite's own type vocabulary rather than a
+literal port of the others' columns: no ENUM/SET/BIT/YEAR/geometry types exist to stand in for, so
+it instead demonstrates the five affinity families side by side, plus a column with no declared
+type at all (F21 — the one case `typeClassFor` reports as `other`).
+
 Unlike the relational/document seeds, the Kafka/SQS/S3 seeds are **not** idempotent in the same
 way — topics/queues are created with `--if-not-exists`/reused and S3 objects are simply
 overwritten in place, but re-running `seed.sh` appends another batch of messages to Kafka/SQS on
@@ -151,8 +176,11 @@ scripts/demo-dbs/
 │   └── seed.sh               # topics + keyed messages + a registered consumer group
 ├── sqs/
 │   └── seed.sh               # queues + messages, via LocalStack's `awslocal` CLI
-└── s3/
-    └── seed.sh               # buckets + nested objects, via LocalStack's `awslocal` CLI
+├── s3/
+│   └── seed.sh               # buckets + nested objects, via LocalStack's `awslocal` CLI
+└── sqlite/
+    └── seed.ts               # schema + 20k-row seed, run directly with `bun` — no container,
+                               # no init/seed split; produces a gitignored kira-demo.sqlite here
 ```
 
 ## Reset everything
