@@ -107,6 +107,9 @@ export interface ConnectionTestResult {
 export interface TreeChildrenResult {
   nodes: TreeNode[];
   source: 'cache' | 'server';
+  /** P43 iter2 D21/D22: always `false` for `source: 'cache'` — a truncated level is never
+   *  persisted, so a cache hit is always complete. */
+  truncated: boolean;
 }
 
 export interface TreeDescribeResult {

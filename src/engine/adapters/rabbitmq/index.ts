@@ -2,7 +2,7 @@ import type { Caps } from '@shared/caps';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -12,6 +12,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { rabbitmqCaps } from './caps';
@@ -93,11 +94,11 @@ class RabbitMqAdapter implements Adapter {
     this.handle = null;
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const h = this.requireHandle();
     const segments = path.segments;
 
-    if (segments.length === 0) return catalog.listVhosts(h, ctx);
+    if (segments.length === 0) return { nodes: await catalog.listVhosts(h, ctx) };
 
     const [vhostSegment, objectSegment] = segments;
     if (vhostSegment.kind !== 'database') {
@@ -106,7 +107,9 @@ class RabbitMqAdapter implements Adapter {
         `unexpected root path segment kind: ${vhostSegment.kind}`,
       );
     }
-    if (segments.length === 1) return catalog.listVhostChildren(h, ctx, vhostSegment.name);
+    if (segments.length === 1) {
+      return { nodes: await catalog.listVhostChildren(h, ctx, vhostSegment.name) };
+    }
 
     // Adapter rule 5: children() returns [] for a leaf, never throws — queues and exchanges are
     // both leaves (D17: bindings live in the definition view, not the tree).
@@ -115,7 +118,7 @@ class RabbitMqAdapter implements Adapter {
       objectSegment &&
       (objectSegment.kind === 'queue' || objectSegment.kind === 'exchange')
     ) {
-      return [];
+      return { nodes: [] };
     }
 
     throw new AdapterError('E_NOT_FOUND', `unrecognized path: ${encodePath(segments)}`);

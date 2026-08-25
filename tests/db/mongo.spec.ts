@@ -94,12 +94,12 @@ describe('mongo adapter (§9.1, P8)', () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const roots = await adapter.children(path([]), makeCtx());
+      const { nodes: roots } = await adapter.children(path([]), makeCtx());
       expect(roots.map((n) => n.name).sort()).toEqual(
         [MONGO_ANALYTICS_DATABASE, MONGO_DATABASE].sort(),
       );
 
-      const collections = await adapter.children(
+      const { nodes: collections } = await adapter.children(
         path([{ kind: 'database', name: MONGO_DATABASE }]),
         makeCtx(),
       );
@@ -137,7 +137,7 @@ describe('mongo adapter (§9.1, P8)', () => {
     try {
       // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a
       // collection is one now (P19 D5's own SQL-relation precedent), so this asks its own path.
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: MONGO_DATABASE },
           { kind: 'collection', name: 'widgets' },

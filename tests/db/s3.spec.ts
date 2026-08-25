@@ -167,7 +167,7 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const root = await adapter.children(path([]), makeCtx());
+      const { nodes: root } = await adapter.children(path([]), makeCtx());
       expect(root.map((n) => n.name)).toEqual([EMPTY_BUCKET, MAIN_BUCKET, MUTABLE_BUCKET].sort());
       // P41 D5: a bucket is a leaf in the project tree — its prefix/object space is unbounded and
       // is now navigated in a Browse tab (§8.18) instead, via the same children() call this test
@@ -182,7 +182,11 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(bucketPath(MAIN_BUCKET), makeCtx());
+      const result = await adapter.children(bucketPath(MAIN_BUCKET), makeCtx());
+      // P43 iter2 F16/D21: an ordinary listing (well under MAX_LIST_ROUNDS) never sets
+      // `truncated` — the guard that the widening left the normal path unchanged.
+      expect(result.truncated).toBeUndefined();
+      const children = result.nodes;
       // 'reports/' and 'sizes/' are CommonPrefixes; readme.txt is the one root-level object.
       // P33 D14: the size-ladder objects live under sizes/ precisely so this root listing (the
       // only thing this scenario asserts) never has to change when they're added.
@@ -200,7 +204,7 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'bucket', name: MAIN_BUCKET },
           { kind: 'prefix', name: 'reports' },
@@ -225,13 +229,16 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
     const adapter = await createAdapter('s3', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const leafChildren = await adapter.children(
+      const { nodes: leafChildren } = await adapter.children(
         objectPath(MAIN_BUCKET, ROOT_OBJECT_KEY),
         makeCtx(),
       );
       expect(leafChildren).toEqual([]);
 
-      const emptyBucketChildren = await adapter.children(bucketPath(EMPTY_BUCKET), makeCtx());
+      const { nodes: emptyBucketChildren } = await adapter.children(
+        bucketPath(EMPTY_BUCKET),
+        makeCtx(),
+      );
       expect(emptyBucketChildren).toEqual([]);
     } finally {
       await adapter.disconnect();

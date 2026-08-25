@@ -3,7 +3,7 @@ import type { ConsoleRequest } from '@shared/domain/console';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import { type Connection, createConnection } from 'mariadb';
@@ -14,6 +14,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, unsupported } from '../errors';
 import type { QueryExecutor } from './catalog';
@@ -98,12 +99,14 @@ class MysqlFamilyAdapter implements Adapter {
     this.runningByOp.clear();
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const segments = path.segments;
 
     if (segments.length === 0) {
       const conn = await this.requireConnection(null);
-      return catalog.listDatabases(this.execFor(conn, ctx), this.primaryDatabase ?? '');
+      return {
+        nodes: await catalog.listDatabases(this.execFor(conn, ctx), this.primaryDatabase ?? ''),
+      };
     }
 
     const [databaseSegment, objectSegment] = segments;
@@ -117,7 +120,7 @@ class MysqlFamilyAdapter implements Adapter {
     const exec = this.execFor(conn, ctx);
 
     if (segments.length === 1) {
-      return catalog.listTablesAndRoutines(exec, databaseSegment.name);
+      return { nodes: await catalog.listTablesAndRoutines(exec, databaseSegment.name) };
     }
     if (!objectSegment) {
       throw new AdapterError('E_NOT_FOUND', 'missing path segment at depth 1');
@@ -134,7 +137,7 @@ class MysqlFamilyAdapter implements Adapter {
         objectSegment.kind === 'table' ||
         objectSegment.kind === 'view'
       ) {
-        return [];
+        return { nodes: [] };
       }
       throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
     }

@@ -77,7 +77,12 @@ export const engineOpResultSchema = {
     caps: capsSchema,
   }),
   [ENGINE_OP.disconnect]: z.object({}),
-  [ENGINE_OP.children]: z.object({ nodes: z.array(treeNodeSchema) }),
+  // P43 iter2 D21: `truncated` optional so nothing already stored or in flight becomes
+  // unparseable — absent (not `false`) for the eight adapters that can never truncate a level.
+  [ENGINE_OP.children]: z.object({
+    nodes: z.array(treeNodeSchema),
+    truncated: z.boolean().optional(),
+  }),
   [ENGINE_OP.describe]: z.object({ meta: objectMetaSchema }),
   [ENGINE_OP.definition]: z.object({ definition: objectDefinitionSchema }),
   [ENGINE_OP.test]: z.object({

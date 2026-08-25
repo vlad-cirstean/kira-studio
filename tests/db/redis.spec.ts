@@ -114,20 +114,24 @@ describe('redis adapter (§9.1, P9)', () => {
     const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbs = await adapter.children(path([]), makeCtx());
+      const { nodes: dbs } = await adapter.children(path([]), makeCtx());
       expect(dbs.map((n) => n.name)).toEqual([PRIMARY_DB_NAME, SECONDARY_DB_NAME]);
       expect(dbs.every((n) => n.kind === 'database')).toBe(true);
 
-      const root = await adapter.children(
+      const rootResult = await adapter.children(
         path([{ kind: 'database', name: PRIMARY_DB_NAME }]),
         makeCtx(),
       );
+      const root = rootResult.nodes;
+      // P43 iter2 F16/D21: an ordinary listing (well under MAX_SCAN_ROUNDS) never sets
+      // `truncated` — the guard that the widening left the normal path unchanged.
+      expect(rootResult.truncated).toBeUndefined();
       const rootNamespaces = root.filter((n) => n.kind === 'namespace').map((n) => n.name);
       const rootKeys = root.filter((n) => n.kind === 'key').map((n) => n.name);
       expect(rootNamespaces).toEqual(['events', 'queue', 'session', 'tags', 'user']);
       expect(rootKeys).toEqual(['counter', 'leaderboard']);
 
-      const userChildren = await adapter.children(
+      const { nodes: userChildren } = await adapter.children(
         path([
           { kind: 'database', name: PRIMARY_DB_NAME },
           { kind: 'namespace', name: 'user' },
@@ -137,7 +141,7 @@ describe('redis adapter (§9.1, P9)', () => {
       expect(userChildren.map((n) => n.name)).toEqual(['1', '2']);
       expect(userChildren.every((n) => n.kind === 'namespace')).toBe(true);
 
-      const user1Children = await adapter.children(
+      const { nodes: user1Children } = await adapter.children(
         path([
           { kind: 'database', name: PRIMARY_DB_NAME },
           { kind: 'namespace', name: 'user' },
@@ -170,7 +174,7 @@ describe('redis adapter (§9.1, P9)', () => {
     const adapter = await createAdapter('redis', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: PRIMARY_DB_NAME },
           { kind: 'key', name: 'counter' },

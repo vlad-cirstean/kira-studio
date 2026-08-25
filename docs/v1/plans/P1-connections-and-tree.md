@@ -431,8 +431,9 @@ export interface Adapter {
   connect(cfg: ResolvedConnectionConfig, ctx: OpCtx): Promise<ConnectInfo>;
   disconnect(): Promise<void>;
 
-  /** One lazy tree level. `path.segments` is empty for the connection root. */
-  children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]>;
+  /** One lazy tree level. `path.segments` is empty for the connection root. Widened in P43
+   *  iteration 2 (D21 of that phase's plan) — see the roadmap table below. */
+  children(path: NodePath, ctx: OpCtx): Promise<TreeChildren>;
 
   /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
@@ -462,6 +463,7 @@ export interface AdapterDeps {
 | P5 | `mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult>` | `caps.writable` |
 | P5.5 | `execute(req: ConsoleRequest, ctx: OpCtx): Promise<Page[]>` | `caps.sql` |
 | P33 | `downloadObject(req: ObjectDownloadRequest, ctx: OpCtx): Promise<ObjectTransferResult>` — streams one object's bytes to a local path; a **read**, never blocked by the connection's read-only flag | `caps.fileTransfer` |
+| P43 iter2 | `children()`'s return type widens from `TreeNode[]` to `TreeChildren = { nodes: TreeNode[]; truncated?: boolean }` — `truncated` is set only by `redis`/`s3` (the two adapters whose catalog listing has its own round budget, `MAX_SCAN_ROUNDS`/`MAX_LIST_ROUNDS`) when that budget cut the level short; the other eight adapters return `{ nodes }` unchanged. `main/tree-service.ts` never persists a truncated level to `metadata_cache` (P43 iter2 D22), so a `source: 'cache'` `TreeChildrenResult` is always complete. This is the first amendment to this table since P33 — see `docs/v1/plans/P43-functionality-review-iter2.md` D21/D22/D23 for the full finding and rationale. | always present (the field itself); `truncated` only ever appears for `redis`/`s3` |
 
 Rules that hold for every adapter, present and future — put them as a doc comment at the top of `adapter.ts`:
 
@@ -469,7 +471,7 @@ Rules that hold for every adapter, present and future — put them as a doc comm
 2. **Every method that talks to the server takes an `OpCtx` and honours `ctx.signal`.** A method that ignores the signal is a bug even if the underlying driver "is fast".
 3. **`ctx.setCommand()` is called before the statement is issued**, not after it returns — an op that is cancelled mid-flight must still show what it was running.
 4. **Errors are thrown as `AdapterError`** (`src/engine/adapters/errors.ts`) with a `code` from a closed set (`E_CONNECT`, `E_AUTH`, `E_CANCELLED`, `E_TIMEOUT`, `E_NOT_FOUND`, `E_QUERY`, `E_UNSUPPORTED`) and the server's own message **verbatim** in `message`. §8.5 and §8.14 both require unmodified server errors; wrapping starts here.
-5. **`children()` returns `[]` for a leaf, never throws.** `hasChildren` on the parent is the adapter's promise; getting it wrong shows a twisty that expands to nothing, which is a bug to fix in the parent's query, not to paper over.
+5. **`children()` returns `{ nodes: [] }` for a leaf, never throws** (P43 iter2: `{ nodes: [] }`, not the bare `[]` this rule originally said — the roadmap table's own widening). `hasChildren` on the parent is the adapter's promise; getting it wrong shows a twisty that expands to nothing, which is a bug to fix in the parent's query, not to paper over.
 6. **An adapter is single-connection.** One instance ↔ one `connections` row. The registry in `src/engine/control.ts` owns the `Map<connectionId, Adapter>`.
 
 ### 4c. `src/engine/scheduler/ops.ts`

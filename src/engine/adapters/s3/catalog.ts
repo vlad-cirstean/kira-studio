@@ -5,7 +5,7 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { encodePath, type TreeNode } from '@shared/domain/tree';
-import type { OpCtx } from '../adapter';
+import type { OpCtx, TreeChildren } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';
 
@@ -66,7 +66,7 @@ export async function listPrefixChildren(
   bucket: string,
   prefixSegments: string[],
   ctx: OpCtx,
-): Promise<TreeNode[]> {
+): Promise<TreeChildren> {
   const prefix = prefixSegments.length > 0 ? `${prefixSegments.join('/')}/` : '';
   const ancestor = [
     { kind: 'bucket' as const, name: bucket },
@@ -128,8 +128,13 @@ export async function listPrefixChildren(
     rounds++;
   } while (continuationToken && rounds < MAX_LIST_ROUNDS);
 
-  return [
+  const nodes = [
     ...prefixNodes.sort((a, b) => a.name.localeCompare(b.name)),
     ...objectNodes.sort((a, b) => a.name.localeCompare(b.name)),
   ];
+  // P43 iter2 F16/D21: true only when the round cap cut the listing short (a continuation token
+  // means ListObjectsV2 itself says there is more) — never for an ordinary complete listing that
+  // happened to take fewer rounds.
+  const truncated = !!continuationToken && rounds >= MAX_LIST_ROUNDS;
+  return truncated ? { nodes, truncated } : { nodes };
 }

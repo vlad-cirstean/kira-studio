@@ -2,7 +2,7 @@ import { librdkafkaVersion } from '@confluentinc/kafka-javascript';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -12,6 +12,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { kafkaCaps } from './caps';
@@ -52,13 +53,13 @@ class KafkaAdapter implements Adapter {
     this.handle = null;
   }
 
-  async children(path: NodePath): Promise<TreeNode[]> {
+  async children(path: NodePath): Promise<TreeChildren> {
     const segments = path.segments;
-    if (segments.length === 0) return catalog.listRoot(this.requireAdmin());
+    if (segments.length === 0) return { nodes: await catalog.listRoot(this.requireAdmin()) };
 
     const [rootSegment] = segments;
     // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws.
-    if (rootSegment.kind === 'consumerGroup') return [];
+    if (rootSegment.kind === 'consumerGroup') return { nodes: [] };
     if (rootSegment.kind !== 'topic') {
       throw new AdapterError(
         'E_NOT_FOUND',
@@ -70,8 +71,10 @@ class KafkaAdapter implements Adapter {
     // same call, re-fetched every time it opens (loadPartitionOptions()). Deleting this the way
     // P19's D5 deleted column enumeration would break that filter; the two cases differ precisely
     // because this one still has a caller.
-    if (segments.length === 1) return catalog.listPartitions(this.requireAdmin(), rootSegment.name);
-    return []; // a partition — leaf.
+    if (segments.length === 1) {
+      return { nodes: await catalog.listPartitions(this.requireAdmin(), rootSegment.name) };
+    }
+    return { nodes: [] }; // a partition — leaf.
   }
 
   async describe(): Promise<ObjectMeta> {

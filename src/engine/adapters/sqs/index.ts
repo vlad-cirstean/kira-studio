@@ -2,7 +2,7 @@ import type { SQSClient } from '@aws-sdk/client-sqs';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -12,6 +12,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { sqsCaps } from './caps';
@@ -57,13 +58,13 @@ class SqsAdapter implements Adapter {
     this.receiptHandles.clear();
   }
 
-  async children(path: NodePath): Promise<TreeNode[]> {
+  async children(path: NodePath): Promise<TreeChildren> {
     // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a 'queue'
     // node never has children (§5.1's flat "region -> queues" tree, no deeper level).
-    if (path.segments.length > 0) return [];
+    if (path.segments.length > 0) return { nodes: [] };
     const { nodes, urlByName } = await catalog.listQueues(this.requireClient());
     for (const [name, url] of urlByName) this.queueUrls.set(name, url);
-    return nodes;
+    return { nodes };
   }
 
   private async resolveQueueUrl(client: SQSClient, name: string): Promise<string> {

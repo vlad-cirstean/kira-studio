@@ -101,6 +101,10 @@ async function loadChildren(connectionId: string, path: string, refresh: boolean
   delete treeState.errors[k];
   try {
     const result = await control.treeChildren(connectionId, path, refresh);
+    // P43 iter2 D23: `result.truncated` is deliberately unread here — no level the project tree
+    // ever renders can truncate (every SQL/Mongo/Kafka/SQS/RabbitMQ catalog enumerates a bounded
+    // set in one round trip, and Redis/S3 stop expanding at the database/bucket, P41 D5). Only
+    // views/browse/state.ts's own levels can, and it's the only place that shows the strip.
     treeState.children[k] = result.nodes;
   } catch (err) {
     treeState.errors[k] = err instanceof Error ? err.message : String(err);

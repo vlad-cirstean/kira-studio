@@ -218,12 +218,12 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
     const adapter = await createAdapter('rabbitmq', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const root = await adapter.children(path('test-rabbitmq', []), makeCtx());
+      const { nodes: root } = await adapter.children(path('test-rabbitmq', []), makeCtx());
       expect(root.some((n) => n.name === KIRA_VHOST)).toBe(true);
       expect(root.every((n) => n.kind === 'database' && n.hasChildren === true)).toBe(true);
 
       const vhostPath = path('test-rabbitmq', [{ kind: 'database', name: KIRA_VHOST }]);
-      const children = await adapter.children(vhostPath, makeCtx());
+      const { nodes: children } = await adapter.children(vhostPath, makeCtx());
       const queues = children.filter((n) => n.kind === 'queue');
       const exchanges = children.filter((n) => n.kind === 'exchange');
       expect(queues.some((n) => n.name === ORDERS_QUEUE)).toBe(true);
@@ -240,7 +240,7 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
     const scoped = await createAdapter('rabbitmq', deps);
     await scoped.connect(fixture.config, makeCtx());
     try {
-      const root = await scoped.children(path('test-rabbitmq', []), makeCtx());
+      const { nodes: root } = await scoped.children(path('test-rabbitmq', []), makeCtx());
       expect(root.map((n) => n.name)).toEqual([KIRA_VHOST]);
     } finally {
       await scoped.disconnect();
@@ -249,7 +249,7 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
     const unscoped = await createAdapter('rabbitmq', deps);
     await unscoped.connect({ ...fixture.config, database: null }, makeCtx());
     try {
-      const root = await unscoped.children(path('test-rabbitmq', []), makeCtx());
+      const { nodes: root } = await unscoped.children(path('test-rabbitmq', []), makeCtx());
       expect(root.map((n) => n.name)).toContain(KIRA_VHOST);
       expect(root.map((n) => n.name)).toContain(DEFAULT_VHOST);
 
@@ -285,9 +285,11 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
     const adapter = await createAdapter('rabbitmq', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      expect(await adapter.children(queuePath(KIRA_VHOST, ORDERS_QUEUE), makeCtx())).toEqual([]);
       expect(
-        await adapter.children(exchangePath(KIRA_VHOST, ORDERS_DIRECT_EXCHANGE), makeCtx()),
+        (await adapter.children(queuePath(KIRA_VHOST, ORDERS_QUEUE), makeCtx())).nodes,
+      ).toEqual([]);
+      expect(
+        (await adapter.children(exchangePath(KIRA_VHOST, ORDERS_DIRECT_EXCHANGE), makeCtx())).nodes,
       ).toEqual([]);
     } finally {
       await adapter.disconnect();
@@ -766,7 +768,7 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
     // A fresh connect on the same instance succeeds immediately afterward.
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const root = await adapter.children(path('test-rabbitmq', []), makeCtx());
+      const { nodes: root } = await adapter.children(path('test-rabbitmq', []), makeCtx());
       expect(root.length).toBeGreaterThan(0);
     } finally {
       await adapter.disconnect();

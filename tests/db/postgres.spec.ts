@@ -106,11 +106,11 @@ describe('postgres adapter (§9.1)', () => {
     const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const roots = await adapter.children(path([]), makeCtx());
+      const { nodes: roots } = await adapter.children(path([]), makeCtx());
       const rootNames = roots.map((n) => n.name).sort();
       expect(rootNames).toEqual(['kira_test', 'postgres']);
 
-      const schemas = await adapter.children(
+      const { nodes: schemas } = await adapter.children(
         path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
@@ -119,7 +119,7 @@ describe('postgres adapter (§9.1)', () => {
       expect(schemaNames).not.toContain('pg_catalog');
       expect(schemaNames).not.toContain('information_schema');
 
-      const appChildren = await adapter.children(
+      const { nodes: appChildren } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -138,7 +138,7 @@ describe('postgres adapter (§9.1)', () => {
       // children(). wide_table's own children() call returns [] rather than 60 column nodes.
       const wideTable = appChildren.find((n) => n.name === 'wide_table');
       expect(wideTable?.hasChildren).toBe(false);
-      const noColumns = await adapter.children(
+      const { nodes: noColumns } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -168,7 +168,7 @@ describe('postgres adapter (§9.1)', () => {
     const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const appChildren = await adapter.children(
+      const { nodes: appChildren } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -255,7 +255,7 @@ describe('postgres adapter (§9.1)', () => {
     const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const appChildren = await adapter.children(
+      const { nodes: appChildren } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },
@@ -310,7 +310,7 @@ describe('postgres adapter (§9.1)', () => {
             throw new Error('not used by this test');
           },
           disconnect: () => Promise.resolve(),
-          children: () => Promise.resolve([]),
+          children: () => Promise.resolve({ nodes: [] }),
           describe() {
             throw new Error('not used by this test');
           },
@@ -406,7 +406,7 @@ describe('postgres adapter (§9.1)', () => {
     const adapter = await createAdapter('postgres', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'schema', name: 'app' },

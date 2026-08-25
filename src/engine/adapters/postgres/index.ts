@@ -2,7 +2,7 @@ import type { ConsoleRequest } from '@shared/domain/console';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import { Client } from 'pg';
@@ -13,6 +13,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, unsupported } from '../errors';
 import { postgresCaps } from './caps';
@@ -79,12 +80,14 @@ class PostgresAdapter implements Adapter {
     this.runningByOp.clear();
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const segments = path.segments;
 
     if (segments.length === 0) {
       const client = await this.requireClient(null);
-      return catalog.listDatabases(this.execFor(client, ctx), this.primaryDatabase ?? '');
+      return {
+        nodes: await catalog.listDatabases(this.execFor(client, ctx), this.primaryDatabase ?? ''),
+      };
     }
 
     const [databaseSegment, schemaSegment, objectSegment] = segments;
@@ -98,7 +101,7 @@ class PostgresAdapter implements Adapter {
     const exec = this.execFor(client, ctx);
 
     if (segments.length === 1) {
-      return catalog.listSchemas(exec, databaseSegment.name);
+      return { nodes: await catalog.listSchemas(exec, databaseSegment.name) };
     }
     if (schemaSegment?.kind !== 'schema') {
       throw new AdapterError(
@@ -108,7 +111,13 @@ class PostgresAdapter implements Adapter {
     }
 
     if (segments.length === 2) {
-      return catalog.listRelationsAndFunctions(exec, databaseSegment.name, schemaSegment.name);
+      return {
+        nodes: await catalog.listRelationsAndFunctions(
+          exec,
+          databaseSegment.name,
+          schemaSegment.name,
+        ),
+      };
     }
     if (!objectSegment) {
       throw new AdapterError('E_NOT_FOUND', 'missing path segment at depth 2');
@@ -126,7 +135,7 @@ class PostgresAdapter implements Adapter {
         objectSegment.kind === 'view' ||
         objectSegment.kind === 'matview'
       ) {
-        return [];
+        return { nodes: [] };
       }
       throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
     }

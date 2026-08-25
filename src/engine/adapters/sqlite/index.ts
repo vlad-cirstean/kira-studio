@@ -3,7 +3,7 @@ import type { ConsoleRequest } from '@shared/domain/console';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -13,6 +13,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, unsupported } from '../errors';
 import { sqliteCaps } from './caps';
@@ -80,12 +81,12 @@ class SqliteAdapter implements Adapter {
     this.handle = null;
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const segments = path.segments;
     const exec = this.execFor(ctx);
 
     if (segments.length === 0) {
-      return catalog.listDatabases(exec);
+      return { nodes: await catalog.listDatabases(exec) };
     }
 
     const [databaseSegment, objectSegment] = segments;
@@ -96,7 +97,7 @@ class SqliteAdapter implements Adapter {
       );
     }
     if (segments.length === 1) {
-      return catalog.listTablesAndViews(exec, databaseSegment.name);
+      return { nodes: await catalog.listTablesAndViews(exec, databaseSegment.name) };
     }
     if (!objectSegment) {
       throw new AdapterError('E_NOT_FOUND', 'missing path segment at depth 1');
@@ -104,7 +105,7 @@ class SqliteAdapter implements Adapter {
     if (segments.length === 2) {
       // Rule 5 (Adapter doc comment): every relation is a leaf (P19 D5) — its columns live in
       // the definition view, not the tree.
-      if (objectSegment.kind === 'table' || objectSegment.kind === 'view') return [];
+      if (objectSegment.kind === 'table' || objectSegment.kind === 'view') return { nodes: [] };
       throw new AdapterError('E_NOT_FOUND', `unexpected object kind: ${objectSegment.kind}`);
     }
 

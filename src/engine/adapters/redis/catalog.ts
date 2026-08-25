@@ -1,6 +1,6 @@
 import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { Redis } from 'ioredis';
-import type { OpCtx } from '../adapter';
+import type { OpCtx, TreeChildren } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';
 
@@ -53,7 +53,7 @@ export async function listNamespaceChildren(
   dbName: string,
   namespaceSegments: string[],
   ctx: OpCtx,
-): Promise<TreeNode[]> {
+): Promise<TreeChildren> {
   const prefix = namespaceSegments.length > 0 ? `${namespaceSegments.join(':')}:` : '';
   const namespaceNodes = new Map<string, TreeNode>();
   const keyNodes = new Map<string, TreeNode>();
@@ -101,8 +101,13 @@ export async function listNamespaceChildren(
     rounds++;
   } while (cursor !== '0' && rounds < MAX_SCAN_ROUNDS);
 
-  return [
+  const nodes = [
     ...[...namespaceNodes.values()].sort((a, b) => a.name.localeCompare(b.name)),
     ...[...keyNodes.values()].sort((a, b) => a.name.localeCompare(b.name)),
   ];
+  // P43 iter2 F16/D21: true only when the round cap cut the scan short (cursor !== '0' means
+  // SCAN itself says there is more) — never for an ordinary complete scan that happened to take
+  // fewer rounds.
+  const truncated = cursor !== '0' && rounds >= MAX_SCAN_ROUNDS;
+  return truncated ? { nodes, truncated } : { nodes };
 }

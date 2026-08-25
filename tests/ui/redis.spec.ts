@@ -109,6 +109,8 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   );
   await expect(otherNsRow).toBeVisible();
   await expect(otherNsRow).toHaveAttribute('data-kind', 'namespace');
+  // P43 iter2 F16/D23: a small, ordinary namespace never shows the truncated strip.
+  await expect(browseView.locator('[data-testid="browse-truncated"]')).toHaveCount(0);
 
   // --- db0's own Browse tab: descend user -> 1 -> the hash key, open its keyvalue tab ----------
   await db0Row.dblclick();

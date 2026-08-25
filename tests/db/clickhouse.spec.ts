@@ -160,7 +160,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
     const adapter = await createAdapter('clickhouse', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const roots = await adapter.children(path([]), makeCtx());
+      const { nodes: roots } = await adapter.children(path([]), makeCtx());
       const rootNames = roots.map((n) => n.name);
       expect(rootNames).toContain(fixture.database);
       expect(rootNames).toContain('default');
@@ -169,7 +169,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       expect(rootNames).not.toContain('INFORMATION_SCHEMA');
       expect(rootNames).not.toContain('information_schema');
 
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: fixture.database }]),
         makeCtx(),
       );
@@ -185,7 +185,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       expect(wideTable?.path).toBe(`database:${fixture.database}/table:wide_table`);
       expect(wideTable?.hasChildren).toBe(false);
 
-      const noColumns = await adapter.children(
+      const { nodes: noColumns } = await adapter.children(
         path([
           { kind: 'database', name: fixture.database },
           { kind: 'table', name: 'wide_table' },
@@ -202,7 +202,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
     const adapter = await createAdapter('clickhouse', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: fixture.database }]),
         makeCtx(),
       );
@@ -269,7 +269,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
     const adapter = await createAdapter('clickhouse', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: fixture.database }]),
         makeCtx(),
       );
@@ -392,7 +392,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
     const adapter = await createAdapter('clickhouse', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: fixture.database },
           { kind: 'view', name: 'order_summary' },

@@ -16,6 +16,10 @@ export interface BrowseViewRuntime {
    *  next successful action or load. */
   actionError: string | null;
   nodes: TreeNode[];
+  /** P43 iter2 F16/D23: this level's own listing stopped at the adapter's own round budget —
+   *  BrowseView.vue's own strip is the only surface that renders these levels (P41 D5 cut the
+   *  tree at the container). Refresh is the only affordance that can try again. */
+  truncated: boolean;
   /** Substring filter over `nodes` (D18), runtime-only — mirrors grid/state.ts's `searchOpen`. */
   filter: string;
   /** The row that holds the list's roving tab stop, by path. */
@@ -23,7 +27,15 @@ export interface BrowseViewRuntime {
 }
 
 function defaultRuntime(): BrowseViewRuntime {
-  return { status: 'idle', error: null, actionError: null, nodes: [], filter: '', selected: null };
+  return {
+    status: 'idle',
+    error: null,
+    actionError: null,
+    nodes: [],
+    truncated: false,
+    filter: '',
+    selected: null,
+  };
 }
 
 const { runtime, ensureRuntime } = createRuntimeStore<BrowseViewRuntime>(defaultRuntime);
@@ -60,6 +72,7 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   try {
     const result = await control.treeChildren(tab.connectionId, level, opts?.refresh ?? false);
     rt.nodes = result.nodes;
+    rt.truncated = result.truncated;
     rt.status = 'idle';
   } catch (err) {
     const failure = classifyLoadError(err);

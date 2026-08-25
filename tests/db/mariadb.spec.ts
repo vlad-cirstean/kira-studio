@@ -114,7 +114,7 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const roots = await adapter.children(path([]), makeCtx());
+      const { nodes: roots } = await adapter.children(path([]), makeCtx());
       const rootNames = roots.map((n) => n.name).sort();
       expect(rootNames).toEqual(['kira_analytics', 'kira_test']);
       expect(rootNames).not.toContain('mysql');
@@ -122,7 +122,7 @@ describe('mariadb adapter (§9.1)', () => {
       expect(rootNames).not.toContain('performance_schema');
       expect(rootNames).not.toContain('sys');
 
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
@@ -141,7 +141,7 @@ describe('mariadb adapter (§9.1)', () => {
       // P19 D5: every relation is a tree leaf now — its columns live in describe(), not
       // children(). wide_table's own children() call returns [] rather than 59 column nodes.
       expect(wideTable?.hasChildren).toBe(false);
-      const noColumns = await adapter.children(
+      const { nodes: noColumns } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'table', name: 'wide_table' },
@@ -171,7 +171,7 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
@@ -262,7 +262,7 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'kira_test' }]),
         makeCtx(),
       );
@@ -322,7 +322,7 @@ describe('mariadb adapter (§9.1)', () => {
             throw new Error('not used by this test');
           },
           disconnect: () => Promise.resolve(),
-          children: () => Promise.resolve([]),
+          children: () => Promise.resolve({ nodes: [] }),
           describe() {
             throw new Error('not used by this test');
           },
@@ -417,7 +417,7 @@ describe('mariadb adapter (§9.1)', () => {
     const adapter = await createAdapter('mariadb', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: 'kira_test' },
           { kind: 'sequence', name: 'invoice_number_seq' },

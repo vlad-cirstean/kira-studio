@@ -2,7 +2,7 @@ import type { ConsoleRequest } from '@shared/domain/console';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -12,6 +12,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, unsupported } from '../errors';
 import { redisCaps } from './caps';
@@ -59,9 +60,11 @@ class RedisAdapter implements Adapter {
     this.set = null;
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const segments = path.segments;
-    if (segments.length === 0) return catalog.listDatabases(await this.requireSet().primary());
+    if (segments.length === 0) {
+      return { nodes: await catalog.listDatabases(await this.requireSet().primary()) };
+    }
 
     const [dbSegment, ...rest] = segments;
     if (dbSegment.kind !== 'database') {
@@ -69,7 +72,7 @@ class RedisAdapter implements Adapter {
     }
     // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — a 'key'
     // node never has children.
-    if (rest.length > 0 && rest[rest.length - 1].kind === 'key') return [];
+    if (rest.length > 0 && rest[rest.length - 1].kind === 'key') return { nodes: [] };
 
     const namespaceSegments: string[] = [];
     for (const seg of rest) {

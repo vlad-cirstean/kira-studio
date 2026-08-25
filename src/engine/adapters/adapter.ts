@@ -69,6 +69,16 @@ export interface CountRequest {
   filter: string | null;
 }
 
+/** P43 iter2 D21: a level listing plus whether the adapter stopped short of the whole thing.
+ *  `truncated` is true only when the adapter hit its *own* round budget (redis/catalog.ts's
+ *  MAX_SCAN_ROUNDS, s3/catalog.ts's MAX_LIST_ROUNDS) with more still to come — never for an
+ *  ordinary complete listing, and never a guess. Optional so the eight adapters that cannot
+ *  truncate say nothing rather than saying `false` eight times. */
+export interface TreeChildren {
+  nodes: TreeNode[];
+  truncated?: boolean;
+}
+
 export interface Adapter {
   readonly kind: ConnectionKind;
   readonly caps: Caps;
@@ -77,7 +87,7 @@ export interface Adapter {
   disconnect(): Promise<void>;
 
   /** One lazy tree level. `path.segments` is empty for the connection root. */
-  children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]>;
+  children(path: NodePath, ctx: OpCtx): Promise<TreeChildren>;
 
   /** Columns, PK, FK, inbound FK, indexes for one object. Feeds the L1 cache. */
   describe(path: NodePath, ctx: OpCtx): Promise<ObjectMeta>;
@@ -136,7 +146,8 @@ export interface AdapterDeps {
 
 /**
  * Adapter roadmap (normative, D3). `read`/`count` shipped in P2, `preview`/`mutate` in P5,
- * `execute` in P5.5, `downloadObject` in P33 — all above, nothing pending. A later phase that
- * widens `Adapter` again does so by amending docs/v1/plans/P1-connections-and-tree.md §4b first,
- * same discipline as this line.
+ * `execute` in P5.5, `downloadObject` in P33, `children`'s `TreeChildren` widening in P43
+ * iteration 2 (D21, docs/v1/plans/P1-connections-and-tree.md §4b amended in the same commit) —
+ * all above, nothing pending. A later phase that widens `Adapter` again does so by amending that
+ * plan's §4b first, same discipline as this line.
  */

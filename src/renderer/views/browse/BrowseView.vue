@@ -194,6 +194,11 @@ onMounted(() => {
         <MessageStrip v-if="rt?.actionError" tone="err" data-testid="browse-action-error">
           {{ rt.actionError }}
         </MessageStrip>
+        <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
+             nothing failed, the listing is real, it's just incomplete. -->
+        <MessageStrip v-if="rt?.truncated" tone="warn" icon="warning" data-testid="browse-truncated">
+          This level stopped short of the full listing — Refresh to try again.
+        </MessageStrip>
       </template>
 
       <div class="p-panel body-panel">

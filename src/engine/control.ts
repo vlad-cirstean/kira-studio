@@ -80,11 +80,15 @@ async function handleChildren(payload: unknown) {
   const { connectionId, path } = engineOpPayloadSchema[ENGINE_OP.children].parse(payload);
   const adapter = requireAdapter(connectionId);
   const { value } = await runOp({ connectionId, kind: 'children' }, async (ctx) => {
-    const nodes = await adapter.children(path, ctx);
-    ctx.setRows(nodes.length);
-    return nodes;
+    const result = await adapter.children(path, ctx);
+    ctx.setRows(result.nodes.length);
+    return result;
   });
-  return { nodes: value };
+  // P43 iter2 D21: `truncated` only when the adapter actually said so — never a bare `false` for
+  // the eight adapters that can't (TreeChildren's own optionality, carried through unchanged).
+  return value.truncated
+    ? { nodes: value.nodes, truncated: value.truncated }
+    : { nodes: value.nodes };
 }
 
 async function handleDescribe(payload: unknown) {

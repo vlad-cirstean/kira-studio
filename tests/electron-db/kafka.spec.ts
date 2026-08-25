@@ -142,7 +142,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const root = await adapter.children(path([]), makeCtx());
+      const { nodes: root } = await adapter.children(path([]), makeCtx());
       const topics = root.filter((n) => n.kind === 'topic').map((n) => n.name);
       const groups = root.filter((n) => n.kind === 'consumerGroup').map((n) => n.name);
       assert.deepStrictEqual(topics, [EMPTY_TOPIC, ORDERS_TOPIC].sort());
@@ -163,11 +163,11 @@ describe('kafka adapter (§9.1, P10)', () => {
       // D3: the tree no longer expands a topic — its root-level node says so — but D4 keeps
       // children() itself enumerating real partitions, since StreamView.vue's partition filter is
       // a second, live caller of exactly this call.
-      const root = await adapter.children(path([]), makeCtx());
+      const { nodes: root } = await adapter.children(path([]), makeCtx());
       const ordersNode = root.find((n) => n.kind === 'topic' && n.name === ORDERS_TOPIC);
       assert.strictEqual(ordersNode?.hasChildren, false);
 
-      const partitions = await adapter.children(topicPath(ORDERS_TOPIC), makeCtx());
+      const { nodes: partitions } = await adapter.children(topicPath(ORDERS_TOPIC), makeCtx());
       assert.strictEqual(partitions.length, ORDERS_PARTITION_COUNT);
       assert.ok(partitions.every((n) => n.kind === 'partition' && n.hasChildren === false));
       assert.deepStrictEqual(
@@ -183,7 +183,7 @@ describe('kafka adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('kafka', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const partitionChildren = await adapter.children(
+      const { nodes: partitionChildren } = await adapter.children(
         path([
           { kind: 'topic', name: ORDERS_TOPIC },
           { kind: 'partition', name: '0' },
@@ -192,7 +192,7 @@ describe('kafka adapter (§9.1, P10)', () => {
       );
       assert.deepStrictEqual(partitionChildren, []);
 
-      const groupChildren = await adapter.children(
+      const { nodes: groupChildren } = await adapter.children(
         path([{ kind: 'consumerGroup', name: CONSUMER_GROUP }]),
         makeCtx(),
       );
@@ -555,7 +555,7 @@ describe('kafka adapter (§9.1, P10)', () => {
         cursor = { mode: 'after', token };
       }
 
-      const root = await adapter.children(path([]), makeCtx());
+      const { nodes: root } = await adapter.children(path([]), makeCtx());
       const groups = root.filter((n) => n.kind === 'consumerGroup').map((n) => n.name);
       assert.deepStrictEqual(groups, [CONSUMER_GROUP]);
     } finally {

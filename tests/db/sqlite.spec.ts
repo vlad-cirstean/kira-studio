@@ -125,11 +125,11 @@ describe('sqlite adapter (§9.1, P35)', () => {
     const adapter = await createAdapter('sqlite', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const roots = await adapter.children(path([]), makeCtx());
+      const { nodes: roots } = await adapter.children(path([]), makeCtx());
       // `temp` is always present in database_list but is never a user schema (D19) — hidden.
       expect(roots.map((n) => n.name)).toEqual(['main']);
 
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'main' }]),
         makeCtx(),
       );
@@ -151,7 +151,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
       const wideTable = dbChildren.find((n) => n.name === 'wide_table');
       expect(wideTable?.path).toBe('database:main/table:wide_table');
       expect(wideTable?.hasChildren).toBe(false);
-      const noColumns = await adapter.children(
+      const { nodes: noColumns } = await adapter.children(
         path([
           { kind: 'database', name: 'main' },
           { kind: 'table', name: 'wide_table' },
@@ -179,7 +179,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
     const adapter = await createAdapter('sqlite', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'main' }]),
         makeCtx(),
       );
@@ -260,7 +260,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
     const adapter = await createAdapter('sqlite', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const dbChildren = await adapter.children(
+      const { nodes: dbChildren } = await adapter.children(
         path([{ kind: 'database', name: 'main' }]),
         makeCtx(),
       );
@@ -330,7 +330,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
     const adapter = await createAdapter('sqlite', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(
+      const { nodes: children } = await adapter.children(
         path([
           { kind: 'database', name: 'main' },
           { kind: 'view', name: 'order_summary' },

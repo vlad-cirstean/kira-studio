@@ -154,7 +154,7 @@ describe('sqs adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const root = await adapter.children(path([]), makeCtx());
+      const { nodes: root } = await adapter.children(path([]), makeCtx());
       expect(root.map((n) => n.name)).toEqual([DRAIN_QUEUE, EMPTY_QUEUE, ORDERS_QUEUE].sort());
       expect(root.every((n) => n.kind === 'queue' && n.hasChildren === false)).toBe(true);
     } finally {
@@ -166,7 +166,7 @@ describe('sqs adapter (§9.1, P10)', () => {
     const adapter = await createAdapter('sqs', deps);
     await adapter.connect(fixture.config, makeCtx());
     try {
-      const children = await adapter.children(queuePath(ORDERS_QUEUE), makeCtx());
+      const { nodes: children } = await adapter.children(queuePath(ORDERS_QUEUE), makeCtx());
       expect(children).toEqual([]);
     } finally {
       await adapter.disconnect();

@@ -21,6 +21,9 @@ export class DisconnectedError extends Error {
 export interface TreeChildrenResult {
   nodes: TreeNode[];
   source: 'cache' | 'server';
+  /** P43 iter2 D21/D22: never persisted — a truncated level is never written to metadata_cache
+   *  (below), so a `source: 'cache'` result is always complete and this is always `false`. */
+  truncated: boolean;
 }
 
 export interface TreeDescribeResult {
@@ -79,18 +82,21 @@ export function createTreeService(
         const cached = await getCached(db, connectionId, path, 'children');
         if (cached !== null) {
           const parsed = treeNodeArraySchema.safeParse(cached);
-          if (parsed.success) return { nodes: parsed.data, source: 'cache' };
+          if (parsed.success) return { nodes: parsed.data, source: 'cache', truncated: false };
           await dropCached(db, connectionId, path);
         }
       }
       await requireConnected(connectionId);
       const nodePath = decodePath(connectionId, path);
-      const result = await engineHost.call<{ nodes: TreeNode[] }>(ENGINE_OP.children, {
-        connectionId,
-        path: nodePath,
-      });
-      await putCached(db, connectionId, path, 'children', result.nodes);
-      return { nodes: result.nodes, source: 'server' };
+      const result = await engineHost.call<{ nodes: TreeNode[]; truncated?: boolean }>(
+        ENGINE_OP.children,
+        { connectionId, path: nodePath },
+      );
+      // P43 iter2 D22: a truncated listing is a different, smaller answer than the real one — not
+      // caching it means the next visit re-scans (and may well succeed) instead of serving the
+      // same short list, possibly past an app restart, until the user happens to press Refresh.
+      if (!result.truncated) await putCached(db, connectionId, path, 'children', result.nodes);
+      return { nodes: result.nodes, source: 'server', truncated: !!result.truncated };
     },
 
     async describe(connectionId, path, refresh, tabId = null) {

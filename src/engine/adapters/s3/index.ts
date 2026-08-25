@@ -2,7 +2,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { ObjectDownloadRequest, ObjectTransferResult } from '@shared/domain/object-store';
-import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import { encodePath, type NodePath, type ObjectMeta } from '@shared/domain/tree';
 import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { Page } from '@shared/protocol/page';
 import type {
@@ -12,6 +12,7 @@ import type {
   CountRequest,
   OpCtx,
   ReadRequest,
+  TreeChildren,
 } from '../adapter';
 import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { s3Caps } from './caps';
@@ -60,10 +61,12 @@ class S3Adapter implements Adapter {
     this.scopedBucket = null;
   }
 
-  async children(path: NodePath, ctx: OpCtx): Promise<TreeNode[]> {
+  async children(path: NodePath, ctx: OpCtx): Promise<TreeChildren> {
     const segments = path.segments;
     if (segments.length === 0) {
-      return catalog.listBuckets(this.requireClient(), this.scopedBucket ?? undefined);
+      return {
+        nodes: await catalog.listBuckets(this.requireClient(), this.scopedBucket ?? undefined),
+      };
     }
 
     const [bucketSegment, ...rest] = segments;
@@ -75,7 +78,7 @@ class S3Adapter implements Adapter {
     }
     // Rule 5 (Adapter doc comment): children() returns [] for a leaf, never throws — an 'object'
     // node never has children.
-    if (rest.length > 0 && rest[rest.length - 1].kind === 'object') return [];
+    if (rest.length > 0 && rest[rest.length - 1].kind === 'object') return { nodes: [] };
 
     const prefixSegments: string[] = [];
     for (const seg of rest) {
