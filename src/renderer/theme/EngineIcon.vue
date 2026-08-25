@@ -1,12 +1,37 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
+import {
+  siApachekafka,
+  siClickhouse,
+  siMariadb,
+  siMongodb,
+  siMysql,
+  siPostgresql,
+  siRabbitmq,
+  siRedis,
+  siSqlite,
+} from 'simple-icons';
 import { computed } from 'vue';
 
-// P16 design system: the products' own logos, redrawn to 16px as currentColor
-// paths so they take the connection colour and obey the icon law — not the
-// vendored trademarked marks (docs/v1/design/kira-design-system, "The engine
-// marks are drawn here, not vendored"). 1:1 with parts/_icons.html's i-*
-// engine symbols.
+// P16 design system: the products' own marks, imported from simple-icons (see NOTICES.md) and
+// drawn in each icon's real brand `hex`, not currentColor. Each mark is authored on a 24x24 grid;
+// `translate(2,2) scale(0.5)` maps that onto this component's 16x16 canvas, inset to fit inside the
+// 14x14 backdrop chip below it. SQS and S3 have no simple-icons entry (Amazon publishes no
+// per-service marks there either, only a generic AWS wordmark), so they stay as original redrawn
+// shapes, already authored to fit the chip inset directly (no transform needed) — drawn in a fixed
+// color instead of currentColor (SQS: dark navy #232F3E, S3: goldenrod #B8860B), since a backdrop
+// chip breaks the assumption that let them adopt whatever text/accent color ambient context set.
+// All 11 marks sit on the same #ececec off-white rounded-square backdrop chip: several brand hexes
+// (MariaDB, SQLite, Kafka) are otherwise near-invisible on Kira's dark chrome, and per-icon tinted
+// chip colors were tried (10%/28% tints of each icon's own hex, then a hand-picked distinct pastel
+// per icon) but made the set look inconsistent/arbitrary — one flat chip color for every engine
+// reads as a single coherent design instead. Plain #fff read as too bright/harsh against the dark
+// chrome and washed out the glyphs sitting on it; #ececec is a deliberately soft, barely-tinted
+// off-white instead.
+// Unlike Devicon, the 9 simple-icons imports are genuine ES imports (simple-icons
+// ships real named exports and "sideEffects": false), so only the 9 referenced consts should end
+// up in the bundle.
+// 1:1 with parts/_icons.html's i-* engine symbols.
 const props = defineProps<{ kind: ConnectionKind; size?: number }>();
 
 const iconSize = computed(() => props.size ?? 16);
@@ -14,137 +39,77 @@ const iconSize = computed(() => props.size ?? 16);
 
 <template>
   <svg class="icon" :width="iconSize" :height="iconSize" viewBox="0 0 16 16" aria-hidden="true">
-    <path
-      v-if="kind === 'postgres'"
-      fill="currentColor"
-      fill-rule="evenodd"
-      d="M8 1.6c-1.85 0-3.4.75-4.35 2-.75-.5-1.6-.4-2 .3-.4.75.05 1.6.9 1.95-.15.5-.2 1-.2 1.5 0 2.5 1.85 4.4 5.65 4.4s5.65-1.9 5.65-4.4c0-.5-.05-1-.2-1.5.85-.35 1.3-1.2.9-1.95-.4-.7-1.25-.8-2-.3C11.4 2.35 9.85 1.6 8 1.6zM5.1 5.6a.85.85 0 1 0 1.7 0 .85.85 0 1 0-1.7 0z"
-    />
     <template v-if="kind === 'postgres'">
-      <path
-        fill="currentColor"
-        d="M6.8 10.3c0 2.2.45 4.4 2.85 4.4 1.65 0 2.6-1.05 2.6-2.2 0-.65-.28-1.2-.75-1.55l-1.1 1.15c.27.22.38.38.38.6 0 .42-.32.7-.8.7-.9 0-1.18-.95-1.18-3.1z"
-      />
-      <path fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" d="M6.15 11 5.25 13.3" />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siPostgresql.hex}`" :d="siPostgresql.path" />
     </template>
 
-    <path
-      v-if="kind === 'mariadb'"
-      fill="currentColor"
-      fill-rule="evenodd"
-      d="M2.1 6.95c.28-1.75 1.3-3.1 2.85-3.8.62-.28 1.12.03 1.22.7.18 1.15.85 2.05 1.98 2.85 1.85 1.32 3.42 2.85 4.85 4.55.6.7 1.28 1.15 2.05 1.35.6.15.75.62.3 1.02-.75.65-1.85 1-3.25 1.1-2.6.2-4.95.05-7.1-.45-.65-.15-.85-.65-.5-1.2.5-.8.6-1.6.3-2.4-.25-.65-.72-1.12-1.38-1.55-.92-.62-1.5-1.15-1.32-2.17zm2.05-1.85a.65.65 0 1 0 1.3 0 .65.65 0 1 0-1.3 0z"
-    />
+    <template v-if="kind === 'mariadb'">
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siMariadb.hex}`" :d="siMariadb.path" />
+    </template>
 
-    <!-- P34 D18: a dolphin silhouette (leaping arc, dorsal fin, eye), redrawn — not the vendored
-         MySQL dolphin mark — mirroring the other engines' own currentColor-path convention. -->
     <template v-if="kind === 'mysql'">
-      <path
-        fill="currentColor"
-        fill-rule="evenodd"
-        d="M2 12.2c.4-3.6 2.4-6.6 5.5-8.4.85-.5 1.85-.8 2.9-.8-.35.55-.5 1.15-.45 1.8 1.5.15 2.85.9 3.8 2.05-.85 0-1.65.2-2.35.6.8.45 1.4 1.15 1.75 2-.85.15-1.7 0-2.45-.4.05.9-.25 1.75-.85 2.4-1.1-1.6-2.95-2.55-4.9-2.5-1.9.05-3.6 1.1-4.5 2.75-.1-.5-.2-.9-.45-1.5z"
-      />
-      <circle cx="10.4" cy="5.4" r=".5" fill="currentColor" />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siMysql.hex}`" :d="siMysql.path" />
     </template>
 
-    <!-- P35 D30: a feather (quill vane + shaft + barbs), redrawn — the mark SQLite's own project
-         uses, not a vendored asset — mirroring the other engines' currentColor line-art convention. -->
     <template v-if="kind === 'sqlite'">
-      <ellipse
-        cx="8"
-        cy="7.2"
-        rx="2.4"
-        ry="5.6"
-        transform="rotate(-28 8 7.2)"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.15"
-      />
-      <path
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.15"
-        stroke-linecap="round"
-        d="M10.4 2.3 4.6 13.7"
-      />
-      <path
-        fill="none"
-        stroke="currentColor"
-        stroke-width=".9"
-        stroke-linecap="round"
-        d="M8.7 5.3 6.6 6.3M7.9 7.7 5.6 8.7M7.1 10.1 4.7 11"
-      />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siSqlite.hex}`" :d="siSqlite.path" />
     </template>
 
     <template v-if="kind === 'mongodb'">
-      <path
-        fill="currentColor"
-        fill-rule="evenodd"
-        d="M8 1C5.85 3.7 3.85 6.3 3.85 9.1c0 2.45 1.6 4.35 3.55 4.75h1.2c1.95-.4 3.55-2.3 3.55-4.75C12.15 6.3 10.15 3.7 8 1zm.05 2.25c.52 1.4.75 2.55.75 3.85v6.1h-.62V7.1c0-1.3-.2-2.4-.66-3.65z"
-      />
-      <path fill="currentColor" d="M7.42 13.6h1.16l-.2 1.45h-.76z" />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siMongodb.hex}`" :d="siMongodb.path" />
     </template>
 
     <template v-if="kind === 'redis'">
-      <path fill="currentColor" d="M8 1.5 15 4.3 8 7.1 1 4.3z" />
-      <path fill="currentColor" d="M1 6.05 8 8.85l7-2.8v1.6L8 10.45 1 7.65z" />
-      <path fill="currentColor" d="M1 9.4 8 12.2l7-2.8V11L8 13.8 1 11z" />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siRedis.hex}`" :d="siRedis.path" />
     </template>
 
     <template v-if="kind === 'kafka'">
-      <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M5.2 2.4v11.2" />
-      <path
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.45"
-        stroke-linecap="round"
-        d="m5.3 8.15 5-3.6m-5 3.9 5.1 3.5"
-      />
-      <circle cx="5.2" cy="8" r="1.75" fill="currentColor" />
-      <circle cx="11.4" cy="3.7" r="1.95" fill="currentColor" />
-      <circle cx="11.5" cy="12.4" r="1.95" fill="currentColor" />
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siApachekafka.hex}`" :d="siApachekafka.path" />
     </template>
 
     <template v-if="kind === 'sqs'">
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
       <path
-        fill="currentColor"
+        fill="#232F3E"
         fill-rule="evenodd"
         d="M6.6 3.9h7.1c.72 0 1.3.58 1.3 1.3v5.6c0 .72-.58 1.3-1.3 1.3H6.6c-.72 0-1.3-.58-1.3-1.3V5.2c0-.72.58-1.3 1.3-1.3zm.5 1.55v5.1h6.1v-5.1l-3.05 2.45z"
       />
       <path
         fill="none"
-        stroke="currentColor"
+        stroke="#232F3E"
         stroke-width="1.3"
         stroke-linecap="round"
         d="M1.2 5.9h2.5M1.2 8.1h2.5M1.2 10.3h2.5"
       />
     </template>
 
-    <!-- P36 D31: four equal bars plus one offset square — ClickHouse's own "columnar and fast"
-         identity, redrawn as plain shapes rather than the vendored logo mark, mirroring every
-         other engine's currentColor line-art convention. 1:1 with parts/_icons.html's i-clickhouse. -->
-    <path
-      v-if="kind === 'clickhouse'"
-      fill="currentColor"
-      d="M1.35 1.9h2.1v12.2h-2.1zM4.2 1.9h2.1v12.2H4.2zM7.05 1.9h2.1v12.2h-2.1zM9.9 1.9H12v12.2H9.9zM12.75 6.95h2.1v2.1h-2.1z"
-    />
-
-    <!-- P37 D33: a rabbit silhouette (two ears + head), redrawn — not the vendored RabbitMQ mark —
-         mirroring every other engine's currentColor line-art convention. 1:1 with
-         parts/_icons.html's i-rabbitmq. -->
-    <template v-if="kind === 'rabbitmq'">
-      <ellipse cx="5.7" cy="4.5" rx="1.15" ry="3.35" transform="rotate(-16 5.7 4.5)" fill="currentColor" />
-      <ellipse cx="10.3" cy="4.5" rx="1.15" ry="3.35" transform="rotate(16 10.3 4.5)" fill="currentColor" />
-      <circle cx="8" cy="10.3" r="3.5" fill="currentColor" />
+    <template v-if="kind === 'clickhouse'">
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siClickhouse.hex}`" :d="siClickhouse.path" />
     </template>
 
-    <path
-      v-if="kind === 's3'"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.2"
-      stroke-linejoin="round"
-      d="M2.95 3.5l.9 9.25c.06.63.6 1.1 1.24 1.1h5.82c.64 0 1.18-.47 1.24-1.1l.9-9.25"
-    />
-    <ellipse v-if="kind === 's3'" cx="8" cy="3.4" rx="5.05" ry="1.7" fill="none" stroke="currentColor" stroke-width="1.2" />
+    <template v-if="kind === 'rabbitmq'">
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path transform="translate(2,2) scale(0.5)" :fill="`#${siRabbitmq.hex}`" :d="siRabbitmq.path" />
+    </template>
+
+    <template v-if="kind === 's3'">
+      <rect x="1" y="1" width="14" height="14" rx="3" fill="#ececec" />
+      <path
+        fill="none"
+        stroke="#B8860B"
+        stroke-width="1.2"
+        stroke-linejoin="round"
+        d="M2.95 3.5l.9 9.25c.06.63.6 1.1 1.24 1.1h5.82c.64 0 1.18-.47 1.24-1.1l.9-9.25"
+      />
+      <ellipse cx="8" cy="3.4" rx="5.05" ry="1.7" fill="none" stroke="#B8860B" stroke-width="1.2" />
+    </template>
   </svg>
 </template>

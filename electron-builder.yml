@@ -7,6 +7,7 @@ directories:
 files:
   - out/**/*                                # electron-vite's build output; `main` points into it
   - package.json
+  - NOTICES.md                              # third-party icon license text; ships with the app itself
   - '!**/*.map'
   # P32 D7: the vendored librdkafka C/C++ sources and build intermediates are pure build residue —
   # ~11 MB of sources plus ~8 MB of .o files (P32 F19) that the packaged app never touches.
