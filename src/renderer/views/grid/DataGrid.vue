@@ -286,6 +286,7 @@ function onScroll(): void {
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
+    window.__kiraGridScrollWorkStart?.(performance.now());
     syncScrollState();
   });
 }

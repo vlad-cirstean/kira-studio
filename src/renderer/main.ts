@@ -36,6 +36,13 @@ declare global {
     __kiraCount?: (req: CountRequestWire) => Promise<CountResponse>;
     __kiraCacheStats?: () => Promise<CacheStats>;
     __kiraTreeConnectionIds?: () => string[];
+    /**
+     * Playwright-only hook (tests/ui/budgets.spec.ts) — DataGrid.vue calls this, if a test has set
+     * it, at the start of its scroll-driven work (inside its own coalescing rAF callback, after the
+     * browser's native scroll-event-dispatch and rAF scheduling have both already resolved), so a
+     * scroll-response budget can measure the app's actual work independent of display refresh rate.
+     */
+    __kiraGridScrollWorkStart?: (t: number) => void;
   }
 }
 window.__kiraGridRetainedBytes = totalRetainedBytes;

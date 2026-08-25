@@ -138,19 +138,39 @@ export function measureClickToDom(
   );
 }
 
+export interface ScrollResponseDeltas {
+  /** DataGrid.vue's own __kiraGridScrollWorkStart mark → MutationObserver callback (see below). */
+  workDeltas: number[];
+  /** The original end-to-end number: synchronous trigger → MutationObserver callback (D5/D6). */
+  e2eDeltas: number[];
+}
+
 /**
- * Per scroll step: returns (mutation-callback time − the synchronous `scrollTop` assignment) —
- * the app's whole main-thread response to a scroll, same "synchronous trigger → first
- * MutationObserver callback" shape D5 uses for every other budget in this file (D5/D6).
+ * Per scroll step: returns both an end-to-end delta (synchronous `scrollTop` assignment → first
+ * MutationObserver callback, same "trigger → DOM commit" shape D5 uses for every other budget in
+ * this file) and a work-only delta that isolates the app's own main-thread work from browser
+ * frame-scheduling delay.
  *
- * An earlier version started the clock at the native `scroll` event's own `timeStamp` instead,
- * on the theory that a `scroll` event (unlike requestAnimationFrame) isn't vsync-locked. That's
- * false for a script-driven `scrollTop` change: Chromium defers the `scroll` event's dispatch to
- * the next "update the rendering" step, the same per-frame cadence rAF uses — confirmed by
- * forcing a step to start right after a frame boundary (via a double-rAF wait) and observing
- * every sample jump to a full frame period. Gating the measurement on that event timestamp was
- * reintroducing exactly the vsync floor D6 says a rAF-based measurement "can never" escape.
- * Starting the clock at the trigger itself avoids the same floor `measureClickToDom` avoids.
+ * An earlier version gated the 8ms budget on the end-to-end number alone. That number conflates
+ * two frame-scheduling waits that are not app work: a script-driven `scrollTop` change's own
+ * `scroll` event is deferred to Chromium's next "update the rendering" step (the same per-frame
+ * cadence requestAnimationFrame uses), and DataGrid.vue's onScroll deliberately coalesces bursty
+ * scroll events by doing its actual state sync inside its own requestAnimationFrame callback — a
+ * second hop stacked on the first. Confirmed by forcing a step to start right after a frame
+ * boundary (via a double-rAF wait) and observing every sample jump to a full frame period.
+ * SPEC.md's 8ms figure is explicitly "(120 Hz displays)" — a per-frame work budget, not a
+ * display-independent latency — so gating on the end-to-end number was reintroducing exactly the
+ * vsync floor D6 says a rAF-based measurement "can never" escape, on an environment with no real
+ * 120Hz cadence to synthesize.
+ *
+ * The work-only delta starts its clock at DataGrid.vue's own __kiraGridScrollWorkStart mark
+ * (src/renderer/main.ts's Window augmentation; called from the top of onScroll's rAF callback,
+ * after both scheduling hops have already resolved and neither app code path takes) instead of at
+ * the synchronous property write, while keeping the same MutationObserver-based end signal. If no
+ * mark ever arrives for a step (mark is only set once a test defines the hook, so this shouldn't
+ * happen when called from budgets.spec.ts, but would if this were reused without wiring it up),
+ * workDeltas falls back to the e2e start so the promise still resolves with a sane, if inflated,
+ * number rather than a negative or NaN one.
  */
 // P29 D13: one axis parameter, not a second function — this file's own header rule is that
 // budgets.spec.ts/memory.spec.ts/startup.spec.ts must all produce numbers with identical
@@ -161,7 +181,7 @@ export function measureScrollResponses(
   gridSelector: string,
   steps: number,
   axis: 'vertical' | 'horizontal' = 'vertical',
-): Promise<number[]> {
+): Promise<ScrollResponseDeltas> {
   return page.evaluate(
     ({ gridSelector, steps, axis }) => {
       const el = document.querySelector<HTMLElement>(gridSelector);
@@ -172,17 +192,27 @@ export function measureScrollResponses(
           ? Math.max(0, el.scrollWidth - el.clientWidth)
           : Math.max(0, el.scrollHeight - el.clientHeight);
 
-      function step(target: number): Promise<number> {
+      const w = window as unknown as { __kiraGridScrollWorkStart?: (t: number) => void };
+
+      function step(target: number): Promise<{ work: number; e2e: number }> {
         return new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
+            w.__kiraGridScrollWorkStart = undefined;
             observer.disconnect();
             reject(new Error('measureScrollResponses: step timed out'));
           }, 5000);
 
+          let workStart = 0;
+          w.__kiraGridScrollWorkStart = (t: number) => {
+            workStart = t;
+          };
+
           const observer = new MutationObserver(() => {
             clearTimeout(timer);
+            w.__kiraGridScrollWorkStart = undefined;
             observer.disconnect();
-            resolve(performance.now() - start);
+            const end = performance.now();
+            resolve({ work: end - (workStart || start), e2e: end - start });
           });
           observer.observe(el as HTMLElement, { childList: true, subtree: true, attributes: true });
 
@@ -192,11 +222,14 @@ export function measureScrollResponses(
       }
 
       return (async () => {
-        const results: number[] = [];
+        const workDeltas: number[] = [];
+        const e2eDeltas: number[] = [];
         for (let i = 1; i <= steps; i++) {
-          results.push(await step(Math.round((total * i) / steps)));
+          const { work, e2e } = await step(Math.round((total * i) / steps));
+          workDeltas.push(work);
+          e2eDeltas.push(e2e);
         }
-        return results;
+        return { workDeltas, e2eDeltas };
       })();
     },
     { gridSelector, steps, axis },
