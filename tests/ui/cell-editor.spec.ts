@@ -643,9 +643,63 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   // Fixture row order (0001_seed.sql's own INSERT order, already relied on by the sibling test's
   // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds.
-  // P42 D23/D29: the old UUID-generate button (and row 8's 'uuid' detected format it exercised)
-  // is gone; a generators panel offering UUID among others replaces it in a later commit, with
-  // its own test.
+  // P42 D23: the old UUID-only detected format (and the generate button it gated) is gone —
+  // row 8's former 'uuid' sample now detects as plain text, exercised by the sibling test's own
+  // scenario 3 regression check.
+
+  // --- generators panel (D29/D30/D31): never format-gated, unlike the button it replaces -------
+  let plainTextRow = -1;
+  for (let row = 0; row < 13; row++) {
+    if ((await kindOf(page, row)) === 'text') {
+      plainTextRow = row;
+      break;
+    }
+  }
+  expect(plainTextRow).toBeGreaterThanOrEqual(0);
+  await selectCell(page, plainTextRow, 'sample');
+  await panel.waitFor();
+  await expect(panel).toHaveAttribute('data-detected', 'text');
+
+  // Proves the gate is gone (F26): this cell's format is plain text, not uuid, and the trigger
+  // is enabled anyway.
+  const generateTrigger = page.locator('[data-testid="cell-editor-generate"]');
+  await expect(generateTrigger).toBeEnabled();
+  const plainTextCell = page.locator(
+    `[data-testid="grid-cell"][data-row="${plainTextRow}"][data-column="sample"]`,
+  );
+
+  await generateTrigger.click();
+  await page.click('[data-testid="cell-editor-generate-uuid"]');
+  expect(await editorText(page)).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+  // One-shot, like Ctrl+Enter — stages immediately, with no blur needed first.
+  await expect(plainTextCell).toHaveClass(/pending-edit/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  await generateTrigger.click();
+  await page.click('[data-testid="cell-editor-generate-ulid"]');
+  expect(await editorText(page)).toMatch(/^[0-9A-Z]{26}$/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  await generateTrigger.click();
+  await page.click('[data-testid="cell-editor-generate-token"]');
+  expect(await editorText(page)).toMatch(/^[0-9a-f]{32}$/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // "Now" is format-aware — this cell's effective format is 'text' (no override), so it spells an
+  // ISO-8601 timestamp rather than an epoch count.
+  await generateTrigger.click();
+  await page.click('[data-testid="cell-editor-generate-now"]');
+  expect(await editorText(page)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
+  // Exactly one byte figure (D31): EditBufferActions' own badge is gone from this mount, the
+  // status badge above still carries it.
+  await expect(page.locator('[data-testid="cell-editor-byte-badge"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText(
+    /\d+( bytes|\.\d+ (KB|MB))/,
+  );
 
   // --- timestamp translate pane (P24 D14/D15/D18/D19) --------------------------------------
   await selectCell(page, 5, 'sample'); // epochSeconds row
@@ -933,7 +987,7 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
   // affordances that exist only to serve staging one.
   await expect(panel).toHaveAttribute('data-read-only', 'true');
   await expect(panel).not.toHaveAttribute('data-read-only-reason');
-  await expect(panel.locator('[data-testid="cell-editor-uuid-generate"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-generate"]')).toHaveCount(0);
   await expect(panel.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
   await expect(panel.locator('[data-testid="cell-editor-byte-badge"]')).toHaveCount(0);
   await expect(panel.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveCount(0);

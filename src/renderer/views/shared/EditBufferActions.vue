@@ -16,8 +16,12 @@ const props = withDefaults(
      *  body (`ObjectId(...)`, `ISODate(...)`) the way the cell editor's raw JSON/XML does — the
      *  Minify action is hidden there rather than offering a control that doesn't serve a purpose. */
     showCompact?: boolean;
+    /** P42 D31: the cell editor's own status badge already carries a byte figure (among truncation/
+     *  decoded-reading/beautify-failure notes) — this row's badge would be the same number shown
+     *  twice. The document editor has no such badge, so its two mounts keep the default. */
+    showBytes?: boolean;
   }>(),
-  { revertTitle: undefined, showCompact: true },
+  { revertTitle: undefined, showCompact: true, showBytes: true },
 );
 
 const beautifyDisabledTitle = 'Indented and compact formatting apply to JSON and XML/HTML.';
@@ -47,7 +51,7 @@ const resetTitle = computed<string>(
     >
       modified
     </span>
-    <span class="p-badge" :data-testid="`${testidPrefix}-byte-badge`">{{
+    <span v-if="showBytes" class="p-badge" :data-testid="`${testidPrefix}-byte-badge`">{{
       buffer.byteLabel.value
     }}</span>
     <IconButton

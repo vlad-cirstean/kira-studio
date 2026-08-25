@@ -9,6 +9,7 @@ import { connectionRecord } from '../../../state/connections';
 import { type MenuItem, openContextMenu } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import IconButton from '../../../theme/primitives/IconButton.vue';
+import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../EditBufferActions.vue';
 import { sqlDialectFor } from '../sqlIdent';
@@ -24,6 +25,7 @@ import {
   FORMAT_LABEL,
   FORMAT_LANGUAGE,
 } from './formats';
+import { GENERATORS, type Generator } from './generate';
 import { overrideFor, readOnlyReasonFor, setOverride } from './state';
 import TimestampPane from './TimestampPane.vue';
 import { validateFormat } from './validate';
@@ -304,6 +306,21 @@ function openFormatMenu(e: MouseEvent): void {
   openContextMenu(e, rows);
 }
 
+// P42 D29: never format-gated — a generator writes text into the buffer, and the buffer does not
+// care what format the value is being read as (the old UUID-only button's disabled tooltip was a
+// false statement precisely because that gate was arbitrary). Applying one overwrites the buffer
+// outright, same as applyBeautify's own "replace doc.value" contract — Reset already exists for
+// "I changed my mind." The button sits outside `.editor-body`, so no focusout ever reaches
+// onEditorBlur — this is a one-shot action like Ctrl+Enter, not a keystroke mid-edit, so it stages
+// immediately rather than waiting on a blur that will never come.
+const generatePanelOpen = ref(false);
+function applyGenerator(gen: Generator): void {
+  if (!isEditable.value) return;
+  doc.value = gen.run(effectiveFormat.value);
+  saveEdit();
+  generatePanelOpen.value = false;
+}
+
 const targetLabel = computed(() => {
   const c = selectedCell.value;
   const tail = pathTail(c.path);
@@ -383,12 +400,43 @@ const statusLine = computed(() => {
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
 
-        <!-- P40 D13: EditBufferActions' own modified chip/byte badge/Beautify/Revert describe an
-             edit buffer that, in a viewer, can never be dirty. (P42: the UUID-generate button
-             that used to sit beside it is gone — D29's generators panel replaces it in a later
-             commit; the tree between the two commits simply has no generator, which is honest.) -->
+        <!-- P40 D13: neither affordance serves a purpose in viewer mode — nothing here exists to
+             stage a write. showBytes=false (D31): the status badge above already carries a byte
+             figure, alongside the decoded reading/truncation/beautify-failure notes it already
+             said first — this row's own badge would be the same number shown twice. -->
         <template v-if="!viewerMode">
-          <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" />
+          <span class="generate-anchor">
+            <IconButton
+              icon="sparkle"
+              :disabled="!isEditable"
+              data-testid="cell-editor-generate"
+              v-tooltip="'Generate a value'"
+              @click="generatePanelOpen = !generatePanelOpen"
+            />
+            <PopoverPanel
+              v-if="generatePanelOpen"
+              :width="200"
+              anchor="left"
+              test-id="cell-editor-generate-popover"
+              backdrop-testid="cell-editor-generate-backdrop"
+              @close="generatePanelOpen = false"
+            >
+              <div class="generate-menu">
+                <button
+                  v-for="gen in GENERATORS"
+                  :key="gen.id"
+                  type="button"
+                  class="p-row generate-item"
+                  :data-testid="`cell-editor-generate-${gen.id}`"
+                  v-tooltip="gen.hint"
+                  @click="applyGenerator(gen)"
+                >
+                  {{ gen.label }}
+                </button>
+              </div>
+            </PopoverPanel>
+          </span>
+          <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
         </template>
       </span>
 
@@ -514,6 +562,26 @@ const statusLine = computed(() => {
 
 .format-select.is-invalid {
   border-color: var(--kira-error);
+}
+
+.generate-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.generate-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--kira-s-2);
+}
+
+.generate-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-family: var(--kira-font-family);
 }
 
 /* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation
