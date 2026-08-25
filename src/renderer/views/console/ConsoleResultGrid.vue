@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, ref, watch } from 'vue';
-import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
+import {
+  clearSelectedCellFor,
+  publishSelectedCell,
+  type SelectedCell,
+} from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
@@ -154,7 +158,7 @@ function onToggleDocExpanded(id: string): void {
 }
 
 function docRowAt(row: number) {
-  return documentRow(props.pageKey, row) ?? { id: '', body: '' };
+  return documentRow(props.pageKey, row) ?? { id: '', body: '', isTruncated: false };
 }
 
 function kvRowAt(row: number) {
@@ -170,6 +174,17 @@ const selected = ref<{ row: number; col: number } | null>(null);
 function isSelected(row: number, col: number): boolean {
   return selected.value?.row === row && selected.value?.col === col;
 }
+
+// P43 iter2 F20/D27: unlike DataGrid.vue's rt.selection, this panel's "selection" is only ever
+// the last click, held in the local `selected` ref above — a row index into a page that has been
+// replaced (a new result chip swapping `pageKey` on this same mounted instance, F20's own
+// finding, or the same result reloading) identifies nothing. Clearing rather than republishing is
+// the honest operation: there is no persistent selection concept here to republish against a new
+// page in the first place.
+watch([() => props.pageKey, () => pageVersion.n], () => {
+  selected.value = null;
+  clearSelectedCellFor(props.tabId);
+});
 
 // P40 D10: rebuilt only when the search result changes (a completed scan or prev/next), not per
 // cell — mirrors KeyValueView.vue's own matchIndex.
@@ -249,7 +264,7 @@ function selectDocumentRow(row: number): void {
     column,
     row,
     value: doc.body,
-    truncated: false,
+    truncated: doc.isTruncated,
     hasPrimaryKey: true,
   });
 }

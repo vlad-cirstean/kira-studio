@@ -221,6 +221,15 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
   await expect(resultTabs).toHaveCount(2);
 
+  // --- P43 iter2 F20/D27: switching result chips clears the cell editor rather than leaving it
+  // showing a cell from a result that is no longer the active one. --------------------------------
+  await resultTabs.first().click();
+  await consoleView.locator('[data-testid="console-result-cell"]').first().click();
+  const cellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(cellEditorPanel).toBeVisible();
+  await resultTabs.last().click();
+  await expect(cellEditorPanel).toHaveCount(0);
+
   await resultTabs.first().locator('[data-testid="console-result-close"]').click();
   await expect(resultTabs).toHaveCount(1);
   await expect(results).toContainText('2');

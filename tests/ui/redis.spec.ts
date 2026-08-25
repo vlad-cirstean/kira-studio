@@ -140,6 +140,14 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   const hashFields = await page.locator('[data-testid="keyvalue-field"]').allTextContents();
   expect(hashFields.slice().sort()).toEqual(Object.keys(HASH_FIELDS).slice().sort());
 
+  // --- P43 iter2 F20/D27: a reload clears the cell editor rather than leaving it showing the
+  // previous page's row value. --------------------------------------------------------------
+  await view.locator('[data-testid="keyvalue-row"]').first().click();
+  const hashCellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(hashCellEditorPanel).toBeVisible();
+  await page.click('[data-testid="keyvalue-refresh"]');
+  await expect(hashCellEditorPanel).toHaveCount(0);
+
   // --- open a list key's keyvalue tab: index/value rows, one page holds every seeded job ----
   // Opening the hash key's tab switched the active tab away from db0's Browse tab (still open,
   // just not active) — double-clicking the tree row again reactivates the same tab (§8.4's

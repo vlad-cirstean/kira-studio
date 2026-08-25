@@ -118,14 +118,20 @@ export function cell(key: string, row: number, col: number): CellView {
   return { text, isNull: false, truncated: isTruncated(chunk, row) };
 }
 
-/** Document-only: one document's id/body text, decoded from a DocumentPage's chunks. */
-export function documentRow(key: string, row: number): { id: string; body: string } | null {
+/** Document-only: one document's id/body text, decoded from a DocumentPage's chunks. Mirrors
+ *  views/documents/page.ts's own documentRow() (P43 iter2 D28) — the divergence (this one
+ *  hard-coded `isTruncated: false`) meant the console's own cell-editor publish could never know
+ *  a Mongo console document's body was cut, unlike the data-tab equivalent. */
+export function documentRow(
+  key: string,
+  row: number,
+): { id: string; body: string; isTruncated: boolean } | null {
   const entry = pages.get(key);
   if (entry?.page.kind !== 'document') return null;
   const page = entry.page;
   const id = cached(entry, row, 'id', (d) => cellText(page.ids, row, d));
   const body = cached(entry, row, 'body', (d) => cellText(page.bodies, row, d));
-  return { id, body };
+  return { id, body, isTruncated: isTruncated(page.bodies, row) };
 }
 
 /** Key/value-only: one field/value pair, decoded from a KeyValuePage's chunks. */

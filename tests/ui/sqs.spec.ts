@@ -114,6 +114,14 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');
 
+  // --- P43 iter2 F20/D27: a Poll clears the cell editor rather than leaving it showing the
+  // previous batch's message body. ----------------------------------------------------------
+  await firstRow.locator('[data-testid="stream-body"]').click();
+  const streamCellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(streamCellEditorPanel).toBeVisible();
+  await view.locator('[data-testid="stream-poll"]').click();
+  await expect(streamCellEditorPanel).toHaveCount(0);
+
   // --- row context menu: copy-key + copy-body, read-only -----------------------------------------
   await firstRow.click({ button: 'right' });
   const menu = page.locator('[data-testid="context-menu"]');

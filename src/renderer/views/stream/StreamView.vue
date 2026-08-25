@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
-import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
+import {
+  clearSelectedCellFor,
+  publishSelectedCell,
+  type SelectedCell,
+} from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { patchStreamTabState } from '../../state/tabs';
@@ -155,6 +159,15 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
   };
   publishSelectedCell(selected);
 }
+
+// P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
+// comment: "a fresh page invalidates whatever row index used to be selected") — the published
+// cell is the other half of the same idea and was left out of it, so a Poll cleared the row
+// highlight while the dock kept showing the previous batch's message body.
+watch(
+  () => pageVersion.n,
+  () => clearSelectedCellFor(props.tab.id),
+);
 
 function onStop(): void {
   stop(props.tab.id);

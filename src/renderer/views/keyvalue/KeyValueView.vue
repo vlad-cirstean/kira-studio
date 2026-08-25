@@ -9,7 +9,11 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
-import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
+import {
+  clearSelectedCellFor,
+  publishSelectedCell,
+  type SelectedCell,
+} from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
@@ -303,10 +307,13 @@ const objectSaveError = ref<string | null>(null);
 
 // A reload (this Save, a manual Refresh, a relaunch) means the row this draft was staged against
 // no longer necessarily matches what's on screen — dropping it here rather than leaving a stale
-// draft that a later Save could silently commit over newer data.
+// draft that a later Save could silently commit over newer data. P43 iter2 F20/D27: the cell
+// editor's own published cell is the same case — a row index into a page that no longer exists
+// identifies nothing, so it's cleared here too rather than left showing the previous page's value.
 watch(page, () => {
   objectDraft.value = null;
   objectSaveError.value = null;
+  clearSelectedCellFor(props.tab.id);
 });
 
 async function saveObjectEdit(): Promise<void> {
