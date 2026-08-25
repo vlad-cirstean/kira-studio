@@ -8,12 +8,14 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
+import { openContextMenu } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import { wheelToHorizontal } from '../../wheelScroll';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
@@ -22,9 +24,12 @@ import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
 import { consoleLintSource } from './lint';
+import { getPage } from './resultPages';
 import { type Match, pageSearchApi } from './search';
 import {
+  closeOtherResults,
   closeResult,
+  closeResultsToTheRight,
   run,
   runtime,
   setActiveResult,
@@ -160,6 +165,55 @@ onUnmounted(() => {
   for (const off of unregisterCommands) off();
 });
 
+// P42 D6: a leading icon per result set's own page kind — the only thing that says which kind a
+// chip holds once a Mongo or Redis console can produce more than one kind of result set at once.
+const RESULT_KIND_ICON: Record<string, string> = {
+  tabular: 'table',
+  document: 'json',
+  keyvalue: 'symbol-key',
+};
+function iconForResult(key: string): string {
+  return RESULT_KIND_ICON[getPage(key)?.kind ?? ''] ?? 'table';
+}
+
+function onResultMiddleClick(key: string): void {
+  closeResult(props.tab.id, key);
+}
+
+// P42 D8: the same three items TabStrip.vue's own tab row leads with, over one tab's result sets
+// instead of the app's whole tab list — disabled rather than hidden when they would be a no-op.
+function onResultContextMenu(e: MouseEvent, key: string, index: number): void {
+  const total = rt.value?.results.length ?? 0;
+  openContextMenu(e, [
+    {
+      type: 'item',
+      id: 'close',
+      label: 'Close',
+      icon: 'close',
+      run: () => closeResult(props.tab.id, key),
+    },
+    {
+      type: 'item',
+      id: 'close-other-results',
+      label: 'Close others',
+      disabled: total <= 1,
+      run: () => closeOtherResults(props.tab.id, key),
+    },
+    {
+      type: 'item',
+      id: 'close-results-to-the-right',
+      label: 'Close to the right',
+      disabled: index >= total - 1,
+      run: () => closeResultsToTheRight(props.tab.id, key),
+    },
+  ]);
+}
+
+const resultStripRef = ref<HTMLElement | null>(null);
+function onResultStripWheel(e: WheelEvent): void {
+  if (wheelToHorizontal(resultStripRef.value, e)) e.preventDefault();
+}
+
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';
@@ -287,18 +341,26 @@ const statusLine = computed(() => {
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <div class="result-strip p-toolbar" data-testid="console-result-strip">
+        <div
+          ref="resultStripRef"
+          class="result-strip p-toolbar"
+          data-testid="console-result-strip"
+          @wheel="onResultStripWheel"
+        >
           <button
             v-for="(result, i) in rt.results"
             :key="result.key"
             type="button"
-            class="p-tab"
+            class="p-tab result-tab"
             :class="{ 'is-active': result.key === rt.activeKey }"
             data-testid="console-result-tab"
             :data-active="result.key === rt.activeKey"
             @click="setActiveResult(tab.id, result.key)"
+            @auxclick.middle="onResultMiddleClick(result.key)"
+            @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
           >
-            Result {{ i + 1 }}
+            <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
+            <span class="result-tab-title">Result {{ i + 1 }}</span>
             <span
               class="result-close"
               role="button"
@@ -306,7 +368,7 @@ const statusLine = computed(() => {
               data-testid="console-result-close"
               @click.stop="closeResult(tab.id, result.key)"
             >
-              <CodiconIcon name="close" :size="13" />
+              <CodiconIcon name="close" :size="11" />
             </span>
           </button>
           <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
@@ -377,16 +439,57 @@ const statusLine = computed(() => {
 /* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
    TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
    here. The trailing status text keeps data-testid="console-status": the "N result sets" /
-   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4). */
+   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4).
+   P42 D6: a step smaller than the app's primary tabs (--kira-h-sm/--kira-t-xs vs. --kira-h-md/
+   --kira-t-sm) — the only way a secondary, in-panel strip actually reads as secondary — and
+   scrollable under the wheel once new-result-by-default (D5) means a working session accumulates
+   chips. No .p-tab-rail: every result set in one console belongs to the same connection, so a
+   colour rail here would carry no information the main tab strip's own rail doesn't already. */
 .result-strip {
   gap: var(--kira-s-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.result-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.result-tab {
+  height: var(--kira-h-sm);
+  font-size: var(--kira-t-xs);
+  max-width: 140px;
+}
+
+.result-tab:hover:not(.is-active) {
+  background: var(--kira-hover);
+}
+
+.result-tab-icon {
+  flex-shrink: 0;
+}
+
+.result-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .result-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
   border-radius: var(--kira-radius-sm);
+  opacity: 0;
+}
+
+.result-tab:hover .result-close,
+.result-tab.is-active .result-close {
+  opacity: 1;
 }
 
 .result-close:hover {

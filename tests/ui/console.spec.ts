@@ -441,3 +441,78 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 
   expect(consoleErrors).toEqual([]);
 });
+
+// P42 D8: a result chip's own right-click menu — Close, Close others, Close to the right, each
+// acting on the clicked chip and disabled (never hidden) when it would be a no-op.
+test('Query console — result-tab right-click: close, close others, close to the right (P42)', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(300_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  const cfg = {
+    host: pg.config.host,
+    port: pg.config.port,
+    database: pg.config.database,
+    username: pg.config.username,
+    password: pg.config.password,
+  };
+  await createConnection(page, cfg, { name: 'Console Menu DB', color: 'blue', readOnly: false });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  // Three chips, appending by default (P42 D5).
+  await typeInto(consoleView, page, 'SELECT 1 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await typeInto(consoleView, page, '\nSELECT 2 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await typeInto(consoleView, page, '\nSELECT 3 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(3);
+
+  // --- close others: right-click the middle chip, keep only it -------------------------------
+  await resultTabs.nth(1).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-close-other-results"]');
+  await expect(resultTabs).toHaveCount(1);
+  await expect(results).toContainText('2');
+
+  // Rebuild three chips for the second half.
+  await typeInto(consoleView, page, '\nSELECT 4 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await typeInto(consoleView, page, '\nSELECT 5 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(3);
+
+  // --- close to the right: right-click the first chip, drop everything after it --------------
+  await resultTabs.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-close-results-to-the-right"]');
+  await expect(resultTabs).toHaveCount(1);
+  await expect(results).toContainText('2');
+
+  // --- disabled, never hidden, when it would be a no-op — the sole surviving chip's own menu --
+  await resultTabs.first().click({ button: 'right' });
+  await expect(page.locator('[data-testid="menu-item-close-other-results"]')).toHaveClass(
+    /is-disabled/,
+  );
+  await expect(page.locator('[data-testid="menu-item-close-results-to-the-right"]')).toHaveClass(
+    /is-disabled/,
+  );
+
+  // --- plain close: the panel goes empty once the only result set closes ---------------------
+  await page.click('[data-testid="menu-item-close"]');
+  await expect(page.locator('[data-testid="console-results"]')).toHaveCount(0);
+
+  expect(consoleErrors).toEqual([]);
+});

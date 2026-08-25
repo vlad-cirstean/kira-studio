@@ -18,6 +18,7 @@ import {
 } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
+import { wheelToHorizontal } from '../../wheelScroll';
 
 function colorFor(tab: TabRecord): string | undefined {
   return connectionRecord(tab.connectionId)?.color;
@@ -130,14 +131,11 @@ watch(
   { immediate: true },
 );
 
-// P31 D7/F9: a plain mouse produces only a vertical wheel axis (deltaY), and this strip's own
-// horizontal scrollbar is deliberately thin/subtle — without this, the strip is reachable only by
-// trackpad. A no-op once the strip doesn't overflow, so it never fights ordinary page scroll.
+// P31 D7/F9, hoisted to wheelScroll.ts P42 D7 (views/console/'s own result strip needs the same
+// eight lines and may not import workbench/): this strip's own horizontal scrollbar is
+// deliberately thin/subtle — without this, the strip is reachable only by trackpad.
 function onWheel(e: WheelEvent): void {
-  const el = stripRef.value;
-  if (!el || e.deltaY === 0 || el.scrollWidth <= el.clientWidth) return;
-  el.scrollLeft += e.deltaY;
-  e.preventDefault();
+  if (wheelToHorizontal(stripRef.value, e)) e.preventDefault();
 }
 </script>
 

@@ -77,6 +77,32 @@ export function closeResult(tabId: string, key: string): void {
   }
 }
 
+/** Result-strip context menu (P42 D8), mirroring TabStrip.vue's own closeOthers/closeToTheRight
+ *  over one tab's result sets rather than the app's whole tab list. Keeps `key` active if it
+ *  survives; re-selects the last survivor otherwise. */
+export function closeOtherResults(tabId: string, key: string): void {
+  const rt = runtime[tabId];
+  if (!rt) return;
+  const keep = rt.results.find((r) => r.key === key);
+  if (!keep) return;
+  for (const result of rt.results) {
+    if (result.key !== key) dropPage(result.key);
+  }
+  rt.results = [keep];
+  rt.activeKey = key;
+}
+
+export function closeResultsToTheRight(tabId: string, key: string): void {
+  const rt = runtime[tabId];
+  if (!rt) return;
+  const index = rt.results.findIndex((r) => r.key === key);
+  if (index === -1) return;
+  const dropped = rt.results.slice(index + 1);
+  for (const result of dropped) dropPage(result.key);
+  rt.results = rt.results.slice(0, index + 1);
+  if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;
+}
+
 /** Selects which result set the single mounted grid shows (P40 D2). Bumps resultPages'
  *  pageVersion (D9): to every reader of that store — the find toolbar above all — "the page this
  *  scope resolves to has changed" is the same event as a page being replaced under a key. */
