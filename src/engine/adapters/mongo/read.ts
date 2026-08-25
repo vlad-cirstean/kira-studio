@@ -93,7 +93,11 @@ export async function readPage(
       sortTerms.map((t) => [t.column, t.direction === 'asc' ? 1 : -1]),
     );
   }
-  if (!idOnlySort && req.cursor.mode === 'offset') {
+  // P43 iter2 D24: any offset cursor with a non-zero offset applies `skip`, not just a
+  // non-`_id` sort — `skip()` has no relationship to which sort is in force, so the old
+  // `!idOnlySort` guard threw the offset away on the app's own default (unsorted) view (F17).
+  // The `> 0` test keeps the ordinary first page issuing no `skip` at all.
+  if (req.cursor.mode === 'offset' && req.cursor.offset > 0) {
     findOptions.skip = safeInt(req.cursor.offset, 'offset');
   }
 

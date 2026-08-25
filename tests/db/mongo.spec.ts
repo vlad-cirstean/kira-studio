@@ -406,6 +406,54 @@ describe('mongo adapter (§9.1, P8)', () => {
     }
   });
 
+  // P43 iter2 F17/D24: an offset cursor with no sort at all (idOnlySort, the default state of
+  // every freshly opened document tab) used to skip `skip` entirely, so a page jump silently
+  // re-fetched page one. Every offset assertion above this one carries a non-`_id` sort, which is
+  // exactly why this case survived — see test 10's own `sort` field.
+  test('10c. read: an offset cursor with no sort actually skips (D24)', async () => {
+    const adapter = await createAdapter('mongodb', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const target = path([
+        { kind: 'database', name: MONGO_DATABASE },
+        { kind: 'collection', name: 'widgets' },
+      ]);
+      const page1 = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        makeCtx(),
+      );
+      expect(page1.position.strategy).toBe('keyset'); // idOnlySort still reports keyset (D24 doesn't touch this)
+      expect(docBodyAt(page1, 0).name).toBe('widget-0');
+
+      const page2 = await readDocument(
+        adapter,
+        {
+          path: target,
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 10,
+          cursor: { mode: 'offset', offset: 10 },
+        },
+        makeCtx(),
+      );
+      // Fails against the pre-fix tree: `skip` was never applied for an unsorted request, so this
+      // would return the same widget-0..widget-9 page1 already got.
+      expect(docBodyAt(page2, 0).name).toBe('widget-10');
+      expect(page2.rowCount).toBe(10);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
   test('11. read: filter', async () => {
     const adapter = await createAdapter('mongodb', deps);
     await adapter.connect(fixture.config, makeCtx());

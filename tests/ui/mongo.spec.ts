@@ -281,6 +281,16 @@ test('mongodb — page-size-1000 render tripwires, truncated fallback, go-to-mat
   // never a per-row editor — so no CodeMirror instance exists anywhere in the list (D19/D24).
   await expect(page.locator('[data-testid="document-list"] .cm-editor')).toHaveCount(0);
 
+  // --- P43 iter2 F17/D24: a page jump on the default (unsorted) view actually skips — mongo's
+  // own `skip` used to apply only for a real sort, so this silently re-fetched page one. ---------
+  const firstDocTree = () =>
+    page.locator('[data-testid="document-row"]').first().locator('[data-testid="document-tree"]');
+  await page.fill('[data-testid="document-pager-page-input"]', '2');
+  await page.press('[data-testid="document-pager-page-input"]', 'Tab');
+  await expect(firstDocTree()).toContainText('big-widget-1000', { timeout: 15_000 });
+  await page.click('[data-testid="document-pager-first"]');
+  await expect(firstDocTree()).toContainText('big-widget-0', { timeout: 15_000 });
+
   // --- go to match scrolls a document that starts off-screen into view (D8) ------------------
   await page.click('[data-testid="document-toolbar-search"]');
   await page.fill('[data-testid="document-search-input"]', 'big-widget-999');

@@ -67,10 +67,10 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   // Mirrors views/grid/state.ts's `load()`: the fallback cursor tracks `pageIndex * pageSize`,
-  // not a hardcoded 0 — a real (non-`_id`) sort forces mongo/read.ts's skip/limit strategy (D6),
-  // which returns no keyset token, so this is what keeps a bare `load(tabId)` (reload, or any
-  // setter below) re-fetching the page the user is actually on instead of silently snapping back
-  // to page one.
+  // not a hardcoded 0 — this is what keeps a bare `load(tabId)` (reload, or any setter below)
+  // re-fetching the page the user is actually on instead of silently snapping back to page one.
+  // Applies on the default (unsorted/`_id`-sorted) view too (P43 iter2 D24): mongo/read.ts's
+  // `skip` now runs on any non-zero offset cursor, not just a real (non-`_id`) sort.
   const effectiveCursor: PageCursor = cursor ?? {
     mode: 'offset',
     offset: tab.state.pageIndex * tab.state.pageSize,
