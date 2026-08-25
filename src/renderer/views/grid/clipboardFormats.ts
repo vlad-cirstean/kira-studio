@@ -10,6 +10,53 @@ export function rowsToTsv(rows: RowSnapshot[]): string {
   return rows.map((r) => r.columns.map((c) => r.values[c] ?? '').join('\t')).join('\n');
 }
 
+interface CellText {
+  text: string;
+  isNull: boolean;
+}
+
+// A cell/range/column-selection copy reads the same displayed values a row copy does (D6's
+// rationale, above) — `cellAt` is the grid's own `displayCell`, kept as a parameter rather than a
+// second RowSnapshot pass because a range/column selection is addressed by (row, display column)
+// pairs, not by whole rows.
+export function rangeToTsv(
+  r0: number,
+  r1: number,
+  c0: number,
+  c1: number,
+  cellAt: (row: number, col: number) => CellText,
+): string {
+  const lines: string[] = [];
+  for (let r = r0; r <= r1; r++) {
+    const cells: string[] = [];
+    for (let c = c0; c <= c1; c++) {
+      const dc = cellAt(r, c);
+      cells.push(dc.isNull ? '' : dc.text);
+    }
+    lines.push(cells.join('\t'));
+  }
+  return lines.join('\n');
+}
+
+export function columnsToTsv(
+  rows: readonly number[],
+  cols: readonly number[],
+  cellAt: (row: number, col: number) => CellText,
+): string {
+  const lines: string[] = [];
+  for (const r of rows) {
+    lines.push(
+      cols
+        .map((c) => {
+          const dc = cellAt(r, c);
+          return dc.isNull ? '' : dc.text;
+        })
+        .join('\t'),
+    );
+  }
+  return lines.join('\n');
+}
+
 function csvField(value: string): string {
   if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;

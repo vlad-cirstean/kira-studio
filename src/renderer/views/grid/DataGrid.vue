@@ -28,7 +28,13 @@ import {
 } from '../shared/columns';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { typeDescription } from '../shared/typeGlossary';
-import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
+import {
+  columnsToTsv,
+  parseDelimited,
+  type RowSnapshot,
+  rangeToTsv,
+  rowsToTsv,
+} from './clipboardFormats';
 import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './gridMenu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
@@ -41,6 +47,7 @@ import {
   stageInsertValue,
 } from './pendingChanges';
 import { matchedRows, searchState, setSearchFiltering } from './search';
+import { parseTextSortTerms } from './sortTerms';
 import { runtime, setSort } from './state';
 
 const props = defineProps<{ tabId: string }>();
@@ -400,30 +407,6 @@ function alignFor(displayCol: number): 'left' | 'right' {
   const name = columnOrder.value[displayCol];
   const descriptor = columnByName.value.get(name);
   return descriptor ? alignmentFor(descriptor) : 'left';
-}
-
-// queries.ts's own doc comment: typing in the ORDER BY box always produces a `text` sort and
-// "clears the header indicators" — true for the machine-driven distinction that keeps pagination
-// on `offset` (D7), but a user who types "a asc, b desc" still expects the headers to reflect it.
-// This best-effort, display-only parse recovers per-column direction + position for exactly that
-// case; a term that doesn't match a real column name (an expression, a typo) is silently skipped
-// rather than guessed at. It never feeds back into `state.sort` — the text/structured split for
-// pagination purposes is untouched.
-function parseTextSortTerms(
-  text: string,
-  knownColumns: readonly string[],
-): { column: string; direction: 'asc' | 'desc' }[] {
-  const known = new Set(knownColumns);
-  const terms: { column: string; direction: 'asc' | 'desc' }[] = [];
-  for (const raw of text.split(',')) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(/^(?:"([^"]+)"|`([^`]+)`|(\w+))\b\s*(desc|asc)?/i);
-    const name = match?.[1] ?? match?.[2] ?? match?.[3];
-    if (!name || !known.has(name)) continue;
-    terms.push({ column: name, direction: match?.[4]?.toLowerCase() === 'desc' ? 'desc' : 'asc' });
-  }
-  return terms;
 }
 
 const sortTerms = computed(() => {
@@ -1027,34 +1010,14 @@ function onCopy(): void {
   if (sel.kind === 'range') {
     const [r0, r1] = [sel.anchorRow, sel.row].sort((a, b) => a - b);
     const [c0, c1] = [sel.anchorCol, sel.col].sort((a, b) => a - b);
-    const lines: string[] = [];
-    for (let r = r0; r <= r1; r++) {
-      const cells: string[] = [];
-      for (let c = c0; c <= c1; c++) {
-        const dc = displayCell(r, c);
-        cells.push(dc.isNull ? '' : dc.text);
-      }
-      lines.push(cells.join('\t'));
-    }
-    copyText(lines.join('\n'));
+    copyText(rangeToTsv(r0, r1, c0, c1, displayCell));
     return;
   }
   if (sel.kind === 'row') {
     copyText(rowsToTsv(sel.rows.map(rowSnapshot)));
     return;
   }
-  const lines: string[] = [];
-  for (const r of rowsForColumnOps(p.rowCount)) {
-    lines.push(
-      sel.cols
-        .map((c) => {
-          const dc = displayCell(r, c);
-          return dc.isNull ? '' : dc.text;
-        })
-        .join('\t'),
-    );
-  }
-  copyText(lines.join('\n'));
+  copyText(columnsToTsv(rowsForColumnOps(p.rowCount), sel.cols, displayCell));
 }
 
 // D13: TSV-if-tab-else-CSV, applied column-by-column from the selection's anchor across the
