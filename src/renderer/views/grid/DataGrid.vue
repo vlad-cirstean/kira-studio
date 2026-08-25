@@ -26,6 +26,7 @@ import {
   resolveColumnOrder,
   visibleColumnRange,
 } from '../shared/columns';
+import { setSearchFiltering } from '../shared/searchFilter';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { typeDescription } from '../shared/typeGlossary';
 import {
@@ -46,7 +47,7 @@ import {
   stageEdit,
   stageInsertValue,
 } from './pendingChanges';
-import { matchedRows, searchState, setSearchFiltering } from './search';
+import { matchedRows, searchState } from './search';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, setSort } from './state';
 

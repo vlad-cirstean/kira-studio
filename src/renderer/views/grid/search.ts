@@ -1,14 +1,7 @@
 import { cellText, isNull } from '@shared/protocol/page';
 import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
 import { createPageSearch } from '../shared/pageSearch';
-import { isSearchFiltering, searchFilterState, setSearchFiltering } from '../shared/searchFilter';
 import { getPage, pageVersion } from './page';
-
-export type { SearchHandle, SearchQuery };
-// P31 D16: the filter-toggle state (and matchedRows' own de-dup pass) moved to
-// views/shared/searchFilter.ts so documents/keyvalue/stream can share it — re-exported here so
-// this module's own public shape, and every existing importer, is unchanged.
-export { isSearchFiltering, searchFilterState, setSearchFiltering };
 
 export interface Match {
   row: number;

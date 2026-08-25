@@ -3,8 +3,6 @@ import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '
 import { createPageSearch } from '../shared/pageSearch';
 import { getPage, pageVersion } from './page';
 
-export type { SearchHandle, SearchQuery };
-
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns
 // (`fields`/`values`, D8.8) instead of a tabular page's caller-defined column set — 'field'/
 // 'value' are close enough to 'col' that this stays `col: 'field' | 'value'` rather than an

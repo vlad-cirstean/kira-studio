@@ -2,8 +2,6 @@ import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '
 import { createPageSearch } from '../shared/pageSearch';
 import { documentRow, getPage, pageVersion } from './page';
 
-export type { SearchHandle, SearchQuery };
-
 export interface Match {
   row: number;
   start: number;
