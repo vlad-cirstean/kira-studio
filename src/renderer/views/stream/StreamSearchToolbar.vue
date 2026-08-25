@@ -18,14 +18,14 @@ const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
 
 // README's own "search walks the loaded rows only and never issues a query" wording, borrowed
-// verbatim from grid/SearchToolbar.vue's precedent — applies here too (item 5).
+// verbatim from views/shared/page/SearchToolbar.vue's precedent — applies here too (item 5).
 // P31 D22/F24: pageVersion.n is the explicit dependency — getPage reads a plain, non-reactive Map.
 const loadedRowCount = computed(() => {
   void pageVersion.n;
   return getPage(props.tabId)?.rowCount ?? 0;
 });
 
-// P31 D17: the same filter-mode toggle grid/SearchToolbar.vue has (P24 D1/D9).
+// P31 D17: the same filter-mode toggle views/shared/page/SearchToolbar.vue has (P24 D1/D9).
 const filtering = computed(() => isSearchFiltering(props.tabId));
 const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
 function toggleFilter(): void {
@@ -35,7 +35,7 @@ function toggleFilter(): void {
 const query = ref('');
 const entry = computed(() => searchState[props.tabId]);
 
-// See views/grid/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
+// See views/shared/page/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
 // target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
 // right place to autofocus (this component is mounted fresh each time the toolbar opens).
 const searchInput = ref<{ $el: HTMLElement } | null>(null);
@@ -88,13 +88,13 @@ onMounted(() => {
 onUnmounted(() => {
   clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
-  // above — the toggle must reset here too (mirrors grid/SearchToolbar.vue's own note).
+  // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
   setSearchFiltering(props.tabId, false);
 });
 </script>
 
 <template>
-  <!-- Docks below the toolbar it searches, same placement law as grid/SearchToolbar.vue. -->
+  <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
     <span class="icon-box muted"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
@@ -114,7 +114,7 @@ onUnmounted(() => {
     <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
     <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
     <div class="sep" />
-    <!-- P31 D17: same filter *mode* as grid/SearchToolbar.vue (P24 D1/D9) — hides every
+    <!-- P31 D17: same filter *mode* as views/shared/page/SearchToolbar.vue (P24 D1/D9) — hides every
          non-matching row. -->
     <div class="group">
       <IconButton

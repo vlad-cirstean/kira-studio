@@ -644,7 +644,7 @@ onUnmounted(() => {
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
         </MessageStrip>
-        <!-- Below the filter/sort row, above the list it searches — PageSearchToolbar.vue's own
+        <!-- Below the filter/sort row, above the list it searches — views/shared/page/SearchToolbar.vue's own
              "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
         <SearchToolbar
           v-if="rt?.searchOpen"

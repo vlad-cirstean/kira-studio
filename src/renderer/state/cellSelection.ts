@@ -1,7 +1,7 @@
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { reactive } from 'vue';
 
-// The only thing that crosses between the grid and the cell editor (D1): `views/celleditor/`
+// The only thing that crosses between the grid and the cell editor (D1): `views/shared/celleditor/`
 // imports nothing from `views/grid/` — §11 forbids sideways view imports, and this publication
 // is the seam that keeps it that way. P8/P10 publish into the same slot for their own views.
 export interface SelectedCell {
@@ -19,7 +19,7 @@ export interface SelectedCell {
   /** The engine cut this value at MAX_CELL_BYTES; the rest was never fetched (D14). */
   truncated: boolean;
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
-   *  page has one is grid-only knowledge and `views/celleditor/` may not import `views/grid/`. */
+   *  page has one is grid-only knowledge and `views/shared/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;
   /** Set only by a publisher that can genuinely stage a write for this exact cell (today, only
    *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`). `undefined`

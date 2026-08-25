@@ -9,7 +9,7 @@ import {
   toggleStreamFilterHistoryPin,
 } from './streamFilterHistory';
 
-// A lean sibling of grid/FilterHistoryMenu.vue/console/ConsoleSavedMenu.vue: this one has no
+// A lean sibling of views/shared/FilterHistoryMenu.vue/console/ConsoleSavedMenu.vue: this one has no
 // "Recent" section at all (SavedListMenu's `recent` prop is optional exactly so a caller can omit
 // it) because there is only one list here — session-only history, no separately-persisted saved
 // filters to distinguish it from (streamFilterHistory.ts's own doc comment explains why there's no
@@ -81,7 +81,7 @@ function remove(entry: StreamFilterHistoryEntry): void {
     @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <!-- P31 D27/F27: full, untruncated text — same reasoning as grid/FilterHistoryMenu.vue's
+      <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
            own note (the 320px popover is structurally too narrow for a long summary). -->
       <span class="entry-name mono" v-tooltip="summarize(entry)">{{ summarize(entry) }}</span>
     </template>

@@ -3,7 +3,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 
-// Shared popover shell for grid/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
+// Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
 // a "Saved" list (pin/rename/delete an entry, click to apply it) with an optional "Recent" list
 // underneath (click-to-apply only — history entries can't be pinned, renamed or deleted). Every
 // bit of per-caller business logic (what "apply"/"pin"/"delete" actually do, the rename prompt,

@@ -16,7 +16,7 @@ const pages = new Map<string, Entry>();
 const decoder = new TextDecoder();
 
 /** The decode-then-cache body cell()/documentRow()/keyValueRow() each wrote out five times
- *  (P39 iter3 F11/D12) — the same one-line memo views/shared/pageStore.ts's own `cached()` runs
+ *  (P39 iter3 F11/D12) — the same one-line memo views/shared/page/store.ts's own `cached()` runs
  *  for the other three stores. Not built on that factory: this store keys by `${tabId}:${...}`
  *  rather than `tabId`, holds a `Page` union, and clears its whole cache on a window change
  *  instead of pruning (iteration 1 D7). */

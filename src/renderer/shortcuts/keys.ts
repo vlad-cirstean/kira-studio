@@ -46,7 +46,7 @@ export function formatShortcut(id: ShortcutId): string {
 const DOM_KEY: Record<string, string> = { Return: 'Enter' };
 
 // `chord.ctrl` (a literal Control, distinct from cmdOrCtrl) only ever appears on the two
-// `global: true` tab-navigation bindings (shared/shortcuts.ts) — an Electron accelerator owns
+// `global: true` tab-navigation bindings (shared/domain/shortcuts.ts) — an Electron accelerator owns
 // those, never a local keydown handler — so a local match only ever needs cmdOrCtrl/shift/alt.
 export function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   const chord = resolveChord(id);

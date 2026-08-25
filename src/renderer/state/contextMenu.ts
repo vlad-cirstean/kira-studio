@@ -12,7 +12,7 @@ export type MenuItem =
       danger?: boolean;
       disabled?: boolean;
       checked?: boolean;
-      /** P21: names a binding in shared/shortcuts.ts by id, never a display string — a typo is a
+      /** P21: names a binding in shared/domain/shortcuts.ts by id, never a display string — a typo is a
        *  type error, and the printed key can never drift from the key that actually runs `run()`. */
       shortcut?: ShortcutId;
       run(): void | Promise<void>;

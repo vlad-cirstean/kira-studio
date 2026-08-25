@@ -10,7 +10,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { setText } from './state';
 
-// A lean sibling of grid/FilterHistoryMenu.vue: saved-only (§8.14 gives the console no run
+// A lean sibling of views/shared/FilterHistoryMenu.vue: saved-only (§8.14 gives the console no run
 // history, only saved_queries), scoped to one tab's own connectionId/path. Both share the same
 // popover shell/list layout via views/shared/SavedListMenu.vue.
 const props = defineProps<{ tabId: string }>();
@@ -112,7 +112,7 @@ async function saveCurrent(): Promise<void> {
     @close="emit('close')"
   >
     <template #entry="{ entry }">
-      <!-- P31 D27/F27: full, untruncated text — same reasoning as grid/FilterHistoryMenu.vue's
+      <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
            own note (the 320px popover is structurally too narrow for a saved query's full text). -->
       <span class="entry-name" v-tooltip="`${entry.name}\n${entry.body.text}`">{{ entry.name }}</span>
     </template>
