@@ -7,7 +7,7 @@ import { mapHttpError, mapNetworkError } from './errors';
 // unreachable-but-not-refusing host would hang until the OS gave up. Two constants because the
 // connect probe (D5) needs to fail fast while an ordinary poll can legitimately take longer.
 export const CONNECT_TIMEOUT_MS = 10_000;
-export const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 // D8/F8: the default vhost is literally *named* '/' — a single un-encoded segment would turn
 // '/api/queues//' into a different endpoint (or a 404). Every path segment goes through this one

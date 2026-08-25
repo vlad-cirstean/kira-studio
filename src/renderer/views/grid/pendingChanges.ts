@@ -24,7 +24,7 @@ export interface TabPending {
   inserts: PendingInsert[];
 }
 
-export const pendingState = reactive({} as Record<string, TabPending>);
+const pendingState = reactive({} as Record<string, TabPending>);
 
 function ensure(tabId: string): TabPending {
   if (!pendingState[tabId]) {

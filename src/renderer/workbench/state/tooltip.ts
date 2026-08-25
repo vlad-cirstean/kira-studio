@@ -15,7 +15,7 @@ export const TOOLTIP_REARM_MS = 300;
 
 /** The attribute the directive writes and the controller reads — also the Playwright handle that
  *  replaces `title` (D8: one source of truth for hit-testing and for the displayed string). */
-export const TIP_ATTR = 'data-kira-tip';
+const TIP_ATTR = 'data-kira-tip';
 
 /** D7 rule 1's marker: distinguishes an `aria-label` this directive set (safe to keep in sync with
  *  a changing hint) from one the author wrote (never touched — F6's seven carve-out sites). */

@@ -38,8 +38,8 @@ export interface PreconnectSupervisor {
   onExit(cb: (exit: PreconnectExit) => void): () => void;
 }
 
-export const PRECONNECT_SETTLE_MS = 2000; // alive this long ⇒ treated as a running sidecar
-export const PRECONNECT_KILL_GRACE_MS = 2000; // SIGTERM → SIGKILL escalation window
+const PRECONNECT_SETTLE_MS = 2000; // alive this long ⇒ treated as a running sidecar
+const PRECONNECT_KILL_GRACE_MS = 2000; // SIGTERM → SIGKILL escalation window
 const STDERR_TAIL_MAX = 200;
 
 interface Entry {

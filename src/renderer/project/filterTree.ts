@@ -64,7 +64,7 @@ export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow
 /** Rows past this count are dropped and `truncated` is set — a Redis namespace with 20 000 cached
  *  keys must not render 20 000 checkboxes (D18); the name filter is the intended way through such
  *  a level. */
-export const FILTER_ROW_CAP = 500;
+const FILTER_ROW_CAP = 500;
 
 export interface FilterNodeRows {
   rows: FilterNodeRow[];
