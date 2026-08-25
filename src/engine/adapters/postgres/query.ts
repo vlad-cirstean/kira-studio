@@ -1,6 +1,6 @@
 import type { Client, QueryArrayConfig, QueryConfig, QueryResultRow } from 'pg';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import { mapError } from './errors';
 
 export interface RunningQuery {
@@ -42,9 +42,7 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
     opts?.logParams && params.length > 0 ? `${sql} -- params: ${JSON.stringify(params)}` : sql,
   );
 
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
 
   const backendPid = (client as unknown as { processID?: number }).processID;
   const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
@@ -127,9 +125,7 @@ export async function runCommand(
 ): Promise<{ rowCount: number }> {
   if (!opts?.suppressCommand) ctx.setCommand(sql);
 
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
 
   const backendPid = (client as unknown as { processID?: number }).processID;
   const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;

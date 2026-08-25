@@ -1,5 +1,5 @@
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import type { ClickHouseHandle } from './client';
 import { mapError } from './errors';
 
@@ -13,12 +13,6 @@ export interface RunningQuery {
 // statement op (mutate's insert batch, console's "Run all") is never unregistered by an earlier
 // one settling after it.
 export type TrackQuery = (q: RunningQuery) => () => void;
-
-export function checkNotCancelled(ctx: OpCtx): void {
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
-}
 
 // D8: an aborted request surfaces from the driver as a plain, uncoded Error ("The user aborted a
 // request.", verified empirically — it is not a ClickHouseError and carries no `code`), so
@@ -69,7 +63,7 @@ export async function streamQuery(
   onHeader: (names: string[], types: string[]) => void,
   onRow: (values: (string | null)[]) => void,
 ): Promise<void> {
-  checkNotCancelled(ctx);
+  assertNotCancelled(ctx);
   const release = track({ queryId: opts.queryId });
   try {
     const resultSet = await h.client.query({
@@ -113,7 +107,7 @@ export async function runCommand(
   opts: RunOptions,
   track: TrackQuery,
 ): Promise<{ writtenRows: number }> {
-  checkNotCancelled(ctx);
+  assertNotCancelled(ctx);
   const release = track({ queryId: opts.queryId });
   try {
     const result = await h.client.command({
@@ -143,7 +137,7 @@ export async function runCatalogQuery<T = Record<string, unknown>>(
   track: TrackQuery,
   params?: Record<string, string>,
 ): Promise<T[]> {
-  checkNotCancelled(ctx);
+  assertNotCancelled(ctx);
   ctx.setCommand(sql);
   const release = track({ queryId: opts.queryId });
   try {

@@ -1,6 +1,6 @@
 import type { Connection, FieldInfo, TypeCastFunction, TypeCastNextFunction } from 'mariadb';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import { mapError } from './errors';
 
 export interface RunningQuery {
@@ -62,9 +62,7 @@ export async function runQuery<R = unknown>(
     opts?.logParams && params.length > 0 ? `${sql} -- params: ${JSON.stringify(params)}` : sql,
   );
 
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
 
   const release = track({ threadId: conn.threadId });
 
@@ -131,9 +129,7 @@ export async function runCommand(
 ): Promise<{ affectedRows: number }> {
   if (!opts?.suppressCommand) ctx.setCommand(sql);
 
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
 
   const release = track({ threadId: conn.threadId });
 

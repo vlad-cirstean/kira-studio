@@ -1,16 +1,10 @@
 import type { StatementSync } from 'node:sqlite';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import type { SqliteHandle } from './client';
 import { mapError } from './errors';
 
 export type SqliteParam = string | number | bigint | null | Uint8Array;
-
-export function checkNotCancelled(ctx: OpCtx): void {
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
-}
 
 // F9/D9: `prepare()` silently keeps only the first statement of a multi-statement string, with no
 // error — `stmt.sourceSQL` is exactly the substring of `sql` that was actually compiled (verified:
@@ -75,7 +69,7 @@ export function runQuery<R = unknown>(
   ctx.setCommand(
     opts?.logParams && params.length > 0 ? `${sql} -- params: ${JSON.stringify(params)}` : sql,
   );
-  checkNotCancelled(ctx);
+  assertNotCancelled(ctx);
   const stmt = prepareOne(h, sql, { readBigInts: opts?.readBigInts });
   if (opts?.rowsAsArray) stmt.setReturnArrays(true);
   try {
@@ -100,7 +94,7 @@ export function runCommand(
   opts?: CommandOptions,
 ): { affectedRows: number } {
   if (!opts?.suppressCommand) ctx.setCommand(sql);
-  checkNotCancelled(ctx);
+  assertNotCancelled(ctx);
   const stmt = prepareOne(h, sql);
   try {
     const result = stmt.run(...params);

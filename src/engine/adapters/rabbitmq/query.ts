@@ -1,5 +1,5 @@
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { assertNotCancelled } from '../errors';
 import type { RabbitHandle } from './client';
 import { mapHttpError, mapNetworkError } from './errors';
 
@@ -51,9 +51,7 @@ interface RabbitApiErrorBody {
 // the connect probe — goes through this, so D7's signal wiring, D6's Authorization header, F16's
 // error envelope and F40's command text are each written exactly once.
 export async function request<T>(h: RabbitHandle, ctx: OpCtx, opts: RequestOptions): Promise<T> {
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
   const url = buildUrl(h, opts);
   ctx.setCommand(opts.command ?? `${opts.method} /api/${encodedPath(opts.segments)}`);
   const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;

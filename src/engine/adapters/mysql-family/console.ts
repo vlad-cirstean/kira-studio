@@ -7,7 +7,7 @@ import {
 } from '@shared/protocol/page';
 import type { Connection, FieldInfo } from 'mariadb';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import { type TrackQuery, typeCastString } from './query';
@@ -73,9 +73,7 @@ async function runRaw(
   ctx: OpCtx,
   track: TrackQuery,
 ): Promise<QueryResultShape> {
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
   const release = track({ threadId: conn.threadId });
 
   return new Promise<QueryResultShape>((resolve, reject) => {

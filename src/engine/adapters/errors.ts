@@ -1,4 +1,5 @@
 import type { ConnectionKind } from '@shared/domain/connection';
+import type { OpCtx } from './adapter';
 
 export type AdapterErrorCode =
   | 'E_CONNECT'
@@ -50,4 +51,13 @@ export function noQueryConsole(kind: ConnectionKind): never {
 // ("Throws E_UNSUPPORTED if the connection is read-only") implemented once instead of ten times.
 export function assertWritable(readOnly: boolean): void {
   if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+}
+
+// P39 iter3 F17/D15: Adapter rule 2's pre-flight check ("Every method that talks to the server
+// takes an OpCtx and honours ctx.signal") — written out nine times across five adapters, two of
+// them under the name checkNotCancelled. Message preserved byte-for-byte.
+export function assertNotCancelled(ctx: OpCtx): void {
+  if (ctx.signal.aborted) {
+    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
+  }
 }

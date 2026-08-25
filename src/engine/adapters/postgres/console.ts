@@ -6,7 +6,7 @@ import {
 } from '@shared/protocol/page';
 import type { Client, QueryArrayConfig } from 'pg';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import type { TrackQuery } from './query';
@@ -36,9 +36,7 @@ async function runRaw(
   ctx: OpCtx,
   track: TrackQuery,
 ): Promise<RawResult> {
-  if (ctx.signal.aborted) {
-    throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
-  }
+  assertNotCancelled(ctx);
   const backendPid = (client as unknown as { processID?: number }).processID;
   const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
 

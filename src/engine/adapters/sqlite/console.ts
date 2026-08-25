@@ -6,11 +6,11 @@ import {
   type TabularPage,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertNotCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import type { SqliteHandle } from './client';
 import { mapError } from './errors';
-import { checkNotCancelled, prepareOne } from './query';
+import { prepareOne } from './query';
 import { toCellText, typeClassFor } from './read';
 
 // F5: `StatementSync.columns()` reports each column's *declared* origin type ('INTEGER', 'TEXT',
@@ -71,7 +71,7 @@ export function execute(h: SqliteHandle, ctx: OpCtx, statements: string[]): Tabu
 
   const pages: TabularPage[] = [];
   for (const sql of statements) {
-    checkNotCancelled(ctx);
+    assertNotCancelled(ctx);
     // D3: a user's own console statement can touch real table data just as easily as the read
     // path can.
     const stmt = prepareOne(h, sql, { readBigInts: true });
