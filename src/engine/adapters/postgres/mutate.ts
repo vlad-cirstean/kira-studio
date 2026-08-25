@@ -1,4 +1,4 @@
-import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
+import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import { encodePath } from '@shared/domain/tree';
 import type { Client } from 'pg';
 import type { OpCtx } from '../adapter';
@@ -7,59 +7,16 @@ import {
   assertAffectedExactlyOne,
   assertColumnsKnown,
   assertKeyIsPrimaryKey,
+  createParamRenderer,
+  literalRenderer,
   orderedOps,
+  renderRowOp,
 } from '../sql-mutate';
 import * as catalog from './catalog';
 import { runCommand, runQuery, type TrackQuery } from './query';
 import { quoteIdent } from './read';
 
-// Renders one row-op's statement text. preview() (never executes, D6) inlines an escaped SQL
-// literal for each value; mutate() pushes a `$n` placeholder onto `params` instead — the two stay
-// textually identical in shape (column list, WHERE construction) by sharing this one builder.
-type ValueRenderer = (value: string | null, params: unknown[]) => string;
-
-function literalRenderer(value: string | null): string {
-  if (value === null) return 'NULL';
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-function paramRenderer(value: string | null, params: unknown[]): string {
-  params.push(value);
-  return `$${params.length}`;
-}
-
-function whereFromKey(
-  key: Record<string, string | null>,
-  render: ValueRenderer,
-  params: unknown[],
-): string {
-  return Object.entries(key)
-    .map(([col, val]) =>
-      val === null ? `${quoteIdent(col)} IS NULL` : `${quoteIdent(col)} = ${render(val, params)}`,
-    )
-    .join(' AND ');
-}
-
-function renderRowOp(
-  relationSql: string,
-  op: MutationRowOp,
-  render: ValueRenderer,
-  params: unknown[],
-): string {
-  if (op.kind === 'update') {
-    const setSql = Object.entries(op.changes)
-      .map(([col, val]) => `${quoteIdent(col)} = ${render(val, params)}`)
-      .join(', ');
-    return `UPDATE ${relationSql} SET ${setSql} WHERE ${whereFromKey(op.key, render, params)}`;
-  }
-  if (op.kind === 'delete') {
-    return `DELETE FROM ${relationSql} WHERE ${whereFromKey(op.key, render, params)}`;
-  }
-  const columns = Object.keys(op.values);
-  const columnSql = columns.map((c) => quoteIdent(c)).join(', ');
-  const valueSql = columns.map((c) => render(op.values[c], params)).join(', ');
-  return `INSERT INTO ${relationSql} (${columnSql}) VALUES (${valueSql})`;
-}
+const paramRenderer = createParamRenderer<unknown>((n) => `$${n}`);
 
 function resolveTablePath(path: MutationPlan['path']): { schema: string; table: string } {
   const [, schemaSegment, objectSegment] = path.segments;
@@ -81,7 +38,9 @@ function resolveTablePath(path: MutationPlan['path']): { schema: string; table: 
 export function preview(plan: MutationPlan): string[] {
   const { schema, table } = resolveTablePath(plan.path);
   const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
-  return orderedOps(plan.ops).map((op) => renderRowOp(relationSql, op, literalRenderer, []));
+  return orderedOps(plan.ops).map((op) =>
+    renderRowOp(relationSql, op, literalRenderer, [], quoteIdent),
+  );
 }
 
 export async function mutate(
@@ -119,12 +78,12 @@ export async function mutate(
   const ordered = orderedOps(plan.ops);
   const compiled = ordered.map((op) => {
     const params: unknown[] = [];
-    const sql = renderRowOp(relationSql, op, paramRenderer, params);
+    const sql = renderRowOp(relationSql, op, paramRenderer, params, quoteIdent);
     return { op, sql, params };
   });
   // One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
   ctx.setCommand(
-    ordered.map((op) => renderRowOp(relationSql, op, literalRenderer, [])).join(';\n'),
+    ordered.map((op) => renderRowOp(relationSql, op, literalRenderer, [], quoteIdent)).join(';\n'),
   );
 
   const execCommand = (sql: string, params: unknown[]) =>

@@ -1,5 +1,5 @@
-import type { MutationRowOp } from '@shared/domain/mutations';
-import type { ColumnMeta } from '@shared/domain/tree';
+import type { MutationPlan, MutationRowOp } from '@shared/domain/mutations';
+import { type ColumnMeta, encodePath } from '@shared/domain/tree';
 import { AdapterError } from './errors';
 
 // P39 iter2 F16: postgres/mysql-family/sqlite each declared this same ordering — D8: delete, then
@@ -50,4 +50,89 @@ export function assertKeyIsPrimaryKey(
   if (given.length !== pk.length || given.some((c, i) => c !== pk[i])) {
     throw new AdapterError('E_QUERY', 'row key must be exactly the primary key columns');
   }
+}
+
+// P39 iter3 F15/D17: postgres/mysql-family/sqlite's mutate.ts each wrote out this exact renderer.
+// Diffed character-for-character, the only real difference across all three is the placeholder
+// each dialect's paramRenderer emits ($n vs ?) — sql-text.ts's own buildKeysetPredicate already
+// takes exactly this as a parameter, for the same reason. Generic over the params element type
+// covers unknown[] (postgres/mysql-family) vs SqliteParam[] (sqlite). ClickHouse is not part of
+// this: it renders insert-only batches through its own renderInsert/literalFor, a different
+// statement shape, not a different dialect of the same one.
+export type ValueRenderer<P> = (value: string | null, params: P[]) => string;
+
+/** preview()'s renderer (D6: never executes) — an escaped SQL literal, no params touched. */
+export function literalRenderer(value: string | null): string {
+  if (value === null) return 'NULL';
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** mutate()'s renderer — pushes onto `params` and returns the dialect's placeholder for the
+ *  position it landed at. `placeholder` is the one thing the three copies disagreed on. */
+export function createParamRenderer<P>(placeholder: (n: number) => string): ValueRenderer<P> {
+  return (value, params) => {
+    params.push(value as P);
+    return placeholder(params.length);
+  };
+}
+
+function whereFromKey<P>(
+  key: Record<string, string | null>,
+  render: ValueRenderer<P>,
+  params: P[],
+  quote: (name: string) => string,
+): string {
+  return Object.entries(key)
+    .map(([col, val]) =>
+      val === null ? `${quote(col)} IS NULL` : `${quote(col)} = ${render(val, params)}`,
+    )
+    .join(' AND ');
+}
+
+/** UPDATE/DELETE/INSERT text for one row op, with the WHERE built from the row key. `quote` is
+ *  the caller's own quoteIdent, so every emitted string is byte-identical to today's. */
+export function renderRowOp<P>(
+  relationSql: string,
+  op: MutationRowOp,
+  render: ValueRenderer<P>,
+  params: P[],
+  quote: (name: string) => string,
+): string {
+  if (op.kind === 'update') {
+    const setSql = Object.entries(op.changes)
+      .map(([col, val]) => `${quote(col)} = ${render(val, params)}`)
+      .join(', ');
+    return `UPDATE ${relationSql} SET ${setSql} WHERE ${whereFromKey(op.key, render, params, quote)}`;
+  }
+  if (op.kind === 'delete') {
+    return `DELETE FROM ${relationSql} WHERE ${whereFromKey(op.key, render, params, quote)}`;
+  }
+  const columns = Object.keys(op.values);
+  const columnSql = columns.map((c) => quote(c)).join(', ');
+  const valueSql = columns.map((c) => render(op.values[c], params)).join(', ');
+  return `INSERT INTO ${relationSql} (${columnSql}) VALUES (${valueSql})`;
+}
+
+// P39 iter3 F16/D18: clickhouse/mysql-family/sqlite's mutate.ts each wrote out this same
+// two-segment database/table path check, message included — the only difference was whether the
+// private destructuring named the first segment `database` or `schema`, which no emitted string
+// depends on. postgres/mutate.ts keeps its own resolveTablePath: a genuinely different path shape
+// (three segments, a real `schema` kind) with its own message.
+export function resolveDatabaseTablePath(path: MutationPlan['path']): {
+  database: string;
+  table: string;
+} {
+  const [databaseSegment, objectSegment] = path.segments;
+  if (
+    path.segments.length !== 2 ||
+    databaseSegment?.kind !== 'database' ||
+    !objectSegment ||
+    objectSegment.kind !== 'table'
+  ) {
+    throw new AdapterError(
+      'E_NOT_FOUND',
+      `mutate requires a database/table path, got: ${encodePath(path.segments)}`,
+    );
+  }
+  return { database: databaseSegment.name, table: objectSegment.name };
 }

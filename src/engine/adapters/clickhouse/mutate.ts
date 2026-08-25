@@ -1,8 +1,7 @@
 import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
-import { encodePath } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
-import { assertColumnsKnown } from '../sql-mutate';
+import { assertColumnsKnown, resolveDatabaseTablePath } from '../sql-mutate';
 import * as catalog from './catalog';
 import type { ClickHouseHandle } from './client';
 import { runCatalogQuery, runCommand, type TrackQuery } from './query';
@@ -22,22 +21,6 @@ function assertInsertOnly(
         'index, not a unique key, so there is no addressable row to update or delete',
     );
   }
-}
-
-function resolveTablePath(path: MutationPlan['path']): { schema: string; table: string } {
-  const [databaseSegment, objectSegment] = path.segments;
-  if (
-    path.segments.length !== 2 ||
-    databaseSegment?.kind !== 'database' ||
-    !objectSegment ||
-    objectSegment.kind !== 'table'
-  ) {
-    throw new AdapterError(
-      'E_NOT_FOUND',
-      `mutate requires a database/table path, got: ${encodePath(path.segments)}`,
-    );
-  }
-  return { schema: databaseSegment.name, table: objectSegment.name };
 }
 
 // D6/F27: backslash-then-quote — ClickHouse string literals use backslash escapes (F27), not
@@ -79,7 +62,7 @@ function renderInsert(
 // Synchronous (Adapter rule 3/§8.13): no catalog lookup, no network — trusts the plan's column
 // names as given, exactly like every other adapter's own preview().
 export function preview(plan: MutationPlan): string[] {
-  const { schema, table } = resolveTablePath(plan.path);
+  const { database: schema, table } = resolveDatabaseTablePath(plan.path);
   const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
   plan.ops.forEach(assertInsertOnly);
   const inserts = plan.ops as Extract<MutationRowOp, { kind: 'insert' }>[];
@@ -98,7 +81,7 @@ export async function mutate(
   // §8.12's standard: enforced here, not only greyed out in the UI (P5 D11).
   assertWritable(readOnly);
 
-  const { schema, table } = resolveTablePath(plan.path);
+  const { database: schema, table } = resolveDatabaseTablePath(plan.path);
   plan.ops.forEach(assertInsertOnly);
   const inserts = plan.ops as Extract<MutationRowOp, { kind: 'insert' }>[];
   if (inserts.length === 0) return { affectedRows: 0 };

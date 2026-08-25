@@ -1,86 +1,30 @@
-import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
-import { encodePath } from '@shared/domain/tree';
+import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertWritable } from '../errors';
+import { assertWritable } from '../errors';
 import {
   assertAffectedExactlyOne,
   assertColumnsKnown,
   assertKeyIsPrimaryKey,
+  createParamRenderer,
+  literalRenderer,
   orderedOps,
+  renderRowOp,
+  resolveDatabaseTablePath,
 } from '../sql-mutate';
 import * as catalog from './catalog';
 import type { SqliteHandle } from './client';
 import { execLiteral, runCommand, runQuery, type SqliteParam } from './query';
 import { quoteIdent } from './read';
 
-// Mirrors mysql-family/mutate.ts's renderer exactly — see its comments for the shared-shape
-// rationale (P5's own precedent, one design used by every SQL adapter).
-type ValueRenderer = (value: string | null, params: SqliteParam[]) => string;
-
-function literalRenderer(value: string | null): string {
-  if (value === null) return 'NULL';
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-function paramRenderer(value: string | null, params: SqliteParam[]): string {
-  params.push(value);
-  return '?';
-}
-
-function whereFromKey(
-  key: Record<string, string | null>,
-  render: ValueRenderer,
-  params: SqliteParam[],
-): string {
-  return Object.entries(key)
-    .map(([col, val]) =>
-      val === null ? `${quoteIdent(col)} IS NULL` : `${quoteIdent(col)} = ${render(val, params)}`,
-    )
-    .join(' AND ');
-}
-
-function renderRowOp(
-  relationSql: string,
-  op: MutationRowOp,
-  render: ValueRenderer,
-  params: SqliteParam[],
-): string {
-  if (op.kind === 'update') {
-    const setSql = Object.entries(op.changes)
-      .map(([col, val]) => `${quoteIdent(col)} = ${render(val, params)}`)
-      .join(', ');
-    return `UPDATE ${relationSql} SET ${setSql} WHERE ${whereFromKey(op.key, render, params)}`;
-  }
-  if (op.kind === 'delete') {
-    return `DELETE FROM ${relationSql} WHERE ${whereFromKey(op.key, render, params)}`;
-  }
-  const columns = Object.keys(op.values);
-  const columnSql = columns.map((c) => quoteIdent(c)).join(', ');
-  const valueSql = columns.map((c) => render(op.values[c], params)).join(', ');
-  return `INSERT INTO ${relationSql} (${columnSql}) VALUES (${valueSql})`;
-}
-
-function resolveTablePath(path: MutationPlan['path']): { schema: string; table: string } {
-  const [databaseSegment, objectSegment] = path.segments;
-  if (
-    path.segments.length !== 2 ||
-    databaseSegment?.kind !== 'database' ||
-    !objectSegment ||
-    objectSegment.kind !== 'table'
-  ) {
-    throw new AdapterError(
-      'E_NOT_FOUND',
-      `mutate requires a database/table path, got: ${encodePath(path.segments)}`,
-    );
-  }
-  return { schema: databaseSegment.name, table: objectSegment.name };
-}
+const paramRenderer = createParamRenderer<SqliteParam>(() => '?');
 
 // Synchronous, no catalog lookup, no I/O — trusts the plan's column names as given (Adapter rule).
 export function preview(plan: MutationPlan): string[] {
-  const { schema, table } = resolveTablePath(plan.path);
-  const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
-  return orderedOps(plan.ops).map((op) => renderRowOp(relationSql, op, literalRenderer, []));
+  const { database, table } = resolveDatabaseTablePath(plan.path);
+  const relationSql = `${quoteIdent(database)}.${quoteIdent(table)}`;
+  return orderedOps(plan.ops).map((op) =>
+    renderRowOp(relationSql, op, literalRenderer, [], quoteIdent),
+  );
 }
 
 // D25: BEGIN IMMEDIATE, not a deferred BEGIN — a deferred transaction only takes its write lock at
@@ -94,7 +38,7 @@ export function mutate(
 ): MutationResult {
   assertWritable(readOnly);
 
-  const { schema, table } = resolveTablePath(plan.path);
+  const { database: schema, table } = resolveDatabaseTablePath(plan.path);
   const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
 
   // Fresh in this same op — never trusts a column name the renderer sent without re-checking it
@@ -120,13 +64,13 @@ export function mutate(
   const ordered = orderedOps(plan.ops);
   const compiled = ordered.map((op) => {
     const params: SqliteParam[] = [];
-    const sql = renderRowOp(relationSql, op, paramRenderer, params);
+    const sql = renderRowOp(relationSql, op, paramRenderer, params, quoteIdent);
     return { op, sql, params };
   });
   // One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5's own
   // precedent).
   ctx.setCommand(
-    ordered.map((op) => renderRowOp(relationSql, op, literalRenderer, [])).join(';\n'),
+    ordered.map((op) => renderRowOp(relationSql, op, literalRenderer, [], quoteIdent)).join(';\n'),
   );
 
   execLiteral(h, 'BEGIN IMMEDIATE');
