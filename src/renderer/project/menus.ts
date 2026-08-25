@@ -89,6 +89,9 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
     case 'queue':
       return streamNodeMenu(row);
     case 'consumerGroup':
+    // P37 D17/D33: a rabbitmq exchange is a definition-only leaf, exactly like a kafka consumer
+    // group — its bindings live in the definition view, never the tree.
+    case 'exchange':
       return consumerGroupMenu(row);
     case 'sequence':
     case 'function':
