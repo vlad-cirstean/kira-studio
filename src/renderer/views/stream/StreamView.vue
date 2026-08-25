@@ -87,6 +87,10 @@ const isBatch = computed(() => caps.value?.pagination === 'batch');
 // Delete but no filter row at all (queue-based, no topic/partition/offset concept to filter by).
 const isKafka = computed(() => connectionRecord.value?.kind === 'kafka');
 const isSqs = computed(() => connectionRecord.value?.kind === 'sqs');
+// P37 D32: rabbitmq is the stream view's third kind — batch pagination like SQS (isBatch below),
+// but its own compose shape and its own poll-warning wording (a poll requeues, it does not
+// consume — SQS's own sentence would be a false statement about this engine).
+const isRabbit = computed(() => connectionRecord.value?.kind === 'rabbitmq');
 const canInsert = computed(() => caps.value?.canInsert ?? false);
 const canDelete = computed(() => caps.value?.canDelete ?? false);
 
@@ -519,13 +523,14 @@ onUnmounted(() => {
               v-if="canInsert"
               icon="add"
               data-testid="stream-add-message"
-              v-tooltip="isKafka ? 'Produce a message' : 'Send a message'"
+              v-tooltip="isKafka ? 'Produce a message' : isRabbit ? 'Publish a message' : 'Send a message'"
               @click="composeOpen = !composeOpen"
             />
             <StreamComposeMessage
-              v-if="composeOpen && (isKafka || isSqs)"
+              v-if="composeOpen && (isKafka || isSqs || isRabbit)"
               :tab-id="tab.id"
-              :kind="isKafka ? 'kafka' : 'sqs'"
+              :kind="isKafka ? 'kafka' : isRabbit ? 'rabbitmq' : 'sqs'"
+              :queue-name="isRabbit ? targetTail?.name : undefined"
               @close="composeOpen = false"
             />
           </div>
@@ -663,10 +668,20 @@ onUnmounted(() => {
 
       <!-- The one destructive truth of this view, stated once at the top. -->
       <template #strips>
-      <MessageStrip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
+      <MessageStrip v-if="isBatch && !isRabbit" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
         <span
           >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
           above) — it does not browse a stable position.</span
+        >
+      </MessageStrip>
+
+      <!-- P37 D32: a true statement about SQS is a false one about rabbitmq — a poll here goes
+           through the management API's own basic.get, which requeues rather than removes (F12). -->
+      <MessageStrip v-if="isBatch && isRabbit" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
+        <span
+          >Each poll fetches up to 500 messages through the management API and immediately
+          <b>requeues</b> them — nothing is removed, but they are marked redelivered and their
+          position in the queue can change.</span
         >
       </MessageStrip>
 
