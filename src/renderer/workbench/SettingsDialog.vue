@@ -68,6 +68,10 @@ function setRowDensity(density: RowDensity): void {
   void patchSettings({ appearance: { rowDensity: density } });
 }
 
+function onWordWrapChange(e: Event): void {
+  void patchSettings({ appearance: { wordWrap: (e.target as HTMLInputElement).checked } });
+}
+
 const rowPreviewHeight = computed(() =>
   settingsState.appearance.rowDensity === 'compact' ? 22 : 28,
 );
@@ -231,6 +235,20 @@ async function onClearCaches(): Promise<void> {
                 </div>
               </div>
             </div>
+
+            <label class="field checkbox">
+              <input
+                :checked="settingsState.appearance.wordWrap"
+                type="checkbox"
+                data-testid="settings-word-wrap"
+                @change="onWordWrapChange"
+              />
+              <span>Word wrap</span>
+              <span class="helper-text"
+                >Long lines wrap instead of scrolling — the query console, the Mongo console and
+                the cell editor.</span
+              >
+            </label>
           </template>
 
           <template v-else-if="activeSection === 'Data'">

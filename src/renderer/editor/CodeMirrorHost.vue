@@ -63,6 +63,15 @@ const languageCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 const autocompleteCompartment = new Compartment();
 const lintCompartment = new Compartment();
+const wordWrapCompartment = new Compartment();
+
+// P42 D14/D14a: every editable and read-only surface mounts through this one host, so this is
+// the one place a wrap setting has to live. `settingsState.appearance.wordWrap` defaults to
+// `true` (the unconditional behavior this replaces, F11), read fresh on every (re)configure
+// rather than captured once, same as the other four compartments' own resolve*() functions.
+function resolveWordWrap(): Extension[] {
+  return settingsState.appearance.wordWrap ? [EditorView.lineWrapping] : [];
+}
 
 function resolveLanguage(): ReturnType<typeof languageExtension> {
   return languageExtension(props.language, props.sqlDialect);
@@ -153,7 +162,7 @@ onMounted(() => {
     extensions: [
       lineNumbers(),
       highlightSpecialChars(),
-      EditorView.lineWrapping,
+      wordWrapCompartment.of(resolveWordWrap()),
       keymap.of(defaultKeymap),
       autocompleteCompartment.of(resolveAutocomplete()),
       lintCompartment.of(resolveLint()),
@@ -234,6 +243,14 @@ watch(
   () => {
     if (!view) return;
     view.dispatch({ effects: lintCompartment.reconfigure(resolveLint()) });
+  },
+);
+
+watch(
+  () => settingsState.appearance.wordWrap,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: wordWrapCompartment.reconfigure(resolveWordWrap()) });
   },
 );
 

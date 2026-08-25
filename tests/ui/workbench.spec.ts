@@ -178,6 +178,27 @@ test('settings dialog Advanced section persists across relaunch', async ({ relau
   await expect(window.locator('[data-testid="settings-oplog-retention"]')).toHaveValue('45');
 });
 
+// P42 D14: on by default (a settings row saved before this field existed has no key at all, so
+// `.default(true)` fires and it restores on — the same claim startup.spec.ts's restored-session
+// scenario guards for the whole Settings row).
+test('word wrap setting persists across relaunch', async ({ relaunch }) => {
+  let { window } = await relaunch();
+
+  await window.click('[data-testid="open-settings"]');
+  await window.click('[data-testid="settings-section-Appearance"]');
+  const wordWrapToggle = window.locator('[data-testid="settings-word-wrap"]');
+  await expect(wordWrapToggle).toBeChecked();
+
+  await wordWrapToggle.uncheck();
+  await window.click('[data-testid="settings-close"]');
+  await window.waitForTimeout(PERSIST_SETTLE_MS);
+  ({ window } = await relaunch());
+
+  await window.click('[data-testid="open-settings"]');
+  await window.click('[data-testid="settings-section-Appearance"]');
+  await expect(window.locator('[data-testid="settings-word-wrap"]')).not.toBeChecked();
+});
+
 test('a settings patch to one section leaves the other sections untouched (F15, D15)', async ({
   relaunch,
 }) => {

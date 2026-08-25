@@ -7,6 +7,11 @@ export const appearanceSettingsSchema = z.object({
   fontFamily: z.string(),
   fontSize: z.number(),
   rowDensity: rowDensitySchema,
+  // P42 D14: word wrap in every CodeMirror surface (query console, Mongo console, cell editor,
+  // definition view, ...). `.default(true)` is today's hard-coded behavior
+  // (CodeMirrorHost.vue's own unconditional EditorView.lineWrapping, F11), so a settings row
+  // saved before this field existed parses and behaves identically.
+  wordWrap: z.boolean().default(true),
 });
 export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 
@@ -51,6 +56,7 @@ export const defaultSettings: Settings = {
     fontFamily: '"SF Mono", Menlo, monospace',
     fontSize: 12,
     rowDensity: 'comfortable',
+    wordWrap: true,
   },
   data: {
     defaultPageSize: 100,

@@ -172,5 +172,20 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
     '1 of 1',
   );
 
+  // --- P42 D14/D14a: word wrap is on by default in every CodeMirror surface (F11) — this is the
+  // one Docker-free spec that can exercise the new setting for real. -----------------------------
+  const consoleContent = consoleView.locator('.cm-content');
+  const wrappedWhiteSpace = await consoleContent.evaluate((el) => getComputedStyle(el).whiteSpace);
+  await page.click('[data-testid="open-settings"]');
+  await page.click('[data-testid="settings-section-Appearance"]');
+  const wordWrapToggle = page.locator('[data-testid="settings-word-wrap"]');
+  await expect(wordWrapToggle).toBeChecked();
+  await wordWrapToggle.uncheck();
+  await page.click('[data-testid="settings-close"]');
+  const unwrappedWhiteSpace = await consoleContent.evaluate(
+    (el) => getComputedStyle(el).whiteSpace,
+  );
+  expect(unwrappedWhiteSpace).not.toBe(wrappedWhiteSpace);
+
   expect(consoleErrors).toEqual([]);
 });
