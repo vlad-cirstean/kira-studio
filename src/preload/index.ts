@@ -28,88 +28,44 @@ import type {
 import { IPC } from '@shared/protocol/ipc';
 import { contextBridge, ipcRenderer } from 'electron';
 
+// P39 iter3 F13/D14: the subscribe/unsubscribe pattern every on*() property below needs, in the
+// two shapes this API uses — a bare signal and a typed payload. Nineteen call sites used to write
+// this out by hand; the risk that made it worth a helper is a mismatched channel or closure
+// between the .on() and the .off() line, which nothing but reading caught.
+function onSignal(channel: string, cb: () => void): () => void {
+  const listener = (): void => cb();
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.off(channel, listener);
+}
+
+function onEvent<T>(channel: string, cb: (payload: T) => void): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T): void => cb(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.off(channel, listener);
+}
+
 const kiraApi: KiraApi = {
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),
   settingsGetAll: () => ipcRenderer.invoke(IPC.settingsGetAll),
   settingsSet: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.settingsSet, patch),
-  onSettingsChanged: (cb: (settings: Settings) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, settings: Settings): void => cb(settings);
-    ipcRenderer.on(IPC.settingsChanged, listener);
-    return () => ipcRenderer.off(IPC.settingsChanged, listener);
-  },
+  onSettingsChanged: (cb: (settings: Settings) => void) => onEvent(IPC.settingsChanged, cb),
   layoutGetAll: () => ipcRenderer.invoke(IPC.layoutGetAll),
   layoutSet: (patch: LayoutPatch) => ipcRenderer.invoke(IPC.layoutSet, patch),
   engineStatus: () => ipcRenderer.invoke(IPC.engineStatus),
-  onEngineState: (cb: (status: EngineStatus) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, status: EngineStatus): void => cb(status);
-    ipcRenderer.on(IPC.engineState, listener);
-    return () => ipcRenderer.off(IPC.engineState, listener);
-  },
-  onOpenSettings: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.openSettings, listener);
-    return () => ipcRenderer.off(IPC.openSettings, listener);
-  },
-  onNewConnection: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.newConnection, listener);
-    return () => ipcRenderer.off(IPC.newConnection, listener);
-  },
-  onToggleProjectPanel: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.toggleProjectPanel, listener);
-    return () => ipcRenderer.off(IPC.toggleProjectPanel, listener);
-  },
-  onToggleOperationsPanel: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.toggleOperationsPanel, listener);
-    return () => ipcRenderer.off(IPC.toggleOperationsPanel, listener);
-  },
-  onCommandPalette: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.commandPalette, listener);
-    return () => ipcRenderer.off(IPC.commandPalette, listener);
-  },
-  onTabNext: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.tabNext, listener);
-    return () => ipcRenderer.off(IPC.tabNext, listener);
-  },
-  onTabPrev: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.tabPrev, listener);
-    return () => ipcRenderer.off(IPC.tabPrev, listener);
-  },
-  onTabClose: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.tabClose, listener);
-    return () => ipcRenderer.off(IPC.tabClose, listener);
-  },
-  onViewFind: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.viewFind, listener);
-    return () => ipcRenderer.off(IPC.viewFind, listener);
-  },
-  onViewRefresh: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.viewRefresh, listener);
-    return () => ipcRenderer.off(IPC.viewRefresh, listener);
-  },
-  onViewRun: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.viewRun, listener);
-    return () => ipcRenderer.off(IPC.viewRun, listener);
-  },
-  onViewRunAll: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.viewRunAll, listener);
-    return () => ipcRenderer.off(IPC.viewRunAll, listener);
-  },
-  onFlushBeforeClose: (cb: () => void) => {
-    const listener = (): void => cb();
-    ipcRenderer.on(IPC.appFlushBeforeClose, listener);
-    return () => ipcRenderer.off(IPC.appFlushBeforeClose, listener);
-  },
+  onEngineState: (cb: (status: EngineStatus) => void) => onEvent(IPC.engineState, cb),
+  onOpenSettings: (cb: () => void) => onSignal(IPC.openSettings, cb),
+  onNewConnection: (cb: () => void) => onSignal(IPC.newConnection, cb),
+  onToggleProjectPanel: (cb: () => void) => onSignal(IPC.toggleProjectPanel, cb),
+  onToggleOperationsPanel: (cb: () => void) => onSignal(IPC.toggleOperationsPanel, cb),
+  onCommandPalette: (cb: () => void) => onSignal(IPC.commandPalette, cb),
+  onTabNext: (cb: () => void) => onSignal(IPC.tabNext, cb),
+  onTabPrev: (cb: () => void) => onSignal(IPC.tabPrev, cb),
+  onTabClose: (cb: () => void) => onSignal(IPC.tabClose, cb),
+  onViewFind: (cb: () => void) => onSignal(IPC.viewFind, cb),
+  onViewRefresh: (cb: () => void) => onSignal(IPC.viewRefresh, cb),
+  onViewRun: (cb: () => void) => onSignal(IPC.viewRun, cb),
+  onViewRunAll: (cb: () => void) => onSignal(IPC.viewRunAll, cb),
+  onFlushBeforeClose: (cb: () => void) => onSignal(IPC.appFlushBeforeClose, cb),
   appFlushed: () => {
     ipcRenderer.send(IPC.appFlushed);
   },
@@ -133,23 +89,11 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.connectionsDisconnect, args),
   connectionsStates: () => ipcRenderer.invoke(IPC.connectionsStates),
   connectionsSecretsStatus: () => ipcRenderer.invoke(IPC.connectionsSecretsStatus),
-  onConnectionState: (cb: (state: ConnectionState) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, state: ConnectionState): void => cb(state);
-    ipcRenderer.on(IPC.connectionState, listener);
-    return () => ipcRenderer.off(IPC.connectionState, listener);
-  },
-  onConnectionMetadataInvalidated: (cb: (connectionId: string) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, connectionId: string): void =>
-      cb(connectionId);
-    ipcRenderer.on(IPC.connectionMetadataInvalidated, listener);
-    return () => ipcRenderer.off(IPC.connectionMetadataInvalidated, listener);
-  },
-  onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, records: ConnectionSummary[]): void =>
-      cb(records);
-    ipcRenderer.on(IPC.connectionsChanged, listener);
-    return () => ipcRenderer.off(IPC.connectionsChanged, listener);
-  },
+  onConnectionState: (cb: (state: ConnectionState) => void) => onEvent(IPC.connectionState, cb),
+  onConnectionMetadataInvalidated: (cb: (connectionId: string) => void) =>
+    onEvent(IPC.connectionMetadataInvalidated, cb),
+  onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void) =>
+    onEvent(IPC.connectionsChanged, cb),
 
   treeChildren: (args: { connectionId: string; path: string; refresh?: boolean }) =>
     ipcRenderer.invoke(IPC.treeChildren, args) as Promise<TreeChildrenResult>,
@@ -168,11 +112,7 @@ const kiraApi: KiraApi = {
   opsRecent: (args: { limit: number }) =>
     ipcRenderer.invoke(IPC.opsRecent, args) as Promise<OpRecord[]>,
   opsCancel: (args: { opId: string }) => ipcRenderer.invoke(IPC.opsCancel, args),
-  onOpUpdate: (cb: (record: OpRecord) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, record: OpRecord): void => cb(record);
-    ipcRenderer.on(IPC.opUpdate, listener);
-    return () => ipcRenderer.off(IPC.opUpdate, listener);
-  },
+  onOpUpdate: (cb: (record: OpRecord) => void) => onEvent(IPC.opUpdate, cb),
 
   tabsList: () => ipcRenderer.invoke(IPC.tabsList) as Promise<TabRecord[]>,
   tabsSave: (args: { tabs: TabRecord[] }) => ipcRenderer.invoke(IPC.tabsSave, args),
