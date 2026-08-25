@@ -31,6 +31,7 @@ function iconFor(tab: TabRecord): string {
   // computed below for the table/view/matview fallback) tells them apart with no extra state.
   if (tab.kind === 'keyvalue') return pathTail(tab.path)?.kind === 'object' ? 'file' : 'symbol-key';
   if (tab.kind === 'stream') return 'broadcast';
+  if (tab.kind === 'browse') return 'list-tree';
   const tail = pathTail(tab.path);
   const KIND_ICON: Record<string, string> = {
     table: 'table',

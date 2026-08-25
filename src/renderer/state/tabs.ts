@@ -1,9 +1,12 @@
 import {
+  asBrowseTab,
   asConsoleTab,
   asDataTab,
   asDocumentTab,
   asKeyValueTab,
   asStreamTab,
+  type BrowseTabRecord,
+  type BrowseTabState,
   type ConsoleTabRecord,
   type ConsoleTabState,
   type DataTabRecord,
@@ -11,6 +14,7 @@ import {
   type DefinitionTabState,
   type DocumentTabRecord,
   type DocumentTabState,
+  defaultBrowseTabState,
   defaultConsoleTabState,
   defaultDataTabState,
   defaultDefinitionTabState,
@@ -295,6 +299,20 @@ export function openStreamTab(
   );
 }
 
+// Opens a 'browse' tab (P41 D11/D14) over a redis database / s3 bucket's key or object space —
+// identity is the container (`path`), reused across "Browse keys"/"Browse objects" invocations on
+// the same container the same way openDataTab reuses a table's tab; `newTab` opens a fresh one
+// regardless, with its own independent levelPath.
+export function openBrowseTab(
+  connectionId: string,
+  path: string,
+  opts?: { newTab?: boolean },
+): OpenTabResult {
+  return openTab('browse', connectionId, path, () => defaultBrowseTabState(), {
+    reuse: !opts?.newTab,
+  });
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
@@ -349,6 +367,16 @@ export function duplicateTab(id: string): string {
       path: source.path,
       kind: 'stream',
       state: defaultStreamTabState(source.state.pageSize),
+      order: tabsState.tabs.length,
+      active: true,
+    };
+  } else if (source.kind === 'browse') {
+    record = {
+      id: newId,
+      connectionId: source.connectionId,
+      path: source.path,
+      kind: 'browse',
+      state: defaultBrowseTabState(),
       order: tabsState.tabs.length,
       active: true,
     };
@@ -515,6 +543,12 @@ export function patchStreamTabState(id: string, patch: Partial<StreamTabState>):
   patchTabState(id, 'stream', patch, { skipUnchanged: false });
 }
 
+// P41: mirrors data/console/definition's skipUnchanged: true — descending/ascending to the level
+// a tab is already showing (e.g. a duplicate reload) must not schedule a save.
+export function patchBrowseTabState(id: string, patch: Partial<BrowseTabState>): void {
+  patchTabState(id, 'browse', patch, { skipUnchanged: true });
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -552,6 +586,10 @@ export function findKeyValueTab(id: string): KeyValueTabRecord | null {
 
 export function findStreamTab(id: string): StreamTabRecord | null {
   return asStreamTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findBrowseTab(id: string): BrowseTabRecord | null {
+  return asBrowseTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));

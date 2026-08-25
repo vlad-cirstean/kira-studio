@@ -8,7 +8,7 @@ import type { SortSpec } from '@shared/domain/queries';
 // ./state), so the registry is populated before the first render — unlike shortcuts/commands.ts's
 // deliberate no-op (mount-scoped, legitimately empty), an unregistered kind here can only mean that
 // static import chain broke, so the accessors below throw rather than silently doing nothing.
-export type CommandTabKind = 'data' | 'document' | 'keyvalue' | 'stream';
+export type CommandTabKind = 'data' | 'document' | 'keyvalue' | 'stream' | 'browse';
 
 const reloaders = new Map<CommandTabKind, (tabId: string) => Promise<void>>();
 
@@ -58,4 +58,24 @@ export function registerDataQueryCommands(cmds: DataQueryCommands): void {
 export function dataQueryCommands(): DataQueryCommands {
   if (!dataQueryCmds) throw new Error('viewCommands: data query commands were never registered');
   return dataQueryCmds;
+}
+
+// P41: an S3 upload can land in a container the project tree no longer renders (a bucket's own
+// prefix level, once redis/s3 stop expanding — D5) — UploadObjectDialog.vue can no longer reach
+// for project/state/tree.ts's refresh() (project/ must not import views/), so it calls this
+// instead. The Browse view owns that level's cache now.
+let browseInvalidateFn: ((connectionId: string, path: string) => Promise<void>) | null = null;
+
+export function registerBrowseInvalidate(
+  fn: (connectionId: string, path: string) => Promise<void>,
+): void {
+  browseInvalidateFn = fn;
+}
+
+/** Fire-and-forget, matching UploadObjectDialog.vue's own prior `await refresh(...)` call site —
+ *  a no-op (not a throw) when no Browse tab has ever mounted, unlike reloadTab/countTab above,
+ *  since a Browse tab visiting the uploaded-into container is not guaranteed the way every tab
+ *  kind's own state.ts module is guaranteed to load. */
+export function browseInvalidate(connectionId: string, path: string): void {
+  void browseInvalidateFn?.(connectionId, path);
 }

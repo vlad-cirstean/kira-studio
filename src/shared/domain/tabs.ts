@@ -9,13 +9,14 @@ export const tabKindSchema = z.enum([
   'keyvalue',
   'stream',
   'console',
+  'browse',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
 // 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
-// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10. The restore path drops rows of any
-// other kind with a `warn` — a closed vocabulary decided once, same discipline as P1's
-// Caps/connectionKind.
+// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41. The restore path
+// drops rows of any other kind with a `warn` — a closed vocabulary decided once, same discipline
+// as P1's Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
   'definition',
@@ -23,6 +24,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'document',
   'keyvalue',
   'stream',
+  'browse',
 ];
 
 const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
@@ -118,6 +120,16 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // into a multiselect array — `.default([])` keeps a tab saved under the old shape restorable
 // (storage/repos/tabs.ts drops a tab row outright on a failed parse) rather than reviving the
 // old value, which is an acceptable loss for a browse convenience like this one.
+// P41: a Browse tab's identity is its container (`path` = `database:db0` / `bucket:photos`,
+// §8.4's rule); the level currently shown is per-tab session state. `''` means "the tab's own
+// `path`", so a freshly opened tab and one restored at its root parse to the same record —
+// `.default('')` keeps a tab saved before this field existed restorable, the same discipline
+// every other tab-state schema's own added field follows.
+export const browseTabStateSchema = z.object({
+  levelPath: z.string().default(''),
+});
+export type BrowseTabState = z.infer<typeof browseTabStateSchema>;
+
 export const streamTabStateSchema = z.object({
   pageSize: pageSizeSchema.default(100),
   offsetFilter: z.string().nullable().default(null),
@@ -146,6 +158,7 @@ export const tabRecordSchema = z.discriminatedUnion('kind', [
   z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('keyvalue'), state: keyValueTabStateSchema }),
   z.object({ ...tabRecordBase, kind: z.literal('stream'), state: streamTabStateSchema }),
+  z.object({ ...tabRecordBase, kind: z.literal('browse'), state: browseTabStateSchema }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -154,6 +167,7 @@ export type ConsoleTabRecord = Extract<TabRecord, { kind: 'console' }>;
 export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
 export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
 export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
+export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -173,6 +187,10 @@ export function asKeyValueTab(tab: TabRecord | null | undefined): KeyValueTabRec
 
 export function asStreamTab(tab: TabRecord | null | undefined): StreamTabRecord | null {
   return tab && tab.kind === 'stream' ? tab : null;
+}
+
+export function asBrowseTab(tab: TabRecord | null | undefined): BrowseTabRecord | null {
+  return tab && tab.kind === 'browse' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -213,6 +231,10 @@ export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState 
     timestampFilter: null,
     columnWidths: {},
   };
+}
+
+export function defaultBrowseTabState(): BrowseTabState {
+  return { levelPath: '' };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

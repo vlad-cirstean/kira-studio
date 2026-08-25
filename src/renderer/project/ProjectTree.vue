@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
+import { connectionsState } from '../state/connections';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
-import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
+import {
+  openBrowseTab,
+  openDataTab,
+  openDocumentTab,
+  openKeyValueTab,
+  openStreamTab,
+} from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
 import VirtualList from '../theme/primitives/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -35,6 +42,14 @@ const KEYVALUE_OPENABLE_KINDS = new Set(['key', 'object']);
 // browse-only leaves with nothing to open (onOpen's hasChildren guard makes double-click a no-op
 // on them, same as a column/index leaf).
 const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
+// P41 D17: a redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
+// unbounded — double-click/Enter opens a Browse tab instead of the ordinary expand/collapse
+// toggle. Gated on the capability, never the row kind alone (`database` is shared by six engines
+// that stay expand-only, F13) or the connection kind (Caps is the only thing the UI reads, ARCHITECTURE.md).
+function isKeyBrowserRow(row: TreeRowVm): boolean {
+  if (row.kind !== 'database' && row.kind !== 'bucket') return false;
+  return connectionsState.states[row.connectionId]?.caps?.keyBrowser === true;
+}
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const virtualListRef = ref<{ scrollToIndex: (index: number, inset?: number) => void } | null>(null);
@@ -122,6 +137,11 @@ function onOpen(row: TreeRowVm): void {
   if (STREAM_OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openStreamTab(row.connectionId, row.path);
     if (reused) reloadTab('stream', id);
+    return;
+  }
+  if (isKeyBrowserRow(row)) {
+    const { id, reused } = openBrowseTab(row.connectionId, row.path);
+    if (reused) reloadTab('browse', id);
     return;
   }
   // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue

@@ -13,6 +13,7 @@ import {
 } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
+import BrowseTabView from '../../views/browse/BrowseView.vue';
 import ConsoleTabView from '../../views/console/ConsoleView.vue';
 import DefinitionTabView from '../../views/definition/DefinitionView.vue';
 import DocumentTabView from '../../views/documents/DocumentView.vue';
@@ -87,6 +88,11 @@ function openRecent(entry: RecentTableEntry): void {
   />
   <StreamTabView
     v-else-if="activeTab && activeTab.kind === 'stream'"
+    :key="activeTab.id"
+    :tab="activeTab"
+  />
+  <BrowseTabView
+    v-else-if="activeTab && activeTab.kind === 'browse'"
     :key="activeTab.id"
     :tab="activeTab"
   />

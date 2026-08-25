@@ -19,6 +19,7 @@ import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../state/objectStore';
 import {
+  openBrowseTab,
   openConsoleTab,
   openDataTab,
   openDefinitionTab,
@@ -260,8 +261,29 @@ function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
   ];
 }
 
+// P41 D17: first position, ahead of Refresh — a redis `database` / s3 `bucket` row's primary
+// action once its key space is unbounded (caps.keyBrowser). `shortcut: 'tree.open'` is display-only
+// (ProjectTree.vue's onOpen(row) is what Enter actually dispatches, same as relationMenu's own).
+function browseMenuItem(row: TreeRowVm): MenuItem[] {
+  if (row.kind !== 'database' && row.kind !== 'bucket') return [];
+  if (connectionsState.states[row.connectionId]?.caps?.keyBrowser !== true) return [];
+  return [
+    {
+      type: 'item',
+      id: 'browse',
+      label: row.kind === 'bucket' ? 'Browse objects' : 'Browse keys',
+      icon: 'list-tree',
+      shortcut: 'tree.open',
+      run: () => {
+        openBrowseTab(row.connectionId, row.path);
+      },
+    },
+  ];
+}
+
 function containerMenu(row: TreeRowVm): MenuItem[] {
   return [
+    ...browseMenuItem(row),
     {
       type: 'item',
       id: 'refresh',
