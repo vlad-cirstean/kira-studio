@@ -3,7 +3,7 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across seven database engines.
+Vue 3 — one workbench across eight database engines.
 
 ## Status
 
@@ -24,6 +24,7 @@ Vue 3 — one workbench across seven database engines.
 |---|---|---|---|---|---|---|---|---|
 | PostgreSQL | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MariaDB | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
+| MySQL² | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MongoDB | Documents | yes (shell-style) | yes | yes | yes | estimate only | cursor | yes |
 | Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | yes (string keys only) |
 | Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
@@ -32,6 +33,12 @@ Vue 3 — one workbench across seven database engines.
 
 ¹ The console takes each engine's native command form, not SQL — that's why the column isn't
 called "SQL".
+
+² MySQL 8.0.16 or newer (the `CHECK_CONSTRAINTS` information-schema floor). Uses the same
+`mariadb` driver package as the MariaDB adapter — a genuine dual client, no second dependency.
+`sslmode=require` is the documented default for MySQL 8's `caching_sha2_password` handshake: a
+plaintext connection needs either TLS or `allowPublicKeyRetrieval=true` (a per-connection option)
+the first time a given user authenticates, or the server refuses to send its RSA key.
 
 A couple of things worth knowing up front:
 

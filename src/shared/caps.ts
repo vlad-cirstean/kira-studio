@@ -101,6 +101,7 @@ export const capsSchema = z.object({
  * |----------|---------------------------------------------------------------------------|-----------------|---------------|----------------|------------------------------------------|-----|------------|-------------|
  * | postgres | database → schema → table/view/matview/function/sequence                 | tabular         | keyset        | yes            | pg_cancel_backend(pid), side connection | yes | yes        | yes         |
  * | mariadb  | database → table/view/routine                                            | tabular         | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes        | yes         |
+ * | mysql    | database → table/view/routine (no sequence — MySQL has no SEQUENCE engine) | tabular       | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes        | yes         |
  * | mongodb  | database → collection (+ indexes)                                        | document        | cursor        | estimate only  | cursor AbortSignal, killOp fallback     | yes | yes        | no          |
  * | redis    | db index → key namespace (split on ':')                                  | keyvalue        | cursor (SCAN) | no (DBSIZE)    | abort the SCAN loop; CLIENT KILL        | yes | no         | no          |
  * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no         | no          |
