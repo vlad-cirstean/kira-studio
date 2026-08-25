@@ -1,4 +1,4 @@
-import { connectionColorSchema } from '@shared/domain/connection';
+import { CONNECTION_COLOR_CHOICES } from '@shared/domain/connection';
 import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
@@ -192,7 +192,10 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'color',
       label: 'Color',
       icon: 'symbol-color',
-      items: connectionColorSchema.options.map((color) => ({
+      // P42 D34: the offered subset — a connection already stored with a retired colour is
+      // untouched and still checked correctly if `record.color` happens to be one (checked below
+      // compares against record?.color, not against this list).
+      items: CONNECTION_COLOR_CHOICES.map((color) => ({
         type: 'item' as const,
         id: `color-${color}`,
         label: color,

@@ -77,7 +77,7 @@ test('mysql — engine picker, connect, tree, filter-by-value quoting, console',
   const generatedUri = await page.inputValue('[data-testid="connection-uri"]');
   await page.fill('[data-testid="connection-uri"]', `${generatedUri}?sslmode=require`);
 
-  await page.click('[data-testid="color-teal"]');
+  await page.click('[data-testid="color-cyan"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 

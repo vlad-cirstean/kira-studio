@@ -52,6 +52,24 @@ export const connectionColorSchema = z.enum([
 // than the field being nullable, so no DB/schema change is needed to add it.
 export type ConnectionColor = z.infer<typeof connectionColorSchema>;
 
+/** P42 D34/D35: the *offered* subset, not the storable one — `connectionColorSchema` above stays
+ *  whole on purpose (F27: a connection saved with a retired colour must keep parsing, listing and
+ *  painting its own rail, or "trim the palette" silently deletes connections on next launch).
+ *  Six hues chosen for a 42° minimum adjacent OKLCH hue gap (F28/F28a) at the app's one fixed
+ *  lightness/chroma (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst
+ *  gap (25.6°, blue↔indigo), which is what makes a 2px tab rail or a 5px status dot legible at
+ *  all. Retired from the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
+export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = [
+  'none',
+  'red',
+  'amber',
+  'green',
+  'cyan',
+  'blue',
+  'magenta',
+  'grey',
+];
+
 export const connectionModeSchema = z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;
 

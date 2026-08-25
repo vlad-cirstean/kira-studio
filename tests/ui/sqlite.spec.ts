@@ -59,7 +59,7 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
   await page.fill('[data-testid="connection-name"]', 'Test SQLite');
   await page.fill('[data-testid="connection-database"]', sqlite.path);
-  await page.click('[data-testid="color-violet"]');
+  await page.click('[data-testid="color-magenta"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 

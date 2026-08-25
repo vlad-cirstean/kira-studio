@@ -59,7 +59,7 @@ test('rabbitmq — engine picker, connect, tree, poll (requeue warning), publish
   await page.fill('[data-testid="connection-database"]', cfg.database ?? '');
   await page.fill('[data-testid="connection-username"]', cfg.username ?? '');
   await page.fill('[data-testid="connection-password"]', cfg.password ?? '');
-  await page.click('[data-testid="color-indigo"]');
+  await page.click('[data-testid="color-blue"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 

@@ -138,18 +138,51 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
 
   await (await connectionRow(page, 'Test PG')).click({ button: 'right' });
   await page.hover('[data-testid="menu-item-color"]');
-  await page.click('[data-testid="menu-item-color-teal"]');
+  await page.click('[data-testid="menu-item-color-cyan"]');
   await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
     'style',
-    /--kira-conn-teal/,
+    /--kira-conn-cyan/,
   );
 
   await page.waitForTimeout(PERSIST_SETTLE_MS);
   ({ window: page } = await relaunch());
   await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
     'style',
-    /--kira-conn-teal/,
+    /--kira-conn-cyan/,
   );
+
+  // --- P42 D35: the picker offers exactly eight swatches (six hues + grey + none) -----------
+  await (await connectionRow(page, 'Test PG')).click({ button: 'right' });
+  await page.click('[data-testid="menu-item-edit"]');
+  await expect(page.locator('.color-picker .swatch')).toHaveCount(8);
+  await page.click('[data-testid="connection-cancel"]');
+
+  // --- P42 D34: a connection already stored with a retired colour (orange, dropped from the
+  // picker by D35) still lists and still paints its own rail — the standing proof that the split
+  // between "storable" and "offered" holds in what the tree actually renders, not just the schema.
+  await page.evaluate(() =>
+    window.kira.connectionsCreate({
+      name: 'Retired Colour Conn',
+      kind: 'postgres',
+      color: 'orange',
+      mode: 'fields',
+      readOnly: false,
+      host: '127.0.0.1',
+      port: 5432,
+      database: 'retired',
+      username: 'retired',
+      password: null,
+      uri: null,
+      options: {},
+      preconnect: null,
+      preconnectSidecar: false,
+    }),
+  );
+  const retiredRow = await connectionRow(page, 'Retired Colour Conn');
+  await expect(retiredRow).toBeVisible();
+  await expect(retiredRow.locator('.p-tree-rail')).toHaveAttribute('style', /--kira-conn-orange/);
+  const retiredRecord = (await listConnections(page)).find((r) => r.name === 'Retired Colour Conn');
+  expect(retiredRecord?.color).toBe('orange');
 
   // --- duplicate, then delete with confirm -------------------------------------------------
   const beforeDuplicate = (await listConnections(page)).length;

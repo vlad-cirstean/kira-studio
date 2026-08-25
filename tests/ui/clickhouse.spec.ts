@@ -68,7 +68,7 @@ test('clickhouse — engine picker, connect, tree, filter-by-value quoting, dele
   await page.fill('[data-testid="connection-database"]', cfg.database ?? '');
   await page.fill('[data-testid="connection-username"]', cfg.username ?? '');
   await page.fill('[data-testid="connection-password"]', cfg.password ?? '');
-  await page.click('[data-testid="color-orange"]');
+  await page.click('[data-testid="color-amber"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 

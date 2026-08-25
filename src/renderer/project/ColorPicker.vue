@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { ConnectionColor } from '@shared/domain/connection';
-import { connectionColorSchema } from '@shared/domain/connection';
+import { CONNECTION_COLOR_CHOICES, type ConnectionColor } from '@shared/domain/connection';
 
 defineProps<{ modelValue: ConnectionColor }>();
 const emit = defineEmits<{ 'update:modelValue': [ConnectionColor] }>();
 
-const colors = connectionColorSchema.options;
+// P42 D34: the offered subset, not the full storable enum — a connection already saved with a
+// retired colour keeps its own rail regardless (connColor.ts), it just isn't offered here again.
+const colors = CONNECTION_COLOR_CHOICES;
 </script>
 
 <template>
