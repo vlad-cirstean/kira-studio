@@ -6,6 +6,7 @@ import { appearanceVersion, settingsState } from '../../state/settings';
 import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
+import { typeDescription } from '../shared/typeGlossary';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 
@@ -35,6 +36,17 @@ const page = computed(() => {
   void pageVersion.n;
   return getPage(props.pageKey);
 });
+
+// P40 D16: the data-type badge in the header (Console.html's own mockup markup) has no
+// counterpart in the data grid — DataGrid.vue has never carried one; the type lives in the header
+// cell's tooltip instead (its own headerTitleFor, P31 D29). This is that same shape, narrowed to
+// what a console result actually has: name, dataType, the type glossary's description — no DB
+// comment line, since execute() never consults the catalog (postgres/console.ts's own doc
+// comment: "console results are always read-only regardless" — there is no column to have one).
+function headerTitleFor(col: ColumnDescriptor): string {
+  const description = col.dataType ? typeDescription(col.dataType) : null;
+  return [col.name, col.dataType, description].filter((line) => !!line).join('\n');
+}
 
 // P31 D11/F13: same reasoning as DataGrid.vue's own widths computed — without this, a font
 // change leaves every result grid sized for whatever font was active when columns.ts's shared
@@ -142,8 +154,9 @@ function selectTabularCell(row: number, col: number): void {
 
 // A console document/key-value result has no ColumnDescriptor of its own (P8's DocumentPage/
 // KeyValuePage carry fixed semantic columns, not a caller projection) — built the same way
-// DocumentView.vue's own publisher does, so the cell editor's format detector still opens JSON
-// pretty-printed by default.
+// DocumentView.vue's own publisher does, so the cell editor's format detector still recognizes it
+// as JSON (P40 F11/D13: nothing here beautifies on seed — the raw text renders exactly as stored,
+// only syntax-highlighted, until Beautify is pressed).
 function selectDocumentRow(row: number): void {
   selected.value = { row, col: 0 };
   const doc = docRowAt(row);
@@ -212,9 +225,9 @@ function selectKeyValueRow(row: number): void {
             class="cell header-cell p-th"
             :class="cellClass({ alignRight: alignmentFor(col) === 'right' })"
             :style="{ width: `${widths[col.name]}px` }"
+            v-tooltip="headerTitleFor(col)"
           >
             <span class="name">{{ col.name }}</span>
-            <span class="p-badge" v-tooltip="col.dataType">{{ col.dataType }}</span>
           </div>
         </div>
       </template>
@@ -360,6 +373,16 @@ function selectKeyValueRow(row: number): void {
 
 .cell.align-right {
   justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* No zebra striping (DataGrid.vue's own rule/comment: "the design's own _gridrows.html/
+   _style.css draws no alternating row colour, only the hover state") — P40 D17 parity. Scoped off
+   .header-row: this grid's header/body rows share one .row class (DataGrid's own header-row never
+   carries its .grid-row), so the exclusion is what this rule gets for free there. */
+.row:not(.header-row):hover .cell:not(.selected),
+.row:not(.header-row):hover .gutter-cell {
+  background: var(--kira-hover);
 }
 
 /* Matches DataGrid.vue's .grid-cell.selected look (P8/P10 publish into the same cellSelection.ts
