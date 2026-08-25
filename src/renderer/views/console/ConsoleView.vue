@@ -10,6 +10,7 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
@@ -20,7 +21,15 @@ import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
 import { consoleLintSource } from './lint';
-import { closeResult, run, runtime, setActiveResult, setText, stop } from './state';
+import {
+  closeResult,
+  run,
+  runtime,
+  setActiveResult,
+  setNewResultSet,
+  setText,
+  stop,
+} from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -188,6 +197,21 @@ const statusLine = computed(() => {
         >
           Run all
         </AppButton>
+        <div class="sep"></div>
+        <!-- P40 D6: append a new result set instead of replacing the current ones. Off by
+             default and per-tab, so accumulating results is opt-in and can never surprise
+             someone who never pressed it. -->
+        <IconButton
+          icon="layers"
+          :active="!!tab.state.newResultSet"
+          data-testid="console-new-result-toggle"
+          v-tooltip="
+            tab.state.newResultSet
+              ? 'Running adds a new result set — click to replace instead'
+              : 'Running replaces the current result sets — click to add a new one instead'
+          "
+          @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
+        />
         <div class="sep"></div>
         <div class="saved-anchor">
           <AppButton

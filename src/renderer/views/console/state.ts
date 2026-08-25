@@ -90,6 +90,10 @@ export function setText(tabId: string, text: string): void {
   patchConsoleTabState(tabId, { text });
 }
 
+export function setNewResultSet(tabId: string, on: boolean): void {
+  patchConsoleTabState(tabId, { newResultSet: on });
+}
+
 // One execute() call per run, covering both "Run statement" (one-element array) and "Run all"
 // (the caller pre-splits via sql-split.ts) — the adapter's own all-or-nothing semantics (P5.5
 // D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
@@ -113,13 +117,16 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     });
     if (rt.opId !== opId) return; // superseded by a newer run
 
-    dropResults(tabId);
-    rt.results = response.pages.map((page) => {
+    // P40 D6: the toolbar toggle decides append vs. replace — off (the default) keeps today's
+    // always-replace behavior.
+    if (!tab.state.newResultSet) dropResults(tabId);
+    const newResults = response.pages.map((page) => {
       const key = resultPageKey(tabId, rt.nextSeq++);
       setPage(key, page);
       return { key, rowCount: page.rowCount };
     });
-    rt.activeKey = rt.results[0]?.key ?? null;
+    rt.results.push(...newResults);
+    rt.activeKey = newResults[0]?.key ?? rt.activeKey;
     rt.status = 'idle';
     rt.opId = null;
   } catch (err) {

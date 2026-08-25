@@ -52,8 +52,13 @@ export type DefinitionTabState = z.infer<typeof definitionTabStateSchema>;
 
 // Only the editor's own text is session state (§8.4) — the last run's results are runtime-only,
 // like `views/definition/state.ts`'s `definition` field, and never round-trip through `tabs.save`.
+// `newResultSet` (P40 D6): the toolbar toggle deciding whether a run appends a new result set or
+// replaces the current ones. `.default(false)` keeps a tab saved before this field existed
+// restorable (documentTabStateSchema's own comment states the rule), and matches today's
+// always-replace behavior, so an existing console tab restores behaving exactly as it did.
 export const consoleTabStateSchema = z.object({
   text: z.string(),
+  newResultSet: z.boolean().default(false),
 });
 export type ConsoleTabState = z.infer<typeof consoleTabStateSchema>;
 
@@ -189,7 +194,7 @@ export function defaultDefinitionTabState(): DefinitionTabState {
 }
 
 export function defaultConsoleTabState(): ConsoleTabState {
-  return { text: '' };
+  return { text: '', newResultSet: false };
 }
 
 export function defaultDocumentTabState(pageSize: PageSize = 100): DocumentTabState {
