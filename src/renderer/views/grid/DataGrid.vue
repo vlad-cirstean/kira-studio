@@ -3,7 +3,6 @@ import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
-import { typeDescription } from '../../project/typeGlossary';
 import { shortcutFor } from '../../shortcuts/keys';
 import {
   clearSelectedCellFor,
@@ -28,6 +27,7 @@ import {
   visibleColumnRange,
 } from '../shared/columns';
 import { sqlDialectFor } from '../shared/sqlIdent';
+import { typeDescription } from '../shared/typeGlossary';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './gridMenu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';

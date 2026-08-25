@@ -4,8 +4,8 @@ import { connectionsState } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import EngineIcon from '../theme/EngineIcon.vue';
+import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
-import { columnTypeIcon, nodeIcon } from './icons';
 import type { TreeRowVm } from './state/tree';
 
 // P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a

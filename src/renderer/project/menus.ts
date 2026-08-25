@@ -27,9 +27,9 @@ import {
   openKeyValueTab,
   openStreamTab,
 } from '../state/tabs';
+import { nodeIcon } from '../theme/icons';
 import { runCount as runDocumentCount } from '../views/documents/state';
 import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
-import { nodeIcon } from './icons';
 import {
   collapseAll,
   groupParentPath,

@@ -10,7 +10,7 @@ export interface Completion {
   /** Right-aligned dim text: a column's dataType, or "keyword" / "operator". Never required. */
   detail?: string;
   /** A codicon name (`symbol-field`, `symbol-keyword`, `symbol-operator`) — the same set
-   *  `project/icons.ts` already draws from. */
+   *  `theme/icons.ts` already draws from. */
   icon?: string;
   /** How many characters from the end of `insert` (or `label`) the caret lands after acceptance —
    *  0 (the default) means "at the very end". A BSON constructor completion (P27 D17) inserts
