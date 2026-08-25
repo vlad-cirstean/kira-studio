@@ -136,7 +136,7 @@ const DESCRIPTIONS: readonly { test: RegExp; text: string }[] = [
     // "('a','b')" list is a qualifier like any other now, so this matches the same way
     // varchar/numeric's own qualifiers do rather than relying on the paren surviving.
     test: /^set$/,
-    text: "MariaDB's SET type: any combination of a fixed list of string values, stored as one field.",
+    text: "MariaDB/MySQL's SET type: any combination of a fixed list of string values, stored as one field.",
   },
   { test: /^geometry|geography/, text: 'A spatial (GIS) value.' },
 

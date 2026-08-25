@@ -35,11 +35,15 @@ const KIND_LABELS: Record<NodeKind, KindLabel> = {
   object: { singular: 'Object', plural: 'Objects' },
 };
 
-// Per-connection-kind overrides — one entry today: MariaDB's `function` nodes include stored
-// procedures, and §5.1 calls that level "routines".
+// Per-connection-kind overrides — one entry today: MariaDB's and MySQL's `function` nodes include
+// stored procedures (P34 F21b: MySQL calls them stored routines too, from the same
+// information_schema.ROUTINES source), and §5.1 calls that level "routines".
 const KIND_LABEL_OVERRIDES: Partial<Record<NodeKind, Partial<Record<ConnectionKind, KindLabel>>>> =
   {
-    function: { mariadb: { singular: 'Routine', plural: 'Routines' } },
+    function: {
+      mariadb: { singular: 'Routine', plural: 'Routines' },
+      mysql: { singular: 'Routine', plural: 'Routines' },
+    },
   };
 
 /** The display label for any node kind, per connection kind. Plural for a folder or a checkbox

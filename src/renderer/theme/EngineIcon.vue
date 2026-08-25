@@ -35,6 +35,17 @@ const iconSize = computed(() => props.size ?? 16);
       d="M2.1 6.95c.28-1.75 1.3-3.1 2.85-3.8.62-.28 1.12.03 1.22.7.18 1.15.85 2.05 1.98 2.85 1.85 1.32 3.42 2.85 4.85 4.55.6.7 1.28 1.15 2.05 1.35.6.15.75.62.3 1.02-.75.65-1.85 1-3.25 1.1-2.6.2-4.95.05-7.1-.45-.65-.15-.85-.65-.5-1.2.5-.8.6-1.6.3-2.4-.25-.65-.72-1.12-1.38-1.55-.92-.62-1.5-1.15-1.32-2.17zm2.05-1.85a.65.65 0 1 0 1.3 0 .65.65 0 1 0-1.3 0z"
     />
 
+    <!-- P34 D18: a dolphin silhouette (leaping arc, dorsal fin, eye), redrawn — not the vendored
+         MySQL dolphin mark — mirroring the other engines' own currentColor-path convention. -->
+    <template v-if="kind === 'mysql'">
+      <path
+        fill="currentColor"
+        fill-rule="evenodd"
+        d="M2 12.2c.4-3.6 2.4-6.6 5.5-8.4.85-.5 1.85-.8 2.9-.8-.35.55-.5 1.15-.45 1.8 1.5.15 2.85.9 3.8 2.05-.85 0-1.65.2-2.35.6.8.45 1.4 1.15 1.75 2-.85.15-1.7 0-2.45-.4.05.9-.25 1.75-.85 2.4-1.1-1.6-2.95-2.55-4.9-2.5-1.9.05-3.6 1.1-4.5 2.75-.1-.5-.2-.9-.45-1.5z"
+      />
+      <circle cx="10.4" cy="5.4" r=".5" fill="currentColor" />
+    </template>
+
     <template v-if="kind === 'mongodb'">
       <path
         fill="currentColor"
