@@ -172,37 +172,38 @@ export async function disconnectConnection(id: string): Promise<void> {
   connectionsState.states[id] = state;
 }
 
+// P39 iter2 F9/D9: the find-existing -> strip id/sortOrder/createdAt/updatedAt -> connectionsUpdate
+// -> splice-back body setConnectionColor and setConnectionReadOnly share. Returns whether a
+// record was found and patched — setConnectionReadOnly's reconnect tail must still not run when
+// it wasn't, which is why this isn't the void the two public functions themselves return.
+async function patchConnectionFields(
+  id: string,
+  patch: Partial<ConnectionInput>,
+): Promise<boolean> {
+  const existing = connectionRecord(id);
+  if (!existing) return false;
+  const {
+    id: _id,
+    sortOrder: _sortOrder,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    ...fields
+  } = existing;
+  const updated = await control.connectionsUpdate(id, { ...fields, ...patch, password: null });
+  const idx = connectionsState.records.findIndex((r) => r.id === id);
+  if (idx >= 0) connectionsState.records[idx] = updated;
+  return true;
+}
+
 export async function setConnectionColor(
   id: string,
   color: ConnectionSummary['color'],
 ): Promise<void> {
-  const existing = connectionRecord(id);
-  if (!existing) return;
-  const {
-    id: _id,
-    sortOrder: _sortOrder,
-    createdAt: _createdAt,
-    updatedAt: _updatedAt,
-    ...fields
-  } = existing;
-  const updated = await control.connectionsUpdate(id, { ...fields, color, password: null });
-  const idx = connectionsState.records.findIndex((r) => r.id === id);
-  if (idx >= 0) connectionsState.records[idx] = updated;
+  await patchConnectionFields(id, { color });
 }
 
 export async function setConnectionReadOnly(id: string, readOnly: boolean): Promise<void> {
-  const existing = connectionRecord(id);
-  if (!existing) return;
-  const {
-    id: _id,
-    sortOrder: _sortOrder,
-    createdAt: _createdAt,
-    updatedAt: _updatedAt,
-    ...fields
-  } = existing;
-  const updated = await control.connectionsUpdate(id, { ...fields, readOnly, password: null });
-  const idx = connectionsState.records.findIndex((r) => r.id === id);
-  if (idx >= 0) connectionsState.records[idx] = updated;
+  if (!(await patchConnectionFields(id, { readOnly }))) return;
   // §9b: forces a reconnect so the engine picks up the new flag when the connection is live.
   if (connectionsState.states[id]?.status === 'connected') {
     await disconnectConnection(id);
