@@ -716,7 +716,7 @@ describe('rabbitmq adapter (§9.1, P37)', () => {
       await adapter.disconnect();
     }
     for (const cmd of commands) {
-      expect(cmd).not.toContain(fixture.config.password ?? ' never-empty-guard ');
+      expect(cmd).not.toContain(fixture.config.password ?? '\0never-empty-guard\0');
       expect(cmd).not.toContain('@');
     }
   });
