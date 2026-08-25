@@ -20,8 +20,8 @@ team works, and how to run things in whichever box a session happens to be on.
   Subagents are fine for genuinely independent, parallelizable, or throwaway research (e.g.
   "how does the `pg` driver handle cancellation?") — not for writing the phase's code.
 - **The loop per phase:** check for a plan → spawn an Opus subagent to write one if missing →
-  Sonnet implements the whole phase → **stop**. Do not roll on into the next phase automatically;
-  each phase boundary is a checkpoint.
+  Sonnet implements the whole phase. Phases are done one at a time, in order — do not parallelize
+  or batch multiple phases together.
 - **A phase asked for in multiple passes/iterations/rounds means repeat that whole loop that many
   times**, not run it once and call the extra passes optional. Each pass is its own
   Opus-research-then-Sonnet-fix cycle, in order, each one written and implemented against the
