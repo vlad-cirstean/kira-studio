@@ -296,6 +296,17 @@ export async function readTopic(
 
     if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
+    // P43 iter2 F19/D26: a partition's own `end` was frozen from its high watermark at browse
+    // start, and `partition.eof` from librdkafka means the consumer's position *reached* that
+    // watermark — proof, not a heuristic, that nothing between `next` and `end` will ever be
+    // delivered (a transaction marker, a compacted offset, an offset aged out by retention). Left
+    // unclamped, `hasMore` stayed true forever and every later browse re-hit EOF immediately for
+    // zero rows. `emptyPolls` is deliberately not clamped the same way: an empty poll with no EOF
+    // is indistinguishable from a slow broker, and there genuinely may be more.
+    for (const w of cursor.values()) {
+      if (eofPartitions.has(w.partition)) w.next = w.end;
+    }
+
     const nextWindows = [...cursor.values()];
     const hasMore = nextWindows.some((w) => BigInt(w.next) < BigInt(w.end));
     return builder.finish(finishPosition(nextWindows, hasMore, fingerprint, req.pageSize));

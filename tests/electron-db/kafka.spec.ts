@@ -675,4 +675,83 @@ describe('kafka adapter (§9.1, P10)', () => {
       await adapter.disconnect();
     }
   });
+
+  // P43 iter2 F19/D26: a partition's high watermark counts offsets the consumer never receives
+  // as a delivered message — a transaction's own commit marker is exactly such an offset, on any
+  // topic a transactional producer ever wrote to, whether or not the transaction itself aborted.
+  // readTopic's own `w.next` only advances when it processes a *delivered* message
+  // (`:293`'s `w.next = String(offset + 1n)`), so a lone commit marker leaves `w.next` one behind
+  // the `end` the admin call already saw — exactly the gap `partition.eof` (this test's own
+  // trigger) used to leave unclamped forever. GAP_TOPIC is dedicated and transaction-only so it
+  // doesn't perturb ORDERS_TOPIC/EMPTY_TOPIC's own message-count assumptions elsewhere in this
+  // file. Uses the driver under test's own `KafkaJS.Kafka` directly, the same way produce.ts
+  // itself does — the seed file (0005_kafka_seed.ts) is what stays client-free (D26/F24), not
+  // this suite, which already requires the real ABI build to run at all.
+  test("21. read: a partition ending in a transaction's commit marker still terminates (D26)", async () => {
+    const { KafkaJS } = await import('@confluentinc/kafka-javascript');
+    const GAP_TOPIC = 'gap-topic';
+    const rdConfig = { 'bootstrap.servers': `${fixture.host}:${fixture.port}` };
+    const kafka = new KafkaJS.Kafka(rdConfig as never);
+
+    const admin = kafka.admin();
+    await admin.connect();
+    try {
+      await admin.createTopics({
+        topics: [{ topic: GAP_TOPIC, numPartitions: 1, replicationFactor: 1 }],
+      });
+    } finally {
+      await admin.disconnect();
+    }
+
+    const txProducer = kafka.producer({
+      kafkaJS: { transactionalId: 'kira-test-gap-txn' },
+    } as never);
+    await txProducer.connect();
+    try {
+      const tx = await txProducer.transaction();
+      await tx.send({
+        topic: GAP_TOPIC,
+        messages: [{ key: 'gap-key', value: JSON.stringify({ seq: 0 }) }],
+      });
+      await tx.commit();
+    } finally {
+      await txProducer.disconnect();
+    }
+
+    const adapter = await createAdapter('kafka', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const req = {
+        path: topicPath(GAP_TOPIC),
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 10,
+      };
+      // Read to exhaustion, mirroring test 8's own paging loop — the transactional message is
+      // the only row this topic will ever produce, so the very first page is already terminal.
+      let cursor: { mode: 'offset'; offset: number } | { mode: 'after'; token: string } = {
+        mode: 'offset',
+        offset: 0,
+      };
+      let lastPage: StreamPage | null = null;
+      for (let guard = 0; guard < 4; guard++) {
+        lastPage = await readStream(adapter, { ...req, cursor }, makeCtx());
+        if (!lastPage.position.hasMore) break;
+        const token = lastPage.position.nextToken;
+        if (!token) throw new Error('expected a nextToken on a truncated page');
+        cursor = { mode: 'after', token };
+      }
+      if (!lastPage) throw new Error('never read a page');
+      assert.strictEqual(lastPage.rowCount, 1);
+      assert.deepStrictEqual(JSON.parse(rowAt(lastPage, 0).body), { seq: 0 });
+      // The assertion that fails against the pre-fix tree: `hasMore` stayed true and `nextToken`
+      // non-null forever, because `w.next` (stuck at the commit marker's offset) never caught up
+      // to `end` (the watermark including it) through any number of empty re-browses.
+      assert.strictEqual(lastPage.position.hasMore, false);
+      assert.strictEqual(lastPage.position.nextToken, null);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
 });
