@@ -38,6 +38,28 @@ services:
       timeout: 5s
       retries: 20
 
+  # mysql://kira:kira@localhost:3307/kira (root password: root) — 3307, not 3306: that's
+  # mariadb's port in this same file, and the whole point of the demo stack is every engine up
+  # at once.
+  mysql:
+    image: mysql:8.4
+    container_name: kira-mysql
+    environment:
+      MYSQL_USER: kira
+      MYSQL_PASSWORD: kira
+      MYSQL_DATABASE: kira
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot", "--silent"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
   # mongodb://localhost:27017/kira (no auth)
   mongo:
     image: mongo:7
@@ -123,6 +145,7 @@ services:
 volumes:
   kira-pg-data:
   kira-mariadb-data:
+  kira-mysql-data:
   kira-mongo-data:
   kira-redis-data:
   kira-kafka-data:

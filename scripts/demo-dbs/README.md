@@ -1,10 +1,10 @@
 # Kira Studio — local database fixtures
 
-Spins up all seven of Kira Studio's supported engines (PostgreSQL, MariaDB, MongoDB, Redis, Kafka,
-SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The four relational/
-document/key-value stores get a full schema, foreign keys, indexes, and ~20k rows of seed data;
-Kafka/SQS/S3 get a handful of topics/queues/buckets with a small backlog — enough to exercise
-every tree view without waiting on a multi-minute seed.
+Spins up all eight of Kira Studio's supported engines (PostgreSQL, MariaDB, MySQL, MongoDB, Redis,
+Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The five
+relational/document/key-value stores get a full schema, foreign keys, indexes, and ~20k rows of
+seed data; Kafka/SQS/S3 get a handful of topics/queues/buckets with a small backlog — enough to
+exercise every tree view without waiting on a multi-minute seed.
 
 Kafka uses the same image/mode as the `@testcontainers/kafka` harness under `bun run test:db`
 (confluentinc/cp-kafka in KRaft mode) — see `tests/db/support/kafka.ts`. SQS and S3 share one
@@ -45,6 +45,7 @@ and SQS it appends another batch of messages rather than resetting (see the Mode
 |----------|------|------|----------|----------|------|
 | PostgreSQL | localhost | 5432 | `kira` | `kira` | `kira` |
 | MariaDB  | localhost | 3306 | `kira` | `kira` | `kira` |
+| MySQL    | localhost | 3307 | `kira` | `kira` | `kira` |
 | MongoDB  | localhost | 27017 | — (no auth) | — | `kira` |
 | Redis    | localhost | 6379 | — | — | db 0 |
 | Kafka    | localhost | 9092 | — | — | — |
@@ -56,6 +57,7 @@ Connection strings:
 ```sh
 postgresql://kira:kira@localhost:5432/kira
 mariadb://kira:kira@localhost:3306/kira
+mysql://kira:kira@localhost:3307/kira
 mongodb://localhost:27017/kira
 redis://localhost:6379/0
 ```
@@ -128,7 +130,7 @@ top of whatever's already there (a topic/queue has no primary key to upsert agai
 
 ```
 scripts/demo-dbs/
-├── docker-compose.yml        # all seven services (sqs + s3 share one LocalStack container)
+├── docker-compose.yml        # all eight services (sqs + s3 share one LocalStack container)
 ├── seed.sh                   # run every seed
 ├── README.md
 ├── postgres/
@@ -137,6 +139,9 @@ scripts/demo-dbs/
 ├── mariadb/
 │   ├── init.sql              # schema — runs on init
 │   └── seed.sql              # 20k-row seed (seq_1_to_N)
+├── mysql/
+│   ├── init.sql              # schema — runs on init (CHAR(36) stands in for MariaDB's UUID type)
+│   └── seed.sql              # 20k-row seed (WITH RECURSIVE, MySQL has no SEQUENCE engine)
 ├── mongo/
 │   ├── init.js               # collections + indexes — runs on init
 │   └── seed.js               # 20k-doc seed

@@ -14,6 +14,11 @@ docker exec -i kira-mariadb mariadb -ukira -pkira kira \
   < "${SCRIPT_DIR}/mariadb/seed.sql"
 
 echo
+echo "==> MySQL"
+docker exec -i kira-mysql mysql -ukira -pkira kira \
+  < "${SCRIPT_DIR}/mysql/seed.sql"
+
+echo
 echo "==> MongoDB"
 docker exec -i kira-mongo mongosh --quiet kira \
   < "${SCRIPT_DIR}/mongo/seed.js"
