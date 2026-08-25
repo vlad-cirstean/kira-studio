@@ -16,7 +16,7 @@ export const settingsOpen = ref(false);
 // not in views/grid/columns.ts, so this module never has to import upward into views/* (§11).
 export const appearanceVersion = reactive({ n: 0 });
 
-export function applyAppearance(): void {
+function applyAppearance(): void {
   const root = document.documentElement.style;
   root.setProperty('--kira-font-family', settingsState.appearance.fontFamily);
   root.setProperty('--kira-font-size', `${settingsState.appearance.fontSize}px`);

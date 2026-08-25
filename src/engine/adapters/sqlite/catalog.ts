@@ -157,10 +157,7 @@ export function listColumns(exec: QueryExecutor, table: string): ColumnMeta[] {
 // The `pk` ordinal is 1-based and always present on table_xinfo, unlike the other SQL adapters —
 // a single-column INTEGER PRIMARY KEY (the rowid alias) has no backing index at all (verified: no
 // autoindex, no index_list row), so this is read directly rather than derived from listIndexes.
-export function primaryKeyFromColumns(
-  columns: ColumnMeta[],
-  rawRows: TableXInfoRow[],
-): string[] | null {
+function primaryKeyFromColumns(columns: ColumnMeta[], rawRows: TableXInfoRow[]): string[] | null {
   const pkRows = rawRows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
   if (pkRows.length === 0) return null;
   const known = new Set(columns.map((c) => c.name));

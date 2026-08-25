@@ -109,7 +109,7 @@ async function loadChildren(connectionId: string, path: string, refresh: boolean
   }
 }
 
-export async function loadVisibility(connectionId: string): Promise<void> {
+async function loadVisibility(connectionId: string): Promise<void> {
   if (treeState.visibility[connectionId]) return;
   treeState.visibility[connectionId] = await control.filtersList(connectionId);
 }
@@ -220,7 +220,7 @@ export async function refreshAllConnections(): Promise<void> {
 // onConnectionsChanged (below) rather than off deleteConnection() directly, so every deletion
 // path is covered — the context menu, a direct IPC call, a future bulk delete — the same
 // reasoning state/connections.ts:44-50 records for that channel.
-export function dropConnectionState(connectionId: string): void {
+function dropConnectionState(connectionId: string): void {
   const prefix = `${connectionId}|`;
   for (const k of Object.keys(treeState.children)) {
     if (k.startsWith(prefix)) delete treeState.children[k];

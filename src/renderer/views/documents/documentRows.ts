@@ -100,7 +100,7 @@ function expandedPathsFor(tabId: string, row: number): Set<string> {
   return set;
 }
 
-export function isPathExpanded(tabId: string, row: number, path: string): boolean {
+function isPathExpanded(tabId: string, row: number, path: string): boolean {
   return expandedPathsFor(tabId, row).has(path);
 }
 

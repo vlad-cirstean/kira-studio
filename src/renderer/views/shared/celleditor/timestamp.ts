@@ -230,7 +230,7 @@ const RELATIVE_STEPS: { unit: Intl.RelativeTimeFormatUnit; ms: number }[] = [
 const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
 /** "3 days ago" / "in 2 hours" / "just now" — Intl.RelativeTimeFormat, no dependency (D18). */
-export function relativeTime(date: Date, now: Date): string {
+function relativeTime(date: Date, now: Date): string {
   const diffMs = date.getTime() - now.getTime();
   if (Math.abs(diffMs) < 45_000) return 'just now';
   for (const { unit, ms } of RELATIVE_STEPS) {

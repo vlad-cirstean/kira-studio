@@ -45,7 +45,7 @@ const TEMPORAL_TYPES = new Set([
 // tinyint(1) is MariaDB's boolean spelling (§5d) — read.ts detects it from the catalog's
 // 'tinyint(1)' display string; execute() has no catalog, so columnLength (the wire protocol's
 // analogous display-width field) is the equivalent signal.
-export function typeClassForField(field: FieldInfo): TypeClass {
+function typeClassForField(field: FieldInfo): TypeClass {
   if (field.type === 'TINY' && field.columnLength === 1) return 'boolean';
   if (NUMBER_TYPES.has(field.type)) return 'number';
   if (TEMPORAL_TYPES.has(field.type)) return 'temporal';

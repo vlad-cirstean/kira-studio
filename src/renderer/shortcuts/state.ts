@@ -37,7 +37,7 @@ export const paletteCommands: PaletteCommand[] = [
 
 export const paletteState = reactive({ open: false, query: '' });
 
-export function openPalette(): void {
+function openPalette(): void {
   paletteState.open = true;
   paletteState.query = '';
 }

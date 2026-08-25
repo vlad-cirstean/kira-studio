@@ -68,7 +68,7 @@ export async function hydrateConnections(): Promise<void> {
   });
 }
 
-export function defaultDraft(): ConnectionInput {
+function defaultDraft(): ConnectionInput {
   return {
     name: '',
     kind: 'postgres',

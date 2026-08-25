@@ -121,7 +121,7 @@ export function referencedByItems(
 
 // P7 D3/D4: referencedByItems, wrapped in a "Referenced by ▸" submenu — [] (not a lone separator)
 // when empty, so cellMenu() can always splice this in unconditionally.
-export function referencedByMenuItems(
+function referencedByMenuItems(
   columnName: string,
   meta: ObjectMeta | null,
   ctx: FkNavContext,

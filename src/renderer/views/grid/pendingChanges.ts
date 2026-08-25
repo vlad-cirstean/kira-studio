@@ -181,7 +181,7 @@ export function discardInsertRow(tabId: string, insertId: string): void {
 
 // D8: delete, then update, then insert — mirrors the adapter's own execution order so the
 // *Preview command* panel shows exactly what mutate() will run.
-export function buildPlan(tabId: string): MutationRowOp[] | null {
+function buildPlan(tabId: string): MutationRowOp[] | null {
   const p = pendingState[tabId];
   if (!p) return null;
   const ops: MutationRowOp[] = [];
