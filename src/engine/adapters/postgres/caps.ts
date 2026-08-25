@@ -5,6 +5,7 @@ export const postgresCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: false,
+  keyBrowser: false,
   defaultPageKind: 'tabular',
   sql: true,
   definition: true,

@@ -8,6 +8,7 @@ export const kafkaCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: true,
+  keyBrowser: false,
   defaultPageKind: 'stream',
   sql: false,
   // P23 D5: a topic's partitions/config and a consumer group's members/offsets moved here once

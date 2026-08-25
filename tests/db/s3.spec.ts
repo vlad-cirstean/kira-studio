@@ -149,6 +149,7 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
   test('3. cap honesty', () => {
     expect(s3Caps.tabular).toBe(false);
     expect(s3Caps.keyValue).toBe(true);
+    expect(s3Caps.keyBrowser).toBe(true); // P41: unbounded prefix/object tree, browsed in a tab
     expect(s3Caps.defaultPageKind).toBe('keyvalue');
     expect(s3Caps.definition).toBe(false);
     expect(s3Caps.sql).toBe(false);

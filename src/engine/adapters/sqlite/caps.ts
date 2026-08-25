@@ -12,6 +12,7 @@ export const sqliteCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: false,
+  keyBrowser: false,
   defaultPageKind: 'tabular',
   sql: true,
   definition: true,

@@ -7,6 +7,7 @@ export const sqsCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: true,
+  keyBrowser: false,
   defaultPageKind: 'stream',
   sql: false,
   // P23 D9: a queue's attributes — visibility timeout, retention, redrive policy, FIFO/dedup,

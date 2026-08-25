@@ -9,6 +9,7 @@ export const rabbitmqCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: true,
+  keyBrowser: false,
   defaultPageKind: 'stream',
   sql: false,
   // D29/D30: a queue or exchange genuinely *is* its attributes plus its bindings — two or three

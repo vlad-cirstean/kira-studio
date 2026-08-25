@@ -10,6 +10,7 @@ export const s3Caps: Caps = {
   documents: false,
   keyValue: true,
   stream: false,
+  keyBrowser: true, // P41: a bucket's prefix/object space is unbounded — browsed in a Browse tab (§8.18)
   defaultPageKind: 'keyvalue',
   sql: false,
   // P23 D11: stays false for now, as a named follow-up rather than a permanent no — an *object*

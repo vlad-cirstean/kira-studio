@@ -8,6 +8,7 @@ export const redisCaps: Caps = {
   documents: false,
   keyValue: true,
   stream: false,
+  keyBrowser: true, // P41: a db index's key namespace is unbounded — browsed in a Browse tab (§8.18)
   defaultPageKind: 'keyvalue',
   sql: true,
   // P23 D10: stays false permanently, not deferred — a key's type/TTL/memory usage are already on

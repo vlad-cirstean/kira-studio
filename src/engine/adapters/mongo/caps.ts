@@ -8,6 +8,7 @@ export const mongoCaps: Caps = {
   documents: true,
   keyValue: false,
   stream: false,
+  keyBrowser: false,
   defaultPageKind: 'document',
   sql: true,
   definition: true,

@@ -8,6 +8,7 @@ export const mariadbCaps: Caps = {
   documents: false,
   keyValue: false,
   stream: false,
+  keyBrowser: false,
   defaultPageKind: 'tabular',
   sql: true,
   definition: true,

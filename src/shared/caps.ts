@@ -25,6 +25,10 @@ export interface Caps {
   documents: boolean;
   keyValue: boolean;
   stream: boolean;
+  /** P41: this engine's containers hold an arbitrarily nested, unbounded key space. The project
+   *  tree shows the containers only (a redis `database`, an s3 `bucket`); the space itself is
+   *  navigated in a Browse tab (§8.18). True for redis and s3, false for the other nine. */
+  keyBrowser: boolean;
   defaultPageKind: PageKind; // §5.1 "Default view" column — ADDED to §5's list (D4)
 
   // ---- language surfaces
@@ -74,6 +78,7 @@ export const capsSchema = z.object({
   documents: z.boolean(),
   keyValue: z.boolean(),
   stream: z.boolean(),
+  keyBrowser: z.boolean(),
   defaultPageKind: pageKindSchema,
   sql: z.boolean(),
   definition: z.boolean(),

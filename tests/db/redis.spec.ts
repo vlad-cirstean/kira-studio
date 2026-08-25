@@ -152,6 +152,7 @@ describe('redis adapter (§9.1, P9)', () => {
   test('4. cap honesty', () => {
     expect(redisCaps.tabular).toBe(false);
     expect(redisCaps.keyValue).toBe(true);
+    expect(redisCaps.keyBrowser).toBe(true); // P41: unbounded namespace tree, browsed in a tab
     expect(redisCaps.defaultPageKind).toBe('keyvalue');
     expect(redisCaps.definition).toBe(false);
     expect(redisCaps.exactCount).toBe(true);
