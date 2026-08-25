@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { selectedCellFor } from '../../state/cellSelection';
 import { layoutState, setCellEditorHeight } from '../../state/layout';
-import PanelSplitter from '../../workbench/PanelSplitter.vue';
+import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import CellEditorView from './CellEditorView.vue';
 
 // Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.

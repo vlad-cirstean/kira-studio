@@ -12,7 +12,7 @@ import { isHydrated, markHydrated } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../workbench/panels/ViewChrome.vue';
+import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';

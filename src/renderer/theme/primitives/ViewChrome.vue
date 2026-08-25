@@ -3,10 +3,10 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { useRunState } from '../../state/runState';
-import { connColorVar } from '../../theme/connColor';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import RunState from '../../theme/primitives/RunState.vue';
-import ViewHeader from '../../theme/primitives/ViewHeader.vue';
+import { connColorVar } from '../connColor';
+import IconButton from './IconButton.vue';
+import RunState from './RunState.vue';
+import ViewHeader from './ViewHeader.vue';
 
 // The view-head + rail + toolbar + run-state trio every non-grid view opens with (LAW 09/10/12
 // in docs/v1/design/kira-design-system). Refresh/Stop live here rather than in each view's own

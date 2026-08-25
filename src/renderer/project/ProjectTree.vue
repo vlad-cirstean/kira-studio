@@ -4,11 +4,11 @@ import { shortcutFor } from '../shortcuts/keys';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
 import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
+import VirtualList from '../theme/primitives/VirtualList.vue';
 import { reload as reloadDocumentTab } from '../views/documents/state';
 import { reload as reloadDataTab } from '../views/grid/state';
 import { reload as reloadKeyValueTab } from '../views/keyvalue/state';
 import { reload as reloadStreamTab } from '../views/stream/state';
-import VirtualList from '../workbench/VirtualList.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {
   collapse,

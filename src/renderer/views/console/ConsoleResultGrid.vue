@@ -4,7 +4,7 @@ import { computed, ref, watch } from 'vue';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { cellClass } from '../../theme/cellClass';
-import VirtualList from '../../workbench/VirtualList.vue';
+import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../grid/columns';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 

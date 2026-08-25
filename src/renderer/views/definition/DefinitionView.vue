@@ -18,7 +18,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import ViewChrome from '../../workbench/panels/ViewChrome.vue';
+import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';

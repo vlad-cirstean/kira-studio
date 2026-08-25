@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends string | number">
 // P6. Generic so each caller keeps its own literal union for `modelValue` (e.g. 'all' | 'running'
 // | 'error', or a numeric page-size union) instead of widening to string. See
-// workbench/VirtualList.vue for this codebase's other precedent for a generic SFC.
+// theme/primitives/VirtualList.vue for this codebase's other precedent for a generic SFC.
 withDefaults(
   defineProps<{
     modelValue: T;

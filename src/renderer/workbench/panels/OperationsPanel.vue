@@ -16,9 +16,9 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { run as runConsole } from '../../views/console/state';
 import { sqlDialectFor } from '../../views/shared/sqlIdent';
-import VirtualList from '../VirtualList.vue';
 
 interface OpsListItem {
   key: string;
