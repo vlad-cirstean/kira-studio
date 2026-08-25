@@ -1,9 +1,9 @@
 import type { Page } from '@shared/protocol/page';
 import { reactive } from 'vue';
-import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
+import { classifyLoadError, stopOp } from '../shared/viewOp';
 import { drop as dropPage, setPage } from './resultPages';
 
 export interface ConsoleViewRuntime {
@@ -54,8 +54,6 @@ export function setText(tabId: string, text: string): void {
   patchConsoleTabState(tabId, { text });
 }
 
-const DISCONNECTED_CODES = new Set(['E_NOT_FOUND', 'E_ENGINE_DOWN', 'E_CONNECT']);
-
 // One execute() call per run, covering both "Run statement" (one-element array) and "Run all"
 // (the caller pre-splits via sql-split.ts) — the adapter's own all-or-nothing semantics (P5.5
 // D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
@@ -89,15 +87,14 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
-    const code = (err as { code?: string } | undefined)?.code ?? 'E_QUERY';
-    const message = err instanceof Error ? err.message : String(err);
-    if (code === 'E_CANCELLED') {
+    const failure = classifyLoadError(err);
+    if (failure.kind === 'cancelled') {
       // Same discipline as the data grid's stop button: the previous results stay exactly as
       // they were rather than being blanked.
       rt.status = 'cancelled';
       return;
     }
-    if (DISCONNECTED_CODES.has(code)) {
+    if (failure.kind === 'disconnected') {
       // unmarkHydrated swaps ViewChrome out for ReconnectGate immediately, but `status` still
       // has to drop out of 'running' here — ConsoleView's `running`/`canStop` read it directly,
       // and onReconnectAndLoad only ever calls markHydrated(), never touches `rt`. Left as
@@ -109,11 +106,10 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       return;
     }
     rt.status = 'error';
-    rt.error = { code, message };
+    rt.error = { code: failure.code, message: failure.message };
   }
 }
 
 export function stop(tabId: string): void {
-  const rt = runtime[tabId];
-  if (rt?.opId) void control.opsCancel(rt.opId);
+  stopOp(runtime[tabId]);
 }

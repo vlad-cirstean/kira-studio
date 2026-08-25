@@ -7,6 +7,7 @@ import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDataTab, patchDataTabState, unmarkHydrated } from '../../state/tabs';
+import { classifyLoadError, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
 
@@ -79,8 +80,6 @@ async function loadMeta(tabId: string): Promise<void> {
   }
 }
 
-const DISCONNECTED_CODES = new Set(['E_NOT_FOUND', 'E_ENGINE_DOWN', 'E_CONNECT']);
-
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
@@ -135,21 +134,20 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
-    const code = (err as { code?: string } | undefined)?.code ?? 'E_QUERY';
-    const message = err instanceof Error ? err.message : String(err);
-    if (code === 'E_CANCELLED') {
+    const failure = classifyLoadError(err);
+    if (failure.kind === 'cancelled') {
       // A stop button that blanks the grid is worse than the query the user stopped — the
       // previously rendered page stays exactly as it was.
       rt.status = 'cancelled';
       return;
     }
-    if (DISCONNECTED_CODES.has(code)) {
+    if (failure.kind === 'disconnected') {
       // Same entry point as a restored tab: one component, two ways in.
       unmarkHydrated(tabId);
       return;
     }
     rt.status = 'error';
-    rt.error = { code, message };
+    rt.error = { code: failure.code, message: failure.message };
   }
 }
 
@@ -199,8 +197,7 @@ export async function runCount(tabId: string): Promise<void> {
 }
 
 export function stop(tabId: string): void {
-  const rt = runtime[tabId];
-  if (rt?.opId) void control.opsCancel(rt.opId);
+  stopOp(runtime[tabId]);
 }
 
 export async function goFirst(tabId: string): Promise<void> {

@@ -2,10 +2,10 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { DocumentTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { reactive } from 'vue';
-import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDocumentTab, patchDocumentTabState, unmarkHydrated } from '../../state/tabs';
+import { classifyLoadError, stopOp } from '../shared/viewOp';
 import { setPage } from './docPage';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
@@ -53,8 +53,6 @@ function ensureRuntime(tabId: string): DocumentViewRuntime {
   return runtime[tabId];
 }
 
-const DISCONNECTED_CODES = new Set(['E_NOT_FOUND', 'E_ENGINE_DOWN', 'E_CONNECT']);
-
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab?.connectionId) return;
@@ -100,18 +98,17 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
-    const code = (err as { code?: string } | undefined)?.code ?? 'E_QUERY';
-    const message = err instanceof Error ? err.message : String(err);
-    if (code === 'E_CANCELLED') {
+    const failure = classifyLoadError(err);
+    if (failure.kind === 'cancelled') {
       rt.status = 'cancelled';
       return;
     }
-    if (DISCONNECTED_CODES.has(code)) {
+    if (failure.kind === 'disconnected') {
       unmarkHydrated(tabId);
       return;
     }
     rt.status = 'error';
-    rt.error = { code, message };
+    rt.error = { code: failure.code, message: failure.message };
   }
 }
 
@@ -142,8 +139,7 @@ export async function runCount(tabId: string): Promise<void> {
 }
 
 export function stop(tabId: string): void {
-  const rt = runtime[tabId];
-  if (rt?.opId) void control.opsCancel(rt.opId);
+  stopOp(runtime[tabId]);
 }
 
 // D7's cursor choice (views/grid/state.ts's own goNext precedent): prefer the token when one is
