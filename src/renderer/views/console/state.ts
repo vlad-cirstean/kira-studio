@@ -1,19 +1,27 @@
-import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { drop as dropPage, setPage } from './resultPages';
 
+/** One result set of a run. `key` is identity and never changes while the result is open — the
+ *  "Result N" label the strip prints (P40) is its *position*, which renumbers when a sibling
+ *  closes, so it is deliberately not stored here. */
+export interface ConsoleResult {
+  key: string;
+  rowCount: number;
+}
+
 export interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   opId: string | null; // the in-flight op, for the stop button
-  results: Page[]; // the last run's result pages — runtime-only, never saved (§8.4)
+  results: ConsoleResult[]; // the last run's result sets — runtime-only, never saved (§8.4)
+  nextSeq: number; // per-tab monotonic result-set counter (P40 D1) — never reused
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
-  return { status: 'idle', error: null, opId: null, results: [] };
+  return { status: 'idle', error: null, opId: null, results: [], nextSeq: 0 };
 }
 
 const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
@@ -21,24 +29,24 @@ const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaul
 export { runtime };
 
 // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-// `dropAllPagesForTab` already frees this tab's entries in resultPages.ts's own `pages` map, but
-// `rt.results` holds a second, direct reference to those same Page objects (F5) — clearing it
-// before the record itself is dropped is what actually releases them.
+// state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
+// `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
+// there is no second reference here left to release before the record itself is dropped).
 registerTabRuntimeCleanup((tabId) => {
-  const rt = runtime[tabId];
-  if (rt) rt.results = [];
   delete runtime[tabId];
 });
 
-/** `views/grid/page.ts` keys, one per result set of a run — index-aligned with `rt.results`. */
-export function resultPageKey(tabId: string, index: number): string {
-  return `${tabId}:result:${index}`;
+/** `views/grid/page.ts`-style key for one result set. `seq` is the tab's own monotonic
+ *  `nextSeq` (P40 D1), not an array index — a result keeps the same key for its whole lifetime
+ *  even after an earlier sibling result set closes. */
+export function resultPageKey(tabId: string, seq: number): string {
+  return `${tabId}:result:${seq}`;
 }
 
 function dropResults(tabId: string): void {
   const rt = runtime[tabId];
   if (!rt) return;
-  for (let i = 0; i < rt.results.length; i++) dropPage(resultPageKey(tabId, i));
+  for (const result of rt.results) dropPage(result.key);
   rt.results = [];
 }
 
@@ -70,10 +78,11 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     if (rt.opId !== opId) return; // superseded by a newer run
 
     dropResults(tabId);
-    response.pages.forEach((page, i) => {
-      setPage(resultPageKey(tabId, i), page);
+    rt.results = response.pages.map((page) => {
+      const key = resultPageKey(tabId, rt.nextSeq++);
+      setPage(key, page);
+      return { key, rowCount: page.rowCount };
     });
-    rt.results = response.pages;
     rt.status = 'idle';
     rt.opId = null;
   } catch (err) {

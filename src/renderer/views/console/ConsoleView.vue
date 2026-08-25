@@ -19,7 +19,7 @@ import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
 import { consoleLintSource } from './lint';
-import { resultPageKey, run, runtime, setText, stop } from './state';
+import { run, runtime, setText, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -235,14 +235,16 @@ const statusLine = computed(() => {
              badge assume one active result at a time; this view stacks every statement's page
              instead (no "which statement produced this" or verb metadata is tracked per page),
              so each panel keeps only what it actually has: its index and row count. -->
-        <div v-for="(page, i) in rt.results" :key="i" class="result-panel">
+        <div v-for="(result, i) in rt.results" :key="result.key" class="result-panel">
           <div class="result-head">
             <span class="p-badge">Result {{ i + 1 }}</span>
-            <span class="p-sm muted">{{ page.rowCount }} row{{ page.rowCount === 1 ? '' : 's' }}</span>
+            <span class="p-sm muted"
+              >{{ result.rowCount }} row{{ result.rowCount === 1 ? '' : 's' }}</span
+            >
           </div>
           <div class="result-grid">
             <ConsoleResultGrid
-              :page-key="resultPageKey(tab.id, i)"
+              :page-key="result.key"
               :tab-id="tab.id"
               :connection-id="tab.connectionId"
               :path="tab.path"
