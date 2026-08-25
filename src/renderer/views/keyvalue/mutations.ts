@@ -1,6 +1,7 @@
 import { decodePath, encodePath } from '@shared/domain/tree';
 import { data } from '../../bridge/data';
 import { findKeyValueTab, openKeyValueTab } from '../../state/tabs';
+import { reloadTabsForTarget } from '../../state/viewCommands';
 import { reload } from './state';
 
 // Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline
@@ -34,6 +35,7 @@ export async function saveValueEdit(
     ],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 export async function deleteKey(tabId: string, keyName: string): Promise<void> {
@@ -51,6 +53,7 @@ export async function deleteKey(tabId: string, keyName: string): Promise<void> {
   // ordinary "key no longer exists" query-time condition (read.ts's own precedent) rather than
   // this module inventing a second way to report the same fact.
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 // Scoped to string-type keys only (same D2 as edit — see redis/mutate.ts's assertEditableType).

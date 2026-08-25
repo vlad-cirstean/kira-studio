@@ -261,7 +261,7 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
 // P43: a second, focused test rather than growing the scenario above — this is the one Docker-free
 // spec that can give commits 5/7/8/9's own findings real, executed coverage (§5).
-test('sqlite — a failed commit reports the server error, verbatim; a filter change invalidates the count; a disconnect regates the tab', async ({
+test('sqlite — a failed commit reports the server error, verbatim; a filter change invalidates the count; a disconnect regates the tab; a commit reloads a sibling tab', async ({
   kira,
   consoleErrors,
 }) => {
@@ -358,4 +358,37 @@ test('sqlite — a failed commit reports the server error, verbatim; a filter ch
   await page.click('[data-testid="reconnect-load"]');
   await expect(dataGrid).toBeVisible();
   await expect(reconnectPanel).toHaveCount(0);
+
+  // --- P43 F10/D14: a committed mutation reloads every other hydrated tab on the same target —
+  // no manual Refresh needed. This is the LAST step of this test: everything above runs against
+  // an order_items table this step is the only one to actually mutate. --------------------------
+  await openRowMenu(page, ORDER_ITEMS_PATH);
+  await page.click('[data-testid="menu-item-open-data-new-tab"]');
+  await expect(dataGrid).toBeVisible();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(2);
+
+  const tabAId = await page.locator('[data-testid="tab"]').nth(0).getAttribute('data-tab-id');
+  const tabBId = await page.locator('[data-testid="tab"]').nth(1).getAttribute('data-tab-id');
+  if (!tabAId || !tabBId) throw new Error('tab ids not found');
+
+  // tab B (just opened, no filter) sees id=1 — a real seeded row (0009_sqlite_seed.sql) that
+  // every step above only staged-and-discarded or counted, never committed.
+  const idCells = () => page.locator('[data-testid="grid-cell"][data-column="id"]');
+  await expect
+    .poll(async () => (await idCells().allInnerTexts()).includes('1'), { timeout: 10_000 })
+    .toBe(true);
+
+  // Back to tab A — still filtered to "id = 1" (the one row it shows) — delete and commit there.
+  await page.click(`[data-testid="tab"][data-tab-id="${tabAId}"]`);
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1);
+  await page.locator('[data-testid="grid-gutter-cell"]').nth(0).click();
+  await page.click('[data-testid="toolbar-delete-row"]');
+  await page.click('[data-testid="toolbar-commit-changes"]');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(0);
+
+  // tab B never ran a manual Refresh — it must already be correct.
+  await page.click(`[data-testid="tab"][data-tab-id="${tabBId}"]`);
+  await expect
+    .poll(async () => (await idCells().allInnerTexts()).includes('1'), { timeout: 10_000 })
+    .toBe(false);
 });

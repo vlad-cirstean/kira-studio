@@ -10,6 +10,7 @@ import {
   registerDataQueryCommands,
   registerTabCount,
   registerTabReload,
+  reloadTabsForTarget,
 } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
@@ -182,6 +183,9 @@ export async function reloadAfterMutation(tabId: string): Promise<void> {
   // rather than forcing a real recount. Skipped when this tab never ran a count in the first
   // place — nothing to grey, and nothing cached yet to read this cheaply.
   if (runtime[tabId]?.count) await runCount(tabId);
+  // P43 F10/D14: a second tab open on this same table kept rendering rows this commit just
+  // changed — this tab is already correcting itself above, so it is the one excepted here.
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 export async function runCount(tabId: string): Promise<void> {

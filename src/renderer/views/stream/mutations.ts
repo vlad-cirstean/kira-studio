@@ -1,5 +1,6 @@
 import { data } from '../../bridge/data';
 import { findStreamTab } from '../../state/tabs';
+import { reloadTabsForTarget } from '../../state/viewCommands';
 import { reload } from './state';
 
 // Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
@@ -22,6 +23,7 @@ export async function produceKafkaMessage(
     ops: [{ kind: 'insert', values }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 export async function sendSqsMessage(
@@ -41,6 +43,7 @@ export async function sendSqsMessage(
     ops: [{ kind: 'insert', values }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 // P37 D25/D32: publish-only — rabbitmq/mutate.ts's $routingKey/$exchange/$properties join the
@@ -73,6 +76,7 @@ export async function publishRabbitMessage(
     ops: [{ kind: 'insert', values }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 // `messageId` mirrors sqs/mutate.ts's ID_FIELD — the row's own `key` column, which read.ts
@@ -88,4 +92,5 @@ export async function deleteSqsMessage(tabId: string, messageId: string): Promis
     ops: [{ kind: 'delete', key: { messageId } }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }

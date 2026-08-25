@@ -1,4 +1,5 @@
 import type { SortSpec } from '@shared/domain/queries';
+import { isHydrated, tabsState } from './tabs';
 
 // P39 iter3 D5/D6: the leaf-registry inversion state/tabRuntime.ts already uses, applied to the six
 // project/ -> views/ edges (ProjectTree.vue's four reload imports, menus.ts's runCount/
@@ -78,4 +79,31 @@ export function registerBrowseInvalidate(
  *  kind's own state.ts module is guaranteed to load. */
 export function browseInvalidate(connectionId: string, path: string): void {
   void browseInvalidateFn?.(connectionId, path);
+}
+
+// P43 F10/D14: §7's "L2 is invalidated by any local mutation on the same target" is kept by the
+// engine (engine/data.ts's cache.invalidateAfterMutation), but the renderer's own per-tab page
+// stores are not — a second tab open on the same (connectionId, path) kept rendering rows a
+// sibling tab had already deleted or edited, with no user action able to notice. Skips the tab
+// that performed the mutation (its own caller already reloads it, with the pages-only invalidate
+// scope P13 D18 needs — a second reload here would double it) and every tab still behind the
+// reconnect gate (§8.4: it has no page to correct, and will load fresh when pressed). Only the
+// four kinds a mutation ever targets — a Browse tab's path is a container, never a mutation's own
+// (connectionId, path).
+export function reloadTabsForTarget(connectionId: string, path: string, exceptTabId: string): void {
+  for (const tab of tabsState.tabs) {
+    if (tab.id === exceptTabId) continue;
+    if (tab.connectionId !== connectionId || tab.path !== path) continue;
+    if (!isHydrated(tab.id)) continue;
+    switch (tab.kind) {
+      case 'data':
+      case 'document':
+      case 'keyvalue':
+      case 'stream':
+        reloadTab(tab.kind, tab.id);
+        break;
+      default:
+        break;
+    }
+  }
 }

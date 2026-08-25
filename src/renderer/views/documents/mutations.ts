@@ -1,5 +1,6 @@
 import { data } from '../../bridge/data';
 import { findDocumentTab } from '../../state/tabs';
+import { reloadTabsForTarget } from '../../state/viewCommands';
 import { reload } from './state';
 
 // Documents mutate immediately (P8's ground rules — §8.7 never mentions staging/preview, unlike
@@ -24,6 +25,7 @@ export async function saveDocumentEdit(
     ops: [{ kind: 'update', key: { _id: id }, changes: { $document: newBodyEjson } }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 export async function saveNewDocument(tabId: string, bodyEjson: string): Promise<void> {
@@ -40,6 +42,7 @@ export async function saveNewDocument(tabId: string, bodyEjson: string): Promise
     ops: [{ kind: 'insert', values: { $document: bodyEjson } }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
 
 export async function deleteDocument(tabId: string, id: string): Promise<void> {
@@ -53,4 +56,5 @@ export async function deleteDocument(tabId: string, id: string): Promise<void> {
     ops: [{ kind: 'delete', key: { _id: id } }],
   });
   await reload(tabId);
+  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
 }
