@@ -361,12 +361,14 @@ no way to reach it (P31 D6/D7).
 
 Modal, sectioned. v1 sections:
 - **Appearance** — one font family + size for the whole app (UI, grid and editors alike), row
-  density. Typing a font family that doesn't resolve to a real face marks the field invalid, names
-  the browser fallback it lands on, and still saves it (settings apply immediately, not just valid
-  ones) — a canvas-measurement check against a guaranteed-bogus probe name, since
-  `document.fonts.check()` returns `true` even for a nonexistent family (P31 D9/D10). A font change
-  re-measures every grid's column widths rather than reusing widths sized for whatever font was
-  active when the app first measured (P31 D11).
+  density, and a **word wrap** toggle (P42), defaulting on, driven into every CodeMirror instance
+  (query console, Mongo console, cell editor, translate panes) through a live-reconfigurable
+  `Compartment` rather than a per-surface setting. Typing a font family that doesn't resolve to a
+  real face marks the field invalid, names the browser fallback it lands on, and still saves it
+  (settings apply immediately, not just valid ones) — a canvas-measurement check against a
+  guaranteed-bogus probe name, since `document.fonts.check()` returns `true` even for a nonexistent
+  family (P31 D9/D10). A font change re-measures every grid's column widths rather than reusing
+  widths sized for whatever font was active when the app first measured (P31 D11).
 - **Data** — default page size. (Prefetch and count-on-open toggles existed at one point; both
   were removed as functionality per user request, not merely hidden here — see §7.)
 - **Cache** — L2 byte budget, hit-rate readout, clear caches.
@@ -467,16 +469,32 @@ Below it, a second **filter toolbar**, left to right:
   match highlighting exist in every other in-page find widget the app has — document, key/value and
   stream (§8.7/§8.9) — sharing one state module (P31 D16-D21). Paging, Fetch more, a page-size
   change, Refresh or a `WHERE` re-run all restart the scan against the new page rather than leave a
-  stale match list pointing at rows that no longer hold what matched (P31 D22-D24).
+  stale match list pointing at rows that no longer hold what matched (P31 D22-D24). **Viewport-first
+  scanning (P42):** the rows currently on screen are scanned first, in their own frame, and
+  highlighted immediately; the ordinary ascending pass then runs in chunked animation frames behind
+  it, publishing a growing (`pending`) match list as it goes rather than nothing until the whole
+  page has been walked. The filter toggle waits for a *completed* scan before it hides anything — a
+  partial answer highlights, but never filters, so rows can't vanish and reappear as the scan
+  catches up. The completed match list, and prev/next's own cycling, are always strictly ascending
+  regardless of where the priority window sat.
 - **Stop** — aborts the in-flight op and forwards the cancel to the server (§5.1). Enabled only while
   an op is running.
 
 Grid: virtualized rows and columns, sticky header, row-number gutter, resizable/reorderable columns,
 sort by clicking a header (direction shown as a 13px codicon pinned to the header cell's own right
-edge, not a text glyph in the font-affected label flow — P31 D34), multi-cell/row/column selection,
-`NULL` rendered distinctly from empty string, type-aware right-alignment for numerics. Both axes
-render a 560px overscan buffer beyond the viewport (P29) — a fast fling in either direction outruns
-the main thread's own re-render before it can show a blank gap, not just vertically.
+edge, not a text glyph in the font-affected label flow — P31 D34), multi-cell/row/column selection —
+including **click-and-drag** across cells (P42), extending a range selection the same way shift-click
+already does, with the selection auto-scrolling the grid when the drag reaches an edge — and the
+gutter/header's top-left corner cell **selecting every cell in the grid** on click. Two adjacent
+selected cells share one border at their common edge rather than each drawing its own (a doubled
+line where they meet, P42). `NULL` rendered distinctly from empty string, type-aware
+right-alignment for numerics. Both axes render a 560px overscan buffer beyond the viewport (P29) —
+a fast fling in either direction outruns the main thread's own re-render before it can show a blank
+gap, not just vertically. A column header's hover tooltip (P42) separates the column name, its data
+type and its glossary description into distinct visual rows rather than one run-on line — the same
+structured tooltip shape §8.17 describes. Where two scrollbars meet (the grid's own bottom-right
+corner, and any other scroll container) the corner square is transparent, not Chromium's opaque
+white default (P42).
 
 The gutter's staged-change rail is a 2px bar: warn/yellow for a pending edit, ok/green for a pending
 insert, error/red for a pending delete (mutually exclusive — a row headed for deletion never also
@@ -500,33 +518,51 @@ that tab has a selected cell and disappearing the instant it doesn't, including 
 a tab with no cell selected or to a view kind that never mounts one (a definition tab, for
 instance). A view kind opts out simply by not mounting it (P26).
 - **Format autodetect** even for free text: JSON, XML/HTML, SQL, base64, hex, epoch seconds/millis,
-  ISO-8601, UUID, URL, CSV, plain text. Detection is a scored guess, always overridable.
-- **Manual type override** — dropdown; the choice sticks per column for the session.
+  ISO-8601 (labelled "Time (ISO…)"), CSV, plain text. Detection is a scored guess, always
+  overridable. **UUID and URL are not formats** (P42) — neither did anything useful when picked
+  (no beautify, no validation), so a UUID/URL-shaped value now simply detects as plain text; a
+  UUID-shaped value is still guarded against colliding with base64's own overlapping shape.
+- **Manual type override** — an app-drawn picker (not a native `<select>`, P42, so each row can
+  carry its own hover explanation matching the column header's — §8.17), common formats first,
+  binary encodings last; the choice sticks per column for the session.
+- **Validation (P42)** — every format checks the buffer for real against the *effective* (auto or
+  overridden) format: JSON/XML for balance, CSV for a consistent column count, SQL for a lint
+  error, a timestamp format for a parseable moment, base64/hex for a decodable shape. A failure
+  shows a named "invalid" chip beside the format picker — broken JSON says where, a bad timestamp
+  says so — rather than silently accepting it.
 - **Beautify** — two modes: *indented* and *compact* (single-line, no indentation).
-- **UUID format** gets a generate button (a fresh `crypto.randomUUID()`, overwriting the buffer).
+- **Generators (P42)** — a small panel of values a developer routinely needs to type by hand: a
+  UUID (v4), a ULID, a random hex token, and "Now" (spelled for the effective format — an ISO
+  timestamp, or an epoch count when the format is one of those). Never gated by the cell's own
+  format — a generator writes text into the buffer regardless of what format that text is read as.
 - **Timestamp formats** (epoch seconds/millis, ISO-8601) get a **translate pane** below the raw
   value, on the same footing as the hex/base64 decoded-text pane: an editable field plus a
   local/UTC toggle and an expressive calendar picker (month grid, time-of-day controls, a "now"
   shortcut), kept in sync with the raw value in both directions in real time — typing in the
   translate pane or picking a moment re-encodes the raw value, and editing the raw value re-parses
   into the pane. Re-encoding preserves the value's original shape byte-for-byte (separator, UTC
-  offset style, fractional-second digits) apart from the digits that actually changed.
+  offset style, fractional-second digits) apart from the digits that actually changed. The
+  calendar's own month/year label (P42) is itself a control, cycling **days → months → years** so a
+  date far away is a handful of clicks instead of dozens of single-month page turns; picking a month
+  or a year moves only the calendar's view, never the selected value.
 - **Hex and base64** get a second, editable "decoded text" pane below the raw value — the same
   bytes as plaintext, kept in sync in both directions (typing plaintext re-encodes the raw value;
   editing the raw value re-decodes the plaintext). Bytes that aren't valid UTF-8 show a note
   instead of a second editor rather than rendering garbled text.
-- **Editable.** Committing a change stages a pending cell edit (§8.13) rather than writing
+- **Editable.** Committing a change stages a pending cell edit (§8.14) rather than writing
   immediately. The panel is forced read-only when the connection is marked read-only, and likewise
   when the cell's value was truncated on load — a partial value can be read and copied, but never
-  staged as a write over the full one.
+  staged as a write over the full one. Its own byte figure is shown once, in the status badge
+  alongside the decoded reading/truncation/beautify-failure notes it already carries (P42) — not a
+  second time in a duplicate byte badge, which this panel no longer has at all.
 - **Viewer mode** (P40): the query console's dock passes `readOnly` — a distinct, stronger flag
   than the two above. Those explain a *refusal* (a real write exists but is blocked), and keep
   their reason chip and full staging UI to say so; viewer mode means there was never a write on
   offer at all (a console result has no addressable row to write back to), so it shows no reason
-  chip and hides every affordance that exists only to serve staging one — UUID-generate, the
-  `modified` chip, the byte badge, Beautify, Revert. Facts about the value (type, NULL/empty/
-  truncated badges, the format select, both translate panes) still show; only ways to *write* it
-  are hidden.
+  chip and hides every affordance that exists only to serve staging one — the generators panel, the
+  `modified` chip, Beautify, Revert. Facts about the value (type, NULL/empty/truncated badges, the
+  format select and its validation, both translate panes) still show; only ways to *write* it are
+  hidden.
 
 ### 8.7 Document view (Mongo, and any document-shaped page)
 
@@ -647,6 +683,7 @@ the two diverge the mac key follows a slash. See §8.16 for the binding table it
 | Consumer group (P23) / Exchange (P37) | Open definition, Copy name `Ctrl/Cmd+C`, Copy qualified name |
 | Column (definition view) | Copy name, Add to projection, Sort by |
 | Tab | Close `Ctrl/Cmd+W`, Close others, Close to the right, Close all, Duplicate tab, Copy name, Reveal in project panel |
+| Console result tab (P42) | Close, Close others, Close to the right |
 | Grid cell | Copy `Ctrl/Cmd+C`, Copy with header, Copy as JSON, Paste `Ctrl/Cmd+V`, Edit `Enter`, Set NULL, Delete row `Delete`/`⌘⌫`, Filter by this value, Go to referenced row |
 | Grid row | Copy row(s) ▸ (TSV `Ctrl/Cmd+C`/CSV/JSON/INSERT), Duplicate row `Ctrl/Cmd+D`, Revert row(s) (un-stages a pending edit/delete on the row, disabled when there's nothing to revert), Delete row `Delete`/`⌘⌫` |
 | Grid header | Sort asc/desc, Clear sort, Hide column, Show all columns, Copy column name, Copy column values `Ctrl/Cmd+C` |
@@ -726,11 +763,23 @@ editing, document edit/delete and console execution of anything but a read — t
 the **engine**, not just greyed out in the UI. The two modes are kept in sync where unambiguous (fields → URI is generated;
 URI → fields is parsed best-effort and the dialog stays in URI mode if it cannot round-trip).
 
-**Color palette** — twelve swatches approximating DataGrip's, tuned for a dark UI:
+**Color palette** — twelve swatches approximating DataGrip's, tuned for a dark UI, all twelve still a
+valid, storable, renderable colour for a connection (`none` plus eleven hues):
 
 `Red #C75450` · `Orange #CC7832` · `Amber #BFA23A` · `Olive #91A93E` · `Green #499C54` ·
 `Teal #2AA198` · `Cyan #3592C4` · `Blue #4B7BEC` · `Indigo #6C71C4` · `Violet #9876AA` ·
 `Magenta #C066B0` · `Grey #6E7681`
+
+**Offered vs. storable (P42).** The picker (here, and the tree row's Color submenu, §8.10) offers a
+**trimmed eight** — `none, red, amber, green, cyan, blue, magenta, grey` — dropping `orange, olive,
+teal, indigo, violet`. The full twelve-entry enum above is never narrowed: the palette was built as
+one lightness/chroma at eleven evenly-spaced hues, which put its two closest neighbours (blue and
+indigo) under 26° apart — visible side by side as swatches, invisible in the 2px tab rail or 5px
+status dot the colour is actually shown in. Trimming to the six hues with the widest minimum gap
+(over 42°) fixes that; narrowing the *stored* enum instead would silently drop any connection
+already saved with a retired colour on next launch (its row fails to parse), so a connection with
+one keeps parsing, listing and painting its own rail exactly as before — it's just not offered to a
+new one.
 
 The color appears on: the tree rail, the tab, and the data-view toolbar.
 
@@ -751,21 +800,33 @@ errors surfaced verbatim. For non-SQL engines the console takes that engine's na
 (Mongo shell-style commands, Redis commands); where an adapter has no console, `caps.sql` is false
 and the menu item is absent. Every console kind completes as you type — SQL keywords (uppercase)
 for Postgres/MariaDB, collection names and supported shell methods for Mongo, command names for
-Redis — and shows inline syntax diagnostics for the statement under the cursor. Console contents
-are saved to `saved_queries`.
+Redis — and shows inline syntax diagnostics for the statement under the cursor; a Mongo statement's
+own diagnostics now (P42) include each top-level argument's shell-literal validity, not just
+balanced brackets. Console contents are saved to `saved_queries`.
 
 **One result set is shown at a time, chosen by a strip of chips** above it (P40) — a "Run all"
 producing several result sets no longer stacks a fixed-height panel per statement; each chip reads
-"Result N" (its position, which renumbers as siblings close) and closes with its own ×, dropping
-that result's cached page. A toolbar toggle decides whether the next run **replaces** the current
-result sets (the default) or **appends** a new one alongside them — a per-tab preference, so
-accumulating results across runs is opt-in. The active result's grid always fills the panel down to
-its own bottom edge (no fixed-height band left empty below a short result). The same shared find
-toolbar the grid/document/key-value views use (§8.5) docks above the active result, scoped to the
-console tab and resolving to whichever result is currently active — switching the active result
-re-scans the toolbar's own query against it rather than leaving a stale match list pointing at rows
-no longer on screen. The result grid's header shows a column's type in its hover tooltip (name,
-type, glossary description), matching the main data grid, rather than a badge in the header row.
+"Result N" (its position, which renumbers as siblings close), shows a leading icon for that result's
+own kind (tabular/document/key-value), and closes with its own ×, dropping that result's cached
+page; right-clicking a chip offers Close/Close others/Close to the right (§8.10). The chip strip is
+styled closer to — while staying visually smaller and secondary to — the main tab strip (P42),
+scrolling horizontally (wheel included) once it overflows. A toolbar toggle decides whether the next
+run **appends** a new result set alongside the current ones (the default, P42) or **replaces** them
+— a per-tab preference, so *not* accumulating results across runs is now the opt-in. The active
+result's grid always fills the panel down to its own bottom edge (no fixed-height band left empty
+below a short result). The same shared find toolbar the grid/document/key-value views use (§8.5)
+docks above the active result, scoped to the console tab and resolving to whichever result is
+currently active — switching the active result re-scans the toolbar's own query against it rather
+than leaving a stale match list pointing at rows no longer on screen. The result grid's header shows
+a column's type in its hover tooltip (name, type, glossary description), matching the main data
+grid, rather than a badge in the header row.
+
+**A Mongo statement's result** (P42) renders as the same read-only document view §8.7 describes —
+DocumentTree.vue, moved to `views/shared/document/` so both places can mount it (§11) — rather than
+the tabular grid every other engine's result reuses; each document starts **collapsed**, unlike the
+Mongo data tab's own expanded-by-default (a console run is usually a shape-skimming glance at many
+documents, not a read of one). No edit/delete affordance and no JSON validation chip beyond the
+console's own diagnostics above — the result is read-only, the same as every other console result.
 
 ### 8.16 Keyboard shortcuts
 
@@ -804,6 +865,14 @@ constant, shared with the query console's lint-diagnostic delay (§8.15) — and
 pause) when the pointer moves from one hinted control straight to another, so scanning a toolbar reads
 as one gesture. It hides on pointer-leave, click, any keypress, scroll, or window blur, and is
 `pointer-events: none` so it can never intercept the press it describes.
+
+The directive's value can be a plain string, or (P42) a **structured** `{ title, meta?, body? }` —
+rendered as a title line, a muted meta badge on that same line, and a body line below, rather than
+one run-on sentence; the grid/console-result header (§8.5) and the cell editor's format picker
+(§8.6) are its first two callers. The plain-text mirror (`data-kira-tip`, the newline-joined title +
+meta + body) is unchanged either way — it's what accessibility and every existing assertion still
+read — so a structured tooltip is a strictly additive widening of the one directive, never a second
+mechanism.
 
 The hovered control is resolved through one document-level, animation-frame-coalesced `pointermove`
 listener plus `elementFromPoint`, deliberately not a `mouseenter`/`pointerover` handler on each control:
@@ -990,7 +1059,7 @@ careless broad override placed after a narrow one can silently delete the narrow
 test tests/db` reproduces the pre-existing 12 pass/10 fail baseline; every `data-testid` unchanged |
 | **P40 Query console UX and cell-editor read-only mode** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: a toolbar toggle for opening a run's result in a new result tab vs. reusing the current one; the shared find/search toolbar (already in grid/documents/keyvalue) added to console results; a result-set strip ("N result sets", each closable with an ×) for console's multi-statement runs; the empty gap between the last row and the panel's bottom edge when the cell editor is closed; a real read-only mode for the cell editor — hiding Format/Beautify and other edit-only affordances and the primary-key label when nothing on screen is editable, which the query console's own cell editor (always read-only, §8.14) currently doesn't do; the console's SQL cell view brought visually in line with the main grid's cell view, dropping the data-type badge from its header | The user's own framing: a set of console-specific UX gaps found by using the feature, queued ahead of the broader functionality review | Implemented per `docs/v1/plans/P40-query-console-ux-and-readonly-cell-editor.md`, eight commits. A result set gets a stable key (`views/console/state.ts`'s `resultPageKey(tabId, seq)`, the tab's own monotonic `nextSeq`, never an array index) so closing one never re-keys its siblings. One result set is shown at a time behind a `.p-tab`-chip strip (`console-result-strip`/`console-result-tab`/`console-result-close`), replacing the old stacked-panel-per-statement layout the view's own comment had recorded as a deviation from the design system since P5.5 — this also fixed the empty band below the last row when the cell editor is closed (the fixed `height: 260px` `.result-panel` is gone; the active grid is `flex: 1`, same as the data grid's own `.grid-area`). A toolbar toggle (`console-new-result-toggle`) decides append-vs-replace, persisted per tab as `consoleTabStateSchema.newResultSet` (`.default(false)`, so an already-saved tab restores unchanged). `views/console/search.ts` is the fourth `createPageSearch` call site (after grid/documents/keyvalue) — its `activePage(tabId)` in `state.ts` is the one place "which of this tab's N result sets" is resolved, so `views/shared/page/`'s two shared cleanup handlers never had to learn a per-result-set key scheme; `setActiveResult` bumps `resultPages.ts`'s `pageVersion` so an open find re-scans the newly active result. `CellEditorDock`/`CellEditorView` gained an optional `readOnly` prop (defaulting to `false`, so the other four mounts are unchanged) — true "viewer mode": no reason chip (`data-read-only="true"`, no `data-read-only-reason`, since there was never a write on offer to refuse) and none of UUID-generate/`modified`/byte-badge/Beautify/Revert, which either did nothing meaningful on a console cell or lied about why. `ConsoleResultGrid.vue`'s header dropped its `p-badge` data-type badge for the same hover tooltip (name/type/glossary description) `DataGrid.vue`'s own header cell has carried since P31, plus row-hover and `tabular-nums` parity. Two real defects found on the way were written up and deliberately left untouched, handed to P43: `stream`/`documents` mount the cell editor with the same no-write-path gap the console had (F14); `resultPages.ts`'s `setVisibleWindow` has no caller anywhere (F22), so the console's decode cache is never pruned the way the grid's is. `bun run lint`/`typecheck` (all four projects)/`build` clean after every commit; `tests/ui/sqlite.spec.ts` (the one console-touching spec that runs without Docker in this sandbox) exercises the toggle/strip/×/find toolbar for real and passes; `console.spec.ts`/`interaction.spec.ts`'s two stacked-grid-count assertions were updated to the new chip model in the same commits that changed the behavior, and `console.spec.ts` gained its own dedicated result-set/find-toolbar test plus a viewer-mode block in `cell-editor.spec.ts`'s existing console step — all Postgres-backed and **not run in this sandbox** (Docker image pulls are blocked here); they typecheck/lint clean and need a real run in CI or on the macOS/Colima box before this phase is fully verified. |
 | **P41 Redis/S3 tree navigation and the sticky header fix** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: Redis and S3 connections currently expand their full key/object tree inline in the project panel; this phase keeps only the top-level containers (buckets for S3, databases for Redis) in the connection tree and adds a dedicated panel for the actual — potentially infinitely nested — key/object navigation. Also fixes the sticky ancestor-band header (P28's `stickyBand.ts`): the top band does not stick on scroll while a bottom one incorrectly does and duplicates rows | The user's own framing: the sticky header is a real, currently-broken bug, and unbounded Redis/S3 nesting in the connection tree is a scalability problem worth fixing before the broader functionality review | Implemented per `docs/v1/plans/P41-redis-s3-tree-navigation-and-sticky-header-fix.md`, seven commits. The sticky bug's real cause was never `stickyBand.ts`'s geometry (correct all along) but DOM order in `theme/primitives/VirtualList.vue`: a `position: sticky; top: 0` box only ever engages from flow position 0, and the sticky slot was rendered *after* the header/top-spacer, never at position 0 — moved to the first child, two-line fix. A new `caps.keyBrowser` boolean (true only for redis/s3) marks an engine whose top-level container hides an unbounded, arbitrarily-nested key/object space; `redis/catalog.ts`'s `database` node and `s3/catalog.ts`'s `bucket` node flip to `hasChildren: false`, and `project/grouping.ts`'s `isLeafKind`/`project/state/tree.ts`'s `revealPath`/`project/filterTree.ts` all thread the flag through so a keyBrowser container is treated as a leaf everywhere the tree already treats a table/topic as one. A new `browse` tab kind (`shared/domain/tabs.ts`, `views/browse/{state,BrowseView.vue,menu.ts}`) shows exactly one level at a time — `state.levelPath` persists which level a reactivated tab resumes at (§8.4's identity rule, unchanged) — with Up/breadcrumb navigation, a client-side substring filter, and container/key/object row menus moved verbatim from the tree's now-deleted `namespaceMenu`/`prefixMenu`/`keyMenu`/`objectMenu`; `state/objectStore.ts` gained the moved, re-signatured `uploadMenuItem` so both the tree's bucket row and the Browse panel's own container rows share one upload entry point without crossing the `project/ → views/` layering rule (`state/viewCommands.ts`'s existing leaf-registry pattern extended with `registerBrowseInvalidate`/`browseInvalidate`). `ProjectTree.vue`'s `onOpen` and `project/menus.ts`'s new `browseMenuItem` (first position, ahead of Refresh) are the two entry points into a Browse tab. `lint`/`typecheck` (all four projects)/`build` green after every commit; `tests/ui/sqlite.spec.ts`'s new inline-height sticky-band assertions and the full Docker-free spec subset (`startup`/`smoke`/`connections`/`sqlite`) pass for real in this sandbox after every commit. `redis.spec.ts`/`s3.spec.ts`/`memory.spec.ts` were rewritten wherever they drove tree-based namespace/prefix/key/object navigation to instead open a Browse tab and drive it, plus new dedicated Browse-panel scenarios (filter, Up, a prefix-level upload, and the tree-wide absence of any `prefix` row) — all Postgres/Redis/S3-backed and **not run in this sandbox** (Docker image pulls are blocked here); they typecheck/lint clean and need a real run in CI or on the macOS/Colima box before this phase is fully verified. One pre-existing bug was found and deliberately left untouched, out of this phase's scope: `UploadObjectDialog.vue`'s `containerPrefix` computed only captures a container path's own immediate local segment name (`pathTail`), not the full ancestor-joined relative prefix, so uploading through a *2-or-more-level-nested* S3 prefix's own Upload entry point silently drops every ancestor segment above the immediate parent from the prefilled key — handed to P43. |
-| **P42 Console, grid and cell-editor polish batch** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, a grab-bag of concrete UX gaps and visual bugs found by using the app, in the same spirit as P31's own "polish/bugfix batch": **Query console** — the new-result-vs-reuse toggle (P40) defaults flipped so a run opens a **new** result tab by default (reuse becomes the opt-in); the result-tab strip (`console-result-strip`) restyled closer to the main `TabStrip.vue` look while staying visually smaller/secondary; the result tabs gain a right-click menu (Close, Close others, Close to the right — the same three §8.10 already gives the main tab strip). **Mongo console** — a Mongo statement's result switches from the tabular grid to the same document view (§8.7/DocumentTree.vue) the Mongo data tab already uses, read-only; the console's own editor gains JSON validation feedback (currently only the cell editor has it). **Code editors** — a word-wrap toggle/default added everywhere a CodeMirror instance is editable (query console, Mongo console, the cell editor), not just the ones that already wrap. **Grid selection** — click-and-drag over multiple cells doesn't extend the selection today (only click + shift-click do); the corner cell (row-number/column-header intersection) doesn't select-all the way a spreadsheet's does; two adjacent selected cells render a visibly doubled border where their edges meet. **Grid chrome** — the column header's hover tooltip needs real visual hierarchy between the column name, its data format and its description (currently reads as one run-on); the grid's own bottom-right corner cell renders white regardless of theme. **Cell editor's format picker** — UUID and URL are listed as detected "formats" but do nothing useful when picked (no beautify, no validation) and should be dropped; the existing ISO-timestamp format's label becomes "Time (ISO…)"; every remaining format gains real validation (a broken-JSON or invalid-timestamp value should say so, not silently accept it); the list reorders common-first; hovering a format in this picker should show the same explanation text the column-header tooltip now shows for it; the "Generate UUID" single-purpose button becomes a small panel/menu of generators (UUID plus whatever else this list decides developers commonly reach for on the fly); the byte-size figure is shown twice in the cell editor's own chrome and should show once. **Date/time picker** — month/year navigation needs an easier jump than only prev/next arrows; a numeric stepper's increase/decrease controls render visibly outside their own button box, a CSS layout bug. **Connection colors** — the palette's colors sit too close to each other perceptually; trim it to keep only entries distinct enough from the rest. **Find/search performance** — on a large loaded dataset, the in-page find highlight is slow because it scans and highlights the whole dataset before showing anything; it should highlight what's already in the viewport first, then continue scanning/highlighting the rest in the background | The user's own framing: a list of concrete UX gaps and visual bugs found by using the app, given ahead of the broader functionality-review phase the same way P40's own console gaps were | Not yet planned — queued |
+| **P42 Console, grid and cell-editor polish batch** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, a grab-bag of concrete UX gaps and visual bugs found by using the app, in the same spirit as P31's own "polish/bugfix batch": **Query console** — the new-result-vs-reuse toggle (P40) defaults flipped so a run opens a **new** result tab by default (reuse becomes the opt-in); the result-tab strip (`console-result-strip`) restyled closer to the main `TabStrip.vue` look while staying visually smaller/secondary; the result tabs gain a right-click menu (Close, Close others, Close to the right — the same three §8.10 already gives the main tab strip). **Mongo console** — a Mongo statement's result switches from the tabular grid to the same document view (§8.7/DocumentTree.vue) the Mongo data tab already uses, read-only; the console's own editor gains JSON validation feedback (currently only the cell editor has it). **Code editors** — a word-wrap toggle/default added everywhere a CodeMirror instance is editable (query console, Mongo console, the cell editor), not just the ones that already wrap. **Grid selection** — click-and-drag over multiple cells doesn't extend the selection today (only click + shift-click do); the corner cell (row-number/column-header intersection) doesn't select-all the way a spreadsheet's does; two adjacent selected cells render a visibly doubled border where their edges meet. **Grid chrome** — the column header's hover tooltip needs real visual hierarchy between the column name, its data format and its description (currently reads as one run-on); the grid's own bottom-right corner cell renders white regardless of theme. **Cell editor's format picker** — UUID and URL are listed as detected "formats" but do nothing useful when picked (no beautify, no validation) and should be dropped; the existing ISO-timestamp format's label becomes "Time (ISO…)"; every remaining format gains real validation (a broken-JSON or invalid-timestamp value should say so, not silently accept it); the list reorders common-first; hovering a format in this picker should show the same explanation text the column-header tooltip now shows for it; the "Generate UUID" single-purpose button becomes a small panel/menu of generators (UUID plus whatever else this list decides developers commonly reach for on the fly); the byte-size figure is shown twice in the cell editor's own chrome and should show once. **Date/time picker** — month/year navigation needs an easier jump than only prev/next arrows; a numeric stepper's increase/decrease controls render visibly outside their own button box, a CSS layout bug. **Connection colors** — the palette's colors sit too close to each other perceptually; trim it to keep only entries distinct enough from the rest. **Find/search performance** — on a large loaded dataset, the in-page find highlight is slow because it scans and highlights the whole dataset before showing anything; it should highlight what's already in the viewport first, then continue scanning/highlighting the rest in the background | The user's own framing: a list of concrete UX gaps and visual bugs found by using the app, given ahead of the broader functionality-review phase the same way P40's own console gaps were | Implemented per `docs/v1/plans/P42-console-grid-celleditor-polish-batch.md`, all 17 commits. Two CSS regressions fixed first: the numeric stepper's chevrons now fit inside their own 10px button (the icon prop, not a losing CSS override, since `CodiconIcon`'s inline `font-size` style beats an external rule) and every scroll container's corner square is transparent, not Chromium's opaque white default. The query console: `newResultSet` defaults to `true` (an explicit "off" saved before this phase still restores off — an explicit preference outranks a changed default); the result-chip strip drops to `--kira-h-sm`, gains a leading kind icon, hover/close-on-hover chrome and wheel-to-horizontal scrolling (hoisted into `renderer/wheelScroll.ts`, shared with the main tab strip), and a right-click gives Close/Close others/Close to the right. `views/documents/{ejson.ts,documentRows.ts,DocumentTree.vue}` moved verbatim to `views/shared/document/` (a zero-behavior-change commit, `rows.ts`'s one hard dependency on `documents/page.ts` inverted into a registered row source) so the console's own Mongo result could rebuild on it: collapsed-by-default (unlike the data tab's expanded default — a console run is usually a shape-skimming glance at many documents), no edit/delete affordance, and `lintMongoConsole` gained an argument check via the existing shell-literal parser (`tryParseShellText`, exported from `ejson.ts`), not `JSON.parse` — a Mongo statement's own grammar allows `ObjectId(…)`/`ISODate(…)` constructors a plain JSON parser would reject. Word wrap became one `appearanceSettingsSchema.wordWrap` setting (`.default(true)`, matching today's hard-coded behavior) driven into `CodeMirrorHost.vue` through a fifth `Compartment`, replacing the per-component hard-code the report was actually describing. The grid gained real drag-to-select (`mousedown` → `mouseenter` while held → `mouseup`, auto-scrolling at the viewport edge) and a corner cell that selects everything as one `range` (never a `row` selection, which would be an O(rows) `Array.includes` inside the render loop); two adjacent selected cells now share one border at their common edge via four independent `box-shadow` custom properties rather than each drawing a full outline. `workbench/state/tooltip.ts` widened to accept a structured `{ title, meta?, body? }` alongside a plain string — the grid/console-result header's own tooltip is its first caller, rendering the column name, type and description as separate lines instead of one run-on sentence; the plain-text `data-kira-tip` mirror is unchanged either way. The cell editor's format picker: `uuid`/`url` dropped entirely (both were inert on selection — `detectUuid`'s regex survives as a one-line guard inside `detectBase64`, so a real UUID doesn't start mis-detecting as base64), `iso8601`'s label became "Time (ISO…)", the list reordered common-first into three groups: a new `validate.ts` checks the buffer for real against the effective format (JSON/XML balance, CSV column-count consistency, a SQL lint error, a parseable timestamp, a decodable base64/hex shape) and surfaces a named "invalid" chip; the native `<select>` became an app-drawn `ContextMenu` picker (the only way a per-row hover explanation — `FORMAT_HELP`, read by both the picker and the trigger's own tooltip — could exist at all, since a native `<option>` sits outside `elementFromPoint`'s reach), at the cost of losing arrow-key navigation the native control had; the old UUID-only generate button became a four-entry generators panel (UUID v4, ULID, a random hex token, "Now") that is never format-gated, and `EditBufferActions` gained a `showBytes` prop (default true, the cell editor passes false) so its own byte badge stopped duplicating the status badge's byte figure. `DateTimePicker.vue`'s month/year label became a button cycling three views — days, a 3×4 month grid, a 4×4 16-year block — with the prev/next arrows paging whichever is active; picking a month or year moves only the calendar's own view, never the selected value. `CONNECTION_COLOR_CHOICES` trims the picker to eight offered swatches (`none, red, amber, green, cyan, blue, magenta, grey`) at a 42° minimum OKLCH hue gap, roughly double the full palette's worst gap (25.6°, blue↔indigo); `connectionColorSchema` itself stays whole, since narrowing it would make a connection saved with a retired colour silently vanish on next launch rather than merely stop being offered. `runChunkedScan` gained an optional priority window, scanned in its own animation frame before the ordinary ascending pass starts from row 0 and rebuilds the match list from scratch (so the published order stays strictly ascending regardless of where the window sat); every scan tick now publishes into `searchState` marked `pending`, so the filter toggle (`matchedRows()`) waits for a *completed* scan before hiding anything instead of hiding-then-un-hiding rows as a partial answer arrives. A new `views/shared/page/visibleRows.ts` carries each tab's on-screen row window from renderer to scanner, reported by `DataGrid.vue`'s existing bounds watch and a new `VirtualList.vue` `visible-range` emit forwarded by `DocumentView.vue` and `ConsoleResultGrid.vue`; `KeyValueView.vue` renders every loaded row directly (no virtualization to report a window from) and so keeps ascending-only priority while still gaining the progressive-publication fix. `bun run format`/`lint`/`typecheck`/`build` clean after every commit, and the five non-Docker Playwright specs (`sqlite`/`startup`/`smoke`/`connections`/`workbench`) — extended with real regression coverage for the stepper fix, the scrollbar corner, the console tab default, the drag-select/corner-select/shared-border trio, the structured header tooltip, word wrap, and the trimmed color palette (including a connection created with a retired color, proving it still lists and paints) — pass for real in this sandbox throughout. Every other spec this batch touches (`cell-editor.spec.ts`'s format-picker/validation/generators/date-picker scenarios, `data-view.spec.ts`'s viewport-first search assertions, `budgets.spec.ts`'s re-run, `mongo.spec.ts`'s document-result rewrite, `autocomplete.spec.ts`'s Mongo argument-lint additions, and the single retired-swatch line each in `clickhouse.spec.ts`/`rabbitmq.spec.ts`/`mysql.spec.ts`) is Docker-gated and self-skips cleanly in this sandbox; each was written, passes `typecheck`/`lint`/`playwright test --list`, and — where reasoned about by construction rather than observed live (the viewport-first scan's own frame-boundary ordering, in particular) — the reasoning is recorded in the spec's own comments, but none of it has been executed against a live container here. That run still needs to happen in CI or the macOS/Colima environment before this phase is fully verified. |
 | **P43 Functionality review** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, run as **three iterations** like P39: an in-depth review of the app's actual behavior (data handling, panel-to-panel communication, whether a state change is reflected everywhere it should be, error handling and how errors reach the user), frontend or engine/main, followed by real fixes — unlike P39, this phase is explicitly allowed to change behavior | The user's own framing: "practically anything that could be a bug should be found and fixed no matter if it be FE or in between" | Not yet planned — queued |
 | **P44 Unit tests** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: add unit tests, but sparingly — only where there is enough logic to justify one, and only where a unit test is the better fit than the existing UI (Playwright) coverage when both could apply. `tests/db/` is explicitly out of scope | The user's own framing: be scarce with new tests, prioritize unit over UI when both would work, never touch the DB suites | Not yet planned — queued |
 | **P45 Docs cleanup** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: SPEC.md and its `plans/` are retired as v1 history rather than a living spec; whatever in them is still true and durable moves into `ARCHITECTURE.md`, which `AGENTS.md` points to and which itself points out to the general docs (`PACKAGING.md`, `PERF.md`); the `docs/` folder structure is reconsidered to match | The user's own framing: spec and its plans are now "an element of the past of v1" | Not yet planned — queued |
@@ -1103,10 +1172,20 @@ src/
                     a VirtualList body), menu.ts (containerRowMenu/keyRowMenu/objectRowMenu, moved
                     verbatim from project/menus.ts's deleted namespaceMenu/prefixMenu/keyMenu/
                     objectMenu once the tree stopped rendering any of those rows, D5)
-      documents/    ejson.ts (BSON shape recognition, shell-form render, no `bson` import — P27
-                    D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
-                    exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
-                    document's flattened line list, no per-node component recursion — P27 D19)
+      documents/    page.ts, menu.ts, mutations.ts, search.ts, state.ts, DocumentView.vue — the
+                    Mongo data tab's own view/state; (P42) ejson.ts/documentRows.ts/DocumentTree.vue
+                    moved out to shared/document/ below once the console needed the same document
+                    tree for its own Mongo results (§8.15)
+      shared/document/  (P42) ejson.ts (BSON shape recognition, shell-form render, no `bson`
+                    import — P27 D13; also exports tryParseShellText, the same shell-literal
+                    grammar the Mongo console's own lint now validates arguments against — §8.15),
+                    rows.ts (documents/'s former documentRows.ts — memoized per-row parse, per-path
+                    nested expansion, the exact row-height model — P27 D18/D20/D21; its own hard
+                    dependency on documents/page.ts inverted into a registered row source rather
+                    than an import, so console/ can supply its own), DocumentTree.vue (one expanded
+                    document's flattened line list, no per-node component recursion — P27 D19).
+                    Moved out of documents/ (byte-for-byte, its own commit) once console/ needed
+                    the same tree for a Mongo statement's own result
       keyvalue/     an S3 object's body is edited through the same docked cell editor every grid
                     cell uses (CellEditorDock, format detection included) — its onEdit stages the
                     draft into a local ref rather than writing to S3 on blur, and a Save strip in
@@ -1131,15 +1210,22 @@ src/
       shared/       cross-view Vue helpers with a second consumer (never view-specific):
                     FilterHistoryMenu.vue, mongoVocabulary.ts, sqlIdent.ts, and (P27)
                     useEditBuffer.ts (the dirty/beautify/bytes/revert state machine) plus
-                    EditBufferActions.vue (the chip/byte-badge/Beautify/Minify/Revert row) —
+                    EditBufferActions.vue (the chip/byte-badge/Beautify/Minify/Revert row, its
+                    byte badge now optional — a `showBytes` prop, P42 — since the cell editor's own
+                    mount hides it in favor of the one figure its status badge already carries) —
                     mounted by both the cell editor and the document row's own edit area, one
-                    implementation instead of two. (P31) DateTimePicker.vue. (P39) celleditor/
-                    moved here whole (it was never a tab kind — the cell editor is a panel five
-                    of the six view kinds mount, P26 — and every one of its own imports already
-                    went to state/theme/editor/views/shared/, never sideways to another view);
-                    typeGlossary.ts joined it for the same reason; viewOp.ts (classifyLoadError()/
-                    stopOp(), the load-error classification and stop-button body all six view state
-                    modules share) is new here too. (P39 iter2) useConnectionGate.ts — a composable,
+                    implementation instead of two. (P31) DateTimePicker.vue — (P42) its month/year
+                    label cycles a days/months/years view for a faster jump than prev/next alone.
+                    (P39) celleditor/ moved here whole (it was never a tab kind — the cell editor is
+                    a panel five of the six view kinds mount, P26 — and every one of its own imports
+                    already went to state/theme/editor/views/shared/, never sideways to another
+                    view); typeGlossary.ts joined it for the same reason; viewOp.ts
+                    (classifyLoadError()/stopOp(), the load-error classification and stop-button
+                    body all six view state modules share) is new here too. (P42) celleditor/ gained
+                    validate.ts (per-format buffer validation, read by the format picker's own
+                    invalid chip) and generate.ts (the four pure generator functions — UUID/ULID/
+                    token/Now — the generators panel calls, no Vue import so P44's sparse-unit-test
+                    phase can pin them cheaply). (P39 iter2) useConnectionGate.ts — a composable,
                     the same shape useEditBuffer.ts already is — holding §8.4's reconnect gate the
                     six view components each wrote out; `onLoad` is the one thing that varies per
                     view (stream skips a batch tab, console passes none). (P39 iter3)
@@ -1150,15 +1236,21 @@ src/
                     set and internal cross-imports — moved out of shared/ and dropped their `page`
                     prefix, the same un-prefixing iteration 1's own D24 did inside each view folder:
                     store.ts (the page store three of the four data views share verbatim), scan.ts
-                    (the chunked scanner) + search.ts (per-tab search state + the generic find-widget
-                    API factory) + SearchToolbar.vue (the find widget grid/documents/keyvalue share,
-                    joined by console (P40), which supplies its own runSearch/pageVersion/
-                    loadedRowCount from views/console/search.ts without this folder changing at all
-                    — stream's own scanner and toolbar are deliberately simpler and stay in stream/),
-                    searchFilter.ts (the "hide non-matching rows" toggle + matched-row derivation
-                    every in-page find widget shares), sizes.ts (one page-size table, four testid
-                    prefixes) and columns.ts (the grid's column-width/measuring helpers, also used
-                    by the console's result grid)
+                    (the chunked scanner — P42: an optional priority row-window scanned first, in
+                    its own frame, before the ordinary ascending pass) + search.ts (per-tab search
+                    state + the generic find-widget API factory — P42: a `pending` flag on each
+                    partial publication) + SearchToolbar.vue (the find widget grid/documents/
+                    keyvalue share, joined by console (P40), which supplies its own runSearch/
+                    pageVersion/loadedRowCount from views/console/search.ts without this folder
+                    changing at all — stream's own scanner and toolbar are deliberately simpler and
+                    stay in stream/), searchFilter.ts (the "hide non-matching rows" toggle +
+                    matched-row derivation every in-page find widget shares), sizes.ts (one
+                    page-size table, four testid prefixes), columns.ts (the grid's
+                    column-width/measuring helpers, also used by the console's result grid) and
+                    (P42) visibleRows.ts — a tab's on-screen row window, reported by whichever view
+                    renders it and read by that tab's own runSearch as scan.ts's priority window;
+                    deliberately not views/{grid,console}/page.ts's own setVisibleWindow, which
+                    prunes a decode cache keyed by *page*, not search priority keyed by *tab*
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
                     objectStore.ts (P33): S3 upload-dialog state + download/upload/delete flows —
@@ -1192,6 +1284,10 @@ src/
     fonts.ts        (P31) canvas-measurement font-availability check — document.fonts.check()
                     returns true even for a nonexistent family, so this compares a candidate
                     family's measured width against a guaranteed-bogus probe name instead
+    wheelScroll.ts  (P42) translates a vertical wheel gesture into horizontal scroll on an
+                    overflowing strip (a plain mouse produces no deltaX) — a renderer-root utility
+                    since both workbench/'s tab strip and views/console/'s result-chip strip need
+                    it and neither may import the other's own file sideways
   shared/
     protocol/       ipc.ts, port.ts, engine-ops.ts, data-ops.ts, page.ts — wire message shapes, one
                     file per channel group (`page.ts` is the largest module in shared/ — the
