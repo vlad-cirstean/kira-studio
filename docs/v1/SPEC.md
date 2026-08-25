@@ -895,7 +895,35 @@ the pre-existing 12 pass/10 fail baseline with zero resolution errors; every `da
 unchanged. The largest unfixed finding — `project/`↔`views/` depending on each other in both
 directions, which undermines iteration 1's own rationale for where `columnsSectionMenu` lives — is
 recorded, not fixed, and handed to iteration 3 with a concrete proposal (a small command registry
-in `renderer/state/`). **Iteration 3**: queued |
+in `renderer/state/`). **Iteration 3**: implemented per its own plan
+(`P39-modularity-and-cleanliness-iter3.md`), all fifteen steps — completing the three-iteration
+convention. `state/viewCommands.ts` (new): the leaf-registry inversion `state/tabRuntime.ts` already
+uses, applied to the six `project/ → views/` import edges iteration 2 recorded and deferred; each
+view's `state.ts` registers its own `reload`/count/query commands at module scope, `ProjectTree.vue`
+and `menus.ts` dispatch through the registry, and `grep -rn "views/" src/renderer/project` now
+returns only comment text. `columnsSectionMenu` moved from `project/menus.ts` into a new
+`views/definition/columnsMenu.ts` — iteration 1's own D23 finally answered rather than deferred, now
+that the registry means the move creates no `views/definition → views/grid` edge. Seven near-
+duplicate `views/shared/` modules (page store, chunked scanner, find-widget state, the "hide
+non-matching rows" toggle, page-size table, column-measuring helpers, find-widget toolbar) moved
+into a new `views/shared/page/` folder and dropped their `page` prefix, the same un-prefixing
+iteration 1's own D24 did inside each view folder. `createSearchState` moved out of the chunked
+scanner into the module that actually owns per-tab search state; `computeEffectiveOrder` (the
+keyset-eligibility rule three `read.ts` modules each wrote out) and a generic row-op renderer
+(`ValueRenderer<P>`/`renderRowOp`/`resolveDatabaseTablePath`, the SQL adapters' mutate-statement
+text) hoisted into `sql-text.ts`/`sql-mutate.ts`; `assertNotCancelled` replaced nine copies of the
+pre-flight cancellation check; two module-private helpers in `preload/index.ts` replaced nineteen
+copies of one four-line listener pattern. Eighteen source comments across nine files that still
+named five paths earlier iterations had already moved or deleted were corrected. `biome.json`'s
+`noRestrictedImports` layering rule — iteration 2 enforced it for `views/*` only — extended to
+`main/` (Drizzle and `node:sqlite` scoped away from anything but `storage/`), `engine/adapters/**`
+(no adapter imports `electron`, the rule that lets `tests/db/` import adapters directly), and
+`project/**` (no more `views/*` imports, closing the loop the new registry opened); every override
+proven with a throwaway violation before removal, and each `includes` kept disjoint from every
+other's — Biome's `noRestrictedImports` options do not merge across overlapping overrides, so a
+careless broad override placed after a narrow one can silently delete the narrow one's rules while
+`lint` stays green. `lint`/`typecheck` (all four projects)/`build` green after every commit; `bun
+test tests/db` reproduces the pre-existing 12 pass/10 fail baseline; every `data-testid` unchanged |
 | **P40 Query console UX and cell-editor read-only mode** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: a toolbar toggle for opening a run's result in a new result tab vs. reusing the current one; the shared find/search toolbar (already in grid/documents/keyvalue) added to console results; a result-set strip ("N result sets", each closable with an ×) for console's multi-statement runs; the empty gap between the last row and the panel's bottom edge when the cell editor is closed; a real read-only mode for the cell editor — hiding Format/Beautify and other edit-only affordances and the primary-key label when nothing on screen is editable, which the query console's own cell editor (always read-only, §8.14) currently doesn't do; the console's SQL cell view brought visually in line with the main grid's cell view, dropping the data-type badge from its header | The user's own framing: a set of console-specific UX gaps found by using the feature, queued ahead of the broader functionality review | Not yet planned — queued |
 | **P41 Redis/S3 tree navigation and the sticky header fix** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: Redis and S3 connections currently expand their full key/object tree inline in the project panel; this phase keeps only the top-level containers (buckets for S3, databases for Redis) in the connection tree and adds a dedicated panel for the actual — potentially infinitely nested — key/object navigation. Also fixes the sticky ancestor-band header (P28's `stickyBand.ts`): the top band does not stick on scroll while a bottom one incorrectly does and duplicates rows | The user's own framing: the sticky header is a real, currently-broken bug, and unbounded Redis/S3 nesting in the connection tree is a scalability problem worth fixing before the broader functionality review | Not yet planned — queued |
 | **P42 Functionality review** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, run as **three iterations** like P39: an in-depth review of the app's actual behavior (data handling, panel-to-panel communication, whether a state change is reflected everywhere it should be, error handling and how errors reach the user), frontend or engine/main, followed by real fixes — unlike P39, this phase is explicitly allowed to change behavior | The user's own framing: "practically anything that could be a bug should be found and fixed no matter if it be FE or in between" | Not yet planned — queued |
@@ -918,7 +946,8 @@ src/
   main/
     window/        BrowserWindow creation, native menu, app lifecycle
     storage/
-      db.ts         node:sqlite open + pragmas — the only file that imports node:sqlite (D2)
+      db.ts         node:sqlite open + pragmas — the only file in main/ that imports node:sqlite
+                    (D2; `engine/adapters/sqlite/` also does, correctly — a different driver, P35)
       migrate.ts     forward-only migration runner
       migrations/    numbered .sql files
       schema/        one Drizzle sqliteTable() file per table, mirrors migrations/ 1:1
@@ -1011,28 +1040,39 @@ src/
                     KeyValueView.vue's own #strips slot is what actually calls saveValueEdit; the
                     same `_key`/`$value` sentinel pair mutations.ts already used for Redis covers
                     S3 too, unmodified
+      definition/   columnsMenu.ts (P39 iter3): columnsSectionMenu (the tree's former column-row
+                    context menu, P19 D9) moved here from project/menus.ts — it has belonged to the
+                    Columns section since P19 moved columns there, and only the import direction
+                    (state/viewCommands.ts now closes it) kept it in project/ until this iteration
       shared/       cross-view Vue helpers with a second consumer (never view-specific):
                     FilterHistoryMenu.vue, mongoVocabulary.ts, sqlIdent.ts, and (P27)
                     useEditBuffer.ts (the dirty/beautify/bytes/revert state machine) plus
                     EditBufferActions.vue (the chip/byte-badge/Beautify/Minify/Revert row) —
                     mounted by both the cell editor and the document row's own edit area, one
-                    implementation instead of two. (P31) DateTimePicker.vue, and searchFilter.ts
-                    (the "hide non-matching rows" toggle + matched-row derivation every in-page
-                    find widget shares). (P39) celleditor/ moved here whole (it was never a tab
-                    kind — the cell editor is a panel five of the six view kinds mount, P26 — and
-                    every one of its own imports already went to state/theme/editor/views/shared/,
-                    never sideways to another view); columns.ts and typeGlossary.ts joined it for
-                    the same reason. Also new in P39: pageStore.ts (the page store three of the
-                    four data views share verbatim), pageScan.ts + pageSearch.ts +
-                    PageSearchToolbar.vue (the chunked scanner and generic find widget grid/
-                    documents/keyvalue share — stream's own scanner and toolbar are deliberately
-                    simpler and stay in stream/), pageSizes.ts (one page-size table, four testid
-                    prefixes) and viewOp.ts (classifyLoadError()/stopOp(), the load-error
-                    classification and stop-button body all five view state modules share).
-                    (P39 iter2) useConnectionGate.ts — a composable, the same shape useEditBuffer.ts
-                    already is — holding §8.4's reconnect gate the six view components each wrote
-                    out; `onLoad` is the one thing that varies per view (stream skips a batch tab,
-                    console passes none)
+                    implementation instead of two. (P31) DateTimePicker.vue. (P39) celleditor/
+                    moved here whole (it was never a tab kind — the cell editor is a panel five
+                    of the six view kinds mount, P26 — and every one of its own imports already
+                    went to state/theme/editor/views/shared/, never sideways to another view);
+                    typeGlossary.ts joined it for the same reason; viewOp.ts (classifyLoadError()/
+                    stopOp(), the load-error classification and stop-button body all six view state
+                    modules share) is new here too. (P39 iter2) useConnectionGate.ts — a composable,
+                    the same shape useEditBuffer.ts already is — holding §8.4's reconnect gate the
+                    six view components each wrote out; `onLoad` is the one thing that varies per
+                    view (stream skips a batch tab, console passes none). (P39 iter3)
+                    viewOp.ts gained createRuntimeStore() — the `reactive({})` + re-read-after-
+                    assign pattern behind each view's per-tab runtime record, replacing six
+                    hand-written copies.
+      shared/page/  (P39 iter3) the seven paged-data-view modules — a closed unit with one client
+                    set and internal cross-imports — moved out of shared/ and dropped their `page`
+                    prefix, the same un-prefixing iteration 1's own D24 did inside each view folder:
+                    store.ts (the page store three of the four data views share verbatim), scan.ts
+                    (the chunked scanner) + search.ts (per-tab search state + the generic find-widget
+                    API factory) + SearchToolbar.vue (the find widget grid/documents/keyvalue share
+                    — stream's own scanner and toolbar are deliberately simpler and stay in stream/),
+                    searchFilter.ts (the "hide non-matching rows" toggle + matched-row derivation
+                    every in-page find widget shares), sizes.ts (one page-size table, four testid
+                    prefixes) and columns.ts (the grid's column-width/measuring helpers, also used
+                    by the console's result grid)
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
                     objectStore.ts (P33): S3 upload-dialog state + download/upload/delete flows —
@@ -1040,6 +1080,12 @@ src/
                     can open the upload dialog without a sideways import into views/
                     (P39) contextMenu.ts and layout.ts joined this folder from workbench/state/ —
                     most of their importers were already outside workbench/ (§11's own rationale)
+                    viewCommands.ts (P39 iter3): the leaf-registry inversion tabRuntime.ts already
+                    used for per-tab cleanup, applied to project/'s six former `views/*` imports
+                    (reload/count/setFilter/setSort/setProjection) — each view's own state.ts
+                    registers its handler at module scope, project/ dispatches by tab kind, and the
+                    `views/* → project/ → state/` graph iteration 2 recorded as two-directional is
+                    one-directional again
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
     theme/          tokens, codicons
                     primitives/ (P39): also holds ViewChrome.vue/VirtualList.vue/PanelSplitter.vue
@@ -1090,24 +1136,45 @@ docs/
   lifecycles (an op's cancellation vs a page's eviction) that P1/P2 currently co-locate; keeping them
   separate now avoids a forced split later when Kafka/SQS streaming ops need scheduler changes that
   have nothing to do with caching.
-- **Adapters keep one fixed internal shape** (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`,
-  and — every adapter but RabbitMQ, P39 — `errors.ts` exporting one `mapError`) so `tests/db/` can
-  mirror `engine/adapters/` 1:1 and a reviewer already knows where MongoDB's `read.ts`, or its
-  error mapper, will be before either exists. Three modules sit directly under `engine/adapters/`,
-  outside any one adapter's own folder, for the genuinely driver-agnostic glue that duplicating
-  would only let drift: `sql-text.ts` (P39: `resolveProjection`/`safeInt`; P39 iter2:
-  `stripOneTrailingSemicolon`/`singleStatusPage`), `sql-mutate.ts` (P39 iter2:
-  `orderedOps`/`assertColumnsKnown`/`assertAffectedExactlyOne`/`assertKeyIsPrimaryKey` — the SQL
-  adapters' mutation guards) and `errors.ts` (P39: `unsupported()`/`noQueryConsole()`; P39 iter2:
-  `assertWritable()`, the read-only refusal every write-capable adapter opened with).
+- **Adapters share the same core files, not one fixed five-file shape.** Every adapter has
+  `index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`/`caps.ts` (P36's ClickHouse was the
+  eleventh and last to add `caps.ts`), and most also have `catalog.ts` (9), `mutate.ts` (9) and
+  `console.ts` (6) — `postgres/` alone holds ten files. `errors.ts` is not "every adapter but
+  RabbitMQ": **RabbitMQ has it** (exporting two mappers, not one), and **`mariadb/`/`mysql/` have
+  none** — they are re-export profiles over `mysql-family/` (P34 D7-D10), which owns the mapper.
+  `tests/db/` mirrors `engine/adapters/` 1:1 regardless, and a reviewer already knows where a new
+  adapter's `read.ts`, or its error mapper, will be before either exists. Four modules sit directly
+  under `engine/adapters/`, outside any one adapter's own folder, for the genuinely driver-agnostic
+  glue that duplicating would only let drift: `sql-text.ts` (P39: `resolveProjection`/`safeInt`;
+  P39 iter2: `stripOneTrailingSemicolon`/`singleStatusPage`; P39 iter3: `computeEffectiveOrder`, the
+  keyset-eligibility rule postgres/mysql-family/sqlite's `read.ts` each wrote out), `sql-mutate.ts`
+  (P39 iter2: `orderedOps`/`assertColumnsKnown`/`assertAffectedExactlyOne`/`assertKeyIsPrimaryKey`
+  — the SQL adapters' mutation guards; P39 iter3: a generic `ValueRenderer<P>`/`renderRowOp`/
+  `resolveDatabaseTablePath`, the row-op-to-SQL-text renderer four adapters' `mutate.ts` each wrote
+  out, parameterized over the dialect's own placeholder and params-element type) and `errors.ts`
+  (P39: `unsupported()`/`noQueryConsole()`; P39 iter2: `assertWritable()`, the read-only refusal
+  every write-capable adapter opened with; P39 iter3: `assertNotCancelled()`, Adapter rule 2's
+  pre-flight cancellation check, replacing nine copies).
 - **`renderer/state/`** exists so `views/*` are siblings that depend downward on shared state, never
-  sideways on each other or upward into `workbench/` — the dependency graph stays a tree as more
-  view kinds (P8 documents, P9 key/value, P10 stream) are added. P39 made this a fact rather than
-  an intention: eighteen `views/* → workbench/*` imports and six sideways `views/* → views/*`
-  imports had accumulated by P38; both counts are zero now. P39 iteration 2 made it a *held* fact
-  rather than a measured one: `biome.json`'s `noRestrictedImports` override on
+  sideways on each other, upward into `workbench/`, or (P39 iter3) into `project/` — the dependency
+  graph stays a tree as more view kinds (P8 documents, P9 key/value, P10 stream) are added. P39 made
+  this a fact rather than an intention: eighteen `views/* → workbench/*` imports and six sideways
+  `views/* → views/*` imports had accumulated by P38; both counts are zero now. P39 iteration 2 made
+  it a *held* fact rather than a measured one: `biome.json`'s `noRestrictedImports` override on
   `src/renderer/views/**` fails the build on either kind of edge, so the count staying zero no
-  longer depends on review alone.
+  longer depends on review alone. Iteration 2 also found, but left unfixed, `project/`↔`views/`
+  depending on each other in both directions; iteration 3 closed it with `state/viewCommands.ts`'s
+  registry (above) and added a matching `src/renderer/project/**` override forbidding `**/views/**`.
+  The same pass extended the enforced layering past `views/*` for the first time: `main/**` (minus
+  `storage/`) may not import `drizzle-orm`/`node:sqlite`, `main/storage/**` (minus `db.ts`) may not
+  import `node:sqlite`, and `engine/adapters/**` may not import `electron` — Adapter rule 1, the
+  property that lets `tests/db/` import an adapter directly, checked by a lint rule for the first
+  time. Biome's `noRestrictedImports` `overrides` do not merge across overlapping blocks — the last
+  matching override replaces the whole rule rather than adding to it — so a broadly-scoped override
+  placed after a narrowly-scoped one can silently delete the narrow one's patterns while `lint`
+  stays green; every override added here keeps its `includes` disjoint from every other's, except
+  the deliberate `engine/adapters/s3/**` nesting inside `engine/adapters/**`, which repeats the
+  `electron` pattern it would otherwise mask.
 - **`@shared/*` is the one import spelling, everywhere.** P39 iteration 2 made the alias resolvable
   from `engine/`/`main/`/`preload/` too (a root `tsconfig.json` `paths` map plus
   `electron.vite.config.ts`'s `main`/`preload` blocks) and migrated every relative

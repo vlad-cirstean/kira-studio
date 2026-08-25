@@ -35,7 +35,18 @@ every `E_UNSUPPORTED` capability stub (describe/definition/file-transfer read `"
 supported for <kind>"`; a missing query console reads `"<kind> has no query console"`). It also
 holds `assertWritable(readOnly)` (P39 iter2) — the `"connection is read-only"` refusal every
 write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contract in
-`adapter.ts`: enforced on the engine side, not only greyed out in the UI).
+`adapter.ts`: enforced on the engine side, not only greyed out in the UI). It also holds
+`assertNotCancelled(ctx)` (P39 iter3) — Adapter rule 2's pre-flight cancellation check (`throw`s
+`E_CANCELLED` if `ctx.signal` is already aborted), replacing nine copies of the same guard across
+postgres/mysql-family/rabbitmq/clickhouse/sqlite.
+
+`src/engine/adapters/sql-text.ts` holds the genuinely shared, driver-agnostic SQL text/planning
+glue the SQL adapters' `read.ts` modules call — `resolveProjection`/`safeInt` (P39),
+`stripOneTrailingSemicolon`/`singleStatusPage` (P39 iter2), and `computeEffectiveOrder` (P39 iter3)
+— the keyset-eligibility rule (which sort terms admit a keyset predicate, and the tiebreaker that
+makes one) that postgres/mysql-family/sqlite's `read.ts` each wrote out identically; each call site
+still passes its own tiebreaker expression (sqlite's keeps its rowid fallback, since only sqlite's
+`ReadTarget` has a `rowidColumn` field to fall back to).
 
 `src/engine/adapters/sql-mutate.ts` (P39 iter2) holds the SQL adapters' shared mutation guards —
 `orderedOps` (delete, then update, then insert, regardless of the plan's own array order),
@@ -43,7 +54,14 @@ write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contr
 mysql-family/sqlite (and clickhouse for `assertColumnsKnown` alone, since it has no addressable row
 to update or delete). `assertKeyIsPrimaryKey` takes the caller's own already-built qualified-name
 string rather than a shared format, since the three dialects spell it three different ways
-(`schema.relation` / `database.table` / `schema.table`).
+(`schema.relation` / `database.table` / `schema.table`). It also holds (P39 iter3) a generic
+row-op-to-SQL-text renderer — `ValueRenderer<P>`, `literalRenderer`/`createParamRenderer` and
+`renderRowOp` — that postgres/mysql-family/sqlite's `mutate.ts` each wrote out character-for-
+character identically apart from the dialect's own parameter placeholder (`$n` vs `?`) and params
+element type (`unknown[]` vs sqlite's `SqliteParam[]`), plus `resolveDatabaseTablePath` for the
+two-segment database/table path check clickhouse/mysql-family/sqlite's `mutate.ts` shared (postgres
+keeps its own three-segment `resolveTablePath`, a genuinely different path shape with its own
+message).
 
 ## Per-engine adapter facts
 
