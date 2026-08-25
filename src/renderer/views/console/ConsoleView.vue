@@ -7,14 +7,14 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectConnection, connectionsState } from '../../state/connections';
-import { isHydrated, markHydrated } from '../../state/tabs';
+import { connectionsState } from '../../state/connections';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
@@ -24,24 +24,9 @@ import { resultPageKey, run, runtime, setText, stop } from './state';
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
 
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
-);
-
-// §8.4's gate, copied literally from DefinitionView.vue.
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
-);
-
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-}
+// A console tab hydrates without loading anything (there is nothing to load until a statement
+// runs), so no onLoad is passed.
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');

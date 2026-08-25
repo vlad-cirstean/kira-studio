@@ -5,9 +5,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { connectConnection, connectionsState } from '../../state/connections';
+import { connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
-import { isHydrated, markHydrated, patchStreamTabState } from '../../state/tabs';
+import { patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -23,6 +23,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { deleteSqsMessage } from './mutations';
 import { getPage, pageVersion, streamRow } from './page';
@@ -45,16 +46,6 @@ import {
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
-
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
-);
-
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
-);
 
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
@@ -95,14 +86,14 @@ const isRabbit = computed(() => connectionRecord.value?.kind === 'rabbitmq');
 const canInsert = computed(() => caps.value?.canInsert ?? false);
 const canDelete = computed(() => caps.value?.canDelete ?? false);
 
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-  if (!isBatch.value) await load(props.tab.id);
-}
+// D10/D12: a batch tab (SQS/RabbitMQ) never auto-loads on reconnect — only an explicit Poll does,
+// since every poll consumes/requeues from the queue rather than merely browsing it.
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+  () => props.tab,
+  () => {
+    if (!isBatch.value) return load(props.tab.id);
+  },
+);
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');

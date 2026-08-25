@@ -6,13 +6,8 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectConnection, connectionsState } from '../../state/connections';
-import {
-  isHydrated,
-  markHydrated,
-  openConsoleTab,
-  patchDefinitionTabState,
-} from '../../state/tabs';
+import { connectionsState } from '../../state/connections';
+import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -20,6 +15,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
 import IndexesSection from './IndexesSection.vue';
@@ -32,28 +28,13 @@ import ValidationSection from './ValidationSection.vue';
 // DataView.vue.
 const props = defineProps<{ tab: DefinitionTabRecord }>();
 
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
-);
-
-// §8.4's gate, copied literally from DataView.vue.
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+  () => props.tab,
+  () => load(props.tab.id),
 );
 
 const rt = computed(() => runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
-
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-  await load(props.tab.id);
-}
 
 function onRefresh(): void {
   void load(props.tab.id, { refresh: true });

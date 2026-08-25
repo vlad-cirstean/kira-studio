@@ -6,9 +6,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectConnection, connectionsState } from '../../state/connections';
+import { connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
-import { isHydrated, markHydrated } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -27,6 +26,7 @@ import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentTree from './DocumentTree.vue';
 import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
@@ -66,24 +66,10 @@ import {
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
 
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+  () => props.tab,
+  () => load(props.tab.id),
 );
-
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
-);
-
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-  await load(props.tab.id);
-}
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');

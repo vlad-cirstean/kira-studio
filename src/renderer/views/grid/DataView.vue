@@ -3,14 +3,14 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectConnection, connectionsState } from '../../state/connections';
-import { isHydrated, markHydrated } from '../../state/tabs';
+import { connectionsState } from '../../state/connections';
 import { connColorVar } from '../../theme/connColor';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
@@ -22,15 +22,9 @@ import { load, reload, runtime } from './state';
 // restore (DataGrid's own onMounted) work without a manual watcher.
 const props = defineProps<{ tab: TabRecord }>();
 
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
-);
-
-// §8.4: a restored tab shows only this button until pressed — nothing loads automatically.
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+  () => props.tab,
+  () => load(props.tab.id),
 );
 
 const rt = computed(() => runtime[props.tab.id]);
@@ -89,15 +83,6 @@ const primaryKeyLabel = computed(() => {
   const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
   return names.length ? `PK ${names.join(', ')}` : null;
 });
-
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-  await load(props.tab.id);
-}
 
 let unregisterCommands: Array<() => void> = [];
 

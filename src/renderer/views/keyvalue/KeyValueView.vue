@@ -10,10 +10,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { connectConnection, connectionsState } from '../../state/connections';
+import { connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
-import { isHydrated, markHydrated } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -29,6 +28,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
+import { useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow, pageVersion } from './page';
@@ -38,24 +38,10 @@ import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } fr
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
 const props = defineProps<{ tab: KeyValueTabRecord }>();
 
-const connectionStatus = computed(() =>
-  props.tab.connectionId
-    ? (connectionsState.states[props.tab.connectionId]?.status ?? 'disconnected')
-    : 'disconnected',
+const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+  () => props.tab,
+  () => load(props.tab.id),
 );
-
-const needsReconnect = computed(
-  () => !isHydrated(props.tab.id) || connectionStatus.value !== 'connected',
-);
-
-async function onReconnectAndLoad(): Promise<void> {
-  if (!props.tab.connectionId) return;
-  if (connectionStatus.value !== 'connected') {
-    await connectConnection(props.tab.connectionId);
-  }
-  markHydrated(props.tab.id);
-  await load(props.tab.id);
-}
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
