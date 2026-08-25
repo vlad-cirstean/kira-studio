@@ -876,6 +876,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P36 ClickHouse adapter** | An eighth SQL-family adapter, `engine/adapters/clickhouse/`, for ClickHouse's columnar/OLAP dialect, matching the fixed adapter shape with its own `tests/db/clickhouse.spec.ts` against a ClickHouse testcontainer | The open question was whether OLAP's own conventions (a MergeTree `PRIMARY KEY` as a sparse index, not a unique key; no per-request database override in the HTTP client) fit the fixed SQL-adapter shape at all, or needed a divergent one; they turned out to fit cleanly once row identity is treated honestly | Implemented per `docs/v1/plans/P36-clickhouse-adapter.md`, all eleven commits. `@clickhouse/client@1` (npm) is the app's first added dependency since P32, and needs no native build — a plain JS HTTP client. `engine/adapters/clickhouse/` stands alone, ten files (`index.ts`/`client.ts`/`query.ts`/`catalog.ts`/`read.ts`/`mutate.ts`/`console.ts`/`definition.ts`/`caps.ts`/`errors.ts`), no shared "family" (P34's reason doesn't apply — ClickHouse shares neither wire protocol nor driver with anything). The client's HTTP interface has **no per-request `database` override** (confirmed from `node_modules` source: `database` is sourced only from client-construction config and embedded in every request's URL query string) — the originally-planned `RunOptions.database` field was removed once `typecheck` caught it referencing a property that doesn't exist on the client's own types; every statement instead relies on the connection's one construction-time default database plus fully-qualified `` `db`.`table` `` identifiers (D19). `caps.ts` sets `canUpdate`/`canDelete` permanently `false` alongside `canInsert: true` — ClickHouse's own first non-Kafka case of a permanently-false write flag, since a MergeTree `PRIMARY KEY` is a sparse index over parts, not a unique row key, so there is no addressable row to target for update/delete; `catalog.ts`'s `toColumnMeta()` hardcodes `isPrimaryKey: false` for the same reason (a caught bug: an early draft surfaced `system.columns.is_in_primary_key` as the PK badge, which would have claimed uniqueness the engine doesn't have — fixed in a standalone commit, with the already-pushed DB-spec assertion corrected alongside it). `mutate.ts`'s insert-only `assertColumnsKnown` deliberately does **not** pre-block a MATERIALIZED/ALIAS generated column (D28) — that belongs to the renderer's own insert paths (a new `ColumnDescriptor.generated` flag, threaded through every adapter's `read.ts`/`console.ts` and the grid's add-row/paste/duplicate-as-insert paths, gated in this same phase); an explicit `mutate()` call against one is left for ClickHouse's own native rejection to surface verbatim (Adapter rule 4), not a second app-invented message ahead of it — a design correction made after the first draft added its own guard, caught while writing DB-spec scenario 39. `definition.ts` composes Engine/Sorting key/Primary key/Partition key/Total rows/Comment from `system.tables`, `create_table_query` verbatim minus its trailing `;`, and two fixed notes on the sparse-index/no-FK facts. `views/shared/sqlIdent.ts`/`editor/languages.ts` gained ClickHouse as a genuine fourth `SqlDialect` (backtick-quoted, `backslashEscapes: true`, its own keyword/type lists); `DataGrid.vue`/`DataToolbar.vue`/`gridMenu.ts` gained a `canDeleteRows` computed and caps-gated `−row`/delete-menu disabling (previously conflated with the edit-permission check) with a tooltip naming the real reason; `typeGlossary.ts` gained `CLICKHOUSE_DESCRIPTIONS` (case-sensitive PascalCase match against the un-lowercased type text, since `Int8` and Postgres/MySQL's lowercase `int8` share six characters for unrelated meanings) and `unwrapClickHouseWrappers()` (recursive `Nullable(...)`/`LowCardinality(...)` stripping before the generic single-level paren regex, which otherwise mangled `Nullable(LowCardinality(String))`). `tests/db/clickhouse.spec.ts` (45 scenarios) and its fixture/harness (`0010_clickhouse_seed.sql`, `support/clickhouse.ts` on `@testcontainers/clickhouse@12.1.0`) follow the same shape as every prior adapter's DB spec, with ClickHouse-specific additions: `ReplacingMergeTree` duplicate-key rows proving F16 directly (two separate inserts with an identical `ORDER BY` value both stay visible with no background merge run), cancel via `KILL QUERY WHERE query_id = ... SYNC` issued as a second HTTP request against a self-chosen `query_id`, and a scratch-database round trip for `definition()`. `tests/ui/clickhouse.spec.ts` covers the tile/connect/tree(Views+Materialized views folders)/backtick-filter/row-gating-and-no-inline-edit/definition-no-PK-badge/console surface. `scripts/demo-dbs/` gained a tenth service (`clickhouse/clickhouse-server:26.3`, host port 8124) with its own `init.sql`/`seed.sql` re-expressing the shared e-commerce model in MergeTree terms via `numbers()` (no chunking, no `WITH RECURSIVE` depth limit — P34's own workaround doesn't apply) plus a `data_types_demo` row showing ClickHouse's own type family (Array/Tuple/Map/Enum8/UUID/IPv4/IPv6/Decimal/DateTime64/FixedString/LowCardinality/geo) rather than a literal port. `bun run format`/`lint`/`typecheck`/`build` are clean throughout every commit. **Not verified in this sandbox** (Docker's daemon is reachable here, unlike prior phases, but pulling `testcontainers/ryuk`/`clickhouse/clickhouse-server` images fails with `403` at the outbound proxy's Docker Hub relay): `tests/db/clickhouse.spec.ts`'s 45 scenarios and `tests/ui/clickhouse.spec.ts` were written and pass `typecheck`/`lint`/`playwright test --list`, and `xvfb-run -a bunx playwright test tests/ui/clickhouse.spec.ts` was run for real, failing only at the same image-pull step — confirming the spec file itself is defect-free up to that point. Verification was substituted where possible with real, targeted checks against actual dependencies: `node:sqlite` for the cross-adapter `generated` column fix, `splitSqlStatements` for both new SQL fixture/seed files (run standalone via esbuild-bundled scripts), and `@clickhouse/client`'s own module resolution. `docker compose config` validated the demo stack's new service block and `bash -n` validated `seed.sh`'s new stanza, but neither the DB suite, the UI spec's live assertions, nor the demo seed's actual `docker compose up` + `seed.sh` run against a live ClickHouse container here — that run still needs to happen on the macOS/Colima box or in CI before this phase is fully verified. |
 | **P37 RabbitMQ adapter** | A new adapter and view for RabbitMQ (exchanges, queues, bindings), alongside the existing Kafka/SQS stream adapters, with its own `tests/db/rabbitmq.spec.ts` against a RabbitMQ testcontainer | The open question was whether RabbitMQ's model fits the existing `stream` view (P10) or needs its own page kind; it fits cleanly on SQS's own half of that view (no addressable position, `'batch'` pagination) once message data and topology data are kept apart — a message's routing key/headers/body map onto the five fixed stream columns, while exchanges/bindings/policies (not message data at all) move into the definition view, exactly where P23 already put a Kafka topic's partitions. Implemented per `docs/v1/plans/P37-rabbitmq-adapter.md`, all ten commits. **No new dependency** — AMQP 0-9-1 itself cannot enumerate anything (no list-queues/list-exchanges/list-bindings in the protocol), so the only viable enumeration surface is the `rabbitmq_management` plugin's HTTP API, and the platform's own `fetch` (already global in both this app's runtimes) is enough to speak it; adding an AMQP client on top for publish/destructive-consume was considered and rejected as a second protocol for zero enumeration benefit. `engine/adapters/rabbitmq/` stands alone (nine files: index.ts/caps.ts/client.ts/query.ts/catalog.ts/read.ts/mutate.ts/definition.ts/errors.ts, no console.ts — `caps.sql` is false), with every HTTP call routed through `query.ts`'s one `request()`/`requestAll()` pair so the default-vhost `%2F` encoding rule, the per-request `AbortSignal`, the Authorization header and the op-log command text are each written exactly once. `canUpdate`/`canDelete` stay permanently false — a RabbitMQ message has no broker-assigned identity at all and AMQP has no per-message update or delete at any version, a third distinct structural reason after ClickHouse's sparse-index one and Kafka's immutable-log one; `mutate()` accepts only `insert` (a publish through an exchange, defaulting to the default exchange with the queue's own name as routing key), and a publish the broker accepts but routes nowhere (`{"routed":false}`) is reported as an error rather than a silent success. Reads are poll-on-demand (`ackmode: reject_requeue_true` — nothing is ever removed, messages come back marked redelivered) with a 500-message clamp (the management API's own page-size ceiling) and a one-byte-over-budget truncate request so an oversized payload the broker doesn't fully truncate still gets marked truncated by the page builder's own logic, no new mechanism needed. `connect()` issues exactly one request (`GET /api/overview`) and turns each of its distinguishable failures into its own message — wrong credential, no management plugin at this address, and the single most common mistake (pointing the adapter at AMQP's own port 5672 instead of the management API's 15672) named explicitly; an `amqp://` URI is refused the same way rather than silently tried. The tree reuses the existing `database` kind for a RabbitMQ virtual host (a per-connection-kind label override renders it "Virtual host") rather than adding a new one, and `exchange` is the one genuinely new `NodeKind` this phase adds — a definition-only leaf, foldered under an "Exchanges" heading exactly the way P23 foldered Kafka's consumer groups, with the nameless default exchange filtered out of every listing since its blank name cannot survive this app's own path/tab-title plumbing honestly. `tests/db/rabbitmq.spec.ts` (27 scenarios) and its fixture/harness (`0011_rabbitmq_seed.ts`, `support/rabbitmq.ts` on `@testcontainers/rabbitmq@12.1.0`, whose own wait strategy is overridden from the AMQP-era "Server startup complete" log line to an HTTP probe of the management port) cover connect-failure classification, vhost scoping and the `%2F` round trip, a percent-encoded queue name end to end, both binding directions on an exchange's definition, the exact stream-column mapping, read non-destructiveness across two consecutive polls, the 500-message clamp, a stream-type queue's `basic.get` refusal reclassified from a generic query error to `E_UNSUPPORTED`, binary/oversize payload truncation, every mutation refusal (read-only sending zero requests), the credential never reaching `op_log.command` text, and the P13 tripwire (exactly two GETs per vhost expansion regardless of object count). `tests/ui/rabbitmq.spec.ts` is a small, Docker-gated subset (not unconditional like SQLite's own spec — there is no local-file equivalent for a message broker) whose load-bearing assertions are the seams where a missing branch fails silently: the queue tab never auto-loading with a requeue-worded warning strip (not SQS's "consumes" wording), Poll rendering the routing key in the key column, and the Delete-message button's absence. `scripts/demo-dbs/` gained an eleventh service (`rabbitmq:4.3.5-management-alpine`, host port 15672 unchanged since nothing else collides, the AMQP port deliberately not published) with a host-side `seed.sh` — the management-alpine image ships no bulk-publish CLI worth `docker exec`-ing into, so it talks straight to `localhost:15672` with `curl`, the same HTTP surface the adapter itself reads. `bun run format`/`lint`/`typecheck`/`build` are clean throughout every commit, and the four non-Docker Playwright specs plus the unconditional `sqlite.spec.ts` all still pass, confirming the SQS/Kafka stream-view branches moved by nothing. **Not verified in this sandbox** (Docker's daemon is reachable here, but pulling `testcontainers/ryuk`/`rabbitmq:4.3.5-management-alpine` images fails with `403` at the outbound proxy's Docker Hub relay, confirmed directly via `docker pull`): `tests/db/rabbitmq.spec.ts`'s 27 scenarios and `tests/ui/rabbitmq.spec.ts` were written and pass `typecheck`/`lint`/`playwright test --list`, and both were run for real up to the same image-pull step, confirming the spec files themselves are defect-free that far. Verification was substituted where possible with real, targeted checks against actual dependencies: a standalone esbuild bundle of the adapter exercised against a mocked `fetch` (connect/probe classification for 401/404/timeout/ECONNREFUSED, the default-vhost `%2F` decode and its own `//`-shaped round trip through `formatConnectionUri`, the default-exchange filter, the exact stream-column mapping, a full publish→preview→mutate round trip with byte-identical text, every mutation refusal, the `amqp://` scheme rejection, and the stream-queue `E_UNSUPPORTED` reclassification), plus a second bundle dry-running the seed fixture's ~2,031 requests to confirm its own encoding and topology. That live-container run, and the demo stack's own `docker compose up` + `seed.sh` pass, still need to happen on the macOS/Colima box or in CI before this phase is fully verified. |
 | **P38 Catppuccin themes** | Add the [Catppuccin](https://github.com/catppuccin/vscode) theme family (Latte/Frappé/Macchiato/Mocha) as selectable app themes, alongside the app's current single fixed dark theme, with a picker in the settings dialog | Not yet planned — queued. The `theme/tokens.css` variable set was designed around one dark palette; how much of it maps cleanly onto four new palettes (including a light one, Latte) is an open question for that plan |
+| **P39 Modularity and cleanliness** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase (P38 skipped by user direction; nothing here touches themes) reorganizing structure with zero behavior change: eighteen commits fixing §11's layering (`views/*` no longer imports `workbench/*` or a sibling `views/*`), collapsing five near-duplicate data-view modules (page store, chunked scanner, find-widget toolbar, page-size table, load-error classifier) behind shared `views/shared/` implementations, giving every adapter but RabbitMQ one `errors.ts`/`mapError`, hoisting `resolveProjection`/`safeInt` into `sql-text.ts`, one `unsupported()`/`noQueryConsole()` pair for twenty capability-stub throws, one naming scheme across the four data-view folders (`page.ts`/`search.ts`/`menu.ts`/`mutations.ts`), and moving `shared/port.ts`/`layout.ts`/`settings.ts`/`shortcuts.ts` into `protocol/`/`domain/` to match §11's own tree | After 38 phases, structure debt: eighteen §11 layering violations, three near-verbatim 253-line toolbar copies, ten adapters repeating the same stub, five copied `openXTab`/`patchXTabState` pairs with a real behavioral drift in three of each, six dead exports, three module-naming conventions across four sibling folders — each cited to a `file:line` in `docs/v1/plans/P39-modularity-and-cleanliness.md` §1 | Implemented per the plan, all eighteen steps. `lint`/`typecheck` (all four projects)/`build` green after every commit; every `data-testid` unchanged. The one finding where a naive merge would have changed behavior — `state/tabs.ts`'s six patchers, three of which skip a no-op patch's save and three of which didn't — is preserved as an explicit `skipUnchanged` flag per caller rather than silently unified either way, with the question of which is the bug left to P40 |
 
 ---
 
@@ -952,8 +953,12 @@ src/
                     only file in the adapter that imports node:fs — downloadObject's temp-file-
                     then-rename streaming, and openUploadBody for insert)
   renderer/         Vue app
-    workbench/      shell, panels, status bar, settings dialog, context-menu service,
+    workbench/      shell, panels, status bar, settings dialog,
                     the app-owned tooltip (state/tooltip.ts, AppTooltip.vue — §8.17)
+                    (P39) the context-menu service and panel layout state moved to
+                    renderer/state/ — most of their importers were already outside workbench/;
+                    ViewChrome.vue/VirtualList.vue/PanelSplitter.vue moved to theme/primitives/
+                    — none had a workbench/ dependency and each has callers beyond it
                     UploadObjectDialog.vue (P33): choose file → key → content type → upload, one
                     dialog reachable from a bucket/prefix tree row and an open object's own toolbar
     project/        tree, connection dialog, filters, search
@@ -962,13 +967,15 @@ src/
                     filterTree.ts (P28): the checkbox filter dialog's model over the tree's own
                     cached nodes — kind rows, tri-state object rows, toggles, no IPC of its own
     views/
-      grid/ documents/ keyvalue/ stream/ definition/ celleditor/ console/
+      grid/ documents/ keyvalue/ stream/ definition/ console/
                     -- each owns its own state module; a new page kind is one new folder here
                        plus one Page variant in shared/protocol, not a change to existing views
-                    celleditor/ also has timestamp.ts (shape-preserving parse/encode) and
-                    TimestampPane.vue — the translate pane (P24, §8.6) — and CellEditorDock.vue,
-                    the one mount point each data-shaped view uses to own the panel (P26): a v-if
-                    on that tab's selection, the resize splitter, the persisted global height
+                    (P39) grid/documents/keyvalue/stream share one module-naming scheme —
+                    page.ts (the page store), search.ts (the chunked scanner), menu.ts (context
+                    menus) and, on the three that stage no pending-change set, mutations.ts (the
+                    mutate-immediately writers) — so a reviewer already knows where a sibling
+                    view's equivalent file lives. grid/pendingChanges.ts keeps its own name: it's
+                    the staged-change model (§8.14), not a mutation executor
       documents/    ejson.ts (BSON shape recognition, shell-form render, no `bson` import — P27
                     D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
                     exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
@@ -977,30 +984,45 @@ src/
                     cell uses (CellEditorDock, format detection included) — its onEdit stages the
                     draft into a local ref rather than writing to S3 on blur, and a Save strip in
                     KeyValueView.vue's own #strips slot is what actually calls saveValueEdit; the
-                    same `_key`/`$value` sentinel pair keyValueMutations.ts already used for Redis
-                    covers S3 too, unmodified
-      shared/       cross-view Vue helpers with a second consumer (never view-specific): FilterHistoryMenu.vue,
-                    mongoVocabulary.ts, sqlIdent.ts, and (P27) useEditBuffer.ts (the
-                    dirty/beautify/bytes/revert state machine) plus EditBufferActions.vue (the
-                    chip/byte-badge/Beautify/Minify/Revert row) — mounted by both the cell editor
-                    and the document row's own edit area, one implementation instead of two.
-                    (P31) DateTimePicker.vue moved here from celleditor/ once the stream view's
-                    since-timestamp filter became its second consumer, and searchFilter.ts holds
-                    the "hide non-matching rows" toggle + matched-row derivation every in-page find
-                    widget (grid/documents/keyvalue/stream) shares
+                    same `_key`/`$value` sentinel pair mutations.ts already used for Redis covers
+                    S3 too, unmodified
+      shared/       cross-view Vue helpers with a second consumer (never view-specific):
+                    FilterHistoryMenu.vue, mongoVocabulary.ts, sqlIdent.ts, and (P27)
+                    useEditBuffer.ts (the dirty/beautify/bytes/revert state machine) plus
+                    EditBufferActions.vue (the chip/byte-badge/Beautify/Minify/Revert row) —
+                    mounted by both the cell editor and the document row's own edit area, one
+                    implementation instead of two. (P31) DateTimePicker.vue, and searchFilter.ts
+                    (the "hide non-matching rows" toggle + matched-row derivation every in-page
+                    find widget shares). (P39) celleditor/ moved here whole (it was never a tab
+                    kind — the cell editor is a panel five of the six view kinds mount, P26 — and
+                    every one of its own imports already went to state/theme/editor/views/shared/,
+                    never sideways to another view); columns.ts and typeGlossary.ts joined it for
+                    the same reason. Also new in P39: pageStore.ts (the page store three of the
+                    four data views share verbatim), pageScan.ts + pageSearch.ts +
+                    PageSearchToolbar.vue (the chunked scanner and generic find widget grid/
+                    documents/keyvalue share — stream's own scanner and toolbar are deliberately
+                    simpler and stay in stream/), pageSizes.ts (one page-size table, four testid
+                    prefixes) and viewOp.ts (classifyLoadError()/stopOp(), the load-error
+                    classification and stop-button body all five view state modules share)
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
                     objectStore.ts (P33): S3 upload-dialog state + download/upload/delete flows —
                     lives here rather than views/keyvalue/ so project/menus.ts's bucket/prefix rows
                     can open the upload dialog without a sideways import into views/
+                    (P39) contextMenu.ts and layout.ts joined this folder from workbench/state/ —
+                    most of their importers were already outside workbench/ (§11's own rationale)
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
     theme/          tokens, codicons
+                    primitives/ (P39): also holds ViewChrome.vue/VirtualList.vue/PanelSplitter.vue
+                    (view-agnostic chrome and generic list/splitter primitives, moved from
+                    workbench/) and icons.ts (the node-kind/column-type icon vocabulary, moved
+                    from project/ once views/definition/ became a second consumer)
     format.ts       shared number/byte formatting (formatBytes), used by the status bar,
                     settings dialog and cell editor alike (P24)
     beautify.ts     lossless JSON/XML scanner + indented/compact renderer (P24), moved to the
                     renderer root in P27 so views/documents/ can use it without a sideways import
-                    into views/celleditor/ — the CellFormat-aware dispatch stayed behind as
-                    celleditor/formats.ts's beautifyFor()
+                    into views/celleditor/ (P39: views/shared/celleditor/) — the CellFormat-aware
+                    dispatch stayed behind as celleditor/formats.ts's beautifyFor()
     fonts.ts        (P31) canvas-measurement font-availability check — document.fonts.check()
                     returns true even for a nonexistent family, so this compares a candidate
                     family's measured width against a guaranteed-bogus probe name instead
@@ -1010,7 +1032,12 @@ src/
                     concepts, independent of any one transport
                     object-store.ts (P33): the S3 transfer/upload wire types, the `_key`/`$file`/
                     `$contentType` mutation sentinels, and contentTypeForFilename()
-    caps.ts         the Caps/Adapter contract (§5)
+                    (P39) layout.ts, settings.ts and shortcuts.ts joined this folder from the
+                    shared/ root — Zod-schema domain vocabularies whose transports differ (layout/
+                    settings ride IPC, shortcuts rides nothing), which is exactly why this split
+                    separates "what the concepts mean" from "bytes on the wire"
+    caps.ts         the Caps/Adapter contract (§5) — the one documented root member; every other
+                    shared/ file lives under protocol/ or domain/ (P39)
 tests/
   db/               testcontainers fixtures + per-engine scenarios, mirrors engine/adapters/
   electron-db/      P32: the Kafka adapter suite, run under `ELECTRON_RUN_AS_NODE=1 electron` on
@@ -1031,12 +1058,15 @@ docs/
   lifecycles (an op's cancellation vs a page's eviction) that P1/P2 currently co-locate; keeping them
   separate now avoids a forced split later when Kafka/SQS streaming ops need scheduler changes that
   have nothing to do with caching.
-- **Adapters keep one fixed internal shape** (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`)
-  so `tests/db/` can mirror `engine/adapters/` 1:1 and a reviewer already knows where MongoDB's
-  `read.ts` will be before it exists.
+- **Adapters keep one fixed internal shape** (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`,
+  and — every adapter but RabbitMQ, P39 — `errors.ts` exporting one `mapError`) so `tests/db/` can
+  mirror `engine/adapters/` 1:1 and a reviewer already knows where MongoDB's `read.ts`, or its
+  error mapper, will be before either exists.
 - **`renderer/state/`** exists so `views/*` are siblings that depend downward on shared state, never
   sideways on each other or upward into `workbench/` — the dependency graph stays a tree as more
-  view kinds (P8 documents, P9 key/value, P10 stream) are added.
+  view kinds (P8 documents, P9 key/value, P10 stream) are added. P39 made this a fact rather than
+  an intention: eighteen `views/* → workbench/*` imports and six sideways `views/* → views/*`
+  imports had accumulated by P38; both counts are zero now.
 - **`shared/protocol/` vs `shared/domain/`** separates "bytes on the wire" from "what the concepts
   mean," so a new transport (e.g. moving an op onto the MessagePort) never touches the Zod schemas
   that define what a connection or a tree node *is*.

@@ -24,6 +24,16 @@ directory so an unused engine's driver is never loaded into the engine process's
 Full per-database mapping table (tree shape, pagination, exact count, cancel mechanism): SPEC.md
 §5.1.
 
+Every adapter maps its own driver's thrown errors from its own `errors.ts`, exported as one
+`mapError(err): AdapterError` (P39) — the closed `AdapterErrorCode` set, with the driver's message
+preserved verbatim (Adapter rule 4). RabbitMQ is the one exception: it exports `mapHttpError` and
+`mapNetworkError` instead, since it maps two genuinely different inputs (an HTTP status plus a
+management-API body, and a `fetch` rejection) and collapsing them would lose the `notFoundHint`
+distinction P37 built. `src/engine/adapters/errors.ts` (the shared root, not any one engine's own)
+also holds `unsupported(kind, what)` and `noQueryConsole(kind)` — the two sentence shapes behind
+every `E_UNSUPPORTED` capability stub (describe/definition/file-transfer read `"<what> is not
+supported for <kind>"`; a missing query console reads `"<kind> has no query console"`).
+
 ## Per-engine adapter facts
 
 ### PostgreSQL / MariaDB / MySQL

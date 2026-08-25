@@ -924,11 +924,11 @@ onUnmounted(() => {
 }
 
 .search-match {
-  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+  background: var(--kira-search-match);
 }
 
 .search-match-current {
-  background: var(--kira-warn);
+  background: var(--kira-search-match-current);
   color: var(--kira-bg);
 }
 

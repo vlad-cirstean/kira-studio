@@ -887,11 +887,11 @@ onUnmounted(() => {
 /* P31 D21: adopts the same color-mix tint / solid-current pair as DataGrid.vue and
    KeyValueView.vue, replacing the inset bar so all four search-capable views agree. */
 .stream-row.search-match {
-  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+  background: var(--kira-search-match);
 }
 
 .stream-row.search-match-current {
-  background: var(--kira-warn);
+  background: var(--kira-search-match-current);
   color: var(--kira-bg);
 }
 

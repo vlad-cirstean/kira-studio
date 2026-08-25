@@ -1661,11 +1661,11 @@ defineExpose({ scrollCellIntoView });
 }
 
 .grid-cell.search-match {
-  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+  background: var(--kira-search-match);
 }
 
 .grid-cell.search-match-current {
-  background: var(--kira-warn);
+  background: var(--kira-search-match-current);
   color: var(--kira-bg);
 }
 

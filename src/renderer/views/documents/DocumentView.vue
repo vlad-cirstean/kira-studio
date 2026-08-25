@@ -992,11 +992,11 @@ onUnmounted(() => {
    a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
    still reads through it) since a document match has no single cell to point at. */
 .doc-row.search-match {
-  background: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+  background: var(--kira-search-match);
 }
 
 .doc-row.search-match-current {
-  background: var(--kira-warn);
+  background: var(--kira-search-match-current);
 }
 
 .doc-preview-match {
