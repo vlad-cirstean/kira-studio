@@ -1131,6 +1131,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
           typeClass: 'text',
           nullable: false,
           isPrimaryKey: false,
+          generated: false,
         },
       ]);
       expect(page1.rowCount).toBe(1);
@@ -1550,6 +1551,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
         makeCtx(),
       );
       expect(page.columns.map((c) => c.name)).toEqual(['id', 'a', 'b', 'c']);
+      expect(page.columns.map((c) => c.generated)).toEqual([false, false, true, true]);
       const bIdx = page.columns.findIndex((c) => c.name === 'b');
       const cIdx = page.columns.findIndex((c) => c.name === 'c');
       expect(cellAt(page, bIdx, 0)).toBe('10'); // a * 2, a = 5

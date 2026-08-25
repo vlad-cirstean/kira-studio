@@ -166,6 +166,8 @@ export async function readPage(
     typeClass: typeClassFor(c.dataType),
     nullable: c.nullable,
     isPrimaryKey: c.isPrimaryKey,
+    // P36 D28: not detected here yet — false rather than a guess.
+    generated: false,
   }));
 
   const relationSql = `${quoteIdent(target.qualifiedName.database)}.${quoteIdent(target.qualifiedName.table)}`;

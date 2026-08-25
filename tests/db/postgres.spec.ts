@@ -1446,6 +1446,7 @@ describe('postgres adapter (§9.1)', () => {
           typeClass: 'text',
           nullable: false,
           isPrimaryKey: false,
+          generated: false,
         },
       ]);
       expect(page1.rowCount).toBe(1);

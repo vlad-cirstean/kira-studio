@@ -171,6 +171,9 @@ export async function readPage(
     typeClass: typeClassFor(c.dataType),
     nullable: c.nullable,
     isPrimaryKey: c.isPrimaryKey,
+    // P36 D28: not detected here yet (definition.ts's own attgenerated is the only place this
+    // adapter currently reads it) — false rather than a guess.
+    generated: false,
   }));
 
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.relation)}`;

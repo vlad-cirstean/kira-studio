@@ -150,6 +150,7 @@ export async function readPage(
     typeClass: typeClassFor(c.dataType),
     nullable: c.nullable,
     isPrimaryKey: c.isPrimaryKey,
+    generated: target.generatedColumns.has(c.name),
   }));
 
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.table)}`;

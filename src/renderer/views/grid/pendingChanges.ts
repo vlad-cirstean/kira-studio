@@ -120,14 +120,16 @@ export function stageNull(tabId: string, row: number, column: string): void {
 // from the row's current *effective* value (staged edit if present, else the page's own cell).
 // Primary-key columns are left blank (null, addInsertRow's own default) for the user to fill in
 // — duplicating a PK verbatim would only ever produce a guaranteed-collision insert on commit.
+// P36 D28: a generated column is skipped the same way — the server computes it, so copying its
+// displayed value forward would only ever be rejected on commit (F18).
 export function duplicateAsInsert(tabId: string, row: number): string | null {
   const page = getPage(tabId);
   if (!page) return null;
-  const columns = page.columns.filter((c) => !c.isPrimaryKey).map((c) => c.name);
+  const columns = page.columns.filter((c) => !c.isPrimaryKey && !c.generated).map((c) => c.name);
   const id = addInsertRow(tabId, columns);
   for (let col = 0; col < page.columns.length; col++) {
     const descriptor = page.columns[col];
-    if (descriptor.isPrimaryKey) continue;
+    if (descriptor.isPrimaryKey || descriptor.generated) continue;
     const staged = stagedValue(tabId, row, descriptor.name);
     if (staged !== undefined) {
       if (staged !== null) stageInsertValue(tabId, id, descriptor.name, staged);

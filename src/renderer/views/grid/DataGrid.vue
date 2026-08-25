@@ -1062,6 +1062,9 @@ async function onPaste(): Promise<void> {
     sel.kind === 'row' ? Math.min(...sel.rows) : sel.kind === 'range' ? sel.anchorRow : sel.row;
   const startCol = sel.kind === 'row' ? 0 : sel.kind === 'range' ? sel.anchorCol : sel.col;
   const columns = columnOrder.value;
+  // P36 D28: the server computes a generated column's value — an explicit paste into one is
+  // silently dropped rather than staged into an insert the server would then reject outright.
+  const insertColumns = columns.filter((name) => !columnByName.value.get(name)?.generated);
   const insertIds = new Map<number, string>();
 
   for (let ri = 0; ri < grid.length; ri++) {
@@ -1070,7 +1073,7 @@ async function onPaste(): Promise<void> {
     const isNewRow = row >= p.rowCount;
     let insertId = insertIds.get(row);
     if (isNewRow && insertId === undefined) {
-      insertId = addInsertRow(props.tabId, columns);
+      insertId = addInsertRow(props.tabId, insertColumns);
       insertIds.set(row, insertId);
     }
     const cols = grid[ri];
@@ -1078,7 +1081,9 @@ async function onPaste(): Promise<void> {
       const name = columns[startCol + ci];
       if (!name) continue;
       if (isNewRow) {
-        if (insertId) stageInsertValue(props.tabId, insertId, name, cols[ci]);
+        if (insertId && !columnByName.value.get(name)?.generated) {
+          stageInsertValue(props.tabId, insertId, name, cols[ci]);
+        }
       } else {
         stageEdit(props.tabId, row, name, cols[ci]);
       }

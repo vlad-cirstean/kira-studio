@@ -21,6 +21,11 @@ export interface ColumnDescriptor {
   typeClass: TypeClass;
   nullable: boolean;
   isPrimaryKey: boolean;
+  /** P36 D28: a GENERATED/computed column (SQLite VIRTUAL/STORED, ClickHouse
+   *  MATERIALIZED/ALIAS) — the server fills it in, an explicit value is refused. The renderer's
+   *  own insert paths (add row, duplicate-as-insert, paste) skip it; `false` where an adapter
+   *  never detects the concept (console results, or an adapter that hasn't wired detection yet). */
+  generated: boolean;
 }
 
 export const columnDescriptorSchema = z.object({
@@ -29,6 +34,7 @@ export const columnDescriptorSchema = z.object({
   typeClass: typeClassSchema,
   nullable: z.boolean(),
   isPrimaryKey: z.boolean(),
+  generated: z.boolean(),
 });
 
 /**

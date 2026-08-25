@@ -299,6 +299,14 @@ export interface ReadTarget {
    *  ROWID table, or the rare table that shadows all three rowid aliases. Never mutation identity
    *  (D23) — purely an internal keyset tiebreaker. */
   rowidColumn: string | null;
+  /** P36 D28: `table_xinfo.hidden` 2 (VIRTUAL) or 3 (STORED) — a GENERATED ALWAYS AS column. The
+   *  server computes it; an explicit INSERT/UPDATE value is rejected (F18's own selectable-but-
+   *  not-writable distinction). */
+  generatedColumns: ReadonlySet<string>;
+}
+
+function generatedColumnNames(rawColumns: TableXInfoRow[]): ReadonlySet<string> {
+  return new Set(rawColumns.filter((r) => r.hidden === 2 || r.hidden === 3).map((r) => r.name));
 }
 
 const ROWID_ALIASES = ['rowid', '_rowid_', 'oid'];
@@ -345,6 +353,14 @@ export function getReadTarget(exec: QueryExecutor, schema: string, table: string
   );
   const isRowidTable = tableInfo?.type !== 'view' && (tableInfo?.wr ?? 1) === 0;
   const rowidColumn = pickRowidColumn(columns, isRowidTable);
+  const generatedColumns = generatedColumnNames(rawColumns);
 
-  return { qualifiedName: { schema, table }, columns, primaryKey, uniqueKeys, rowidColumn };
+  return {
+    qualifiedName: { schema, table },
+    columns,
+    primaryKey,
+    uniqueKeys,
+    rowidColumn,
+    generatedColumns,
+  };
 }

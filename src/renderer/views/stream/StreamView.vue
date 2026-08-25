@@ -153,6 +153,7 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
       typeClass: 'text',
       nullable: value === null,
       isPrimaryKey: false,
+      generated: false,
     },
     row: i,
     value,

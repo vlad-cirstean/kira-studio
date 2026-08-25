@@ -1478,6 +1478,7 @@ describe('mysql adapter (§9.1, P34)', () => {
           typeClass: 'text',
           nullable: false,
           isPrimaryKey: false,
+          generated: false,
         },
       ]);
       expect(page1.rowCount).toBe(1);

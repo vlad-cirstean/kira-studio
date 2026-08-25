@@ -159,9 +159,11 @@ function onAddRow(): void {
   if (!t) return;
   const p = getPage(t.id);
   if (!p) return;
+  // P36 D28: a generated column is never seeded — the server computes it, and an explicit NULL
+  // for it would make the insert fail outright on an engine that enforces this (F18).
   addInsertRow(
     t.id,
-    p.columns.map((c) => c.name),
+    p.columns.filter((c) => !c.generated).map((c) => c.name),
   );
 }
 

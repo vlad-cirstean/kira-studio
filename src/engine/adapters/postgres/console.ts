@@ -78,7 +78,14 @@ async function runRaw(
 
 function singleStatusPage(text: string): TabularPage {
   const columns: ColumnDescriptor[] = [
-    { name: 'status', dataType: 'text', typeClass: 'text', nullable: false, isPrimaryKey: false },
+    {
+      name: 'status',
+      dataType: 'text',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: false,
+      generated: false,
+    },
   ];
   const builder = createTabularPageBuilder(columns);
   builder.appendRow([text]);
@@ -112,6 +119,7 @@ function buildPage(result: RawResult, typeNames: Map<number, string>): TabularPa
       // and PK-ness are unknowable here — console results are always read-only regardless.
       nullable: true,
       isPrimaryKey: false,
+      generated: false,
     };
   });
 

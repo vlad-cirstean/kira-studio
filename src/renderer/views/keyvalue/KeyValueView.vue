@@ -428,6 +428,7 @@ function onRowClick(i: number): void {
     typeClass: 'text',
     nullable: false,
     isPrimaryKey: false,
+    generated: false,
   };
   const selected: SelectedCell = {
     tabId: props.tab.id,

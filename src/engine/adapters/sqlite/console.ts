@@ -25,12 +25,20 @@ function columnsFor(stmt: StatementSync): ColumnDescriptor[] {
     // results are always read-only regardless (mirrors mysql-family/console.ts's own note).
     nullable: true,
     isPrimaryKey: false,
+    generated: false,
   }));
 }
 
 function singleStatusPage(text: string): TabularPage {
   const columns: ColumnDescriptor[] = [
-    { name: 'status', dataType: 'text', typeClass: 'text', nullable: false, isPrimaryKey: false },
+    {
+      name: 'status',
+      dataType: 'text',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: false,
+      generated: false,
+    },
   ];
   const builder = createTabularPageBuilder(columns);
   builder.appendRow([text]);

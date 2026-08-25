@@ -117,6 +117,7 @@ function selectDocumentRow(row: number): void {
     typeClass: 'json',
     nullable: false,
     isPrimaryKey: true,
+    generated: false,
   };
   publish({
     columnIndex: 0,
@@ -137,6 +138,7 @@ function selectKeyValueRow(row: number): void {
     typeClass: 'text',
     nullable: false,
     isPrimaryKey: false,
+    generated: false,
   };
   publish({
     columnIndex: 0,

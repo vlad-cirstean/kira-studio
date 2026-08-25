@@ -25,7 +25,14 @@ function isRowReturning(sql: string): boolean {
 
 function singleStatusPage(text: string): TabularPage {
   const columns: ColumnDescriptor[] = [
-    { name: 'status', dataType: 'String', typeClass: 'text', nullable: false, isPrimaryKey: false },
+    {
+      name: 'status',
+      dataType: 'String',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: false,
+      generated: false,
+    },
   ];
   const builder = createTabularPageBuilder(columns);
   builder.appendRow([text]);
@@ -65,6 +72,7 @@ async function runRowReturning(
         typeClass: typeClassFor(types[i] ?? 'String'),
         nullable: true,
         isPrimaryKey: false,
+        generated: false,
       }));
       builder = createTabularPageBuilder(columns);
     },
