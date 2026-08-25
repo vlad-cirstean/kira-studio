@@ -28,7 +28,10 @@ export async function listDatabases(primary: Redis): Promise<TreeNode[]> {
       kind: 'database',
       name,
       path: encodePath([{ kind: 'database', name }]),
-      hasChildren: true,
+      // P41 D5: a db index's key namespace is unbounded — the tree stops here; the space itself
+      // is navigated in a Browse tab (§8.18, gated on caps.keyBrowser), reached via
+      // listNamespaceChildren below, which still enumerates it for that second, live caller.
+      hasChildren: false,
       detail: `${keys} key${keys === 1 ? '' : 's'}`,
     });
   }

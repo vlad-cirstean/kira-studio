@@ -148,54 +148,51 @@ test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView
     timeout: 10_000,
   });
 
-  // --- tree: two buckets at the root, each a 'bucket' node -------------------------------------
+  // --- tree: two buckets at the root, each a 'bucket' node — now leaves (P41 D5) ----------------
   await expandRow(page, '');
   const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
   await expect(mainBucketRow).toBeVisible();
   await expect(mainBucketRow).toHaveAttribute('data-kind', 'bucket');
+  await expect(mainBucketRow.locator('.twisty')).toHaveClass(/invisible/);
   const emptyBucketRow = await findRow(page, EMPTY_BUCKET_PATH);
   await expect(emptyBucketRow).toBeVisible();
+  await expect(emptyBucketRow.locator('.twisty')).toHaveClass(/invisible/);
 
-  // --- bucket context menu is no longer empty (P17 validation finding #4) ----------------------
+  // --- bucket context menu: Browse objects first (P41 D17), then the menu that was never empty
+  //     (P17 validation finding #4) -----------------------------------------------------------
   await openRowMenu(page, MAIN_BUCKET_PATH);
+  await expect(page.locator('[data-testid="menu-item-browse"]')).toBeVisible();
   await expect(page.locator('[data-testid="menu-item-refresh"]')).toBeVisible();
   await expect(page.locator('[data-testid="menu-item-copy-name"]')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // --- an empty bucket expands to zero children, not an error -----------------------------------
-  await expandRow(page, EMPTY_BUCKET_PATH);
-  await expect(
-    page.locator(`[data-testid="tree-row"][data-path^="${EMPTY_BUCKET_PATH}/"]`),
-  ).toHaveCount(0);
+  const browseView = page.locator('[data-testid="browse-view"]');
 
-  // --- expand the main bucket: a 'reports' prefix and a root-level object, prefixes first -------
-  await expandRow(page, MAIN_BUCKET_PATH);
-  const reportsRow = await findRow(page, REPORTS_PREFIX_PATH);
+  // --- an empty bucket's Browse tab shows zero items, not an error --------------------------------
+  await emptyBucketRow.dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', EMPTY_BUCKET_PATH);
+  await expect(browseView.locator('[data-testid="browse-empty"]')).toBeVisible();
+
+  // --- the main bucket's Browse tab: a 'reports' prefix and a root-level object, prefixes first ---
+  await mainBucketRow.dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const reportsRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${REPORTS_PREFIX_PATH}"]`,
+  );
   await expect(reportsRow).toBeVisible();
   await expect(reportsRow).toHaveAttribute('data-kind', 'prefix');
-  const rootObjectRow = await findRow(page, ROOT_OBJECT_PATH);
+  const rootObjectRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${ROOT_OBJECT_PATH}"]`,
+  );
   await expect(rootObjectRow).toBeVisible();
   await expect(rootObjectRow).toHaveAttribute('data-kind', 'object');
 
-  // --- prefix context menu (namespaceMenu reuse) — no empty menu either --------------------------
-  await openRowMenu(page, REPORTS_PREFIX_PATH);
+  // --- prefix context menu (the moved namespaceMenu/prefixMenu shape) — no empty menu either -----
+  await reportsRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await expect(page.locator('[data-testid="menu-item-refresh"]')).toBeVisible();
-  await expect(page.locator('[data-testid="menu-item-copy-name"]')).toBeVisible();
-  await page.keyboard.press('Escape');
-
-  // --- descend one more prefix level to reach the nested object ----------------------------------
-  await expandRow(page, REPORTS_PREFIX_PATH);
-  const nestedPrefixRow = await findRow(page, NESTED_PREFIX_PATH);
-  await expect(nestedPrefixRow).toBeVisible();
-  await expandRow(page, NESTED_PREFIX_PATH);
-  const nestedObjectRow = await findRow(page, NESTED_OBJECT_PATH);
-  await expect(nestedObjectRow).toBeVisible();
-  await expect(nestedObjectRow).toHaveAttribute('data-kind', 'object');
-
-  // --- object context menu (objectMenu): Open/Open-in-new-tab/Copy name, no empty menu -----------
-  await openRowMenu(page, NESTED_OBJECT_PATH);
-  await expect(page.locator('[data-testid="menu-item-open-keyvalue"]')).toBeVisible();
-  await expect(page.locator('[data-testid="menu-item-open-keyvalue-new-tab"]')).toBeVisible();
   await expect(page.locator('[data-testid="menu-item-copy-name"]')).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -235,6 +232,38 @@ test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView
   });
   await expect(rootView.locator('[data-testid="keyvalue-status"]')).not.toContainText('~');
 
+  // --- descend to the nested object: reactivating the main bucket's Browse tab (§8.4's identity
+  // rule) resumes it right where it was left (still the bucket's own root — nothing navigated it
+  // deeper before rootObjectRow's tab opened above), so this is Down twice, not a fresh reveal. ---
+  await mainBucketRow.dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  await reportsRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', REPORTS_PREFIX_PATH);
+  const nestedPrefixRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${NESTED_PREFIX_PATH}"]`,
+  );
+  await expect(nestedPrefixRow).toBeVisible();
+  await nestedPrefixRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', NESTED_PREFIX_PATH);
+  const nestedObjectRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${NESTED_OBJECT_PATH}"]`,
+  );
+  await expect(nestedObjectRow).toBeVisible();
+  await expect(nestedObjectRow).toHaveAttribute('data-kind', 'object');
+
+  // --- object context menu (the moved keyMenu/objectMenu shape): Open/Open-in-new-tab/Copy name,
+  //     no empty menu -------------------------------------------------------------------------------
+  await nestedObjectRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="menu-item-open"]')).toBeVisible();
+  await expect(page.locator('[data-testid="menu-item-open-new-tab"]')).toBeVisible();
+  await expect(page.locator('[data-testid="menu-item-copy-name"]')).toBeVisible();
+  // --- S3 still has no query console (caps.sql === false) — P33 didn't change that, and neither
+  //     does the move out of the tree (views/browse/menu.ts's object menu never had one either) ---
+  await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
   // --- the nested object's header/tab shows its FULL key, not just the local segment
   //     (P17 validation finding #3 — a bare "summary.json" would be indistinguishable from any
   //     other summary.json elsewhere in the bucket) ------------------------------------------------
@@ -255,11 +284,6 @@ test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView
     { timeout: 15_000 },
   );
 
-  // --- S3 still has no query console (caps.sql === false) — P33 didn't change that -----------------
-  await openRowMenu(page, NESTED_OBJECT_PATH);
-  await expect(page.locator('[data-testid="menu-item-open-console"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
   expect(consoleErrors).toEqual([]);
 });
 
@@ -279,8 +303,15 @@ test('s3 — download an object to disk', async ({ kira, consoleErrors }) => {
 
   await page.click('[data-testid="toggle-operations-panel"]');
   await expandRow(page, '');
-  await expandRow(page, MAIN_BUCKET_PATH);
-  const rootObjectRow = await findRow(page, ROOT_OBJECT_PATH);
+  const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
+  await mainBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const rootObjectRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${ROOT_OBJECT_PATH}"]`,
+  );
+  await expect(rootObjectRow).toBeVisible();
   await rootObjectRow.dblclick();
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${ROOT_OBJECT_PATH}"]`);
   await expect(view).toBeVisible();
@@ -308,8 +339,13 @@ test("s3 — edit a small object's body", async ({ kira, consoleErrors }) => {
   await connectS3(page, s3.config, { name: 'S3' });
 
   await expandRow(page, '');
-  await expandRow(page, MUTABLE_BUCKET_PATH);
-  const row = await findRow(page, EDITABLE_OBJECT_PATH);
+  const mutableBucketRow = await findRow(page, MUTABLE_BUCKET_PATH);
+  await mutableBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MUTABLE_BUCKET_PATH);
+  const row = browseView.locator(`[data-testid="browse-row"][data-path="${EDITABLE_OBJECT_PATH}"]`);
+  await expect(row).toBeVisible();
   await row.dblclick();
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${EDITABLE_OBJECT_PATH}"]`);
   await expect(view).toBeVisible();
@@ -356,9 +392,21 @@ test('s3 — an over-limit object is neither rendered nor editable', async ({
   await connectS3(page, s3.config, { name: 'S3' });
 
   await expandRow(page, '');
-  await expandRow(page, MAIN_BUCKET_PATH);
-  await expandRow(page, SIZES_PREFIX_PATH);
-  const row = await findRow(page, OVERSIZED_OBJECT_PATH);
+  const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
+  await mainBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const sizesRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${SIZES_PREFIX_PATH}"]`,
+  );
+  await expect(sizesRow).toBeVisible();
+  await sizesRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', SIZES_PREFIX_PATH);
+  const row = browseView.locator(
+    `[data-testid="browse-row"][data-path="${OVERSIZED_OBJECT_PATH}"]`,
+  );
+  await expect(row).toBeVisible();
   await row.dblclick();
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${OVERSIZED_OBJECT_PATH}"]`);
   await expect(view).toBeVisible();
@@ -388,9 +436,19 @@ test('s3 — a binary object refuses to edit but still previews', async ({ kira,
   await connectS3(page, s3.config, { name: 'S3' });
 
   await expandRow(page, '');
-  await expandRow(page, MAIN_BUCKET_PATH);
-  await expandRow(page, SIZES_PREFIX_PATH);
-  const row = await findRow(page, BINARY_OBJECT_PATH);
+  const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
+  await mainBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const sizesRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${SIZES_PREFIX_PATH}"]`,
+  );
+  await expect(sizesRow).toBeVisible();
+  await sizesRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', SIZES_PREFIX_PATH);
+  const row = browseView.locator(`[data-testid="browse-row"][data-path="${BINARY_OBJECT_PATH}"]`);
+  await expect(row).toBeVisible();
   await row.dblclick();
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${BINARY_OBJECT_PATH}"]`);
   await expect(view).toBeVisible();
@@ -451,10 +509,14 @@ test("s3 — upload from an empty bucket's tree menu", async ({ kira, consoleErr
     { timeout: 15_000 },
   );
 
-  // The tree row exists too — Upload from a bucket with nothing in it (D17's own point) actually
-  // populates it, not just the tab.
-  const treeRow = await findRow(page, uploadedPath);
-  await expect(treeRow).toBeVisible();
+  // The Browse panel shows it too (P41) — Upload from a bucket with nothing in it (D17's own
+  // point) actually populates the level, not just the tab.
+  const emptyBucketRow = await findRow(page, EMPTY_BUCKET_PATH);
+  await emptyBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  const browseRow = browseView.locator(`[data-testid="browse-row"][data-path="${uploadedPath}"]`);
+  await expect(browseRow).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
 });
@@ -466,18 +528,28 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   await connectS3(page, s3.config, { name: 'S3' });
 
   await expandRow(page, '');
-  await expandRow(page, MUTABLE_BUCKET_PATH);
+  const mutableBucketRow = await findRow(page, MUTABLE_BUCKET_PATH);
+  await mutableBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MUTABLE_BUCKET_PATH);
 
-  // --- delete from a tree row (F12: window.confirm, auto-accepted) -----------------------------
+  // --- delete from the Browse panel (F12: window.confirm, auto-accepted) -------------------------
+  const deleteTargetRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${DELETE_TARGET_PATH}"]`,
+  );
+  await expect(deleteTargetRow).toBeVisible();
   page.once('dialog', (d) => d.accept());
-  await openRowMenu(page, DELETE_TARGET_PATH);
+  await deleteTargetRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-delete-object"]');
-  await expect(
-    page.locator(`[data-testid="tree-row"][data-path="${DELETE_TARGET_PATH}"]`),
-  ).toHaveCount(0, { timeout: 10_000 });
+  await expect(deleteTargetRow).toHaveCount(0, { timeout: 10_000 });
 
   // --- delete from an open tab: the tab then shows the ordinary "gone" error, not a stale page --
-  const secondRow = await findRow(page, SECOND_DELETE_TARGET_PATH);
+  const secondRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${SECOND_DELETE_TARGET_PATH}"]`,
+  );
+  await expect(secondRow).toBeVisible();
   await secondRow.dblclick();
   const deletedView = page.locator(
     `[data-testid="keyvalue-view"][data-path="${SECOND_DELETE_TARGET_PATH}"]`,
@@ -490,10 +562,13 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   });
 
   // --- toggle the connection read-only (menu-item-readonly), confirming the live-reconnect prompt
-  // ROOT_OBJECT_PATH lives under MAIN_BUCKET, never expanded above (only MUTABLE_BUCKET was) —
-  // findRow scrolls but never expands a collapsed row, so without this the row never appears.
-  await expandRow(page, MAIN_BUCKET_PATH);
-  const rootRow = await findRow(page, ROOT_OBJECT_PATH);
+  // ROOT_OBJECT_PATH lives under MAIN_BUCKET, reached through its own Browse tab.
+  const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
+  await mainBucketRow.dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const rootRow = browseView.locator(`[data-testid="browse-row"][data-path="${ROOT_OBJECT_PATH}"]`);
+  await expect(rootRow).toBeVisible();
   await rootRow.dblclick();
   const rootView = page.locator(`[data-testid="keyvalue-view"][data-path="${ROOT_OBJECT_PATH}"]`);
   await expect(rootView).toBeVisible();

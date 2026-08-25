@@ -169,7 +169,10 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
     try {
       const root = await adapter.children(path([]), makeCtx());
       expect(root.map((n) => n.name)).toEqual([EMPTY_BUCKET, MAIN_BUCKET, MUTABLE_BUCKET].sort());
-      expect(root.every((n) => n.kind === 'bucket' && n.hasChildren === true)).toBe(true);
+      // P41 D5: a bucket is a leaf in the project tree — its prefix/object space is unbounded and
+      // is now navigated in a Browse tab (§8.18) instead, via the same children() call this test
+      // makes directly.
+      expect(root.every((n) => n.kind === 'bucket' && n.hasChildren === false)).toBe(true);
     } finally {
       await adapter.disconnect();
     }

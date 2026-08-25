@@ -273,13 +273,32 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
   await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
   await collapseRoot(page, 'Memory Mongo');
 
-  // --- Redis: 2 keyvalue tabs (counter, session:abc) ----------------------------------------------
+  // --- Redis: 2 keyvalue tabs (counter, session:abc), reached through db0's own Browse tab (P41) -
   await connectAndExpand(page, 'Memory Redis');
-  await expandRow(page, REDIS_DB0_PATH);
-  await (await findRow(page, COUNTER_KEY_PATH)).dblclick();
+  const redisDb0Row = await findRow(page, REDIS_DB0_PATH);
+  await redisDb0Row.dblclick();
+  const redisBrowseView = page.locator('[data-testid="browse-view"]');
+  await expect(redisBrowseView).toBeVisible();
+  await expect(redisBrowseView).toHaveAttribute('data-level', REDIS_DB0_PATH);
+  const counterRow = redisBrowseView.locator(
+    `[data-testid="browse-row"][data-path="${COUNTER_KEY_PATH}"]`,
+  );
+  await expect(counterRow).toBeVisible();
+  await counterRow.dblclick();
   await expect(page.locator('[data-testid="keyvalue-view"]')).toBeVisible();
-  await expandRow(page, SESSION_NS_PATH);
-  await (await findRow(page, TTL_KEY_PATH)).dblclick();
+
+  await redisDb0Row.dblclick();
+  await expect(redisBrowseView).toBeVisible();
+  await expect(redisBrowseView).toHaveAttribute('data-level', REDIS_DB0_PATH);
+  const sessionRow = redisBrowseView.locator(
+    `[data-testid="browse-row"][data-path="${SESSION_NS_PATH}"]`,
+  );
+  await expect(sessionRow).toBeVisible();
+  await sessionRow.dblclick();
+  await expect(redisBrowseView).toHaveAttribute('data-level', SESSION_NS_PATH);
+  const ttlRow = redisBrowseView.locator(`[data-testid="browse-row"][data-path="${TTL_KEY_PATH}"]`);
+  await expect(ttlRow).toBeVisible();
+  await ttlRow.dblclick();
   await expect(page.locator('[data-testid="keyvalue-view"]')).toBeVisible();
   await collapseRoot(page, 'Memory Redis');
 

@@ -23,9 +23,9 @@ import { countObject, readObject } from './read';
 import { downloadObject } from './transfer';
 
 // Mirrors redis/index.ts closely: bucket ~ redis's database, prefix ~ redis's namespace, object ~
-// redis's key — a lazy, '/'-delimited tree with the same "only the leaf opens a tab, every
-// ancestor is expand-only" shape (§17's own roadmap-table tree-levels column: "account → bucket →
-// prefix/object, lazy, '/'-delimited").
+// redis's key — a lazy, '/'-delimited key space. As of P41, only the bucket itself is a project-
+// tree row (a leaf there, caps.keyBrowser); prefix/object stay reachable exclusively through the
+// Browse tab (§8.18), which calls the same children() this class has always exposed.
 class S3Adapter implements Adapter {
   readonly kind = 's3' as const;
   readonly caps = s3Caps;

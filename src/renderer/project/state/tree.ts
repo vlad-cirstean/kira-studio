@@ -1,6 +1,6 @@
 import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connection';
 import type { SavedFilterQuery } from '@shared/domain/queries';
-import type { NodeKind, TreeNode } from '@shared/domain/tree';
+import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -193,14 +193,28 @@ export function collapseAll(): void {
 // §8.10's "Reveal in project panel" (Step 7b): expands every ancestor in order — sequentially,
 // the same discipline refreshExpanded already uses — then selects the row and asks the tree
 // view to scroll it into view.
+//
+// P41 D9: a keyBrowser connection's database/bucket is a leaf here (F20) — nothing beneath it has
+// a tree row to expand into or scroll to, so a path reaching into one truncates at that container:
+// the deepest ancestor the tree actually renders is selected/scrolled instead of a row that will
+// never exist. "Reveal in project panel" names the panel; revealing the container an item lives in
+// is the honest answer once the panel stops holding the item itself.
 export async function revealPath(connectionId: string, path: string): Promise<void> {
   if (!treeState.expanded.has(rowKey(connectionId, ''))) {
     await expand(connectionId, '');
   }
+  const keyBrowser = connectionsState.states[connectionId]?.caps?.keyBrowser === true;
   const segments = path.split('/').filter(Boolean);
   let ancestor = '';
   for (let i = 0; i < segments.length - 1; i++) {
     ancestor = ancestor ? `${ancestor}/${segments[i]}` : segments[i];
+    const kind = pathTail(ancestor)?.kind;
+    if (keyBrowser && (kind === 'database' || kind === 'bucket')) {
+      const key = rowKey(connectionId, ancestor);
+      treeState.selected = key;
+      treeState.pendingScrollKey = key;
+      return;
+    }
     if (!treeState.expanded.has(rowKey(connectionId, ancestor))) {
       await expand(connectionId, ancestor);
     }
@@ -282,6 +296,15 @@ interface SearchStats {
   incomplete: boolean;
 }
 
+// P41: `sets` (the checkbox filter, P28) and `keyBrowser` (whether database/bucket rows are leaves
+// here, D7) are both per-connection facts computed once in searchResult below and threaded through
+// unchanged — bundled together rather than as a further positional parameter, since buildRows/
+// buildNodeRow already took six/seven of those each.
+interface ConnectionView {
+  sets: VisibilitySets;
+  keyBrowser: boolean;
+}
+
 // One TreeNode's own row, plus its expanded subtree — shared by ungrouped nodes and group
 // members alike (P19 D2: a group's members go through exactly this, one depth deeper, never a
 // second grouping pass). Returns whether this node or anything under it matched the search query.
@@ -289,7 +312,7 @@ function buildNodeRow(
   connectionId: string,
   node: TreeNode,
   depth: number,
-  sets: VisibilitySets,
+  view: ConnectionView,
   query: string,
   out: TreeRowVm[],
   stats: SearchStats,
@@ -298,8 +321,9 @@ function buildNodeRow(
   const selfMatches = query ? node.name.toLowerCase().includes(query) : false;
   // P19 D5: a table/view/matview is a leaf regardless of what a cached node's own hasChildren
   // says — its columns moved into the definition view, but an L1 payload cached before this
-  // phase can still carry `hasChildren: true` until the connection's next reconnect.
-  const leaf = isLeafKind(node.kind);
+  // phase can still carry `hasChildren: true` until the connection's next reconnect. P41 adds
+  // database/bucket for a keyBrowser connection, same reasoning (F12).
+  const leaf = isLeafKind(node.kind, view.keyBrowser);
   const childNodes = leaf ? undefined : treeState.children[k];
   const naturallyExpanded = !leaf && treeState.expanded.has(k);
 
@@ -315,7 +339,7 @@ function buildNodeRow(
       node.path,
       childNodes,
       depth + 1,
-      sets,
+      view,
       query,
       childOut,
       stats,
@@ -349,17 +373,17 @@ function buildRows(
   parentPath: string,
   nodes: TreeNode[],
   depth: number,
-  sets: VisibilitySets,
+  view: ConnectionView,
   query: string,
   out: TreeRowVm[],
   stats: SearchStats,
 ): boolean {
   let anyMatch = false;
-  const visible = nodes.filter((node) => isVisible(node, sets));
+  const visible = nodes.filter((node) => isVisible(node, view.sets));
   const { ungrouped, groups } = partitionChildren(visible);
 
   for (const node of ungrouped) {
-    if (buildNodeRow(connectionId, node, depth, sets, query, out, stats)) anyMatch = true;
+    if (buildNodeRow(connectionId, node, depth, view, query, out, stats)) anyMatch = true;
   }
 
   if (groups.length === 0) return anyMatch;
@@ -370,7 +394,7 @@ function buildRows(
     const childOut: TreeRowVm[] = [];
     let anyChildMatch = false;
     for (const member of group.nodes) {
-      if (buildNodeRow(connectionId, member, depth + 1, sets, query, childOut, stats)) {
+      if (buildNodeRow(connectionId, member, depth + 1, view, query, childOut, stats)) {
         anyChildMatch = true;
       }
     }
@@ -406,14 +430,17 @@ const searchResult = computed(() => {
     const state = connectionsState.states[conn.id];
     const naturallyExpanded = treeState.expanded.has(connKey);
     const childNodes = treeState.children[connKey];
-    const sets = toSets(treeState.visibility[conn.id] ?? EMPTY_VISIBILITY);
+    const view: ConnectionView = {
+      sets: toSets(treeState.visibility[conn.id] ?? EMPTY_VISIBILITY),
+      keyBrowser: state?.caps?.keyBrowser === true,
+    };
 
     if (query && !childNodes) stats.incomplete = true;
 
     const childOut: TreeRowVm[] = [];
     let descendantMatch = false;
     if (childNodes && (query ? true : naturallyExpanded)) {
-      descendantMatch = buildRows(conn.id, '', childNodes, 1, sets, query, childOut, stats);
+      descendantMatch = buildRows(conn.id, '', childNodes, 1, view, query, childOut, stats);
     }
 
     const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;

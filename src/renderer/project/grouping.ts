@@ -116,6 +116,14 @@ export function partitionChildren(nodes: TreeNode[]): {
 // kinds already stopped emitting column children, but an L1 payload cached before this phase can
 // still carry `hasChildren: true` until the connection's next reconnect. P23 D3 adds `topic` for
 // the same reason: its partitions moved into the definition view too.
-export function isLeafKind(kind: NodeKind): boolean {
+//
+// P41: `keyBrowser`, true only for a connection whose Caps say so (redis/s3), adds `database`/
+// `bucket` to the same stale-cache guard — the adapters already report `hasChildren: false` for
+// them (redis/catalog.ts, s3/catalog.ts), and their own key space is now browsed in a Browse tab
+// (§8.18) instead. Not a bare `NodeKind` entry the way `table`/`topic` are: `database` is shared
+// by six engines that must stay expand-only (postgres/mysql-family/sqlite/clickhouse/mongo/
+// rabbitmq), so the cut needs the connection's own capability, not the kind alone.
+export function isLeafKind(kind: NodeKind, keyBrowser = false): boolean {
+  if (keyBrowser && (kind === 'database' || kind === 'bucket')) return true;
   return kind === 'table' || kind === 'view' || kind === 'matview' || kind === 'topic';
 }

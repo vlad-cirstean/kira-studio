@@ -31,7 +31,9 @@ export async function listBuckets(client: S3Client, scopedBucket?: string): Prom
         kind: 'bucket',
         name: scopedBucket,
         path: encodePath([{ kind: 'bucket', name: scopedBucket }]),
-        hasChildren: true,
+        // P41 D5: a bucket's prefix/object space is unbounded — the tree stops here; the space
+        // itself is navigated in a Browse tab (§8.18, gated on caps.keyBrowser).
+        hasChildren: false,
       },
     ];
   }
@@ -48,7 +50,8 @@ export async function listBuckets(client: S3Client, scopedBucket?: string): Prom
       kind: 'bucket' as const,
       name: b.Name,
       path: encodePath([{ kind: 'bucket', name: b.Name }]),
-      hasChildren: true,
+      // P41 D5: see the scopedBucket branch above — same reasoning, same tree cut.
+      hasChildren: false,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

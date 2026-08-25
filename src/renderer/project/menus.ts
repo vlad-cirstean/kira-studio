@@ -1,5 +1,5 @@
 import { connectionColorSchema } from '@shared/domain/connection';
-import { decodePath, pathParent } from '@shared/domain/tree';
+import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
@@ -17,14 +17,13 @@ import {
 } from '../state/connections';
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
-import { deleteObject, downloadObject, uploadMenuItem } from '../state/objectStore';
+import { uploadMenuItem } from '../state/objectStore';
 import {
   openBrowseTab,
   openConsoleTab,
   openDataTab,
   openDefinitionTab,
   openDocumentTab,
-  openKeyValueTab,
   openStreamTab,
 } from '../state/tabs';
 import { countTab, dataQueryCommands } from '../state/viewCommands';
@@ -74,16 +73,8 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
       return relationMenu(row);
     case 'collection':
       return collectionMenu(row);
-    case 'namespace':
-      return namespaceMenu(row);
-    case 'prefix':
-      return prefixMenu(row);
-    case 'key':
-      return keyMenu(row);
     case 'bucket':
       return bucketMenu(row);
-    case 'object':
-      return objectMenu(row);
     case 'topic':
     case 'queue':
       return streamNodeMenu(row);
@@ -501,139 +492,11 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P9's namespace level (redis's ':'-delimited container) and P17's S3 prefix ("folder") level:
-// same shape either way — a plain intermediate container, no console-default/filters affordance
-// (those are SQL-specific) — minimal, per the read-only scope decision (D2/D14).
-function namespaceMenu(row: TreeRowVm): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'refresh',
-      label: 'Refresh',
-      icon: 'refresh',
-      run: () => refresh(row.connectionId, row.path),
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-  ];
-}
-
-// P33: an S3 prefix gains Upload alongside namespaceMenu's own minimal shape — same gate as
-// bucketMenu's (uploadMenuItem), so a nested "folder" is as valid an upload target as the bucket
-// root.
-function prefixMenu(row: TreeRowVm): MenuItem[] {
-  return [...namespaceMenu(row), ...uploadMenuItem(row.connectionId, row.path)];
-}
-
-// P9's key leaf: minimal open/copy-name only (D14) — no edit/delete rows anywhere, per the
-// read-only scope decision (D2). No separate "copy qualified name": a key node's `name` is
-// already the complete literal Redis key (D3), so it would just duplicate "Copy name".
-function keyMenu(row: TreeRowVm): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'open-keyvalue',
-      label: 'Open',
-      icon: 'symbol-key',
-      shortcut: 'tree.open',
-      run: () => {
-        openKeyValueTab(row.connectionId, row.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-keyvalue-new-tab',
-      label: 'Open in new tab',
-      icon: 'symbol-key',
-      run: () => {
-        openKeyValueTab(row.connectionId, row.path, { newTab: true });
-      },
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-  ];
-}
-
-// P17's S3 object leaf: open/open-in-new-tab/copy-name (no separate "copy qualified name" — an
-// object node's `name` is already the full S3 key verbatim, s3/catalog.ts, mirroring keyMenu's
-// own key-name reasoning, so it would just duplicate "Copy name"), plus P33's Download and Delete,
-// each gated on the connection's own caps/read-only state rather than shown permanently disabled.
-function objectMenu(row: TreeRowVm): MenuItem[] {
-  const caps = connectionsState.states[row.connectionId]?.caps;
-  const record = connectionRecord(row.connectionId);
-  const items: MenuItem[] = [
-    {
-      type: 'item',
-      id: 'open-keyvalue',
-      label: 'Open',
-      icon: nodeIcon(row.kind),
-      shortcut: 'tree.open',
-      run: () => {
-        openKeyValueTab(row.connectionId, row.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-keyvalue-new-tab',
-      label: 'Open in new tab',
-      icon: nodeIcon(row.kind),
-      run: () => {
-        openKeyValueTab(row.connectionId, row.path, { newTab: true });
-      },
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-  ];
-
-  if (caps?.fileTransfer) {
-    items.push({ type: 'separator' });
-    items.push({
-      type: 'item',
-      id: 'download-object',
-      label: 'Download…',
-      icon: 'cloud-download',
-      run: () => void downloadObject(row.connectionId, row.path, null),
-    });
-  }
-
-  if (caps?.canDelete && !record?.readOnly) {
-    items.push({ type: 'separator' });
-    items.push({
-      type: 'item',
-      id: 'delete-object',
-      label: 'Delete',
-      icon: 'trash',
-      danger: true,
-      shortcut: 'tree.delete',
-      run: async () => {
-        if (!window.confirm(`Delete object "${row.name}"? This cannot be undone.`)) return;
-        await deleteObject(row.connectionId, row.path, null);
-        const parent = pathParent(row.path);
-        if (parent !== null) await refresh(row.connectionId, parent);
-      },
-    });
-  }
-
-  return items;
-}
+// P41 D10: namespaceMenu/prefixMenu (redis 'namespace' / s3 'prefix' — a container row) and
+// keyMenu/objectMenu (redis 'key' / s3 'object' — a leaf row) are gone: neither row exists in the
+// tree any more (D5) — both moved to views/browse/menu.ts's containerRowMenu/keyRowMenu/
+// objectRowMenu, addressed by TreeNode instead of by tree row, with `refresh(parent)`'s tree-row
+// refresh replaced by the Browse panel's own local level reload.
 
 // P10's topic/queue leaf: minimal open/copy-name only (D13), same discipline as keyMenu — no
 // edit/delete rows anywhere, per the read-only scope decision. P23 D7 adds "Open definition",

@@ -1,7 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { connectionRecord } from '../state/connections';
+import { connectionRecord, connectionsState } from '../state/connections';
 import { isVisible, toSets } from './filter';
 import { isLeafKind, labelForKind } from './grouping';
 import { rowKey, treeState } from './state/tree';
@@ -80,11 +80,17 @@ export function nodeRows(
   const hiddenKinds = new Set(v.hiddenKinds);
   const hiddenPaths = new Set(v.hiddenPaths);
   const connectionKind = connectionKindFor(connectionId);
+  // P41 D7: a keyBrowser connection's database/bucket rows are leaves here too — its Objects
+  // section stops at the container, and its Object types section only ever lists kinds still
+  // cached under one (F24), same as the tree itself.
+  const keyBrowser = connectionsState.states[connectionId]?.caps?.keyBrowser === true;
   const query = nameFilter.trim().toLowerCase();
   const rootChildren = treeState.children[rowKey(connectionId, '')] ?? [];
 
   const childrenOf = (node: TreeNode): TreeNode[] | undefined =>
-    isLeafKind(node.kind) ? undefined : treeState.children[rowKey(connectionId, node.path)];
+    isLeafKind(node.kind, keyBrowser)
+      ? undefined
+      : treeState.children[rowKey(connectionId, node.path)];
 
   // Whether `node` or anything cached beneath it matches the name filter — used only when a
   // filter is active, to decide which branches survive and are force-expanded (D17).
@@ -138,7 +144,7 @@ export function nodeRows(
         name: node.name,
         kind: node.kind,
         depth,
-        hasChildren: !isLeafKind(node.kind) && node.hasChildren,
+        hasChildren: !isLeafKind(node.kind, keyBrowser) && node.hasChildren,
         childCount: children?.length ?? 0,
         state,
         kindHidden,
