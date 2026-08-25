@@ -227,6 +227,25 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   // real recount, not just a stale-flag flip.
   expect(await countButton.getAttribute('data-kira-tip')).not.toBe(countBeforeCommit);
 
+  // --- P43 F5/D7: a failed commit reports the server's own error, not an unhandled rejection —
+  // (1, 1) is the surviving row from scenario 6's own edit, so a fresh insert of the same
+  // composite key violates the PK. -----------------------------------------------------------
+  await page.click('[data-testid="toolbar-add-row"]');
+  const dupInsertRow = page.locator('[data-testid="grid-row-insert"]');
+  await expect(dupInsertRow).toHaveCount(1);
+  const dupInsertInputs = dupInsertRow.locator('[data-testid="grid-cell-insert"] input');
+  await dupInsertInputs.nth(0).fill('1');
+  await dupInsertInputs.nth(1).fill('1');
+  await dupInsertInputs.nth(2).fill('duplicate key');
+  await page.click('[data-testid="toolbar-commit-changes"]');
+  const actionError = page.locator('[data-testid="data-action-error"]');
+  await expect(actionError).toBeVisible();
+  await expect(actionError).toContainText(/duplicate key|unique/i);
+  await expect(dupInsertRow).toHaveCount(1); // the staged insert survives the failure
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(dupInsertRow).toHaveCount(0);
+  await expect(actionError).toHaveCount(0);
+
   // --- scenario 7: a read-only connection disables every mutation button ------------------
   const firstConnRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
   await expect(firstConnRow).toHaveCount(1);

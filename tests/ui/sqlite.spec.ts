@@ -258,3 +258,57 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
   expect(consoleErrors).toEqual([]);
 });
+
+// P43: a second, focused test rather than growing the scenario above — this is the one Docker-free
+// spec that can give commits 5/7/8/9's own findings real, executed coverage (§5).
+test('sqlite — a failed commit reports the server error, verbatim', async ({
+  kira,
+  consoleErrors,
+}) => {
+  if (!sqlite) throw new Error('sqlite fixture did not start');
+  const { window: page } = kira;
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-sqlite"]');
+  await page.fill('[data-testid="connection-name"]', 'Action Error DB');
+  await page.fill('[data-testid="connection-database"]', sqlite.path);
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(
+    page.locator('[data-testid="tree-row"][data-kind="connection"] .status-dot'),
+  ).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+
+  await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+
+  // --- P43 F5/D7: a failed commit reports the server's own error instead of an unhandled
+  // rejection — id=1 already exists (0009_sqlite_seed.sql), so this insert violates the PK. ------
+  await page.click('[data-testid="toolbar-add-row"]');
+  const insertRow = page.locator('[data-testid="grid-row-insert"]');
+  await expect(insertRow).toHaveCount(1);
+  const insertInputs = insertRow.locator('[data-testid="grid-cell-insert"] input');
+  await insertInputs.nth(0).fill('1');
+  await insertInputs.nth(1).fill('1');
+  await insertInputs.nth(2).fill('1');
+  await insertInputs.nth(3).fill('1');
+  await page.click('[data-testid="toolbar-commit-changes"]');
+  const actionError = page.locator('[data-testid="data-action-error"]');
+  await expect(actionError).toBeVisible();
+  await expect(actionError).toContainText(/unique/i);
+
+  // The staged insert survives the failure (clearPending only runs on success) — the explanation
+  // was missing, not the data.
+  await expect(insertRow).toHaveCount(1);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(insertRow).toHaveCount(0);
+  await expect(actionError).toHaveCount(0);
+
+  // The last assertion that actually proves the unhandled rejection is gone, not merely
+  // accompanied by a strip.
+  expect(consoleErrors).toEqual([]);
+});

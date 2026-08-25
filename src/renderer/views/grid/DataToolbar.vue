@@ -31,6 +31,7 @@ import {
   reloadAfterMutation,
   runCount,
   runtime,
+  setActionError,
   setPageSize,
   stop,
 } from './state';
@@ -200,16 +201,29 @@ function onDeleteRow(): void {
   }
 }
 
+// P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
+// refusal) used to be an unhandled promise rejection — no try/catch here and no async-aware
+// @click. The staged set already survives a failure (clearPending only runs on success); what was
+// missing was telling the user why.
 async function onCommit(): Promise<void> {
   const t = tab.value;
   if (!t?.connectionId) return;
-  await commitPending(t.connectionId, t.path, t.id);
-  await reloadAfterMutation(t.id);
+  try {
+    await commitPending(t.connectionId, t.path, t.id);
+    setActionError(t.id, null);
+    await reloadAfterMutation(t.id);
+  } catch (err) {
+    setActionError(t.id, err instanceof Error ? err.message : String(err));
+  }
 }
 
 function onDiscard(): void {
   const t = tab.value;
-  if (t) discardPending(t.id);
+  if (!t) return;
+  discardPending(t.id);
+  // P43 F5/D7: a discard resolves the very staging that a prior actionError was about — an error
+  // strip surviving it would be pointing at a change that no longer exists.
+  setActionError(t.id, null);
 }
 </script>
 

@@ -180,6 +180,17 @@ function onCloseSearch(): void {
       >
         <span>{{ rt.error.message }}</span>
       </MessageStrip>
+      <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
+           showing a perfectly valid page, only the write was refused. -->
+      <MessageStrip
+        v-if="rt?.actionError"
+        tone="err"
+        icon="warning"
+        data-testid="data-action-error"
+        class="error-strip"
+      >
+        <span>{{ rt.actionError }}</span>
+      </MessageStrip>
       <div class="grid-area">
         <DataGrid ref="dataGridRef" :tab-id="tab.id" />
       </div>

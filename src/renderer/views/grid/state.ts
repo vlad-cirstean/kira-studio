@@ -24,6 +24,12 @@ export type Selection =
 export interface DataViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
+  /** P43 F5/D7: the last *action* (commit) that failed, verbatim from the server. Distinct from
+   *  `error`, which describes a failed page *load* — the page on screen is still valid when a
+   *  commit is refused, so the view keeps rendering it and shows this above it instead. Cleared by
+   *  the next successful action, a load, or a discard (DataToolbar.vue's own onDiscard — resolving
+   *  the very staged change the error was about). */
+  actionError: string | null;
   opId: string | null; // the in-flight op, for the stop button (D2)
   count: { value: number; exact: boolean; stale: boolean } | null;
   meta: ObjectMeta | null; // from kira:tree:describe (L1) — the projection menu
@@ -39,6 +45,7 @@ function defaultRuntime(): DataViewRuntime {
   return {
     status: 'idle',
     error: null,
+    actionError: null,
     opId: null,
     count: null,
     meta: null,
@@ -60,6 +67,13 @@ export { runtime };
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
+
+/** P43 F5/D7: written by DataToolbar.vue's own catch around commitPending — see actionError's own
+ *  doc comment above for why this is a sibling of `error`, not a reuse of it. */
+export function setActionError(tabId: string, message: string | null): void {
+  const rt = runtime[tabId];
+  if (rt) rt.actionError = message;
+}
 
 async function loadMeta(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
@@ -90,6 +104,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   rt.status = 'loading';
   rt.opId = opId;
   rt.error = null;
+  rt.actionError = null;
 
   try {
     const response = await data.read({
