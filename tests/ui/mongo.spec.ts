@@ -228,9 +228,20 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await page.click('[data-testid="console-run-statement"]');
   const consoleResult = consoleView.locator('[data-testid="console-result-grid"]');
   await expect(consoleResult).toHaveCount(1);
-  await expect(consoleResult.locator('[data-testid="console-result-doc-row"]')).toContainText(
+  const docRow = consoleResult.locator('[data-testid="console-result-doc-row"]');
+  await expect(docRow).toHaveCount(1);
+
+  // P42 D11: a Mongo console result renders like the data tab's own document view — read only,
+  // collapsed by default — reusing the same DocumentTree component and testids.
+  await expect(consoleResult.locator('[data-testid="document-tree"]')).toHaveCount(0);
+  await docRow.locator('[data-testid="document-toggle-expand"]').click();
+  await expect(consoleResult.locator('[data-testid="document-tree"]')).toBeVisible();
+  await expect(consoleResult.locator('[data-testid="document-tree-value"]')).toContainText(
     String(WIDGET_COUNT - 2),
   );
+  await expect(consoleView.locator('[data-testid="document-edit"]')).toHaveCount(0);
+  await expect(consoleView.locator('[data-testid="document-delete"]')).toHaveCount(0);
+  await expect(consoleView.locator('[data-testid="document-new"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });

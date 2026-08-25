@@ -3,12 +3,22 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, ref, watch } from 'vue';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
+import DocumentTree from '../shared/document/DocumentTree.vue';
+import {
+  type DocumentRowView,
+  rowHeight as documentRowHeight,
+  rowsVersion,
+  rowView,
+  togglePath,
+} from '../shared/document/rows';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
 import { typeDescription } from '../shared/typeGlossary';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
+import { isResultDocExpanded, toggleResultDocExpanded } from './state';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
 // result has no pager, no sort, no pending-changes, no persisted column widths/order: every one
@@ -77,6 +87,37 @@ const rowIndices = computed(() => {
 
 function cellAt(row: number, col: number) {
   return cell(props.pageKey, row, col);
+}
+
+// P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
+// views/shared/document/rows.ts, registered onto this result's own key in console/state.ts's
+// run()) — collapsed by default, per-result expansion state in the console runtime rather than
+// persisted tab state (D11: a console result is runtime-only to begin with).
+const documentRows = computed<DocumentRowView[]>(() => {
+  void pageVersion.n;
+  const out: DocumentRowView[] = [];
+  for (const i of rowIndices.value) {
+    const view = rowView(props.pageKey, i);
+    if (view) out.push(view);
+  }
+  return out;
+});
+
+const documentRowHeights = computed<number[]>(() => {
+  void pageVersion.n;
+  void rowsVersion.n;
+  return documentRows.value.map((view) =>
+    documentRowHeight(
+      props.pageKey,
+      view.index,
+      null,
+      isResultDocExpanded(props.tabId, props.pageKey, view.id),
+    ),
+  );
+});
+
+function onToggleDocExpanded(id: string): void {
+  toggleResultDocExpanded(props.tabId, props.pageKey, id);
 }
 
 function docRowAt(row: number) {
@@ -155,8 +196,10 @@ function selectTabularCell(row: number, col: number): void {
 // A console document/key-value result has no ColumnDescriptor of its own (P8's DocumentPage/
 // KeyValuePage carry fixed semantic columns, not a caller projection) — built the same way
 // DocumentView.vue's own publisher does, so the cell editor's format detector still recognizes it
-// as JSON (P40 F11/D13: nothing here beautifies on seed — the raw text renders exactly as stored,
-// only syntax-highlighted, until Beautify is pressed).
+// as JSON (P40 F11/D13: nothing here beautifies on seed — the cell editor gets the raw body text
+// exactly as stored, only syntax-highlighted, until Beautify is pressed). This is the *publish*
+// path only — what the row itself shows, once expanded, is the parsed DocumentTree (P42 D11),
+// not this same raw text.
 function selectDocumentRow(row: number): void {
   selected.value = { row, col: 0 };
   const doc = docRowAt(row);
@@ -275,24 +318,61 @@ function selectKeyValueRow(row: number): void {
     <VirtualList
       v-else-if="page.kind === 'document'"
       ref="listRef"
-      :items="rowIndices"
-      :row-height="96"
+      :items="documentRows"
+      :row-height="26"
+      :row-heights="documentRowHeights"
       class="body doc-body"
     >
-      <template #default="{ item: r }">
+      <template #default="{ item: view }">
         <div
           class="doc-row"
           data-testid="console-result-doc-row"
-          :data-row="r"
+          :data-row="view.index"
+          :data-id="view.id"
           :class="{
-            selected: isSelected(r, 0),
-            'search-match': isSearchMatch(r, 0),
-            'search-match-current': isCurrentSearchMatch(r, 0),
+            open: isResultDocExpanded(tabId, pageKey, view.id),
+            selected: isSelected(view.index, 0),
+            'search-match': isSearchMatch(view.index, 0),
+            'search-match-current': isCurrentSearchMatch(view.index, 0),
           }"
-          @click="selectDocumentRow(r)"
         >
-          <div class="doc-id">{{ docRowAt(r).id }}</div>
-          <pre class="doc-body-text">{{ docRowAt(r).body }}</pre>
+          <div class="doc-head" @click="selectDocumentRow(view.index)">
+            <button
+              type="button"
+              class="expand-toggle"
+              data-testid="document-toggle-expand"
+              :aria-label="isResultDocExpanded(tabId, pageKey, view.id) ? 'Collapse' : 'Expand'"
+              @click.stop="onToggleDocExpanded(view.id)"
+            >
+              <CodiconIcon
+                :name="isResultDocExpanded(tabId, pageKey, view.id) ? 'chevron-down' : 'chevron-right'"
+                :size="13"
+              />
+            </button>
+            <span class="doc-id" data-testid="document-id">{{ view.idLabel }}</span>
+            <span class="p-badge" data-testid="document-field-count">{{ view.fieldCount }} fields</span>
+            <span class="p-badge" data-testid="document-byte-badge">{{ view.byteLabel }}</span>
+            <span
+              v-if="view.isTruncated"
+              class="p-badge warn"
+              v-tooltip="'value truncated'"
+              data-testid="document-truncated"
+              >truncated</span
+            >
+          </div>
+          <div
+            v-if="isResultDocExpanded(tabId, pageKey, view.id)"
+            class="doc-body-tree"
+            data-testid="document-body"
+          >
+            <DocumentTree
+              v-if="view.root"
+              :tab-id="pageKey"
+              :row="view.index"
+              @toggle-path="(path) => togglePath(pageKey, view.index, path)"
+            />
+            <pre v-else class="doc-body-text">{{ documentRow(pageKey, view.index)?.body }}</pre>
+          </div>
         </div>
       </template>
     </VirtualList>
@@ -427,25 +507,86 @@ function selectKeyValueRow(row: number): void {
   padding: var(--kira-s-2);
 }
 
+/* P42 D11: the same head/DocumentTree pair the Mongo data tab renders (DocumentView.vue), read
+   only — no edit/delete affordance, no editing chip. */
 .doc-row {
-  padding: var(--kira-s-3) var(--kira-s-4);
+  display: flex;
+  flex-direction: column;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   cursor: default;
 }
 
-.doc-row.selected,
 .row.selected {
   background: var(--kira-select);
 }
 
-.doc-id {
-  font-size: var(--kira-t-xs);
+.doc-head {
+  height: var(--kira-h-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-3);
+  cursor: pointer;
+}
+
+.doc-head:hover {
+  background: var(--kira-hover);
+}
+
+.doc-row.open > .doc-head {
+  background: var(--kira-bg-elevated);
+}
+
+/* The row currently published to the cell editor (this panel's own selectDocumentRow) — a left
+   rail, never a full-row tint, so it stays legible under .open's own background and a search
+   match's highlight at the same time (DocumentView.vue's own rule, mirrored). */
+.doc-row.selected > .doc-head {
+  box-shadow: inset 2px 0 0 var(--kira-accent);
+}
+
+.doc-row.search-match {
+  background: var(--kira-search-match);
+}
+
+.doc-row.search-match-current {
+  background: var(--kira-search-match-current);
+}
+
+.expand-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
   color: var(--kira-fg-muted);
-  margin-bottom: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.doc-id {
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
+}
+
+.doc-body-tree {
+  flex: 1;
+  min-height: 0;
+  border-top: var(--kira-border-width) solid var(--kira-border);
+  background: var(--kira-bg-elevated);
+  overflow: hidden;
 }
 
 .doc-body-text {
   margin: 0;
+  padding: var(--kira-s-2) var(--kira-s-4);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--kira-font-family);

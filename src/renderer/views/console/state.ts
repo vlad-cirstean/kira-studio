@@ -2,8 +2,9 @@ import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
+import { registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { bumpPageVersion, drop as dropPage, getPage, setPage } from './resultPages';
+import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
 /** One result set of a run. `key` is identity and never changes while the result is open — the
  *  "Result N" label the strip prints (P40) is its *position*, which renumbers when a sibling
@@ -21,6 +22,11 @@ export interface ConsoleViewRuntime {
   activeKey: string | null; // which result set the single mounted grid shows (P40 D2)
   searchOpen: boolean; // mirrors views/{grid,documents,keyvalue}/state.ts's own flag (P40 D8)
   nextSeq: number; // per-tab monotonic result-set counter (P40 D1) — never reused
+  // P42 D11: `${resultKey}:${docId}`, present = expanded. Unlike a Mongo data tab's own
+  // documents/state.ts (persisted, default-expanded, P27 D2), a console result set is
+  // runtime-only and starts collapsed — a find() result is usually skimmed for shape, and
+  // expanding a couple hundred documents by default is a very tall list nobody asked for.
+  expandedDocIds: Set<string>;
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
@@ -32,6 +38,7 @@ function defaultRuntime(): ConsoleViewRuntime {
     activeKey: null,
     searchOpen: false,
     nextSeq: 0,
+    expandedDocIds: new Set(),
   };
 }
 
@@ -39,11 +46,24 @@ const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaul
 
 export { runtime };
 
+export function isResultDocExpanded(tabId: string, resultKey: string, id: string): boolean {
+  return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;
+}
+
+export function toggleResultDocExpanded(tabId: string, resultKey: string, id: string): void {
+  const rt = ensureRuntime(tabId);
+  const key = `${resultKey}:${id}`;
+  if (rt.expandedDocIds.has(key)) rt.expandedDocIds.delete(key);
+  else rt.expandedDocIds.add(key);
+}
+
 // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 // state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
 // `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
 // there is no second reference here left to release before the record itself is dropped).
 registerTabRuntimeCleanup((tabId) => {
+  const rt = runtime[tabId];
+  if (rt) for (const result of rt.results) unregisterDocumentRows(result.key);
   delete runtime[tabId];
 });
 
@@ -57,7 +77,10 @@ export function resultPageKey(tabId: string, seq: number): string {
 function dropResults(tabId: string): void {
   const rt = runtime[tabId];
   if (!rt) return;
-  for (const result of rt.results) dropPage(result.key);
+  for (const result of rt.results) {
+    dropPage(result.key);
+    unregisterDocumentRows(result.key);
+  }
   rt.results = [];
   rt.activeKey = null;
 }
@@ -71,6 +94,7 @@ export function closeResult(tabId: string, key: string): void {
   const index = rt.results.findIndex((r) => r.key === key);
   if (index === -1) return;
   dropPage(key);
+  unregisterDocumentRows(key);
   rt.results.splice(index, 1);
   if (rt.activeKey === key) {
     rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
@@ -86,7 +110,10 @@ export function closeOtherResults(tabId: string, key: string): void {
   const keep = rt.results.find((r) => r.key === key);
   if (!keep) return;
   for (const result of rt.results) {
-    if (result.key !== key) dropPage(result.key);
+    if (result.key !== key) {
+      dropPage(result.key);
+      unregisterDocumentRows(result.key);
+    }
   }
   rt.results = [keep];
   rt.activeKey = key;
@@ -98,7 +125,10 @@ export function closeResultsToTheRight(tabId: string, key: string): void {
   const index = rt.results.findIndex((r) => r.key === key);
   if (index === -1) return;
   const dropped = rt.results.slice(index + 1);
-  for (const result of dropped) dropPage(result.key);
+  for (const result of dropped) {
+    dropPage(result.key);
+    unregisterDocumentRows(result.key);
+  }
   rt.results = rt.results.slice(0, index + 1);
   if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;
 }
@@ -158,6 +188,10 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     const newResults = response.pages.map((page) => {
       const key = resultPageKey(tabId, rt.nextSeq++);
       setPage(key, page);
+      // P42 D11: a document-kind result renders through views/shared/document/'s row model,
+      // which resolves a scope key through a registered source rather than an import — this
+      // result's own key is that scope, and resultPages.ts's documentRow is its source.
+      if (page.kind === 'document') registerDocumentRows(key, (row) => documentRow(key, row));
       return { key, rowCount: page.rowCount };
     });
     rt.results.push(...newResults);
