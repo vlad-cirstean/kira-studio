@@ -1,12 +1,13 @@
 # Kira Studio — local database fixtures
 
-Spins up nine of Kira Studio's ten supported engines (PostgreSQL, MariaDB, MySQL, ClickHouse,
-MongoDB, Redis, Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose.
-The six relational/document/key-value stores get a full schema, foreign keys or their MergeTree
-equivalent, indexes, and ~20k rows of seed data; Kafka/SQS/S3 get a handful of topics/queues/buckets
-with a small backlog — enough to exercise every tree view without waiting on a multi-minute seed.
+Spins up ten of Kira Studio's eleven supported engines (PostgreSQL, MariaDB, MySQL, ClickHouse,
+RabbitMQ, MongoDB, Redis, Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker
+Compose. The six relational/document/key-value stores get a full schema, foreign keys or their
+MergeTree equivalent, indexes, and ~20k rows of seed data; Kafka/SQS/S3/RabbitMQ get a handful of
+topics/queues/buckets/exchanges with a small backlog — enough to exercise every tree view without
+waiting on a multi-minute seed.
 
-The tenth engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
+The eleventh engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
 needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
 `node:sqlite` module the app's own adapter reads it with. See its own section below.
 
@@ -41,8 +42,9 @@ bash scripts/demo-dbs/seed.sh
 
 The schema is applied automatically on first container start (via
 `/docker-entrypoint-initdb.d`). The seed step is separate and can be re-run any
-time to reset data — safe to re-run for the four relational/document/key-value stores; for Kafka
-and SQS it appends another batch of messages rather than resetting (see the Model section below).
+time to reset data — safe to re-run for the four relational/document/key-value stores; for Kafka,
+SQS and RabbitMQ it appends another batch of messages rather than resetting (see the Model section
+below).
 `seed.sh`'s SQLite step needs no `up -d` first — it deletes and rebuilds
 `sqlite/kira-demo.sqlite` directly, so it's safe to re-run on its own too:
 `bun scripts/demo-dbs/sqlite/seed.ts`.
@@ -55,6 +57,7 @@ and SQS it appends another batch of messages rather than resetting (see the Mode
 | MariaDB  | localhost | 3306 | `kira` | `kira` | `kira` |
 | MySQL    | localhost | 3307 | `kira` | `kira` | `kira` |
 | ClickHouse | localhost | 8124 | `kira` | `kira` | `kira` |
+| RabbitMQ | localhost | 15672 | `kira` | `kira` | `kira` |
 | MongoDB  | localhost | 27017 | — (no auth) | — | `kira` |
 | Redis    | localhost | 6379 | — | — | db 0 |
 | Kafka    | localhost | 9092 | — | — | — |
@@ -69,6 +72,7 @@ postgresql://kira:kira@localhost:5432/kira
 mariadb://kira:kira@localhost:3306/kira
 mysql://kira:kira@localhost:3307/kira
 clickhouse://kira:kira@localhost:8124/kira
+rabbitmq://kira:kira@localhost:15672/kira
 mongodb://localhost:27017/kira
 redis://localhost:6379/0
 ```
@@ -117,6 +121,19 @@ anywhere: ClickHouse has none of them (F16/F17), so every id is a hand-assigned 
 `ORDER BY` is the MergeTree analog, not a uniqueness guarantee — the same reason the app's own
 − row button stays disabled for this connection.
 
+RabbitMQ gets its own small message-broker topology rather than a row-shaped port of the others
+(P37 D40): a `kira` virtual host holding three exchanges (`orders.direct`, `events.fanout`,
+`events.topic`, the last two bound to each other so the tree's exchange definition view has a real
+exchange-to-exchange binding to show on both sides), an `orders` queue (20 messages, an
+`orders-ttl` policy), a `notifications` queue (8 messages, fanned out from `events.fanout`), an
+`empty-queue`, and a `large-queue` (2,000 messages — enough to demonstrate the app's own 500-message
+poll clamp without a multi-minute seed, since RabbitMQ's management API publishes one message per
+HTTP request with no bulk path the way Kafka's console producer has). The seed runs on the host,
+not via `docker exec` — the `-management` image ships no bulk-publish CLI worth exec'ing into, so
+`rabbitmq/seed.sh` talks to `localhost:15672` directly with `curl`, the same HTTP surface the app's
+own adapter reads. The same reason the app's own − row button stays disabled here too: a RabbitMQ
+message has no broker-assigned identity, so there is no addressable row to delete.
+
 MongoDB mirrors this with the same collections (`customers`, `addresses`,
 `categories`, `products`, `orders`, `orderItems`, `reviews`) using `ObjectId`
 references and the same index set (unique, single-field, compound, text,
@@ -159,17 +176,18 @@ literal port of the others' columns: no ENUM/SET/BIT/YEAR/geometry types exist t
 it instead demonstrates the five affinity families side by side, plus a column with no declared
 type at all (F21 — the one case `typeClassFor` reports as `other`).
 
-Unlike the relational/document seeds, the Kafka/SQS/S3 seeds are **not** idempotent in the same
-way — topics/queues are created with `--if-not-exists`/reused and S3 objects are simply
-overwritten in place, but re-running `seed.sh` appends another batch of messages to Kafka/SQS on
-top of whatever's already there (a topic/queue has no primary key to upsert against). Use
-`down -v` + `up -d` + `seed.sh` for a clean slate.
+Unlike the relational/document seeds, the Kafka/SQS/S3/RabbitMQ seeds are **not** idempotent in the
+same way — topics/queues/exchanges/bindings are created idempotently (`--if-not-exists`, reused, or
+a plain `PUT` for RabbitMQ's own declare-is-idempotent semantics) and S3 objects are simply
+overwritten in place, but re-running `seed.sh` appends another batch of messages to Kafka/SQS/
+RabbitMQ on top of whatever's already there (a topic/queue has no primary key to upsert against).
+Use `down -v` + `up -d` + `seed.sh` for a clean slate.
 
 ## Files
 
 ```
 scripts/demo-dbs/
-├── docker-compose.yml        # all eight services (sqs + s3 share one LocalStack container)
+├── docker-compose.yml        # all nine services (sqs + s3 share one LocalStack container)
 ├── seed.sh                   # run every seed
 ├── README.md
 ├── postgres/
@@ -184,6 +202,9 @@ scripts/demo-dbs/
 ├── clickhouse/
 │   ├── init.sql              # schema, MergeTree terms — runs on init (no PK/FK/UNIQUE, F16/F17)
 │   └── seed.sql              # 20k-row seed (numbers() table function, no chunking needed)
+├── rabbitmq/
+│   └── seed.sh               # vhost + exchanges/queues/bindings/policy + messages, host-side
+│                              # curl against localhost:15672 (no useful CLI inside the image)
 ├── mongo/
 │   ├── init.js               # collections + indexes — runs on init
 │   └── seed.js               # 20k-doc seed
