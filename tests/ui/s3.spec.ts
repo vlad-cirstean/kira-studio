@@ -607,3 +607,71 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
 
   expect(consoleErrors).toEqual([]);
 });
+
+test('s3 — browse tab: descend to reports, upload from a prefix level, no prefix rows in the tree (P41)', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(240_000);
+  if (!s3) throw new Error('s3 fixture did not start');
+  const { window: page } = kira;
+  await connectS3(page, s3.config, { name: 'S3' });
+
+  // --- the tree never renders a 'prefix' row anywhere — bucket/prefix nesting only ever shows up
+  //     inside a Browse tab now (P41 D5) — and a bucket row's twisty stays invisible, since a
+  //     bucket is a leaf in the tree even though it still opens into a Browse panel. -------------
+  await expandRow(page, '');
+  await expect(page.locator('[data-testid="tree-row"][data-kind="prefix"]')).toHaveCount(0);
+  const mainBucketRow = await findRow(page, MAIN_BUCKET_PATH);
+  await expect(mainBucketRow.locator('.twisty')).toHaveClass(/invisible/);
+
+  await mainBucketRow.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', MAIN_BUCKET_PATH);
+  const reportsRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${REPORTS_PREFIX_PATH}"]`,
+  );
+  await reportsRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', REPORTS_PREFIX_PATH);
+
+  // --- upload from this prefix level: the toolbar button (not a row's own context menu), landing
+  //     one level below where the panel already sits ------------------------------------------------
+  const tmpDir = await mkdtemp(join(tmpdir(), 'kira-ui-s3-browse-up-'));
+  const sourcePath = join(tmpDir, 'note.txt');
+  const sourceBody = 'uploaded from a browse-panel prefix level';
+  await writeFile(sourcePath, sourceBody, 'utf8');
+  await kira.app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, sourcePath);
+
+  await browseView.locator('[data-testid="browse-upload"]').click();
+  const dialog = page.locator('[data-testid="upload-dialog"]');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('[data-testid="upload-choose-file"]').click();
+  // Prefilled with the panel's own level prefix ahead of the file name (containerPrefix, D17) —
+  // 'reports/', since the panel is one level below the bucket root.
+  await expect(dialog.locator('[data-testid="upload-key"]')).toHaveValue('reports/note.txt');
+  await dialog.locator('[data-testid="upload-submit"]').click();
+  await expect(dialog).toHaveCount(0);
+
+  // catalog.ts's own object-path convention (F-precedent, matches NESTED_OBJECT_PATH above): the
+  // full ancestor prefix chain, then an object segment named with the *whole* key, not just its
+  // trailing segment.
+  const uploadedPath = `${REPORTS_PREFIX_PATH}/object:${encodeURIComponent('reports/note.txt')}`;
+  const view = page.locator(`[data-testid="keyvalue-view"][data-path="${uploadedPath}"]`);
+  await expect(view).toBeVisible();
+  await expect(bodyRowOf(page, view).locator('[data-testid="keyvalue-value"]')).toContainText(
+    sourceBody,
+    { timeout: 15_000 },
+  );
+
+  // Reactivating the bucket's Browse tab resumes at the reports level (§8.4 tab-identity reuse),
+  // and browseInvalidate() means the new row shows up without a manual refresh.
+  await mainBucketRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', REPORTS_PREFIX_PATH);
+  const uploadedRow = browseView.locator(`[data-testid="browse-row"][data-path="${uploadedPath}"]`);
+  await expect(uploadedRow).toBeVisible();
+
+  expect(consoleErrors).toEqual([]);
+});

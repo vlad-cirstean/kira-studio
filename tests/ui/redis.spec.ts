@@ -199,3 +199,92 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
 
   expect(consoleErrors).toEqual([]);
 });
+
+// P41: the Browse panel's own filter and Up affordances — a separate test rather than folding
+// into the scenario above, since it needs its own connection and shouldn't perturb that test's
+// own path-by-path navigation.
+test('redis — browse tab: filter and Up (P41)', async ({ kira, consoleErrors }) => {
+  test.setTimeout(240_000);
+  if (!redis) throw new Error('redis fixture did not start');
+  const { window: page } = kira;
+
+  const cfg = redis.config;
+  await page.evaluate(
+    (c) =>
+      window.kira.connectionsCreate({
+        name: 'Redis',
+        kind: 'redis',
+        color: 'red',
+        mode: 'fields',
+        readOnly: false,
+        host: c.host,
+        port: c.port,
+        database: c.database,
+        username: c.username,
+        password: c.password,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+      }),
+    {
+      host: cfg.host,
+      port: cfg.port,
+      database: cfg.database,
+      username: cfg.username,
+      password: cfg.password,
+    },
+  );
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(
+    page.locator('[data-testid="tree-row"][data-kind="connection"] .status-dot'),
+  ).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
+  await expandRow(page, '');
+
+  const db0Row = await findRow(page, DB0_PATH);
+  await db0Row.dblclick();
+  const browseView = page.locator('[data-testid="browse-view"]');
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', DB0_PATH);
+
+  const userRow = browseView.locator(`[data-testid="browse-row"][data-path="${USER_NS_PATH}"]`);
+  await userRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', USER_NS_PATH);
+  const user1Row = browseView.locator(`[data-testid="browse-row"][data-path="${USER_1_NS_PATH}"]`);
+  await user1Row.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
+
+  // --- filter: a plain substring match over the loaded level (D18) — 'user:1:name'/'user:1:email'
+  // /'user:1:profile' are the three keys at this level; 'profile' matches only the hash key. ------
+  const totalRows = await browseView.locator('[data-testid="browse-row"]').count();
+  expect(totalRows).toBe(3);
+  await browseView.locator('[data-testid="browse-filter"]').fill('profile');
+  await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(1);
+  await expect(browseView.locator('[data-testid="browse-count"]')).toContainText(
+    `1 of ${totalRows}`,
+  );
+  const hashKeyRow = browseView.locator(`[data-testid="browse-row"][data-path="${HASH_KEY_PATH}"]`);
+  await expect(hashKeyRow).toBeVisible();
+  await hashKeyRow.dblclick();
+  const view = page.locator(`[data-testid="keyvalue-view"][data-path="${HASH_KEY_PATH}"]`);
+  await expect(view).toBeVisible();
+
+  // --- Up: reactivating the tab resumes at the level it was left (user/1) — clear the filter
+  // first so it doesn't hide siblings at the levels Up walks back through. ------------------------
+  await db0Row.dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
+  await browseView.locator('[data-testid="browse-filter"]').fill('');
+  await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(totalRows);
+
+  const upButton = browseView.locator('[data-testid="browse-up"]');
+  await upButton.click();
+  await expect(browseView).toHaveAttribute('data-level', USER_NS_PATH);
+  await upButton.click();
+  await expect(browseView).toHaveAttribute('data-level', DB0_PATH);
+  await expect(upButton).toBeDisabled();
+
+  expect(consoleErrors).toEqual([]);
+});
