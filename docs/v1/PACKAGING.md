@@ -141,9 +141,10 @@ genuinely requires real macOS.
 
 ## 6. Known gaps
 
-- **No app icon.** electron-builder falls back to the default Electron icon — no icon asset is
-  specified anywhere in SPEC.md and none exists in the tree. Left as a design decision for a later
-  phase, not invented here.
+- ~~**No app icon.**~~ `build/icon.png` (1024x1024; `build/icon.svg` is the editable source) is now
+  wired up via `mac.icon` in `electron-builder.yml`. electron-builder's bundled icon-conversion tool
+  rasterizes/generates the `.icns` itself at package time — no `sips`/`iconutil` dependency, unlike
+  the `dmg` background step above.
 - **Ad-hoc signature only.** The build is not distributable outside the machine that built it —
   SPEC.md §3 explicitly defers signing/notarization past v1.
 - **`dmg` construction requires real macOS** (the `sips` dependency above) — the `zip` target and

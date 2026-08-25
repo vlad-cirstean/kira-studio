@@ -31,6 +31,7 @@ electronLanguages:
   - en                                      # dark-mode-only, English-only v1; trims .lproj weight
 mac:
   category: public.app-category.developer-tools
+  icon: build/icon.png                      # 1024x1024 source; build/icon.svg is the editable original
   identity: '-'                             # ad-hoc — NOT null (D12)
   hardenedRuntime: false                    # ad-hoc + hardened runtime ⇒ library-validation failure (D12)
   minimumSystemVersion: '13.0'              # §3 "macOS 13+"

@@ -59,6 +59,17 @@ function requestFlush(win: BrowserWindow): Promise<void> {
 async function main(): Promise<void> {
   await app.whenReady();
 
+  // Packaged builds get their Dock/About-panel icon from electron-builder's `mac.icon`
+  // (electron-builder.yml), baked into the bundle's Info.plist/icns — this call only covers
+  // `bun run dev`, where Electron would otherwise show its own generic icon. build/ isn't part
+  // of the asar (electron-builder.yml's `files`), so it only exists unpackaged. Must run after
+  // `app.whenReady()`: `setIcon()` sets `NSApp.applicationIconImage` (also what the native About
+  // panel reads — `setAboutPanelOptions({ iconPath })` is documented linux/win32 only, no darwin
+  // support), and pre-ready native calls have already bitten this app once (see secretCipher below).
+  if (!app.isPackaged) {
+    app.dock?.setIcon(join(__dirname, '../../build/icon.png'));
+  }
+
   // Probed exactly once, here, before anything else touches `safeStorage` (P25 D1) — a pre-ready
   // call would create the Keychain item under Chromium's own app name instead of this app's
   // (electron/electron#45328), and `app.whenReady()` above is what makes `app.setName` at :18
