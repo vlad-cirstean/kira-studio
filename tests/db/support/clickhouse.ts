@@ -28,6 +28,12 @@ export interface ClickHouseFixture {
   /** The `kira_ro` user — SELECT only; scenario 43's server-side readonly-enforcement target. */
   readOnlyConfig: ResolvedConnectionConfig;
   uri: string;
+  /** The container's own HTTP base URL — for a spec file's own side `@clickhouse/client` (system
+   *  table assertions, admin-only DDL a fixed grant set can't do). */
+  baseUrl: string;
+  adminUsername: string;
+  adminPassword: string;
+  database: string;
   stop(): Promise<void>;
 }
 
@@ -136,6 +142,10 @@ async function start(): Promise<ClickHouseFixture> {
     config,
     readOnlyConfig,
     uri,
+    baseUrl,
+    adminUsername: ADMIN_USER,
+    adminPassword: ADMIN_PASSWORD,
+    database: DATABASE,
     async stop() {
       // Playwright's workers:1 config runs every UI spec file sequentially in the same worker
       // process, sharing this module's state (mirrors support/mysql.ts:196-201's own reset).

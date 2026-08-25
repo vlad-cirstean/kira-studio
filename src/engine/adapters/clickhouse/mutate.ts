@@ -82,17 +82,14 @@ export function preview(plan: MutationPlan): string[] {
   return [renderInsert(relationSql, inserts, literalFor)];
 }
 
+// P36 D28: a generated (MATERIALIZED/ALIAS) column is deliberately NOT blocked here — the
+// renderer's own insert paths already skip it (ColumnDescriptor.generated), and an explicit
+// mutate() call that targets one anyway is left for the server to refuse in its own words
+// (Adapter rule 4) rather than a second, app-invented message ahead of it.
 function assertColumnsKnown(target: catalog.ReadTarget, columns: string[]): void {
   const known = new Set(target.columns.map((c) => c.name));
   for (const c of columns) {
     if (!known.has(c)) throw new AdapterError('E_NOT_FOUND', `unknown column in mutation: ${c}`);
-  }
-  const generated = columns.filter((c) => target.generatedColumns.has(c));
-  if (generated.length > 0) {
-    throw new AdapterError(
-      'E_UNSUPPORTED',
-      `cannot insert into generated column(s): ${generated.join(', ')}`,
-    );
   }
 }
 
