@@ -13,6 +13,7 @@ import { publishSelectedCell, type SelectedCell } from '../../state/cellSelectio
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
+import { browseInvalidate } from '../../state/viewCommands';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -338,6 +339,8 @@ async function onDeleteKey(): Promise<void> {
       if (!props.tab.connectionId) return;
       await deleteObject(props.tab.connectionId, props.tab.path, props.tab.id);
       await reload(props.tab.id);
+      // P43 F11/D15: the deleted object's own container level just lost a member.
+      browseInvalidate(props.tab.connectionId, pathParent(props.tab.path) ?? '');
     } else {
       await deleteKey(props.tab.id, keyName.value);
     }

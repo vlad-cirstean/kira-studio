@@ -560,6 +560,9 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   await expect(deletedView.locator('[data-testid="keyvalue-error"]')).toBeVisible({
     timeout: 10_000,
   });
+  // P43 F11/D15: the Browse tab still sitting on the container level (still open, just not
+  // active) reflects the delete with no manual Refresh.
+  await expect(secondRow).toHaveCount(0, { timeout: 10_000 });
 
   // --- toggle the connection read-only (menu-item-readonly), confirming the live-reconnect prompt
   // ROOT_OBJECT_PATH lives under MAIN_BUCKET, reached through its own Browse tab.

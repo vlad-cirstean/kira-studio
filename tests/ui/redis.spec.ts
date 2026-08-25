@@ -183,6 +183,14 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   await expect(ttlView.locator('[data-testid="keyvalue-ttl"]')).not.toContainText('no expiry');
   await expect(ttlView.locator('[data-testid="keyvalue-memory"]')).not.toContainText('unknown');
 
+  // --- P43 F11/D15: deleting the TTL key from its own tab refreshes the Browse tab still
+  // sitting on its container level (session) — no manual Refresh. --------------------------
+  await expect(browseView).toHaveAttribute('data-level', SESSION_NS_PATH);
+  await expect(ttlKeyRow).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await ttlView.locator('[data-testid="keyvalue-delete"]').click();
+  await expect(ttlKeyRow).toHaveCount(0, { timeout: 10_000 });
+
   // --- console: generic redis command against db0, opened from the database node's menu -----
   await openRowMenu(page, DB0_PATH);
   await page.click('[data-testid="menu-item-open-console"]');

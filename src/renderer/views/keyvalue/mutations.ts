@@ -1,7 +1,7 @@
-import { decodePath, encodePath } from '@shared/domain/tree';
+import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
 import { data } from '../../bridge/data';
 import { findKeyValueTab, openKeyValueTab } from '../../state/tabs';
-import { reloadTabsForTarget } from '../../state/viewCommands';
+import { browseInvalidate, reloadTabsForTarget } from '../../state/viewCommands';
 import { reload } from './state';
 
 // Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline
@@ -54,6 +54,9 @@ export async function deleteKey(tabId: string, keyName: string): Promise<void> {
   // this module inventing a second way to report the same fact.
   await reload(tabId);
   reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  // P43 F11/D15: a deleted key's own container level (the level a Browse tab shows) just lost a
+  // member — a no-op when no Browse tab is open (browseInvalidate's own contract).
+  browseInvalidate(tab.connectionId, pathParent(tab.path) ?? '');
 }
 
 // Scoped to string-type keys only (same D2 as edit — see redis/mutate.ts's assertEditableType).
@@ -81,6 +84,8 @@ export async function addKey(
       },
     ],
   });
+  // P43 F11/D15: the new key's own container level just gained a member.
+  browseInvalidate(tab.connectionId, pathParent(tab.path) ?? '');
   const databaseSegment = decodePath(tab.connectionId, tab.path).segments.find(
     (s) => s.kind === 'database',
   );
