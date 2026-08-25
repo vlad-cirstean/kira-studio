@@ -1,0 +1,94 @@
+import { reactive } from 'vue';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
+import { matchedRowsOf } from './searchFilter';
+
+// P39 F10: grid/search.ts, documents/docSearch.ts and keyvalue/kvSearch.ts declared the same
+// SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
+// cancel/zero-width-match/onProgress/resolve semantics, differing only in the per-row scan body.
+// stream/streamSearch.ts is deliberately NOT built on this — it is a simpler, different scanner
+// (one case-insensitive substring match across five fixed columns, no case/word/regex toggles).
+
+export interface SearchQuery {
+  text: string;
+  matchCase: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
+export interface SearchHandle<M> {
+  cancel(): void;
+  done: Promise<M[]>;
+}
+
+const CHUNK_ROWS = 2000;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Throws SyntaxError synchronously for an invalid regex, before any scan starts — the contract
+ *  every search toolbar depends on to show the error inline rather than as a rejected scan. */
+export function compilePattern(q: SearchQuery): RegExp {
+  const flags = q.matchCase ? 'g' : 'gi';
+  return q.regex
+    ? new RegExp(q.text, flags)
+    : new RegExp(q.wholeWord ? `\\b${escapeRegExp(q.text)}\\b` : escapeRegExp(q.text), flags);
+}
+
+// §8.5 (D28): searches the loaded page only, never the server. Iterates in chunks of 2 000 rows
+// per animation frame; a new keystroke cancels and restarts.
+export function runChunkedScan<M>(
+  totalRows: number,
+  scanRow: (row: number, pattern: RegExp, out: M[]) => void,
+  q: SearchQuery,
+  onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
+): SearchHandle<M> {
+  const pattern = compilePattern(q);
+  let cancelled = false;
+  const matches: M[] = [];
+
+  const done = new Promise<M[]>((resolve) => {
+    let row = 0;
+    function step(): void {
+      if (cancelled) {
+        resolve(matches);
+        return;
+      }
+      const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
+      for (; row < chunkEnd; row++) {
+        scanRow(row, pattern, matches);
+      }
+      onProgress(matches.length, row, totalRows);
+      if (row < totalRows) requestAnimationFrame(step);
+      else resolve(matches);
+    }
+    requestAnimationFrame(step);
+  });
+
+  return {
+    cancel() {
+      cancelled = true;
+    },
+    done,
+  };
+}
+
+/** The per-tab match record + its tab-close cleanup registration, once per view module. */
+export function createSearchState<M extends { row: number }>(): {
+  searchState: Record<string, { matches: M[]; index: number }>;
+  clearSearchState(tabId: string): void;
+  matchedRows(tabId: string): number[] | null;
+} {
+  const searchState = reactive({} as Record<string, { matches: M[]; index: number }>);
+
+  function clearSearchState(tabId: string): void {
+    delete searchState[tabId];
+  }
+  registerTabRuntimeCleanup(clearSearchState);
+
+  function matchedRows(tabId: string): number[] | null {
+    return matchedRowsOf(tabId, searchState[tabId]?.matches);
+  }
+
+  return { searchState, clearSearchState, matchedRows };
+}

@@ -7,6 +7,7 @@ import { getPage, pageVersion } from './page';
 import {
   clearSearchState,
   isSearchFiltering,
+  type Match,
   matchedRows,
   runSearch,
   type SearchHandle,
@@ -51,7 +52,7 @@ const errorMessage = ref<string | null>(null);
 const scanning = ref(false);
 const foundSoFar = ref(0);
 
-let handle: SearchHandle | null = null;
+let handle: SearchHandle<Match> | null = null;
 
 const entry = computed(() => searchState[props.tabId]);
 

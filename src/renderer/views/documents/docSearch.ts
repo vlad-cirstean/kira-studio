@@ -1,7 +1,12 @@
-import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { matchedRowsOf } from '../shared/searchFilter';
+import {
+  createSearchState,
+  runChunkedScan,
+  type SearchHandle,
+  type SearchQuery,
+} from '../shared/pageScan';
 import { documentRow, getPage } from './docPage';
+
+export type { SearchHandle, SearchQuery };
 
 export interface Match {
   row: number;
@@ -9,39 +14,11 @@ export interface Match {
   end: number;
 }
 
-export interface SearchQuery {
-  text: string;
-  matchCase: boolean;
-  wholeWord: boolean;
-  regex: boolean;
-}
+// Mirrors views/grid/search.ts's searchState, narrowed to one column (a document has no columns
+// to disambiguate a match's position within).
+const { searchState, clearSearchState, matchedRows } = createSearchState<Match>();
 
-export interface SearchHandle {
-  cancel(): void;
-  done: Promise<Match[]>;
-}
-
-const CHUNK_ROWS = 2000;
-
-// Per-tab search results — mirrors views/grid/search.ts's searchState, narrowed to one column
-// (a document has no columns to disambiguate a match's position within).
-export const searchState = reactive({} as Record<string, { matches: Match[]; index: number }>);
-
-export function clearSearchState(tabId: string): void {
-  delete searchState[tabId];
-}
-
-// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup(clearSearchState);
-
-// P31 D16: thin wrapper over matchedRowsOf, same shape as grid/search.ts's own.
-export function matchedRows(tabId: string): number[] | null {
-  return matchedRowsOf(tabId, searchState[tabId]?.matches);
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+export { clearSearchState, matchedRows, searchState };
 
 // P27 D9/P31 D20: DocumentView.vue's collapsed row shows only the `_id` until expanded (D1) —
 // exported so the view can build the *same* string a search matched against, and wrap the
@@ -56,57 +33,32 @@ export function previewLineFor(body: string): string {
 // and to each document's rendered preview line specifically, not the full raw EJSON body: a
 // document's "columns" are dynamic, so there is no per-field grid to search field-by-field the
 // way views/grid/search.ts does, and full-text-over-EJSON would be new scope this task doesn't
-// ask for. Iterates in chunks of 2 000 rows per animation frame, same budget as the grid's search.
+// ask for.
 export function runSearch(
   tabId: string,
   q: SearchQuery,
   onProgress: (found: number, rowsScanned: number, totalRows: number) => void,
-): SearchHandle {
+): SearchHandle<Match> {
   const page = getPage(tabId);
   if (!page || q.text === '') {
     return { cancel() {}, done: Promise.resolve([]) };
   }
 
-  const flags = q.matchCase ? 'g' : 'gi';
-  const pattern = q.regex
-    ? new RegExp(q.text, flags) // throws SyntaxError synchronously for invalid input
-    : new RegExp(q.wholeWord ? `\\b${escapeRegExp(q.text)}\\b` : escapeRegExp(q.text), flags);
-
-  let cancelled = false;
-  const matches: Match[] = [];
-  const totalRows = page.rowCount;
-
-  const done = new Promise<Match[]>((resolve) => {
-    let row = 0;
-    function step(): void {
-      if (cancelled) {
-        resolve(matches);
-        return;
+  return runChunkedScan<Match>(
+    page.rowCount,
+    (row, pattern, out) => {
+      const doc = documentRow(tabId, row);
+      if (!doc) return;
+      const text = previewLineFor(doc.body);
+      pattern.lastIndex = 0;
+      let m = pattern.exec(text);
+      while (m) {
+        out.push({ row, start: m.index, end: m.index + m[0].length });
+        if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
+        m = pattern.exec(text);
       }
-      const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
-      for (; row < chunkEnd; row++) {
-        const doc = documentRow(tabId, row);
-        if (!doc) continue;
-        const text = previewLineFor(doc.body);
-        pattern.lastIndex = 0;
-        let m = pattern.exec(text);
-        while (m) {
-          matches.push({ row, start: m.index, end: m.index + m[0].length });
-          if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
-          m = pattern.exec(text);
-        }
-      }
-      onProgress(matches.length, row, totalRows);
-      if (row < totalRows) requestAnimationFrame(step);
-      else resolve(matches);
-    }
-    requestAnimationFrame(step);
-  });
-
-  return {
-    cancel() {
-      cancelled = true;
     },
-    done,
-  };
+    q,
+    onProgress,
+  );
 }

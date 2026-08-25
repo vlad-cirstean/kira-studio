@@ -7,6 +7,7 @@ import { isSearchFiltering, setSearchFiltering } from '../shared/searchFilter';
 import { getPage, pageVersion } from './kvPage';
 import {
   clearSearchState,
+  type Match,
   matchedRows,
   runSearch,
   type SearchHandle,
@@ -45,7 +46,7 @@ const foundSoFar = ref(0);
 // right place to autofocus (this component is mounted fresh each time the toolbar opens).
 const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
-let handle: SearchHandle | null = null;
+let handle: SearchHandle<Match> | null = null;
 
 const entry = computed(() => searchState[props.tabId]);
 
