@@ -1,10 +1,10 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
-import type { SearchHandle } from './pageScan';
-import type { PageSearchApi } from './pageSearch';
+import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import IconButton from '../../../theme/primitives/IconButton.vue';
+import TextField from '../../../theme/primitives/TextField.vue';
+import type { SearchHandle } from './scan';
+import type { PageSearchApi } from './search';
 import { isSearchFiltering, setSearchFiltering } from './searchFilter';
 
 // P39 D9: replaces grid/SearchToolbar.vue, documents/DocumentSearchToolbar.vue and

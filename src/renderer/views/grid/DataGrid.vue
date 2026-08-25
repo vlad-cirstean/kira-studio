@@ -25,8 +25,8 @@ import {
   resetMeasureCtx,
   resolveColumnOrder,
   visibleColumnRange,
-} from '../shared/columns';
-import { setSearchFiltering } from '../shared/searchFilter';
+} from '../shared/page/columns';
+import { setSearchFiltering } from '../shared/page/searchFilter';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { typeDescription } from '../shared/typeGlossary';
 import {

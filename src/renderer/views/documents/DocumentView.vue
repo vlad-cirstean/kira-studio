@@ -23,9 +23,9 @@ import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
-import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
-import { pageSizeOptions } from '../shared/pageSizes';
-import { setSearchFiltering } from '../shared/searchFilter';
+import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import { setSearchFiltering } from '../shared/page/searchFilter';
+import { pageSizeOptions } from '../shared/page/sizes';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentTree from './DocumentTree.vue';
@@ -646,7 +646,7 @@ onUnmounted(() => {
         </MessageStrip>
         <!-- Below the filter/sort row, above the list it searches — PageSearchToolbar.vue's own
              "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
-        <PageSearchToolbar
+        <SearchToolbar
           v-if="rt?.searchOpen"
           :tab-id="tab.id"
           testid-prefix="document-"

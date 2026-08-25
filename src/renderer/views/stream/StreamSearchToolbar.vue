@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { isSearchFiltering, setSearchFiltering } from '../shared/searchFilter';
+import { isSearchFiltering, setSearchFiltering } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import {
   clearSearchState,

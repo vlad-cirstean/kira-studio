@@ -5,7 +5,7 @@ import { publishSelectedCell, type SelectedCell } from '../../state/cellSelectio
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { cellClass } from '../../theme/cellClass';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
-import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/columns';
+import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
 import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console

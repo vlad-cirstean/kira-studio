@@ -1,6 +1,11 @@
 import { cellText } from '@shared/protocol/page';
-import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
-import { createPageSearch } from '../shared/pageSearch';
+import {
+  eachMatch,
+  runChunkedScan,
+  type SearchHandle,
+  type SearchQuery,
+} from '../shared/page/scan';
+import { createPageSearch } from '../shared/page/search';
 import { getPage, pageVersion } from './page';
 
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns

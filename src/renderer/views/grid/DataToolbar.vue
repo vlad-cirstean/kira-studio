@@ -8,7 +8,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import RunState from '../../theme/primitives/RunState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { pageSizeOptions } from '../shared/pageSizes';
+import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { getPage } from './page';

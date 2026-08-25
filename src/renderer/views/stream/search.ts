@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { isSearchFiltering } from '../shared/searchFilter';
+import { isSearchFiltering } from '../shared/page/searchFilter';
 import { getPage, streamRow } from './page';
 
 // Item 5's precedent (grid/search.ts): filters purely client-side against the already-fetched

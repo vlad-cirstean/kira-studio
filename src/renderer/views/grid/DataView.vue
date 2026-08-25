@@ -9,7 +9,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
-import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
+import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
@@ -150,7 +150,7 @@ function onCloseSearch(): void {
       <!-- Below the filter row, not floating over the grid it searches — the "docks at the
            bottom of the result" placement from Toolbars.html overlapped the last visible row,
            which read as a bug rather than a search bar. -->
-      <PageSearchToolbar
+      <SearchToolbar
         v-if="rt?.searchOpen"
         :tab-id="tab.id"
         testid-prefix=""

@@ -1,5 +1,5 @@
 import { cellText, type DocumentPage, isTruncated } from '@shared/protocol/page';
-import { createPageStore } from '../shared/pageStore';
+import { createPageStore } from '../shared/page/store';
 import { resetRows, rowView } from './documentRows';
 
 // P27 D21: a new page has new rows — every memoized parse and every nested-expansion path

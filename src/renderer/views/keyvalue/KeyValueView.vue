@@ -25,9 +25,9 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
-import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
-import { pageSizeOptions } from '../shared/pageSizes';
-import { setSearchFiltering } from '../shared/searchFilter';
+import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import { setSearchFiltering } from '../shared/page/searchFilter';
+import { pageSizeOptions } from '../shared/page/sizes';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
@@ -765,7 +765,7 @@ onUnmounted(() => {
         </MessageStrip>
       </template>
 
-      <PageSearchToolbar
+      <SearchToolbar
         v-if="rt?.searchOpen"
         :tab-id="tab.id"
         testid-prefix="keyvalue-"

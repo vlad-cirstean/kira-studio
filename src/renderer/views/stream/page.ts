@@ -1,5 +1,5 @@
 import { cellText, isNull, isTruncated, type StreamPage } from '@shared/protocol/page';
-import { createPageStore } from '../shared/pageStore';
+import { createPageStore } from '../shared/page/store';
 
 const store = createPageStore<StreamPage>();
 

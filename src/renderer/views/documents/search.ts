@@ -1,5 +1,10 @@
-import { eachMatch, runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
-import { createPageSearch } from '../shared/pageSearch';
+import {
+  eachMatch,
+  runChunkedScan,
+  type SearchHandle,
+  type SearchQuery,
+} from '../shared/page/scan';
+import { createPageSearch } from '../shared/page/search';
 import { documentRow, getPage, pageVersion } from './page';
 
 export interface Match {
