@@ -6,7 +6,13 @@ import PanelSplitter from '../../../theme/primitives/PanelSplitter.vue';
 import CellEditorView from './CellEditorView.vue';
 
 // Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.
-const props = defineProps<{ tabId: string }>();
+// `readOnly` (P40 D11): true when the mounting view has no write path for its cells at all (the
+// query console) — a viewer, not an editor that happens to be refusing this particular cell.
+// Distinct from a cell being individually uneditable (a read-only connection, a truncated value),
+// which stays governed by CellEditorView's own readOnlyReasonFor regardless of this flag.
+const props = withDefaults(defineProps<{ tabId: string; readOnly?: boolean }>(), {
+  readOnly: false,
+});
 
 const cell = computed(() => selectedCellFor(props.tabId));
 </script>
@@ -28,7 +34,7 @@ const cell = computed(() => selectedCellFor(props.tabId));
       :data-tab-id="tabId"
       :style="{ height: `${layoutState.panel.cellEditor.height}px` }"
     >
-      <CellEditorView :cell="cell" />
+      <CellEditorView :cell="cell" :read-only="readOnly" />
     </div>
   </template>
 </template>

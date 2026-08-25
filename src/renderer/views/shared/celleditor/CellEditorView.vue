@@ -32,8 +32,14 @@ const statusEncoder = new TextEncoder();
 // P26 D4: the dock decides whether there is a cell to render at all (its own v-if) — this
 // component is only ever mounted with one, so no downstream code needs to null-guard it. Named
 // `selectedCell` rather than `cell` to avoid colliding with the `cell` prop itself.
-const props = defineProps<{ cell: SelectedCell }>();
+// `readOnly` (P40 D11): forwarded from CellEditorDock — true when the mounting view (the query
+// console) has no write path for its cells at all, distinct from a cell being individually
+// uneditable (readOnlyReasonFor below, unaffected by this flag).
+const props = withDefaults(defineProps<{ cell: SelectedCell; readOnly?: boolean }>(), {
+  readOnly: false,
+});
 const selectedCell = computed(() => props.cell);
+const viewerMode = computed(() => props.readOnly === true);
 
 const override = computed<CellFormat | null>(() => overrideFor(selectedCell.value));
 
@@ -63,14 +69,23 @@ const sqlDialect = computed(() => {
   return sqlDialectFor(record?.kind);
 });
 
-const readOnlyReason = computed(() => readOnlyReasonFor(selectedCell.value));
+// P40 D12: no reason chip in viewer mode — "No primary key" (or any other reason) is a statement
+// about a write that was never on offer here (the query console's results have no addressable
+// row to write back to at all), not an explanation of a refusal. `readOnlyChipText`/`Title` below
+// are unreachable once this is null, since the template's own v-if gates on `readOnlyReason`.
+const readOnlyReason = computed(() =>
+  viewerMode.value ? null : readOnlyReasonFor(selectedCell.value),
+);
 
 // D4 (revised): editable only when the cell is genuinely writable (`readOnlyReason === null`)
 // *and* whoever published it handed over a way to stage the write (`cell.onEdit`, today set only
 // by `DataGrid.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
 // Console — keeps its cells read-only here even once `readOnlyReasonFor()` says nothing's wrong,
-// since there'd be nowhere for a save to go.
-const isEditable = computed(() => readOnlyReason.value === null && !!selectedCell.value.onEdit);
+// since there'd be nowhere for a save to go. `!viewerMode.value` is redundant with that (a viewer
+// mount never sets onEdit either) but stated explicitly so this can't drift if one ever did.
+const isEditable = computed(
+  () => !viewerMode.value && readOnlyReason.value === null && !!selectedCell.value.onEdit,
+);
 const readOnlyChipText = computed(() => {
   switch (readOnlyReason.value) {
     case 'connection-read-only':
@@ -294,6 +309,7 @@ const statusLine = computed(() => {
     :data-cell-key="cellKey(selectedCell)"
     :data-format="effectiveFormat"
     :data-detected="detectedFormat"
+    :data-read-only="viewerMode || undefined"
     :data-read-only-reason="readOnlyReason"
     :data-formatted="formatted"
     :data-dirty="isDirty"
@@ -328,14 +344,21 @@ const statusLine = computed(() => {
           <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
         </select>
 
-        <IconButton
-          icon="sparkle"
-          data-testid="cell-editor-uuid-generate"
-          :disabled="!canGenerateUuid"
-          v-tooltip="uuidGenerateTitle"
-          @click="generateUuid"
-        />
-        <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" />
+        <!-- P40 D13: neither affordance serves a purpose in viewer mode — UUID-generate is
+             permanently disabled there anyway (canGenerateUuid requires isEditable), and its
+             disabled tooltip ("Available when the format is UUID") would be a false statement on
+             a cell whose format genuinely is UUID. EditBufferActions' own modified chip/byte
+             badge/Beautify/Revert describe an edit buffer that, in a viewer, can never be dirty. -->
+        <template v-if="!viewerMode">
+          <IconButton
+            icon="sparkle"
+            data-testid="cell-editor-uuid-generate"
+            :disabled="!canGenerateUuid"
+            v-tooltip="uuidGenerateTitle"
+            @click="generateUuid"
+          />
+          <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" />
+        </template>
       </span>
 
       <template #trailing>

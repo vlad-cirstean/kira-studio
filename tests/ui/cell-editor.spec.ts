@@ -884,6 +884,22 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
   await page.locator('[data-testid="console-result-cell"]').first().click();
   await expect(panel).toHaveAttribute('data-cell-key', new RegExp(`^${consoleTabId}:`));
 
+  // (3b) P40 D11/D12/D13: the console's dock is a viewer, not an editor refusing this cell — no
+  // reason chip (there was never a write on offer to refuse), and none of the edit-buffer
+  // affordances that exist only to serve staging one.
+  await expect(panel).toHaveAttribute('data-read-only', 'true');
+  await expect(panel).not.toHaveAttribute('data-read-only-reason');
+  await expect(panel.locator('[data-testid="cell-editor-uuid-generate"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-byte-badge"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-beautify-compact"]')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="cell-editor-beautify-reset"]')).toHaveCount(0);
+  // Facts about the value, not ways to write it, still show.
+  await expect(panel.locator('[data-testid="cell-editor-format"]')).toBeVisible();
+  await expect(panel.locator('[data-testid="cell-editor-status"]')).toBeVisible();
+  await expect(panel.locator('[data-testid="cell-editor-close"]')).toBeVisible();
+
   // (4) The bug: switch back to the data tab. The panel must show the data tab's cell again —
   // never the console tab's, whether by the grid's own republish-on-mount or by nothing
   // overwriting a per-tab record that no longer exists in a shared slot.

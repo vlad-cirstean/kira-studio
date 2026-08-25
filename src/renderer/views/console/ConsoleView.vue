@@ -332,7 +332,9 @@ const statusLine = computed(() => {
         </div>
       </div>
 
-      <CellEditorDock :tab-id="tab.id" />
+      <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
+           viewer, not an editor refusing this particular cell (F12/F13). -->
+      <CellEditorDock :tab-id="tab.id" :read-only="true" />
     </ViewChrome>
   </div>
 </template>
