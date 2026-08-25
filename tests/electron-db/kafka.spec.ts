@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { encodeKafkaStreamFilter, type KafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { NodePath } from '@shared/domain/tree';
+import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
 import { kafkaCaps } from '../../src/engine/adapters/kafka/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { encodePageToken, requestFingerprint } from '../../src/engine/adapters/sql-text';
-import { cellText, isNull, type StreamPage } from '../../src/shared/protocol/page';
 import {
   CONSUMER_GROUP,
   EMPTY_TOPIC,
