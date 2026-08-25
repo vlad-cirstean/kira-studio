@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RowDensity, SettingsPatch } from '@shared/settings';
+import type { RowDensity, SettingsPatch } from '@shared/domain/settings';
 import { computed, ref } from 'vue';
 import { data } from '../bridge/data';
 import { fontStackAvailable, resolveFontFallback } from '../fonts';

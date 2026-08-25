@@ -28,7 +28,7 @@ test.afterAll(async () => {
   await pg?.stop();
 });
 
-// shared/shortcuts.ts's cmdOrCtrl chords resolve via matchesShortcut (renderer/shortcuts/keys.ts),
+// shared/domain/shortcuts.ts's cmdOrCtrl chords resolve via matchesShortcut (renderer/shortcuts/keys.ts),
 // which on mac requires metaKey and explicitly rejects ctrlKey (the "other platform" mod) — unlike
 // DataGrid.vue's own inline copy/paste checks (`e.ctrlKey || e.metaKey`), which accept either. A
 // literal 'Control+d'/'Control+c' silently no-ops on macOS for any shortcut routed through

@@ -4,7 +4,7 @@ import {
   type SettingsPatch,
   settingsPatchSchema,
   settingsSchema,
-} from '../../../shared/settings';
+} from '../../../shared/domain/settings';
 import type { KiraDb } from '../db';
 import { settings } from '../schema/settings';
 

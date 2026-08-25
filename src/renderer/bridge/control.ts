@@ -3,6 +3,7 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
+import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
   ConsoleBody,
@@ -14,9 +15,9 @@ import type {
   SortSpec,
 } from '@shared/domain/queries';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
+import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import type { Layout, LayoutPatch } from '@shared/layout';
 import type {
   AppInfo,
   ConnectionTestResult,
@@ -28,7 +29,6 @@ import type {
   TreeDefinitionResult,
   TreeDescribeResult,
 } from '@shared/protocol/ipc';
-import type { Settings, SettingsPatch } from '@shared/settings';
 
 const kira = window.kira;
 

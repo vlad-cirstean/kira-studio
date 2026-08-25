@@ -1,4 +1,4 @@
-import type { ShortcutId } from '@shared/shortcuts';
+import type { ShortcutId } from '@shared/domain/shortcuts';
 import { reactive } from 'vue';
 
 export type MenuItem =

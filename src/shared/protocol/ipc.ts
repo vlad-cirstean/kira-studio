@@ -1,5 +1,6 @@
 import type { ConnectionInput, ConnectionState, ConnectionSummary } from '../domain/connection';
 import type { ObjectDefinition } from '../domain/definition';
+import type { Layout, LayoutPatch } from '../domain/layout';
 import type { OpRecord } from '../domain/ops';
 import type {
   ConsoleBody,
@@ -11,11 +12,10 @@ import type {
   SortSpec,
 } from '../domain/queries';
 import type { SecretStorageStatus } from '../domain/secrets';
+import type { Settings, SettingsPatch } from '../domain/settings';
 import type { TabRecord } from '../domain/tabs';
 import type { ObjectMeta, TreeNode } from '../domain/tree';
 import type { TreeVisibility } from '../domain/tree-filter';
-import type { Layout, LayoutPatch } from '../layout';
-import type { Settings, SettingsPatch } from '../settings';
 
 export const IPC = {
   appInfo: 'kira:app:info',

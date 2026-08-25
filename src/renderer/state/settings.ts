@@ -1,4 +1,4 @@
-import { defaultSettings, type Settings, type SettingsPatch } from '@shared/settings';
+import { defaultSettings, type Settings, type SettingsPatch } from '@shared/domain/settings';
 import { reactive, ref } from 'vue';
 import { control } from '../bridge/control';
 

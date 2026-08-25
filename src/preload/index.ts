@@ -4,6 +4,7 @@ import type {
   ConnectionState,
   ConnectionSummary,
 } from '../shared/domain/connection';
+import type { LayoutPatch } from '../shared/domain/layout';
 import type { OpRecord } from '../shared/domain/ops';
 import type {
   ConsoleBody,
@@ -14,9 +15,9 @@ import type {
   SavedQuery,
   SortSpec,
 } from '../shared/domain/queries';
+import type { Settings, SettingsPatch } from '../shared/domain/settings';
 import type { TabRecord } from '../shared/domain/tabs';
 import type { TreeVisibility } from '../shared/domain/tree-filter';
-import type { LayoutPatch } from '../shared/layout';
 import type {
   EngineStatus,
   FilesChooseOpenArgs,
@@ -26,7 +27,6 @@ import type {
   TreeDescribeResult,
 } from '../shared/protocol/ipc';
 import { IPC } from '../shared/protocol/ipc';
-import type { Settings, SettingsPatch } from '../shared/settings';
 
 const kiraApi: KiraApi = {
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),

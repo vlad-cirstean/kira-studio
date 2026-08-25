@@ -1,5 +1,5 @@
-import type { PingPayload, PortRequest, PortResponse } from '../shared/port';
 import { DATA_OP, invalidateRequestWireSchema } from '../shared/protocol/data-ops';
+import type { PingPayload, PortRequest, PortResponse } from '../shared/protocol/port';
 import { cache } from './cache';
 import {
   handleCount,

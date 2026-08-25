@@ -4,7 +4,7 @@ import {
   type LayoutPatch,
   layoutPatchSchema,
   layoutSchema,
-} from '../../../shared/layout';
+} from '../../../shared/domain/layout';
 import type { KiraDb } from '../db';
 import { uiLayout } from '../schema/layout';
 

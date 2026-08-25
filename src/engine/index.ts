@@ -1,6 +1,6 @@
 import type { MessagePortMain } from 'electron';
-import type { PortEvent, PortRequest, PortResponse } from '../shared/port';
 import { PORT_EVENT } from '../shared/protocol/data-ops';
+import type { PortEvent, PortRequest, PortResponse } from '../shared/protocol/port';
 import { cache } from './cache';
 import { handleFrame } from './control';
 import { dispatch } from './rpc';

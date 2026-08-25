@@ -1,4 +1,4 @@
-import { defaultLayout, type Layout, type LayoutPatch } from '@shared/layout';
+import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/layout';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 

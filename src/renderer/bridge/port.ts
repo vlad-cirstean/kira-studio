@@ -1,4 +1,4 @@
-import type { PortEvent, PortRequest, PortResponse } from '@shared/port';
+import type { PortEvent, PortRequest, PortResponse } from '@shared/protocol/port';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 

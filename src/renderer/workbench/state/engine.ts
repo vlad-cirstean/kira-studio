@@ -1,4 +1,4 @@
-import type { PingPayload } from '@shared/port';
+import type { PingPayload } from '@shared/protocol/port';
 import { reactive } from 'vue';
 import { ready, request } from '../../bridge/port';
 

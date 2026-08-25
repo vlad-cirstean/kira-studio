@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { type MessagePortMain, type UtilityProcess, utilityProcess } from 'electron';
-import type { PortEvent, PortRequest, PortResponse } from '../shared/port';
+import type { PortEvent, PortRequest, PortResponse } from '../shared/protocol/port';
 import { log } from './log';
 
 const DEFAULT_TIMEOUT_MS = 30_000;

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
+import { accelerator } from '../shared/domain/shortcuts';
 import { IPC } from '../shared/protocol/ipc';
-import { accelerator } from '../shared/shortcuts';
 
 function sendToFocusedWindow(channel: string): void {
   const window = BrowserWindow.getFocusedWindow();

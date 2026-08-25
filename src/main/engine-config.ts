@@ -1,5 +1,5 @@
+import type { Settings } from '../shared/domain/settings';
 import { ENGINE_OP } from '../shared/protocol/engine-ops';
-import type { Settings } from '../shared/settings';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
 import type { KiraDb } from './storage/db';

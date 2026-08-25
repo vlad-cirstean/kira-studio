@@ -1,4 +1,4 @@
-import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/shortcuts';
+import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/domain/shortcuts';
 
 // Menus build synchronously and AppInfo (shared/protocol/ipc.ts) is fetched async, so a UA sniff
 // beats plumbing a platform bridge through for one boolean that never changes for the process's
