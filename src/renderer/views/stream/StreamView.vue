@@ -19,7 +19,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { setSearchFiltering } from '../shared/searchFilter';
 import StreamComposeMessage from './StreamComposeMessage.vue';

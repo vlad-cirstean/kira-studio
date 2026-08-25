@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
-import type { SelectedCell } from '../../state/cellSelection';
-import { connectionsState } from '../../state/connections';
+import type { SelectedCell } from '../../../state/cellSelection';
+import { connectionsState } from '../../../state/connections';
 import type { CellFormat } from './formats';
 
 /** P5 adds 'no-primary-key' — a table with no primary key can't identify a row to write. P24 D27

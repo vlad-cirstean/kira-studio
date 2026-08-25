@@ -21,7 +21,7 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
-import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { setSearchFiltering } from '../shared/searchFilter';

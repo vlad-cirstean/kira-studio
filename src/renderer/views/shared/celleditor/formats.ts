@@ -1,5 +1,10 @@
-import { type BeautifyMode, type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
-import type { EditorLanguageId } from '../../editor/languages';
+import {
+  type BeautifyMode,
+  type BeautifyResult,
+  beautifyJson,
+  beautifyXml,
+} from '../../../beautify';
+import type { EditorLanguageId } from '../../../editor/languages';
 
 /** §8.6's closed vocabulary, decided once (D8) — the same call P1 D4 made for `Caps`. */
 export const CELL_FORMATS = [

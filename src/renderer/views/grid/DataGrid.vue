@@ -18,8 +18,6 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import { sqlDialectFor } from '../shared/sqlIdent';
-import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
   alignmentFor,
   columnOffsets,
@@ -28,7 +26,9 @@ import {
   resetMeasureCtx,
   resolveColumnOrder,
   visibleColumnRange,
-} from './columns';
+} from '../shared/columns';
+import { sqlDialectFor } from '../shared/sqlIdent';
+import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './gridMenu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {

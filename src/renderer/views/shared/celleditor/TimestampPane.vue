@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
-import DateTimePicker from '../shared/DateTimePicker.vue';
+import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import IconButton from '../../../theme/primitives/IconButton.vue';
+import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
+import SegmentedControl from '../../../theme/primitives/SegmentedControl.vue';
+import TextField from '../../../theme/primitives/TextField.vue';
+import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
 import {
   defaultShapeFor,

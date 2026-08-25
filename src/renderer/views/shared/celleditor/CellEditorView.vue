@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import type { EditorLanguageId } from '../../editor/languages';
-import { formatBytes } from '../../format';
-import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../state/cellSelection';
-import { connectionsState } from '../../state/connections';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import ViewHeader from '../../theme/primitives/ViewHeader.vue';
-import EditBufferActions from '../shared/EditBufferActions.vue';
-import { sqlDialectFor } from '../shared/sqlIdent';
-import { useEditBuffer } from '../shared/useEditBuffer';
+import CodeMirrorHost from '../../../editor/CodeMirrorHost.vue';
+import type { EditorLanguageId } from '../../../editor/languages';
+import { formatBytes } from '../../../format';
+import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
+import { connectionsState } from '../../../state/connections';
+import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import IconButton from '../../../theme/primitives/IconButton.vue';
+import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
+import EditBufferActions from '../EditBufferActions.vue';
+import { sqlDialectFor } from '../sqlIdent';
+import { useEditBuffer } from '../useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {

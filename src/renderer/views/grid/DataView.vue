@@ -9,7 +9,7 @@ import { connColorVar } from '../../theme/connColor';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
-import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';

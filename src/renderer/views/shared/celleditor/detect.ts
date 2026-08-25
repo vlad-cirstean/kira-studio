@@ -1,5 +1,5 @@
 import type { TypeClass } from '@shared/protocol/page';
-import { scanJson, scanXml } from '../../beautify';
+import { scanJson, scanXml } from '../../../beautify';
 import { CELL_FORMATS, type CellFormat } from './formats';
 
 export interface DetectInput {
