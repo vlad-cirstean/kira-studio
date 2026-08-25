@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, notInArray } from 'drizzle-orm';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { metadataCache } from '../schema/metadata-cache';
@@ -15,6 +15,14 @@ interface CachedPayload {
 }
 
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
+// P43 iter2 F15/D20: a Browse session writes one row per level navigated, each up to
+// MAX_PAYLOAD_BYTES, with no eviction until the connection's next successful connect
+// (main/connections.ts's own dropCached) — a single session that browses deep leaves the on-disk
+// cache unbounded until then. Per-connection (not global) so one heavily-browsed S3 connection
+// cannot evict a small Postgres connection's whole tree. Same order as db.ts's own
+// STMT_CACHE_MAX and repos/ops.ts's HARD_CAP_ROWS; an evicted level costs one round trip to
+// re-fetch.
+const MAX_ROWS_PER_CONNECTION = 200;
 
 async function readPayload(
   db: KiraDb,
@@ -84,6 +92,29 @@ export async function putCached(
         target: [metadataCache.connectionId, metadataCache.path],
         set: { kind, payloadJson: json, fetchedAt },
       });
+
+    // D20's eviction pass: keep this connection's MAX_ROWS_PER_CONNECTION newest-`fetched_at`
+    // rows, drop the rest. An `onConflictDoUpdate` above never grows the connection's row count,
+    // so this only ever has anything to do right after the insert branch actually added a row —
+    // but running it unconditionally is one cheap indexed query against a table this small, not
+    // a cost worth special-casing around.
+    const keep = await tx
+      .select({ path: metadataCache.path })
+      .from(metadataCache)
+      .where(eq(metadataCache.connectionId, connectionId))
+      .orderBy(desc(metadataCache.fetchedAt))
+      .limit(MAX_ROWS_PER_CONNECTION);
+    const keepPaths = keep.map((r) => r.path);
+    if (keepPaths.length > 0) {
+      await tx
+        .delete(metadataCache)
+        .where(
+          and(
+            eq(metadataCache.connectionId, connectionId),
+            notInArray(metadataCache.path, keepPaths),
+          ),
+        );
+    }
   });
 }
 
