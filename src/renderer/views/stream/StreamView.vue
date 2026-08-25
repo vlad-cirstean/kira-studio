@@ -21,6 +21,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
+import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
@@ -197,12 +198,7 @@ const statusLine = computed(() => {
 });
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
-const PAGE_SIZE_OPTIONS: { value: PageSize; label: string; testid: string }[] = [
-  { value: 10, label: '10', testid: 'stream-page-size-10' },
-  { value: 100, label: '100', testid: 'stream-page-size-100' },
-  { value: 1000, label: '1k', testid: 'stream-page-size-1000' },
-  { value: 10000, label: '10k', testid: 'stream-page-size-10000' },
-];
+const PAGE_SIZE_OPTIONS = pageSizeOptions('stream-');
 function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
 }

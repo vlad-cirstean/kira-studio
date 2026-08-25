@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DataTabState } from '@shared/domain/tabs';
+import type { PageSize } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
 import { connectionsState } from '../../state/connections';
 import { useRunState } from '../../state/runState';
@@ -8,6 +8,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import RunState from '../../theme/primitives/RunState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import { pageSizeOptions } from '../shared/pageSizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { getPage } from './page';
@@ -36,12 +37,7 @@ import {
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
-const PAGE_SIZE_OPTIONS: { value: DataTabState['pageSize']; label: string; testid: string }[] = [
-  { value: 10, label: '10', testid: 'page-size-10' },
-  { value: 100, label: '100', testid: 'page-size-100' },
-  { value: 1000, label: '1k', testid: 'page-size-1000' },
-  { value: 10000, label: '10k', testid: 'page-size-10000' },
-];
+const PAGE_SIZE_OPTIONS = pageSizeOptions('');
 
 const tab = computed(() => activeDataTab.value);
 const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
@@ -116,7 +112,7 @@ function onCount(): void {
 function onStop(): void {
   if (tab.value) stop(tab.value.id);
 }
-function onPageSize(size: DataTabState['pageSize']): void {
+function onPageSize(size: PageSize): void {
   if (tab.value) void setPageSize(tab.value.id, size);
 }
 function onJump(e: Event): void {

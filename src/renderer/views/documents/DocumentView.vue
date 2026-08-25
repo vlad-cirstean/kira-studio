@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
-import type { DocumentTabRecord, DocumentTabState } from '@shared/domain/tabs';
+import type { DocumentTabRecord, PageSize } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -25,6 +25,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
+import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import DocumentTree from './DocumentTree.vue';
@@ -233,15 +234,9 @@ function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null):
 }
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
-const PAGE_SIZE_OPTIONS: { value: DocumentTabState['pageSize']; label: string; testid: string }[] =
-  [
-    { value: 10, label: '10', testid: 'document-page-size-10' },
-    { value: 100, label: '100', testid: 'document-page-size-100' },
-    { value: 1000, label: '1k', testid: 'document-page-size-1000' },
-    { value: 10000, label: '10k', testid: 'document-page-size-10000' },
-  ];
+const PAGE_SIZE_OPTIONS = pageSizeOptions('document-');
 
-function onPageSize(size: DocumentTabState['pageSize']): void {
+function onPageSize(size: PageSize): void {
   setPageSize(props.tab.id, size);
 }
 

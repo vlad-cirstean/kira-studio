@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { KeyValueTabRecord, KeyValueTabState } from '@shared/domain/tabs';
+import type { KeyValueTabRecord, PageSize } from '@shared/domain/tabs';
 import { decodePath, pathParent, pathTail } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
@@ -27,6 +27,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
+import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
 import { keyValueMenu } from './keyValueMenu';
 import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
@@ -139,14 +140,8 @@ function memoryText(bytes: number | null): string {
 }
 
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
-const PAGE_SIZE_OPTIONS: { value: KeyValueTabState['pageSize']; label: string; testid: string }[] =
-  [
-    { value: 10, label: '10', testid: 'keyvalue-page-size-10' },
-    { value: 100, label: '100', testid: 'keyvalue-page-size-100' },
-    { value: 1000, label: '1k', testid: 'keyvalue-page-size-1000' },
-    { value: 10000, label: '10k', testid: 'keyvalue-page-size-10000' },
-  ];
-function onPageSize(size: KeyValueTabState['pageSize']): void {
+const PAGE_SIZE_OPTIONS = pageSizeOptions('keyvalue-');
+function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
 }
 
