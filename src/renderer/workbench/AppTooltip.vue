@@ -55,7 +55,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
       data-testid="app-tooltip"
       :style="style"
     >
-      {{ tooltipState.text }}
+      <template v-if="tooltipState.parts">
+        <div class="tip-head">
+          <span class="tip-title">{{ tooltipState.parts.title }}</span>
+          <span v-if="tooltipState.parts.meta" class="tip-meta">{{ tooltipState.parts.meta }}</span>
+        </div>
+        <div v-if="tooltipState.parts.body" class="tip-body">{{ tooltipState.parts.body }}</div>
+      </template>
+      <template v-else>{{ tooltipState.text }}</template>
     </div>
   </Teleport>
 </template>
@@ -76,5 +83,31 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   /* The ground rule this whole phase exists to keep: a tooltip must never be able to eat the
      click it is describing. */
   pointer-events: none;
+}
+
+/* P42 D19: the structured half — a bold name, a muted mono type badge beside it on the same
+   line, and a description below as its own paragraph, so "what this is called" reads distinct
+   from "what it holds" at a glance instead of running together in one block. .tip-title and
+   .tip-meta are siblings (not nested) so each is independently queryable by its own text — a
+   parent-child nesting would make .tip-title's own textContent include .tip-meta's. */
+.tip-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kira-s-2);
+}
+
+.tip-title {
+  font-weight: 600;
+}
+
+.tip-meta {
+  color: var(--kira-fg-muted);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-xs);
+}
+
+.tip-body {
+  margin-top: var(--kira-s-1);
+  color: var(--kira-fg-muted);
 }
 </style>

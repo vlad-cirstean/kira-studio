@@ -114,7 +114,20 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   // MySQL spec's own backtick assertion ---------------------------------------------------------
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
-  await expect(page.locator('[data-testid="grid-header-cell"][data-column="id"]')).toBeVisible();
+  const idHeader = page.locator('[data-testid="grid-header-cell"][data-column="id"]');
+  await expect(idHeader).toBeVisible();
+
+  // --- P42 D19/D20: the header tooltip renders name/type/description as separate elements. -----
+  await idHeader.hover();
+  const appTooltip = page.locator('[data-testid="app-tooltip"]');
+  await expect(appTooltip).toBeVisible({ timeout: 1_000 });
+  await expect(appTooltip.locator('.tip-title')).toHaveText('id');
+  await expect(appTooltip.locator('.tip-meta')).not.toBeEmpty();
+  await expect(appTooltip.locator('.tip-body')).not.toBeEmpty();
+  const idMeta = (await appTooltip.locator('.tip-meta').innerText()).trim();
+  const idBody = (await appTooltip.locator('.tip-body').innerText()).trim();
+  await expect(idHeader).toHaveAttribute('data-kira-tip', ['id', idMeta, idBody].join('\n'));
+  await page.mouse.move(4, 4);
 
   const idCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
   await expect(idCell).toBeVisible();

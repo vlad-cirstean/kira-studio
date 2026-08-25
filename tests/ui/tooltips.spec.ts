@@ -186,5 +186,28 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await toggleButton.click(); // restore, so the tree is still usable if anything runs after this
   await expect(projectPanel).toHaveCount(wasVisible ? 1 : 0);
 
+  // --- scenario 5: a structured tooltip (P42 D19/D20) — the grid header's own name/type/
+  // description renders as three separate elements, while data-kira-tip stays the exact same
+  // newline-joined plain text every existing assertion (and the a11y mirror) already reads. -----
+  const tenantIdHeader = page.locator('[data-testid="grid-header-cell"][data-column="tenant_id"]');
+  await tenantIdHeader.hover();
+  await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltip(page).locator('.tip-title')).toHaveText('tenant_id');
+  await expect(tooltip(page).locator('.tip-meta')).not.toBeEmpty();
+  await expect(tooltip(page).locator('.tip-body')).not.toBeEmpty();
+  const meta = (await tooltip(page).locator('.tip-meta').innerText()).trim();
+  const body = (await tooltip(page).locator('.tip-body').innerText()).trim();
+  await expect(tenantIdHeader).toHaveAttribute(
+    'data-kira-tip',
+    ['tenant_id', meta, body].join('\n'),
+  );
+  await expect(tenantIdHeader).toHaveAttribute('aria-label', ['tenant_id', meta, body].join('\n'));
+
+  // A plain-string tooltip elsewhere is unaffected — still one text node, no parts.
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(350);
+  await assertTooltipShows(page, refreshButton, 'Refresh');
+  await expect(tooltip(page).locator('.tip-title')).toHaveCount(0);
+
   expect(consoleErrors).toEqual([]);
 });

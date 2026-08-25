@@ -17,6 +17,25 @@ export const TOOLTIP_REARM_MS = 300;
  *  replaces `title` (D8: one source of truth for hit-testing and for the displayed string). */
 const TIP_ATTR = 'data-kira-tip';
 
+/** P42 D19: the structured half of a tooltip — carried in a second attribute so `data-kira-tip`
+ *  itself stays the exact newline-joined plain text it always was (the a11y mirror, and every
+ *  existing Playwright assertion). A plain string tooltip never sets this at all. */
+export interface TooltipContent {
+  title: string;
+  meta?: string;
+  body?: string;
+}
+
+const PARTS_ATTR = 'data-kira-tip-parts';
+
+function isTooltipContent(value: string | TooltipContent): value is TooltipContent {
+  return typeof value === 'object';
+}
+
+function toPlainText(value: TooltipContent): string {
+  return [value.title, value.meta, value.body].filter((v): v is string => !!v).join('\n');
+}
+
 /** D7 rule 1's marker: distinguishes an `aria-label` this directive set (safe to keep in sync with
  *  a changing hint) from one the author wrote (never touched — F6's seven carve-out sites). */
 const OWNS_LABEL_ATTR = 'data-kira-tip-auto-label';
@@ -25,6 +44,11 @@ const TOOLTIP_ID = 'app-tooltip';
 
 export const tooltipState = reactive({
   text: '',
+  /** P42 D19: set alongside `text` whenever the open tooltip's own value is a `TooltipContent` —
+   *  AppTooltip.vue renders from this when present, and falls back to the plain `text` node
+   *  otherwise. `text` itself is never just this cast back to a string; it is always the
+   *  independently-tracked plain-text join, so the two can never drift. */
+  parts: null as TooltipContent | null,
   open: false,
   /** Set while open, for AppTooltip.vue's `id` and the trigger's `aria-describedby` (D7). */
   id: null as string | null,
@@ -60,8 +84,22 @@ function hideTooltip(): void {
   cachedHostRect = null;
   tooltipState.open = false;
   tooltipState.text = '';
+  tooltipState.parts = null;
   tooltipState.id = null;
   lastCloseAt = performance.now();
+}
+
+// P42 D19: JSON, and only ever written/read by this module — a malformed value here is this
+// module's own bug, not untrusted input, so a parse failure degrades to "no structure" rather
+// than throwing.
+function readParts(el: HTMLElement): TooltipContent | null {
+  const raw = el.getAttribute(PARTS_ATTR);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as TooltipContent;
+  } catch {
+    return null;
+  }
 }
 
 function openFor(el: HTMLElement): void {
@@ -70,6 +108,7 @@ function openFor(el: HTMLElement): void {
   openHostEl = el;
   cachedHostRect = el.getBoundingClientRect();
   tooltipState.text = tip;
+  tooltipState.parts = readParts(el);
   tooltipState.id = TOOLTIP_ID;
   tooltipState.open = true;
   el.setAttribute('aria-describedby', TOOLTIP_ID);
@@ -203,9 +242,10 @@ function hasForeignAccessibleName(el: HTMLElement): boolean {
   return (el.textContent ?? '').trim().length > 0;
 }
 
-function updateTip(el: HTMLElement, value: string | null | undefined): void {
+function updateTip(el: HTMLElement, value: string | TooltipContent | null | undefined): void {
   if (!value) {
     el.removeAttribute(TIP_ATTR);
+    el.removeAttribute(PARTS_ATTR);
     if (el.hasAttribute(OWNS_LABEL_ATTR)) {
       el.removeAttribute('aria-label');
       el.removeAttribute(OWNS_LABEL_ATTR);
@@ -213,19 +253,28 @@ function updateTip(el: HTMLElement, value: string | null | undefined): void {
     if (openHostEl === el) hideTooltip();
     return;
   }
-  el.setAttribute(TIP_ATTR, value);
+  const structured = isTooltipContent(value);
+  const plainText = structured ? toPlainText(value) : value;
+  el.setAttribute(TIP_ATTR, plainText);
+  if (structured) el.setAttribute(PARTS_ATTR, JSON.stringify(value));
+  else el.removeAttribute(PARTS_ATTR);
   if (!hasForeignAccessibleName(el)) {
-    el.setAttribute('aria-label', value);
+    el.setAttribute('aria-label', plainText);
     el.setAttribute(OWNS_LABEL_ATTR, '');
   }
-  if (openHostEl === el) tooltipState.text = value;
+  if (openHostEl === el) {
+    tooltipState.text = plainText;
+    tooltipState.parts = structured ? value : null;
+  }
 }
 
 /** Registered once in main.ts as `v-tooltip` (F9). `title="X"` becomes `v-tooltip="'X'"`,
  *  `:title="expr"` becomes `v-tooltip="expr"` — no component gains a prop, no template gains a
  *  wrapper element. Both button primitives are single-root, so Vue applies this to the real
- *  `<button>` exactly where `title=` landed before (F2). */
-export const vTooltip: ObjectDirective<HTMLElement, string | null | undefined> = {
+ *  `<button>` exactly where `title=` landed before (F2). P42 D19: a `TooltipContent` object widens
+ *  the value this directive accepts — the plain-string case (still the overwhelming majority of
+ *  ~120 call sites) is unchanged in every observable way. */
+export const vTooltip: ObjectDirective<HTMLElement, string | TooltipContent | null | undefined> = {
   mounted(el, binding) {
     updateTip(el, binding.value);
   },

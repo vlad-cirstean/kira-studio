@@ -53,9 +53,11 @@ const page = computed(() => {
 // what a console result actually has: name, dataType, the type glossary's description — no DB
 // comment line, since execute() never consults the catalog (postgres/console.ts's own doc
 // comment: "console results are always read-only regardless" — there is no column to have one).
-function headerTitleFor(col: ColumnDescriptor): string {
+// P42 D19/D20: structured the same way DataGrid.vue's own twin changed with it — deliberately the
+// same shape minus the comment, so the two can't re-drift the way P40 D16 already closed once.
+function headerTitleFor(col: ColumnDescriptor): { title: string; meta?: string; body?: string } {
   const description = col.dataType ? typeDescription(col.dataType) : null;
-  return [col.name, col.dataType, description].filter((line) => !!line).join('\n');
+  return { title: col.name, meta: col.dataType || undefined, body: description ?? undefined };
 }
 
 // P31 D11/F13: same reasoning as DataGrid.vue's own widths computed — without this, a font

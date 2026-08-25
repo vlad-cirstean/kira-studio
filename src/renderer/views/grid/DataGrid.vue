@@ -98,12 +98,20 @@ const columnMetaByName = computed(() => {
 // P31 D29/F29: name, then dataType, then the glossary description (if any), then the DB comment
 // (if any), each on its own line — the header is where a type is actually read while working;
 // AppTooltip is pre-wrap, so this renders as one line per populated field.
-function headerTitleFor(name: string): string {
+// P42 D19/D20: structured for AppTooltip.vue's title/meta/body rendering — no import of
+// TooltipContent itself (views/* may not import workbench/*, §11); the object literal's shape
+// alone is what v-tooltip's own type checks against, the same way every plain-string call site
+// already satisfies that directive with no import of its own.
+function headerTitleFor(name: string): { title: string; meta?: string; body?: string } {
   const meta = columnMetaByName.value.get(name);
   const dataType = meta?.dataType ?? columnByName.value.get(name)?.dataType ?? '';
   const description = dataType ? typeDescription(dataType) : null;
   const comment = meta?.comment;
-  return [name, dataType, description, comment].filter((line) => !!line).join('\n');
+  return {
+    title: name,
+    meta: dataType || undefined,
+    body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
+  };
 }
 
 // P31 D11: a font change drops columns.ts's memoized measuring context (so the next measurement
