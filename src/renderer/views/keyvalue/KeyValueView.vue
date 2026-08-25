@@ -6,8 +6,7 @@ import {
   OBJECT_BODY_EDIT_BYTES,
   OBJECT_BODY_PREVIEW_BYTES,
 } from '@shared/protocol/page';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import type { EditorLanguageId } from '../../editor/languages';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
@@ -33,7 +32,6 @@ import { keyValueMenu } from './keyValueMenu';
 import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
 import { matchedRows, searchState } from './kvSearch';
-import ObjectBodyEditor from './ObjectBodyEditor.vue';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -220,21 +218,6 @@ function objectBodyRowFor(p: typeof page.value): { value: string; isTruncated: b
 }
 const objectBodyRow = computed(() => objectBodyRowFor(page.value));
 
-function objectContentType(p: typeof page.value): string {
-  if (!p) return '';
-  for (let i = 0; i < p.rowCount; i++) {
-    const row = rowAt(i);
-    if (row?.field === 'ContentType') return row.value;
-  }
-  return '';
-}
-const objectEditorLanguage = computed<EditorLanguageId>(() => {
-  const contentType = objectContentType(page.value);
-  if (/json/i.test(contentType)) return 'json';
-  if (/xml|html/i.test(contentType)) return 'xml';
-  return 'plain';
-});
-
 // P33 D6/D7: the whole of the edit-size decision, in one computed — every reason names the
 // actual number or the actual condition, never a silently-disabled control with no explanation.
 interface ObjectEditGate {
@@ -277,11 +260,24 @@ const editDraft = ref('');
 const editSaving = ref(false);
 const editError = ref<string | null>(null);
 
+// Task: S3's object body used to edit through a separate inline CodeMirrorHost band
+// (ObjectBodyEditor.vue) with no format detection — the toolbar Edit button now instead selects
+// the object's own "Body" row, which the docked cell editor (CellEditorDock, already mounted
+// below) renders with the same JSON/XML/hex/base64/timestamp tooling every grid cell gets.
+function objectBodyRowIndex(): number | null {
+  const p = page.value;
+  if (p?.redisType !== 'object') return null;
+  for (let i = 0; i < p.rowCount; i++) {
+    if (rowAt(i)?.field === 'Body') return i;
+  }
+  return null;
+}
+
 function openEdit(): void {
   if (isSingleObjectPage.value) {
     if (!objectEditGate.value.editable) return;
-    editError.value = null;
-    editOpen.value = true;
+    const index = objectBodyRowIndex();
+    if (index !== null) onRowClick(index);
     return;
   }
   if (!canUpdate.value || !editableType.value) return;
@@ -305,6 +301,37 @@ async function saveEdit(): Promise<void> {
     editError.value = err instanceof Error ? err.message : String(err);
   } finally {
     editSaving.value = false;
+  }
+}
+
+// --- S3 object body edit: staged locally by the cell editor's onEdit (below, in onRowClick),
+// never written to S3 on blur/Ctrl+Enter the way a SQL grid cell's onEdit stages a pending
+// change — S3's PutObject is a real, immediate write with no undo, so an explicit Save here is
+// the only thing that ever calls saveValueEdit for this row. onRevert (the cell editor panel's
+// own Revert button) clears the draft the same way discarding a grid's pending edit would. -----
+const objectDraft = ref<string | null>(null);
+const objectSaving = ref(false);
+const objectSaveError = ref<string | null>(null);
+
+// A reload (this Save, a manual Refresh, a relaunch) means the row this draft was staged against
+// no longer necessarily matches what's on screen — dropping it here rather than leaving a stale
+// draft that a later Save could silently commit over newer data.
+watch(page, () => {
+  objectDraft.value = null;
+  objectSaveError.value = null;
+});
+
+async function saveObjectEdit(): Promise<void> {
+  if (objectDraft.value === null || !keyName.value) return;
+  objectSaving.value = true;
+  objectSaveError.value = null;
+  try {
+    await saveValueEdit(props.tab.id, keyName.value, objectDraft.value);
+    objectDraft.value = null;
+  } catch (err) {
+    objectSaveError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    objectSaving.value = false;
   }
 }
 
@@ -430,6 +457,11 @@ function onRowClick(i: number): void {
     isPrimaryKey: false,
     generated: false,
   };
+  // The S3 object's Body row is the one row that can genuinely stage a write — every other row
+  // here (redis hash/list/set/zset fields, an object's own metadata rows) has no onEdit at all,
+  // so the panel stays read-only for them by cellSelection.ts's own "no onEdit -> read-only" rule.
+  const isEditableBodyRow =
+    p.redisType === 'object' && row.field === 'Body' && objectEditGate.value.editable;
   const selected: SelectedCell = {
     tabId: props.tab.id,
     connectionId: props.tab.connectionId,
@@ -440,6 +472,16 @@ function onRowClick(i: number): void {
     value: row.value,
     truncated: row.isTruncated,
     hasPrimaryKey: true,
+    ...(isEditableBodyRow
+      ? {
+          onEdit: (newValue: string) => {
+            objectDraft.value = newValue;
+          },
+          onRevert: () => {
+            objectDraft.value = null;
+          },
+        }
+      : {}),
   };
   publishSelectedCell(selected);
 }
@@ -725,6 +767,25 @@ onUnmounted(() => {
           Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
           {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
         </MessageStrip>
+        <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
+             onEdit stages into objectDraft, never writing to S3 directly) — this strip is the
+             explicit Save/Discard step that turns the staged draft into a real PutObject. -->
+        <MessageStrip v-if="objectDraft !== null" tone="warn" data-testid="keyvalue-object-edit-pending">
+          <span data-testid="keyvalue-object-edit-note"
+            >Unsaved changes to this object's body<template v-if="objectSaveError">
+              — {{ objectSaveError }}</template
+            ></span
+          >
+          <AppButton
+            class="strip-action"
+            variant="primary"
+            data-testid="keyvalue-object-edit-save"
+            :disabled="objectSaving"
+            @click="saveObjectEdit"
+          >
+            Save
+          </AppButton>
+        </MessageStrip>
       </template>
 
       <KeyValueSearchToolbar
@@ -734,18 +795,7 @@ onUnmounted(() => {
         @close="onCloseSearch"
       />
 
-      <!-- P33 D8: reuses editOpen (Redis's own popover-open flag) rather than a second ref —
-           when it's true on an object page, this inline band replaces the field/value table
-           instead of the popover. -->
-      <ObjectBodyEditor
-        v-if="editOpen && isSingleObjectPage"
-        :tab-id="tab.id"
-        :object-key="keyName"
-        :initial="objectBodyRow?.value ?? ''"
-        :language="objectEditorLanguage"
-        @close="closeEdit"
-      />
-      <div v-else class="p-panel table-panel">
+      <div class="p-panel table-panel">
         <div class="p-thead">
           <div class="p-th gutter kv-col-gutter"></div>
           <div class="p-th kv-col-field">

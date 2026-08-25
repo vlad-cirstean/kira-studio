@@ -12,8 +12,12 @@ const props = withDefaults(
     buffer: EditBuffer;
     revertTitle?: string;
     testidPrefix: string;
+    /** Mongo's shell-literal document editor has no real use for a minified constructor-call
+     *  body (`ObjectId(...)`, `ISODate(...)`) the way the cell editor's raw JSON/XML does — the
+     *  Minify action is hidden there rather than offering a control that doesn't serve a purpose. */
+    showCompact?: boolean;
   }>(),
-  { revertTitle: undefined },
+  { revertTitle: undefined, showCompact: true },
 );
 
 const beautifyDisabledTitle = 'Indented and compact formatting apply to JSON and XML/HTML.';
@@ -55,6 +59,7 @@ const resetTitle = computed<string>(
       @click="buffer.applyBeautify('indented')"
     />
     <IconButton
+      v-if="showCompact"
       icon="collapse-all"
       :active="buffer.formatted.value === 'compact'"
       :data-testid="`${testidPrefix}-beautify-compact`"

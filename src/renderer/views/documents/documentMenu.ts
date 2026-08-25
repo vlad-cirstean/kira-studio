@@ -11,6 +11,10 @@ export function documentMenu(
   body: string,
   allIds: string[],
   onEdit: () => void,
+  // Edit is shown but disabled — with a label saying why — rather than omitted, mirroring
+  // keyValueMenu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
+  // agree, or right-clicking would offer an action the toolbar button already refused.
+  editGate: { editable: boolean; label: string },
 ): MenuItem[] {
   return [
     {
@@ -51,7 +55,13 @@ export function documentMenu(
       run: () => void navigator.clipboard.writeText(parseIdLabel(id).text),
     },
     { type: 'separator' },
-    { type: 'item', id: 'edit-document', label: 'Edit', run: onEdit },
+    {
+      type: 'item',
+      id: 'edit-document',
+      label: editGate.editable ? 'Edit' : editGate.label,
+      disabled: !editGate.editable,
+      run: onEdit,
+    },
     {
       type: 'item',
       id: 'delete-document',

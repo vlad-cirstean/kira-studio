@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 // Shared chrome for every trigger-anchored popover/menu (ColumnsMenu, FilterHistoryMenu,
 // ConsoleSavedMenu, PreviewCommandPanel): a full-viewport transparent backdrop that closes the
@@ -22,7 +22,10 @@ const props = withDefaults(
 const emit = defineEmits<{ close: [] }>();
 
 const backdropEl = ref<HTMLElement | null>(null);
-const popoverPosition = ref<{ top: string; left?: string; right?: string }>({ top: '0px' });
+const popoverEl = ref<HTMLElement | null>(null);
+const popoverPosition = ref<{ top?: string; bottom?: string; left?: string; right?: string }>({
+  top: '0px',
+});
 
 // Task #58: this used to be `position: absolute; top: 32px; left/right: 8px`, which positions
 // against the nearest *positioned* ancestor — not necessarily (and in practice, rarely) the
@@ -39,18 +42,31 @@ const popoverPosition = ref<{ top: string; left?: string; right?: string }>({ to
 // the backdrop itself is `position: fixed` and so never contributes to the wrapper's own size.
 // That means no consumer needs to pass an anchor element in explicitly, and none needs to
 // remember `position: relative` on its wrapper for this to resolve correctly either.
+// Task: the cell editor panel is docked at the bottom of the window, so a popover anchored
+// below its trigger (the timestamp calendar button, in particular) routinely has nowhere to
+// grow into and rendered off the bottom of the viewport. Opening upward instead when there
+// isn't room below fixes that generically for every PopoverPanel consumer, not just that one.
 function reposition(): void {
   const anchorEl = backdropEl.value?.parentElement;
   if (!anchorEl) return;
   const rect = anchorEl.getBoundingClientRect();
   const gap = 4;
-  popoverPosition.value =
+  const horiz =
     props.anchor === 'left'
-      ? { top: `${rect.bottom + gap}px`, left: `${rect.left}px` }
-      : {
-          top: `${rect.bottom + gap}px`,
-          right: `${Math.max(0, window.innerWidth - rect.right)}px`,
-        };
+      ? { left: `${rect.left}px` }
+      : { right: `${Math.max(0, window.innerWidth - rect.right)}px` };
+
+  // Before the popover has ever rendered, popoverEl has no height to measure yet — reposition()
+  // runs again once it does (see the nextTick call in onMounted below), so the first paint's
+  // guess is corrected before the user can see it.
+  const popoverHeight = popoverEl.value?.offsetHeight ?? 0;
+  const spaceBelow = window.innerHeight - rect.bottom - gap;
+  const spaceAbove = rect.top - gap;
+  const opensUpward = popoverHeight > spaceBelow && spaceAbove > spaceBelow;
+
+  popoverPosition.value = opensUpward
+    ? { bottom: `${window.innerHeight - rect.top + gap}px`, ...horiz }
+    : { top: `${rect.bottom + gap}px`, ...horiz };
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -59,6 +75,10 @@ function onKeydown(e: KeyboardEvent): void {
 
 onMounted(() => {
   reposition();
+  // The first reposition() runs before popoverEl has ever painted, so its offsetHeight read
+  // above is 0 and the upward-flip decision cannot yet be made — this second pass, after the
+  // real content has laid out, corrects it before the user can see the wrong placement.
+  void nextTick(reposition);
   document.addEventListener('keydown', onKeydown);
   // The window is resizable and this menu can stay open across a resize — recomputing keeps it
   // pinned to its trigger instead of drifting toward whichever corner it started near.
@@ -73,6 +93,7 @@ onUnmounted(() => {
 <template>
   <div ref="backdropEl" class="menu-backdrop" :data-testid="backdropTestId" @click="emit('close')">
     <div
+      ref="popoverEl"
       class="popover p-float"
       :data-testid="testId"
       :style="{ width: `${props.width}px`, ...popoverPosition }"

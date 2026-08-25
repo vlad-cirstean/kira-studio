@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { formatBytes } from '../../format';
-import { cellKey, type SelectedCell } from '../../state/cellSelection';
+import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../state/cellSelection';
 import { connectionsState } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -243,6 +243,10 @@ function onEditorKeydown(e: KeyboardEvent): void {
   }
 }
 
+function closePanel(): void {
+  clearSelectedCellFor(selectedCell.value.tabId);
+}
+
 function onFormatSelect(e: Event): void {
   const c = selectedCell.value;
   const value = (e.target as HTMLSelectElement).value;
@@ -331,6 +335,12 @@ const statusLine = computed(() => {
           <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
         </span>
+        <IconButton
+          icon="close"
+          data-testid="cell-editor-close"
+          v-tooltip="'Close'"
+          @click="closePanel"
+        />
       </template>
     </ViewHeader>
 

@@ -316,16 +316,19 @@ test("s3 — edit a small object's body", async ({ kira, consoleErrors }) => {
     { timeout: 15_000 },
   );
 
+  // Task: S3 body edits now go through the docked cell editor (format detection, beautify,
+  // etc.) with an explicit Save strip — never an auto-commit-on-blur write to S3.
   await view.locator('[data-testid="keyvalue-edit"]').click();
-  const editor = view.locator('[data-testid="object-body-editor"]');
+  const editor = view.locator('[data-testid="cell-editor-encoded"]');
   await expect(editor).toBeVisible();
   await editor.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+A');
   const newBody = '{"status":"final"}';
   await page.keyboard.type(newBody);
-  await editor.locator('[data-testid="object-body-save"]').click();
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await view.locator('[data-testid="keyvalue-object-edit-save"]').click();
 
-  await expect(editor).toHaveCount(0);
+  await expect(view.locator('[data-testid="keyvalue-object-edit-pending"]')).toHaveCount(0);
   await expect(bodyRowOf(page, view).locator('[data-testid="keyvalue-value"]')).toContainText(
     newBody,
     { timeout: 15_000 },

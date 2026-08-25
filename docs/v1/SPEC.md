@@ -973,11 +973,12 @@ src/
                     D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
                     exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
                     document's flattened line list, no per-node component recursion — P27 D19)
-      keyvalue/     (P33) ObjectBodyEditor.vue — the inline CodeMirrorHost band that replaces
-                    KeyValueView.vue's field/value table when editing an S3 object's body (reuses
-                    Redis's own `editOpen` ref rather than a second one); keyValueMutations.ts's
-                    saveValueEdit/deleteKey are unmodified and cover S3 too, via the same
-                    `_key`/`$value` sentinel pair
+      keyvalue/     an S3 object's body is edited through the same docked cell editor every grid
+                    cell uses (CellEditorDock, format detection included) — its onEdit stages the
+                    draft into a local ref rather than writing to S3 on blur, and a Save strip in
+                    KeyValueView.vue's own #strips slot is what actually calls saveValueEdit; the
+                    same `_key`/`$value` sentinel pair keyValueMutations.ts already used for Redis
+                    covers S3 too, unmodified
       shared/       cross-view Vue helpers with a second consumer (never view-specific): FilterHistoryMenu.vue,
                     mongoVocabulary.ts, sqlIdent.ts, and (P27) useEditBuffer.ts (the
                     dirty/beautify/bytes/revert state machine) plus EditBufferActions.vue (the

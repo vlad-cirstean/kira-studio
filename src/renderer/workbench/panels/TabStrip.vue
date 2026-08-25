@@ -193,24 +193,13 @@ function onWheel(e: WheelEvent): void {
   padding: 2px 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
-  /* Scrolls with too many tabs open, and shows it: a thin track in the app's own thumb colour
-     (P31 D7) — was scrollbar-width: none, which hid the only on-screen sign that more tabs exist
-     past the edge. Reachable by wheel (onWheel above), trackpad, or drag either way. */
-  scrollbar-width: thin;
-  scrollbar-color: var(--kira-scrollbar) transparent;
+  /* Scrolls with too many tabs open, but the track itself stays hidden — reachable by wheel
+     (onWheel above), trackpad, or drag either way, with no visible scrollbar chrome. */
+  scrollbar-width: none;
 }
 
 .tab-strip::-webkit-scrollbar {
-  height: 6px;
-}
-
-.tab-strip::-webkit-scrollbar-thumb {
-  background: var(--kira-scrollbar);
-  border-radius: var(--kira-radius);
-}
-
-.tab-strip::-webkit-scrollbar-track {
-  background: transparent;
+  display: none;
 }
 
 /* P24 D32: .tab used to re-declare .p-tab's own rules (primitives.css) by hand, 1px and 10px off

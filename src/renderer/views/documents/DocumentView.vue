@@ -90,6 +90,25 @@ const caps = computed(() => {
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
+// Task: mutate.ts's update op is a whole-document replaceOne({_id}, body) — when a projection is
+// active the fetched (and therefore edited) body holds only the projected fields, so committing
+// it would silently drop every field the projection hid. Editing is refused outright rather than
+// attempting a partial merge, since "which fields the user meant to keep" isn't recoverable from
+// a projected body alone; the fix is clearing the projection first.
+const editGate = computed<{ editable: boolean; label: string }>(() => {
+  if (!caps.value?.canUpdate) {
+    return { editable: false, label: 'Connection does not support update' };
+  }
+  if (props.tab.state.projection !== null) {
+    return {
+      editable: false,
+      label:
+        'Clear the field projection before editing — a projected document would replace the full one',
+    };
+  }
+  return { editable: true, label: 'Edit' };
+});
+
 // P16 design system LAW: the connection colour reaches a view as a 2px rail (here: the
 // toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
 // No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
@@ -401,6 +420,7 @@ function onGoToMatch(row: number): void {
 }
 
 function startEdit(id: string, body: string): void {
+  if (!editGate.value.editable) return;
   editingId.value = id;
   editOriginal.value = toShellText(body);
   editBuffer.reseed();
@@ -422,7 +442,7 @@ function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
   const ids = rows.value.map((r) => r.view.id);
   openContextMenu(
     e,
-    documentMenu(props.tab.id, id, body, ids, () => startEdit(id, body)),
+    documentMenu(props.tab.id, id, body, ids, () => startEdit(id, body), editGate.value),
   );
 }
 
@@ -685,7 +705,7 @@ onUnmounted(() => {
       <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
         <CodeMirrorHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
         <div class="edit-actions">
-          <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" />
+          <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
           <span class="edit-actions-spacer"></span>
           <AppButton variant="primary" data-testid="document-new-save" @click="commitCreate">
             Save
@@ -777,8 +797,8 @@ onUnmounted(() => {
                     icon="edit"
                     :active="editingId === item.view.id"
                     data-testid="document-edit"
-                    :disabled="!caps?.canUpdate"
-                    v-tooltip="caps?.canUpdate ? 'Edit' : 'Connection does not support update'"
+                    :disabled="!editGate.editable"
+                    v-tooltip="editGate.editable ? 'Edit' : editGate.label"
                     @click.stop="startEdit(item.view.id, item.body)"
                   />
                   <IconButton
@@ -815,7 +835,7 @@ onUnmounted(() => {
                 <template v-if="editingId === item.view.id">
                   <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
                   <div class="edit-actions">
-                    <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" />
+                    <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
                     <span class="edit-actions-spacer"></span>
                     <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
                       Save
