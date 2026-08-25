@@ -15,10 +15,12 @@ A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScri
 
 **In scope (v1):** MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, S3. macOS only. Dark mode only.
 Read paths complete. Write paths: PostgreSQL/MariaDB tables get **add row, delete row, and cell
-editing**, staged as pending changes with an exact-command preview (§8.14). MongoDB, Redis, Kafka
-and SQS also write — insert/update/delete gated per adapter's `canInsert`/`canUpdate`/`canDelete`
-capability (§5, §8.7–§8.9) — but apply **immediately**, with no staging or preview; S3 stays
-read-only. **DDL is read-only** but modelled for editing.
+editing**, staged as pending changes with an exact-command preview (§8.14). MongoDB, Redis, Kafka,
+SQS and S3 also write — insert/update/delete gated per adapter's `canInsert`/`canUpdate`/`canDelete`
+capability (§5, §8.7–§8.9) — but apply **immediately**, with no staging or preview. S3 additionally
+gets **download and upload** (`caps.fileTransfer`, §5, §8.8) — streaming a whole object to/from a
+local file, since an object's bytes are never a value the mutation-preview model can show inline.
+**DDL is read-only** but modelled for editing.
 
 Also in v1: a **SQL/query console** (opened from the right-click menu of a connection, database or
 table), **saved filters and queries per table**, and a per-connection **read-only guard** that blocks
@@ -175,6 +177,13 @@ type OpCtx = { opId: string; signal: AbortSignal; onProgress?: (p: Progress) => 
 `Page` is a discriminated union: `TabularPage` (columnar), `DocumentPage`, `KeyValuePage`,
 `StreamPage`. The UI picks a view from the page kind, never from the database type — so a Postgres
 `jsonb` column can open in the document view and a Mongo `$group` result can open in the grid.
+
+Beyond the illustrative fields above, the real `Caps` also carries `canInsert`/`canUpdate`/
+`canDelete` (per-action write gating, §1) and `fileTransfer` — true only for S3: this engine's
+items are whole files, streamed to and from a local path via a native OS dialog (`Adapter`'s
+`downloadObject`, §8.8), rather than a value a mutation preview can show inline. `fileTransfer` is
+orthogonal to the three write flags: Download reads regardless of a connection's read-only flag,
+while Upload is gated on `fileTransfer && canInsert` together.
 
 ### 5.1 Per-database mapping
 
@@ -506,7 +515,7 @@ and the Mongo console both accept a shell constructor call (`ObjectId('…')`) a
 extended-JSON wrapper (`{"$oid": "…"}`) for the same value in the same document, and both offer
 the six constructors as completions.
 
-### 8.8 Key/value view (Redis)
+### 8.8 Key/value view (Redis, and S3 objects)
 
 Namespace tree from `SCAN` with `:` splitting; per-type value renderers (string, hash, list, set,
 zset, stream) with TTL and memory usage shown. Never `KEYS`, never `SCAN` without a count budget.
@@ -515,6 +524,33 @@ highlighting as the grid (P31 D17). **Edit** and **Add key** are scoped to strin
 only (a hash/list/set/zset/stream element needs its own per-type semantics, out of scope for this
 version); **Delete** works on any type. All three execute **immediately** — no pending-change
 staging or preview.
+
+**S3 objects (P33)** reuse this same view — a single object opens as a `KeyValuePage` whose rows are
+its metadata (`ContentType`, `ContentLength`, `LastModified`, `ETag`, `StorageClass`, user
+`Metadata.*`) plus, when the object is small enough, a synthetic `Body` row; `memoryBytes` carries
+the object's real size (no longer always `null` for S3). Four actions, gated on `caps.fileTransfer`/
+`canInsert`/`canUpdate`/`canDelete` and the connection's read-only flag exactly like Redis's own
+gate:
+
+- **Download** streams the object to a local path chosen via a native save dialog, never blocked by
+  read-only (a read). The bytes go straight from the adapter to a temp file in the destination's own
+  directory, renamed into place on success and unlinked on any failure or cancellation — never a
+  partial file left at the real destination.
+- **Upload** (the object tab's Add button, or a bucket/prefix row's own **Upload file…**) opens a
+  file-choose dialog, then a small form (key, content type, both prefilled from the chosen file's
+  name/extension) before a single `PutObject`; refused if the key already exists (S3 has no
+  conditional-create, so this is a `HeadObject` probe first) or if a >5 GiB source is chosen.
+- **Edit** replaces the body with a new `PutObject` that carries forward every other attribute
+  `HeadObject` returned (`ContentType`, `Metadata`, `CacheControl`, etc. — a `PutObject` replaces the
+  object wholesale, so anything not resent is gone). It is enabled only when the object is at or
+  under 1 MB, not truncated, and decodes as valid UTF-8 — otherwise the Edit button stays visible but
+  disabled, with a tooltip naming the actual reason (the real byte count, "truncated", or "not valid
+  UTF-8") rather than just disappearing.
+- **Delete** is `DeleteObject`, behind the same `window.confirm` precedent as a Redis key.
+
+An object over 4 MB (`OBJECT_BODY_PREVIEW_BYTES`) shows no `Body` row at all — its metadata and size
+badge still render, plus an explicit "too large to preview, download it" strip — rather than
+transferring and truncating megabytes of a value nothing downstream can fully show anyway.
 
 ### 8.9 Stream view (Kafka, SQS)
 
@@ -542,10 +578,11 @@ the two diverge the mac key follows a slash. See §8.16 for the binding table it
 | Target | Items |
 |---|---|
 | Connection | Connect, Disconnect, **Open query console**, Refresh, Edit `F2`, Duplicate `Ctrl/Cmd+D`, Copy name `Ctrl/Cmd+C`, Copy URI `Shift+Alt+C`/`⌥⌘C`, Filters…, Color ▸, Read-only ✓, Delete `Delete`/`⌘⌫` |
-| Database / schema / (S3) Bucket | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default |
-| Redis namespace / S3 prefix | Refresh, Copy name `Ctrl/Cmd+C` |
+| Database / schema / (S3) Bucket | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default, (S3) Upload file… |
+| Redis namespace / S3 prefix | Refresh, Copy name `Ctrl/Cmd+C`, (S3) Upload file… |
 | Table / view / collection | Open data `Enter`, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name `Ctrl/Cmd+C`, Copy qualified name, Count rows, Saved filters ▸ |
-| Redis key / S3 object | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C` |
+| Redis key | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C` |
+| S3 object | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C`, Download…, Delete `Delete`/`⌘⌫` |
 | Object-kind folder (P19, and P23's Kafka Consumer groups) | Refresh, Collapse all |
 | Topic / queue (P23) | Open `Enter`, Open in new tab, Open definition, Copy name `Ctrl/Cmd+C` |
 | Consumer group (P23) | Open definition, Copy name `Ctrl/Cmd+C`, Copy qualified name |
@@ -776,7 +813,7 @@ Ordered so each phase is independently demonstrable and nothing is built twice.
 | **P29 Grid/cell-view scroll rendering gap** | Scrolling either the data grid or the cell editor's own content quickly leaves a visible blank gap before the newly-scrolled-to content renders — worse horizontally than vertically. Root-cause the virtualization/paint timing (prefetch window, row-height math, horizontal column virtualization if any) and close the gap rather than papering over it with a spinner | A perceptible responsiveness regression in the app's two highest-traffic surfaces; standalone from every other phase in this batch. Implemented per `docs/v1/plans/P29-scroll-render-gap.md`, all eight steps: the report traced to `DataGrid.vue` (the only two-axis-virtualized surface — every CodeMirror host runs `EditorView.lineWrapping`, so the cell editor has no horizontal scroll to be "worse" at) and to five stacked causes — `rowRange`/`colRange` invalidating on every scroll pixel (fixed by deriving four primitive computeds so a sub-boundary scroll invalidates nothing downstream), zero column-axis overscan against the row axis's existing 560px (`columns.ts`'s `visibleColumnRange` gained symmetric pixel overscan, capped per side), ~126 `displayCell`/`cellNavEntry` calls per rendered cell from the template re-evaluating them on every render (collapsed into `renderRows`'s `RowVM`/`CellVM`, built once per render, template now reads fields only), `cellNavEntry` building a whole-row snapshot before knowing whether a column even had a nav affordance (gated on a `navColumns` precheck plus a narrow per-row value map), and `page.ts`'s decode cache clearing entirely on every row boundary crossed during a fling (now prunes only the rows that left the window). `.grid-row { contain: layout }` was added as a low-risk, low-cost addition; its own measured effect could not be isolated in this sandbox (see below). `bun run lint`/`typecheck`/`build` clean throughout and the four non-Docker Playwright specs pass; `budgets.spec.ts`'s new horizontal/wide-table scroll measurements and overscan-coverage invariants (`tests/ui/support/pg.ts`'s new `app.scroll_grid` fixture, 60 columns x 5000 rows) self-skip cleanly in this sandbox (no Docker daemon) and, along with the rest of the Docker-gated suite this phase's refactor is regression-guarded by (`data-view`/`mutations`/`interaction`/`tabs`/`leaks`/`cell-editor`/`perf.spec.ts`), still need a real run on the macOS/Colima box or CI — before/after PERF.md numbers are recorded as outstanding there, not fabricated. |
 | **P31 Cross-cutting polish and bug-fix batch** | A grouped batch of unrelated small fixes surfaced by use, in the tradition of P16: (1) verify the `describe is not supported for kafka`/`for sqs` log lines are a stale/incorrect warning rather than a sign the data shown is mocked, and fix or remove the log; (2) the tab strip can't be scrolled when tabs overflow — it should; (3) changing the font in Settings has no effect — fix; (4) add a small margin between the app's panels and the window's left/right/top edges; (5) give the Kafka view's ISO-timestamp fields the same date-picker affordance the grid's cell editor has (P24); (6) bring search-match highlighting and the "show only filtered rows" toggle (P24) to the Kafka, SQS, and Mongo views, which don't have it; (7) the search toolbar's match state doesn't update when the underlying page changes (a new page, fetch-more, or fetch-less changing which rows exist) — fix so match indices/highlights never point at stale rows; (8) drop the tooltip on the connections panel's expand/collapse control (it adds noise, not information); (9) the "no color" option in the new-connection color picker currently reads as a dark swatch — make it unambiguously read as transparent/none; (10) add descriptive tooltips for every column data type shown in the grid/definition view; (11) the saved/recent filters menu's hover tooltip truncates content that needs to be readable in full — widen or reflow it; (12) deleted (pending-delete) rows get a red left-edge marker, matching the existing yellow-for-modified/green-for-new convention, and Delete becomes a working keyboard shortcut and a right-click menu item, not mouse/toolbar-only; (13) drop the redundant sort-direction text from a sorted column's header label now that the click-to-sort chevron already shows it; (14) the query console's autocomplete popup doesn't respond to Arrow Up/Down — fix keyboard navigation; (15) the columns-projection toolbar button's "activated" label text overlaps its icon — remove the label and replace it with a small indicator dot/mark on the icon itself; (16) the SQL preview panel should insert a blank line between each generated statement for readability | Batched the same way P16 batched its own post-P15 fixes — none of these sixteen items is large enough to be its own phase, several touch the same surfaces (Kafka/SQS/Mongo search parity, P24's search infrastructure), and batching means one round of `test:ui` regression coverage instead of sixteen. Implemented per `docs/v1/plans/P31-polish-bugfix-batch.md`, all eleven commits: `caps.describe` (false for kafka/sqs/redis/s3) stops the definition view's second load from ever firing for an adapter that can't serve it; `CodeMirrorHost.vue`'s completion keymap wrapped in `Prec.highest` so Arrow Up/Down reach the popup instead of `defaultKeymap`'s cursor-move winning by array order; the workbench gained a 6px three-side window inset and the tab strip scrolls (wheel included) once its tabs overflow; `renderer/fonts.ts`'s canvas-measurement check (a candidate family vs. a guaranteed-bogus probe, since `document.fonts.check()` returns true for anything) reports an unavailable font honestly and re-measures every grid's column widths on a font change; all four in-page search toolbars (grid/documents/keyvalue/stream) now share `views/shared/searchFilter.ts`'s filter-toggle state, restart their scan when the underlying page is replaced (`pageVersion.n`), and Mongo/stream gained real match highlighting and empty states to match the grid/key-value pair that already had them; `DateTimePicker.vue` moved to `views/shared/` for the stream view's since-timestamp field, which now validates on apply instead of silently discarding an unparseable value; the grid's gutter gained its own red pending-delete rail (mutually exclusive with the yellow edit rail), `Delete`/`⌘⌫` and the cell context menu's own **Delete row** both work from a cell/range selection now, not only a row selection; the header's sort chevron became a 13px codicon pinned to the cell's own right edge, the Columns/Fields buttons swapped their "N / M" text badge for a plain indicator dot (the counts stayed in the tooltip), and the preview command panel puts a blank line between staged statements; `typeGlossary.ts` widened from "just the exotica" to every SQL type family plus Mongo's BSON `bsonType` spellings, the grid header tooltip gained the description, the project tree's twisty dropped its redundant tooltip (kept `aria-label`), the "no colour" swatch became a diagonal-slash mark instead of a hollow ring that read as a 13th hue, and the three saved/recent filter menus gained full-text tooltips on every entry. `bun run lint`/`typecheck`/`build` clean throughout every commit and the four non-Docker Playwright specs (`smoke`/`startup`/`workbench`/`connections`) pass — `workbench.spec.ts`'s own font-availability scenario is a real, executable regression guard in this sandbox (not Docker-gated), and caught two genuine bugs in `fonts.ts` and a pre-existing `TextField`/`:invalid`-prop snap-back bug in `SettingsDialog.vue` along the way, both fixed. Every other item this batch touches is Docker-gated (`tests/db/`, `tests/ui/kafka.spec.ts`/`sqs.spec.ts`/`mongo.spec.ts`/`redis.spec.ts`/`data-view.spec.ts`/`tabs.spec.ts`/`tooltips.spec.ts`) and self-skips cleanly in this sandbox (no Docker daemon) rather than erroring; it still needs a real run in CI or the macOS/Colima environment, including `tooltips.spec.ts`'s own new D25/D27 assertions, which were not added blind against an environment this sandbox cannot exercise. |
 | **P32 Kafka client migration + skip unnecessary group-join** | Migrate the Kafka adapter off its current client library onto `@confluentinc/kafka-javascript` (Kafka 4-compatible), and stop joining a consumer group for operations that don't need one — browsing/read-only paths currently pay a group-join round trip they have no use for | Kafka-adapter-internal; the client swap is lower-risk once P27's non-tabular-view lessons and P31's Kafka fixes are already landed, so it isn't chasing two moving targets in the same adapter at once | Implemented per `docs/v1/plans/P32-kafka-client-migration.md`, application-code steps 2–11 (step 1's macOS/Colima native-build proof could not run here — see below). `kafkajs` is gone from `package.json`/`src/`/`tests/` entirely (confirmed by grep); `@confluentinc/kafka-javascript@1.10.0` is a pinned production dependency, native and Electron-ABI-specific, built by the new `scripts/native-electron-build.sh` (marker + cache + `electron-rebuild`, wired as `predev`/`pretest:ui`/`pretest:db:kafka`/`prepackage:mac`) rather than electron-builder's own rebuild step. `client.ts`/`index.ts`/`produce.ts` moved onto the compat `KafkaJS` API behind one shared `RdConfig`; `errors.ts` classifies by librdkafka's numeric codes instead of kafkajs's error names; `catalog.ts`/`definition.ts` adapted to the new array-shaped `fetchTopicMetadata` and numeric group-state/type enums (resolved to names, never the bare digit); a topic's Configuration section is now permanently empty with a note, since this client has no `describeConfigs` call at all. The core commit (`read.ts`) rewrites the browse consumer onto `assign()` with explicit start offsets and a bounded poll loop — it never calls `subscribe()`, so it never joins a consumer group; `group.id` stays a required-but-never-joined constant instead of a per-browse UUID. The Kafka adapter suite left Bun for `ELECTRON_RUN_AS_NODE=1 electron` (`test:db:kafka`, `tests/electron-db/kafka.spec.ts` on `node:test`/`node:assert/strict`) since Bun cannot load this driver at any ABI; the seed fixture (`tests/db/fixtures/0005_kafka_seed.ts`) now runs the broker's own CLI inside the test container instead of a JS client, and the test broker moved from `cp-kafka:7.6.1` to `8.0.7` (Apache Kafka 4.0) — the compatibility target this phase exists for. Four new scenarios (17–20) prove the group-less browse structurally: no `kira-studio-browse` group ever appears in `listGroups()`, it carries no committed offsets, a timestamp filter still seeks via `fetchTopicOffsetsByTimestamp`, and an oversized start offset is refused rather than silently truncated. `bun run lint`/`typecheck` (all three projects, `tests/db`+`tests/electron-db`)/`build` are green throughout and the four non-Docker Playwright specs pass. **Not verified in this sandbox** (no Docker daemon, and Electron's headers host is proxy-blocked here): step 1's macOS-only native-build proof (a real `electron-rebuild` run, the `librdkafka`/feature-list probe, packaging's `asarUnpack`), the 20 `tests/electron-db/kafka.spec.ts` scenarios' actual assertions against a live broker, and `tests/ui/kafka.spec.ts` end to end — confirmed only as far as this container allows: the suite bundles with esbuild and loads correctly under `ELECTRON_RUN_AS_NODE=1 electron` (resolving every import including the adapter's constructor parameter properties and this repo's extensionless relative imports, and reaching `node:test`'s runner — answering D28's open question), then fails cleanly at the same "Docker daemon unreachable" point `tests/db`'s own Docker-gated specs already show in this sandbox. All of this needs a real run on the macOS/Colima box before the phase is considered fully verified. |
-| **P33 S3: upload, download, delete, bounded edit** | S3 objects gain download and upload actions, and the demo-seed script gains more/larger sample content to exercise them against. Also add delete, and edit where the object is small enough to reasonably render/parse — above a size threshold, an object is neither parsed nor rendered, matching the grid's own large-value-truncation precedent (§8.6) rather than risking a stalled frame or a runaway parse | S3 shipped read-only browsing only in P17 S3, with mutation explicitly deferred; this is that deferred work, picked up once the rest of the mutation-and-editing patterns (grid pending-changes, Mongo insert/edit/delete, cell editor size limits) are established elsewhere in the app to reuse rather than reinvent |
+| **P33 S3: upload, download, delete, bounded edit** | S3 objects gain download and upload actions, and the demo-seed script gains more/larger sample content to exercise them against. Also add delete, and edit where the object is small enough to reasonably render/parse — above a size threshold, an object is neither parsed nor rendered, matching the grid's own large-value-truncation precedent (§8.6) rather than risking a stalled frame or a runaway parse | S3 shipped read-only browsing only in P17 S3, with mutation explicitly deferred; this is that deferred work, picked up once the rest of the mutation-and-editing patterns (grid pending-changes, Mongo insert/edit/delete, cell editor size limits) are established elsewhere in the app to reuse rather than reinvent | Implemented per `docs/v1/plans/P33-s3-mutations.md`. `caps.fileTransfer` is a new flag (true only for S3); `canInsert`/`canUpdate`/`canDelete`/`writable` all flip to `true` for S3 too. `s3/mutate.ts` rides the same sentinel-through-`MutationRowOp` technique `redis/mutate.ts` established (`_key`, plus `$file`/`$contentType` for an upload) — update/delete/insert, insert refusing an existing key via a `HeadObject` probe (S3 has no conditional-create) and preserving every other `HeadObject` attribute across an edit's `PutObject` (D11). `s3/transfer.ts` is the one file in the adapter that imports `node:fs`: `downloadObject` streams to a `.kira-partial-*` temp file in the destination's own directory, renamed into place on success and unlinked on any failure or cancellation. The preview ceiling drops from the old 32 MB truncate-and-show to 4 MB (`OBJECT_BODY_PREVIEW_BYTES`) with no `Body` row at all above it — a deliberate reversal (OQ1 in the plan), now that Download exists as the actual answer for a large object; a separate, lower 1 MB `OBJECT_BODY_EDIT_BYTES` gates Edit, which also refuses a truncated or non-UTF-8 body, each with a tooltip naming the real reason. `main/ipc/files.ts` adds one engine-neutral `kira:files:chooseSave`/`chooseOpen` IPC domain (native dialogs, `basename()`'d since an S3 key routinely contains `/`) rather than an S3-specific one. `KeyValueView.vue` gained a Download button (never blocked by read-only, D18) and reuses its existing `editOpen` ref to swap in the new `ObjectBodyEditor.vue` inline band for an S3 object instead of a second popover model; `state/objectStore.ts` (in `renderer/state/`, not `views/keyvalue/`, so `project/menus.ts` can reach it) holds the upload-dialog state and the download/upload/delete flows, driving the new `UploadObjectDialog.vue`. `scripts/demo-dbs/s3/seed.sh` grew from 3 objects in 2 buckets to a full size/type ladder (empty/small/medium/over-edit-limit/over-preview-limit/binary) plus a >1000-object `bulk/` prefix exercising `ListObjectsV2`'s continuation loop, and a third `kira-uploads-bucket` for the empty-bucket-upload case. `bun run lint`/`typecheck` (all three splits)/`build` are clean and the four non-Docker Playwright specs pass. **Not verified in this sandbox** (no Docker daemon, and LocalStack's image pull is blocked by network policy): `tests/db/s3.spec.ts`'s 27 scenarios and `tests/ui/s3.spec.ts`'s 7 scenarios were written and pass `playwright test --list`/typecheck/lint, but neither suite's assertions were ever executed against a live LocalStack container here — that run, and the demo seed's own `docker compose up` + `seed.sh` pass, both still need to happen in CI or on the macOS/Colima box before this phase is fully verified. |
 | **P34 MySQL adapter** | A sixth SQL-family adapter, `engine/adapters/mysql/`, matching the fixed internal shape (`index.ts`/`client.ts`/`query.ts`/`definition.ts`/`read.ts`) `postgres/` and `mariadb/` already establish, with its own `tests/db/mysql.spec.ts` against a MySQL testcontainer | New-engine work is cheapest once every adapter-shape decision (definition view, pending-change staging, projection/caps negotiation) has already been exercised twice; MySQL is closer to MariaDB's dialect than any other engine in the app, so it's the lowest-risk new SQL adapter to add last |
 | **P35 SQLite adapter** | A seventh SQL-family adapter, `engine/adapters/sqlite/`, for local/embedded `.sqlite`/`.db` files rather than a network connection — matching the fixed internal shape the other SQL adapters establish where SQLite's file-based, serverless model actually fits it, with its own `tests/db/sqlite.spec.ts` | Not yet planned — queued for when its turn comes. Connection-dialog shape (a file path instead of host/port/credentials) and driver choice are open questions for that plan, not decided here |
 | **P36 ClickHouse adapter** | An eighth SQL-family adapter, `engine/adapters/clickhouse/`, for ClickHouse's columnar/OLAP dialect, matching the fixed adapter shape with its own `tests/db/clickhouse.spec.ts` against a ClickHouse testcontainer | Not yet planned — queued. How much of the fixed SQL-adapter shape (pending-change mutation staging, in particular) fits an OLAP engine's own conventions is an open question for that plan |
@@ -806,6 +843,8 @@ src/
                       — the only files that import the Drizzle instance
     ipc/
       connections.ts, tree.ts, settings.ts, ops.ts, ...   -- one file per IPC domain
+      files.ts       (P33) kira:files:chooseSave/chooseOpen — engine-neutral native save/open
+                      dialogs (any future export-to-disk feature reuses this, not just S3)
       registry.ts    wires every domain's handlers into ipcMain, single place that must not miss one
     oplog.ts        op-log persistence, retention pruning
   engine/           utilityProcess host
@@ -818,9 +857,15 @@ src/
       mariadb/      same shape as postgres/
       mongo/ redis/ kafka/ sqs/ s3/   -- same shape once each ships; a new engine is
                     "add one folder matching this shape", never a change to scheduler/ or cache/
+                    s3/ also has mutate.ts (update/insert/delete + preview(), the sentinel-through-
+                    MutationRowOp technique redis/mutate.ts established) and transfer.ts (P33: the
+                    only file in the adapter that imports node:fs — downloadObject's temp-file-
+                    then-rename streaming, and openUploadBody for insert)
   renderer/         Vue app
     workbench/      shell, panels, status bar, settings dialog, context-menu service,
                     the app-owned tooltip (state/tooltip.ts, AppTooltip.vue — §8.17)
+                    UploadObjectDialog.vue (P33): choose file → key → content type → upload, one
+                    dialog reachable from a bucket/prefix tree row and an open object's own toolbar
     project/        tree, connection dialog, filters, search
                     stickyBand.ts (P28): pure geometry for the pinned ancestor band — which rows
                     are stuck and where each one sits, DOM/Vue-free
@@ -838,6 +883,11 @@ src/
                     D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
                     exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
                     document's flattened line list, no per-node component recursion — P27 D19)
+      keyvalue/     (P33) ObjectBodyEditor.vue — the inline CodeMirrorHost band that replaces
+                    KeyValueView.vue's field/value table when editing an S3 object's body (reuses
+                    Redis's own `editOpen` ref rather than a second one); keyValueMutations.ts's
+                    saveValueEdit/deleteKey are unmodified and cover S3 too, via the same
+                    `_key`/`$value` sentinel pair
       shared/       cross-view Vue helpers with a second consumer (never view-specific): FilterHistoryMenu.vue,
                     mongoVocabulary.ts, sqlIdent.ts, and (P27) useEditBuffer.ts (the
                     dirty/beautify/bytes/revert state machine) plus EditBufferActions.vue (the
@@ -849,6 +899,9 @@ src/
                     widget (grid/documents/keyvalue/stream) shares
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
+                    objectStore.ts (P33): S3 upload-dialog state + download/upload/delete flows —
+                    lives here rather than views/keyvalue/ so project/menus.ts's bucket/prefix rows
+                    can open the upload dialog without a sideways import into views/
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
     theme/          tokens, codicons
     format.ts       shared number/byte formatting (formatBytes), used by the status bar,
@@ -864,6 +917,8 @@ src/
     protocol/       ipc.ts, port.ts, engine-ops.ts — wire message shapes, one file per channel group
     domain/         connection.ts, tree.ts, ops.ts, uri.ts — types + Zod schemas for domain
                     concepts, independent of any one transport
+                    object-store.ts (P33): the S3 transfer/upload wire types, the `_key`/`$file`/
+                    `$contentType` mutation sentinels, and contentTypeForFilename()
     caps.ts         the Caps/Adapter contract (§5)
 tests/
   db/               testcontainers fixtures + per-engine scenarios, mirrors engine/adapters/
@@ -879,8 +934,8 @@ docs/
   changes only with a migration) from "how the app queries them" (changes with every feature) — today
   both live inside single per-table files, so a schema tweak and a query tweak are an undiffable mix.
 - **`main/ipc/` one file per domain plus a `registry.ts`** replaces a single growing `ipc.ts`. Adding
-  `kira:tabs:*` for session restore, or `kira:s3:*` later, is a new file and one registry line, never
-  an edit to unrelated handlers.
+  `kira:tabs:*` for session restore, or `kira:files:*` for P33's save/open dialogs, is a new file and
+  one registry line, never an edit to unrelated handlers.
 - **`engine/scheduler/` vs `engine/cache/`** are pulled apart because they are genuinely different
   lifecycles (an op's cancellation vs a page's eviction) that P1/P2 currently co-locate; keeping them
   separate now avoids a forced split later when Kafka/SQS streaming ops need scheduler changes that
