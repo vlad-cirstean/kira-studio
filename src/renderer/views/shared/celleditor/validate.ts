@@ -63,27 +63,45 @@ function validateHex(text: string): FormatProblem | null {
   return null;
 }
 
-export function validateFormat(format: CellFormat, text: string): FormatProblem | null {
+// `truncated` short-circuits to null (P43 iter2 D29): the value on screen is a prefix the engine
+// cut at MAX_CELL_BYTES, so "invalid at offset N" would be a statement about the truncation, not
+// the data, and the user has no way to act on it — the rest was never fetched. The truncated chip
+// (CellEditorView.vue's own `cell-editor-badge-truncated`) already says exactly what happened;
+// this suppresses rather than softens the wording, since there is nothing honest a validator can
+// say about a prefix ("valid so far" is not a claim any of these scanners make).
+export function validateFormat(
+  format: CellFormat,
+  text: string,
+  truncated?: boolean,
+): FormatProblem | null {
+  if (truncated) return null;
   const t = text.trim();
   if (t.length === 0) return null;
-  switch (format) {
-    case 'json':
-      return validateJson(t);
-    case 'xml':
-      return validateXml(t);
-    case 'csv':
-      return validateCsv(t);
-    case 'sql':
-      return validateSql(t);
-    case 'iso8601':
-    case 'epochSeconds':
-    case 'epochMillis':
-      return validateTimestamp(format, t);
-    case 'base64':
-      return validateBase64(t);
-    case 'hex':
-      return validateHex(t);
-    case 'text':
-      return null;
-  }
+  const problem = ((): FormatProblem | null => {
+    switch (format) {
+      case 'json':
+        return validateJson(t);
+      case 'xml':
+        return validateXml(t);
+      case 'csv':
+        return validateCsv(t);
+      case 'sql':
+        return validateSql(t);
+      case 'iso8601':
+      case 'epochSeconds':
+      case 'epochMillis':
+        return validateTimestamp(format, t);
+      case 'base64':
+        return validateBase64(t);
+      case 'hex':
+        return validateHex(t);
+      case 'text':
+        return null;
+    }
+  })();
+  // P43 iter2 D30: `t` is trimmed, but the buffer CodeMirror shows is `text` verbatim — an
+  // offset measured against `t` alone reports short by however much leading whitespace `trim()`
+  // stripped (a value beginning with a newline and two spaces, say).
+  if (problem?.offset === undefined) return problem;
+  return { ...problem, offset: problem.offset + (text.length - text.trimStart().length) };
 }

@@ -263,7 +263,9 @@ function closePanel(): void {
 // P42 D26: validated against the *effective* format, on the live buffer — a value that fails
 // says so right beside the status badge, whether the format was auto-detected or overridden.
 const formatProblem = computed(() =>
-  isNullValue.value ? null : validateFormat(effectiveFormat.value, doc.value),
+  isNullValue.value
+    ? null
+    : validateFormat(effectiveFormat.value, doc.value, isTruncatedValue.value),
 );
 
 // P42 D28: the trigger's own tooltip explains the effective format, the same map the picker's

@@ -249,6 +249,7 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText(
     '1 of 1',
   );
+  await page.click('[data-testid="console-search-close"]');
 
   // --- P42 D14/D14a: word wrap is on by default in every CodeMirror surface (F11) — this is the
   // one Docker-free spec that can exercise the new setting for real. -----------------------------
@@ -264,6 +265,19 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
     (el) => getComputedStyle(el).whiteSpace,
   );
   expect(unwrappedWhiteSpace).not.toBe(wrappedWhiteSpace);
+
+  // --- P43 iter2 F21/D29: a value the engine truncated is never reported as broken JSON. The
+  // expression below generates an 80,001-byte value the page builder cuts at MAX_CELL_BYTES
+  // (64 KB) and detectJson scores into its 0.35 bucket (P42's own intent) — exactly F21's path. --
+  await typeInto(consoleView, page, "\nSELECT '{' || hex(zeroblob(40000)) AS big;");
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results).toContainText('big');
+  await consoleView.locator('[data-testid="console-result-cell"]').first().click();
+  const bigCellPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(bigCellPanel).toBeVisible();
+  await expect(bigCellPanel.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
+  await expect(bigCellPanel).toHaveAttribute('data-format', 'json');
+  await expect(bigCellPanel.locator('[data-testid="cell-editor-invalid"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
