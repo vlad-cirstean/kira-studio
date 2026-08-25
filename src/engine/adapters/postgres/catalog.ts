@@ -7,7 +7,7 @@ import {
   type NodeKind,
   type TreeNode,
 } from '../../../shared/domain/tree';
-import { AdapterError } from '../../adapters/errors';
+import { AdapterError } from '../errors';
 
 // Every function below takes an `exec` rather than a `pg.Client` directly, so every catalog
 // query is routed through query.ts's runQuery — cancellable and command-logged like any other

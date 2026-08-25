@@ -23,7 +23,7 @@ import { sqsCaps } from './caps';
 import * as catalog from './catalog';
 import { connectSqs } from './client';
 import { buildQueueDefinition } from './definition';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 import * as mutate from './mutate';
 import { countQueue, pollQueue } from './read';
 
@@ -48,7 +48,7 @@ class SqsAdapter implements Adapter {
       await catalog.listQueues(client);
     } catch (err) {
       client.destroy();
-      throw mapSqsError(err);
+      throw mapError(err);
     }
     this.client = client;
     this.readOnly = cfg.readOnly;

@@ -7,7 +7,7 @@ import {
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import type { DbConnectionSet } from './client';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 
 // §8.14: "for non-SQL engines the console takes that engine's native command form" — real Redis
 // CLI syntax is flat whitespace-separated tokens with optional single/double quoting (backslash
@@ -106,7 +106,7 @@ export async function execute(
       const reply = await conn.call(command, ...args);
       pages.push(resultToPage(command, reply));
     } catch (err) {
-      throw mapRedisError(err);
+      throw mapError(err);
     }
   }
   if (pages.length === 0) throw new AdapterError('E_QUERY', 'no statements to execute');

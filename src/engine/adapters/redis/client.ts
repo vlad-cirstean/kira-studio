@@ -3,7 +3,7 @@ import { parseConnectionUri } from '../../../shared/domain/uri';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_CONNECTIONS = 8;
@@ -98,7 +98,7 @@ export class DbConnectionSet {
     // ioredis's own connect() promise rejects with a generic "Connection is closed" once the
     // socket drops before reaching 'ready' — a handshake failure like WRONGPASS surfaces its
     // real ReplyError only on the 'error' event, which always fires first, so this races it in
-    // to give mapRedisError() something it can actually classify as E_AUTH.
+    // to give mapError() something it can actually classify as E_AUTH.
     let initError: unknown;
     const captureInitError = (err: unknown): void => {
       initError = err;
@@ -108,7 +108,7 @@ export class DbConnectionSet {
       await conn.connect();
     } catch (err) {
       conn.disconnect();
-      throw mapRedisError(initError ?? err);
+      throw mapError(initError ?? err);
     } finally {
       conn.removeListener('error', captureInitError);
     }

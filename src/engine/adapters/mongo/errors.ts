@@ -1,11 +1,11 @@
 import { MongoNetworkError, MongoServerError, MongoServerSelectionError } from 'mongodb';
 import { AdapterError } from '../errors';
 
-// Mirrors mysql-family/query.ts's mapError — a single place that turns a driver-thrown error
+// Mirrors mysql-family/errors.ts's mapError — a single place that turns a driver-thrown error
 // into the closed AdapterError code set, preserving the server's own message verbatim (Adapter
 // rule 4). An AbortSignal-driven cancellation (D7's primary layer) throws an 'AbortError' from
 // the driver itself, not a MongoServerError — checked first.
-export function mapMongoError(err: unknown): AdapterError {
+export function mapError(err: unknown): AdapterError {
   if (err instanceof AdapterError) return err;
   const message = err instanceof Error ? err.message : String(err);
   if (err instanceof Error && err.name === 'AbortError') {

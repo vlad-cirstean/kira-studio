@@ -1,7 +1,7 @@
 import { Client, type ClientConfig } from 'pg';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
-import { mapPgError } from './query';
+import { mapError } from './errors';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_CLIENTS = 8;
@@ -71,7 +71,7 @@ export class ClientSet {
     try {
       await client.connect();
     } catch (err) {
-      throw mapPgError(err);
+      throw mapError(err);
     }
     this.clients.set(key, client);
     this.touch(key);

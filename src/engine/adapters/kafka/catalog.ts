@@ -1,6 +1,6 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
-import { mapKafkaError } from './errors';
+import { mapError } from './errors';
 
 // Internal topics/groups (consumer offsets, transaction state, ...) are Kafka-internal
 // bookkeeping, not anything a user would browse.
@@ -24,7 +24,7 @@ async function listTopics(admin: KafkaJS.Admin): Promise<TreeNode[]> {
   try {
     topics = await admin.fetchTopicMetadata();
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   const nodes = topics
     .filter((t) => !isInternal(t.name))
@@ -49,7 +49,7 @@ async function listGroups(admin: KafkaJS.Admin): Promise<TreeNode[]> {
   try {
     ({ groups } = await admin.listGroups());
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   const nodes = groups
     .filter((g) => !isInternal(g.groupId))
@@ -70,7 +70,7 @@ export async function listPartitions(admin: KafkaJS.Admin, topic: string): Promi
   try {
     topics = await admin.fetchTopicMetadata({ topics: [topic] });
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   const found = topics.find((t) => t.name === topic);
   return (found?.partitions ?? [])

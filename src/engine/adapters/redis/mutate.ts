@@ -3,7 +3,7 @@ import type { MutationPlan, MutationResult, MutationRowOp } from '../../../share
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 
 // The reserved sentinels for redis mutations, expressed through the existing relational-shaped
 // MutationRowOp rather than widening the shared mutation schema — mirrors mongo/mutate.ts's
@@ -75,7 +75,7 @@ async function assertEditableType(conn: Redis, key: string): Promise<void> {
   try {
     rawType = await conn.type(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   if (rawType !== 'none' && rawType !== 'string') {
     throw new AdapterError(
@@ -125,7 +125,7 @@ export async function mutate(
     }
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    throw mapRedisError(err);
+    throw mapError(err);
   }
 
   return { affectedRows };

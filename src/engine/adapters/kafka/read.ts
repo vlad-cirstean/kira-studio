@@ -10,7 +10,7 @@ import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
 import type { KafkaClientHandle } from './client';
-import { mapKafkaError } from './errors';
+import { mapError } from './errors';
 
 interface PartitionWindow {
   partition: number;
@@ -87,7 +87,7 @@ async function freshWindows(
   try {
     offsets = await admin.fetchTopicOffsets(topic);
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
@@ -118,7 +118,7 @@ async function freshWindows(
     try {
       byTimestamp = await admin.fetchTopicOffsetsByTimestamp(topic, filter.timestampMs);
     } catch (err) {
-      throw mapKafkaError(err);
+      throw mapError(err);
     }
     if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
     for (const entry of byTimestamp) {
@@ -304,7 +304,7 @@ export async function readTopic(
     const hasMore = nextWindows.some((w) => BigInt(w.next) < BigInt(w.end));
     return builder.finish(finishPosition(nextWindows, hasMore, fingerprint, req.pageSize));
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   } finally {
     ctx.signal.removeEventListener('abort', onAbort);
     await disconnectConsumer(consumer);
@@ -322,7 +322,7 @@ export async function countTopic(
   try {
     offsets = await admin.fetchTopicOffsets(topic);
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
   const value = offsets.reduce((sum, o) => sum + Number(BigInt(o.high) - BigInt(o.low)), 0);

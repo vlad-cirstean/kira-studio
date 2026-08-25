@@ -1,7 +1,7 @@
 import { GetQueueAttributesCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import type { DefinitionSection, ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath } from '../../../shared/domain/tree';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 
 // P23 D9: a queue genuinely *is* its attributes — visibility timeout, retention, delay, redrive
 // policy, FIFO/dedup, KMS key, ARN, timestamps — none of which the app shows anywhere today. One
@@ -34,7 +34,7 @@ export async function buildQueueDefinition(
     );
     attributes = result.Attributes ?? {};
   } catch (err) {
-    throw mapSqsError(err);
+    throw mapError(err);
   }
 
   const names = Object.keys(attributes).sort();

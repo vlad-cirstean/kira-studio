@@ -8,7 +8,7 @@ import {
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 import { parseFilterObject } from './literal';
 
 function safeInt(value: number, label: string): number {
@@ -110,7 +110,7 @@ export async function readPage(
   try {
     docs = await collection.find(filter, findOptions).toArray();
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 
   const probedExtra = docs.length > req.pageSize;
@@ -180,6 +180,6 @@ export async function countRows(
     const value = await collection.estimatedDocumentCount();
     return { value, exact: false };
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 }

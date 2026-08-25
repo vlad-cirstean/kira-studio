@@ -13,7 +13,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapS3Error } from './errors';
+import { mapError } from './errors';
 
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -68,7 +68,7 @@ export async function readObject(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 
   const builder = createKeyValuePageBuilder({
@@ -95,7 +95,7 @@ export async function readObject(
         abortSignal: ctx.signal,
       });
     } catch (err) {
-      throw mapS3Error(err);
+      throw mapError(err);
     }
     pushMetadataFields(builder, res);
     if (res.Body) {
@@ -103,7 +103,7 @@ export async function readObject(
       try {
         bytes = await res.Body.transformToByteArray();
       } catch (err) {
-        throw mapS3Error(err);
+        throw mapError(err);
       }
       if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
       // Lossy on purpose (fatal: false) — a binary object opened for preview degrades to U+FFFD
@@ -143,7 +143,7 @@ export async function countObject(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
   // ContentType/ContentLength/LastModified/ETag are effectively always present on a real object;
   // StorageClass is the only field readObject() may skip. P33 D4: the Body row itself is pushed

@@ -1,10 +1,10 @@
 import { AdapterError } from '../errors';
 
-// Mirrors redis/errors.ts's mapRedisError / kafka/errors.ts's mapKafkaError — a single place
+// Mirrors redis/errors.ts's mapError / kafka/errors.ts's mapError — a single place
 // that turns an AWS SDK v3-thrown error into the closed AdapterError code set, preserving the
 // server's own message verbatim (Adapter rule 4). SDK v3 errors carry a `name` set to the AWS
 // error code (e.g. 'QueueDoesNotExist') and, for a service-side rejection, `$metadata`.
-export function mapSqsError(err: unknown): AdapterError {
+export function mapError(err: unknown): AdapterError {
   if (err instanceof AdapterError) return err;
   const message = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : '';

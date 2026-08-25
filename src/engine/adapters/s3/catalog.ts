@@ -7,7 +7,7 @@ import {
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapS3Error } from './errors';
+import { mapError } from './errors';
 
 // Never an unbudgeted listing (ground rules, mirrors redis/catalog.ts's own SCAN_COUNT/
 // MAX_SCAN_ROUNDS): ListObjectsV2's own MaxKeys default (1000) per round-trip, capped rounds —
@@ -24,7 +24,7 @@ export async function listBuckets(client: S3Client, scopedBucket?: string): Prom
     try {
       await client.send(new HeadBucketCommand({ Bucket: scopedBucket }));
     } catch (err) {
-      throw mapS3Error(err);
+      throw mapError(err);
     }
     return [
       {
@@ -40,7 +40,7 @@ export async function listBuckets(client: S3Client, scopedBucket?: string): Prom
     const res = await client.send(new ListBucketsCommand({}));
     buckets = res.Buckets ?? [];
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
   return buckets
     .filter((b): b is { Name: string } => !!b.Name)
@@ -92,7 +92,7 @@ export async function listPrefixChildren(
       contents = res.Contents ?? [];
       continuationToken = res.NextContinuationToken;
     } catch (err) {
-      throw mapS3Error(err);
+      throw mapError(err);
     }
 
     for (const cp of commonPrefixes) {

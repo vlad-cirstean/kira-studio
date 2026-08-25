@@ -2,7 +2,7 @@ import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapKafkaError } from './errors';
+import { mapError } from './errors';
 
 // Sentinel keys (mirrors mongo/mutate.ts's `$document` precedent): a new message is expressed
 // through the existing relational-shaped MutationRowOp's `values`/`key` rather than widening the
@@ -88,7 +88,7 @@ export async function produce(
     }
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    throw mapKafkaError(err);
+    throw mapError(err);
   } finally {
     await producer.disconnect().catch(() => {});
   }

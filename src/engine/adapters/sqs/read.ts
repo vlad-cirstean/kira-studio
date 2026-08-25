@@ -11,7 +11,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 
 const RECEIVE_LIMIT = 10; // ReceiveMessage's own hard per-call cap on MaxNumberOfMessages
 const WAIT_TIME_SECONDS = 1; // short poll per call; looped rather than one long wait
@@ -104,7 +104,7 @@ export async function pollQueue(
         { abortSignal: ctx.signal },
       );
     } catch (err) {
-      throw mapSqsError(err);
+      throw mapError(err);
     }
     const messages = result.Messages ?? [];
     for (const message of messages) pushMessage(builder, message, receiptHandles);
@@ -132,7 +132,7 @@ export async function countQueue(
       { abortSignal: ctx.signal },
     );
   } catch (err) {
-    throw mapSqsError(err);
+    throw mapError(err);
   }
   const raw = result.Attributes?.ApproximateNumberOfMessages;
   return { value: raw ? Number(raw) : 0, exact: false };

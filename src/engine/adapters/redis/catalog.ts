@@ -2,7 +2,7 @@ import type { Redis } from 'ioredis';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 
 // Never an unbudgeted SCAN (ground rules): a fixed COUNT hint per round-trip, and a hard cap on
 // how many rounds one children() call will run — a call degrades to "not everything shown yet
@@ -15,7 +15,7 @@ export async function listDatabases(primary: Redis): Promise<TreeNode[]> {
   try {
     info = await primary.info('keyspace');
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   const nodes: TreeNode[] = [];
   for (const line of info.split(/\r?\n/)) {
@@ -63,7 +63,7 @@ export async function listNamespaceChildren(
     try {
       result = await conn.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', SCAN_COUNT);
     } catch (err) {
-      throw mapRedisError(err);
+      throw mapError(err);
     }
     cursor = result[0];
     for (const key of result[1]) {

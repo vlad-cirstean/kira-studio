@@ -15,7 +15,7 @@ import {
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapS3Error } from './errors';
+import { mapError } from './errors';
 import { formatBytes } from './read';
 import { openUploadBody } from './transfer';
 
@@ -126,7 +126,7 @@ async function applyUpdate(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
   try {
     await client.send(
@@ -139,7 +139,7 @@ async function applyUpdate(
       { abortSignal: ctx.signal },
     );
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 }
 
@@ -160,7 +160,7 @@ async function applyInsert(
     throw new AdapterError('E_QUERY', `key already exists: ${key}`);
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    const mapped = mapS3Error(err);
+    const mapped = mapError(err);
     if (mapped.code !== 'E_QUERY') throw mapped; // anything but "not found" is a real failure
   }
 
@@ -177,7 +177,7 @@ async function applyInsert(
       { abortSignal: ctx.signal },
     );
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 }
 
@@ -193,14 +193,14 @@ async function applyDelete(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
   try {
     await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }), {
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 }
 

@@ -1,10 +1,10 @@
 import { ReplyError } from 'ioredis';
 import { AdapterError } from '../errors';
 
-// Mirrors mysql-family/query.ts's mapError / mongo/errors.ts's mapMongoError — a single place
+// Mirrors mysql-family/errors.ts's mapError / mongo/errors.ts's mapError — a single place
 // that turns a driver-thrown error into the closed AdapterError code set, preserving the
 // server's own message verbatim (Adapter rule 4).
-export function mapRedisError(err: unknown): AdapterError {
+export function mapError(err: unknown): AdapterError {
   if (err instanceof AdapterError) return err;
   const message = err instanceof Error ? err.message : String(err);
   if (err instanceof Error && err.name === 'AbortError') {

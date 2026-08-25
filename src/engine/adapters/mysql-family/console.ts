@@ -8,7 +8,8 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapError, type TrackQuery, typeCastString } from './query';
+import { mapError } from './errors';
+import { type TrackQuery, typeCastString } from './query';
 
 // Wire-protocol type-name vocabulary (`FieldInfo.type`, e.g. 'TINY', 'VAR_STRING') — distinct
 // from read.ts's catalog-string vocabulary ('tinyint(1)', 'varchar(50)'); confirmed against

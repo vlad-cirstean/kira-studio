@@ -7,7 +7,8 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapPgError, type TrackQuery } from './query';
+import { mapError } from './errors';
+import type { TrackQuery } from './query';
 import { normalizeCellText, typeClassFor } from './read';
 
 interface RawField {
@@ -71,7 +72,7 @@ async function runRaw(
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
         release?.();
-        reject(mapPgError(err));
+        reject(mapError(err));
       });
   });
 }

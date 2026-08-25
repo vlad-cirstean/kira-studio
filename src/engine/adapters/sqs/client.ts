@@ -3,7 +3,7 @@ import { fromIni } from '@aws-sdk/credential-providers';
 import { parseConnectionUri } from '../../../shared/domain/uri';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 
 type Credentials = SQSClientConfig['credentials'];
 
@@ -23,14 +23,14 @@ export function connectSqs(
 
   if (cfg.mode === 'uri' && cfg.uri) {
     const parsed = parseConnectionUri(cfg.uri);
-    if (!parsed?.host) throw mapSqsError(new Error('could not parse the connection URI'));
+    if (!parsed?.host) throw mapError(new Error('could not parse the connection URI'));
     region = parsed.host;
     credentials =
       parsed.username && parsed.password
         ? { accessKeyId: parsed.username, secretAccessKey: parsed.password }
         : undefined;
   } else {
-    if (!cfg.database) throw mapSqsError(new Error('a region is required (the "database" field)'));
+    if (!cfg.database) throw mapError(new Error('a region is required (the "database" field)'));
     region = cfg.database;
     credentials = cfg.username ? fromIni({ profile: cfg.username }) : undefined;
   }

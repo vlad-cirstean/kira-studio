@@ -45,7 +45,7 @@ function codeOf(err: unknown): number | null {
   return null;
 }
 
-export function mapKafkaError(err: unknown): AdapterError {
+export function mapError(err: unknown): AdapterError {
   if (err instanceof AdapterError) return err;
   const message = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : '';

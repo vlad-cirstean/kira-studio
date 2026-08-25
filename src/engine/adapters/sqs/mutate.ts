@@ -7,7 +7,7 @@ import {
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 
 // Sentinel key (mirrors mongo/mutate.ts's `$document`, kafka/produce.ts's `$body`): a new
 // message is expressed through the existing relational-shaped MutationRowOp's `values` rather
@@ -134,7 +134,7 @@ export async function mutateQueue(
     }
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    throw mapSqsError(err);
+    throw mapError(err);
   }
 
   return { affectedRows };

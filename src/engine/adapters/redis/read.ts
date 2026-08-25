@@ -7,7 +7,7 @@ import {
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 
 // Never an unbudgeted SCAN (ground rules) — same per-round-trip COUNT hint as catalog.ts.
 const SCAN_COUNT = 1000;
@@ -26,7 +26,7 @@ async function readMeta(conn: Redis, key: string, ctx: OpCtx): Promise<KeyMeta> 
   try {
     rawType = await conn.type(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   // A key gone at read time is an ordinary query-time condition (expired/deleted concurrently),
   // not a connection failure — E_QUERY, deliberately not E_NOT_FOUND (P9's D10).
@@ -38,7 +38,7 @@ async function readMeta(conn: Redis, key: string, ctx: OpCtx): Promise<KeyMeta> 
   try {
     pttl = await conn.pttl(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   let memoryBytes: number | null;
   try {
@@ -65,7 +65,7 @@ async function readString(
   try {
     value = await conn.get(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   const builder = createKeyValuePageBuilder({
     redisType: 'string',
@@ -152,7 +152,7 @@ async function readHash(
       try {
         return await conn.hscan(key, cursor, 'COUNT', SCAN_COUNT);
       } catch (err) {
-        throw mapRedisError(err);
+        throw mapError(err);
       }
     },
     2,
@@ -177,7 +177,7 @@ async function readSet(
       try {
         return await conn.sscan(key, cursor, 'COUNT', SCAN_COUNT);
       } catch (err) {
-        throw mapRedisError(err);
+        throw mapError(err);
       }
     },
     1,
@@ -202,7 +202,7 @@ async function readZSet(
       try {
         return await conn.zscan(key, cursor, 'COUNT', SCAN_COUNT);
       } catch (err) {
-        throw mapRedisError(err);
+        throw mapError(err);
       }
     },
     2,
@@ -230,7 +230,7 @@ async function readList(
   try {
     elements = await conn.lrange(key, offset, offset + limit - 1);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
@@ -238,7 +238,7 @@ async function readList(
   try {
     total = await conn.llen(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
 
   const builder = createKeyValuePageBuilder({
@@ -287,7 +287,7 @@ async function readStream(
   try {
     entries = await conn.xrange(key, startId, '+', 'COUNT', limit);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
 
@@ -363,7 +363,7 @@ export async function countKey(
   try {
     rawType = await conn.type(key);
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
   if (rawType === 'none') throw new AdapterError('E_QUERY', `key no longer exists: ${key}`);
   if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
@@ -386,6 +386,6 @@ export async function countKey(
         throw new AdapterError('E_UNSUPPORTED', `unsupported redis type for ${key}: ${rawType}`);
     }
   } catch (err) {
-    throw mapRedisError(err);
+    throw mapError(err);
   }
 }

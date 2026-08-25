@@ -1,6 +1,7 @@
 import type { Client, QueryArrayConfig, QueryConfig, QueryResultRow } from 'pg';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
+import { mapError } from './errors';
 
 export interface RunningQuery {
   backendPid: number;
@@ -12,29 +13,6 @@ export interface RunningQuery {
 // currently registered for the op, so a later statement in the same multi-statement op (mutate's
 // BEGIN/…/COMMIT, console's "Run all") is never unregistered by an earlier one settling after it.
 export type TrackQuery = (q: RunningQuery) => () => void;
-
-interface PgDriverError {
-  code?: string;
-  message?: string;
-}
-
-// Exported so client.ts can map a raw pg connection-time failure (client.connect() itself,
-// before any query has run) the same way a query failure is mapped — an auth failure at
-// connect time is just as much an E_AUTH as one hit mid-query.
-export function mapPgError(err: unknown): AdapterError {
-  const driverCode = (err as PgDriverError | undefined)?.code;
-  const message = err instanceof Error ? err.message : String(err);
-  if (driverCode === '28P01' || driverCode === '28000') {
-    return new AdapterError('E_AUTH', message, err);
-  }
-  if (driverCode === '57014') {
-    return new AdapterError('E_CANCELLED', message, err);
-  }
-  if (driverCode === 'ECONNREFUSED' || driverCode === 'ENOTFOUND' || driverCode === 'ETIMEDOUT') {
-    return new AdapterError('E_CONNECT', message, err);
-  }
-  return new AdapterError('E_QUERY', message, err);
-}
 
 export interface QueryOptions {
   rowMode?: 'array';
@@ -125,7 +103,7 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
         release?.();
-        reject(mapPgError(err));
+        reject(mapError(err));
       });
   });
 }
@@ -181,7 +159,7 @@ export async function runCommand(
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
         release?.();
-        reject(mapPgError(err));
+        reject(mapError(err));
       });
   });
 }

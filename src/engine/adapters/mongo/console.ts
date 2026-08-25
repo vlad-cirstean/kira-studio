@@ -9,7 +9,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 import { LiteralParser } from './literal';
 
 // §8.14: "for non-SQL engines the console takes that engine's native command form" — Mongo's
@@ -192,7 +192,7 @@ export async function execute(db: Db, ctx: OpCtx, statements: string[]): Promise
       pages.push(await runStatement(db, parsed, ctx));
     } catch (err) {
       if (err instanceof AdapterError) throw err;
-      throw mapMongoError(err);
+      throw mapError(err);
     }
   }
   return pages;

@@ -1,9 +1,9 @@
 import { AdapterError } from '../errors';
 
-// Mirrors sqs/errors.ts's mapSqsError exactly (same SDK v3 error shape: `name` is the AWS error
+// Mirrors sqs/errors.ts's mapError exactly (same SDK v3 error shape: `name` is the AWS error
 // code, `$metadata` on a service-side rejection) — including falling a missing bucket/object
 // through to the default E_QUERY, the same way sqs/errors.ts falls a missing queue through.
-export function mapS3Error(err: unknown): AdapterError {
+export function mapError(err: unknown): AdapterError {
   if (err instanceof AdapterError) return err;
   const message = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : '';

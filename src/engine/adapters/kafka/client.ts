@@ -2,7 +2,7 @@ import { KafkaJS } from '@confluentinc/kafka-javascript';
 import { parseConnectionUri } from '../../../shared/domain/uri';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
-import { mapKafkaError } from './errors';
+import { mapError } from './errors';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 
@@ -44,7 +44,7 @@ export async function connectKafka(
 
   if (cfg.mode === 'uri' && cfg.uri) {
     const parsed = parseConnectionUri(cfg.uri);
-    if (!parsed?.host) throw mapKafkaError(new Error('could not parse the connection URI'));
+    if (!parsed?.host) throw mapError(new Error('could not parse the connection URI'));
     host = parsed.host;
     port = parsed.port ?? 9092;
     username = parsed.username;
@@ -96,7 +96,7 @@ export async function connectKafka(
     await admin.listTopics({ timeout: CONNECT_TIMEOUT_MS });
   } catch (err) {
     await admin.disconnect().catch(() => {});
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
 
   return {

@@ -23,7 +23,7 @@ import { redisCaps } from './caps';
 import * as catalog from './catalog';
 import { connectRedis, type DbConnectionSet } from './client';
 import * as consoleQuery from './console';
-import { mapRedisError } from './errors';
+import { mapError } from './errors';
 import * as mutateOps from './mutate';
 import { countKey, readKey } from './read';
 
@@ -45,7 +45,7 @@ class RedisAdapter implements Adapter {
       serverInfo = await primary.info('server');
     } catch (err) {
       await set.closeAll();
-      throw mapRedisError(err);
+      throw mapError(err);
     }
 
     this.set = set;

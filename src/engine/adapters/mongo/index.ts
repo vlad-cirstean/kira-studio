@@ -25,7 +25,7 @@ import * as catalog from './catalog';
 import { connectMongo } from './client';
 import * as consoleQuery from './console';
 import { buildDefinition } from './definition';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 import * as mutate from './mutate';
 import { countRows, readPage } from './read';
 
@@ -52,7 +52,7 @@ class MongoAdapter implements Adapter {
       buildInfo = await handle.client.db().admin().buildInfo();
     } catch (err) {
       await handle.client.close().catch(() => {});
-      throw mapMongoError(err);
+      throw mapError(err);
     }
 
     this.client = handle.client;

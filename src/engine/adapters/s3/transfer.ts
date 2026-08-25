@@ -13,7 +13,7 @@ import type { ObjectTransferResult } from '../../../shared/domain/object-store';
 import { OBJECT_UPLOAD_MAX_BYTES } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapS3Error } from './errors';
+import { mapError } from './errors';
 import { formatBytes } from './read';
 
 // P33: the only file in this adapter that touches node:fs — Adapter rule 1 ("an adapter imports
@@ -41,7 +41,7 @@ export async function downloadObject(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 
   const tmpPath = `${destPath}.kira-partial-${randomUUID()}`;
@@ -51,7 +51,7 @@ export async function downloadObject(
       abortSignal: ctx.signal,
     });
   } catch (err) {
-    throw mapS3Error(err);
+    throw mapError(err);
   }
   if (!res.Body) throw new AdapterError('E_QUERY', `${key} has no body to download`);
 
@@ -62,7 +62,7 @@ export async function downloadObject(
     return { bytes: written.size };
   } catch (err) {
     await unlink(tmpPath).catch(() => {});
-    throw mapS3Error(err);
+    throw mapError(err);
   }
 }
 

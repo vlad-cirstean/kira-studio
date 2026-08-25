@@ -3,8 +3,8 @@ import { parseConnectionUri } from '../../../shared/domain/uri';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { AdapterError } from '../errors';
+import { mapError } from './errors';
 import type { MysqlFamilyProfile } from './profile';
-import { mapError } from './query';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_CONNECTIONS = 8;

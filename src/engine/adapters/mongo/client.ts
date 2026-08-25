@@ -2,7 +2,7 @@ import { MongoClient } from 'mongodb';
 import { parseConnectionUri } from '../../../shared/domain/uri';
 import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 
@@ -48,7 +48,7 @@ export async function connectMongo(
     await client.connect();
   } catch (err) {
     await client.close().catch(() => {});
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 
   const defaultDatabase =

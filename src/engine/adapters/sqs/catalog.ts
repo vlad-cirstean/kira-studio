@@ -1,6 +1,6 @@
 import { GetQueueUrlCommand, ListQueuesCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
-import { mapSqsError } from './errors';
+import { mapError } from './errors';
 
 const PAGE_LIMIT = 1000; // ListQueues's own max MaxResults per call
 
@@ -25,7 +25,7 @@ export async function listQueues(client: SQSClient): Promise<QueueListing> {
         new ListQueuesCommand({ MaxResults: PAGE_LIMIT, NextToken: nextToken }),
       );
     } catch (err) {
-      throw mapSqsError(err);
+      throw mapError(err);
     }
     for (const url of result.QueueUrls ?? []) {
       const name = url.slice(url.lastIndexOf('/') + 1);
@@ -51,6 +51,6 @@ export async function resolveQueueUrl(client: SQSClient, name: string): Promise<
     if (!result.QueueUrl) throw new Error(`queue not found: ${name}`);
     return result.QueueUrl;
   } catch (err) {
-    throw mapSqsError(err);
+    throw mapError(err);
   }
 }

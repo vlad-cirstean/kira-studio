@@ -1,6 +1,6 @@
 import type { CollectionInfo, Db, Document, MongoClient } from 'mongodb';
 import { encodePath, type TreeNode } from '../../../shared/domain/tree';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 
 // Databases mongod itself owns and that no user connection meaningfully browses — the same
 // system-schema exclusion mysql-family/catalog.ts applies for information_schema et al.
@@ -18,7 +18,7 @@ export async function listDatabases(client: MongoClient): Promise<TreeNode[]> {
         hasChildren: true,
       }));
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 }
 
@@ -41,7 +41,7 @@ export async function listCollections(db: Db): Promise<TreeNode[]> {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 }
 
@@ -52,7 +52,7 @@ export async function collectionOptions(db: Db, collection: string): Promise<Doc
     const [info] = await db.listCollections<CollectionInfo>({ name: collection }, {}).toArray();
     return info?.options;
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 }
 
@@ -71,6 +71,6 @@ export async function describeIndexes(db: Db, collection: string): Promise<Mongo
       unique: idx.unique === true,
     }));
   } catch (err) {
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 }

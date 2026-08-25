@@ -3,7 +3,7 @@ import { ConsumerGroupStates, ConsumerGroupTypes } from '@confluentinc/kafka-jav
 import type { DefinitionSection, ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
-import { mapKafkaError } from './errors';
+import { mapError } from './errors';
 
 // P23 D5: where a topic's/group's partition and member data went once the tree stopped showing it
 // (P19's "relocation, not deletion" ground rule, F4). Every value here is already typed in the
@@ -40,7 +40,7 @@ export async function buildTopicDefinition(
   try {
     topics = await admin.fetchTopicMetadata({ topics: [topic] });
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   const partitions = (topics.find((t) => t.name === topic)?.partitions ?? [])
     .slice()
@@ -108,7 +108,7 @@ export async function buildGroupDefinition(
       groups: [group],
     } = await admin.describeGroups([groupId]));
   } catch (err) {
-    throw mapKafkaError(err);
+    throw mapError(err);
   }
   if (!group) throw new AdapterError('E_NOT_FOUND', `consumer group not found: ${groupId}`);
 

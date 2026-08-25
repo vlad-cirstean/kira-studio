@@ -25,7 +25,7 @@ import { AdapterError } from '../errors';
 import { s3Caps } from './caps';
 import * as catalog from './catalog';
 import { connectS3 } from './client';
-import { mapS3Error } from './errors';
+import { mapError } from './errors';
 import * as mutateOps from './mutate';
 import { countObject, readObject } from './read';
 import { downloadObject } from './transfer';
@@ -54,7 +54,7 @@ class S3Adapter implements Adapter {
       await catalog.listBuckets(client, scopedBucket ?? undefined);
     } catch (err) {
       client.destroy();
-      throw mapS3Error(err);
+      throw mapError(err);
     }
     this.client = client;
     this.scopedBucket = scopedBucket;

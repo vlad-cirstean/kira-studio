@@ -3,7 +3,7 @@ import type { MutationPlan, MutationResult, MutationRowOp } from '../../../share
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapMongoError } from './errors';
+import { mapError } from './errors';
 import { parseDocumentLiteral, parseJson5Literal, resolveEjsonWrappers } from './literal';
 
 // D3: the reserved sentinel key for a whole-document replace, expressed through the existing
@@ -142,7 +142,7 @@ export async function mutate(
     }
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    throw mapMongoError(err);
+    throw mapError(err);
   }
 
   return { affectedRows };
