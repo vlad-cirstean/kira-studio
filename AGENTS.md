@@ -1,5 +1,9 @@
 # Working agreement
 
+Facts about the app itself — driver choices, protocol constraints, capability quirks and why —
+live in `docs/v1/ARCHITECTURE.md`, not here. This file is process and environment only: how this
+team works, and how to run things in whichever box a session happens to be on.
+
 **Opus plans, Sonnet implements.**
 
 - The **main session runs on Sonnet**. It implements directly — it does not delegate
@@ -91,22 +95,17 @@
   plaintext. This is deliberate (see `docs/v1/plans/P25-credential-keychain-encryption.md` D13),
   not a bug to work around.
 
-## Native Kafka driver (librdkafka, P32)
+## Native Kafka driver — building and testing in this environment (P32)
 
-- The Kafka adapter's driver, `@confluentinc/kafka-javascript`, wraps a native NAN addon (built
-  against V8's C++ API, not N-API) — it is **ABI-specific per JS runtime**, not portable the way a
-  pure-JS dependency is. `bun install` only ever provides a Node-ABI bootstrap build.
+See `docs/v1/ARCHITECTURE.md`'s Kafka section for *why* (ABI-specific native addon, Bun can't load
+it at all, no consumer-group join on browse). This section is only about running it here.
+
 - **Electron's ABI is the only one that matters for this app.** `scripts/native-electron-build.sh`
   rebuilds the driver for Electron's own ABI (read from `node_modules/electron/abi_version`) before
   anything that loads it runs — wired as `predev`, `pretest:ui`, `pretest:db:kafka` and
   `prepackage:mac`. It caches a successful build under `.cache/native/confluent-kafka-javascript/<abi>.node`
   and writes a marker beside the built module, so a matching ABI skips the rebuild entirely on
   every run after the first.
-- **Never bun.** Confirmed empirically (not just from the docs): Bun cannot load this addon at any
-  ABI. Even a matching-ABI build crashes with `undefined symbol: v8::FunctionTemplate::SetClassName`
-  when required from Bun. This is why the Kafka adapter suite runs under
-  `ELECTRON_RUN_AS_NODE=1 electron` (`bun run test:db:kafka`, `tests/electron-db/kafka.spec.ts` on
-  `node:test`/`node:assert/strict`) instead of `bun test tests/db` like every other engine.
 - **Claude Code's Linux web containers**: `electron-rebuild` (what
   `native-electron-build.sh` calls to do the real work) needs to download Electron's C++ headers
   from `artifacts.electronjs.org`, which this environment's proxy blocks (403). This means
@@ -125,12 +124,11 @@
   `isDockerAvailable()`, the same point every `tests/db/`-style spec fails at here (no Docker
   daemon, see above).
 
-## SQLite adapter (`node:sqlite`, P35)
+## SQLite adapter — testing in this environment (P35)
 
-- The SQLite adapter and its tests use `node:sqlite`, a Node builtin — **no new dependency, no
-  native module, no build step**. It requires **Bun 1.4+, or Electron/Node 22.5+**; it is not in
-  Bun 1.3, which is what shows up as `node:sqlite is unavailable in this runtime` from the adapter
-  or `SQLITE_UNAVAILABLE_MESSAGE` from the test fixture if you hit it.
+See `docs/v1/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies on
+(`node:sqlite`, runtime version floor). This section is only about running it here.
+
 - **`tests/db/sqlite.spec.ts` needs no Docker.** `tests/db/support/sqlite.ts` is a temp-file
   fixture (`mkdtemp` + `node:sqlite`), not a Testcontainers harness — there is no container to
   start, no image to pull, no daemon to reach. Its only environment dependency is `node:sqlite`
@@ -149,64 +147,37 @@
   P32's Kafka smoke-testing established for "the target runtime differs from the one `bun test`
   would use."
 
-## ClickHouse adapter (`@clickhouse/client`, P36)
+## ClickHouse adapter — testing in this environment (P36)
 
-- `@clickhouse/client` (npm) is the app's **first added dependency since the P32 Kafka client
-  migration**. Unlike that one, it needs no native build step at all — it's a plain JS client
-  talking HTTP, so nothing in the native-Electron-rebuild section above applies to it.
-- The client's HTTP interface has **no per-request `database` override** — `database` is set once
-  at client construction and embedded in every request's URL query string automatically. Every
-  statement the adapter issues relies on that one construction-time default plus fully-qualified
-  `` `db`.`table` `` identifiers; don't reintroduce a per-call `database` option, the client's own
-  types don't have one.
+See `docs/v1/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts (no
+per-request `database` override, why `canUpdate`/`canDelete` are permanently false). This section
+is only about running it here.
+
 - **`tests/db/clickhouse.spec.ts` needs Docker** (`@testcontainers/clickhouse`, image
   `clickhouse/clickhouse-server`) — same `isDockerAvailable()` gate as every other Testcontainers
   spec, and the same image-pull limitation applies here as elsewhere in this sandbox (Docker's
   daemon is reachable, but pulling images from Docker Hub through the outbound proxy returns
   `403`). `tests/ui/clickhouse.spec.ts` is Docker-gated the same way, not unconditional like
   SQLite's — ClickHouse needs a real server, there's no local-file equivalent.
-- **`canUpdate`/`canDelete` are permanently `false`** for this adapter (`caps.ts`) — a MergeTree
-  `PRIMARY KEY` is a sparse index over parts, not a unique row key, so there is no addressable row
-  to target. This is a structural fact about the engine, not a gap to fill in later; don't add a
-  TODO or a "not yet implemented" framing near it. The grid's `− row` button and inline cell
-  editing are both disabled for this connection kind for the same reason, with a tooltip naming it.
 - Verified in this sandbox the same way SQLite's own hard-to-run pieces were: real, targeted checks
   against actual dependencies where a live container wasn't reachable — `splitSqlStatements` run
   standalone against both new SQL fixture files via an esbuild-bundled script, and
   `xvfb-run -a bunx playwright test tests/ui/clickhouse.spec.ts` run for real, failing only at the
   same Docker image-pull step every other Docker-gated spec hits here.
 
-## RabbitMQ adapter (HTTP management API, P37)
+## RabbitMQ adapter — testing in this environment (P37)
 
-- **No dependency at all** — the adapter speaks only the `rabbitmq_management` plugin's HTTP API
-  over the platform's own `fetch`. This is because AMQP 0-9-1 itself has no way to enumerate
-  anything (no list-queues, no list-exchanges, no list-bindings in the protocol), so the wire
-  protocol was never a candidate; adding an AMQP client on top would be a second protocol for zero
-  enumeration benefit, not a shortcut. Nothing in the native-Electron-rebuild section above applies
-  here — there is no native module and no build step to add one.
-- **The image must carry `-management` in its tag.** `rabbitmq:4` (the plain image) has no
-  management plugin at all, so the adapter cannot reach a broker started from it — there is no
-  fallback protocol to fall back to. Both `tests/db/support/rabbitmq.ts` and the demo compose
-  service pin `rabbitmq:4.3.5-management-alpine`.
-- **The default vhost is literally named `/`, and must reach the wire as `%2F`.** The management
-  API's own path convention (`GET /api/queues/%2F/<name>`) — every path segment the adapter builds
-  goes through one `encodeSegment()` function in `query.ts` specifically so this rule can't be
-  forgotten at a second call site.
+See `docs/v1/ARCHITECTURE.md`'s RabbitMQ section for the adapter's own design facts (no
+dependency, the `-management` image requirement, the `%2F` vhost encoding, why `canUpdate`/
+`canDelete` are permanently false, poll-requeues-not-consumes). This section is only about running
+it here.
+
 - **`tests/db/rabbitmq.spec.ts` needs Docker** (`@testcontainers/rabbitmq`, image
   `rabbitmq:4.3.5-management-alpine`) — same `isDockerAvailable()` gate and the same image-pull
   limitation as every other Testcontainers spec in this sandbox (Docker's daemon is reachable, but
   pulling images through the outbound proxy returns `403`). `tests/ui/rabbitmq.spec.ts` is
   Docker-gated the same way, not unconditional like SQLite's — there is no local-file equivalent
   for a message broker.
-- **`canUpdate`/`canDelete` are permanently `false`** (`caps.ts`) — a RabbitMQ message has no
-  broker-assigned identity at all (`message_id` is an optional, publisher-set AMQP property, never
-  one the broker itself assigns), and AMQP has no per-message update or delete at any protocol
-  version. This is a structural fact about the protocol, not a gap to fill in later — don't add a
-  TODO near it. `mutate()` accepts only `insert` (a publish through an exchange).
-- **A poll requeues, it does not consume.** `read()` always uses `ackmode: reject_requeue_true` —
-  nothing this adapter does removes a message from a queue. The stream view's own warning strip
-  says so in RabbitMQ's own words, not SQS's "consumes" wording, which would be a false statement
-  about this engine.
 - Verified in this sandbox the same way ClickHouse's own hard-to-run pieces were: a standalone
   esbuild bundle exercised against a mocked `fetch` (connect/probe classification, vhost scoping
   and the `%2F` decode, the default-exchange filter, the exact stream-column mapping, publish
@@ -214,4 +185,4 @@
   `xvfb-run -a bunx playwright test tests/ui/rabbitmq.spec.ts` run for real, failing only at the
   same Docker image-pull step every other Docker-gated spec hits here.
 
-Full spec: `docs/v1/SPEC.md`.
+Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/v1/ARCHITECTURE.md`.
