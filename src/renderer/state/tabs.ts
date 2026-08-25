@@ -40,17 +40,23 @@ import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
 import { cleanupTabRuntime } from './tabRuntime';
 
-// Closing a tab must free whichever page store(s) it could have populated (§2.2) — a plain
-// no-op lookup miss for the stores a tab's own kind never touches, same discipline as calling
-// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind. D4: also frees
-// every view's per-tab runtime record via the leaf registry (state/tabRuntime.ts) — every call
-// site below that drops a tab's pages permanently closes that tab, so all of them need this.
-function dropAllPagesForTab(id: string): void {
+// Frees whichever page store(s) a tab could have populated (§2.2) — a plain no-op lookup miss
+// for the stores a tab's own kind never touches, same discipline as calling
+// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind.
+function dropPageStoresForTab(id: string): void {
   dropGridPagesForTab(id);
   dropConsoleResultPagesForTab(id);
   dropDocumentPagesForTab(id);
   dropKeyValuePagesForTab(id);
   dropStreamPagesForTab(id);
+}
+
+// The tab-closed signal: page stores plus the runtime record every view keeps its count,
+// selection, find-toolbar state and actionError in (state/tabRuntime.ts). A disconnect (below)
+// deliberately calls only dropPageStoresForTab — the tab comes back on reconnect and should keep
+// looking like the same tab, not one that lost its find toolbar and selection along with its rows.
+function dropAllPagesForTab(id: string): void {
+  dropPageStoresForTab(id);
   cleanupTabRuntime(id);
 }
 
@@ -140,6 +146,23 @@ control.onConnectionsChanged((records) => {
     .filter((t) => t.connectionId && !liveIds.has(t.connectionId))
     .map((t) => t.id);
   for (const id of stale) closeTab(id);
+});
+
+// P43 F9/D12: an explicit Disconnect (or a lost connection surfacing as 'error') never used to
+// touch tabsState.hydrated at all — only a failed *load* did, so a tab kept rendering its
+// pre-disconnect rows until the moment something happened to try reading it again. Regating here
+// puts every open tab of the connection behind §8.4's Reconnect gate the instant the connection
+// itself says it is gone, matching what the engine already did with its own cache
+// (engine/cache/index.ts's dropConnection). D13: only the page bytes are freed — the runtime
+// record (count, selection, find toolbar, actionError) stays, so the tab that comes back on
+// reconnect is still the same tab, not a blank one.
+control.onConnectionState((state) => {
+  if (state.status !== 'disconnected' && state.status !== 'error') return;
+  for (const t of tabsState.tabs) {
+    if (t.connectionId !== state.connectionId) continue;
+    unmarkHydrated(t.id);
+    dropPageStoresForTab(t.id);
+  }
 });
 
 export async function hydrateTabs(): Promise<void> {

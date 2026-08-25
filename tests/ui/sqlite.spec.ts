@@ -261,7 +261,7 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
 // P43: a second, focused test rather than growing the scenario above — this is the one Docker-free
 // spec that can give commits 5/7/8/9's own findings real, executed coverage (§5).
-test('sqlite — a failed commit reports the server error, verbatim; a filter change invalidates the count', async ({
+test('sqlite — a failed commit reports the server error, verbatim; a filter change invalidates the count; a disconnect regates the tab', async ({
   kira,
   consoleErrors,
 }) => {
@@ -333,4 +333,29 @@ test('sqlite — a failed commit reports the server error, verbatim; a filter ch
   await countButton.click();
   await expect(countButton).toHaveAttribute('data-kira-tip', /Σ\s*1(?!\d)/, { timeout: 10_000 });
   await expect(pagerLast).toBeEnabled();
+
+  // --- P43 F9/D12: an explicit Disconnect regates every open tab of that connection back to
+  // Reconnect & load — previously only a failed *load* did this, so a disconnected tab kept
+  // showing its pre-disconnect rows until something happened to try reading it again. -----------
+  const statusDot = page.locator('[data-testid="tree-row"][data-kind="connection"] .status-dot');
+  const reconnectPanel = page.locator('[data-testid="reconnect-panel"]');
+  const dataGrid = page.locator('[data-testid="data-grid"]');
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-disconnect"]');
+  await expect(statusDot).toHaveAttribute('data-status', 'disconnected', { timeout: 10_000 });
+  await expect(reconnectPanel).toBeVisible();
+  await expect(dataGrid).toHaveCount(0);
+
+  // Reconnecting the connection itself does not re-fetch a gated tab — it stays gated until its
+  // own "Reconnect & load" is pressed (D13: the tab's runtime, not just its rows, survived).
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
+  await expect(reconnectPanel).toBeVisible();
+  await expect(dataGrid).toHaveCount(0);
+
+  await page.click('[data-testid="reconnect-load"]');
+  await expect(dataGrid).toBeVisible();
+  await expect(reconnectPanel).toHaveCount(0);
 });
