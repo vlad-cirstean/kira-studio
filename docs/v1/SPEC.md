@@ -215,10 +215,10 @@ offers.
 | SQLite | one `database` node per `PRAGMA database_list` entry (in practice always exactly `main`) → tables (ungrouped), views grouped into a folder; no sequences or routines (SQLite has neither) | tabular | keyset on PK, else a unique index, else the table's own implicit `rowid` (never mutation identity); `LIMIT/OFFSET` only for a view or a text-sorted request | yes (`count(*)` measured at ~9 ms/1M rows) | none — SQLite has no interruptible statement (`sqlite3_interrupt` doesn't exist in `node:sqlite`, and the whole API is synchronous) |
 | ClickHouse | one node per `system.databases` row → tables (ungrouped), views/materialized views grouped into per-kind folders; no sequences or routines (ClickHouse has neither); `system` is kept, not hidden | tabular | `LIMIT/OFFSET` only — a MergeTree `PRIMARY KEY` is a sparse index, with no unique row key to build a keyset cursor on | yes (`count()` reads part metadata) | `KILL QUERY WHERE query_id = '<id>' SYNC` on a second HTTP request (the client's own connection pool already has one free) |
 | MongoDB | database → collections (ungrouped, indexes shown in the definition view) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `AbortSignal` on the cursor, `killOp` fallback |
-| Redis | db index → key namespaces (split on `:`) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
+| Redis | db index (a leaf — its key namespace is unbounded, browsed in a Browse tab, §8.18) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
 | Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | close the assigned consumer, `AbortSignal` |
 | SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | `AbortSignal` on the SDK call |
-| S3 | account → buckets → prefixes/objects (lazy, `/`-delimited) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
+| S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab, §8.18) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
 | RabbitMQ | one `database` node per virtual host (reuses the `database` kind, labelled "Virtual host") → queues (ungrouped), exchanges (grouped into an "Exchanges" folder); bindings live in the definition view, never the tree, since a binding has no name or ID of its own | stream | `basic.get` batches of up to 500 messages through the management HTTP API, no addressable position | no — `messages` is a live snapshot of a moving queue, never a transactional count | `AbortSignal` on the HTTP request (no server-side kill — there is no long-running query left executing after the socket closes) |
 
 **SQS/RabbitMQ read policy.** Reads are **never automatic**. The stream view has an explicit
@@ -390,6 +390,14 @@ partition list is still fetched fresh through the same adapter call whenever the
 partition filter is opened (§8.9), since that is a
 second, live consumer of it unrelated to the tree.
 
+**Unbounded key/object spaces (P41).** A Redis `database` node and an S3 `bucket` node are leaves
+in this tree (no twisty, `hasChildren: false`) for the same structural reason a table's columns
+moved out: unlike a schema's table list, a db index's keyspace or a bucket's prefix/object space
+has no fixed size and can nest arbitrarily deep, so caching it inline would mean caching an
+unbounded tree. Double-clicking either row, or its context menu's **Browse objects/keys** item,
+opens a dedicated Browse tab (§8.18) instead — the tree itself never renders a `namespace`,
+`prefix` or `key`/`object` row.
+
 - **Sticky ancestor headers (P28).** Scrolling the panel pins the currently-open connection,
   database and schema rows (up to three, outermost first) at the top of the list until the scroll
   passes into the next section, at which point the header stack slides out and the next
@@ -415,7 +423,7 @@ second, live consumer of it unrelated to the tree.
 A tab is `{ id, connectionId, path, kind, state }`. **Identity is `id`, not `path`** — the same table
 opens any number of times, each with independent paging, projection, sort, filter and scroll state.
 Tabs are tinted with the connection color. Kinds: `data`, `definition`, `document`, `keyvalue`,
-`stream`, `console`.
+`stream`, `console`, `browse` (§8.18).
 
 **Session restore.** On relaunch the previous tabs are reopened but their connections are **not**
 opened automatically. A restored tab renders a centred **Reconnect & load** button and nothing else
@@ -558,8 +566,9 @@ the six constructors as completions.
 
 ### 8.8 Key/value view (Redis, and S3 objects)
 
-Namespace tree from `SCAN` with `:` splitting; per-type value renderers (string, hash, list, set,
-zset, stream) with TTL and memory usage shown. Never `KEYS`, never `SCAN` without a count budget.
+Opens one key's value (reached by descending a Browse tab to it, §8.18 — the namespace/`:`-split
+navigation itself lives there, not here). Per-type value renderers (string, hash, list, set, zset,
+stream) with TTL and memory usage shown. Never `KEYS`, never `SCAN` without a count budget.
 Toolbar adds a page-size control and in-page search, with the same filter toggle and cell-level
 highlighting as the grid (P31 D17). **Edit** and **Add key** are scoped to string-typed values
 only (a hash/list/set/zset/stream element needs its own per-type semantics, out of scope for this
@@ -577,10 +586,11 @@ gate:
   read-only (a read). The bytes go straight from the adapter to a temp file in the destination's own
   directory, renamed into place on success and unlinked on any failure or cancellation — never a
   partial file left at the real destination.
-- **Upload** (the object tab's Add button, or a bucket/prefix row's own **Upload file…**) opens a
-  file-choose dialog, then a small form (key, content type, both prefilled from the chosen file's
-  name/extension) before a single `PutObject`; refused if the key already exists (S3 has no
-  conditional-create, so this is a `HeadObject` probe first) or if a >5 GiB source is chosen.
+- **Upload** (the object tab's Add button, a bucket row's own tree menu, or a Browse tab's toolbar/
+  container-row menu, §8.18) opens a file-choose dialog, then a small form (key, content type, both
+  prefilled from the chosen file's name and the Browse panel's own current level) before a single
+  `PutObject`; refused if the key already exists (S3 has no conditional-create, so this is a
+  `HeadObject` probe first) or if a >5 GiB source is chosen.
 - **Edit** replaces the body with a new `PutObject` that carries forward every other attribute
   `HeadObject` returned (`ContentType`, `Metadata`, `CacheControl`, etc. — a `PutObject` replaces the
   object wholesale, so anything not resent is gone). It is enabled only when the object is at or
@@ -627,11 +637,11 @@ the two diverge the mac key follows a slash. See §8.16 for the binding table it
 | Target | Items |
 |---|---|
 | Connection | Connect, Disconnect, **Open query console**, Refresh, Edit `F2`, Duplicate `Ctrl/Cmd+D`, Copy name `Ctrl/Cmd+C`, Copy URI `Shift+Alt+C`/`⌥⌘C`, Filters…, Color ▸, Read-only ✓, Delete `Delete`/`⌘⌫` |
-| Database / schema / (S3) Bucket | **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default, (S3) Upload file… |
-| Redis namespace / S3 prefix | Refresh, Copy name `Ctrl/Cmd+C`, (S3) Upload file… |
+| Database / schema / (Redis) Database / (S3) Bucket | (Redis/S3 only, `caps.keyBrowser`) **Browse objects/keys** `Enter`, **Open query console**, Refresh, Copy name `Ctrl/Cmd+C`, Filters…, (Postgres) Set as default, (S3) Upload file… |
 | Table / view / collection | Open data `Enter`, Open data in new tab, **Open query console**, Open definition, Refresh, Copy name `Ctrl/Cmd+C`, Copy qualified name, Count rows, Saved filters ▸ |
-| Redis key | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C` |
-| S3 object | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C`, Download…, Delete `Delete`/`⌘⌫` |
+| Browse panel row (§8.18): Redis namespace / S3 prefix | Refresh, Copy name `Ctrl/Cmd+C`, (S3) Upload file… |
+| Browse panel row (§8.18): Redis key | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C` |
+| Browse panel row (§8.18): S3 object | Open `Enter`, Open in new tab, Copy name `Ctrl/Cmd+C`, Download…, Delete `Delete`/`⌘⌫` |
 | Object-kind folder (P19, P23's Kafka Consumer groups, P37's RabbitMQ Exchanges) | Refresh, Collapse all |
 | Topic / queue (P23) | Open `Enter`, Open in new tab, Open definition, Copy name `Ctrl/Cmd+C` |
 | Consumer group (P23) / Exchange (P37) | Open definition, Copy name `Ctrl/Cmd+C`, Copy qualified name |
@@ -807,6 +817,39 @@ gets the tooltip text mirrored into `aria-label`; while the tooltip is open, the
 `aria-describedby` pointing at it, and `focusin`/`focusout` open and close it for keyboard users the
 same way pointer hover does.
 
+### 8.18 Browse panel (P41)
+
+The one place a Redis db index's keyspace or an S3 bucket's prefix/object space is actually
+navigated — reached by double-clicking (or `Enter`-ing) a `database`/`bucket` row in the project
+tree, or its context menu's **Browse objects/keys** item (§8.10). A `browse` tab, one lazy level at
+a time, over the same `SCAN`/`ListObjectsV2` calls the tree used to make inline.
+
+**One level per screen, never a recursive tree.** The panel shows exactly the children of its
+*current level* — a namespace/prefix's own container children, or a top-level db index/bucket's
+own. Double-clicking a container row descends into it; double-clicking a key/object row opens it
+in a key/value tab (§8.8), reusing the same tab identity rules as everywhere else. The toolbar's
+**Up** button (disabled at the tab's own top level) and a breadcrumb (one crumb per path segment,
+each a jump target) are the only ways to move between levels — there is no expand/collapse, and no
+level is ever rendered nested under another.
+
+**Tab identity persists the level, not just the container.** Reactivating an already-open Browse
+tab (double-clicking its tree row again) resumes exactly where it was left — still three levels
+deep, if that's where it was — the same `{ id, connectionId, path, kind, state }` identity every
+other tab kind uses (§8.4), with `state.levelPath` as the one piece of Browse-specific state.
+
+**Filter** is a plain client-side substring match over the level already loaded — never a second
+`SCAN`/`ListObjectsV2` call, and the count strip reads `N of M` while a filter is active. **Upload**
+(toolbar button, or a container row's own menu) opens the same dialog as the tree's bucket-row
+Upload, prefilled with the current level's own prefix ahead of the chosen file's name. Row actions
+are addressed by node kind, not the whole tab (§8.10's last three rows): a container row gets
+Refresh/Copy name/Upload; a Redis key gets Open/Open in new tab/Copy name only (no download/delete
+from this row, unlike an S3 object, which additionally gets Download…/Delete gated on caps and
+read-only exactly like the key/value view's own toolbar buttons, §8.8).
+
+Loading, empty, and error states follow the same `ReconnectGate`/`MessageStrip` chrome as every
+other view — a restored tab shows **Reconnect & load** until pressed (§8.4), and a level with zero
+children shows "No items" rather than an empty list indistinguishable from a still-loading one.
+
 ---
 
 ## 9. Testing
@@ -946,7 +989,7 @@ careless broad override placed after a narrow one can silently delete the narrow
 `lint` stays green. `lint`/`typecheck` (all four projects)/`build` green after every commit; `bun
 test tests/db` reproduces the pre-existing 12 pass/10 fail baseline; every `data-testid` unchanged |
 | **P40 Query console UX and cell-editor read-only mode** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: a toolbar toggle for opening a run's result in a new result tab vs. reusing the current one; the shared find/search toolbar (already in grid/documents/keyvalue) added to console results; a result-set strip ("N result sets", each closable with an ×) for console's multi-statement runs; the empty gap between the last row and the panel's bottom edge when the cell editor is closed; a real read-only mode for the cell editor — hiding Format/Beautify and other edit-only affordances and the primary-key label when nothing on screen is editable, which the query console's own cell editor (always read-only, §8.14) currently doesn't do; the console's SQL cell view brought visually in line with the main grid's cell view, dropping the data-type badge from its header | The user's own framing: a set of console-specific UX gaps found by using the feature, queued ahead of the broader functionality review | Implemented per `docs/v1/plans/P40-query-console-ux-and-readonly-cell-editor.md`, eight commits. A result set gets a stable key (`views/console/state.ts`'s `resultPageKey(tabId, seq)`, the tab's own monotonic `nextSeq`, never an array index) so closing one never re-keys its siblings. One result set is shown at a time behind a `.p-tab`-chip strip (`console-result-strip`/`console-result-tab`/`console-result-close`), replacing the old stacked-panel-per-statement layout the view's own comment had recorded as a deviation from the design system since P5.5 — this also fixed the empty band below the last row when the cell editor is closed (the fixed `height: 260px` `.result-panel` is gone; the active grid is `flex: 1`, same as the data grid's own `.grid-area`). A toolbar toggle (`console-new-result-toggle`) decides append-vs-replace, persisted per tab as `consoleTabStateSchema.newResultSet` (`.default(false)`, so an already-saved tab restores unchanged). `views/console/search.ts` is the fourth `createPageSearch` call site (after grid/documents/keyvalue) — its `activePage(tabId)` in `state.ts` is the one place "which of this tab's N result sets" is resolved, so `views/shared/page/`'s two shared cleanup handlers never had to learn a per-result-set key scheme; `setActiveResult` bumps `resultPages.ts`'s `pageVersion` so an open find re-scans the newly active result. `CellEditorDock`/`CellEditorView` gained an optional `readOnly` prop (defaulting to `false`, so the other four mounts are unchanged) — true "viewer mode": no reason chip (`data-read-only="true"`, no `data-read-only-reason`, since there was never a write on offer to refuse) and none of UUID-generate/`modified`/byte-badge/Beautify/Revert, which either did nothing meaningful on a console cell or lied about why. `ConsoleResultGrid.vue`'s header dropped its `p-badge` data-type badge for the same hover tooltip (name/type/glossary description) `DataGrid.vue`'s own header cell has carried since P31, plus row-hover and `tabular-nums` parity. Two real defects found on the way were written up and deliberately left untouched, handed to P42: `stream`/`documents` mount the cell editor with the same no-write-path gap the console had (F14); `resultPages.ts`'s `setVisibleWindow` has no caller anywhere (F22), so the console's decode cache is never pruned the way the grid's is. `bun run lint`/`typecheck` (all four projects)/`build` clean after every commit; `tests/ui/sqlite.spec.ts` (the one console-touching spec that runs without Docker in this sandbox) exercises the toggle/strip/×/find toolbar for real and passes; `console.spec.ts`/`interaction.spec.ts`'s two stacked-grid-count assertions were updated to the new chip model in the same commits that changed the behavior, and `console.spec.ts` gained its own dedicated result-set/find-toolbar test plus a viewer-mode block in `cell-editor.spec.ts`'s existing console step — all Postgres-backed and **not run in this sandbox** (Docker image pulls are blocked here); they typecheck/lint clean and need a real run in CI or on the macOS/Colima box before this phase is fully verified. |
-| **P41 Redis/S3 tree navigation and the sticky header fix** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: Redis and S3 connections currently expand their full key/object tree inline in the project panel; this phase keeps only the top-level containers (buckets for S3, databases for Redis) in the connection tree and adds a dedicated panel for the actual — potentially infinitely nested — key/object navigation. Also fixes the sticky ancestor-band header (P28's `stickyBand.ts`): the top band does not stick on scroll while a bottom one incorrectly does and duplicates rows | The user's own framing: the sticky header is a real, currently-broken bug, and unbounded Redis/S3 nesting in the connection tree is a scalability problem worth fixing before the broader functionality review | Not yet planned — queued |
+| **P41 Redis/S3 tree navigation and the sticky header fix** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: Redis and S3 connections currently expand their full key/object tree inline in the project panel; this phase keeps only the top-level containers (buckets for S3, databases for Redis) in the connection tree and adds a dedicated panel for the actual — potentially infinitely nested — key/object navigation. Also fixes the sticky ancestor-band header (P28's `stickyBand.ts`): the top band does not stick on scroll while a bottom one incorrectly does and duplicates rows | The user's own framing: the sticky header is a real, currently-broken bug, and unbounded Redis/S3 nesting in the connection tree is a scalability problem worth fixing before the broader functionality review | Implemented per `docs/v1/plans/P41-redis-s3-tree-navigation-and-sticky-header-fix.md`, seven commits. The sticky bug's real cause was never `stickyBand.ts`'s geometry (correct all along) but DOM order in `theme/primitives/VirtualList.vue`: a `position: sticky; top: 0` box only ever engages from flow position 0, and the sticky slot was rendered *after* the header/top-spacer, never at position 0 — moved to the first child, two-line fix. A new `caps.keyBrowser` boolean (true only for redis/s3) marks an engine whose top-level container hides an unbounded, arbitrarily-nested key/object space; `redis/catalog.ts`'s `database` node and `s3/catalog.ts`'s `bucket` node flip to `hasChildren: false`, and `project/grouping.ts`'s `isLeafKind`/`project/state/tree.ts`'s `revealPath`/`project/filterTree.ts` all thread the flag through so a keyBrowser container is treated as a leaf everywhere the tree already treats a table/topic as one. A new `browse` tab kind (`shared/domain/tabs.ts`, `views/browse/{state,BrowseView.vue,menu.ts}`) shows exactly one level at a time — `state.levelPath` persists which level a reactivated tab resumes at (§8.4's identity rule, unchanged) — with Up/breadcrumb navigation, a client-side substring filter, and container/key/object row menus moved verbatim from the tree's now-deleted `namespaceMenu`/`prefixMenu`/`keyMenu`/`objectMenu`; `state/objectStore.ts` gained the moved, re-signatured `uploadMenuItem` so both the tree's bucket row and the Browse panel's own container rows share one upload entry point without crossing the `project/ → views/` layering rule (`state/viewCommands.ts`'s existing leaf-registry pattern extended with `registerBrowseInvalidate`/`browseInvalidate`). `ProjectTree.vue`'s `onOpen` and `project/menus.ts`'s new `browseMenuItem` (first position, ahead of Refresh) are the two entry points into a Browse tab. `lint`/`typecheck` (all four projects)/`build` green after every commit; `tests/ui/sqlite.spec.ts`'s new inline-height sticky-band assertions and the full Docker-free spec subset (`startup`/`smoke`/`connections`/`sqlite`) pass for real in this sandbox after every commit. `redis.spec.ts`/`s3.spec.ts`/`memory.spec.ts` were rewritten wherever they drove tree-based namespace/prefix/key/object navigation to instead open a Browse tab and drive it, plus new dedicated Browse-panel scenarios (filter, Up, a prefix-level upload, and the tree-wide absence of any `prefix` row) — all Postgres/Redis/S3-backed and **not run in this sandbox** (Docker image pulls are blocked here); they typecheck/lint clean and need a real run in CI or on the macOS/Colima box before this phase is fully verified. One pre-existing bug was found and deliberately left untouched, out of this phase's scope: `UploadObjectDialog.vue`'s `containerPrefix` computed only captures a container path's own immediate local segment name (`pathTail`), not the full ancestor-joined relative prefix, so uploading through a *2-or-more-level-nested* S3 prefix's own Upload entry point silently drops every ancestor segment above the immediate parent from the prefilled key — handed to P42. |
 | **P42 Functionality review** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase, run as **three iterations** like P39: an in-depth review of the app's actual behavior (data handling, panel-to-panel communication, whether a state change is reflected everywhere it should be, error handling and how errors reach the user), frontend or engine/main, followed by real fixes — unlike P39, this phase is explicitly allowed to change behavior | The user's own framing: "practically anything that could be a bug should be found and fixed no matter if it be FE or in between" | Not yet planned — queued |
 | **P43 Unit tests** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: add unit tests, but sparingly — only where there is enough logic to justify one, and only where a unit test is the better fit than the existing UI (Playwright) coverage when both could apply. `tests/db/` is explicitly out of scope | The user's own framing: be scarce with new tests, prioritize unit over UI when both would work, never touch the DB suites | Not yet planned — queued |
 | **P44 Docs cleanup** | Not a SPEC §10 deliverable — a user-directed, post-v1 phase: SPEC.md and its `plans/` are retired as v1 history rather than a living spec; whatever in them is still true and durable moves into `ARCHITECTURE.md`, which `AGENTS.md` points to and which itself points out to the general docs (`PACKAGING.md`, `PERF.md`); the `docs/` folder structure is reconsidered to match | The user's own framing: spec and its plans are now "an element of the past of v1" | Not yet planned — queued |
@@ -1035,14 +1078,15 @@ src/
                     ViewChrome.vue/VirtualList.vue/PanelSplitter.vue moved to theme/primitives/
                     — none had a workbench/ dependency and each has callers beyond it
                     UploadObjectDialog.vue (P33): choose file → key → content type → upload, one
-                    dialog reachable from a bucket/prefix tree row and an open object's own toolbar
+                    dialog reachable from a bucket's own tree row, an open object's own toolbar, and
+                    (P41) the Browse panel's toolbar/container-row menu
     project/        tree, connection dialog, filters, search
                     stickyBand.ts (P28): pure geometry for the pinned ancestor band — which rows
                     are stuck and where each one sits, DOM/Vue-free
                     filterTree.ts (P28): the checkbox filter dialog's model over the tree's own
                     cached nodes — kind rows, tri-state object rows, toggles, no IPC of its own
     views/
-      grid/ documents/ keyvalue/ stream/ definition/ console/
+      grid/ documents/ keyvalue/ stream/ definition/ console/ browse/
                     -- each owns its own state module; a new page kind is one new folder here
                        plus one Page variant in shared/protocol, not a change to existing views
                     (P39) grid/documents/keyvalue/stream share one module-naming scheme —
@@ -1051,6 +1095,13 @@ src/
                     mutate-immediately writers) — so a reviewer already knows where a sibling
                     view's equivalent file lives. grid/pendingChanges.ts keeps its own name: it's
                     the staged-change model (§8.14), not a mutation executor
+      browse/       (P41) §8.18's one-level-at-a-time redis/s3 key-object navigation — state.ts
+                    (currentLevel/load/descend/ascend/goToLevel/setFilter, registers 'browse' with
+                    both state/tabRuntime.ts's reload hook and state/viewCommands.ts's own
+                    registerBrowseInvalidate), BrowseView.vue (toolbar Up/breadcrumb/filter/count,
+                    a VirtualList body), menu.ts (containerRowMenu/keyRowMenu/objectRowMenu, moved
+                    verbatim from project/menus.ts's deleted namespaceMenu/prefixMenu/keyMenu/
+                    objectMenu once the tree stopped rendering any of those rows, D5)
       documents/    ejson.ts (BSON shape recognition, shell-form render, no `bson` import — P27
                     D13), documentRows.ts (memoized per-row parse, per-path nested expansion, the
                     exact row-height model — P27 D18/D20/D21), DocumentTree.vue (one expanded
@@ -1110,8 +1161,10 @@ src/
     state/          cross-view app state (tabs, active connection, op log ring) — promoted out of
                     workbench/ so views/ doesn't have to reach into workbench/ to read it
                     objectStore.ts (P33): S3 upload-dialog state + download/upload/delete flows —
-                    lives here rather than views/keyvalue/ so project/menus.ts's bucket/prefix rows
-                    can open the upload dialog without a sideways import into views/
+                    lives here rather than views/keyvalue/ so project/menus.ts's bucket row and
+                    (P41) views/browse/menu.ts's own container-row menu can both open the upload
+                    dialog through one shared uploadMenuItem() without a sideways views/ → views/
+                    import
                     (P39) contextMenu.ts and layout.ts joined this folder from workbench/state/ —
                     most of their importers were already outside workbench/ (§11's own rationale)
                     viewCommands.ts (P39 iter3): the leaf-registry inversion tabRuntime.ts already
@@ -1119,7 +1172,10 @@ src/
                     (reload/count/setFilter/setSort/setProjection) — each view's own state.ts
                     registers its handler at module scope, project/ dispatches by tab kind, and the
                     `views/* → project/ → state/` graph iteration 2 recorded as two-directional is
-                    one-directional again
+                    one-directional again. (P41) registerBrowseInvalidate/browseInvalidate: the same
+                    pattern for one more edge — UploadObjectDialog.vue invalidating the Browse
+                    panel's currently loaded level after a successful upload without importing
+                    views/browse/ directly
     bridge/         control.ts, port.ts — the only files that touch ipcRenderer/MessagePort
     theme/          tokens, codicons
                     primitives/ (P39): also holds ViewChrome.vue/VirtualList.vue/PanelSplitter.vue

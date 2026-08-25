@@ -17,9 +17,12 @@ block, which env var a headless Linux box needs) belong in `AGENTS.md`, not here
 Every engine is one directory under `src/engine/adapters/`, implementing the `Adapter` interface
 (`src/engine/adapters/adapter.ts`). A `Caps` object (`src/shared/caps.ts`) declares what that
 engine can do — `defaultPageKind`, `pagination` strategy, `canInsert`/`canUpdate`/`canDelete`,
-`cancel`, `sql`, `definition`, `describe`, `fileTransfer` — and the UI reads *only* `Caps`, never a
-`connection.kind` check, to decide what to show. `registry.ts` lazily `import()`s each adapter
-directory so an unused engine's driver is never loaded into the engine process's baseline memory.
+`cancel`, `sql`, `definition`, `describe`, `fileTransfer`, `keyBrowser` (P41 — true only for
+redis/s3: the top-level container's own key/object space is unbounded and arbitrarily nested, so
+the project tree treats that container as a leaf and the UI reaches it through a dedicated Browse
+tab instead, SPEC.md §8.18) — and the UI reads *only* `Caps`, never a `connection.kind` check, to
+decide what to show. `registry.ts` lazily `import()`s each adapter directory so an unused engine's
+driver is never loaded into the engine process's baseline memory.
 
 Full per-database mapping table (tree shape, pagination, exact count, cancel mechanism): SPEC.md
 §5.1.
@@ -133,6 +136,14 @@ a native OS dialog (`downloadObject`), not a value the mutation-preview model ca
 `fileTransfer` is orthogonal to the three write flags: Download reads regardless of a connection's
 read-only flag; Upload is gated on `fileTransfer && canInsert` together.
 
+`caps.keyBrowser = true` (P41): a bucket's prefix/object space has no fixed size and can nest
+arbitrarily deep, so `s3/catalog.ts`'s `bucket` node is `hasChildren: false` — the tree stops at the
+bucket, and `/`-delimited prefix/object navigation happens in a Browse tab instead
+(SPEC.md §8.18). Object node paths still carry the *full* bucket-relative key on their own
+`object` segment, nested under every ancestor `prefix` segment (`catalog.ts`'s `listPrefixChildren`
+— `bucket:b/prefix:reports/object:reports%2Fnote.txt`, not a bare local filename), the same
+convention the tree used before this phase and unrelated to it.
+
 ### RabbitMQ (HTTP management API, P37)
 
 **No dependency at all** — the adapter speaks only the `rabbitmq_management` plugin's HTTP API over
@@ -172,6 +183,12 @@ of every listing (its blank name cannot survive the app's own path/tab-title plu
 MongoDB: document-shaped, `_id` keyset pagination falling back to `skip/limit`, `AbortSignal` +
 `killOp` cancellation. Redis: key/value-shaped, `SCAN`-cursor pagination (never `KEYS`), `DBSIZE`
 for an approximate count only.
+
+Redis is the other `caps.keyBrowser = true` engine (P41, alongside S3): a db index's own key
+namespace is unbounded, so `redis/catalog.ts`'s `database` node is `hasChildren: false` and the
+`:`-split namespace/key navigation that used to expand inline in the tree happens in a Browse tab
+instead (SPEC.md §8.18) — `SCAN`'s own cursor/count-budget discipline is unchanged, only where the
+result is shown moved.
 
 ## Storage
 
