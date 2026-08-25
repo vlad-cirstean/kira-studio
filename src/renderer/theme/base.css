@@ -84,3 +84,10 @@ textarea,
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Chromium's own unstyled defaults for these two are opaque white, which survives every theme —
+   most visible where a scroll container shows both scrollbars at once (P42). */
+::-webkit-scrollbar-corner,
+::-webkit-resizer {
+  background: transparent;
+}

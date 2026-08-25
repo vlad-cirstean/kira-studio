@@ -78,7 +78,7 @@ function stepBy(dir: 1 | -1): void {
         v-tooltip="'Increase'"
         @mousedown.prevent="stepBy(1)"
       >
-        <CodiconIcon name="chevron-up" :size="13" />
+        <CodiconIcon name="chevron-up" :size="9" />
       </button>
       <button
         type="button"
@@ -88,7 +88,7 @@ function stepBy(dir: 1 | -1): void {
         v-tooltip="'Decrease'"
         @mousedown.prevent="stepBy(-1)"
       >
-        <CodiconIcon name="chevron-down" :size="13" />
+        <CodiconIcon name="chevron-down" :size="9" />
       </button>
     </span>
   </span>

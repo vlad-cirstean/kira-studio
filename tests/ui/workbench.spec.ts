@@ -51,6 +51,18 @@ test('the workbench is inset from the window edge on three sides (P31 D8)', asyn
   expect(projectBox.x - shellBox.x).toBeGreaterThanOrEqual(6);
 });
 
+// P42 F17: Chromium's own unstyled default for this pseudo-element is opaque white, which
+// survives every theme (it uses none of this app's own tokens) until base.css overrides it.
+test("the scrollbar corner is not left at Chromium's opaque-white default (P42 F17)", async ({
+  relaunch,
+}) => {
+  const { window } = await relaunch();
+  const corner = await window.evaluate(
+    () => getComputedStyle(document.documentElement, '::-webkit-scrollbar-corner').backgroundColor,
+  );
+  expect(corner).not.toBe('rgb(255, 255, 255)');
+});
+
 test('settings dialog appearance font size persists across relaunch', async ({ relaunch }) => {
   let { window } = await relaunch();
 

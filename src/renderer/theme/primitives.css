@@ -178,6 +178,11 @@
   appearance: none;
   margin: 0;
 }
+/* P42: the stepper takes the field's own right edge (no dead gutter of input background beyond
+   it) — the input's own right padding moves onto .stepper's right corner radius instead. */
+.p-input.has-stepper {
+  padding-right: 0;
+}
 .p-input.has-stepper input {
   padding-right: var(--kira-s-1);
 }
@@ -186,9 +191,15 @@
   flex-direction: column;
   align-self: stretch;
   flex-shrink: 0;
-  margin: 2px 0;
   border-left: var(--kira-border-width) solid var(--kira-border);
+  border-top-right-radius: var(--kira-radius-sm);
+  border-bottom-right-radius: var(--kira-radius-sm);
+  overflow: hidden;
 }
+/* P42 F16: each button's content box is ~8px tall; TextField.vue's chevron icon is sized to fit
+   it (9px). overflow:hidden is a guard against the glyph spilling out again if a height token
+   moves — the icon's own :size prop is the actual fix, since its inline style would win over any
+   font-size set here. */
 .p-input .step-btn {
   display: flex;
   align-items: center;
@@ -201,6 +212,7 @@
   color: var(--kira-fg-muted);
   cursor: pointer;
   line-height: 0;
+  overflow: hidden;
 }
 .p-input .step-btn:hover {
   color: var(--kira-fg);

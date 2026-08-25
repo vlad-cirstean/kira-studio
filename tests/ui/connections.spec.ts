@@ -38,6 +38,25 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.fill('[data-testid="connection-name"]', 'Test PG');
   await page.fill('[data-testid="connection-host"]', '127.0.0.1');
   await page.fill('[data-testid="connection-port"]', '5432');
+
+  // --- P42 F16: the port field's numeric stepper draws both chevrons wholly inside their own
+  // buttons, not spilling into a sibling or out of the field (a CSS regression guard). --------
+  const portInput = page.locator('[data-testid="connection-port"]');
+  const stepButtons = portInput.locator('xpath=parent::span').locator('.step-btn');
+  await expect(stepButtons).toHaveCount(2);
+  for (const btn of await stepButtons.all()) {
+    const btnBox = await btn.boundingBox();
+    const iconBox = await btn.locator('.codicon').boundingBox();
+    expect(btnBox).not.toBeNull();
+    expect(iconBox).not.toBeNull();
+    if (btnBox && iconBox) {
+      expect(iconBox.y).toBeGreaterThanOrEqual(btnBox.y - 0.5);
+      expect(iconBox.y + iconBox.height).toBeLessThanOrEqual(btnBox.y + btnBox.height + 0.5);
+      expect(iconBox.x).toBeGreaterThanOrEqual(btnBox.x - 0.5);
+      expect(iconBox.x + iconBox.width).toBeLessThanOrEqual(btnBox.x + btnBox.width + 0.5);
+    }
+  }
+
   await page.fill('[data-testid="connection-database"]', 'testdb');
   await page.fill('[data-testid="connection-username"]', 'testuser');
   await page.click('[data-testid="color-green"]');
