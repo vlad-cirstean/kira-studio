@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
-import type { NodePath } from '@shared/domain/tree';
+import { encodePath, type NodePath } from '@shared/domain/tree';
 import { cellText, type KeyValuePage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
+import { deleteLiveAdapter, setLiveAdapter } from '../../src/engine/adapters/live';
 import { redisCaps } from '../../src/engine/adapters/redis/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
+import { handleMutate, handleRead } from '../../src/engine/data';
 import {
   HASH_FIELDS,
   HASH_KEY,
@@ -621,6 +623,67 @@ describe('redis adapter (§9.1, P9)', () => {
       expect(await adapter.cancel(crypto.randomUUID())).toBe(false);
     } finally {
       await adapter.disconnect();
+    }
+  });
+
+  // P43 F12/D17: engine/data.ts's handleMutate — not the adapter directly, since the bug this
+  // pins lives in the cache layer above it, not in the adapter. redis/mutate.ts's own `mutate()`
+  // is a plain sequential loop with no transaction (unlike postgres/mysql-family/sqlite), so a
+  // plan whose second op fails still applies its first op against the server. Before this fix
+  // handleMutate only invalidated the cache on the success path, so a page read before the
+  // mutation kept serving the pre-mutation value as a cache hit even after a failed commit.
+  test("22. a partially failed mutate still invalidates the target's cached page (D17)", async () => {
+    const connectionId = 'cache-test-redis-partial-failure';
+    const adapter = await createAdapter('redis', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    setLiveAdapter(connectionId, adapter);
+    try {
+      const counterPath = encodePath(keyPath('counter').segments);
+      const readReq = {
+        opId: crypto.randomUUID(),
+        tabId: null,
+        connectionId,
+        path: counterPath,
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 10 as const,
+        cursor: { mode: 'offset' as const, offset: 0 },
+      };
+
+      // Warm L2: a miss, then a hit — proves the read that matters below is genuinely served
+      // from cache rather than happening to hit the server again anyway.
+      const first = await handleRead(readReq);
+      expect(first.response.source).toBe('server');
+      expect(kvValueAt(first.page as KeyValuePage, 0)).toBe('42');
+      const second = await handleRead({ ...readReq, opId: crypto.randomUUID() });
+      expect(second.response.source).toBe('cache');
+
+      // op 1 (SET counter) succeeds against the server; op 2 targets HASH_KEY, a hash — wrong
+      // type for an `update` op (assertEditableType), so the plan throws part-way through.
+      await expect(
+        handleMutate({
+          opId: crypto.randomUUID(),
+          tabId: null,
+          connectionId,
+          path: counterPath,
+          ops: [
+            { kind: 'update', key: { _key: 'counter' }, changes: { $value: '43' } },
+            { kind: 'update', key: { _key: HASH_KEY }, changes: { $value: 'irrelevant' } },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'E_UNSUPPORTED' });
+
+      // The cached page must be gone (a fresh server read, not the stale '42' hit) and the read
+      // that replaces it must reflect op 1's already-applied effect.
+      const afterFailure = await handleRead({ ...readReq, opId: crypto.randomUUID() });
+      expect(afterFailure.response.source).toBe('server');
+      expect(kvValueAt(afterFailure.page as KeyValuePage, 0)).toBe('43');
+    } finally {
+      deleteLiveAdapter(connectionId);
+      await adapter.disconnect();
+      // Leaves 'counter' at '43' for the rest of this suite — no other test reads it after this
+      // one runs (test order is declaration order, and this is the last test in the file).
     }
   });
 });

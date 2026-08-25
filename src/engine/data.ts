@@ -130,16 +130,26 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
 
   const path = decodePath(req.connectionId, req.path);
   const plan: MutationPlan = { path, ops: req.ops };
-  const { value } = await runOp(
-    { connectionId: req.connectionId, kind: 'mutate', opId: req.opId, tabId: req.tabId },
-    (ctx) => adapter.mutate(plan, ctx),
-  );
-
-  // Same-process, not a round trip back through main (P5 D12). §7/P13 D18: a mutation drops the
-  // target's pages but only marks its counts stale — DATA_OP.invalidate's hard drop is reserved
-  // for the renderer's explicit ↻ Refresh.
-  cache.invalidateAfterMutation(req.connectionId, req.path);
-  return { affectedRows: value.affectedRows };
+  try {
+    const { value } = await runOp(
+      { connectionId: req.connectionId, kind: 'mutate', opId: req.opId, tabId: req.tabId },
+      (ctx) => adapter.mutate(plan, ctx),
+    );
+    return { affectedRows: value.affectedRows };
+  } finally {
+    // Same-process, not a round trip back through main (P5 D12). §7/P13 D18: a mutation drops
+    // the target's pages but only marks its counts stale — DATA_OP.invalidate's hard drop is
+    // reserved for the renderer's explicit ↻ Refresh.
+    // P43 F12/D17: in a `finally`, not just the success path — redis/s3/sqs/rabbitmq/mongo/
+    // clickhouse's own `mutate()` is a plain sequential loop with no transaction (unlike
+    // postgres/mysql-family/sqlite's own BEGIN/COMMIT/ROLLBACK), so a plan that fails part-way
+    // through still mutates the server. Leaving the success-only call meant that partial write
+    // left its pre-mutation page cached as a hit, silently wrong until the user happened to press
+    // Refresh. Dropping pages a transactional adapter's own rollback already left correct costs
+    // one extra re-read; keeping pages a partial failure left wrong is the bug this fixes — the
+    // asymmetry decides it (D18: the six adapters are not made transactional here).
+    cache.invalidateAfterMutation(req.connectionId, req.path);
+  }
 }
 
 // P33: no cache interaction at all — a download reads nothing the L1/L2 cache holds (it streams
