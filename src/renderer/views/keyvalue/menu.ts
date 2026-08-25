@@ -9,7 +9,7 @@ import type { MenuItem } from '../../state/contextMenu';
 // `assertEditableType`); S3 scopes it by size/truncation/UTF-8-validity (P33 D6/D7,
 // KeyValueView.vue's `objectEditGate`) — shown but disabled, with a label that says why, rather
 // than simply omitted, so the limit is visible rather than looking like a missing feature.
-export function keyValueMenu(opts: {
+export function rowMenu(opts: {
   field: string;
   value: string;
   redisType: KeyValuePage['redisType'];

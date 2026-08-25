@@ -4,7 +4,7 @@ import type { MenuItem } from '../../state/contextMenu';
 // Read-only view (P10's D13) — copy-only per-row menu, no edit/delete rows anywhere. Mirrors
 // keyvalue/menu.ts; key/body only (headers/attrs/timestamp are visible inline but rarely
 // what someone wants to paste elsewhere).
-export function streamMenu(key: string | null, body: string): MenuItem[] {
+export function rowMenu(key: string | null, body: string): MenuItem[] {
   const items: MenuItem[] = [];
   if (key !== null) {
     items.push({

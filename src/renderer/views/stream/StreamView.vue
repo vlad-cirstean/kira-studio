@@ -23,7 +23,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
-import { streamMenu } from './menu';
+import { rowMenu } from './menu';
 import { deleteSqsMessage } from './mutations';
 import { getPage, pageVersion, streamRow } from './page';
 import StreamComposeMessage from './StreamComposeMessage.vue';
@@ -130,7 +130,7 @@ function rowAt(i: number) {
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
   e.preventDefault();
-  openContextMenu(e, streamMenu(key, body));
+  openContextMenu(e, rowMenu(key, body));
 }
 
 // Row click alone (gutter, empty row background) just selects the row for highlighting/delete-

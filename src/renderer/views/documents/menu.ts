@@ -5,7 +5,7 @@ import { setAllExpanded, toggleExpanded } from './state';
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
 // shared by the per-row context menu and (expand/collapse all only) the toolbar.
-export function documentMenu(
+export function rowMenu(
   tabId: string,
   id: string,
   body: string,

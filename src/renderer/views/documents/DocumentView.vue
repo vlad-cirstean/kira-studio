@@ -32,7 +32,7 @@ import DocumentTree from './DocumentTree.vue';
 import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
 import { beautifyShellText, toShellText } from './ejson';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
-import { documentMenu } from './menu';
+import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
 import { documentRow, fieldNamesOnPage, pageVersion } from './page';
@@ -444,7 +444,7 @@ function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
   const ids = rows.value.map((r) => r.view.id);
   openContextMenu(
     e,
-    documentMenu(props.tab.id, id, body, ids, () => startEdit(id, body), editGate.value),
+    rowMenu(props.tab.id, id, body, ids, () => startEdit(id, body), editGate.value),
   );
 }
 

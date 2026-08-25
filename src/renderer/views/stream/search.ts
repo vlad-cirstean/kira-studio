@@ -27,7 +27,7 @@ export function clearSearchState(tabId: string): void {
 // mirrors grid/search.ts's own registration.
 registerTabRuntimeCleanup(clearSearchState);
 
-export function runStreamSearch(tabId: string, query: string): void {
+export function runSearch(tabId: string, query: string): void {
   if (query === '') {
     clearSearchState(tabId);
     return;

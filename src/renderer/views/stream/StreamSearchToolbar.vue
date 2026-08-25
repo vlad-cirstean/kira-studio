@@ -10,7 +10,7 @@ import {
   goToNextMatch,
   goToPrevMatch,
   matchedRows,
-  runStreamSearch,
+  runSearch,
   searchState,
 } from './search';
 
@@ -41,18 +41,18 @@ const entry = computed(() => searchState[props.tabId]);
 const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 watch(query, (q) => {
-  runStreamSearch(props.tabId, q);
+  runSearch(props.tabId, q);
   const e = searchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
 });
 
 // P31 D22/D23/F23: a Fetch more/poll/page change calls setPage and bumps pageVersion.n —
-// re-scan against the new page (runStreamSearch already resets index to the first match, or -1,
+// re-scan against the new page (runSearch already resets index to the first match, or -1,
 // per D23) without auto-scrolling; a background poll must not move the viewport under the user.
 watch(
   () => pageVersion.n,
   () => {
-    if (query.value !== '') runStreamSearch(props.tabId, query.value);
+    if (query.value !== '') runSearch(props.tabId, query.value);
   },
 );
 

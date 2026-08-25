@@ -29,7 +29,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { pageSizeOptions } from '../shared/pageSizes';
 import { setSearchFiltering } from '../shared/searchFilter';
-import { keyValueMenu } from './menu';
+import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow, pageVersion } from './page';
 import { type Match, matchedRows, pageSearchApi, searchState } from './search';
@@ -408,7 +408,7 @@ function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
   const isObject = p.redisType === 'object';
   openContextMenu(
     e,
-    keyValueMenu({
+    rowMenu({
       field,
       value,
       redisType: p.redisType,
