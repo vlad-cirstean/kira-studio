@@ -128,6 +128,36 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
 
   await whereInput.fill('');
   await whereInput.press('Enter');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
+
+  // --- P42 D15/D16/D17: press-drag across cells builds a rectangular range; the corner cell
+  // selects everything (order_items has exactly 4 columns/3 rows, so this covers 3 of each). -----
+  const grid = page.locator('[data-testid="data-grid"]');
+  const cellTopLeft = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
+  const cellBottomRight = page.locator(
+    '[data-testid="grid-cell"][data-row="2"][data-column="product_id"]',
+  );
+  const topLeftBox = await cellTopLeft.boundingBox();
+  const bottomRightBox = await cellBottomRight.boundingBox();
+  if (!topLeftBox || !bottomRightBox) throw new Error('cell bounding boxes not found');
+  await page.mouse.move(topLeftBox.x + topLeftBox.width / 2, topLeftBox.y + topLeftBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    bottomRightBox.x + bottomRightBox.width / 2,
+    bottomRightBox.y + bottomRightBox.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(grid.locator('.grid-cell.selected')).toHaveCount(9);
+
+  // Shift-click still extends a range exactly as it did before drag-select existed.
+  await cellTopLeft.click();
+  await cellBottomRight.click({ modifiers: ['Shift'] });
+  await expect(grid.locator('.grid-cell.selected')).toHaveCount(9);
+
+  const totalCells = await grid.locator('[data-testid="grid-cell"]').count();
+  await page.click('[data-testid="grid-select-all"]');
+  await expect(grid.locator('.grid-cell.selected')).toHaveCount(totalCells);
 
   // --- D28's other half: the console tab is really in SQL mode, not plain text ----------------
   await openRowMenu(page, DB_PATH);

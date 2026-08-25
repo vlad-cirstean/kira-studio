@@ -318,6 +318,9 @@ onUnmounted(() => {
   // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
   // tab is gone — clearing it just stops the timer firing against an unmounted component.
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
+  // P42 D16: a tab closed mid-drag (e.g. Ctrl/Cmd+W) must not leave a document-level listener or
+  // an animation-frame loop running against an unmounted component.
+  onDragMouseUp();
 });
 
 // P24 D3: in *display-position* space (0..displayRowCount), not page-row space — the rows a
@@ -641,6 +644,12 @@ function onInsertInput(e: Event, insertId: string, column: string): void {
 // ctrl/cmd-click a disjoint cell is folded into a plain cell selection — multi-cell disjoint
 // selection has no consumer until P6's copy/paste, so a second selected-cell set is not built here.
 function onCellClick(row: number, displayCol: number, e: MouseEvent): void {
+  // P42 D15: the trailing click a real drag still fires (mousedown -> mouseup -> click, same
+  // target) would otherwise collapse the range it just built back down to a single cell.
+  if (dragProducedRange) {
+    dragProducedRange = false;
+    return;
+  }
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
   const sel = runtimeEntry.selection;
@@ -665,6 +674,119 @@ function onCellClick(row: number, displayCol: number, e: MouseEvent): void {
 // into a disjoint set. A plain click still replaces the selection with a single row, as before.
 const rowAnchor = ref<number | null>(null);
 const colAnchor = ref<number | null>(null);
+
+// P42 D15/D16: press-drag across cells extends the selection, writing the exact same
+// `{ kind: 'range', anchorRow, anchorCol, row, col }` shape shift-click already writes — so
+// copy, the cell menu and the cell-editor publish above need no changes at all. Plain variables,
+// not refs: this is read on every pointer event during a drag, and none of it is ever rendered.
+let dragging = false;
+let dragProducedRange = false;
+let dragPointerX = 0;
+let dragPointerY = 0;
+let autoScrollRaf = 0;
+const AUTO_SCROLL_EDGE = 24;
+const AUTO_SCROLL_STEP = 12;
+
+function extendSelectionTo(row: number, displayCol: number): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  const sel = runtimeEntry.selection;
+  const anchor =
+    sel?.kind === 'range'
+      ? { row: sel.anchorRow, col: sel.anchorCol }
+      : sel?.kind === 'cell'
+        ? { row: sel.row, col: sel.col }
+        : { row, col: displayCol };
+  if (sel?.kind !== 'range' && anchor.row === row && anchor.col === displayCol) return;
+  dragProducedRange = true;
+  runtimeEntry.selection = {
+    kind: 'range',
+    anchorRow: anchor.row,
+    anchorCol: anchor.col,
+    row,
+    col: displayCol,
+  };
+}
+
+// The pointer's own position, re-checked against whatever cell is now underneath it — needed
+// because auto-scroll moves cells under a pointer that never itself moves, which fires no native
+// mouseenter at all (the browser only re-hit-tests on real pointer movement).
+function extendFromPoint(x: number, y: number): void {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('.grid-cell[data-row]');
+  if (!el) return;
+  const row = Number(el.dataset.row);
+  const col = Number(el.dataset.colIndex);
+  if (Number.isNaN(row) || Number.isNaN(col)) return;
+  extendSelectionTo(row, col);
+}
+
+function autoScrollTick(): void {
+  if (!dragging) {
+    autoScrollRaf = 0;
+    return;
+  }
+  const el = containerRef.value;
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    let scrolled = false;
+    if (dragPointerY - rect.top < AUTO_SCROLL_EDGE && el.scrollTop > 0) {
+      el.scrollTop -= AUTO_SCROLL_STEP;
+      scrolled = true;
+    } else if (rect.bottom - dragPointerY < AUTO_SCROLL_EDGE) {
+      el.scrollTop += AUTO_SCROLL_STEP;
+      scrolled = true;
+    }
+    if (dragPointerX - rect.left < AUTO_SCROLL_EDGE && el.scrollLeft > 0) {
+      el.scrollLeft -= AUTO_SCROLL_STEP;
+      scrolled = true;
+    } else if (rect.right - dragPointerX < AUTO_SCROLL_EDGE) {
+      el.scrollLeft += AUTO_SCROLL_STEP;
+      scrolled = true;
+    }
+    if (scrolled) extendFromPoint(dragPointerX, dragPointerY);
+  }
+  autoScrollRaf = requestAnimationFrame(autoScrollTick);
+}
+
+function onDragMouseMove(e: MouseEvent): void {
+  if (!dragging) return;
+  dragPointerX = e.clientX;
+  dragPointerY = e.clientY;
+}
+
+function onDragMouseUp(): void {
+  dragging = false;
+  if (autoScrollRaf) {
+    cancelAnimationFrame(autoScrollRaf);
+    autoScrollRaf = 0;
+  }
+  document.removeEventListener('mousemove', onDragMouseMove);
+  // Idempotent — this is also called directly from onUnmounted for a tab closed mid-drag, when
+  // this listener (registered `{ once: true }`) may never actually have fired.
+  document.removeEventListener('mouseup', onDragMouseUp);
+}
+
+// Shift falls through to onCellClick's own extend path unchanged — this only ever starts a drag
+// on a plain primary-button press. `.grid-cell` is already `user-select: none`, so there is no
+// native text selection to fight.
+function onCellMouseDown(row: number, displayCol: number, e: MouseEvent): void {
+  if (e.button !== 0 || e.shiftKey) return;
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  dragging = true;
+  dragProducedRange = false;
+  dragPointerX = e.clientX;
+  dragPointerY = e.clientY;
+  runtimeEntry.selection = { kind: 'cell', row, col: displayCol };
+  document.addEventListener('mousemove', onDragMouseMove);
+  document.addEventListener('mouseup', onDragMouseUp, { once: true });
+  autoScrollRaf = requestAnimationFrame(autoScrollTick);
+}
+
+function onCellMouseEnter(row: number, displayCol: number): void {
+  if (!dragging) return;
+  extendSelectionTo(row, displayCol);
+}
 
 function onGutterClick(row: number, e: MouseEvent): void {
   const runtimeEntry = rt();
@@ -711,6 +833,27 @@ function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
   }
   runtimeEntry.selection = { kind: 'column', cols: [displayCol] };
   colAnchor.value = displayCol;
+}
+
+// P42 D17: the corner cell selects everything, as a `range` — never a `row` selection, which
+// `isSelected` resolves with `Array.includes` (O(rows) per rendered cell per render, F14a). A
+// range spanning the whole page is O(1) per cell, same as copy/paste and the cell menu already
+// assume. No keyboard shortcut (§9): Ctrl/Cmd+A already means something else inside an open
+// inline editor and inside the cell editor's own CodeMirror, and choosing between them is a real
+// focus-scope decision this phase doesn't make on its own.
+function onSelectAll(): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  const lastRow = (page.value?.rowCount ?? 0) - 1;
+  const lastCol = columnOrder.value.length - 1;
+  if (lastRow < 0 || lastCol < 0) return;
+  runtimeEntry.selection = {
+    kind: 'range',
+    anchorRow: 0,
+    anchorCol: 0,
+    row: lastRow,
+    col: lastCol,
+  };
 }
 
 // The row's effective values across the whole display column order (D6) — reused by row copy
@@ -1245,7 +1388,14 @@ defineExpose({ scrollCellIntoView });
       :style="{ width: `${totalWidth + GUTTER_WIDTH}px`, height: `${totalHeight + rowHeight}px` }"
     >
       <div class="header-row" :style="{ height: `${rowHeight}px` }">
-        <div class="gutter-cell header-gutter" :style="{ width: `${GUTTER_WIDTH}px` }" />
+        <div
+          class="gutter-cell header-gutter"
+          role="button"
+          aria-label="Select all cells"
+          data-testid="grid-select-all"
+          :style="{ width: `${GUTTER_WIDTH}px` }"
+          @click="onSelectAll"
+        />
         <div
           v-for="c in visibleColumnIndices"
           :key="columnOrder[c]"
@@ -1331,6 +1481,7 @@ defineExpose({ scrollCellIntoView });
           class="grid-cell"
           data-testid="grid-cell"
           :data-row="rowVm.row"
+          :data-col-index="cellVm.col"
           :data-column="cellVm.name"
           :data-null="cellVm.isNull"
           :class="cellVm.classes"
@@ -1339,6 +1490,8 @@ defineExpose({ scrollCellIntoView });
             width: `${cellVm.width}px`,
             scrollMarginTop: `${rowHeight}px`,
           }"
+          @mousedown="onCellMouseDown(rowVm.row, cellVm.col, $event)"
+          @mouseenter="onCellMouseEnter(rowVm.row, cellVm.col)"
           @click="onCellClick(rowVm.row, cellVm.col, $event)"
           @dblclick="onCellDblClick(rowVm.row, cellVm.col)"
           @contextmenu.prevent="onCellContextMenu(rowVm.row, cellVm.col, $event)"
@@ -1445,6 +1598,11 @@ defineExpose({ scrollCellIntoView });
   height: 100%;
   background: var(--kira-bg-elevated);
   border-right: var(--kira-border-width) solid var(--kira-border);
+  cursor: pointer;
+}
+
+.header-gutter:hover {
+  background: var(--kira-hover);
 }
 
 .header-cell {
