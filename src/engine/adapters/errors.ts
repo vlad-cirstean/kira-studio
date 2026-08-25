@@ -44,3 +44,10 @@ export function unsupported(kind: ConnectionKind, what: string): never {
 export function noQueryConsole(kind: ConnectionKind): never {
   throw new AdapterError('E_UNSUPPORTED', `${kind} has no query console`);
 }
+
+// P39 iter2 F15: the read-only refusal every write-capable adapter's mutate.ts (and kafka's
+// produce.ts) opens with, byte-identical ten times — adapter.ts's own contract sentence
+// ("Throws E_UNSUPPORTED if the connection is read-only") implemented once instead of ten times.
+export function assertWritable(readOnly: boolean): void {
+  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+}

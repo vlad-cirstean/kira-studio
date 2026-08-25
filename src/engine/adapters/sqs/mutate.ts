@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-sqs';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';
 
 // Sentinel key (mirrors mongo/mutate.ts's `$document`, kafka/produce.ts's `$body`): a new
@@ -86,7 +86,7 @@ export async function mutateQueue(
   receiptHandles: Map<string, string>,
   ctx: OpCtx,
 ): Promise<MutationResult> {
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
 
   ctx.setCommand(preview(plan, queueName).join(';\n'));
   let affectedRows = 0;

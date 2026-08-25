@@ -1,7 +1,7 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';
 
 // Sentinel keys (mirrors mongo/mutate.ts's `$document` precedent): a new message is expressed
@@ -60,7 +60,7 @@ export async function produce(
   ctx: OpCtx,
 ): Promise<MutationResult> {
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mongo/mariadb).
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
 
   // P32 D11: the library's own recommendation for this await-each-send shape (MIGRATION.md) —
   // without it every staged message pays the default batching delay, which a user watching a

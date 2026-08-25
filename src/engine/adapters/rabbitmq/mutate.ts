@@ -1,6 +1,6 @@
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import type { RabbitHandle } from './client';
 import { encodeSegment, request } from './query';
 
@@ -123,7 +123,7 @@ export async function mutateQueue(
   plan: MutationPlan,
   ctx: OpCtx,
 ): Promise<MutationResult> {
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
   const inserts = assertPublishOnly(plan);
 
   let affectedRows = 0;

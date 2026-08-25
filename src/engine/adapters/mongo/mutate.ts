@@ -2,7 +2,7 @@ import type { Db, Document } from 'mongodb';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';
 import { parseDocumentLiteral, parseJson5Literal, resolveEjsonWrappers } from './literal';
 
@@ -78,7 +78,7 @@ export async function mutate(
   plan: MutationPlan,
 ): Promise<MutationResult> {
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mysql-family/mutate.ts).
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
 
   const { collection: collectionName } = resolveCollectionPath(plan.path);
   const collection = db.collection(collectionName);

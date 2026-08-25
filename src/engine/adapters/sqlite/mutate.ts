@@ -1,7 +1,13 @@
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
+import {
+  assertAffectedExactlyOne,
+  assertColumnsKnown,
+  assertKeyIsPrimaryKey,
+  orderedOps,
+} from '../sql-mutate';
 import * as catalog from './catalog';
 import type { SqliteHandle } from './client';
 import { execLiteral, runCommand, runQuery, type SqliteParam } from './query';
@@ -54,12 +60,6 @@ function renderRowOp(
   return `INSERT INTO ${relationSql} (${columnSql}) VALUES (${valueSql})`;
 }
 
-// D8: delete, then update, then insert, regardless of the plan's own array order.
-const KIND_RANK: Record<MutationRowOp['kind'], number> = { delete: 0, update: 1, insert: 2 };
-function orderedOps(ops: MutationRowOp[]): MutationRowOp[] {
-  return [...ops].sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]);
-}
-
 function resolveTablePath(path: MutationPlan['path']): { schema: string; table: string } {
   const [databaseSegment, objectSegment] = path.segments;
   if (
@@ -83,40 +83,6 @@ export function preview(plan: MutationPlan): string[] {
   return orderedOps(plan.ops).map((op) => renderRowOp(relationSql, op, literalRenderer, []));
 }
 
-function assertColumnsKnown(target: catalog.ReadTarget, columns: string[]): void {
-  const known = new Set(target.columns.map((c) => c.name));
-  for (const c of columns) {
-    if (!known.has(c)) throw new AdapterError('E_NOT_FOUND', `unknown column in mutation: ${c}`);
-  }
-}
-
-// A partial or missing primary key is not a safe row identifier (P5's own rule) — enforced here
-// too, not only by the renderer graying out editing for a keyless table. D23: the table's own
-// rowid, even when it exists and is used internally for keyset paging, is never an acceptable key
-// here — it is not a column the renderer ever shows.
-function assertKeyIsPrimaryKey(
-  target: catalog.ReadTarget,
-  key: Record<string, string | null>,
-): void {
-  if (!target.primaryKey || target.primaryKey.length === 0) {
-    throw new AdapterError(
-      'E_UNSUPPORTED',
-      `${target.qualifiedName.schema}.${target.qualifiedName.table} has no primary key`,
-    );
-  }
-  const given = Object.keys(key).sort();
-  const pk = [...target.primaryKey].sort();
-  if (given.length !== pk.length || given.some((c, i) => c !== pk[i])) {
-    throw new AdapterError('E_QUERY', 'row key must be exactly the primary key columns');
-  }
-}
-
-function assertAffectedExactlyOne(kind: string, n: number): void {
-  if (n !== 1) {
-    throw new AdapterError('E_QUERY', `expected ${kind} to affect exactly one row, affected ${n}`);
-  }
-}
-
 // D25: BEGIN IMMEDIATE, not a deferred BEGIN — a deferred transaction only takes its write lock at
 // the first write, so a contended file would fail mid-batch; IMMEDIATE takes the lock up front, so
 // a busy database fails before a single row has changed.
@@ -126,7 +92,7 @@ export function mutate(
   readOnly: boolean,
   plan: MutationPlan,
 ): MutationResult {
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
 
   const { schema, table } = resolveTablePath(plan.path);
   const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
@@ -136,15 +102,18 @@ export function mutate(
   const execSelect: catalog.QueryExecutor = (sql, params) => runQuery(h, sql, params ?? [], ctx);
   const target = catalog.getReadTarget(execSelect, schema, table);
 
+  const qualifiedName = `${target.qualifiedName.schema}.${target.qualifiedName.table}`;
+  // D23: the table's own rowid, even when it exists and is used internally for keyset paging, is
+  // never an acceptable key here — it is not a column the renderer ever shows.
   for (const op of plan.ops) {
     if (op.kind === 'update') {
-      assertColumnsKnown(target, [...Object.keys(op.key), ...Object.keys(op.changes)]);
-      assertKeyIsPrimaryKey(target, op.key);
+      assertColumnsKnown(target.columns, [...Object.keys(op.key), ...Object.keys(op.changes)]);
+      assertKeyIsPrimaryKey(target.primaryKey, op.key, qualifiedName);
     } else if (op.kind === 'delete') {
-      assertColumnsKnown(target, Object.keys(op.key));
-      assertKeyIsPrimaryKey(target, op.key);
+      assertColumnsKnown(target.columns, Object.keys(op.key));
+      assertKeyIsPrimaryKey(target.primaryKey, op.key, qualifiedName);
     } else {
-      assertColumnsKnown(target, Object.keys(op.values));
+      assertColumnsKnown(target.columns, Object.keys(op.values));
     }
   }
 

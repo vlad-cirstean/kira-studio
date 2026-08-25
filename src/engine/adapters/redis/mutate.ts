@@ -2,7 +2,7 @@ import type { Redis } from 'ioredis';
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';
 
 // The reserved sentinels for redis mutations, expressed through the existing relational-shaped
@@ -93,7 +93,7 @@ export async function mutate(
 ): Promise<MutationResult> {
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mongo/mariadb/
   // mutate.ts).
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
   resolveDatabaseSegment(plan.path);
   ctx.setCommand(preview(plan).join(';\n'));
 

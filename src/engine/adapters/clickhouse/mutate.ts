@@ -1,7 +1,8 @@
 import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
+import { assertColumnsKnown } from '../sql-mutate';
 import * as catalog from './catalog';
 import type { ClickHouseHandle } from './client';
 import { runCatalogQuery, runCommand, type TrackQuery } from './query';
@@ -86,17 +87,6 @@ export function preview(plan: MutationPlan): string[] {
   return [renderInsert(relationSql, inserts, literalFor)];
 }
 
-// P36 D28: a generated (MATERIALIZED/ALIAS) column is deliberately NOT blocked here — the
-// renderer's own insert paths already skip it (ColumnDescriptor.generated), and an explicit
-// mutate() call that targets one anyway is left for the server to refuse in its own words
-// (Adapter rule 4) rather than a second, app-invented message ahead of it.
-function assertColumnsKnown(target: catalog.ReadTarget, columns: string[]): void {
-  const known = new Set(target.columns.map((c) => c.name));
-  for (const c of columns) {
-    if (!known.has(c)) throw new AdapterError('E_NOT_FOUND', `unknown column in mutation: ${c}`);
-  }
-}
-
 export async function mutate(
   h: ClickHouseHandle,
   ctx: OpCtx,
@@ -106,7 +96,7 @@ export async function mutate(
   nextQueryId: () => string,
 ): Promise<MutationResult> {
   // §8.12's standard: enforced here, not only greyed out in the UI (P5 D11).
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
 
   const { schema, table } = resolveTablePath(plan.path);
   plan.ops.forEach(assertInsertOnly);
@@ -118,7 +108,7 @@ export async function mutate(
   const exec: catalog.QueryExecutor = (sql, params) =>
     runCatalogQuery(h, ctx, sql, { queryId: nextQueryId() }, track, params);
   const target = await catalog.getReadTarget(exec, schema, table);
-  for (const op of inserts) assertColumnsKnown(target, Object.keys(op.values));
+  for (const op of inserts) assertColumnsKnown(target.columns, Object.keys(op.values));
 
   const relationSql = `${quoteIdent(schema)}.${quoteIdent(table)}`;
   const sql = renderInsert(relationSql, inserts, literalFor);

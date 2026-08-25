@@ -14,7 +14,7 @@ import {
 } from '../../../shared/domain/object-store';
 import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';
 import { formatBytes } from './read';
 import { openUploadBody } from './transfer';
@@ -211,7 +211,7 @@ export async function mutate(
   plan: MutationPlan,
 ): Promise<MutationResult> {
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors redis/mariadb/mongo).
-  if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
+  assertWritable(readOnly);
   const bucket = resolveBucketSegment(plan.path);
   ctx.setCommand(preview(plan).join(';\n'));
 
