@@ -114,5 +114,29 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(results).toHaveCount(1);
   await expect(results.first()).toContainText('1');
 
+  // --- P40: the result-set strip, the new-vs-reuse toggle and the find toolbar — this is the
+  // one console-touching spec that runs unconditionally in this repo's own sandbox (no Docker
+  // gate), so it is where these get real, non-Docker-gated coverage. Kept short — console.spec.ts
+  // (Postgres-backed) covers the deeper scenarios (chip switching, ×, filtering).
+  const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
+  await newResultToggle.click();
+  await expect(newResultToggle).toHaveClass(/is-active/);
+  await typeInto(consoleView, page, '\nSELECT 2;');
+  await page.click('[data-testid="console-run-statement"]');
+  const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
+  await expect(resultTabs).toHaveCount(2);
+
+  await resultTabs.first().locator('[data-testid="console-result-close"]').click();
+  await expect(resultTabs).toHaveCount(1);
+  await expect(results).toContainText('2');
+
+  await page.click('[data-testid="console-search"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.fill('[data-testid="console-search-input"]', '2');
+  await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText(
+    '1 of 1',
+  );
+
   expect(consoleErrors).toEqual([]);
 });

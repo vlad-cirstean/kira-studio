@@ -347,3 +347,94 @@ test('Query console — open, run statement/all, errors, saved queries, session 
 
   expect(consoleErrors).toEqual([]);
 });
+
+// P40: the result-set strip (new-vs-reuse toggle, per-result ×, chip switching) and the shared
+// find toolbar over the active result set — a separate test rather than folding into the scenario
+// above, since it needs its own connection/tab and shouldn't perturb that test's own tab-id-keyed
+// assertions.
+test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40)', async ({
+  kira,
+  consoleErrors,
+}) => {
+  test.setTimeout(300_000);
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+
+  const cfg = {
+    host: pg.config.host,
+    port: pg.config.port,
+    database: pg.config.database,
+    username: pg.config.username,
+    password: pg.config.password,
+  };
+  await createConnection(page, cfg, { name: 'Console Results DB', color: 'blue', readOnly: false });
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  // --- toggle off (default, D6): running again replaces the current result set -----------------
+  await typeInto(consoleView, page, 'SELECT 1 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(1);
+  await expect(results).toContainText('1');
+
+  await typeInto(consoleView, page, '\nSELECT 2 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(1);
+  await expect(results).toContainText('2');
+
+  // --- toggle on: running now appends a new result set instead of replacing (D6) ----------------
+  const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
+  await newResultToggle.click();
+  await expect(newResultToggle).toHaveClass(/is-active/);
+
+  await typeInto(consoleView, page, '\nSELECT 3 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(2);
+  await expect(results).toContainText('3'); // the newest run becomes the active result (D6)
+
+  // --- the strip: one grid is mounted at a time, switched by clicking a chip (D2/D3) ------------
+  await resultTabs.nth(0).click();
+  await expect(resultTabs.nth(0)).toHaveClass(/is-active/);
+  await expect(results).toHaveCount(1);
+  await expect(results).toContainText('2');
+
+  // --- ×: closes one result set; the remaining chip renumbers, a neighbour becomes active (D5) --
+  await resultTabs.nth(0).locator('[data-testid="console-result-close"]').click();
+  await expect(resultTabs).toHaveCount(1);
+  await expect(resultTabs.first()).toContainText('Result 1');
+  await expect(results).toContainText('3');
+
+  // --- find toolbar: opens over the active result set, filters, and counts matches (D8/D9/D10) --
+  await newResultToggle.click(); // back to replace mode — one result set, easier to search
+  await expect(newResultToggle).not.toHaveClass(/is-active/);
+  await typeInto(consoleView, page, '\nSELECT 4 AS n UNION ALL SELECT 55 AS n ORDER BY n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
+
+  await page.click('[data-testid="console-search"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.fill('[data-testid="console-search-input"]', '55');
+  await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText(
+    '1 of 1',
+  );
+
+  await page.click('[data-testid="console-search-filter-rows"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(1);
+  await expect(results).toContainText('55');
+
+  await page.click('[data-testid="console-search-close"]');
+  await expect(searchToolbar).toHaveCount(0);
+  // P24 D7: closing the toolbar leaves no rows hidden with no visible cause.
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
+
+  expect(consoleErrors).toEqual([]);
+});
