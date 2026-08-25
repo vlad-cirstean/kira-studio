@@ -3,6 +3,7 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
+import { registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 
@@ -167,3 +168,7 @@ export async function setPageSize(
   patchKeyValueTabState(tabId, { pageSize, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }
+
+// D5/D6: project/ no longer imports this module directly — it reaches reload through
+// state/viewCommands.ts's registry instead.
+registerTabReload('keyvalue', reload);

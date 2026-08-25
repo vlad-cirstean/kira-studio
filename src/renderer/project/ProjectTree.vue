@@ -4,11 +4,8 @@ import { shortcutFor } from '../shortcuts/keys';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
 import { openDataTab, openDocumentTab, openKeyValueTab, openStreamTab } from '../state/tabs';
+import { reloadTab } from '../state/viewCommands';
 import VirtualList from '../theme/primitives/VirtualList.vue';
-import { reload as reloadDocumentTab } from '../views/documents/state';
-import { reload as reloadDataTab } from '../views/grid/state';
-import { reload as reloadKeyValueTab } from '../views/keyvalue/state';
-import { reload as reloadStreamTab } from '../views/stream/state';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {
   collapse,
@@ -109,22 +106,22 @@ function onOpen(row: TreeRowVm): void {
   }
   if (OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openDataTab(row.connectionId, row.path);
-    if (reused) void reloadDataTab(id);
+    if (reused) reloadTab('data', id);
     return;
   }
   if (DOCUMENT_OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openDocumentTab(row.connectionId, row.path);
-    if (reused) void reloadDocumentTab(id);
+    if (reused) reloadTab('document', id);
     return;
   }
   if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openKeyValueTab(row.connectionId, row.path);
-    if (reused) void reloadKeyValueTab(id);
+    if (reused) reloadTab('keyvalue', id);
     return;
   }
   if (STREAM_OPENABLE_KINDS.has(row.kind)) {
     const { id, reused } = openStreamTab(row.connectionId, row.path);
-    if (reused) void reloadStreamTab(id);
+    if (reused) reloadTab('stream', id);
     return;
   }
   // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue

@@ -4,6 +4,7 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDocumentTab, patchDocumentTabState, unmarkHydrated } from '../../state/tabs';
+import { registerTabCount, registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 
@@ -265,3 +266,8 @@ export function setAllExpanded(tabId: string, ids: string[], value: boolean): vo
   for (const id of ids) expanded[id] = false;
   patchDocumentTabState(tabId, { expanded });
 }
+
+// D5/D6: project/ no longer imports this module directly — it reaches reload/runCount through
+// state/viewCommands.ts's registry instead.
+registerTabReload('document', reload);
+registerTabCount('document', runCount);

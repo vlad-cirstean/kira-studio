@@ -5,6 +5,7 @@ import { data } from '../../bridge/data';
 import { connectionsState } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findStreamTab, patchStreamTabState, unmarkHydrated } from '../../state/tabs';
+import { registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { recordStreamFilterUse } from './streamFilterHistory';
@@ -216,3 +217,7 @@ export async function applyStreamFilter(tabId: string, filter: StreamFilterInput
 export function selectRow(tabId: string, row: number | null): void {
   ensureRuntime(tabId).selectedRow = row;
 }
+
+// D5/D6: project/ no longer imports this module directly — it reaches reload through
+// state/viewCommands.ts's registry instead.
+registerTabReload('stream', reload);

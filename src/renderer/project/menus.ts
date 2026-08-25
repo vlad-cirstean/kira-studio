@@ -28,9 +28,8 @@ import {
   openKeyValueTab,
   openStreamTab,
 } from '../state/tabs';
+import { countTab, dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
-import { runCount as runDocumentCount } from '../views/documents/state';
-import { runCount, setFilter, setProjection, setSort } from '../views/grid/state';
 import {
   collapseAll,
   groupParentPath,
@@ -386,7 +385,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       // nowhere to show the answer.
       run: () => {
         const { id: tabId } = openDataTab(row.connectionId, row.path);
-        void runCount(tabId);
+        countTab('data', tabId);
       },
     },
     {
@@ -468,7 +467,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       icon: 'symbol-numeric',
       run: () => {
         const { id: tabId } = openDocumentTab(row.connectionId, row.path);
-        void runDocumentCount(tabId);
+        countTab('document', tabId);
       },
     },
   ];
@@ -740,8 +739,8 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
     label: entry.name,
     run: async () => {
       const { id: tabId } = openDataTab(row.connectionId, row.path);
-      await setFilter(tabId, entry.body.where);
-      await setSort(tabId, entry.body.orderBy);
+      await dataQueryCommands().setFilter(tabId, entry.body.where);
+      await dataQueryCommands().setSort(tabId, entry.body.orderBy);
       await control.queriesTouch(entry.id);
     },
   }));
@@ -810,7 +809,10 @@ export function columnsSectionMenu(
         const tab = findDataTab(tabId);
         const current = tab?.state.projection ?? null;
         if (current?.includes(columnName)) return;
-        void setProjection(tabId, current ? [...current, columnName] : [columnName]);
+        void dataQueryCommands().setProjection(
+          tabId,
+          current ? [...current, columnName] : [columnName],
+        );
       },
     },
     {
@@ -820,7 +822,7 @@ export function columnsSectionMenu(
       icon: 'sort-precedence',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
-        void setSort(tabId, {
+        void dataQueryCommands().setSort(tabId, {
           kind: 'structured',
           terms: [{ column: columnName, direction: 'asc' }],
         });

@@ -6,6 +6,11 @@ import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDataTab, patchDataTabState, unmarkHydrated } from '../../state/tabs';
+import {
+  registerDataQueryCommands,
+  registerTabCount,
+  registerTabReload,
+} from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
@@ -280,3 +285,9 @@ export async function setSort(tabId: string, sort: SortSpec | null): Promise<voi
 export function setColumnOrder(tabId: string, columnOrder: string[] | null): void {
   patchDataTabState(tabId, { columnOrder });
 }
+
+// D5/D6: project/ no longer imports this module directly — it reaches reload/runCount/
+// setFilter/setProjection/setSort through state/viewCommands.ts's registry instead.
+registerTabReload('data', reload);
+registerTabCount('data', runCount);
+registerDataQueryCommands({ setFilter, setSort, setProjection });
