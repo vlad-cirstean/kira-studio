@@ -7,6 +7,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
+import { singleStatusPage } from '../sql-text';
 import type { SqliteHandle } from './client';
 import { mapError } from './errors';
 import { checkNotCancelled, prepareOne } from './query';
@@ -29,30 +30,6 @@ function columnsFor(stmt: StatementSync): ColumnDescriptor[] {
   }));
 }
 
-function singleStatusPage(text: string): TabularPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: 'status',
-      dataType: 'text',
-      typeClass: 'text',
-      nullable: false,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  const builder = createTabularPageBuilder(columns);
-  builder.appendRow([text]);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
-}
-
 // F5: `columns().length === 0` is exactly how a non-row-returning statement (INSERT/UPDATE/DELETE/
 // DDL/pragma) is told apart from a SELECT — verified against node:sqlite directly, not assumed.
 function runOneStatement(stmt: StatementSync): TabularPage {
@@ -60,7 +37,7 @@ function runOneStatement(stmt: StatementSync): TabularPage {
   try {
     if (descriptors.length === 0) {
       const result = stmt.run();
-      return singleStatusPage(`${result.changes} row(s) affected`);
+      return singleStatusPage(`${result.changes} row(s) affected`, 'text');
     }
 
     // D5: `.iterate()`, not `.all()` — a user's own console statement is unbounded, unlike the

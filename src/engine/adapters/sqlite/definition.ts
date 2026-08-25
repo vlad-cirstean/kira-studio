@@ -1,6 +1,7 @@
 import type { ConstraintMeta, ObjectDefinition } from '../../../shared/domain/definition';
 import { decodePath, encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
+import { stripOneTrailingSemicolon } from '../sql-text';
 import type { QueryExecutor, ReadTarget } from './catalog';
 import * as catalog from './catalog';
 import { quoteIdent } from './read';
@@ -9,15 +10,6 @@ export type RelationLikeKind = 'table' | 'view';
 
 interface SqliteMasterRow {
   sql: string | null;
-}
-
-// SHOW CREATE TABLE has no SQLite analogue — sqlite_master.sql already *is* the CREATE statement
-// as the user (or a prior migration) wrote it, verbatim, so this is "asked, never composed" in
-// its simplest possible form (the position mysql-family/definition.ts:97-101 takes about
-// SHOW CREATE TABLE — SQLite just skips the round trip through the server entirely).
-function stripOneTrailingSemicolon(text: string): string {
-  const match = /;\s*$/.exec(text);
-  return match ? text.slice(0, text.length - match[0].length) : text;
 }
 
 // F19/D24: SQLite has no CHECK-constraint catalog at all — a CHECK is visible only inside the
@@ -80,6 +72,10 @@ export function buildDefinition(
       `sqlite_master returned no definition for "${schema}"."${object.name}"`,
     );
   }
+  // SHOW CREATE TABLE has no SQLite analogue — sqlite_master.sql already *is* the CREATE statement
+  // as the user (or a prior migration) wrote it, verbatim, so this is "asked, never composed" in
+  // its simplest possible form (the position mysql-family/definition.ts takes about SHOW CREATE
+  // TABLE — SQLite just skips the round trip through the server entirely).
   const statement = stripOneTrailingSemicolon(raw);
 
   let constraints: ConstraintMeta[] = [];

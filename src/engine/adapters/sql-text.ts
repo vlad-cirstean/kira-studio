@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { SortDirection } from '../../shared/domain/queries';
 import type { ColumnMeta } from '../../shared/domain/tree';
+import {
+  type ColumnDescriptor,
+  createTabularPageBuilder,
+  type PagePosition,
+  type TabularPage,
+} from '../../shared/protocol/page';
 import { AdapterError } from './errors';
 
 // The genuinely shared, driver-agnostic glue the SQL adapters' read.ts modules call — kept out
@@ -106,4 +112,40 @@ export function safeInt(value: number, label: string): number {
     throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
   }
   return value;
+}
+
+// P39 iter2 F13: character-for-character the same in clickhouse/mysql-family/postgres/sqlite's
+// definition.ts — nothing in it is dialect-shaped, a `;` terminates a statement in every SQL
+// dialect this app speaks.
+export function stripOneTrailingSemicolon(text: string): string {
+  const match = /;\s*$/.exec(text);
+  return match ? text.slice(0, text.length - match[0].length) : text;
+}
+
+// P39 iter2 F14: the one-column, one-row "status" page a console statement with no result set
+// returns — identical in clickhouse/mysql-family/postgres/sqlite's console.ts except `dataType`,
+// which really does vary: 'text' for the other three, but ClickHouse's own type vocabulary spells
+// it 'String', and this string reaches the grid's type tooltip verbatim.
+export function singleStatusPage(text: string, dataType: string): TabularPage {
+  const columns: ColumnDescriptor[] = [
+    {
+      name: 'status',
+      dataType,
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: false,
+      generated: false,
+    },
+  ];
+  const builder = createTabularPageBuilder(columns);
+  builder.appendRow([text]);
+  const position: PagePosition = {
+    offset: 0,
+    pageSize: 1,
+    hasMore: false,
+    nextToken: null,
+    prevToken: null,
+    strategy: 'offset',
+  };
+  return builder.finish(position);
 }

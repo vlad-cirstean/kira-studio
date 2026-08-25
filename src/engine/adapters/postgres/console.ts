@@ -7,6 +7,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
+import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import type { TrackQuery } from './query';
 import { normalizeCellText, typeClassFor } from './read';
@@ -77,37 +78,13 @@ async function runRaw(
   });
 }
 
-function singleStatusPage(text: string): TabularPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: 'status',
-      dataType: 'text',
-      typeClass: 'text',
-      nullable: false,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  const builder = createTabularPageBuilder(columns);
-  builder.appendRow([text]);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
-}
-
 // A statement with no output columns (INSERT/UPDATE/DELETE/DDL/…) gets a synthetic single-cell
 // page approximating Postgres's own command-complete tag ('INSERT 0 3', 'UPDATE 1', …) — the
 // real wire tag is not exposed by node-postgres beyond `.command`/`.rowCount`, so this is a
 // documented approximation, not the literal server string.
 function buildPage(result: RawResult, typeNames: Map<number, string>): TabularPage {
   if (result.fields.length === 0) {
-    return singleStatusPage(`${result.command ?? 'OK'} ${result.rowCount ?? 0}`);
+    return singleStatusPage(`${result.command ?? 'OK'} ${result.rowCount ?? 0}`, 'text');
   }
 
   const columns: ColumnDescriptor[] = result.fields.map((f) => {

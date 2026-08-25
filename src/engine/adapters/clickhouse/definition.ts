@@ -5,15 +5,9 @@ import type {
 } from '../../../shared/domain/definition';
 import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
+import { stripOneTrailingSemicolon } from '../sql-text';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
-
-// SHOW CREATE's own text carries at most one trailing `;` — remove exactly that, untouched
-// otherwise. `statements` carries no trailing semicolons and no blank padding (shared/domain).
-function stripOneTrailingSemicolon(text: string): string {
-  const match = /;\s*$/.exec(text);
-  return match ? text.slice(0, text.length - match[0].length) : text;
-}
 
 // D18: system.constraints has no primary/unique/foreign-key rows at all (F17/F16 — a MergeTree
 // PRIMARY KEY is a sparse index, not a constraint the catalog tracks this way), so this section is

@@ -1,6 +1,7 @@
 import type { ConstraintMeta, ObjectDefinition } from '../../../shared/domain/definition';
 import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { AdapterError } from '../errors';
+import { stripOneTrailingSemicolon } from '../sql-text';
 import { getRelationInfo, type QueryExecutor } from './catalog';
 
 export type RelationLikeKind = 'table' | 'view' | 'matview';
@@ -58,14 +59,6 @@ interface SerialSequenceRow {
 
 interface CommentStmtRow {
   stmt: string;
-}
-
-// pg_get_viewdef/SHOW CREATE emit at most one trailing `;` — remove exactly that, untouched
-// otherwise. `statements` carries no trailing semicolons and no blank padding
-// (shared/domain/definition.ts).
-function stripOneTrailingSemicolon(text: string): string {
-  const match = /;\s*$/.exec(text);
-  return match ? text.slice(0, text.length - match[0].length) : text;
 }
 
 function columnLine(col: ColumnDdlRow): string {

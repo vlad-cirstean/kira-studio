@@ -8,6 +8,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
+import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import { type TrackQuery, typeCastString } from './query';
 
@@ -106,33 +107,9 @@ async function runRaw(
   });
 }
 
-function singleStatusPage(text: string): TabularPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: 'status',
-      dataType: 'text',
-      typeClass: 'text',
-      nullable: false,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  const builder = createTabularPageBuilder(columns);
-  builder.appendRow([text]);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
-}
-
 function buildPage(result: QueryResultShape): TabularPage {
   if (isOkPacket(result)) {
-    return singleStatusPage(`${result.affectedRows} row(s) affected`);
+    return singleStatusPage(`${result.affectedRows} row(s) affected`, 'text');
   }
 
   const fields = result.meta;

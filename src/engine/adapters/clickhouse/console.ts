@@ -6,6 +6,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
+import { singleStatusPage } from '../sql-text';
 import type { ClickHouseHandle } from './client';
 import { runCommand, streamQuery, type TrackQuery } from './query';
 import { typeClassFor } from './read';
@@ -21,30 +22,6 @@ const ROW_RETURNING_RE = /^\s*(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN|EXISTS)\b/
 function isRowReturning(sql: string): boolean {
   const stripped = sql.replace(LEADING_COMMENT_RE, '');
   return ROW_RETURNING_RE.test(stripped);
-}
-
-function singleStatusPage(text: string): TabularPage {
-  const columns: ColumnDescriptor[] = [
-    {
-      name: 'status',
-      dataType: 'String',
-      typeClass: 'text',
-      nullable: false,
-      isPrimaryKey: false,
-      generated: false,
-    },
-  ];
-  const builder = createTabularPageBuilder(columns);
-  builder.appendRow([text]);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
 }
 
 async function runRowReturning(
@@ -112,7 +89,7 @@ export async function execute(
       pages.push(await runRowReturning(h, ctx, sql, track, nextQueryId));
     } else {
       const { writtenRows } = await runCommand(h, ctx, sql, { queryId: nextQueryId() }, track);
-      pages.push(singleStatusPage(`${writtenRows} row(s) written`));
+      pages.push(singleStatusPage(`${writtenRows} row(s) written`, 'String'));
     }
   }
   return pages;
