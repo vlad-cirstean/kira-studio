@@ -18,7 +18,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, unsupported } from '../errors';
 import { redisCaps } from './caps';
 import * as catalog from './catalog';
 import { connectRedis, type DbConnectionSet } from './client';
@@ -90,12 +90,12 @@ class RedisAdapter implements Adapter {
 
   async describe(): Promise<ObjectMeta> {
     // caps.describe is false (P31 D2) — unreachable while that flag gates every caller.
-    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for redis');
+    unsupported(this.kind, 'describe');
   }
 
   async definition(): Promise<ObjectDefinition> {
     // caps.definition === false gates §8.10's "Open definition" menu item for redis — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for redis');
+    unsupported(this.kind, 'definition');
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
@@ -146,7 +146,7 @@ class RedisAdapter implements Adapter {
   // `DbConnectionSet`'s one-connection-per-db-index sharing (P9's D7).
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for redis; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for redis');
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(): Promise<boolean> {

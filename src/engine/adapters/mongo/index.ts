@@ -19,7 +19,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, unsupported } from '../errors';
 import { mongoCaps } from './caps';
 import * as catalog from './catalog';
 import { connectMongo } from './client';
@@ -199,7 +199,7 @@ class MongoAdapter implements Adapter {
   // case is an ordinary connection with plain readWrite on its own database, not an admin one.
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for mongodb; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for mongodb');
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(opId: string): Promise<boolean> {

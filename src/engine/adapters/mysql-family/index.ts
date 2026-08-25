@@ -20,7 +20,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, unsupported } from '../errors';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
@@ -339,7 +339,7 @@ class MysqlFamilyAdapter implements Adapter {
 
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for this engine; never reached.
-    throw new AdapterError('E_UNSUPPORTED', `file transfer is not supported for ${this.kind}`);
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(opId: string): Promise<boolean> {

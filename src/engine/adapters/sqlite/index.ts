@@ -19,7 +19,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, unsupported } from '../errors';
 import { sqliteCaps } from './caps';
 import * as catalog from './catalog';
 import { openDatabase, type SqliteHandle } from './client';
@@ -254,7 +254,7 @@ class SqliteAdapter implements Adapter {
 
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for this engine; never reached.
-    throw new AdapterError('E_UNSUPPORTED', `file transfer is not supported for ${this.kind}`);
+    unsupported(this.kind, 'file transfer');
   }
 
   // D4: there is no sqlite3_interrupt in node:sqlite, and its entire API is synchronous — a

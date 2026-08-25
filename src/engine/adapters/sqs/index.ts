@@ -18,7 +18,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { sqsCaps } from './caps';
 import * as catalog from './catalog';
 import { connectSqs } from './client';
@@ -82,7 +82,7 @@ class SqsAdapter implements Adapter {
   async describe(): Promise<ObjectMeta> {
     // caps.describe is false (P31 D2) — unreachable while that flag gates every caller,
     // including the definition view's own describe() load that used to fire this every time.
-    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for sqs');
+    unsupported(this.kind, 'describe');
   }
 
   async definition(path: NodePath): Promise<ObjectDefinition> {
@@ -126,14 +126,14 @@ class SqsAdapter implements Adapter {
 
   async execute(): Promise<Page[]> {
     // caps.sql === false — no console for sqs (P10's D13); never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'sqs has no query console');
+    noQueryConsole(this.kind);
   }
 
   // D14: the SDK's own abortSignal request option (passed straight through in read.ts/pollQueue)
   // is the sole cancel mechanism — this stays a permanent no-op, mirroring kafka's own cancel().
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for sqs; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for sqs');
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(): Promise<boolean> {

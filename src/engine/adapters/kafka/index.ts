@@ -18,7 +18,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { kafkaCaps } from './caps';
 import * as catalog from './catalog';
 import { connectKafka, type KafkaClientHandle } from './client';
@@ -82,7 +82,7 @@ class KafkaAdapter implements Adapter {
   async describe(): Promise<ObjectMeta> {
     // caps.describe is false (P31 D2) — unreachable while that flag gates every caller,
     // including the definition view's own describe() load that used to fire this every time.
-    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for kafka');
+    unsupported(this.kind, 'describe');
   }
 
   async definition(path: NodePath): Promise<ObjectDefinition> {
@@ -121,7 +121,7 @@ class KafkaAdapter implements Adapter {
 
   async execute(): Promise<Page[]> {
     // caps.sql === false — no console for kafka (P10's D13); never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'kafka has no query console');
+    noQueryConsole(this.kind);
   }
 
   // P32 D22 (was D6/D14): `ctx.signal.addEventListener('abort', () => consumer.disconnect())`
@@ -130,7 +130,7 @@ class KafkaAdapter implements Adapter {
   // effectiveness.
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for kafka; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for kafka');
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(): Promise<boolean> {

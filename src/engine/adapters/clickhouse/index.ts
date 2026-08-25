@@ -19,7 +19,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, unsupported } from '../errors';
 import { clickhouseCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
@@ -205,7 +205,7 @@ class ClickHouseAdapter implements Adapter {
 
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for this engine; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for clickhouse');
+    unsupported(this.kind, 'file transfer');
   }
 
   async cancel(opId: string): Promise<boolean> {

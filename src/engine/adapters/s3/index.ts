@@ -21,7 +21,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { s3Caps } from './caps';
 import * as catalog from './catalog';
 import { connectS3 } from './client';
@@ -103,12 +103,12 @@ class S3Adapter implements Adapter {
 
   async describe(): Promise<ObjectMeta> {
     // caps.describe is false (P31 D2) — unreachable while that flag gates every caller.
-    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for s3');
+    unsupported(this.kind, 'describe');
   }
 
   async definition(): Promise<ObjectDefinition> {
     // caps.definition === false gates §8.10's "Open definition" menu item for s3 — never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'definition is not supported for s3');
+    unsupported(this.kind, 'definition');
   }
 
   async read(req: ReadRequest, ctx: OpCtx): Promise<Page> {
@@ -134,7 +134,7 @@ class S3Adapter implements Adapter {
 
   async execute(): Promise<Page[]> {
     // caps.sql === false — no console for s3; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 's3 has no query console');
+    noQueryConsole(this.kind);
   }
 
   async downloadObject(req: ObjectDownloadRequest, ctx: OpCtx): Promise<ObjectTransferResult> {

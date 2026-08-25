@@ -18,7 +18,7 @@ import type {
   OpCtx,
   ReadRequest,
 } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, noQueryConsole, unsupported } from '../errors';
 import { rabbitmqCaps } from './caps';
 import * as catalog from './catalog';
 import { buildHandle, type RabbitHandle } from './client';
@@ -128,7 +128,7 @@ class RabbitMqAdapter implements Adapter {
 
   async describe(): Promise<ObjectMeta> {
     // caps.describe is false (D19) — unreachable while that flag gates every caller.
-    throw new AdapterError('E_UNSUPPORTED', 'describe is not supported for rabbitmq');
+    unsupported(this.kind, 'describe');
   }
 
   async definition(path: NodePath, ctx: OpCtx): Promise<ObjectDefinition> {
@@ -173,12 +173,12 @@ class RabbitMqAdapter implements Adapter {
   async execute(): Promise<Page[]> {
     // caps.sql === false — the management API has no ad-hoc command language worth a console
     // (D28); never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'rabbitmq has no query console');
+    noQueryConsole(this.kind);
   }
 
   async downloadObject(): Promise<ObjectTransferResult> {
     // caps.fileTransfer === false — no UI ever offers Download for this engine; never reached.
-    throw new AdapterError('E_UNSUPPORTED', 'file transfer is not supported for rabbitmq');
+    unsupported(this.kind, 'file transfer');
   }
 
   // D7: cancellation is delivered per-request via ctx.signal (query.ts's request()) — there is no
