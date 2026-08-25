@@ -10,6 +10,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
@@ -57,11 +58,11 @@ const detectedReason = computed<string>(() => detected.value[0]?.reason ?? '');
 const effectiveFormat = computed<CellFormat>(() => override.value ?? detectedFormat.value);
 const language = computed<EditorLanguageId>(() => FORMAT_LANGUAGE[effectiveFormat.value]);
 
-const sqlDialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+const sqlDialect = computed(() => {
   const c = selectedCell.value;
   if (!c.connectionId) return undefined;
   const record = connectionsState.records.find((r) => r.id === c.connectionId);
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return sqlDialectFor(record?.kind);
 });
 
 const readOnlyReason = computed(() => readOnlyReasonFor(selectedCell.value));

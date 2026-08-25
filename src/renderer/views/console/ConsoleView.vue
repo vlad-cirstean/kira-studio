@@ -14,6 +14,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
@@ -52,11 +53,7 @@ const connectionKind = computed<ConnectionKind | undefined>(() => {
   return connectionsState.records.find((r) => r.id === props.tab.connectionId)?.kind;
 });
 
-const dialect = computed<'postgres' | 'mariadb' | undefined>(() =>
-  connectionKind.value === 'postgres' || connectionKind.value === 'mariadb'
-    ? connectionKind.value
-    : undefined,
-);
+const dialect = computed(() => sqlDialectFor(connectionKind.value));
 
 // P18 addendum D23: realities #10's wart, fixed as a side effect of needing per-engine behaviour
 // at all — a Mongo shell command has been coloured by the SQL grammar since P5.5. `language`
@@ -69,7 +66,7 @@ const language = computed<EditorLanguageId>(() => {
   return 'plain';
 });
 
-// D21/D22: undefined for postgres/mariadb (lang-sql's own keyword source stays in charge) and for
+// D21/D22: undefined for postgres/mariadb/mysql (lang-sql's own keyword source stays in charge) and for
 // any kind with no console at all, which a mounted ConsoleView never actually has (caps.sql
 // gates the tab) — `language.value !== 'plain'` covers both without special-casing kafka/sqs/s3.
 const completionSources = computed(() => {
@@ -81,7 +78,7 @@ const completionSources = computed(() => {
 
 // D24: one lexical linter per engine, scoped to this console's own text — undefined for any tab
 // this view never actually mounts for (caps.sql gates the tab), so `connectionKind.value` is
-// always postgres/mariadb/mongodb/redis in practice.
+// always postgres/mariadb/mysql/mongodb/redis in practice.
 const lintSource = computed(() => consoleLintSource(connectionKind.value));
 
 const cursorPos = ref(0);

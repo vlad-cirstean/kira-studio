@@ -3,7 +3,7 @@ import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import { openDataTab } from '../../state/tabs';
 import type { MenuItem } from '../../workbench/state/contextMenu';
-import { type Dialect, quoteIdent } from '../shared/sqlIdent';
+import { quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   type RowSnapshot,
   rowsToCsv,
@@ -32,7 +32,7 @@ function qualifiedNameForPath(connectionId: string, path: string): string {
 
 export interface FkNavContext {
   connectionId: string;
-  dialect: Dialect;
+  dialect: SqlDialect | undefined;
   rowValues: Record<string, string | null>;
 }
 
@@ -43,7 +43,7 @@ export interface FkNavContext {
 // Returns null (P7 D2) — never an IS NULL clause — when a needed source value is missing or NULL:
 // there is no row to jump to, unlike D5's filter-by-value which treats NULL as a real predicate.
 function foreignKeyValueFilter(
-  dialect: Dialect,
+  dialect: SqlDialect | undefined,
   columns: string[],
   referencedColumns: string[],
   rowValues: Record<string, string | null>,
@@ -139,7 +139,7 @@ export interface CellMenuContext {
   columnName: string;
   isNull: boolean;
   text: string;
-  dialect: Dialect;
+  dialect: SqlDialect | undefined;
   canEdit: boolean;
   isDeleted: boolean;
   startEdit: () => void;

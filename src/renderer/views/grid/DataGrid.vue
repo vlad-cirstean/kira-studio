@@ -18,6 +18,7 @@ import { cellClass } from '../../theme/cellClass';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../workbench/state/contextMenu';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import { parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import {
   alignmentFor,
@@ -179,11 +180,11 @@ const isWritable = computed(() => {
 // preview/commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
 const canEditTable = computed(() => isWritable.value && hasPrimaryKey.value);
 
-const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+const dialect = computed(() => {
   const t = tab();
   if (!t?.connectionId) return undefined;
   const record = connectionsState.records.find((r) => r.id === t.connectionId);
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return sqlDialectFor(record?.kind);
 });
 
 // Produced locally from the path, never round-tripped to the engine for a string join —

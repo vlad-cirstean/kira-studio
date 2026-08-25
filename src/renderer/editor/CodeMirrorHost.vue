@@ -12,6 +12,7 @@ import { Compartment, EditorState, type Extension, Prec } from '@codemirror/stat
 import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
+import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { ConsoleDiagnostic } from './diagnostics';
 import { type EditorLanguageId, languageExtension } from './languages';
 import { kiraEditorTheme, kiraHighlightStyle } from './theme';
@@ -20,7 +21,7 @@ const props = defineProps<{
   doc: string;
   language: EditorLanguageId;
   /** Only consulted when `language === 'sql'` (D17). */
-  sqlDialect?: 'postgres' | 'mariadb';
+  sqlDialect?: SqlDialect;
   readOnly: boolean;
   /** P18 D10: off everywhere by default. On only for the query console on a SQL connection — the
    *  cell editor, definition viewer, document editor and op-log detail rows must not sprout a popup. */

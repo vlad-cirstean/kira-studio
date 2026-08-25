@@ -16,6 +16,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { run as runConsole } from '../../views/console/state';
+import { sqlDialectFor } from '../../views/shared/sqlIdent';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import VirtualList from '../VirtualList.vue';
 
@@ -88,9 +89,8 @@ function onRowClick(record: OpRecord): void {
   toggleExpanded(record);
 }
 
-function sqlDialectFor(record: OpRecord): 'postgres' | 'mariadb' | undefined {
-  const kind = connectionFor(record)?.kind;
-  return kind === 'postgres' || kind === 'mariadb' ? kind : undefined;
+function opSqlDialect(record: OpRecord) {
+  return sqlDialectFor(connectionFor(record)?.kind);
 }
 
 // D10: Re-run reopens the exact command text through a fresh console tab and runs it
@@ -244,7 +244,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <CodeMirrorHost
                 :doc="`command: ${item.record.command}`"
                 language="sql"
-                :sql-dialect="sqlDialectFor(item.record)"
+                :sql-dialect="opSqlDialect(item.record)"
                 :read-only="true"
               />
             </div>

@@ -19,6 +19,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../workbench/panels/ViewChrome.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
 import IndexesSection from './IndexesSection.vue';
@@ -109,10 +110,10 @@ const constraintRows = computed(() =>
   definition.value && meta.value ? buildConstraintRows(definition.value, meta.value) : [],
 );
 
-const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+const dialect = computed(() => {
   if (!props.tab.connectionId) return undefined;
   const record = connectionsState.records.find((r) => r.id === props.tab.connectionId);
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return sqlDialectFor(record?.kind);
 });
 
 const originPhrase = computed(() =>

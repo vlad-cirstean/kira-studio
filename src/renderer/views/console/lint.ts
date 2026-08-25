@@ -2,6 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
+import { sqlDialectFor } from '../shared/sqlIdent';
 
 function lintSqlConsole(text: string): ConsoleDiagnostic[] {
   return lintSql(text);
@@ -165,6 +166,6 @@ export function consoleLintSource(
 ): ((doc: string) => ConsoleDiagnostic[]) | undefined {
   if (kind === 'mongodb') return lintMongoConsole;
   if (kind === 'redis') return lintRedisConsole;
-  if (kind === 'postgres' || kind === 'mariadb') return lintSqlConsole;
+  if (sqlDialectFor(kind)) return lintSqlConsole;
   return undefined;
 }

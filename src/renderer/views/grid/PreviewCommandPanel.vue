@@ -6,6 +6,7 @@ import { findDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import { previewPending } from './pendingChanges';
 
 const props = defineProps<{ tabId: string }>();
@@ -18,11 +19,11 @@ const error = ref<string | null>(null);
 // P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
-const sqlDialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+const sqlDialect = computed(() => {
   const tab = findDataTab(props.tabId);
   if (!tab?.connectionId) return undefined;
   const record = connectionsState.records.find((r) => r.id === tab.connectionId);
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return sqlDialectFor(record?.kind);
 });
 
 onMounted(async () => {

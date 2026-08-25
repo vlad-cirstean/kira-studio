@@ -3,6 +3,7 @@ import { MySQL, PostgreSQL, sql } from '@codemirror/lang-sql';
 import { xml } from '@codemirror/lang-xml';
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
+import type { SqlDialect } from '../views/shared/sqlIdent';
 
 /** The six grammars an editor surface can request. `formats.ts` maps CellFormat onto the first
  *  four; `mongo`/`redis` are the addendum's console-only highlighting modes (D23). */
@@ -107,10 +108,7 @@ const redisLanguage = StreamLanguage.define<RedisTokenState>({
  * middle of the 50 ms selection path (SPEC §2.1) would buy nothing and would race two rapid
  * cell clicks against each other.
  */
-export function languageExtension(
-  id: EditorLanguageId,
-  dialect?: 'postgres' | 'mariadb',
-): Extension {
+export function languageExtension(id: EditorLanguageId, dialect?: SqlDialect): Extension {
   switch (id) {
     case 'json':
       return json();
@@ -122,7 +120,7 @@ export function languageExtension(
       // vocabularies (filterCompletion.ts), which are uppercase by construction. FuzzyMatcher
       // case-folds, so typing `sel` still matches `SELECT`.
       return sql({
-        dialect: dialect === 'postgres' ? PostgreSQL : dialect === 'mariadb' ? MySQL : undefined,
+        dialect: dialect === 'postgres' ? PostgreSQL : dialect === 'mysql' ? MySQL : undefined,
         upperCaseKeywords: true,
       });
     case 'mongo':

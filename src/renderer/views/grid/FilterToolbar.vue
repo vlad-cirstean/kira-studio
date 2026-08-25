@@ -9,6 +9,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
 import {
   orderByCandidates as buildOrderByCandidates,
   whereCandidates as buildWhereCandidates,
@@ -25,11 +26,11 @@ const hasError = computed(() => rt.value?.status === 'error');
 // Mirrors PreviewCommandPanel.vue's/ConsoleView.vue's own three-line dialect computed exactly —
 // undefined for every non-SQL connection kind, which filterCompletion.ts's dialect-conditional
 // vocabularies (ILIKE, NULLS FIRST/LAST) already treat as "the non-Postgres list".
-const dialect = computed<'postgres' | 'mariadb' | undefined>(() => {
+const dialect = computed(() => {
   const record = tab.value?.connectionId
     ? connectionsState.records.find((r) => r.id === tab.value?.connectionId)
     : undefined;
-  return record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined;
+  return sqlDialectFor(record?.kind);
 });
 const whereCandidates = computed(() =>
   tab.value ? buildWhereCandidates(tab.value.id, dialect.value) : [],

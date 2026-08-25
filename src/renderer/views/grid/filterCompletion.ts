@@ -1,6 +1,6 @@
 // P18 D7/D8: candidate lists for FilterToolbar.vue's WHERE/ORDER BY boxes.
 import type { Completion } from '../../theme/primitives/completion';
-import { type Dialect, identNeedsQuoting, quoteIdent } from '../shared/sqlIdent';
+import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import { getPage } from './page';
 import { runtime } from './state';
 
@@ -43,7 +43,7 @@ function columnCompletions(tabId: string): Completion[] {
 // A column needing quotes is inserted quoted, dialect-correctly; a plain lowercase, non-reserved
 // one is inserted bare — auto-quoting every identifier would turn a `stat` + Tab into
 // `"status"`, which is correct SQL but not what someone typing a bare word would expect.
-function quotedIfNeeded(dialect: Dialect, c: Completion): Completion {
+function quotedIfNeeded(dialect: SqlDialect | undefined, c: Completion): Completion {
   if (!identNeedsQuoting(dialect, c.label)) return c;
   return { ...c, insert: quoteIdent(dialect, c.label) };
 }
@@ -53,7 +53,7 @@ function keywordCompletions(keywords: readonly string[]): Completion[] {
 }
 
 // Columns first, keywords after — a user types a field far more often than they type BETWEEN.
-export function whereCandidates(tabId: string, dialect: Dialect): Completion[] {
+export function whereCandidates(tabId: string, dialect: SqlDialect | undefined): Completion[] {
   const keywords =
     dialect === 'postgres' ? [...WHERE_KEYWORDS, ...WHERE_KEYWORDS_POSTGRES] : WHERE_KEYWORDS;
   return [
@@ -62,7 +62,7 @@ export function whereCandidates(tabId: string, dialect: Dialect): Completion[] {
   ];
 }
 
-export function orderByCandidates(tabId: string, dialect: Dialect): Completion[] {
+export function orderByCandidates(tabId: string, dialect: SqlDialect | undefined): Completion[] {
   const keywords =
     dialect === 'postgres'
       ? [...ORDER_BY_KEYWORDS, ...ORDER_BY_KEYWORDS_POSTGRES]

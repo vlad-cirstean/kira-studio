@@ -140,8 +140,8 @@ function redisCompletionSource(): CompletionSource {
   };
 }
 
-/** null/undefined for postgres/mariadb — lang-sql's own language-data source stays in charge
- *  (D23); the console's `autocomplete` prop is what gates SQL completion on those two kinds. */
+/** null/undefined for postgres/mariadb/mysql — lang-sql's own language-data source stays in charge
+ *  (D23); the console's `autocomplete` prop is what gates SQL completion on those kinds. */
 export function consoleCompletionSources(
   kind: ConnectionKind,
   connectionId: string | null,

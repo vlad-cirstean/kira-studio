@@ -2,10 +2,30 @@
 // (grid/filterCompletion.ts) — one shared definition beats two that can drift on the
 // backtick/double-quote split. Same trust boundary gridMenu.ts's own comment already states:
 // generated as literal SQL text once, never validated against the column's type.
-export type Dialect = 'postgres' | 'mariadb' | undefined;
+//
+// P34 D17: a quoting-and-grammar *family*, not a product — MariaDB and MySQL share one dialect
+// ('mysql', since languages.ts already maps MariaDB to CodeMirror's own `MySQL` lang-sql dialect;
+// the family is the concept the code was already reaching for). Before this, the twelve call
+// sites across the renderer each hand-wrote
+// `record?.kind === 'postgres' || record?.kind === 'mariadb' ? record.kind : undefined`, and any
+// kind missing from that inline check silently fell to `undefined` — which quoteIdent below reads
+// as "double-quote it", not "this isn't SQL". A MySQL connection that wasn't added to every one
+// of those twelve sites would emit invalid double-quoted identifiers into `gridMenu.ts`'s
+// generated *Filter by this value* and FK-navigation predicates (P34 F22). sqlDialectFor is the
+// one place that decision is made now.
+import type { ConnectionKind } from '@shared/domain/connection';
 
-export function quoteIdent(dialect: Dialect, name: string): string {
-  if (dialect === 'mariadb') return `\`${name.replace(/`/g, '``')}\``;
+export type SqlDialect = 'postgres' | 'mysql';
+
+/** undefined for a kind with no SQL surface (mongodb, redis, kafka, sqs, s3) or no connection. */
+export function sqlDialectFor(kind: ConnectionKind | undefined): SqlDialect | undefined {
+  if (kind === 'postgres') return 'postgres';
+  if (kind === 'mariadb' || kind === 'mysql') return 'mysql';
+  return undefined;
+}
+
+export function quoteIdent(dialect: SqlDialect | undefined, name: string): string {
+  if (dialect === 'mysql') return `\`${name.replace(/`/g, '``')}\``;
   return `"${name.replace(/"/g, '""')}"`;
 }
 
@@ -69,9 +89,9 @@ const COMMON_RESERVED = new Set([
 const BARE_SAFE_RE = /^[a-z_][a-z0-9_]*$/;
 
 /** False for a bare-safe, non-reserved lowercase identifier — those are inserted unquoted by a
- *  completion accept. The bare-identifier grammar itself doesn't vary between postgres/mariadb
+ *  completion accept. The bare-identifier grammar itself doesn't vary between postgres/mysql
  *  (only the quote character quoteIdent picks does), so `dialect` is accepted for symmetry with
  *  quoteIdent and future divergence, not used today. */
-export function identNeedsQuoting(_dialect: Dialect, name: string): boolean {
+export function identNeedsQuoting(_dialect: SqlDialect | undefined, name: string): boolean {
   return !BARE_SAFE_RE.test(name) || COMMON_RESERVED.has(name.toLowerCase());
 }
