@@ -105,7 +105,13 @@ const DESCRIPTIONS: readonly { test: RegExp; text: string }[] = [
     text: 'Variable-length raw binary data, up to a declared maximum (MariaDB).',
   },
   { test: /^tinyblob$/, text: 'Raw binary data, up to 255 bytes (MariaDB).' },
-  { test: /^blob$/, text: 'Raw binary data, up to 64 KB (MariaDB).' },
+  {
+    // P35 D31: "blob" alone is no longer a MariaDB-only spelling — it's also SQLite's own native
+    // blob type (F21), which has no such size cap, so a single hard number would be wrong for one
+    // of the two engines this entry now has to describe.
+    test: /^blob$/,
+    text: "Raw binary data — MariaDB/MySQL's own blob type caps it at 64 KB; SQLite's BLOB (its only blob type) has no declared size limit.",
+  },
   { test: /^mediumblob$/, text: 'Raw binary data, up to ~16 MB (MariaDB).' },
   { test: /^longblob$/, text: 'Raw binary data, up to ~4 GB (MariaDB).' },
 
@@ -139,6 +145,12 @@ const DESCRIPTIONS: readonly { test: RegExp; text: string }[] = [
     text: "MariaDB/MySQL's SET type: any combination of a fixed list of string values, stored as one field.",
   },
   { test: /^geometry|geography/, text: 'A spatial (GIS) value.' },
+  {
+    // P35 D21/D31: SQLite's own STRICT-table type — the one declared type with no affinity rule
+    // at all (F21), so a value here can genuinely be any SQLite storage class.
+    test: /^any$/,
+    text: 'SQLite STRICT-table type: accepts a value of any storage class, with no affinity applied.',
+  },
 
   // --- Mongo BSON type names (a $jsonSchema validator's own "bsonType" spellings) -------------
   // Genuinely self-explanatory ones (string, array, object, null) are left uncovered, same

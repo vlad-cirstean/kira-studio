@@ -1,5 +1,5 @@
 import { json } from '@codemirror/lang-json';
-import { MySQL, PostgreSQL, sql } from '@codemirror/lang-sql';
+import { MySQL, PostgreSQL, SQLite, sql } from '@codemirror/lang-sql';
 import { xml } from '@codemirror/lang-xml';
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
@@ -120,7 +120,14 @@ export function languageExtension(id: EditorLanguageId, dialect?: SqlDialect): E
       // vocabularies (filterCompletion.ts), which are uppercase by construction. FuzzyMatcher
       // case-folds, so typing `sel` still matches `SELECT`.
       return sql({
-        dialect: dialect === 'postgres' ? PostgreSQL : dialect === 'mysql' ? MySQL : undefined,
+        dialect:
+          dialect === 'postgres'
+            ? PostgreSQL
+            : dialect === 'mysql'
+              ? MySQL
+              : dialect === 'sqlite'
+                ? SQLite
+                : undefined,
         upperCaseKeywords: true,
       });
     case 'mongo':

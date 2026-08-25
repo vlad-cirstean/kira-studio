@@ -5,6 +5,7 @@ import {
   connectionInputSchema,
   connectionKindSchema,
   DEFAULT_PORT,
+  FILE_KINDS,
 } from '@shared/domain/connection';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, ref } from 'vue';
@@ -48,6 +49,7 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
   'mariadb',
   'mysql',
+  'sqlite',
   'mongodb',
   'redis',
   'kafka',
@@ -219,6 +221,26 @@ const isValid = computed(() =>
 // (sqs/client.ts's, s3/client.ts's own D8/D9).
 const isAwsStyle = computed(() => !!draft.value && AWS_STYLE_KINDS.has(draft.value.kind));
 
+// P35 D10/D11/D14: a file kind (SQLite) has no host/port/username/password at all — `database`
+// carries the absolute file path instead, edited through one full-width field with a Browse
+// button rather than the network-shaped host/port/user/password block.
+const isFileStyle = computed(() => !!draft.value && FILE_KINDS.has(draft.value.kind));
+
+// P35 D15: the SQLite-specific filter list — chooseOpen's own filters payload is generic, so a
+// second file kind would pass a different list here rather than this being hardcoded lower down.
+async function onBrowseDatabaseFile(): Promise<void> {
+  const d = draft.value;
+  if (!d) return;
+  const res = await control.filesChooseOpen({
+    filters: [
+      { name: 'SQLite database', extensions: ['sqlite', 'sqlite3', 'db', 'db3'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+    title: 'Choose a database file',
+  });
+  if (!res.canceled && res.file) d.database = res.file.path;
+}
+
 // P11: '' <-> null bridging so an emptied field is "no script" rather than a schema violation
 // the user cannot see (min(1) on the underlying schema rejects '').
 const preconnectText = computed({
@@ -347,7 +369,27 @@ const preconnectText = computed({
             </div>
           </div>
 
-          <template v-if="draft.mode === 'fields'">
+          <template v-if="draft.mode === 'fields' && isFileStyle">
+            <div class="field">
+              <label>Database file</label>
+              <div class="password-row">
+                <div class="password-input">
+                  <TextField
+                    :model-value="draft.database ?? ''"
+                    size="md"
+                    class="mono"
+                    data-testid="connection-database"
+                    @update:model-value="draft.database = $event"
+                  />
+                </div>
+                <AppButton kind="dialog" data-testid="connection-browse" @click="onBrowseDatabaseFile">
+                  Browse…
+                </AppButton>
+              </div>
+            </div>
+            <span v-if="fieldErrors.database" class="field-error">{{ fieldErrors.database }}</span>
+          </template>
+          <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="field-row">
               <div class="field">
                 <label>Host</label>
@@ -469,26 +511,30 @@ const preconnectText = computed({
 
           <!-- P25 D8: three states driven by connectionsState.secretStorage, replacing the old
                unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
-               none of them rather than guessing. -->
-          <p
-            v-if="secretStatus?.available && !secretStatus.insecureFallback"
-            class="credential-note"
-            data-testid="connection-credential-note"
-          >
-            Credentials are encrypted with your macOS Keychain.
-          </p>
-          <MessageStrip
-            v-else-if="secretStatus?.insecureFallback"
-            tone="warn"
-            data-testid="connection-credential-note"
-          >
-            Development fallback: credentials on this platform are obfuscated with a built-in
-            key, not a real keychain.
-          </MessageStrip>
-          <MessageStrip v-else-if="secretStatus" tone="err" data-testid="connection-credential-note">
-            The macOS Keychain is unavailable, so passwords cannot be saved. Everything else
-            about this connection can be.
-          </MessageStrip>
+               none of them rather than guessing. P35 D14: a file kind has no credentials at all,
+               so none of the three states apply — the note would be describing something that
+               doesn't exist. -->
+          <template v-if="!isFileStyle">
+            <p
+              v-if="secretStatus?.available && !secretStatus.insecureFallback"
+              class="credential-note"
+              data-testid="connection-credential-note"
+            >
+              Credentials are encrypted with your macOS Keychain.
+            </p>
+            <MessageStrip
+              v-else-if="secretStatus?.insecureFallback"
+              tone="warn"
+              data-testid="connection-credential-note"
+            >
+              Development fallback: credentials on this platform are obfuscated with a built-in
+              key, not a real keychain.
+            </MessageStrip>
+            <MessageStrip v-else-if="secretStatus" tone="err" data-testid="connection-credential-note">
+              The macOS Keychain is unavailable, so passwords cannot be saved. Everything else
+              about this connection can be.
+            </MessageStrip>
+          </template>
       </div>
     </template>
 

@@ -15,12 +15,17 @@
 // one place that decision is made now.
 import type { ConnectionKind } from '@shared/domain/connection';
 
-export type SqlDialect = 'postgres' | 'mysql';
+// P35 D28: SQLite is its own member, not folded into 'mysql' — it double-quotes identifiers
+// (already quoteIdent's own default branch below) but is a genuinely different grammar with its
+// own CodeMirror lang-sql dialect (languages.ts), so mapping it to 'postgres' would be a lie the
+// next reader has to decode.
+export type SqlDialect = 'postgres' | 'mysql' | 'sqlite';
 
 /** undefined for a kind with no SQL surface (mongodb, redis, kafka, sqs, s3) or no connection. */
 export function sqlDialectFor(kind: ConnectionKind | undefined): SqlDialect | undefined {
   if (kind === 'postgres') return 'postgres';
   if (kind === 'mariadb' || kind === 'mysql') return 'mysql';
+  if (kind === 'sqlite') return 'sqlite';
   return undefined;
 }
 

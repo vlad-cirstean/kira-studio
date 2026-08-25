@@ -46,6 +46,35 @@ const iconSize = computed(() => props.size ?? 16);
       <circle cx="10.4" cy="5.4" r=".5" fill="currentColor" />
     </template>
 
+    <!-- P35 D30: a feather (quill vane + shaft + barbs), redrawn — the mark SQLite's own project
+         uses, not a vendored asset — mirroring the other engines' currentColor line-art convention. -->
+    <template v-if="kind === 'sqlite'">
+      <ellipse
+        cx="8"
+        cy="7.2"
+        rx="2.4"
+        ry="5.6"
+        transform="rotate(-28 8 7.2)"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.15"
+      />
+      <path
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.15"
+        stroke-linecap="round"
+        d="M10.4 2.3 4.6 13.7"
+      />
+      <path
+        fill="none"
+        stroke="currentColor"
+        stroke-width=".9"
+        stroke-linecap="round"
+        d="M8.7 5.3 6.6 6.3M7.9 7.7 5.6 8.7M7.1 10.1 4.7 11"
+      />
+    </template>
+
     <template v-if="kind === 'mongodb'">
       <path
         fill="currentColor"
