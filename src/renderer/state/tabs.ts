@@ -160,17 +160,21 @@ export interface OpenTabResult {
   reused: boolean;
 }
 
-// Without `newTab`, activates an existing tab for the same (connectionId, path) if one exists
-// (§8.10's "Open data"). "Open data in new tab" always creates (`newTab: true`), so the same
-// table can be open N times with independent state — identity is `id`, never `path` (§8.4).
-export function openDataTab(
+// P39 F16/D12: the six openers below shared this exact sequence — find-existing-and-activate
+// (opt-in per caller via `reuse`), else create-and-push-and-activate, then an opt-in
+// recordRecent — differing only in which of those two opt-ins applied and which kind/state
+// constructor built the record. Kept internal: the six exported signatures (and every caller)
+// are unchanged.
+function openTab<S>(
+  kind: TabRecord['kind'],
   connectionId: string,
   path: string,
-  opts?: { newTab?: boolean },
+  makeState: () => S,
+  opts: { reuse: boolean; recentKind?: RecentTableEntry['kind'] },
 ): OpenTabResult {
-  if (!opts?.newTab) {
+  if (opts.reuse) {
     const existing = tabsState.tabs.find(
-      (t) => t.kind === 'data' && t.connectionId === connectionId && t.path === path,
+      (t) => t.kind === kind && t.connectionId === connectionId && t.path === path,
     );
     if (existing) {
       activateTab(existing.id);
@@ -179,53 +183,54 @@ export function openDataTab(
   }
 
   const id = crypto.randomUUID();
-  const record: TabRecord = {
+  const record = {
     id,
     connectionId,
     path,
-    kind: 'data',
-    state: defaultDataTabState(settingsState.data.defaultPageSize),
+    kind,
+    state: makeState(),
     order: tabsState.tabs.length,
     active: true,
-  };
+    // `kind` and `makeState()`'s return type agree at every call site below — TabRecord's own
+    // discriminated union can't express that generically, so this is asserted rather than typed.
+  } as unknown as TabRecord;
   deactivateAll();
   tabsState.tabs.push(record);
   tabsState.activeId = id;
   // Opened from a live connection — nothing to reconnect.
   tabsState.hydrated.add(id);
-  recordRecent(connectionId, path, 'data');
+  if (opts.recentKind) recordRecent(connectionId, path, opts.recentKind);
   saveNow();
   return { id, reused: false };
+}
+
+// Without `newTab`, activates an existing tab for the same (connectionId, path) if one exists
+// (§8.10's "Open data"). "Open data in new tab" always creates (`newTab: true`), so the same
+// table can be open N times with independent state — identity is `id`, never `path` (§8.4).
+export function openDataTab(
+  connectionId: string,
+  path: string,
+  opts?: { newTab?: boolean },
+): OpenTabResult {
+  return openTab(
+    'data',
+    connectionId,
+    path,
+    () => defaultDataTabState(settingsState.data.defaultPageSize),
+    {
+      reuse: !opts?.newTab,
+      recentKind: 'data',
+    },
+  );
 }
 
 // Opens a 'definition' tab, reusing an existing one for the same (connectionId, path) — mirrors
 // openDataTab's identity rule (§8.4), minus the `newTab` escape hatch: D14 gives the definition
 // view no "open in new tab" affordance.
 export function openDefinitionTab(connectionId: string, path: string): string {
-  const existing = tabsState.tabs.find(
-    (t) => t.kind === 'definition' && t.connectionId === connectionId && t.path === path,
-  );
-  if (existing) {
-    activateTab(existing.id);
-    return existing.id;
-  }
-
-  const id = crypto.randomUUID();
-  const record: TabRecord = {
-    id,
-    connectionId,
-    path,
-    kind: 'definition',
-    state: defaultDefinitionTabState(),
-    order: tabsState.tabs.length,
-    active: true,
-  };
-  deactivateAll();
-  tabsState.tabs.push(record);
-  tabsState.activeId = id;
-  tabsState.hydrated.add(id);
-  saveNow();
-  return id;
+  return openTab('definition', connectionId, path, () => defaultDefinitionTabState(), {
+    reuse: true,
+  }).id;
 }
 
 // Opens a new 'console' tab — always a fresh one, never reused by (connectionId, path): unlike
@@ -237,22 +242,9 @@ export function openDefinitionTab(connectionId: string, path: string): string {
 // default" path here, before the path ever reaches the engine, needs no adapter change at all.
 export function openConsoleTab(connectionId: string, path: string): string {
   const effectivePath = path === '' ? (consoleDefaultFor(connectionId) ?? path) : path;
-  const id = crypto.randomUUID();
-  const record: TabRecord = {
-    id,
-    connectionId,
-    path: effectivePath,
-    kind: 'console',
-    state: defaultConsoleTabState(),
-    order: tabsState.tabs.length,
-    active: true,
-  };
-  deactivateAll();
-  tabsState.tabs.push(record);
-  tabsState.activeId = id;
-  tabsState.hydrated.add(id);
-  saveNow();
-  return id;
+  return openTab('console', connectionId, effectivePath, () => defaultConsoleTabState(), {
+    reuse: false,
+  }).id;
 }
 
 // Opens a 'document' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -262,33 +254,13 @@ export function openDocumentTab(
   path: string,
   opts?: { newTab?: boolean },
 ): OpenTabResult {
-  if (!opts?.newTab) {
-    const existing = tabsState.tabs.find(
-      (t) => t.kind === 'document' && t.connectionId === connectionId && t.path === path,
-    );
-    if (existing) {
-      activateTab(existing.id);
-      return { id: existing.id, reused: true };
-    }
-  }
-
-  const id = crypto.randomUUID();
-  const record: TabRecord = {
-    id,
+  return openTab(
+    'document',
     connectionId,
     path,
-    kind: 'document',
-    state: defaultDocumentTabState(settingsState.data.defaultPageSize),
-    order: tabsState.tabs.length,
-    active: true,
-  };
-  deactivateAll();
-  tabsState.tabs.push(record);
-  tabsState.activeId = id;
-  tabsState.hydrated.add(id);
-  recordRecent(connectionId, path, 'document');
-  saveNow();
-  return { id, reused: false };
+    () => defaultDocumentTabState(settingsState.data.defaultPageSize),
+    { reuse: !opts?.newTab, recentKind: 'document' },
+  );
 }
 
 // Opens a 'keyvalue' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -298,33 +270,13 @@ export function openKeyValueTab(
   path: string,
   opts?: { newTab?: boolean },
 ): OpenTabResult {
-  if (!opts?.newTab) {
-    const existing = tabsState.tabs.find(
-      (t) => t.kind === 'keyvalue' && t.connectionId === connectionId && t.path === path,
-    );
-    if (existing) {
-      activateTab(existing.id);
-      return { id: existing.id, reused: true };
-    }
-  }
-
-  const id = crypto.randomUUID();
-  const record: TabRecord = {
-    id,
+  return openTab(
+    'keyvalue',
     connectionId,
     path,
-    kind: 'keyvalue',
-    state: defaultKeyValueTabState(settingsState.data.defaultPageSize),
-    order: tabsState.tabs.length,
-    active: true,
-  };
-  deactivateAll();
-  tabsState.tabs.push(record);
-  tabsState.activeId = id;
-  tabsState.hydrated.add(id);
-  recordRecent(connectionId, path, 'keyvalue');
-  saveNow();
-  return { id, reused: false };
+    () => defaultKeyValueTabState(settingsState.data.defaultPageSize),
+    { reuse: !opts?.newTab, recentKind: 'keyvalue' },
+  );
 }
 
 // Opens a 'stream' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -334,33 +286,13 @@ export function openStreamTab(
   path: string,
   opts?: { newTab?: boolean },
 ): OpenTabResult {
-  if (!opts?.newTab) {
-    const existing = tabsState.tabs.find(
-      (t) => t.kind === 'stream' && t.connectionId === connectionId && t.path === path,
-    );
-    if (existing) {
-      activateTab(existing.id);
-      return { id: existing.id, reused: true };
-    }
-  }
-
-  const id = crypto.randomUUID();
-  const record: TabRecord = {
-    id,
+  return openTab(
+    'stream',
     connectionId,
     path,
-    kind: 'stream',
-    state: defaultStreamTabState(settingsState.data.defaultPageSize),
-    order: tabsState.tabs.length,
-    active: true,
-  };
-  deactivateAll();
-  tabsState.tabs.push(record);
-  tabsState.activeId = id;
-  tabsState.hydrated.add(id);
-  recordRecent(connectionId, path, 'stream');
-  saveNow();
-  return { id, reused: false };
+    () => defaultStreamTabState(settingsState.data.defaultPageSize),
+    { reuse: !opts?.newTab, recentKind: 'stream' },
+  );
 }
 
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
@@ -540,49 +472,47 @@ function patchChanged<T extends object>(target: T, patch: Partial<T>): boolean {
   return false;
 }
 
-export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {
+// P39 F16/D12: the six patchers below shared this exact body, differing only in which kind they
+// target and whether they check patchChanged first — data/console/definition do (a patch that
+// sets every field to a value it already had must not schedule a save, D17); document/keyvalue/
+// stream never did. That is a real behavior difference, not a formatting one (F16), so it is kept
+// as an explicit per-caller flag rather than silently unified either way.
+function patchTabState<S extends object>(
+  id: string,
+  kind: TabRecord['kind'],
+  patch: Partial<S>,
+  opts: { skipUnchanged: boolean },
+): void {
   const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'data') return;
-  if (!patchChanged(target.state, patch)) return;
-  Object.assign(target.state, patch);
+  if (target?.kind !== kind) return;
+  const state = target.state as S;
+  if (opts.skipUnchanged && !patchChanged(state, patch)) return;
+  Object.assign(state, patch);
   saveDebounced();
+}
+
+export function patchDataTabState(id: string, patch: Partial<DataTabState>): void {
+  patchTabState(id, 'data', patch, { skipUnchanged: true });
 }
 
 export function patchConsoleTabState(id: string, patch: Partial<ConsoleTabState>): void {
-  const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'console') return;
-  if (!patchChanged(target.state, patch)) return;
-  Object.assign(target.state, patch);
-  saveDebounced();
+  patchTabState(id, 'console', patch, { skipUnchanged: true });
 }
 
 export function patchDefinitionTabState(id: string, patch: Partial<DefinitionTabState>): void {
-  const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'definition') return;
-  if (!patchChanged(target.state, patch)) return;
-  Object.assign(target.state, patch);
-  saveDebounced();
+  patchTabState(id, 'definition', patch, { skipUnchanged: true });
 }
 
 export function patchDocumentTabState(id: string, patch: Partial<DocumentTabState>): void {
-  const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'document') return;
-  Object.assign(target.state, patch);
-  saveDebounced();
+  patchTabState(id, 'document', patch, { skipUnchanged: false });
 }
 
 export function patchKeyValueTabState(id: string, patch: Partial<KeyValueTabState>): void {
-  const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'keyvalue') return;
-  Object.assign(target.state, patch);
-  saveDebounced();
+  patchTabState(id, 'keyvalue', patch, { skipUnchanged: false });
 }
 
 export function patchStreamTabState(id: string, patch: Partial<StreamTabState>): void {
-  const target = tabsState.tabs.find((t) => t.id === id);
-  if (target?.kind !== 'stream') return;
-  Object.assign(target.state, patch);
-  saveDebounced();
+  patchTabState(id, 'stream', patch, { skipUnchanged: false });
 }
 
 export function markHydrated(id: string): void {
