@@ -10,7 +10,7 @@ import {
   type KeyValuePage,
   OBJECT_BODY_PREVIEW_BYTES,
   type PagePosition,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

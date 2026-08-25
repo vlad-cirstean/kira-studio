@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's redis row: key/value-shaped, cursor (SCAN) pagination, no FK navigation, a shell-style
 // console (§8.14). Writable as of this phase — string-only edit/insert plus type-agnostic delete

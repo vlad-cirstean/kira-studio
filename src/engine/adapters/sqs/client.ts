@@ -1,7 +1,7 @@
 import { SQSClient, type SQSClientConfig } from '@aws-sdk/client-sqs';
 import { fromIni } from '@aws-sdk/credential-providers';
-import { parseConnectionUri } from '../../../shared/domain/uri';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
+import { parseConnectionUri } from '@shared/domain/uri';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { mapError } from './errors';
 

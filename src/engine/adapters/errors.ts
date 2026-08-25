@@ -1,4 +1,4 @@
-import type { ConnectionKind } from '../../shared/domain/connection';
+import type { ConnectionKind } from '@shared/domain/connection';
 
 export type AdapterErrorCode =
   | 'E_CONNECT'

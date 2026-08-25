@@ -1,6 +1,6 @@
 import { join } from 'node:path';
+import { IPC } from '@shared/protocol/ipc';
 import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain } from 'electron';
-import { IPC } from '../shared/protocol/ipc';
 import { createConnectionsService } from './connections';
 import { pushEngineConfig } from './engine-config';
 import { startEngine } from './engine-host';

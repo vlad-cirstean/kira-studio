@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // P35 D27: identical to the other SQL adapters except `cancel: false` — the app's first honest
 // `false`. node:sqlite exposes no sqlite3_interrupt, and its entire API is synchronous, so a

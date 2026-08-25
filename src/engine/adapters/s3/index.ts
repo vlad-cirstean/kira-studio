@@ -1,18 +1,10 @@
 import type { S3Client } from '@aws-sdk/client-s3';
-import type { ObjectDefinition } from '../../../shared/domain/definition';
-import type { MutationPlan, MutationResult } from '../../../shared/domain/mutations';
-import type {
-  ObjectDownloadRequest,
-  ObjectTransferResult,
-} from '../../../shared/domain/object-store';
-import {
-  encodePath,
-  type NodePath,
-  type ObjectMeta,
-  type TreeNode,
-} from '../../../shared/domain/tree';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
-import type { Page } from '../../../shared/protocol/page';
+import type { ObjectDefinition } from '@shared/domain/definition';
+import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
+import type { ObjectDownloadRequest, ObjectTransferResult } from '@shared/domain/object-store';
+import { encodePath, type NodePath, type ObjectMeta, type TreeNode } from '@shared/domain/tree';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import type { Page } from '@shared/protocol/page';
 import type {
   Adapter,
   AdapterDeps,

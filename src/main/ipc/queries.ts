@@ -1,6 +1,6 @@
+import { consoleBodySchema, filterBodySchema, sortSpecSchema } from '@shared/domain/queries';
+import { IPC } from '@shared/protocol/ipc';
 import { z } from 'zod';
-import { consoleBodySchema, filterBodySchema, sortSpecSchema } from '../../shared/domain/queries';
-import { IPC } from '../../shared/protocol/ipc';
 import { listFilterHistory, recordFilterUse } from '../storage/repos/filter-history';
 import {
   deleteSavedQuery,

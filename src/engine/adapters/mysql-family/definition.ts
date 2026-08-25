@@ -1,5 +1,5 @@
-import type { ConstraintMeta, ObjectDefinition } from '../../../shared/domain/definition';
-import { encodePath, type NodePath } from '../../../shared/domain/tree';
+import type { ConstraintMeta, ObjectDefinition } from '@shared/domain/definition';
+import { encodePath, type NodePath } from '@shared/domain/tree';
 import { AdapterError } from '../errors';
 import { stripOneTrailingSemicolon } from '../sql-text';
 import type { QueryExecutor } from './catalog';

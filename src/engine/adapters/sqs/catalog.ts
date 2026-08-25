@@ -1,5 +1,5 @@
 import { GetQueueUrlCommand, ListQueuesCommand, type SQSClient } from '@aws-sdk/client-sqs';
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import { mapError } from './errors';
 
 const PAGE_LIMIT = 1000; // ListQueues's own max MaxResults per call

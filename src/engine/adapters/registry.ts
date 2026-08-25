@@ -1,4 +1,4 @@
-import type { ConnectionKind } from '../../shared/domain/connection';
+import type { ConnectionKind } from '@shared/domain/connection';
 import type { Adapter, AdapterDeps } from './adapter';
 import { AdapterError } from './errors';
 

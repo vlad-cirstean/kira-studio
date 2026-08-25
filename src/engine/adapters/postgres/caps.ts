@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 export const postgresCaps: Caps = {
   tabular: true,

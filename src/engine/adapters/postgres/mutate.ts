@@ -1,6 +1,6 @@
+import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
+import { encodePath } from '@shared/domain/tree';
 import type { Client } from 'pg';
-import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
-import { encodePath } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
 import {

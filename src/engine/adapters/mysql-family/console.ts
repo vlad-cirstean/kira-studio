@@ -1,11 +1,11 @@
-import type { Connection, FieldInfo } from 'mariadb';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
   type PagePosition,
   type TabularPage,
   type TypeClass,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
+import type { Connection, FieldInfo } from 'mariadb';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { singleStatusPage } from '../sql-text';

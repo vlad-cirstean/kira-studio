@@ -1,6 +1,6 @@
+import type { SettingsPatch } from '@shared/domain/settings';
+import { IPC } from '@shared/protocol/ipc';
 import { BrowserWindow, ipcMain } from 'electron';
-import type { SettingsPatch } from '../../shared/domain/settings';
-import { IPC } from '../../shared/protocol/ipc';
 import { pushEngineConfig } from '../engine-config';
 import { getAllSettings, setSettings } from '../storage/repos/settings';
 import type { IpcDeps } from './deps';

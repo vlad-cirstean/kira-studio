@@ -1,5 +1,5 @@
+import { RENDERABLE_TAB_KINDS, type TabRecord, tabRecordSchema } from '@shared/domain/tabs';
 import { asc } from 'drizzle-orm';
-import { RENDERABLE_TAB_KINDS, type TabRecord, tabRecordSchema } from '../../../shared/domain/tabs';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { tabs } from '../schema/tabs';

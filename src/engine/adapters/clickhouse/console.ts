@@ -3,7 +3,7 @@ import {
   createTabularPageBuilder,
   type PagePosition,
   type TabularPage,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { singleStatusPage } from '../sql-text';

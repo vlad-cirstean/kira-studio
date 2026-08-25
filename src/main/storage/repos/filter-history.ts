@@ -1,9 +1,9 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
 import {
   type FilterHistoryEntry,
   filterHistoryEntrySchema,
   type SortSpec,
-} from '../../../shared/domain/queries';
+} from '@shared/domain/queries';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { filterHistory } from '../schema/filter-history';

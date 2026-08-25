@@ -1,6 +1,6 @@
+import type { LayoutPatch } from '@shared/domain/layout';
+import { IPC } from '@shared/protocol/ipc';
 import { ipcMain } from 'electron';
-import type { LayoutPatch } from '../../shared/domain/layout';
-import { IPC } from '../../shared/protocol/ipc';
 import { getAllLayout, setLayout } from '../storage/repos/layout';
 import type { IpcDeps } from './deps';
 

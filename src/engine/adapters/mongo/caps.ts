@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's mongodb row: document-shaped, cursor pagination, estimate-only count, no FK
 // navigation (§8.5), a shell-style console (§8.14). definition: true as of P19 D12 — a

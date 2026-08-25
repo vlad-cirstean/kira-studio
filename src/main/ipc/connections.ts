@@ -1,6 +1,6 @@
+import { connectionInputSchema } from '@shared/domain/connection';
+import { IPC } from '@shared/protocol/ipc';
 import { z } from 'zod';
-import { connectionInputSchema } from '../../shared/domain/connection';
-import { IPC } from '../../shared/protocol/ipc';
 import type { IpcDeps } from './deps';
 import { handle } from './errors';
 

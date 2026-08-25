@@ -1,13 +1,13 @@
-import type { Caps } from '../../shared/caps';
-import type { ConnectionKind } from '../../shared/domain/connection';
-import type { ConsoleRequest } from '../../shared/domain/console';
-import type { ObjectDefinition } from '../../shared/domain/definition';
-import type { MutationPlan, MutationResult } from '../../shared/domain/mutations';
-import type { ObjectDownloadRequest, ObjectTransferResult } from '../../shared/domain/object-store';
-import type { NodePath, ObjectMeta, TreeNode } from '../../shared/domain/tree';
-import type { PageCursor, SortSpec } from '../../shared/protocol/data-ops';
-import type { ResolvedConnectionConfig } from '../../shared/protocol/engine-ops';
-import type { Page } from '../../shared/protocol/page';
+import type { Caps } from '@shared/caps';
+import type { ConnectionKind } from '@shared/domain/connection';
+import type { ConsoleRequest } from '@shared/domain/console';
+import type { ObjectDefinition } from '@shared/domain/definition';
+import type { MutationPlan, MutationResult } from '@shared/domain/mutations';
+import type { ObjectDownloadRequest, ObjectTransferResult } from '@shared/domain/object-store';
+import type { NodePath, ObjectMeta, TreeNode } from '@shared/domain/tree';
+import type { PageCursor, SortSpec } from '@shared/protocol/data-ops';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import type { Page } from '@shared/protocol/page';
 
 export interface Progress {
   message?: string;

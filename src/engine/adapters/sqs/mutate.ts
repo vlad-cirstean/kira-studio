@@ -4,7 +4,7 @@ import {
   SendMessageCommand,
   type SQSClient,
 } from '@aws-sdk/client-sqs';
-import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';

@@ -2,8 +2,8 @@ import type {
   ConstraintMeta,
   DefinitionSection,
   ObjectDefinition,
-} from '../../../shared/domain/definition';
-import { encodePath, type NodePath } from '../../../shared/domain/tree';
+} from '@shared/domain/definition';
+import { encodePath, type NodePath } from '@shared/domain/tree';
 import { AdapterError } from '../errors';
 import { stripOneTrailingSemicolon } from '../sql-text';
 import type { QueryExecutor } from './catalog';

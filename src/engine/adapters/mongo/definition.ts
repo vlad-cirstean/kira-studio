@@ -1,7 +1,7 @@
+import type { DocumentSchemaMeta, ObjectDefinition } from '@shared/domain/definition';
+import { encodePath, type NodePath } from '@shared/domain/tree';
 import { EJSON } from 'bson';
 import type { Db } from 'mongodb';
-import type { DocumentSchemaMeta, ObjectDefinition } from '../../../shared/domain/definition';
-import { encodePath, type NodePath } from '../../../shared/domain/tree';
 import { collectionOptions } from './catalog';
 
 const NO_OPTIONS_NOTE =

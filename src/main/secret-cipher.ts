@@ -1,5 +1,5 @@
+import type { SecretStorageStatus } from '@shared/domain/secrets';
 import { safeStorage } from 'electron';
-import type { SecretStorageStatus } from '../shared/domain/secrets';
 import { log } from './log';
 
 const ENVELOPE_PREFIX = 'kira:v1:';

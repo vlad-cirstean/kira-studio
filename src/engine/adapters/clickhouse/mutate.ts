@@ -1,5 +1,5 @@
-import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
-import { encodePath } from '../../../shared/domain/tree';
+import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
+import { encodePath } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
 import { assertColumnsKnown } from '../sql-mutate';

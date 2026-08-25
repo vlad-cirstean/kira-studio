@@ -1,12 +1,12 @@
-import { EJSON } from 'bson';
-import type { Collection, Db, Document } from 'mongodb';
-import { MONGO_CONSOLE_METHODS } from '../../../shared/domain/console';
+import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import {
   createDocumentPageBuilder,
   type DocumentPage,
   type Page,
   type PagePosition,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
+import { EJSON } from 'bson';
+import type { Collection, Db, Document } from 'mongodb';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

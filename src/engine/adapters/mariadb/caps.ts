@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // Identical to Postgres's, which is the point (§5.1: the two SQL rows differ only in
 // mechanism). `caps.definition: true` is a statement about what MariaDB *can* do — `definition()`

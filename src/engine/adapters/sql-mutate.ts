@@ -1,5 +1,5 @@
-import type { MutationRowOp } from '../../shared/domain/mutations';
-import type { ColumnMeta } from '../../shared/domain/tree';
+import type { MutationRowOp } from '@shared/domain/mutations';
+import type { ColumnMeta } from '@shared/domain/tree';
 import { AdapterError } from './errors';
 
 // P39 iter2 F16: postgres/mysql-family/sqlite each declared this same ordering — D8: delete, then

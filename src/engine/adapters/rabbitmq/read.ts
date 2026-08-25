@@ -3,7 +3,7 @@ import {
   MAX_CELL_BYTES,
   type PagePosition,
   type StreamPage,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import type { RabbitHandle } from './client';

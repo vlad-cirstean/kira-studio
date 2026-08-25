@@ -1,6 +1,6 @@
-import type { MutationPlan } from '../shared/domain/mutations';
-import type { ObjectDownloadRequest } from '../shared/domain/object-store';
-import { decodePath } from '../shared/domain/tree';
+import type { MutationPlan } from '@shared/domain/mutations';
+import type { ObjectDownloadRequest } from '@shared/domain/object-store';
+import { decodePath } from '@shared/domain/tree';
 import {
   type CountRequestWire,
   type CountResponse,
@@ -20,8 +20,8 @@ import {
   type ReadRequestWire,
   type ReadResponse,
   readRequestWireSchema,
-} from '../shared/protocol/data-ops';
-import type { Page } from '../shared/protocol/page';
+} from '@shared/protocol/data-ops';
+import type { Page } from '@shared/protocol/page';
 import { AdapterError } from './adapters/errors';
 import { getLiveAdapter } from './adapters/live';
 import { cache, pageCacheKey } from './cache';

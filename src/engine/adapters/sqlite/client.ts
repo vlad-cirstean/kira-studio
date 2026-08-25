@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
-import { parseConnectionUri } from '../../../shared/domain/uri';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
+import { parseConnectionUri } from '@shared/domain/uri';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';
 

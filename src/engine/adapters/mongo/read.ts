@@ -1,10 +1,10 @@
-import { EJSON } from 'bson';
-import type { Abortable, Db, Document, Filter, FindOptions } from 'mongodb';
 import {
   createDocumentPageBuilder,
   type DocumentPage,
   type PagePosition,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
+import { EJSON } from 'bson';
+import type { Abortable, Db, Document, Filter, FindOptions } from 'mongodb';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint, safeInt } from '../sql-text';

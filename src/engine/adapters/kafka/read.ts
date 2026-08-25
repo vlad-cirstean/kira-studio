@@ -1,11 +1,7 @@
 import type { Assignment, EofEvent, KafkaJS, Message } from '@confluentinc/kafka-javascript';
 import { KafkaConsumer } from '@confluentinc/kafka-javascript';
-import { parseKafkaStreamFilter } from '../../../shared/domain/streamFilter';
-import {
-  createStreamPageBuilder,
-  type PagePosition,
-  type StreamPage,
-} from '../../../shared/protocol/page';
+import { parseKafkaStreamFilter } from '@shared/domain/streamFilter';
+import { createStreamPageBuilder, type PagePosition, type StreamPage } from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';

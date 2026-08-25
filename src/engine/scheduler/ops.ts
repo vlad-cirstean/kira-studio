@@ -1,5 +1,5 @@
-import type { OpKind } from '../../shared/domain/ops';
-import { ENGINE_EVENT } from '../../shared/protocol/engine-ops';
+import type { OpKind } from '@shared/domain/ops';
+import { ENGINE_EVENT } from '@shared/protocol/engine-ops';
 import type { Adapter, OpCtx, Progress } from '../adapters/adapter';
 import { AdapterError } from '../adapters/errors';
 

@@ -1,5 +1,5 @@
+import { type OpRecord, opRecordSchema } from '@shared/domain/ops';
 import { desc, eq, lt, notInArray } from 'drizzle-orm';
-import { type OpRecord, opRecordSchema } from '../../../shared/domain/ops';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { opLog } from '../schema/ops';

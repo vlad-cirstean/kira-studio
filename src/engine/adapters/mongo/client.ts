@@ -1,6 +1,6 @@
+import { parseConnectionUri } from '@shared/domain/uri';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { MongoClient } from 'mongodb';
-import { parseConnectionUri } from '../../../shared/domain/uri';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { mapError } from './errors';
 

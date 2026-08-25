@@ -9,8 +9,8 @@ import {
   HeadObjectCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import type { ObjectTransferResult } from '../../../shared/domain/object-store';
-import { OBJECT_UPLOAD_MAX_BYTES } from '../../../shared/protocol/page';
+import type { ObjectTransferResult } from '@shared/domain/object-store';
+import { OBJECT_UPLOAD_MAX_BYTES } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

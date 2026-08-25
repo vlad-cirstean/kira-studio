@@ -1,12 +1,12 @@
-import { asc, eq, sql } from 'drizzle-orm';
-import { z } from 'zod';
 import {
   type ConnectionInput,
   type ConnectionSummary,
   connectionColorSchema,
   connectionKindSchema,
   connectionModeSchema,
-} from '../../../shared/domain/connection';
+} from '@shared/domain/connection';
+import { asc, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { connections } from '../schema/connections';

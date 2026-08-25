@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's s3 row: reuses the keyvalue shape (page.ts's own doc comment on KeyValuePage explains
 // why — a single object's metadata+body is exactly a flat field/value listing, same as a redis

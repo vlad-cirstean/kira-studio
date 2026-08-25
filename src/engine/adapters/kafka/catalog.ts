@@ -1,5 +1,5 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import { mapError } from './errors';
 
 // Internal topics/groups (consumer offsets, transaction state, ...) are Kafka-internal

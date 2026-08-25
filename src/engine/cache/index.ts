@@ -2,8 +2,8 @@
 // renders while disconnected (P1 D10); moving it into the engine would tie tree rendering to a
 // live utility process, which P1 designed away. This module is L2 (result pages) and L3
 // (counts) only (D11). §11's "engine/cache/ holds L1/L2/L3" is superseded by that decision.
-import type { CacheStats, ReadRequestWire } from '../../shared/protocol/data-ops';
-import type { Page } from '../../shared/protocol/page';
+import type { CacheStats, ReadRequestWire } from '@shared/protocol/data-ops';
+import type { Page } from '@shared/protocol/page';
 import * as counts from './counts';
 import * as pages from './pages';
 

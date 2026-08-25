@@ -1,5 +1,5 @@
-import type { OpKind, OpRecord } from '../shared/domain/ops';
-import { ENGINE_EVENT, opEndEventSchema, opStartEventSchema } from '../shared/protocol/engine-ops';
+import type { OpKind, OpRecord } from '@shared/domain/ops';
+import { ENGINE_EVENT, opEndEventSchema, opStartEventSchema } from '@shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
 import type { KiraDb } from './storage/db';
 import { appendOp, finishOp, pruneOps } from './storage/repos/ops';

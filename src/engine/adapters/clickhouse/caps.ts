@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // P36 D23/D25/D26/D8: the app's first tabular SQL adapter with canUpdate/canDelete both false —
 // a MergeTree PRIMARY KEY is a sparse index, not a uniqueness constraint (F16), so a row cannot

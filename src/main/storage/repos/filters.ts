@@ -1,5 +1,5 @@
+import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { eq } from 'drizzle-orm';
-import type { TreeVisibility } from '../../../shared/domain/tree-filter';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { connectionTreeFilters } from '../schema/connection-tree-filters';

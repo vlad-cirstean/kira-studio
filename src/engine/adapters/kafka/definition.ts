@@ -1,7 +1,7 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { ConsumerGroupStates, ConsumerGroupTypes } from '@confluentinc/kafka-javascript';
-import type { DefinitionSection, ObjectDefinition } from '../../../shared/domain/definition';
-import { encodePath } from '../../../shared/domain/tree';
+import type { DefinitionSection, ObjectDefinition } from '@shared/domain/definition';
+import { encodePath } from '@shared/domain/tree';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';
 

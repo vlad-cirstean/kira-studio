@@ -1,6 +1,6 @@
+import { parseConnectionUri } from '@shared/domain/uri';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { Redis } from 'ioredis';
-import { parseConnectionUri } from '../../../shared/domain/uri';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

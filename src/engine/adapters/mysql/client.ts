@@ -1,5 +1,5 @@
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { ConnectionConfig } from 'mariadb';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 
 // P34 D3: stays `false` unless the connection's own options explicitly opt in. Retrieving the

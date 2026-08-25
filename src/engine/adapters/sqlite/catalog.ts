@@ -5,7 +5,7 @@ import {
   type ForeignKeyMeta,
   type IndexMeta,
   type TreeNode,
-} from '../../../shared/domain/tree';
+} from '@shared/domain/tree';
 import type { SqliteParam } from './query';
 
 // Every function takes an `exec` rather than a handle directly, so every catalog query is routed

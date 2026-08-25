@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's sqs row: stream-shaped, batch pagination (poll-on-demand, no addressable position),
 // approximate count only, no FK navigation, no console (P10's D13).

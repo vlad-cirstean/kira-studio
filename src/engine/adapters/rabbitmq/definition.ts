@@ -1,5 +1,5 @@
-import type { DefinitionSection, ObjectDefinition } from '../../../shared/domain/definition';
-import { encodePath } from '../../../shared/domain/tree';
+import type { DefinitionSection, ObjectDefinition } from '@shared/domain/definition';
+import { encodePath } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import type { RabbitHandle } from './client';
 import { exchangeUrlName } from './mutate';

@@ -1,5 +1,5 @@
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { Redis } from 'ioredis';
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

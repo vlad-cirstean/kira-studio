@@ -1,12 +1,12 @@
-import type { Caps } from '../shared/caps';
+import type { Caps } from '@shared/caps';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
-} from '../shared/domain/connection';
-import type { SecretStorageStatus } from '../shared/domain/secrets';
-import { injectUriPassword, stripUriPassword } from '../shared/domain/uri';
-import { ENGINE_OP, type ResolvedConnectionConfig } from '../shared/protocol/engine-ops';
+} from '@shared/domain/connection';
+import type { SecretStorageStatus } from '@shared/domain/secrets';
+import { injectUriPassword, stripUriPassword } from '@shared/domain/uri';
+import { ENGINE_OP, type ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { EngineHost } from './engine-host';
 import { log } from './log';
 import { createPreconnectSupervisor, type PreconnectExit } from './preconnect';

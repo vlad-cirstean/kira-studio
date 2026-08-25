@@ -1,9 +1,9 @@
-import type { Redis } from 'ioredis';
 import {
   createKeyValuePageBuilder,
   type KeyValuePage,
   type PagePosition,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
+import type { Redis } from 'ioredis';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';

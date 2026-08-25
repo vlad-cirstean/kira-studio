@@ -1,11 +1,10 @@
-import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
-} from '../shared/domain/connection';
-import type { LayoutPatch } from '../shared/domain/layout';
-import type { OpRecord } from '../shared/domain/ops';
+} from '@shared/domain/connection';
+import type { LayoutPatch } from '@shared/domain/layout';
+import type { OpRecord } from '@shared/domain/ops';
 import type {
   ConsoleBody,
   FilterBody,
@@ -14,10 +13,10 @@ import type {
   SavedFilterQuery,
   SavedQuery,
   SortSpec,
-} from '../shared/domain/queries';
-import type { Settings, SettingsPatch } from '../shared/domain/settings';
-import type { TabRecord } from '../shared/domain/tabs';
-import type { TreeVisibility } from '../shared/domain/tree-filter';
+} from '@shared/domain/queries';
+import type { Settings, SettingsPatch } from '@shared/domain/settings';
+import type { TabRecord } from '@shared/domain/tabs';
+import type { TreeVisibility } from '@shared/domain/tree-filter';
 import type {
   EngineStatus,
   FilesChooseOpenArgs,
@@ -25,8 +24,9 @@ import type {
   TreeChildrenResult,
   TreeDefinitionResult,
   TreeDescribeResult,
-} from '../shared/protocol/ipc';
-import { IPC } from '../shared/protocol/ipc';
+} from '@shared/protocol/ipc';
+import { IPC } from '@shared/protocol/ipc';
+import { contextBridge, ipcRenderer } from 'electron';
 
 const kiraApi: KiraApi = {
   appInfo: () => ipcRenderer.invoke(IPC.appInfo),

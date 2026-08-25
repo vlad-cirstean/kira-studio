@@ -1,6 +1,6 @@
+import { ENGINE_OP } from '@shared/protocol/engine-ops';
+import { IPC } from '@shared/protocol/ipc';
 import { z } from 'zod';
-import { ENGINE_OP } from '../../shared/protocol/engine-ops';
-import { IPC } from '../../shared/protocol/ipc';
 import { recentOps } from '../storage/repos/ops';
 import type { IpcDeps } from './deps';
 import { handle } from './errors';

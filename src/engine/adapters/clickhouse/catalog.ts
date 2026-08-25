@@ -1,9 +1,4 @@
-import {
-  type ColumnMeta,
-  encodePath,
-  type IndexMeta,
-  type TreeNode,
-} from '../../../shared/domain/tree';
+import { type ColumnMeta, encodePath, type IndexMeta, type TreeNode } from '@shared/domain/tree';
 import { AdapterError } from '../errors';
 import { unwrapType } from './read';
 

@@ -3,7 +3,7 @@ import {
   type KeyValuePage,
   type Page,
   type PagePosition,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import type { DbConnectionSet } from './client';

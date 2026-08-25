@@ -1,4 +1,3 @@
-import { and, desc, eq } from 'drizzle-orm';
 import {
   type ConsoleBody,
   consoleBodySchema,
@@ -8,7 +7,8 @@ import {
   type SavedFilterQuery,
   type SavedQuery,
   savedQuerySchema,
-} from '../../../shared/domain/queries';
+} from '@shared/domain/queries';
+import { and, desc, eq } from 'drizzle-orm';
 import { log } from '../../log';
 import type { KiraDb } from '../db';
 import { savedQueries } from '../schema/saved-queries';

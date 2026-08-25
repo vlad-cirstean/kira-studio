@@ -1,6 +1,6 @@
+import type { ConnectionKind } from '@shared/domain/connection';
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import type { ConnectionConfig } from 'mariadb';
-import type { ConnectionKind } from '../../../shared/domain/connection';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 
 // P34 D7/D9: everything that genuinely differs between a MariaDB connection and a MySQL one, and

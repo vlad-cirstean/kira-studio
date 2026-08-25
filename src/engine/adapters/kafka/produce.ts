@@ -1,5 +1,5 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
-import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';

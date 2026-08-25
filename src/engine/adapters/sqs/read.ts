@@ -4,11 +4,7 @@ import {
   ReceiveMessageCommand,
   type SQSClient,
 } from '@aws-sdk/client-sqs';
-import {
-  createStreamPageBuilder,
-  type PagePosition,
-  type StreamPage,
-} from '../../../shared/protocol/page';
+import { createStreamPageBuilder, type PagePosition, type StreamPage } from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import type { SortSpec } from '../../shared/domain/queries';
-import type { ReadRequestWire } from '../../shared/protocol/data-ops';
-import type { Page } from '../../shared/protocol/page';
+import type { SortSpec } from '@shared/domain/queries';
+import type { ReadRequestWire } from '@shared/protocol/data-ops';
+import type { Page } from '@shared/protocol/page';
 import { ByteLru } from './lru';
 
 const DEFAULT_BUDGET_BYTES = 64 * 1024 * 1024; // matches defaultSettings.cache.l2BudgetMb

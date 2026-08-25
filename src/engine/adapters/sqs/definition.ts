@@ -1,6 +1,6 @@
 import { GetQueueAttributesCommand, type SQSClient } from '@aws-sdk/client-sqs';
-import type { DefinitionSection, ObjectDefinition } from '../../../shared/domain/definition';
-import { encodePath } from '../../../shared/domain/tree';
+import type { DefinitionSection, ObjectDefinition } from '@shared/domain/definition';
+import { encodePath } from '@shared/domain/tree';
 import { mapError } from './errors';
 
 // P23 D9: a queue genuinely *is* its attributes — visibility timeout, retention, delay, redrive

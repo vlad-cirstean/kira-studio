@@ -1,5 +1,5 @@
+import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { Client, type ClientConfig } from 'pg';
-import type { ResolvedConnectionConfig } from '../../../shared/protocol/engine-ops';
 import type { AdapterDeps } from '../adapter';
 import { mapError } from './errors';
 

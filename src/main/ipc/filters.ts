@@ -1,6 +1,6 @@
+import { treeVisibilitySchema } from '@shared/domain/tree-filter';
+import { IPC } from '@shared/protocol/ipc';
 import { z } from 'zod';
-import { treeVisibilitySchema } from '../../shared/domain/tree-filter';
-import { IPC } from '../../shared/protocol/ipc';
 import { listVisibility, replaceVisibility } from '../storage/repos/filters';
 import type { IpcDeps } from './deps';
 import { handle } from './errors';

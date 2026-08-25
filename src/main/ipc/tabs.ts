@@ -1,6 +1,6 @@
+import { tabRecordSchema } from '@shared/domain/tabs';
+import { IPC } from '@shared/protocol/ipc';
 import { z } from 'zod';
-import { tabRecordSchema } from '../../shared/domain/tabs';
-import { IPC } from '../../shared/protocol/ipc';
 import { listTabs, replaceTabs } from '../storage/repos/tabs';
 import type { IpcDeps } from './deps';
 import { handle } from './errors';

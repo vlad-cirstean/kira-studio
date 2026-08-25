@@ -1,5 +1,5 @@
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { CollectionInfo, Db, Document, MongoClient } from 'mongodb';
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import { mapError } from './errors';
 
 // Databases mongod itself owns and that no user connection meaningfully browses — the same

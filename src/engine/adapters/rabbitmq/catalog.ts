@@ -1,4 +1,4 @@
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import type { RabbitHandle } from './client';
 import { request, requestAll } from './query';

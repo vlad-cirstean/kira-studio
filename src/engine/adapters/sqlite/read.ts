@@ -1,13 +1,13 @@
-import type { SortDirection } from '../../../shared/domain/queries';
-import type { ColumnMeta } from '../../../shared/domain/tree';
-import type { SortSpec } from '../../../shared/protocol/data-ops';
+import type { SortDirection } from '@shared/domain/queries';
+import type { ColumnMeta } from '@shared/domain/tree';
+import type { SortSpec } from '@shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
   type PagePosition,
   type TabularPage,
   type TypeClass,
-} from '../../../shared/protocol/page';
+} from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import {

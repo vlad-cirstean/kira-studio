@@ -1,5 +1,5 @@
-import { ENGINE_EVENT, ENGINE_OP, engineOpPayloadSchema } from '../shared/protocol/engine-ops';
-import type { PortRequest, PortResponse } from '../shared/protocol/port';
+import { ENGINE_EVENT, ENGINE_OP, engineOpPayloadSchema } from '@shared/protocol/engine-ops';
+import type { PortRequest, PortResponse } from '@shared/protocol/port';
 import type { AdapterDeps } from './adapters/adapter';
 import { AdapterError, toWireError } from './adapters/errors';
 import { deleteLiveAdapter, getLiveAdapter, setLiveAdapter } from './adapters/live';

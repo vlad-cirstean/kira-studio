@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's rabbitmq row: stream-shaped, batch pagination (poll-on-demand, no addressable position —
 // a basic.get batch has no offset or resumable cursor, D20), no exact count (a queue's message

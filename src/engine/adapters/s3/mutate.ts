@@ -5,14 +5,14 @@ import {
   PutObjectCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import type { MutationPlan, MutationResult, MutationRowOp } from '../../../shared/domain/mutations';
+import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
 import {
   OBJECT_CONTENT_TYPE_SENTINEL,
   OBJECT_FILE_SENTINEL,
   OBJECT_KEY_SENTINEL,
   OBJECT_VALUE_SENTINEL,
-} from '../../../shared/domain/object-store';
-import { encodePath } from '../../../shared/domain/tree';
+} from '@shared/domain/object-store';
+import { encodePath } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
 import { mapError } from './errors';

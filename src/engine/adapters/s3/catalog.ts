@@ -4,7 +4,7 @@ import {
   ListObjectsV2Command,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import { encodePath, type TreeNode } from '../../../shared/domain/tree';
+import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
 import { mapError } from './errors';

@@ -1,13 +1,13 @@
-import { z } from 'zod';
-import { type ObjectDefinition, objectDefinitionSchema } from '../shared/domain/definition';
+import { type ObjectDefinition, objectDefinitionSchema } from '@shared/domain/definition';
 import {
   decodePath,
   type ObjectMeta,
   objectMetaSchema,
   type TreeNode,
   treeNodeSchema,
-} from '../shared/domain/tree';
-import { ENGINE_OP } from '../shared/protocol/engine-ops';
+} from '@shared/domain/tree';
+import { ENGINE_OP } from '@shared/protocol/engine-ops';
+import { z } from 'zod';
 import type { ConnectionsService } from './connections';
 import type { EngineHost } from './engine-host';
 import type { KiraDb } from './storage/db';

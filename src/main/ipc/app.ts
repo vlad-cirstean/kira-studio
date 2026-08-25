@@ -1,5 +1,5 @@
+import { IPC } from '@shared/protocol/ipc';
 import { app, ipcMain } from 'electron';
-import { IPC } from '../../shared/protocol/ipc';
 import { kiraHome } from '../storage/paths';
 
 export function registerAppHandlers(): void {

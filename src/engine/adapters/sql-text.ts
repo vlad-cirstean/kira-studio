@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import type { SortDirection } from '../../shared/domain/queries';
-import type { ColumnMeta } from '../../shared/domain/tree';
+import type { SortDirection } from '@shared/domain/queries';
+import type { ColumnMeta } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
   type PagePosition,
   type TabularPage,
-} from '../../shared/protocol/page';
+} from '@shared/protocol/page';
 import { AdapterError } from './errors';
 
 // The genuinely shared, driver-agnostic glue the SQL adapters' read.ts modules call — kept out

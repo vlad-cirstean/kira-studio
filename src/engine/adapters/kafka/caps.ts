@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // §5.1's kafka row: stream-shaped, offsetWindow pagination, exact count (end-begin watermark
 // subtraction), no FK navigation, no console (P10's D13 — neither engine has an ad-hoc command

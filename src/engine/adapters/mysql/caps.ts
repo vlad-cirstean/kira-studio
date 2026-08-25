@@ -1,4 +1,4 @@
-import type { Caps } from '../../../shared/caps';
+import type { Caps } from '@shared/caps';
 
 // P34 D10: identical values to mariadbCaps, stated per engine rather than shared — if MySQL's
 // capabilities ever diverge (a transactions nuance, say) this literal is where that gets said.

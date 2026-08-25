@@ -4,7 +4,7 @@ import {
   type ForeignKeyMeta,
   type IndexMeta,
   type TreeNode,
-} from '../../../shared/domain/tree';
+} from '@shared/domain/tree';
 
 // Every function takes an `exec` rather than a `Connection` directly, so every catalog query is
 // routed through query.ts's runQuery — cancellable and command-logged like any other query.

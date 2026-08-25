@@ -1,8 +1,8 @@
 import { stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { IPC } from '@shared/protocol/ipc';
 import { app, BrowserWindow, dialog } from 'electron';
 import { z } from 'zod';
-import { IPC } from '../../shared/protocol/ipc';
 import { handle } from './errors';
 
 // P33 D15: engine-neutral — "ask the user for a path to save to" is an application capability,
