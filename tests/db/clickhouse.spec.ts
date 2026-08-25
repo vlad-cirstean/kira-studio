@@ -5,6 +5,8 @@ import type { NodePath } from '@shared/domain/tree';
 import { isNull, isTruncated, type TabularPage } from '@shared/protocol/page';
 import type { Adapter, AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { clickhouseCaps } from '../../src/engine/adapters/clickhouse/caps';
+import { quoteIdent } from '../../src/engine/adapters/clickhouse/read';
+import { AdapterError } from '../../src/engine/adapters/errors';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { type ClickHouseFixture, startClickHouse } from './support/clickhouse';
 import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
@@ -612,6 +614,17 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       ).rejects.toMatchObject({ code: 'E_QUERY' });
     } finally {
       await adapter.disconnect();
+    }
+  });
+
+  test('15a. quoteIdent rejects a NUL byte, same as the other three SQL adapters (P43 F4/D6)', () => {
+    expect(() => quoteIdent('evil\0name')).toThrow(AdapterError);
+    try {
+      quoteIdent('evil\0name');
+      throw new Error('expected quoteIdent to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AdapterError);
+      expect((err as AdapterError).code).toBe('E_QUERY');
     }
   });
 

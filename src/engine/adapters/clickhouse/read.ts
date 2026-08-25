@@ -15,7 +15,12 @@ import { runCatalogQuery, streamQuery, type TrackQuery } from './query';
 
 // F28/D29: ClickHouse quotes identifiers with backticks — the same character its own
 // `create_table_query` output uses (F14's example), so this is what the app emits back.
+// P43 F4/D6: the same NUL-byte guard the other three SQL adapters' quoteIdent already carries
+// (postgres/read.ts, mysql-family/read.ts, sqlite/read.ts) — this was the one SQL adapter without
+// it, reached with both catalog-derived and user-derived names (ORDER BY terms, relation and
+// projection columns).
 export function quoteIdent(name: string): string {
+  if (name.includes('\0')) throw new AdapterError('E_QUERY', 'identifier contains a NUL byte');
   return `\`${name.replace(/`/g, '``')}\``;
 }
 
