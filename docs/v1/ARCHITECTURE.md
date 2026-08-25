@@ -32,7 +32,18 @@ management-API body, and a `fetch` rejection) and collapsing them would lose the
 distinction P37 built. `src/engine/adapters/errors.ts` (the shared root, not any one engine's own)
 also holds `unsupported(kind, what)` and `noQueryConsole(kind)` — the two sentence shapes behind
 every `E_UNSUPPORTED` capability stub (describe/definition/file-transfer read `"<what> is not
-supported for <kind>"`; a missing query console reads `"<kind> has no query console"`).
+supported for <kind>"`; a missing query console reads `"<kind> has no query console"`). It also
+holds `assertWritable(readOnly)` (P39 iter2) — the `"connection is read-only"` refusal every
+write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contract in
+`adapter.ts`: enforced on the engine side, not only greyed out in the UI).
+
+`src/engine/adapters/sql-mutate.ts` (P39 iter2) holds the SQL adapters' shared mutation guards —
+`orderedOps` (delete, then update, then insert, regardless of the plan's own array order),
+`assertColumnsKnown`, `assertAffectedExactlyOne` and `assertKeyIsPrimaryKey` — called by postgres/
+mysql-family/sqlite (and clickhouse for `assertColumnsKnown` alone, since it has no addressable row
+to update or delete). `assertKeyIsPrimaryKey` takes the caller's own already-built qualified-name
+string rather than a shared format, since the three dialects spell it three different ways
+(`schema.relation` / `database.table` / `schema.table`).
 
 ## Per-engine adapter facts
 

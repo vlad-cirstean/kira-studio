@@ -60,6 +60,43 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/renderer/views/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/workbench/**"],
+                    "message": "SPEC §11: views/* must not import from workbench/* — the dependency graph stays a tree."
+                  },
+                  {
+                    "group": [
+                      "../grid/**",
+                      "../documents/**",
+                      "../keyvalue/**",
+                      "../stream/**",
+                      "../console/**",
+                      "../definition/**",
+                      "../../grid/**",
+                      "../../documents/**",
+                      "../../keyvalue/**",
+                      "../../stream/**",
+                      "../../console/**",
+                      "../../definition/**"
+                    ],
+                    "message": "SPEC §11: views/<kind>/* must not import another views/<kind>/* — use views/shared/ instead."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
