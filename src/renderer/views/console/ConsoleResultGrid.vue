@@ -17,7 +17,14 @@ import {
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { typeDescription } from '../shared/typeGlossary';
-import { cell, documentRow, getPage, keyValueRow, pageVersion } from './resultPages';
+import {
+  cell,
+  documentRow,
+  getPage,
+  keyValueRow,
+  pageVersion,
+  setVisibleWindow,
+} from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { isResultDocExpanded, toggleResultDocExpanded } from './state';
 
@@ -95,12 +102,16 @@ function cellAt(row: number, col: number) {
 // P42 D39: search state here is keyed by tabId (D9), same as every runSearch below — VirtualList
 // reports positions within `rowIndices`/`documentRows`, which are ascending but, while filtering,
 // non-contiguous page-row indices (same reasoning as DocumentView.vue's own onVisibleRange).
+// P43 F2/D3: the same bounds also prune resultPages.ts's decode cache — keyed by pageKey (a
+// decode cache is per result set), not tabId (search priority is per tab, resolved to whichever
+// result is active) — reusing this one report instead of resultPages.ts growing its own watch.
 function onVisibleRangeIndices(range: { start: number; end: number }): void {
   const list = rowIndices.value;
   const from = list[range.start];
   const to = list[Math.max(range.start, range.end - 1)];
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tabId, from, to + 1);
+  setVisibleWindow(props.pageKey, from, to + 1);
 }
 function onVisibleRangeDocs(range: { start: number; end: number }): void {
   const list = documentRows.value;
@@ -108,6 +119,7 @@ function onVisibleRangeDocs(range: { start: number; end: number }): void {
   const to = list[Math.max(range.start, range.end - 1)]?.index;
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tabId, from, to + 1);
+  setVisibleWindow(props.pageKey, from, to + 1);
 }
 
 // P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
