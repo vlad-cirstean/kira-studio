@@ -2,7 +2,9 @@
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import { computed, onMounted } from 'vue';
-import { connectionRecord } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
+import { openContextMenu } from '../../state/contextMenu';
+import { openUploadDialog } from '../../state/objectStore';
 import { openKeyValueTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon } from '../../theme/icons';
@@ -13,6 +15,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { useConnectionGate } from '../shared/useConnectionGate';
+import { menuForNode } from './menu';
 import { ascend, descend, goToLevel, load, reload, runtime, selectRow, setFilter } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other view.
@@ -96,6 +99,27 @@ function onRowOpen(node: TreeNode): void {
   openKeyValueTab(props.tab.connectionId, node.path);
 }
 
+// D10: the moved keyMenu/objectMenu/namespaceMenu/prefixMenu bodies, now addressed by node
+// instead of by tree row.
+function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
+  if (!props.tab.connectionId) return;
+  selectRow(props.tab.id, node.path);
+  openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node));
+}
+
+// P33 D3: the same caps.fileTransfer + canInsert + not-read-only gate uploadMenuItem applies,
+// surfaced as a toolbar button too (Console.html-style primary action) rather than only reachable
+// through a container row's own context menu.
+const canUpload = computed(() => {
+  const caps = connectionsState.states[props.tab.connectionId ?? '']?.caps;
+  const record = connectionRecord(props.tab.connectionId);
+  return !!caps?.fileTransfer && !!caps.canInsert && !record?.readOnly;
+});
+function onUploadClick(): void {
+  if (!props.tab.connectionId) return;
+  openUploadDialog(props.tab.connectionId, currentLevelPath.value);
+}
+
 const rowHeight = 28;
 
 onMounted(() => {
@@ -152,6 +176,13 @@ onMounted(() => {
         <div class="filter-field">
           <TextField v-model="filterText" placeholder="Filter" data-testid="browse-filter" />
         </div>
+        <IconButton
+          v-if="canUpload"
+          icon="cloud-upload"
+          data-testid="browse-upload"
+          v-tooltip="'Upload file…'"
+          @click="onUploadClick"
+        />
         <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
       </template>
 
@@ -184,6 +215,7 @@ onMounted(() => {
               :style="{ height: `${rowHeight}px` }"
               @click="onRowClick(item)"
               @dblclick="onRowOpen(item)"
+              @contextmenu.prevent="onRowContextMenu($event, item)"
             >
               <span class="icon-box muted"><CodiconIcon :name="nodeIcon(item.kind)" :size="13" /></span>
               <span class="row-name">{{ item.name }}</span>

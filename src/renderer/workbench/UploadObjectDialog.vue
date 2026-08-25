@@ -4,17 +4,18 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
-import { refresh } from '../project/state/tree';
 import { closeUploadDialog, uploadDialogState, uploadObject } from '../state/objectStore';
 import { openKeyValueTab } from '../state/tabs';
+import { browseInvalidate } from '../state/viewCommands';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
 
-// P33 D17: one dialog, two entry points (the tree's bucket/prefix menu and the object tab's own
-// toolbar) — driven entirely by state/objectStore.ts's uploadDialogState so project/menus.ts can
-// open it without importing this component or any views/ module (§11's dependency rule).
+// P33 D17: three entry points as of P41 (the Browse panel's own container rows/toolbar and — until
+// the tree stops rendering bucket/prefix rows, P41 D5 — the tree's own bucket/prefix menu) — driven
+// entirely by state/objectStore.ts's uploadDialogState so project/menus.ts can open it without
+// importing this component or any views/ module (§11's dependency rule).
 
 const chosenFile = ref<{ path: string; name: string; size: number } | null>(null);
 const key = ref('');
@@ -57,7 +58,7 @@ async function onUpload(): Promise<void> {
       contentType: contentType.value.trim() || 'application/octet-stream',
       tabId: null,
     });
-    await refresh(connectionId, uploadDialogState.containerPath);
+    browseInvalidate(connectionId, uploadDialogState.containerPath);
     closeUploadDialog();
     openKeyValueTab(connectionId, newPath, { newTab: true });
   } catch (err) {

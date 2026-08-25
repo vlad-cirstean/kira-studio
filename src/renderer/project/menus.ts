@@ -17,7 +17,7 @@ import {
 } from '../state/connections';
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
-import { deleteObject, downloadObject, openUploadDialog } from '../state/objectStore';
+import { deleteObject, downloadObject, uploadMenuItem } from '../state/objectStore';
 import {
   openBrowseTab,
   openConsoleTab,
@@ -311,28 +311,12 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P33 D3: shared by bucketMenu/prefixMenu, mirroring consoleMenuItem's own one-gating-rule/
-// two-call-sites shape — offered only when the connection's caps say so (fileTransfer + canInsert)
-// and it isn't read-only, never a permanently disabled row.
-function uploadMenuItem(row: TreeRowVm): MenuItem[] {
-  const caps = connectionsState.states[row.connectionId]?.caps;
-  const record = connectionRecord(row.connectionId);
-  if (!caps?.fileTransfer || !caps.canInsert || record?.readOnly) return [];
-  return [
-    {
-      type: 'item',
-      id: 'upload-file',
-      label: 'Upload file…',
-      icon: 'cloud-upload',
-      run: () => openUploadDialog(row.connectionId, row.path),
-    },
-  ];
-}
-
 // P17's S3 bucket row: containerMenu (same as a SQL database/schema) plus P33's Upload — the
 // empty-bucket case (no object row to open one from) needs a tree entry point of its own.
+// P41: uploadMenuItem now lives in state/objectStore.ts, shared with views/browse/menu.ts's own
+// container-row menu.
 function bucketMenu(row: TreeRowVm): MenuItem[] {
-  return [...containerMenu(row), ...uploadMenuItem(row)];
+  return [...containerMenu(row), ...uploadMenuItem(row.connectionId, row.path)];
 }
 
 // §8.10's own ordering: Open data / Open data in new tab come first, before Refresh.
@@ -544,7 +528,7 @@ function namespaceMenu(row: TreeRowVm): MenuItem[] {
 // bucketMenu's (uploadMenuItem), so a nested "folder" is as valid an upload target as the bucket
 // root.
 function prefixMenu(row: TreeRowVm): MenuItem[] {
-  return [...namespaceMenu(row), ...uploadMenuItem(row)];
+  return [...namespaceMenu(row), ...uploadMenuItem(row.connectionId, row.path)];
 }
 
 // P9's key leaf: minimal open/copy-name only (D14) — no edit/delete rows anywhere, per the
