@@ -1,12 +1,11 @@
 import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
-import { reactive } from 'vue';
 import { data } from '../../bridge/data';
 import { connectionsState } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findStreamTab, patchStreamTabState, unmarkHydrated } from '../../state/tabs';
-import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { recordStreamFilterUse } from './streamFilterHistory';
 
@@ -32,13 +31,6 @@ export interface StreamViewRuntime {
   selectedRow: number | null;
 }
 
-export const runtime = reactive({} as Record<string, StreamViewRuntime>);
-
-// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
 function defaultRuntime(): StreamViewRuntime {
   return {
     status: 'idle',
@@ -55,10 +47,14 @@ function defaultRuntime(): StreamViewRuntime {
   };
 }
 
-function ensureRuntime(tabId: string): StreamViewRuntime {
-  if (!runtime[tabId]) runtime[tabId] = defaultRuntime();
-  return runtime[tabId];
-}
+const { runtime, ensureRuntime } = createRuntimeStore<StreamViewRuntime>(defaultRuntime);
+
+export { runtime };
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findStreamTab(tabId);

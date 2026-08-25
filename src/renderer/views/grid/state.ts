@@ -2,12 +2,11 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { DataTabState } from '@shared/domain/tabs';
 import type { ObjectMeta } from '@shared/domain/tree';
 import type { PageCursor } from '@shared/protocol/data-ops';
-import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDataTab, patchDataTabState, unmarkHydrated } from '../../state/tabs';
-import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
 
@@ -31,14 +30,6 @@ export interface DataViewRuntime {
   searchOpen: boolean;
 }
 
-export const runtime = reactive({} as Record<string, DataViewRuntime>);
-
-// D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
-// directly (reality 18), so it registers here instead.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
 function defaultRuntime(): DataViewRuntime {
   return {
     status: 'idle',
@@ -55,18 +46,15 @@ function defaultRuntime(): DataViewRuntime {
   };
 }
 
-function ensureRuntime(tabId: string): DataViewRuntime {
-  if (!runtime[tabId]) {
-    // `runtime` is reactive() — Vue only wraps a nested plain object in its own reactive proxy
-    // when it's read back out through the parent proxy. Returning the just-created local object
-    // directly (instead of reading runtime[tabId] again) would hand load() an unwrapped
-    // reference: every mutation this same load() makes afterward (status, hasMore, tokens, ...)
-    // would bypass the proxy's `set` trap entirely, so no dependent render (e.g. the pager-next
-    // button's `disabled` binding) would ever be notified.
-    runtime[tabId] = defaultRuntime();
-  }
-  return runtime[tabId];
-}
+const { runtime, ensureRuntime } = createRuntimeStore<DataViewRuntime>(defaultRuntime);
+
+export { runtime };
+
+// D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
+// directly (reality 18), so it registers here instead.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 async function loadMeta(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);

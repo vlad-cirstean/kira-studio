@@ -1,11 +1,10 @@
 import type { SortSpec } from '@shared/domain/queries';
 import type { DocumentTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
-import { reactive } from 'vue';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDocumentTab, patchDocumentTabState, unmarkHydrated } from '../../state/tabs';
-import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
@@ -26,13 +25,6 @@ export interface DocumentViewRuntime {
   selectedRow: number | null;
 }
 
-export const runtime = reactive({} as Record<string, DocumentViewRuntime>);
-
-// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
 function defaultRuntime(): DocumentViewRuntime {
   return {
     status: 'idle',
@@ -48,10 +40,14 @@ function defaultRuntime(): DocumentViewRuntime {
   };
 }
 
-function ensureRuntime(tabId: string): DocumentViewRuntime {
-  if (!runtime[tabId]) runtime[tabId] = defaultRuntime();
-  return runtime[tabId];
-}
+const { runtime, ensureRuntime } = createRuntimeStore<DocumentViewRuntime>(defaultRuntime);
+
+export { runtime };
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDocumentTab(tabId);

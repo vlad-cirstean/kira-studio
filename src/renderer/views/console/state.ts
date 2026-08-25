@@ -1,9 +1,8 @@
 import type { Page } from '@shared/protocol/page';
-import { reactive } from 'vue';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
-import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { drop as dropPage, setPage } from './resultPages';
 
 export interface ConsoleViewRuntime {
@@ -13,7 +12,13 @@ export interface ConsoleViewRuntime {
   results: Page[]; // the last run's result pages — runtime-only, never saved (§8.4)
 }
 
-export const runtime = reactive({} as Record<string, ConsoleViewRuntime>);
+function defaultRuntime(): ConsoleViewRuntime {
+  return { status: 'idle', error: null, opId: null, results: [] };
+}
+
+const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
+
+export { runtime };
 
 // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 // `dropAllPagesForTab` already frees this tab's entries in resultPages.ts's own `pages` map, but
@@ -24,19 +29,6 @@ registerTabRuntimeCleanup((tabId) => {
   if (rt) rt.results = [];
   delete runtime[tabId];
 });
-
-function defaultRuntime(): ConsoleViewRuntime {
-  return { status: 'idle', error: null, opId: null, results: [] };
-}
-
-// See views/definition/state.ts's ensureRuntime comment: must return through `runtime[tabId]`, never
-// the object literal itself, so mutations land on the reactive proxy Vue actually tracks.
-function ensureRuntime(tabId: string): ConsoleViewRuntime {
-  if (!runtime[tabId]) {
-    runtime[tabId] = defaultRuntime();
-  }
-  return runtime[tabId];
-}
 
 /** `views/grid/page.ts` keys, one per result set of a run — index-aligned with `rt.results`. */
 export function resultPageKey(tabId: string, index: number): string {

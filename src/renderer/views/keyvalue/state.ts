@@ -1,10 +1,9 @@
 import type { KeyValueTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
-import { reactive } from 'vue';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
-import { classifyLoadError, stopOp } from '../shared/viewOp';
+import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 
 // Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
@@ -22,13 +21,6 @@ export interface KeyValueViewRuntime {
   searchOpen: boolean;
 }
 
-export const runtime = reactive({} as Record<string, KeyValueViewRuntime>);
-
-// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
 function defaultRuntime(): KeyValueViewRuntime {
   return {
     status: 'idle',
@@ -43,10 +35,14 @@ function defaultRuntime(): KeyValueViewRuntime {
   };
 }
 
-function ensureRuntime(tabId: string): KeyValueViewRuntime {
-  if (!runtime[tabId]) runtime[tabId] = defaultRuntime();
-  return runtime[tabId];
-}
+const { runtime, ensureRuntime } = createRuntimeStore<KeyValueViewRuntime>(defaultRuntime);
+
+export { runtime };
+
+// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+registerTabRuntimeCleanup((tabId) => {
+  delete runtime[tabId];
+});
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findKeyValueTab(tabId);
