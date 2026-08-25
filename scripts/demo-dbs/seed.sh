@@ -19,6 +19,11 @@ docker exec -i kira-mysql mysql -ukira -pkira kira \
   < "${SCRIPT_DIR}/mysql/seed.sql"
 
 echo
+echo "==> ClickHouse"
+docker exec -i kira-clickhouse clickhouse-client --multiquery --database kira \
+  < "${SCRIPT_DIR}/clickhouse/seed.sql"
+
+echo
 echo "==> MongoDB"
 docker exec -i kira-mongo mongosh --quiet kira \
   < "${SCRIPT_DIR}/mongo/seed.js"

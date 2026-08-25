@@ -60,6 +60,28 @@ services:
       timeout: 5s
       retries: 20
 
+  # clickhouse://kira:kira@localhost:8124/kira — host port 8124, not 8123: that's the container's
+  # own HTTP port, and the demo stack's own convention is "host port ≠ container port where a
+  # second engine could collide" (mysql's 3307 sets it). The image grants CLICKHOUSE_USER full
+  # access, same as every other engine's single always-admin demo user.
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3
+    container_name: kira-clickhouse
+    environment:
+      CLICKHOUSE_USER: kira
+      CLICKHOUSE_PASSWORD: kira
+      CLICKHOUSE_DB: kira
+    ports:
+      - "8124:8123"
+    volumes:
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8123/ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
   # mongodb://localhost:27017/kira (no auth)
   mongo:
     image: mongo:7
@@ -146,6 +168,7 @@ volumes:
   kira-pg-data:
   kira-mariadb-data:
   kira-mysql-data:
+  kira-clickhouse-data:
   kira-mongo-data:
   kira-redis-data:
   kira-kafka-data:

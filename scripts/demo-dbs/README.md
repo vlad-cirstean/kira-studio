@@ -1,12 +1,12 @@
 # Kira Studio — local database fixtures
 
-Spins up eight of Kira Studio's nine supported engines (PostgreSQL, MariaDB, MySQL, MongoDB,
-Redis, Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose. The five
-relational/document/key-value stores get a full schema, foreign keys, indexes, and ~20k rows of
-seed data; Kafka/SQS/S3 get a handful of topics/queues/buckets with a small backlog — enough to
-exercise every tree view without waiting on a multi-minute seed.
+Spins up nine of Kira Studio's ten supported engines (PostgreSQL, MariaDB, MySQL, ClickHouse,
+MongoDB, Redis, Kafka, SQS, S3) via [Colima](https://github.com/abiosoft/colima) + Docker Compose.
+The six relational/document/key-value stores get a full schema, foreign keys or their MergeTree
+equivalent, indexes, and ~20k rows of seed data; Kafka/SQS/S3 get a handful of topics/queues/buckets
+with a small backlog — enough to exercise every tree view without waiting on a multi-minute seed.
 
-The ninth engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
+The tenth engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
 needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
 `node:sqlite` module the app's own adapter reads it with. See its own section below.
 
@@ -54,6 +54,7 @@ and SQS it appends another batch of messages rather than resetting (see the Mode
 | PostgreSQL | localhost | 5432 | `kira` | `kira` | `kira` |
 | MariaDB  | localhost | 3306 | `kira` | `kira` | `kira` |
 | MySQL    | localhost | 3307 | `kira` | `kira` | `kira` |
+| ClickHouse | localhost | 8124 | `kira` | `kira` | `kira` |
 | MongoDB  | localhost | 27017 | — (no auth) | — | `kira` |
 | Redis    | localhost | 6379 | — | — | db 0 |
 | Kafka    | localhost | 9092 | — | — | — |
@@ -67,6 +68,7 @@ Connection strings:
 postgresql://kira:kira@localhost:5432/kira
 mariadb://kira:kira@localhost:3306/kira
 mysql://kira:kira@localhost:3307/kira
+clickhouse://kira:kira@localhost:8124/kira
 mongodb://localhost:27017/kira
 redis://localhost:6379/0
 ```
@@ -102,6 +104,18 @@ Every relational database uses the same e-commerce-shaped model:
 - `order_items` (80k) → FK `orders`, `products`
 - `reviews` (20k) → FK `products`, `customers`
 - `data_types_demo` (1) — one row exercising every column type
+
+ClickHouse gets the same e-commerce model, re-expressed in MergeTree terms (P36 D38) — `customers`
+(20k), `customer_addresses` (20k), `categories` (20k, self-referencing), `products` (20k), `orders`
+(20k), `order_items` (80k, plus a real CHECK constraint), `reviews` (20k), an `order_summary` view
+and `order_summary_mv` materialized view (so the tree's Views/Materialized views folders both have
+something here too), and a `data_types_demo` (1) row showing ClickHouse's own type family
+(Array/Tuple/Map/Enum8/UUID/IPv4/IPv6/Decimal/DateTime64/FixedString/LowCardinality/the geo types)
+rather than a literal port of the others' MySQL-shaped columns — the same call SQLite's own seed
+already makes for its own engine's types. No PRIMARY KEY/FOREIGN KEY/UNIQUE/AUTO_INCREMENT
+anywhere: ClickHouse has none of them (F16/F17), so every id is a hand-assigned value and every
+`ORDER BY` is the MergeTree analog, not a uniqueness guarantee — the same reason the app's own
+− row button stays disabled for this connection.
 
 MongoDB mirrors this with the same collections (`customers`, `addresses`,
 `categories`, `products`, `orders`, `orderItems`, `reviews`) using `ObjectId`
@@ -167,6 +181,9 @@ scripts/demo-dbs/
 ├── mysql/
 │   ├── init.sql              # schema — runs on init (CHAR(36) stands in for MariaDB's UUID type)
 │   └── seed.sql              # 20k-row seed (WITH RECURSIVE, MySQL has no SEQUENCE engine)
+├── clickhouse/
+│   ├── init.sql              # schema, MergeTree terms — runs on init (no PK/FK/UNIQUE, F16/F17)
+│   └── seed.sql              # 20k-row seed (numbers() table function, no chunking needed)
 ├── mongo/
 │   ├── init.js               # collections + indexes — runs on init
 │   └── seed.js               # 20k-doc seed
