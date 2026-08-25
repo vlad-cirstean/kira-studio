@@ -5,7 +5,7 @@ import CodeMirrorHost from '../../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../../editor/languages';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
-import { connectionsState } from '../../../state/connections';
+import { connectionRecord } from '../../../state/connections';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import IconButton from '../../../theme/primitives/IconButton.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
@@ -59,9 +59,7 @@ const effectiveFormat = computed<CellFormat>(() => override.value ?? detectedFor
 const language = computed<EditorLanguageId>(() => FORMAT_LANGUAGE[effectiveFormat.value]);
 
 const sqlDialect = computed(() => {
-  const c = selectedCell.value;
-  if (!c.connectionId) return undefined;
-  const record = connectionsState.records.find((r) => r.id === c.connectionId);
+  const record = connectionRecord(selectedCell.value.connectionId);
   return sqlDialectFor(record?.kind);
 });
 

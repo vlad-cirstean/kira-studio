@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -19,12 +19,9 @@ const error = ref<string | null>(null);
 // P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
-const sqlDialect = computed(() => {
-  const tab = findDataTab(props.tabId);
-  if (!tab?.connectionId) return undefined;
-  const record = connectionsState.records.find((r) => r.id === tab.connectionId);
-  return sqlDialectFor(record?.kind);
-});
+const sqlDialect = computed(() =>
+  sqlDialectFor(connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
+);
 
 onMounted(async () => {
   const tab = findDataTab(props.tabId);

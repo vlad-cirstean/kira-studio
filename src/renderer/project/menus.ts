@@ -5,6 +5,7 @@ import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
 import {
   connectConnection,
+  connectionRecord,
   connectionsState,
   deleteConnection,
   disconnectConnection,
@@ -120,7 +121,7 @@ function consoleMenuItem(row: TreeRowVm): MenuItem[] {
 
 function connectionMenu(row: TreeRowVm): MenuItem[] {
   const status = connectionsState.states[row.connectionId]?.status ?? 'disconnected';
-  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  const record = connectionRecord(row.connectionId);
   const isLive = status === 'connected' || status === 'connecting';
 
   const items: MenuItem[] = [
@@ -248,7 +249,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
 // D9: Postgres-only — MariaDB's console can already switch database with its own `USE db;` as
 // the console's first statement, so there is nothing for this item to do there.
 function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
-  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  const record = connectionRecord(row.connectionId);
   if (record?.kind !== 'postgres') return [];
   return [
     {
@@ -296,7 +297,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
 // and it isn't read-only, never a permanently disabled row.
 function uploadMenuItem(row: TreeRowVm): MenuItem[] {
   const caps = connectionsState.states[row.connectionId]?.caps;
-  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  const record = connectionRecord(row.connectionId);
   if (!caps?.fileTransfer || !caps.canInsert || record?.readOnly) return [];
   return [
     {
@@ -568,7 +569,7 @@ function keyMenu(row: TreeRowVm): MenuItem[] {
 // each gated on the connection's own caps/read-only state rather than shown permanently disabled.
 function objectMenu(row: TreeRowVm): MenuItem[] {
   const caps = connectionsState.states[row.connectionId]?.caps;
-  const record = connectionsState.records.find((r) => r.id === row.connectionId);
+  const record = connectionRecord(row.connectionId);
   const items: MenuItem[] = [
     {
       type: 'item',

@@ -3,7 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import { connColorVar } from '../../theme/connColor';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
@@ -29,21 +29,15 @@ const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGa
 
 const rt = computed(() => runtime[props.tab.id]);
 
-const connectionRecord = computed(() =>
-  props.tab.connectionId
-    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
-    : undefined,
-);
+const connRecord = computed(() => connectionRecord(props.tab.connectionId));
 
 // P16 design system LAW: the connection colour caps the toolbar as a 2px rail, never a tint on
 // the whole view. Moved here from the shell-level Toolbar.vue this component's toolbars used to
 // be rendered by (see DataToolbar.vue/FilterToolbar.vue — they render their own .p-toolbar bands
 // unchanged, only who mounts them changed).
-const railStyle = computed(() => ({ '--kira-rail': connColorVar(connectionRecord.value?.color) }));
+const railStyle = computed(() => ({ '--kira-rail': connColorVar(connRecord.value?.color) }));
 
-const iconColor = computed(
-  () => connColorVar(connectionRecord.value?.color) ?? 'var(--kira-fg-muted)',
-);
+const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
@@ -64,7 +58,7 @@ const targetIcon = computed(() => {
 const pathPrefix = computed(() => {
   const connectionId = props.tab.connectionId;
   if (!connectionId) return '';
-  const connectionName = connectionRecord.value?.name;
+  const connectionName = connRecord.value?.name;
   const segments = decodePath(connectionId, props.tab.path).segments;
   const parts = [connectionName, ...segments.slice(0, -1).map((s) => s.name)].filter(
     (p): p is string => !!p,
@@ -78,7 +72,7 @@ const pathPrefix = computed(() => {
 // the row count is gated on rt.count existing at all (§7 forbids computing one automatically), so
 // this badge appears only once the user has actually pressed Σ, never before.
 const columnCount = computed(() => rt.value?.meta?.columns.length ?? null);
-const isWritable = computed(() => !connectionRecord.value?.readOnly);
+const isWritable = computed(() => !connRecord.value?.readOnly);
 const primaryKeyLabel = computed(() => {
   const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
   return names.length ? `PK ${names.join(', ')}` : null;
@@ -124,8 +118,8 @@ function onCloseSearch(): void {
       :icon-color="iconColor"
       :path="pathPrefix"
       :name="targetTail?.name ?? tab.path"
-      :conn-color="connectionRecord?.color ?? null"
-      :conn-kind="connectionRecord?.kind"
+      :conn-color="connRecord?.color ?? null"
+      :conn-kind="connRecord?.kind"
       target-testid="grid-target"
     >
       <span v-if="targetTail?.kind" class="p-badge" data-testid="grid-kind-badge">{{

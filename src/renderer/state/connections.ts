@@ -33,6 +33,14 @@ export const connectionsState = reactive({
   secretStorage: null as SecretStorageStatus | null,
 });
 
+// P39 iter2 F8: connectionsState.records is a plain array — every one of its twenty-six
+// find-by-id call sites re-derived this same predicate. Accepts null/undefined so a call site's
+// own `connectionId ? … : undefined` ternary collapses into the call.
+export function connectionRecord(id: string | null | undefined): ConnectionSummary | undefined {
+  if (!id) return undefined;
+  return connectionsState.records.find((r) => r.id === id);
+}
+
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeListChanged: (() => void) | null = null;
 
@@ -97,7 +105,7 @@ export function openCreateDialog(): void {
 // the dialog anyway, with an empty password field and `error` set instead of throwing — the
 // caller here has no try/catch of its own, so a throw would silently no-op the Edit menu item.
 export async function openEditDialog(id: string): Promise<void> {
-  const summary = connectionsState.records.find((r) => r.id === id);
+  const summary = connectionRecord(id);
   if (!summary) return;
   const { password, error } = await control.connectionsReveal(id);
   const {
@@ -168,7 +176,7 @@ export async function setConnectionColor(
   id: string,
   color: ConnectionSummary['color'],
 ): Promise<void> {
-  const existing = connectionsState.records.find((r) => r.id === id);
+  const existing = connectionRecord(id);
   if (!existing) return;
   const {
     id: _id,
@@ -183,7 +191,7 @@ export async function setConnectionColor(
 }
 
 export async function setConnectionReadOnly(id: string, readOnly: boolean): Promise<void> {
-  const existing = connectionsState.records.find((r) => r.id === id);
+  const existing = connectionRecord(id);
   if (!existing) return;
   const {
     id: _id,

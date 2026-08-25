@@ -2,7 +2,7 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, nextTick, ref, watch } from 'vue';
-import { connectionsState } from '../state/connections';
+import { connectionRecord } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -129,7 +129,7 @@ async function onSave(): Promise<void> {
 // Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off
 // the store that already has it, same as ConnectionDialog.vue does; adds no new state.
 const connectionName = computed(
-  () => connectionsState.records.find((r) => r.id === filtersDialogState.connectionId)?.name ?? '',
+  () => connectionRecord(filtersDialogState.connectionId)?.name ?? '',
 );
 </script>
 

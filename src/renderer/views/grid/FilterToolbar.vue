@@ -2,7 +2,7 @@
 import type { SortSpec } from '@shared/domain/queries';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -26,12 +26,7 @@ const hasError = computed(() => rt.value?.status === 'error');
 // Mirrors PreviewCommandPanel.vue's/ConsoleView.vue's own three-line dialect computed exactly —
 // undefined for every non-SQL connection kind, which filterCompletion.ts's dialect-conditional
 // vocabularies (ILIKE, NULLS FIRST/LAST) already treat as "the non-Postgres list".
-const dialect = computed(() => {
-  const record = tab.value?.connectionId
-    ? connectionsState.records.find((r) => r.id === tab.value?.connectionId)
-    : undefined;
-  return sqlDialectFor(record?.kind);
-});
+const dialect = computed(() => sqlDialectFor(connectionRecord(tab.value?.connectionId)?.kind));
 const whereCandidates = computed(() =>
   tab.value ? buildWhereCandidates(tab.value.id, dialect.value) : [],
 );

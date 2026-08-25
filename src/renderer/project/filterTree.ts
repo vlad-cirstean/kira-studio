@@ -1,7 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { connectionsState } from '../state/connections';
+import { connectionRecord } from '../state/connections';
 import { isVisible, toSets } from './filter';
 import { isLeafKind, labelForKind } from './grouping';
 import { rowKey, treeState } from './state/tree';
@@ -37,7 +37,7 @@ export interface FilterNodeRow {
 }
 
 function connectionKindFor(connectionId: string): ConnectionKind | undefined {
-  return connectionsState.records.find((c) => c.id === connectionId)?.kind;
+  return connectionRecord(connectionId)?.kind;
 }
 
 export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow[] {

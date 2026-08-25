@@ -6,7 +6,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -91,11 +91,7 @@ const constraintRows = computed(() =>
   definition.value && meta.value ? buildConstraintRows(definition.value, meta.value) : [],
 );
 
-const dialect = computed(() => {
-  if (!props.tab.connectionId) return undefined;
-  const record = connectionsState.records.find((r) => r.id === props.tab.connectionId);
-  return sqlDialectFor(record?.kind);
-});
+const dialect = computed(() => sqlDialectFor(connectionRecord(props.tab.connectionId)?.kind));
 
 const originPhrase = computed(() =>
   definition.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
@@ -112,9 +108,7 @@ const canOpenConsole = computed(
 // P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
-const connectionRecord = computed(() =>
-  connectionsState.records.find((r) => r.id === props.tab.connectionId),
-);
+const connRecord = computed(() => connectionRecord(props.tab.connectionId));
 // Produced locally from the path — the same discipline DataGrid.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.
@@ -123,7 +117,7 @@ const breadcrumb = computed(() => {
   const parents = decodePath(props.tab.connectionId, props.tab.path)
     .segments.slice(0, -1)
     .map((s) => s.name);
-  const parts = [connectionRecord.value?.name, ...parents].filter((p): p is string => !!p);
+  const parts = [connRecord.value?.name, ...parents].filter((p): p is string => !!p);
   return parts.length > 0 ? `${parts.join(' / ')} / ` : '';
 });
 </script>

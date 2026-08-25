@@ -4,7 +4,7 @@ import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { connectConnection, connectionsState } from '../../state/connections';
+import { connectConnection, connectionRecord, connectionsState } from '../../state/connections';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
 import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
 
@@ -363,7 +363,7 @@ function buildRows(
   }
 
   if (groups.length === 0) return anyMatch;
-  const connectionKind = connectionsState.records.find((c) => c.id === connectionId)?.kind;
+  const connectionKind = connectionRecord(connectionId)?.kind;
   for (const group of groups) {
     const path = groupPath(parentPath, group.kind);
     const k = rowKey(connectionId, path);

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
-import { connectionsState, openCreateDialog } from '../../state/connections';
+import { connectionRecord, connectionsState, openCreateDialog } from '../../state/connections';
 import {
   activeTab,
   openDataTab,
@@ -25,7 +25,7 @@ import StreamTabView from '../../views/stream/StreamView.vue';
 const hasConnections = computed(() => connectionsState.records.length > 0);
 
 function connectionFor(entry: RecentTableEntry) {
-  return connectionsState.records.find((r) => r.id === entry.connectionId);
+  return connectionRecord(entry.connectionId);
 }
 
 function iconFor(entry: RecentTableEntry): string {

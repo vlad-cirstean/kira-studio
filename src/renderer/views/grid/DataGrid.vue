@@ -9,7 +9,7 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
@@ -180,8 +180,7 @@ function isDirtyRow(row: number): boolean {
 const isWritable = computed(() => {
   const t = tab();
   if (!t?.connectionId) return false;
-  const record = connectionsState.records.find((r) => r.id === t.connectionId);
-  return !record?.readOnly;
+  return !connectionRecord(t.connectionId)?.readOnly;
 });
 // P36 D26: mirrors DataToolbar.vue's own caps computed — ClickHouse is the first tabular engine
 // with canUpdate/canDelete both false alongside canInsert:true (a MergeTree PRIMARY KEY is a
@@ -202,12 +201,7 @@ const canDeleteRows = computed(
   () => isWritable.value && hasPrimaryKey.value && !!caps.value?.canDelete,
 );
 
-const dialect = computed(() => {
-  const t = tab();
-  if (!t?.connectionId) return undefined;
-  const record = connectionsState.records.find((r) => r.id === t.connectionId);
-  return sqlDialectFor(record?.kind);
-});
+const dialect = computed(() => sqlDialectFor(connectionRecord(tab()?.connectionId)?.kind));
 
 // Produced locally from the path, never round-tripped to the engine for a string join —
 // the same discipline project/menus.ts's own qualifiedNameFor uses (§9b).

@@ -6,7 +6,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
@@ -106,11 +106,7 @@ const editGate = computed<{ editable: boolean; label: string }>(() => {
 // toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
 // No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
 // when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
-const connectionColor = computed(() => {
-  const id = props.tab.connectionId;
-  if (!id) return undefined;
-  return connectionsState.records.find((r) => r.id === id)?.color;
-});
+const connectionColor = computed(() => connectionRecord(props.tab.connectionId)?.color);
 
 const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--kira-fg-muted)');
 
@@ -119,7 +115,7 @@ const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--k
 const pathPrefix = computed(() => {
   const connectionId = props.tab.connectionId;
   if (!connectionId) return '';
-  const connectionName = connectionsState.records.find((r) => r.id === connectionId)?.name;
+  const connectionName = connectionRecord(connectionId)?.name;
   const segments = decodePath(connectionId, props.tab.path).segments;
   const parts = [connectionName, ...segments.slice(0, -1).map((s) => s.name)].filter(
     (p): p is string => !!p,

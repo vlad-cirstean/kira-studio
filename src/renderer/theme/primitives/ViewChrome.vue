@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import { useRunState } from '../../state/runState';
 import { connColorVar } from '../connColor';
 import IconButton from './IconButton.vue';
@@ -31,9 +31,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
 
-const connection = computed(() =>
-  connectionsState.records.find((r) => r.id === props.tab.connectionId),
-);
+const connection = computed(() => connectionRecord(props.tab.connectionId));
 
 const runState = useRunState(() => props.tab.id);
 </script>

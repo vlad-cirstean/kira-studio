@@ -6,7 +6,7 @@ import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu } from '../../state/contextMenu';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
@@ -51,9 +51,7 @@ const listItems = computed<OpsListItem[]>(() => {
 });
 
 function connectionFor(record: OpRecord) {
-  return record.connectionId
-    ? connectionsState.records.find((r) => r.id === record.connectionId)
-    : undefined;
+  return connectionRecord(record.connectionId);
 }
 
 function formatTime(iso: string): string {

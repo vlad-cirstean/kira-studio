@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PageSize } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { useRunState } from '../../state/runState';
 import { activeDataTab } from '../../state/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -51,11 +51,9 @@ const caps = computed(() => {
 // never on whether the table has a primary key. A no-PK table still rejects at the per-cell
 // edit level (readOnlyReasonFor) and at the server (assertKeyIsPrimaryKey); gating the toolbar
 // too would just be a second, redundant guard.
-const isWritable = computed(() => {
-  const connectionId = tab.value?.connectionId;
-  const record = connectionId ? connectionsState.records.find((r) => r.id === connectionId) : null;
-  return !!caps.value?.writable && !record?.readOnly;
-});
+const isWritable = computed(
+  () => !!caps.value?.writable && !connectionRecord(tab.value?.connectionId)?.readOnly,
+);
 
 // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
 // addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so

@@ -5,7 +5,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
@@ -56,18 +56,10 @@ const caps = computed(() => {
 // dot in the view header — never a background tint. Mirrors Toolbar.vue's `color`/`railStyle`
 // pair exactly. No colour assigned leaves `--kira-rail` unset, so the reserved slot stays blank
 // instead of shifting anything.
-const connectionRecord = computed(() =>
-  props.tab.connectionId
-    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
-    : undefined,
-);
-const iconColor = computed(
-  () => connColorVar(connectionRecord.value?.color) ?? 'var(--kira-fg-muted)',
-);
+const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
 
-const pathPrefix = computed(() =>
-  connectionRecord.value ? `${connectionRecord.value.name} / ` : '',
-);
+const pathPrefix = computed(() => (connRecord.value ? `${connRecord.value.name} / ` : ''));
 
 // D10/D12: SQS's 'batch' pagination is never auto-loaded — the user must click Poll, because
 // every poll consumes messages from the queue (subject to VisibilityTimeout) rather than
@@ -77,12 +69,12 @@ const isBatch = computed(() => caps.value?.pagination === 'batch');
 // Item 2/3/4: Kafka gets the offset/partition/timestamp filter row and Add-message (no Delete —
 // a topic's log is immutable, kafkaCaps.canDelete stays false permanently). SQS gets Add and
 // Delete but no filter row at all (queue-based, no topic/partition/offset concept to filter by).
-const isKafka = computed(() => connectionRecord.value?.kind === 'kafka');
-const isSqs = computed(() => connectionRecord.value?.kind === 'sqs');
+const isKafka = computed(() => connRecord.value?.kind === 'kafka');
+const isSqs = computed(() => connRecord.value?.kind === 'sqs');
 // P37 D32: rabbitmq is the stream view's third kind — batch pagination like SQS (isBatch below),
 // but its own compose shape and its own poll-warning wording (a poll requeues, it does not
 // consume — SQS's own sentence would be a false statement about this engine).
-const isRabbit = computed(() => connectionRecord.value?.kind === 'rabbitmq');
+const isRabbit = computed(() => connRecord.value?.kind === 'rabbitmq');
 const canInsert = computed(() => caps.value?.canInsert ?? false);
 const canDelete = computed(() => caps.value?.canDelete ?? false);
 

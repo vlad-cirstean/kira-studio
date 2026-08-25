@@ -5,7 +5,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { revealPath } from '../../project/state/tree';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import {
   activateTab,
@@ -20,7 +20,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 
 function colorFor(tab: TabRecord): string | undefined {
-  return connectionsState.records.find((r) => r.id === tab.connectionId)?.color;
+  return connectionRecord(tab.connectionId)?.color;
 }
 
 function iconFor(tab: TabRecord): string {

@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import type { SelectedCell } from '../../../state/cellSelection';
-import { connectionsState } from '../../../state/connections';
+import { connectionRecord } from '../../../state/connections';
 import type { CellFormat } from './formats';
 
 /** P5 adds 'no-primary-key' — a table with no primary key can't identify a row to write. P24 D27
@@ -36,9 +36,7 @@ export function setOverride(cell: SelectedCell, format: CellFormat | null): void
  *  cell is genuinely editable in the grid (P5 D2) — the panel itself stays read-only regardless
  *  (D4), but no chip is shown for it. */
 export function readOnlyReasonFor(cell: SelectedCell): ReadOnlyReason | null {
-  const record = cell.connectionId
-    ? connectionsState.records.find((r) => r.id === cell.connectionId)
-    : undefined;
+  const record = connectionRecord(cell.connectionId);
   if (record?.readOnly) return 'connection-read-only';
   if (cell.truncated) return 'value-truncated';
   if (!cell.hasPrimaryKey) return 'no-primary-key';

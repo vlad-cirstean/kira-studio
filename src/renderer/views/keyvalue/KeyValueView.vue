@@ -10,7 +10,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -53,11 +53,7 @@ const targetTail = computed(() => pathTail(props.tab.path));
 // row's own `field`.
 const keyName = computed(() => targetTail.value?.name ?? '');
 
-const connRecord = computed(() =>
-  props.tab.connectionId
-    ? connectionsState.records.find((r) => r.id === props.tab.connectionId)
-    : undefined,
-);
+const connRecord = computed(() => connectionRecord(props.tab.connectionId));
 
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.

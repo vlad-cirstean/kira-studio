@@ -7,7 +7,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionsState } from '../../state/connections';
+import { connectionRecord } from '../../state/connections';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
@@ -33,10 +33,9 @@ const running = computed(() => rt.value?.status === 'running');
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
-const connectionKind = computed<ConnectionKind | undefined>(() => {
-  if (!props.tab.connectionId) return undefined;
-  return connectionsState.records.find((r) => r.id === props.tab.connectionId)?.kind;
-});
+const connectionKind = computed<ConnectionKind | undefined>(
+  () => connectionRecord(props.tab.connectionId)?.kind,
+);
 
 const dialect = computed(() => sqlDialectFor(connectionKind.value));
 
