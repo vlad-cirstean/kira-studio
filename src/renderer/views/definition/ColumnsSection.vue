@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
-import { columnsSectionMenu } from '../../project/menus';
 import { openContextMenu } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
+import { columnsSectionMenu } from './columnsMenu';
 
 const props = defineProps<{
   columns: ColumnMeta[];
