@@ -8,7 +8,7 @@ import {
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
-import { Compartment, EditorState, type Extension, Prec } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, type Extension, Prec } from '@codemirror/state';
 import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
@@ -53,6 +53,12 @@ const rootRef = ref<HTMLElement | null>(null);
 // no-reactivity rule, D4). Wrapping it would proxy every internal object CodeMirror touches
 // on every transaction, spending the 50 ms selection budget (§2.1) inside the proxy.
 let view: EditorView | null = null;
+// Tags the props.doc watcher's own dispatch below (line ~184) so the updateListener can tell it
+// apart from a real keystroke — `update.docChanged` is true for either kind of transaction, and
+// without this a *sync* here (this view catching up to some other write to `doc`, e.g. a sibling
+// pane's own edit re-encoding through the same cell's doc) re-emits `update:doc` right back out as
+// if the user had typed it, corrupting whatever the real edit in flight was.
+const externalSync = Annotation.define<boolean>();
 const languageCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 const autocompleteCompartment = new Compartment();
@@ -71,6 +77,12 @@ function resolveLanguage(): ReturnType<typeof languageExtension> {
 function resolveReadOnly(readOnly: boolean): Extension[] {
   return [
     EditorState.readOnly.of(readOnly),
+    // EditorState.readOnly only blocks transactions (typing is already inert without this); the
+    // DOM's own contenteditable attribute is a separate facet (EditorView.editable) that CodeMirror
+    // never infers from the former — every prior host stayed permanently read-only, so nothing ever
+    // needed the DOM itself to say so until D27's truncated-value case, which refuses edits on a
+    // cell that was previously editable and needs the panel to visibly reflect that.
+    EditorView.editable.of(!readOnly),
     // newGroupDelay: 500 is the library default (undocumented as such, restated here so the
     // grouping window this editor relies on — a run of typed characters is one undo step, not one
     // per keystroke — is a decision this file states rather than one it merely inherits) — every
@@ -150,7 +162,10 @@ onMounted(() => {
       languageCompartment.of(resolveLanguage()),
       readOnlyCompartment.of(resolveReadOnly(props.readOnly)),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) emit('update:doc', update.state.doc.toString());
+        const isExternalSync = update.transactions.some((tr) => tr.annotation(externalSync));
+        if (update.docChanged && !isExternalSync) {
+          emit('update:doc', update.state.doc.toString());
+        }
         if (update.docChanged || update.selectionSet) {
           emit('update:cursor', update.state.selection.main.head);
         }
@@ -184,6 +199,7 @@ watch(
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: doc },
       selection: { anchor: 0 },
+      annotations: externalSync.of(true),
     });
     view.scrollDOM.scrollTop = 0;
   },

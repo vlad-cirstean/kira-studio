@@ -166,7 +166,14 @@ export function encodeTimestamp(shape: TimestampShape, date: Date): string {
     // make, since none of them touch sub-second precision directly); only actually round when the
     // instant's own millisecond value moved, which is the genuinely unrepresentable case.
     const msNow = String(shifted.getUTCMilliseconds()).padStart(3, '0');
-    const msOriginal = shape.fractionRaw.padEnd(3, '0').slice(0, 3);
+    // Rounded the same way parseIso8601Shaped built the original `Date`'s own ms field (line ~95)
+    // — truncating fractionRaw's first 3 digits instead would desync from that rounding whenever
+    // the 4th+ digit rolls the ms value up (".901743" rounds to Date ms 902, but truncates to
+    // "901"), making this comparison spuriously see a change and round away real precision on
+    // every edit that didn't actually touch the sub-second value.
+    const msOriginal = shape.fractionRaw
+      ? String(Math.round(Number(`0.${shape.fractionRaw}`) * 1000)).padStart(3, '0')
+      : '000';
     const fraction =
       msNow === msOriginal
         ? shape.fractionRaw

@@ -236,7 +236,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1000000');
 
   await page.click('[data-testid="grid-header-cell"][data-column="id"]'); // -> none
-  await expect(page.locator('.sort-chevron')).toHaveCount(0);
+  await expect(page.locator('.sort-indicator')).toHaveCount(0);
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1'); // default order is still PK-ascending
 
   // A free-text ORDER BY that names a real column is reflected back in that header's chevron —
@@ -245,7 +245,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.fill('[data-testid="filter-orderby-input"]', 'id ASC');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1');
-  await expect(page.locator('.sort-chevron')).toHaveCount(1);
+  await expect(page.locator('.sort-indicator')).toHaveCount(1);
   await page.fill('[data-testid="filter-orderby-input"]', '');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
 

@@ -703,6 +703,10 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
     )
     .first()
     .click();
+  // Picking a day doesn't itself close the popover (only Escape/click-outside does, D18) — close
+  // it before interacting with anything else, same as the explore-only case just above, otherwise
+  // its full-viewport backdrop keeps intercepting every later click in this scenario.
+  await page.keyboard.press('Escape');
   await page.locator('[data-testid="cell-editor-format"]').focus();
   await expect(
     page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
@@ -909,7 +913,18 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
   await expect(panel).toHaveAttribute('data-cell-key', `${dataTabId}:0:sample`);
   await expect(panel).toHaveAttribute('data-format', 'text');
 
-  // (8) Closing the tab frees its record — no stale panel, no console error.
+  // (8) Closing the tab frees its record — no stale panel, no console error. Close the console
+  // and definition tabs first: closeTab() reactivates whichever tab now sits at the closed tab's
+  // old index, and with the console tab still open that would be the console tab — which has its
+  // own legitimate, still-selected cell (step 5) and would correctly show its own dock. That's a
+  // different (already-covered) property than the one this step means to check, so leave only the
+  // data tab open, where closing it drops the tab strip to zero and the dock unambiguously to 0.
+  await page
+    .locator('[data-testid="tab"][data-tab-kind="definition"] [data-testid="tab-close"]')
+    .click();
+  await page
+    .locator(`[data-testid="tab"][data-tab-id="${consoleTabId}"] [data-testid="tab-close"]`)
+    .click();
   await page
     .locator(`[data-testid="tab"][data-tab-id="${dataTabId}"] [data-testid="tab-close"]`)
     .click();

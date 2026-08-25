@@ -195,7 +195,12 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await page.click('[data-testid="toolbar-commit-changes"]');
   await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
   await expect(gridCell(page, 0, 'name')).not.toHaveClass(/pending-edit/);
-  expect(await cellText(page, 0, 'name')).toBe('committed value');
+  // DataToolbar's onCommit awaits commitPending() (which clears pending-edit state — the two
+  // assertions above — as soon as the mutate round-trip resolves) and only then awaits
+  // reloadAfterMutation() as a separate step. So the button/class already reflect a committed
+  // state before the grid has re-fetched it — a plain one-shot read here would race the reload
+  // under load; toHaveText polls until the fetched row actually lands.
+  await expect(gridCell(page, 0, 'name')).toHaveText('committed value', { timeout: 10_000 });
   const remainingNames = await page
     .locator('[data-testid="grid-cell"][data-column="name"]')
     .allInnerTexts();

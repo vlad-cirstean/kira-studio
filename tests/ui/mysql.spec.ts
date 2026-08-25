@@ -66,6 +66,17 @@ test('mysql — engine picker, connect, tree, filter-by-value quoting, console',
   await page.fill('[data-testid="connection-database"]', cfg.database ?? '');
   await page.fill('[data-testid="connection-username"]', cfg.username ?? '');
   await page.fill('[data-testid="connection-password"]', cfg.password ?? '');
+
+  // fields mode has no sslmode control of its own (options only ever round-trips through a
+  // URI's query string, ConnectionDialog.vue's setUri/setMode) — a stock MySQL 8.4 server's
+  // caching_sha2_password requires a TLS (or public-key) exchange for this user's very first
+  // authentication (mysql/support fixture's own D5/D26 comment), so switching to URI mode and
+  // adding ?sslmode=require here is the only way this connection can actually succeed, mirroring
+  // the fixture's own `options: { sslmode: 'require' }` config the db suite connects with.
+  await page.click('[data-testid="mode-uri"]');
+  const generatedUri = await page.inputValue('[data-testid="connection-uri"]');
+  await page.fill('[data-testid="connection-uri"]', `${generatedUri}?sslmode=require`);
+
   await page.click('[data-testid="color-teal"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);

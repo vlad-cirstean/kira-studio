@@ -290,8 +290,10 @@ test('s3 — download an object to disk', async ({ kira, consoleErrors }) => {
     .poll(async () => readFile(destPath, 'utf8').catch(() => null), { timeout: 15_000 })
     .toBe(ROOT_OBJECT_BODY);
 
+  // OpStatus (shared/domain/ops.ts) is 'running' | 'ok' | 'error' | 'cancelled' — a finished
+  // transfer's row carries data-status="ok", not "done".
   const opRow = page
-    .locator('[data-testid="op-row"][data-status="done"]')
+    .locator('[data-testid="op-row"][data-status="ok"]')
     .filter({ hasText: 'transfer' });
   await expect(opRow).toBeVisible({ timeout: 15_000 });
   await expect(opRow).toContainText(`GetObject s3://${MAIN_BUCKET}/${ROOT_OBJECT_KEY} ->`);
@@ -488,6 +490,9 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   });
 
   // --- toggle the connection read-only (menu-item-readonly), confirming the live-reconnect prompt
+  // ROOT_OBJECT_PATH lives under MAIN_BUCKET, never expanded above (only MUTABLE_BUCKET was) —
+  // findRow scrolls but never expands a collapsed row, so without this the row never appears.
+  await expandRow(page, MAIN_BUCKET_PATH);
   const rootRow = await findRow(page, ROOT_OBJECT_PATH);
   await rootRow.dblclick();
   const rootView = page.locator(`[data-testid="keyvalue-view"][data-path="${ROOT_OBJECT_PATH}"]`);

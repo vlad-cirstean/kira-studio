@@ -211,7 +211,17 @@ function saveEdit(): void {
 // fires on the same event) — no separate Save button needed since leaving the editor is already
 // the "I'm done with this value" signal, and the grid's own pending-edit row highlighting is the
 // feedback that it landed. `focusout` (not `blur`, which doesn't bubble) on the wrapping div.
-function onEditorBlur(): void {
+//
+// `focusout` fires (and bubbles) whenever the *previously* focused element loses focus, whether
+// the next focus target is outside this div or just another control inside it (the timestamp
+// field -> the encoded box, the zone toggle, the calendar) — it says nothing on its own about
+// whether focus actually left the panel. `relatedTarget` is the element gaining focus, so only
+// treat this as "done editing" when that target is null (focus left the window/app entirely) or
+// sits outside the wrapping div; a same-panel transition must fall through and stage nothing.
+function onEditorBlur(e: FocusEvent): void {
+  const next = e.relatedTarget as Node | null;
+  const container = e.currentTarget as HTMLElement | null;
+  if (next && container?.contains(next)) return;
   if (isEditable.value && isDirty.value) saveEdit();
 }
 

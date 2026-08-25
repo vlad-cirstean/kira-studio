@@ -266,6 +266,7 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
     '--separator--',
     'edit',
     'set-null',
+    'delete-row',
     'filter-by-value',
   ]);
 
@@ -412,15 +413,15 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
     'copy-column-values',
   ]);
   await page.click('[data-testid="menu-item-sort-asc"]');
-  await expect(headerCell(page, 'entity_id').locator('.sort-chevron')).toHaveText('▲');
+  await expect(headerCell(page, 'entity_id')).toHaveAttribute('data-sort', 'asc');
 
   await rightClick(headerCell(page, 'entity_id'));
   await page.click('[data-testid="menu-item-sort-desc"]');
-  await expect(headerCell(page, 'entity_id').locator('.sort-chevron')).toHaveText('▼');
+  await expect(headerCell(page, 'entity_id')).toHaveAttribute('data-sort', 'desc');
 
   await rightClick(headerCell(page, 'entity_id'));
   await page.click('[data-testid="menu-item-clear-sort"]');
-  await expect(page.locator('.sort-chevron')).toHaveCount(0);
+  await expect(page.locator('.sort-indicator')).toHaveCount(0);
 
   await rightClick(headerCell(page, 'name'));
   await page.click('[data-testid="menu-item-copy-column-name"]');

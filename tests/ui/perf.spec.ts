@@ -13,6 +13,17 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // (all P12) — this spec's four assertions (rAF tripwire, DOM cell bound, retained-bytes
 // open/close symmetry, L2-usage-vs-budget) are cheap, single-container, and kept unchanged
 // alongside them (P12 D7).
+// Inverse of format.ts's formatBytes ("<number> bytes|KB|MB") — converts to MB so it's directly
+// comparable to the budget field, which is a plain number (no unit) in the same units.
+function parseFormattedMb(text: string): number {
+  const match = /^([\d.]+)\s*(bytes|KB|MB)$/.exec(text);
+  if (!match) return NaN;
+  const n = Number(match[1]);
+  if (match[2] === 'bytes') return n / (1024 * 1024);
+  if (match[2] === 'KB') return n / 1024;
+  return n;
+}
+
 test.describe.configure({ timeout: 180_000 });
 
 let pg: PgFixture | null = null;
@@ -199,7 +210,9 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes, L2 b
     .locator('.section-pane .field', { hasText: 'Current usage' })
     .locator('input');
   const usageValue = (await currentUsageInput.inputValue()).trim();
-  const usedMb = Number(usageValue.split('/')[0]?.trim());
+  // Mirrors format.ts's formatBytes: "<number> bytes|KB|MB", not a bare number — the field reads
+  // e.g. "12.3 MB / 100.0 MB".
+  const usedMb = parseFormattedMb(usageValue.split('/')[0]?.trim() ?? '');
   expect(Number.isFinite(usedMb)).toBe(true);
   expect(usedMb).toBeLessThanOrEqual(budgetMb);
   await page.click('[data-testid="settings-close"]');

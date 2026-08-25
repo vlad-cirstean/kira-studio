@@ -37,6 +37,27 @@ async function setDocumentFilter(page: Page, filter: string): Promise<void> {
   await page.press('[data-testid="document-search"]', 'Enter');
 }
 
+// DocumentView virtualizes rows (VirtualList, P27 D18 — auto-expanded document bodies vary
+// widely in height) — only the scrolled-into-view + overscan rows exist in the DOM at once, same
+// shape as DataGrid.vue's own virtualization (data-view.spec.ts's scrollGridToBottom). "All N
+// documents were fetched" is proven by scrolling to the bottom and finding the highest-indexed
+// one, not by counting DOM rows.
+async function expectLastDocumentToContain(page: Page, text: string): Promise<void> {
+  const list = page.locator('.document-virtual-list[data-testid="virtual-list"]');
+  await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(
+    page.locator('[data-testid="document-row"]').last().locator('[data-testid="document-tree"]'),
+  ).toContainText(text, { timeout: 15_000 });
+  await list.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+}
+
 async function connectMongo(page: Page): Promise<void> {
   if (!mongo) throw new Error('mongo fixture did not start');
   const cfg = mongo.config;
@@ -110,9 +131,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   // whose own target assertions in s3.spec.ts use toContainText for the same reason) — the full
   // text includes that prefix, not just the collection name.
   await expect(view.locator('[data-testid="document-target"]')).toContainText('widgets');
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT, {
-    timeout: 15_000,
-  });
+  await expectLastDocumentToContain(page, `widget-${WIDGET_COUNT - 1}`);
 
   await page.click('[data-testid="document-count"]');
   // P16 removed the standalone status-line text (data-testid="document-status") — the exact
@@ -176,9 +195,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
 
   // --- clear the filter: 25 seeded - 2 deleted (the edited one is renamed, not gone) --------
   await setDocumentFilter(page, '');
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 2, {
-    timeout: 10_000,
-  });
+  await expectLastDocumentToContain(page, `widget-${WIDGET_COUNT - 1}`);
 
   // --- cancel a slow read --------------------------------------------------------------------
   // Same $function busy-loop technique proven at the DB level (mongo.spec.ts) — evaluated once
@@ -198,9 +215,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
     )
     .toBe('cancelled');
   await setDocumentFilter(page, '');
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(WIDGET_COUNT - 2, {
-    timeout: 10_000,
-  });
+  await expectLastDocumentToContain(page, `widget-${WIDGET_COUNT - 1}`);
 
   // --- console: shell-style statement against the same collection ---------------------------
   await openRowMenu(page, WIDGETS_PATH);
@@ -238,7 +253,7 @@ test('mongodb — page-size-1000 render tripwires, truncated fallback, go-to-mat
   await (await findRow(page, bigPath)).dblclick();
   const view = page.locator('[data-testid="document-view"]');
   await expect(view).toBeVisible();
-  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(100, { timeout: 15_000 });
+  await expectLastDocumentToContain(page, 'big-widget-99');
   await page.click('[data-testid="document-page-size-1000"]');
   await expect
     .poll(async () => page.locator('[data-testid="document-row"]').count(), { timeout: 15_000 })

@@ -289,6 +289,7 @@ test('the tab strip scrolls once tabs overflow it (P31 D6/D7)', async ({ kira, c
   if (!pg) throw new Error('postgres fixture did not start');
   const { window: page } = kira;
 
+  await createConnection(page, 'Tabs DB', 'blue');
   await connectAndOpenOrderItems(page);
   const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
   // Twelve independent tabs of the same table (§8.4: "the same table opens any number of

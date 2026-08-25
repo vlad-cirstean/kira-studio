@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
@@ -335,12 +335,15 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     page.locator('[data-testid="tree-sticky-row"]', { hasText: 'Sequences' }),
   ).toHaveCount(0);
 
-  // A pinned row is a real row: its twisty collapses the real schema (the band shrinks to two),
-  // and it carries the connection's colour rail.
+  // A pinned row is a real row: its twisty collapses the real schema, and it carries the
+  // connection's colour rail. Collapsing it removes the whole subtree we'd scrolled into (the
+  // Sequences folder among it) — kira_test's only remaining content is its two collapsed schemas,
+  // which comfortably fit the viewport, so there is nothing left to scroll past and the band
+  // clears entirely (same as the initial "nothing pinned at scrollTop 0" case above).
   await expect(stickyRows.last()).toHaveAttribute('data-path', APP_PATH);
   await expect(stickyRows.last().locator('.p-tree-rail')).toBeVisible();
   await stickyRows.last().locator('.twisty').click();
-  await expect(stickyRows).toHaveCount(2);
+  await expect(stickyRows).toHaveCount(0);
   await expandRow(page, APP_PATH); // restore for the assertions that follow
 
   // The band does not duplicate anything the rest of the suite counts (F5): the connection-kind
@@ -349,7 +352,11 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     el.scrollIntoView({ block: 'start' }),
   );
   await page.waitForTimeout(100);
-  expect(await page.locator('[data-testid="tree-row"][data-kind="connection"]').count()).toBe(1);
+  // schema:app alone (ten tables, three folders, thirteen sequences) now outgrows VirtualList's
+  // 8-row overscan on its own, so the real connection row (index 0) is fully virtualized out at
+  // this depth — only its sticky counterpart remains. The invariant worth guarding is "never
+  // both": data-kind="connection" (real or sticky) resolves to exactly one row, not two.
+  expect(await page.locator('[data-kind="connection"]').count()).toBe(1);
   expect(await page.locator('[data-testid="tree-sticky-row"][tabindex="0"]').count()).toBe(0);
 
   // A row under the band is still reachable: the shared findRow scrolls it clear before
@@ -392,10 +399,47 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     },
   );
   const conn2Row = connectionRow(page, 'Tree DB 2');
+  // The first connection's own expanded subtree (schema:app's ten tables, three folders, and
+  // thirteen sequences) is now taller than the panel's overscan window, so the second connection
+  // — appended after all of it — is not yet in the DOM at scrollTop 0. Scroll to the bottom (it's
+  // the last root row) before asserting it exists.
+  await treeScroll.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(100);
   await expect(conn2Row).toBeVisible();
 
+  // A freshly created, still-collapsed connection is only one row tall — nowhere near enough
+  // content below it for the browser to ever scroll it to the viewport's top (that would leave a
+  // gap under the last row, which no scroll container allows), and unexpanded it could never
+  // join the band anyway (stickyBand.ts only self-pins a row that is showing its own children).
+  // Give it the same connection/database/schema depth as the first connection so there is real
+  // content — and a real handoff — to scroll through. Both connections share the same catalog, so
+  // `path` alone is ambiguous the moment both are expanded (D9's whole reason for deleting this
+  // one afterwards) — every step below walks from `conn2Row` via DOM sibling order instead of the
+  // path-based `findRow`/`expandRow` helpers.
+  async function expandNext(row: Locator): Promise<Locator> {
+    await row.scrollIntoViewIfNeeded();
+    await row.locator('.twisty').click();
+    await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
+    return row.locator('xpath=following-sibling::*[1]');
+  }
+  const conn2Db = await expandNext(conn2Row); // database:kira_test (first child)
+  // schema:analytics sorts before schema:app and stays collapsed (one row) — schema:app is the
+  // second sibling, not the first.
+  const conn2App = (await expandNext(conn2Db)).locator('xpath=following-sibling::*[1]');
+  await expandNext(conn2App);
+
   // Right at the boundary: the band's outermost — only — row is now the second connection.
+  // stickyBand.ts's own kept-loop requires a candidate's natural top to be strictly less than its
+  // pinned slot (D4's "passed", not "arrived") — landing exactly on the row's natural offset
+  // (what scrollIntoView's block:'start' does) is the tie, not the pass, so nudge one pixel
+  // further to cross it without pulling in a second candidate (conn2's own database row, one
+  // full rowHeight below, would join too).
   await conn2Row.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await treeScroll.evaluate((el) => {
+    el.scrollTop += 1;
+  });
   await page.waitForTimeout(100);
   await expect(stickyRows.first()).toContainText('Tree DB 2');
 

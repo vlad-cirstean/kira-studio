@@ -56,6 +56,15 @@ export async function scrollAndSettle(
 // keeps that one fact in one file instead of twenty retry loops.
 async function clearStickyBand(page: Page, container: Locator, target: Locator): Promise<void> {
   if ((await target.count()) === 0) return;
+  // findRow's fast path (the row is already in the DOM via overscan) skips the scroll-search
+  // loop, so `target` can be present yet scrolled fully above the viewport — not just occluded
+  // by the band, genuinely out of view. The shortfall math below assumes the row starts inside
+  // the scrollport; fed a negative (above-viewport) offset, it computes a shortfall that scrolls
+  // even further down, pushing the row out of the overscan window entirely (it vanishes from the
+  // DOM, and the caller's subsequent click hangs waiting for a row that will never come back).
+  // Bringing it into the natural viewport first is a no-op for the ordinary "in view but under
+  // the band" case (already handled below) and a real fix for the above-viewport case.
+  await target.scrollIntoViewIfNeeded();
   const band = page.locator('[data-testid="tree-sticky-band"]');
   if ((await band.count()) === 0) return;
   const bandHeight = await band.evaluate((el) => {
