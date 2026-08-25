@@ -1,4 +1,7 @@
-import { createSearchState, type SearchHandle, type SearchQuery } from './pageScan';
+import { reactive } from 'vue';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
+import type { SearchHandle, SearchQuery } from './pageScan';
+import { matchedRowsOf } from './searchFilter';
 
 // P39 D9: what views/shared/PageSearchToolbar.vue is bound to. Each of grid/search.ts,
 // documents/search.ts and keyvalue/search.ts exports one literal of this shape, built from
@@ -15,6 +18,28 @@ export interface PageSearchApi<M extends { row: number }> {
   matchedRows(tabId: string): number[] | null;
   pageVersion: { n: number };
   loadedRowCount(tabId: string): number;
+}
+
+/** The per-tab match record + its tab-close cleanup registration, once per view module. Moved
+ *  here from pageScan.ts (P39 iter3 F4/D3) — this is about per-tab search *state*, not scanning,
+ *  and createPageSearch below is its only caller. */
+function createSearchState<M extends { row: number }>(): {
+  searchState: Record<string, { matches: M[]; index: number }>;
+  clearSearchState(tabId: string): void;
+  matchedRows(tabId: string): number[] | null;
+} {
+  const searchState = reactive({} as Record<string, { matches: M[]; index: number }>);
+
+  function clearSearchState(tabId: string): void {
+    delete searchState[tabId];
+  }
+  registerTabRuntimeCleanup(clearSearchState);
+
+  function matchedRows(tabId: string): number[] | null {
+    return matchedRowsOf(tabId, searchState[tabId]?.matches);
+  }
+
+  return { searchState, clearSearchState, matchedRows };
 }
 
 // P39 iter2 F2/D3: grid/search.ts, documents/search.ts and keyvalue/search.ts each assembled this

@@ -1,7 +1,3 @@
-import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { matchedRowsOf } from './searchFilter';
-
 // P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
 // cancel/zero-width-match/onProgress/resolve semantics, differing only in the per-row scan body.
@@ -89,24 +85,4 @@ export function runChunkedScan<M>(
     },
     done,
   };
-}
-
-/** The per-tab match record + its tab-close cleanup registration, once per view module. */
-export function createSearchState<M extends { row: number }>(): {
-  searchState: Record<string, { matches: M[]; index: number }>;
-  clearSearchState(tabId: string): void;
-  matchedRows(tabId: string): number[] | null;
-} {
-  const searchState = reactive({} as Record<string, { matches: M[]; index: number }>);
-
-  function clearSearchState(tabId: string): void {
-    delete searchState[tabId];
-  }
-  registerTabRuntimeCleanup(clearSearchState);
-
-  function matchedRows(tabId: string): number[] | null {
-    return matchedRowsOf(tabId, searchState[tabId]?.matches);
-  }
-
-  return { searchState, clearSearchState, matchedRows };
 }
