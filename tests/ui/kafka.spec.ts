@@ -19,12 +19,16 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // stream-shaped pages, not tabular grids/documents/key-values, are the point of this spec — it
 // proves StreamView.vue's offsetWindow auto-load/Next paging and the topic+consumerGroup tree
 // against a live broker. SQS's batch/Poll half of P10 lives in sqs.spec.ts.
-test.describe.configure({ timeout: 240_000 });
+// 0005_kafka_seed.ts's exec()-based seed retries its first admin call to cover a narrow gap between
+// the broker's listener port opening and its self-managed KRaft metadata quorum actually being
+// ready to serve admin calls — each retry can itself take a beat (the CLI's own connection backoff)
+// before giving up, so this budget has room for a few of those on top of container start.
+test.describe.configure({ timeout: 300_000 });
 
 let kafka: KafkaFixture | null = null;
 
 test.beforeAll(async () => {
-  test.setTimeout(240_000);
+  test.setTimeout(300_000);
   if (!(await isDockerAvailable())) {
     test.skip(true, DOCKER_UNAVAILABLE_MESSAGE);
     return;
@@ -198,7 +202,10 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
     '[data-testid="definition-properties"][data-title="Configuration"]',
   );
   await expect(configSection).toBeVisible();
-  await expect(configSection.locator('.def-row').first()).toBeVisible();
+  // kafka/definition.ts (P32 D14/F11): this client has no describeConfigs call (not on the compat
+  // Admin, not on the native AdminClient) — the section stays, rendered empty, with a note on the
+  // Source pane explaining why, rather than failing the whole tab over one missing capability.
+  await expect(configSection.locator('.def-row')).toHaveCount(0);
 
   // --- P31 item 1: caps.describe is false for Kafka, so opening (and refreshing) a topic's
   // definition tab must never issue a describe op or leave an error row behind (F1-F4). ---------
