@@ -7,7 +7,7 @@
 // `JSON.parse` never rounds a BSON integer through a lossy JS `number` the way it would for the SQL
 // cell editor's raw numeric literals (`beautify.ts`'s reason for a hand-written scanner there) —
 // plain `JSON.parse` is exact here.
-import type { BeautifyMode, BeautifyResult } from '../../beautify';
+import type { BeautifyMode, BeautifyResult } from '../../../beautify';
 
 export type DocNodeKind = 'object' | 'array' | 'scalar';
 
@@ -515,7 +515,10 @@ function parseShellArray(c: ShellCursor): ShellNode {
   return { kind: 'array', items };
 }
 
-function tryParseShellText(
+// P42 D12: exported so views/console/lint.ts can validate a Mongo statement's argument against
+// this app's own shell-literal grammar (unquoted keys, single quotes, ObjectId(…)/ISODate(…)
+// calls) instead of JSON.parse, which would reject valid input this console actually accepts.
+export function tryParseShellText(
   text: string,
 ): { ok: true; node: ShellNode } | { ok: false; offset: number } {
   const c: ShellCursor = { text, i: 0 };

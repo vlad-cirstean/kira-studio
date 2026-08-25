@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { rowsVersion, visibleLines } from './documentRows';
+import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import { rowsVersion, visibleLines } from './rows';
 
 // One expanded document's body, rendered as flat indented key/value lines out of visibleLines()
 // (P27 D19) — no CodeMirror, no per-node component recursion, so the DOM cost here is linear in

@@ -4,9 +4,37 @@
 // own `pageVersion`. A `reactive()` tree here would put a Proxy around every node of every document
 // on the page, which is exactly the frame budget this phase exists to protect.
 import { reactive } from 'vue';
-import { formatBytes } from '../../format';
+import { formatBytes } from '../../../format';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';
-import { documentRow } from './page';
+
+// P42 D9: this module used to import documentRow from views/documents/page.ts directly — the one
+// edge that blocked the move here, since views/console/ (the phase's other row source) may not
+// import views/documents/* (biome.json's views/<kind>/* rule). A registered source replaces it:
+// the view that owns a scope (a document tab's id, or a console result's key) registers where its
+// rows come from, and every function below still just calls the same-shaped local documentRow().
+type RowSource = (row: number) => { id: string; body: string; isTruncated?: boolean } | null;
+const rowSources = new Map<string, RowSource>();
+
+/** Where `scope`'s rows come from — the document tab registers documents/page.ts's own
+ *  documentRow on mount and unregisters on unmount; a console result set does the same with
+ *  console/resultPages.ts's documentRow (P42 D11). */
+export function registerDocumentRows(scope: string, source: RowSource): void {
+  rowSources.set(scope, source);
+}
+
+export function unregisterDocumentRows(scope: string): void {
+  rowSources.delete(scope);
+}
+
+function documentRow(
+  tabId: string,
+  row: number,
+): { id: string; body: string; isTruncated: boolean } | null {
+  const result = rowSources.get(tabId)?.(row);
+  return result
+    ? { id: result.id, body: result.body, isTruncated: result.isTruncated ?? false }
+    : null;
+}
 
 export interface DocumentRowView {
   index: number;

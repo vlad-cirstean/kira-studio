@@ -1,5 +1,5 @@
 import type { MenuItem } from '../../state/contextMenu';
-import { parseIdLabel, toShellText } from './ejson';
+import { parseIdLabel, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setAllExpanded, toggleExpanded } from './state';
 

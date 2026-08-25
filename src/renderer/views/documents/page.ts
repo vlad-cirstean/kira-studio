@@ -1,9 +1,9 @@
 import { cellText, type DocumentPage, isTruncated } from '@shared/protocol/page';
+import { resetRows, rowView } from '../shared/document/rows';
 import { createPageStore } from '../shared/page/store';
-import { resetRows, rowView } from './documentRows';
 
 // P27 D21: a new page has new rows — every memoized parse and every nested-expansion path
-// documentRows.ts holds for this tab is stale.
+// views/shared/document/rows.ts holds for this tab is stale.
 const store = createPageStore<DocumentPage>({ onSet: resetRows });
 
 export const pageVersion = store.pageVersion;

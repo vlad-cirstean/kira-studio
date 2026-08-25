@@ -21,6 +21,17 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import DocumentTree from '../shared/document/DocumentTree.vue';
+import { beautifyShellText, toShellText } from '../shared/document/ejson';
+import {
+  type DocumentRowView,
+  registerDocumentRows,
+  rowHeight,
+  rowsVersion,
+  rowView,
+  togglePath,
+  unregisterDocumentRows,
+} from '../shared/document/rows';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
@@ -28,9 +39,6 @@ import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
-import DocumentTree from './DocumentTree.vue';
-import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
-import { beautifyShellText, toShellText } from './ejson';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
@@ -433,6 +441,10 @@ let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
+  // P42 D9: this tab's own page.ts documentRow is where views/shared/document/rows.ts's
+  // functions resolve `props.tab.id` to actual rows — registered before load() so nothing ever
+  // reads through a missing source.
+  registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
@@ -441,6 +453,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  unregisterDocumentRows(props.tab.id);
   unregisterCommand?.();
   unregisterFindCommand?.();
 });
