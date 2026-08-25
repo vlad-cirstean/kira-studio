@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
+import { cellText, type KeyValuePage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { redisCaps } from '../../src/engine/adapters/redis/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
-import { cellText, type KeyValuePage } from '../../src/shared/protocol/page';
 import {
   HASH_FIELDS,
   HASH_KEY,

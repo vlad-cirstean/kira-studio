@@ -3,13 +3,13 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
+import { cellText, type KeyValuePage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { s3Caps } from '../../src/engine/adapters/s3/caps';
-import type { MutationPlan } from '../../src/shared/domain/mutations';
-import { cellText, type KeyValuePage } from '../../src/shared/protocol/page';
 import {
   DELETE_TARGET_KEY,
   EDITABLE_OBJECT_BODY,

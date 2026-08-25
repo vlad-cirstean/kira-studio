@@ -1,10 +1,5 @@
+import type { DocumentPage, KeyValuePage, StreamPage, TabularPage } from '@shared/protocol/page';
 import type { Adapter, OpCtx, ReadRequest } from '../../../src/engine/adapters/adapter';
-import type {
-  DocumentPage,
-  KeyValuePage,
-  StreamPage,
-  TabularPage,
-} from '../../../src/shared/protocol/page';
 
 // P8 widened Adapter.read() to return the Page union (TabularPage | DocumentPage). Postgres and
 // MariaDB are both tabular-only (mariadbCaps/postgresCaps: defaultPageKind: 'tabular') — every

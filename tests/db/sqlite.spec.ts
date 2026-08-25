@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
+import { isNull, isTruncated, type TabularPage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { sqliteCaps } from '../../src/engine/adapters/sqlite/caps';
-import { isNull, isTruncated, type TabularPage } from '../../src/shared/protocol/page';
 import { readTabular } from './support/page';
 import {
   SQLITE_UNAVAILABLE_MESSAGE,

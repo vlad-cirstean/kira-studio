@@ -1,16 +1,16 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import type { NodePath } from '@shared/domain/tree';
-import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
-import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
-import { rabbitmqCaps } from '../../src/engine/adapters/rabbitmq/caps';
-import { createAdapter } from '../../src/engine/adapters/registry';
 import {
   cellText,
   isNull,
   isTruncated,
   MAX_CELL_BYTES,
   type StreamPage,
-} from '../../src/shared/protocol/page';
+} from '@shared/protocol/page';
+import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
+import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
+import { rabbitmqCaps } from '../../src/engine/adapters/rabbitmq/caps';
+import { createAdapter } from '../../src/engine/adapters/registry';
 import {
   BIG_QUEUE,
   BIG_QUEUE_MESSAGE_COUNT,

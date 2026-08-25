@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
+import { isNull, isTruncated, type TabularPage } from '@shared/protocol/page';
 import { createConnection } from 'mariadb';
 import type { Adapter, AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { mariadbCaps } from '../../src/engine/adapters/mariadb/caps';
 import { type RunningQuery, runQuery } from '../../src/engine/adapters/mariadb/query';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { cancelOp, runOp, wireScheduler } from '../../src/engine/scheduler/ops';
-import { isNull, isTruncated, type TabularPage } from '../../src/shared/protocol/page';
 import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
 import { type MariaFixture, startMariadb } from './support/mariadb';
 import { readTabular } from './support/page';

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { MutationPlan } from '@shared/domain/mutations';
 import type { NodePath } from '@shared/domain/tree';
+import { cellText, type DocumentPage } from '@shared/protocol/page';
 import { Decimal128, EJSON } from 'bson';
 import { type Document, MongoClient } from 'mongodb';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { mongoCaps } from '../../src/engine/adapters/mongo/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
-import { cellText, type DocumentPage } from '../../src/shared/protocol/page';
 import { WIDGET_COUNT } from './fixtures/0003_mongo_seed';
 import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
 import {

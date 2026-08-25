@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { GetQueueUrlCommand, SQSClient } from '@aws-sdk/client-sqs';
 import type { NodePath } from '@shared/domain/tree';
+import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
 import type { AdapterDeps, OpCtx } from '../../src/engine/adapters/adapter';
 import { AdapterError, type AdapterErrorCode } from '../../src/engine/adapters/errors';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { sqsCaps } from '../../src/engine/adapters/sqs/caps';
-import { cellText, isNull, type StreamPage } from '../../src/shared/protocol/page';
 import {
   DRAIN_MESSAGE_COUNT,
   DRAIN_QUEUE,
