@@ -140,6 +140,15 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');
 
+  // --- P43 F3/D4: the stream view's cell editor dock is a viewer, not an editor refusing this
+  // cell (there was never a write on offer at all) — no reason chip, no generators panel. --------
+  await firstRow.locator('[data-testid="stream-body"]').click();
+  const cellPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(cellPanel).toHaveAttribute('data-read-only', 'true');
+  await expect(cellPanel).not.toHaveAttribute('data-read-only-reason');
+  await expect(cellPanel.locator('[data-testid="cell-editor-generate"]')).toHaveCount(0);
+  await expect(cellPanel.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
+
   // --- P23 F4/D4: the partition filter still reads children() even though the tree no longer
   // does — this is the single most important regression check in this phase.
   await view.locator('[data-testid="stream-filter-partition"]').click();

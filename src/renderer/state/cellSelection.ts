@@ -21,12 +21,15 @@ export interface SelectedCell {
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
    *  page has one is grid-only knowledge and `views/shared/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;
-  /** Set only by a publisher that can genuinely stage a write for this exact cell (today, only
-   *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`). `undefined`
-   *  means "this view never lets the panel edit its cells" — the panel forces read-only whenever
-   *  this is absent, regardless of `readOnlyReasonFor()`, so a future publisher (Document/
-   *  KeyValue/Stream/Console) that never sets it keeps its cells read-only in the panel by
-   *  default rather than needing to opt out. */
+  /** Set only by a publisher that can genuinely stage a write for this exact cell — today only
+   *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`, and
+   *  `KeyValueView.vue`, for an S3 object's own editable `Body` row. `StreamView.vue` and
+   *  `ConsoleResultGrid.vue` publish too but never set this (both are viewers, P43 F3/D4 — the
+   *  dock mounting them passes `readOnly`). `undefined` means "this view never lets the panel edit
+   *  its cells" — the panel forces read-only whenever this is absent, regardless of
+   *  `readOnlyReasonFor()`, so a publisher that never sets it keeps its cells read-only in the
+   *  panel by default rather than needing to opt out. `views/documents/` publishes nothing at all
+   *  (§8.7: a document's own row is already the read/write surface) and mounts no dock. */
   onEdit?: (newValue: string) => void;
   /** Sibling to `onEdit`, closing over `discardCellEdit(tabId, row, columnName)` — what the panel's
    *  Revert button calls to un-stage a pending edit, not just visually reset its own buffer.

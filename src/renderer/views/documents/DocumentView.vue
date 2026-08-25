@@ -20,7 +20,6 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
-import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
 import {
@@ -843,7 +842,6 @@ onUnmounted(() => {
         </VirtualList>
       </div>
     </ViewChrome>
-    <CellEditorDock :tab-id="tab.id" />
   </div>
 </template>
 

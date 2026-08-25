@@ -151,6 +151,12 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await expect(editRow.locator('[data-testid="document-field-count"]')).toContainText('fields');
   await expect(editRow.locator('[data-testid="document-byte-badge"]')).toBeVisible();
 
+  // --- P43 F3/D4: this view mounts no cell editor dock at all — a document's own row is already
+  // the read/write surface (§8.7), so clicking one never opens the panel every other view shows
+  // on a cell click.
+  await editRow.locator('.doc-head').click();
+  await expect(page.locator('[data-testid="cell-editor"]')).toHaveCount(0);
+
   // --- edit: the row is already expanded by default (D2) — replace its body, save -----------
   await expect(editRow.locator('[data-testid="document-body"]')).toBeVisible();
   await expect(editRow.locator('[data-testid="document-tree"]')).toBeVisible();

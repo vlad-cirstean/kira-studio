@@ -10,9 +10,10 @@ import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
 // pageSize now live on DocumentTabState (mirroring DataTabState) rather than being grid-only, so
-// `searchOpen` (DataView.vue's precedent) and `selectedRow` (the row published to the cell editor,
-// DataGrid.vue's `selection` precedent, narrowed to a single row index since a document has no
-// columns to select within) are the only view-local runtime this adds.
+// `searchOpen` (DataView.vue's precedent) and `selectedRow` (P43 F3/D4: highlight-only local UI
+// state, narrowed to a single row index since a document has no columns to select within — this
+// view mounts no cell editor dock to publish into at all) are the only view-local runtime this
+// adds.
 export interface DocumentViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
@@ -224,9 +225,10 @@ export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize'
   void load(tabId);
 }
 
-// The row published to the cell editor (§0 note: cellSelection.ts's "P8/P10 publish into the
-// same slot"). A plain runtime field, not tab-persisted state — the same reasoning as the grid's
-// own `selection`, which also never round-trips through tabs.save.
+// P43 F3/D4: the clicked row's own highlight — this view has no cell editor dock to publish a
+// selection into (§8.7: a document's own row is already the read/write surface). A plain runtime
+// field, not tab-persisted state — the same reasoning as the grid's own `selection`, which also
+// never round-trips through tabs.save.
 export function selectRow(tabId: string, row: number | null): void {
   ensureRuntime(tabId).selectedRow = row;
 }

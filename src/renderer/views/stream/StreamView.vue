@@ -148,8 +148,8 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
     truncated,
     // Always true here (unlike the grid's real per-table computation, state.ts's own doc comment)
     // — "no primary key" would misleadingly suggest the grid's editability story applies to a
-    // stream row at all, when this panel is read-only for every row regardless (CellEditorView.vue
-    // always renders CodeMirrorHost with `:read-only="true"`).
+    // stream row at all, when this panel is a viewer for every row regardless (P43 F3/D4: the dock
+    // mount below passes `:read-only="true"`, the same flag the console's own viewer mount uses).
     hasPrimaryKey: true,
   };
   publishSelectedCell(selected);
@@ -820,7 +820,7 @@ onUnmounted(() => {
         </template>
       </div>
     </ViewChrome>
-    <CellEditorDock :tab-id="tab.id" />
+    <CellEditorDock :tab-id="tab.id" :read-only="true" />
   </div>
 </template>
 
