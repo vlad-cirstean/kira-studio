@@ -60,7 +60,7 @@ function resolveFields(
   return { fields: { host, port, username, password, tls }, defaultDbIndex };
 }
 
-// Mirrors mariadb/client.ts's ConnectionSet exactly, keyed by logical db index instead of
+// Mirrors mysql-family/client.ts's ConnectionSet exactly, keyed by logical db index instead of
 // database name (P9's D9): one distinct ioredis client per db index, each carrying its own `db`
 // option baked in at construction rather than sharing one connection and issuing a runtime
 // SELECT — the same reason MariaDB's ConnectionSet holds one Connection per database rather than

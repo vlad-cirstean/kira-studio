@@ -84,7 +84,7 @@ function resultToPage(command: string, reply: unknown): KeyValuePage {
   return builder.finish(position);
 }
 
-// One op-log row for the whole batch (P5.5 D9's precedent, mirrored from mariadb/console.ts and
+// One op-log row for the whole batch (P5.5 D9's precedent, mirrored from mysql-family/console.ts and
 // mongo/console.ts).
 export async function execute(
   set: DbConnectionSet,

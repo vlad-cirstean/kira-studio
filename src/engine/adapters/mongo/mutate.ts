@@ -77,7 +77,7 @@ export async function mutate(
   readOnly: boolean,
   plan: MutationPlan,
 ): Promise<MutationResult> {
-  // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mariadb/mutate.ts).
+  // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mysql-family/mutate.ts).
   if (readOnly) throw new AdapterError('E_UNSUPPORTED', 'connection is read-only');
 
   const { collection: collectionName } = resolveCollectionPath(plan.path);

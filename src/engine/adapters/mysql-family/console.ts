@@ -8,12 +8,12 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError } from '../errors';
-import { mapMariaError, type TrackQuery, typeCastString } from './query';
+import { mapError, type TrackQuery, typeCastString } from './query';
 
 // Wire-protocol type-name vocabulary (`FieldInfo.type`, e.g. 'TINY', 'VAR_STRING') — distinct
 // from read.ts's catalog-string vocabulary ('tinyint(1)', 'varchar(50)'); confirmed against
 // node_modules/mariadb/types/share.d.ts's `Types` enum (checked 2026-08-23). Mirrors
-// mariadb/query.ts's typeCastString sets exactly, so a column that is decoded as binary text
+// mysql-family/query.ts's typeCastString sets exactly, so a column that is decoded as binary text
 // here is classified 'binary' there too.
 const BLOB_FAMILY_TYPES = new Set(['TINY_BLOB', 'MEDIUM_BLOB', 'LONG_BLOB', 'BLOB']);
 const ALWAYS_BINARY_TYPES = new Set(['GEOMETRY', 'BIT']);
@@ -100,7 +100,7 @@ async function runRaw(
         settled = true;
         ctx.signal.removeEventListener('abort', onAbort);
         release();
-        reject(mapMariaError(err));
+        reject(mapError(err));
       });
   });
 }

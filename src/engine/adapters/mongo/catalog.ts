@@ -3,7 +3,7 @@ import { encodePath, type TreeNode } from '../../../shared/domain/tree';
 import { mapMongoError } from './errors';
 
 // Databases mongod itself owns and that no user connection meaningfully browses — the same
-// system-schema exclusion mariadb/catalog.ts applies for information_schema et al.
+// system-schema exclusion mysql-family/catalog.ts applies for information_schema et al.
 const SYSTEM_DATABASES = new Set(['admin', 'local', 'config']);
 
 export async function listDatabases(client: MongoClient): Promise<TreeNode[]> {

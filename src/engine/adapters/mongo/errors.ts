@@ -1,7 +1,7 @@
 import { MongoNetworkError, MongoServerError, MongoServerSelectionError } from 'mongodb';
 import { AdapterError } from '../errors';
 
-// Mirrors mariadb/query.ts's mapMariaError — a single place that turns a driver-thrown error
+// Mirrors mysql-family/query.ts's mapError — a single place that turns a driver-thrown error
 // into the closed AdapterError code set, preserving the server's own message verbatim (Adapter
 // rule 4). An AbortSignal-driven cancellation (D7's primary layer) throws an 'AbortError' from
 // the driver itself, not a MongoServerError — checked first.

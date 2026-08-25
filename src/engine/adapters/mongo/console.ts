@@ -86,7 +86,7 @@ function docsToPage(docs: Document[]): DocumentPage {
 }
 
 // Console results that are an acknowledgement rather than a document set (insert/update/delete/
-// count) — one status "document" per statement, mirroring mariadb/console.ts's singleStatusPage.
+// count) — one status "document" per statement, mirroring mysql-family/console.ts's singleStatusPage.
 function statusPage(status: Record<string, unknown>): DocumentPage {
   const builder = createDocumentPageBuilder();
   builder.push('', EJSON.stringify(status, { relaxed: false }));
@@ -179,7 +179,7 @@ async function runStatement(
   }
 }
 
-// One op-log row for the whole batch (P5.5 D9's precedent, mirrored from mariadb/console.ts).
+// One op-log row for the whole batch (P5.5 D9's precedent, mirrored from mysql-family/console.ts).
 export async function execute(db: Db, ctx: OpCtx, statements: string[]): Promise<Page[]> {
   if (statements.length === 0) throw new AdapterError('E_QUERY', 'no statements to execute');
   ctx.setCommand(statements.join(';\n'));
