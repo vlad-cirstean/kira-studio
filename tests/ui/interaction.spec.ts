@@ -713,9 +713,10 @@ test('interaction completeness — grid menus, selection, copy/paste, ops menu, 
 
   await typeInto(activeConsole, page, '\nSELECT 8 AS via_menu_all;');
   await clickMenuItem(app, 'View', 'Run All');
-  // P40 D2: one result grid is mounted at a time — "Run All" now shows as two chips in the
-  // result-set strip rather than two stacked grids.
-  await expect(activeConsole.locator('[data-testid="console-result-tab"]')).toHaveCount(2, {
+  // P40 D2: one result grid is mounted at a time — "Run All" shows as chips in the result-set
+  // strip rather than stacked grids. P42 D5: appending is the default now, so Run All's own two
+  // statements land on top of the one chip "Run Statement" already produced above, for three.
+  await expect(activeConsole.locator('[data-testid="console-result-tab"]')).toHaveCount(3, {
     timeout: 10_000,
   });
 

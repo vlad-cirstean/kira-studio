@@ -216,25 +216,27 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await typeInto(consoleView1, page, 'SELECT 10 AS a;');
   await page.click('[data-testid="console-run-statement"]');
   const results1 = consoleView1.locator('[data-testid="console-result-grid"]');
+  const resultTabs1 = consoleView1.locator('[data-testid="console-result-tab"]');
   await expect(results1).toHaveCount(1);
   await expect(results1.first()).toContainText('10');
 
-  // Appending leaves the cursor at the end of the new text, inside the second statement — "Run
-  // statement" should now target only that one, not the first again and not both.
+  // P42 D5: appending is the default now, so "Run statement" on the second statement (cursor
+  // lands inside it after typing) adds a new chip rather than replacing the first one's — one
+  // grid stays MOUNTED at a time regardless (P40 D2), and the newest run's result is the active one.
   await typeInto(consoleView1, page, '\nSELECT 20 AS b;');
   await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs1).toHaveCount(2);
   await expect(results1).toHaveCount(1);
   await expect(results1.first()).toContainText('20');
-  await expect(results1.first()).not.toContainText('10');
-
-  // P40 D2: one result set is mounted at a time, chosen by the result-set strip — "Run all"
-  // still produces two result sets, now as two chips rather than two stacked grids.
-  await page.click('[data-testid="console-run-all"]');
-  await expect(results1).toHaveCount(1);
-  const resultTabs1 = consoleView1.locator('[data-testid="console-result-tab"]');
-  await expect(resultTabs1).toHaveCount(2);
   await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText(
     '2 result sets',
+  );
+
+  // "Run all" appends both statements' results on top of the two chips already there.
+  await page.click('[data-testid="console-run-all"]');
+  await expect(resultTabs1).toHaveCount(4);
+  await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText(
+    '4 result sets',
   );
   await expect(results1.first()).toContainText('10');
   await resultTabs1.nth(1).click();
@@ -379,7 +381,10 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
   const results = consoleView.locator('[data-testid="console-result-grid"]');
 
-  // --- toggle off (default, D6): running again replaces the current result set -----------------
+  // --- default (on, P42 D5): running again appends a new result set instead of replacing --------
+  const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
+  await expect(newResultToggle).toHaveClass(/is-active/);
+
   await typeInto(consoleView, page, 'SELECT 1 AS n;');
   await page.click('[data-testid="console-run-statement"]');
   await expect(resultTabs).toHaveCount(1);
@@ -387,34 +392,32 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 
   await typeInto(consoleView, page, '\nSELECT 2 AS n;');
   await page.click('[data-testid="console-run-statement"]');
-  await expect(resultTabs).toHaveCount(1);
-  await expect(results).toContainText('2');
-
-  // --- toggle on: running now appends a new result set instead of replacing (D6) ----------------
-  const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
-  await newResultToggle.click();
-  await expect(newResultToggle).toHaveClass(/is-active/);
-
-  await typeInto(consoleView, page, '\nSELECT 3 AS n;');
-  await page.click('[data-testid="console-run-statement"]');
   await expect(resultTabs).toHaveCount(2);
-  await expect(results).toContainText('3'); // the newest run becomes the active result (D6)
+  await expect(results).toContainText('2'); // the newest run becomes the active result (D6)
 
   // --- the strip: one grid is mounted at a time, switched by clicking a chip (D2/D3) ------------
   await resultTabs.nth(0).click();
   await expect(resultTabs.nth(0)).toHaveClass(/is-active/);
   await expect(results).toHaveCount(1);
-  await expect(results).toContainText('2');
+  await expect(results).toContainText('1');
 
   // --- ×: closes one result set; the remaining chip renumbers, a neighbour becomes active (D5) --
   await resultTabs.nth(0).locator('[data-testid="console-result-close"]').click();
   await expect(resultTabs).toHaveCount(1);
   await expect(resultTabs.first()).toContainText('Result 1');
+  await expect(results).toContainText('2');
+
+  // --- toggle off: running now replaces the current result set instead of appending (D6) --------
+  await newResultToggle.click();
+  await expect(newResultToggle).not.toHaveClass(/is-active/);
+
+  await typeInto(consoleView, page, '\nSELECT 3 AS n;');
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(resultTabs).toHaveCount(1); // replace: no new chip, the one result set swapped
   await expect(results).toContainText('3');
 
-  // --- find toolbar: opens over the active result set, filters, and counts matches (D8/D9/D10) --
-  await newResultToggle.click(); // back to replace mode — one result set, easier to search
-  await expect(newResultToggle).not.toHaveClass(/is-active/);
+  // --- find toolbar: opens over the active result set, filters, and counts matches (D8/D9/D10) —
+  // still in replace mode from the toggle above, so this run keeps a single result set. -----------
   await typeInto(consoleView, page, '\nSELECT 4 AS n UNION ALL SELECT 55 AS n ORDER BY n;');
   await page.click('[data-testid="console-run-statement"]');
   await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);

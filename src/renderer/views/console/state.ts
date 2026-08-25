@@ -126,8 +126,8 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     });
     if (rt.opId !== opId) return; // superseded by a newer run
 
-    // P40 D6: the toolbar toggle decides append vs. replace — off (the default) keeps today's
-    // always-replace behavior.
+    // P40 D6, default flipped P42 D5: the toolbar toggle decides append vs. replace — on (the
+    // default) keeps every run's own result set(s) rather than dropping what came before.
     if (!tab.state.newResultSet) dropResults(tabId);
     const newResults = response.pages.map((page) => {
       const key = resultPageKey(tabId, rt.nextSeq++);
