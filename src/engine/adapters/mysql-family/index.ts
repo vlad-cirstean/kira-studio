@@ -79,6 +79,13 @@ class MysqlFamilyAdapter implements Adapter {
       this.primaryDatabase = row.database ?? '';
       this.readOnly = cfg.readOnly;
 
+      // D6: pointing the MySQL adapter at a MariaDB server (or vice versa) works — same driver,
+      // same wire protocol — so this is a warning, not a connect failure; the label would
+      // otherwise silently mismatch what the server actually is.
+      if (this.profile.kind === 'mysql' && /mariadb/i.test(row.version)) {
+        this.deps.log('warn', `mysql: connected server identifies as MariaDB (${row.version})`);
+      }
+
       return {
         serverVersion: `${this.profile.serverLabel} ${row.version}`,
         details: { database: row.database ?? '', charset: row.charset },

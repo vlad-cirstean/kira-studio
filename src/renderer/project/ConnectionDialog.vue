@@ -22,15 +22,19 @@ import ColorPicker from './ColorPicker.vue';
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
   mariadb: 'MariaDB',
+  mysql: 'MySQL',
   mongodb: 'MongoDB',
   redis: 'Redis',
   kafka: 'Kafka',
   sqs: 'SQS',
   s3: 'S3',
 };
+// P34 D19: 'teal' is unused elsewhere in the rail and is the furthest free hue from MariaDB's
+// own 'blue' — the two engines a MySQL connection most often sits beside.
 const KIND_ACCENT: Record<ConnectionKind, string> = {
   postgres: 'cyan',
   mariadb: 'blue',
+  mysql: 'teal',
   mongodb: 'green',
   redis: 'red',
   kafka: 'amber',
@@ -40,6 +44,7 @@ const KIND_ACCENT: Record<ConnectionKind, string> = {
 const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
   'mariadb',
+  'mysql',
   'mongodb',
   'redis',
   'kafka',

@@ -4,12 +4,13 @@ import { capsSchema } from '../caps';
 export const connectionKindSchema = z.enum([
   'postgres',
   'mariadb',
+  'mysql',
   'mongodb',
   'redis',
   'kafka',
   'sqs',
   's3',
-]); // all v1 kinds; postgres (P1) and mariadb (P2) have adapters so far
+]); // all v1 kinds; every one has an adapter as of P34
 export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 
 // The connection dialog's default port per kind (D27's "kind-driven default port", not a
@@ -17,6 +18,7 @@ export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   postgres: 5432,
   mariadb: 3306,
+  mysql: 3306,
   mongodb: 27017,
   redis: 6379,
   kafka: 9092,

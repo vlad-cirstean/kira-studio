@@ -1,4 +1,3 @@
-import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind } from '@shared/domain/tree';
 
 const KIND_ICON: Record<NodeKind, string> = {
@@ -18,7 +17,7 @@ const KIND_ICON: Record<NodeKind, string> = {
   partition: 'symbol-array', // P10: a browse-only leaf under a kafka topic
   consumerGroup: 'organization', // P10: a browse-only, informational leaf under a kafka topic
   queue: 'inbox', // P10: an sqs queue, matching TabStrip.vue's stream-tab icon
-  bucket: 'archive', // P17: an s3 bucket, matching CONNECTION_KIND_ICON's own s3 pick below
+  bucket: 'archive', // P17: an s3 bucket
   prefix: 'folder', // P17: an intermediate '/'-delimited s3 key level
   object: 'file', // P17: a leaf s3 object, opened as a key/value tab (redis's own 'key' precedent)
 };
@@ -28,23 +27,6 @@ const KIND_ICON: Record<NodeKind, string> = {
 // straight through (project/menus.ts's per-row-kind menu builders) need this to stay total.
 export function nodeIcon(kind: NodeKind | 'group'): string {
   return kind === 'group' ? 'folder' : KIND_ICON[kind];
-}
-
-// Misc-fixes: the icon picker in ConnectionDialog.vue's new connection-kind chooser. No brand
-// logos in the codicon set, so these are picked for shape distinctiveness rather than any
-// per-vendor identity — not to be confused with KIND_ICON above, which is per tree-node-kind.
-const CONNECTION_KIND_ICON: Record<ConnectionKind, string> = {
-  postgres: 'database',
-  mariadb: 'server-environment',
-  mongodb: 'json',
-  redis: 'symbol-key',
-  kafka: 'broadcast',
-  sqs: 'inbox',
-  s3: 'archive',
-};
-
-export function connectionKindIcon(kind: ConnectionKind): string {
-  return CONNECTION_KIND_ICON[kind];
 }
 
 export function columnTypeIcon(dataType: string): string {
