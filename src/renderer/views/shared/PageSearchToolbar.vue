@@ -1,40 +1,40 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="M extends { row: number }">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { getPage, pageVersion } from './page';
-import {
-  clearSearchState,
-  isSearchFiltering,
-  type Match,
-  matchedRows,
-  runSearch,
-  type SearchHandle,
-  searchState,
-  setSearchFiltering,
-} from './search';
+import type { SearchHandle } from './pageScan';
+import type { PageSearchApi } from './pageSearch';
+import { isSearchFiltering, setSearchFiltering } from './searchFilter';
 
-const props = defineProps<{ tabId: string }>();
+// P39 D9: replaces grid/SearchToolbar.vue, documents/DocumentSearchToolbar.vue and
+// keyvalue/KeyValueSearchToolbar.vue — same markup, same classes, same testids (testidPrefix is
+// '' for the grid, 'document-' and 'keyvalue-' for the other two). stream/StreamSearchToolbar.vue
+// is a different widget (no case/word/regex toggles, no chunked scan) and stays on its own.
+const props = defineProps<{
+  tabId: string;
+  testidPrefix: string;
+  rowNoun: string;
+  api: PageSearchApi<M>;
+}>();
 
-// README: "search walks the loaded rows only and never issues a query" — this label is what
-// keeps a hit count from ever being mistaken for a count over the whole table.
-// P31 D22/F24: `getPage` reads a plain, non-reactive Map — `pageVersion.n` is the explicit
-// dependency that makes this recompute when the page is replaced.
+const emit = defineEmits<{ goToMatch: [match: M]; close: [] }>();
+
+// P31 D22/F24: `api.pageVersion.n` is the explicit dependency — the page stores read a plain,
+// non-reactive Map.
 const loadedRowCount = computed(() => {
-  void pageVersion.n;
-  return getPage(props.tabId)?.rowCount ?? 0;
+  void props.api.pageVersion.n;
+  return props.api.loadedRowCount(props.tabId);
 });
 
-// P24 D9: the scope label gains a filtered form ("showing N of M loaded rows") whenever the
-// toggle is on and a scan has completed.
+// P24 D9: the scope label gains a filtered form ("showing N of M loaded …") whenever the toggle
+// is on and a scan has completed.
 const filtering = computed(() => isSearchFiltering(props.tabId));
-const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
+const filteredRowCount = computed(() => props.api.matchedRows(props.tabId)?.length ?? null);
 
 function toggleFilter(): void {
   setSearchFiltering(props.tabId, !filtering.value);
 }
-const emit = defineEmits<{ goToMatch: [row: number, col: number]; close: [] }>();
 
 // Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
 // read as a type-only use of the TextField import above — it's a real component, bound as a
@@ -52,9 +52,9 @@ const errorMessage = ref<string | null>(null);
 const scanning = ref(false);
 const foundSoFar = ref(0);
 
-let handle: SearchHandle<Match> | null = null;
+let handle: SearchHandle<M> | null = null;
 
-const entry = computed(() => searchState[props.tabId]);
+const entry = computed(() => props.api.searchState[props.tabId]);
 
 // autoScroll is false for the page-replaced re-scan (D23): jumping the viewport because a
 // background refresh landed would move the page under the user's hands, unlike a query edit
@@ -63,13 +63,13 @@ function startSearch(autoScroll = true): void {
   handle?.cancel();
   errorMessage.value = null;
   if (query.value === '') {
-    clearSearchState(props.tabId);
+    props.api.clearSearchState(props.tabId);
     return;
   }
   scanning.value = true;
   foundSoFar.value = 0;
   try {
-    handle = runSearch(
+    handle = props.api.runSearch(
       props.tabId,
       {
         text: query.value,
@@ -89,8 +89,8 @@ function startSearch(autoScroll = true): void {
   }
   handle.done.then((matches) => {
     scanning.value = false;
-    searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
-    if (autoScroll && matches.length > 0) emit('goToMatch', matches[0].row, matches[0].col);
+    props.api.searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
+    if (autoScroll && matches.length > 0) emit('goToMatch', matches[0]);
   });
 }
 
@@ -98,11 +98,10 @@ watch([query, matchCase, wholeWord, regex], () => startSearch());
 
 // P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
 // setPage and bump pageVersion.n — without this, searchState[tabId].matches keeps pointing at
-// rows from the page that's gone, so the grid highlights row:col pairs that now hold unrelated
-// values and prev/next scrolls to arbitrary rows. Restarting the scan is the only way back to a
-// consistent match list; not auto-scrolling matches a fresh scan's own initial state (D23).
+// rows from the page that's gone. Restarting the scan is the only way back to a consistent match
+// list; not auto-scrolling matches a fresh scan's own initial state (D23).
 watch(
-  () => pageVersion.n,
+  () => props.api.pageVersion.n,
   () => {
     if (query.value !== '') startSearch(false);
   },
@@ -112,20 +111,18 @@ function goNext(): void {
   const e = entry.value;
   if (!e || e.matches.length === 0) return;
   e.index = (e.index + 1) % e.matches.length;
-  const m = e.matches[e.index];
-  emit('goToMatch', m.row, m.col);
+  emit('goToMatch', e.matches[e.index]);
 }
 function goPrev(): void {
   const e = entry.value;
   if (!e || e.matches.length === 0) return;
   e.index = (e.index - 1 + e.matches.length) % e.matches.length;
-  const m = e.matches[e.index];
-  emit('goToMatch', m.row, m.col);
+  emit('goToMatch', e.matches[e.index]);
 }
 
 function close(): void {
   handle?.cancel();
-  clearSearchState(props.tabId);
+  props.api.clearSearchState(props.tabId);
   // P24 D7: a closed toolbar must never leave rows hidden with no visible cause.
   setSearchFiltering(props.tabId, false);
   emit('close');
@@ -142,18 +139,17 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  // This component is mounted fresh each time `rt.searchOpen` flips true (DataView.vue's
-  // `v-if="rt?.searchOpen"`), so onMounted fires exactly when the toolbar opens — both from the
-  // toolbar button and from Cmd+F (view.find) — and is the right place to autofocus so typing can
-  // start immediately without an extra click into the field.
+  // This component is mounted fresh each time its host toolbar opens (both from the toolbar
+  // button and from Cmd+F), so onMounted fires exactly then — the right place to autofocus so
+  // typing can start immediately without an extra click into the field.
   void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
 });
 
 onUnmounted(() => {
   handle?.cancel();
-  clearSearchState(props.tabId);
-  // P24 D7: Cmd+F toggling searchOpen off (DataView.vue's view.find command) unmounts this
-  // component without ever calling close() above — the toggle must reset here too.
+  props.api.clearSearchState(props.tabId);
+  // P24 D7: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
+  // above — the toggle must reset here too.
   setSearchFiltering(props.tabId, false);
 });
 </script>
@@ -161,8 +157,16 @@ onUnmounted(() => {
 <template>
   <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
-  <div class="search-toolbar p-toolbar" data-testid="search-toolbar" @keydown="onKeydown">
-    <span class="icon-box" :class="errorMessage ? undefined : 'muted'" :style="errorMessage ? { color: 'var(--kira-error)' } : undefined">
+  <div
+    class="search-toolbar p-toolbar"
+    :data-testid="`${testidPrefix}search-toolbar`"
+    @keydown="onKeydown"
+  >
+    <span
+      class="icon-box"
+      :class="errorMessage ? undefined : 'muted'"
+      :style="errorMessage ? { color: 'var(--kira-error)' } : undefined"
+    >
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="search-input">
@@ -170,7 +174,7 @@ onUnmounted(() => {
         ref="searchInput"
         v-model="query"
         placeholder="Find"
-        data-testid="search-input"
+        :data-testid="`${testidPrefix}search-input`"
         :invalid="!!errorMessage"
       />
     </div>
@@ -183,21 +187,21 @@ onUnmounted(() => {
         icon="case-sensitive"
         :active="matchCase"
         v-tooltip="'Match case'"
-        data-testid="search-match-case"
+        :data-testid="`${testidPrefix}search-match-case`"
         @click="matchCase = !matchCase"
       />
       <IconButton
         icon="whole-word"
         :active="wholeWord"
         v-tooltip="'Whole word'"
-        data-testid="search-whole-word"
+        :data-testid="`${testidPrefix}search-whole-word`"
         @click="wholeWord = !wholeWord"
       />
       <IconButton
         icon="regex"
         :active="regex"
         v-tooltip="'Regular expression'"
-        data-testid="search-regex"
+        :data-testid="`${testidPrefix}search-regex`"
         @click="regex = !regex"
       />
     </div>
@@ -214,35 +218,55 @@ onUnmounted(() => {
         v-tooltip="
           filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
         "
-        data-testid="search-filter-rows"
+        :data-testid="`${testidPrefix}search-filter-rows`"
         @click="toggleFilter"
       />
     </div>
 
     <div class="sep" />
 
-    <span v-if="errorMessage" class="p-sm search-error" data-testid="search-error">{{
-      errorMessage
-    }}</span>
+    <span
+      v-if="errorMessage"
+      class="p-sm search-error"
+      :data-testid="`${testidPrefix}search-error`"
+      >{{ errorMessage }}</span
+    >
     <template v-else>
-      <span class="p-sm muted search-count" data-testid="search-count">
+      <span class="p-sm muted search-count" :data-testid="`${testidPrefix}search-count`">
         <template v-if="entry && entry.matches.length > 0">
           <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
         </template>
         <template v-else-if="scanning">{{ foundSoFar }}…</template>
         <template v-else>0 of 0</template>
       </span>
-      <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="search-prev" @click="goPrev" />
-      <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="search-next" @click="goNext" />
+      <IconButton
+        icon="chevron-up"
+        v-tooltip="'Previous match'"
+        :data-testid="`${testidPrefix}search-prev`"
+        @click="goPrev"
+      />
+      <IconButton
+        icon="chevron-down"
+        v-tooltip="'Next match'"
+        :data-testid="`${testidPrefix}search-next`"
+        @click="goNext"
+      />
       <div class="sep" />
-      <span class="p-xs dim" data-testid="search-scope">
+      <span class="p-xs dim" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
-          showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
+          showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }}
+          loaded {{ rowNoun }}
         </template>
-        <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
+        <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded {{ rowNoun }}</template>
       </span>
     </template>
-    <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="search-close" @click="close" />
+    <IconButton
+      icon="close"
+      class="p-push"
+      v-tooltip="'Close'"
+      :data-testid="`${testidPrefix}search-close`"
+      @click="close"
+    />
   </div>
 </template>
 
@@ -253,7 +277,7 @@ onUnmounted(() => {
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
    (see TextField.vue's inheritAttrs:false), so the fixed width lives on this wrapper instead of
-   a class/style on the <TextField> tag itself (DocumentView.vue's same `.filter-field`
+   a class/style on the <TextField> tag itself (DocumentView.vue's own `.filter-field`
    precedent). */
 .search-input {
   width: 200px;

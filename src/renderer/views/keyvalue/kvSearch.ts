@@ -5,7 +5,8 @@ import {
   type SearchHandle,
   type SearchQuery,
 } from '../shared/pageScan';
-import { getPage } from './kvPage';
+import type { PageSearchApi } from '../shared/pageSearch';
+import { getPage, pageVersion } from './kvPage';
 
 export type { SearchHandle, SearchQuery };
 
@@ -59,3 +60,13 @@ export function runSearch(
     onProgress,
   );
 }
+
+// P39 D9: what views/shared/PageSearchToolbar.vue binds to.
+export const pageSearchApi: PageSearchApi<Match> = {
+  runSearch,
+  clearSearchState,
+  searchState,
+  matchedRows,
+  pageVersion,
+  loadedRowCount: (tabId) => getPage(tabId)?.rowCount ?? 0,
+};

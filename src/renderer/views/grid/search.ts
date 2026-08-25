@@ -5,8 +5,9 @@ import {
   type SearchHandle,
   type SearchQuery,
 } from '../shared/pageScan';
+import type { PageSearchApi } from '../shared/pageSearch';
 import { isSearchFiltering, searchFilterState, setSearchFiltering } from '../shared/searchFilter';
-import { getPage } from './page';
+import { getPage, pageVersion } from './page';
 
 export type { SearchHandle, SearchQuery };
 // P31 D16: the filter-toggle state (and matchedRows' own de-dup pass) moved to
@@ -59,3 +60,13 @@ export function runSearch(
     onProgress,
   );
 }
+
+// P39 D9: what views/shared/PageSearchToolbar.vue binds to.
+export const pageSearchApi: PageSearchApi<Match> = {
+  runSearch,
+  clearSearchState,
+  searchState,
+  matchedRows,
+  pageVersion,
+  loadedRowCount: (tabId) => getPage(tabId)?.rowCount ?? 0,
+};

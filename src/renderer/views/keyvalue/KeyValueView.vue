@@ -26,12 +26,12 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { setSearchFiltering } from '../shared/searchFilter';
-import KeyValueSearchToolbar from './KeyValueSearchToolbar.vue';
 import { keyValueMenu } from './keyValueMenu';
 import { addKey, deleteKey, saveValueEdit } from './keyValueMutations';
 import { getPage, keyValueRow, pageVersion } from './kvPage';
-import { matchedRows, searchState } from './kvSearch';
+import { type Match, matchedRows, pageSearchApi, searchState } from './kvSearch';
 import { goNext, goPrev, load, reload, runCount, runtime, setPageSize, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -498,8 +498,8 @@ function onCloseSearch(): void {
 }
 
 const tbodyRef = ref<HTMLElement | null>(null);
-function onGoToMatch(row: number): void {
-  tbodyRef.value?.querySelector(`[data-row="${row}"]`)?.scrollIntoView({ block: 'nearest' });
+function onGoToMatch(match: Match): void {
+  tbodyRef.value?.querySelector(`[data-row="${match.row}"]`)?.scrollIntoView({ block: 'nearest' });
 }
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per row.
@@ -788,9 +788,12 @@ onUnmounted(() => {
         </MessageStrip>
       </template>
 
-      <KeyValueSearchToolbar
+      <PageSearchToolbar
         v-if="rt?.searchOpen"
         :tab-id="tab.id"
+        testid-prefix="keyvalue-"
+        row-noun="rows"
+        :api="pageSearchApi"
         @go-to-match="onGoToMatch"
         @close="onCloseSearch"
       />

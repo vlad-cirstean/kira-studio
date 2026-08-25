@@ -85,7 +85,7 @@ const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
 // Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
 // doesn't read as a type-only use of the CodeMirrorHost import — same convention as
-// ConsoleSavedMenu.vue's promptInput/SearchToolbar.vue's own template ref.
+// ConsoleSavedMenu.vue's promptInput/PageSearchToolbar.vue's own template ref.
 const editorHost = ref<{ focus: () => void } | null>(null);
 // The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
 // closes right after loading), and nothing else in the tree reclaims focus — without this the

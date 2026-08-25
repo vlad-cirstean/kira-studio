@@ -24,12 +24,18 @@ import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import { setSearchFiltering } from '../shared/searchFilter';
 import { useEditBuffer } from '../shared/useEditBuffer';
-import DocumentSearchToolbar from './DocumentSearchToolbar.vue';
 import DocumentTree from './DocumentTree.vue';
 import { documentRow, fieldNamesOnPage, pageVersion } from './docPage';
-import { searchState as docSearchState, matchedRows, previewLineFor } from './docSearch';
+import {
+  searchState as docSearchState,
+  type Match,
+  matchedRows,
+  pageSearchApi,
+  previewLineFor,
+} from './docSearch';
 import { documentMenu } from './documentMenu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './documentMutations';
 import { type DocumentRowView, rowHeight, rowsVersion, rowView, togglePath } from './documentRows';
@@ -409,7 +415,8 @@ const rowHeights = computed<number[]>(() => {
 // nothing for a match outside the rendered window (F10). scrollToIndex takes a position in
 // `rows.value` (the rendered array), not a raw page-row number — the two only coincide when the
 // filter toggle (D17) is off, so this always looks the position up rather than assuming they match.
-function onGoToMatch(row: number): void {
+function onGoToMatch(match: Match): void {
+  const row = match.row;
   const view = rowView(props.tab.id, row);
   if (!view) return;
   if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
@@ -692,11 +699,14 @@ onUnmounted(() => {
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="document-error">
           {{ rt.error.message }}
         </MessageStrip>
-        <!-- Below the filter/sort row, above the list it searches — SearchToolbar.vue's own
+        <!-- Below the filter/sort row, above the list it searches — PageSearchToolbar.vue's own
              "docks at the bottom of the toolbar it belongs to" placement (LAW 03). -->
-        <DocumentSearchToolbar
+        <PageSearchToolbar
           v-if="rt?.searchOpen"
           :tab-id="tab.id"
+          testid-prefix="document-"
+          row-noun="documents"
+          :api="pageSearchApi"
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"
         />

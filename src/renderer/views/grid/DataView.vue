@@ -10,10 +10,11 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import PageSearchToolbar from '../shared/PageSearchToolbar.vue';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
-import SearchToolbar from './SearchToolbar.vue';
+import { type Match, pageSearchApi } from './search';
 import { load, reload, runtime } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
@@ -122,8 +123,8 @@ onUnmounted(() => {
 
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
 
-function onGoToMatch(row: number, col: number): void {
-  dataGridRef.value?.scrollCellIntoView(row, col);
+function onGoToMatch(match: Match): void {
+  dataGridRef.value?.scrollCellIntoView(match.row, match.col);
 }
 function onCloseSearch(): void {
   const runtimeEntry = runtime[props.tab.id];
@@ -170,9 +171,12 @@ function onCloseSearch(): void {
       <!-- Below the filter row, not floating over the grid it searches — the "docks at the
            bottom of the result" placement from Toolbars.html overlapped the last visible row,
            which read as a bug rather than a search bar. -->
-      <SearchToolbar
+      <PageSearchToolbar
         v-if="rt?.searchOpen"
         :tab-id="tab.id"
+        testid-prefix=""
+        row-noun="rows"
+        :api="pageSearchApi"
         @go-to-match="onGoToMatch"
         @close="onCloseSearch"
       />
