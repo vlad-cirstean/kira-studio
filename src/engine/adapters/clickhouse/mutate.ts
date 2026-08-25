@@ -15,7 +15,11 @@ function assertInsertOnly(
   op: MutationRowOp,
 ): asserts op is Extract<MutationRowOp, { kind: 'insert' }> {
   if (op.kind !== 'insert') {
-    throw new AdapterError('E_UNSUPPORTED', 'ClickHouse only supports adding new rows (insert)');
+    throw new AdapterError(
+      'E_UNSUPPORTED',
+      'ClickHouse only supports adding new rows (insert): a MergeTree PRIMARY KEY is a sparse ' +
+        'index, not a unique key, so there is no addressable row to update or delete',
+    );
   }
 }
 

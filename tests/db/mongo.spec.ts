@@ -104,7 +104,9 @@ describe('mongo adapter (§9.1, P8)', () => {
         makeCtx(),
       );
       expect(collections.map((n) => n.name).sort()).toEqual([
+        'big_widgets',
         'empty_collection',
+        'oversized_widgets',
         'validated_widgets',
         'widgets',
       ]);

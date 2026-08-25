@@ -291,7 +291,10 @@ describe('clickhouse adapter (§9.1, P36)', () => {
         ]),
         makeCtx(),
       );
-      expect(noSortingKeyMeta.rowEstimate).toBeNull();
+      // Checked against clickhouse-server 26.3.21.7: the Memory engine's total_rows is not null
+      // the way the older assumption behind this fixture's own comment claimed — Memory keeps
+      // every row in an in-process array, trivial to count, unlike a MergeTree's part metadata.
+      expect(noSortingKeyMeta.rowEstimate).toBe(2);
 
       const viewMeta = await adapter.describe(
         path([
@@ -316,7 +319,11 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       const runPromise = adapter.execute(
         {
           path: path([{ kind: 'database', name: fixture.database }]),
-          statements: ['SELECT sleepEachRow(1) FROM numbers(30)'],
+          // max_block_size=1 keeps each block's sleep (1s) under the server's own
+          // function_sleep_max_microseconds_per_block cap (3s) — verified empirically against
+          // clickhouse-server:26.3 that the default block size batches all 30 rows into one block,
+          // whose 30s total sleep the server refuses outright before ever running.
+          statements: ['SELECT sleepEachRow(1) FROM numbers(30) SETTINGS max_block_size = 1'],
         },
         ctx,
       );
@@ -736,8 +743,10 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       );
       expect(wideTableDefinition.origin).toBe('server');
       expect(wideTableDefinition.statements).toHaveLength(1);
-      // D6: show_table_uuid_in_table_create_query_if_not_nil is pinned to 0 — no UUID clause.
-      expect(wideTableDefinition.statements[0]).not.toContain('UUID');
+      // D6: show_table_uuid_in_table_create_query_if_not_nil is pinned to 0 — no auto-generated
+      // `UUID '...'` table-identity clause. A plain substring check would also flag wide_table's
+      // own legitimate `uuid_a UUID DEFAULT generateUUIDv4()` column, so match the clause's shape.
+      expect(wideTableDefinition.statements[0]).not.toMatch(/\bUUID\s+'[0-9a-f-]+'/i);
 
       const rows = await sideRows<{ create_table_query: string }>(
         side,
@@ -1346,8 +1355,15 @@ describe('clickhouse adapter (§9.1, P36)', () => {
         },
         makeCtx(),
       );
-      expect(cellAt(page, 0, 0)).toBe('18446744073709551615');
-      expect(cellAt(page, 1, 0)).toBe('123456789012345678.12345678901234567890');
+      // Projection is resolved in the table's own ordinal order, not request order (read.ts's
+      // resolveProjection, mirrored by every other SQL adapter) — `dec` (position 9) sorts before
+      // `big_uint` (position 14) in wide_types regardless of the ['big_uint', 'dec'] request above.
+      // The server itself renders this Decimal128(20) one digit short of the inserted literal's own
+      // trailing zero (verified directly against clickhouse-server:26.3's raw JSON response) — the
+      // adapter passes the server's own text through unchanged (D16), so 19 fractional digits here
+      // is what "every digit" the server actually reports looks like, not a formatting bug.
+      expect(cellAt(page, 0, 0)).toBe('123456789012345678.1234567890123456789');
+      expect(cellAt(page, 1, 0)).toBe('18446744073709551615');
 
       const [consolePage] = await adapter.execute(
         {
@@ -1437,7 +1453,11 @@ describe('clickhouse adapter (§9.1, P36)', () => {
         },
         memoryCtx,
       );
-      expect(memoryCtx.commands.join('\n')).not.toContain('ORDER BY');
+      // Not the whole command log: runCatalogQuery (Adapter rule 3) logs every catalog lookup
+      // too, and system.columns's own query always carries its own unrelated "ORDER BY position"
+      // clause (sorting the column list, nothing to do with the table's data ordering) — the data
+      // SELECT itself is the last command read() issues.
+      expect(memoryCtx.commands.at(-1)).not.toContain('ORDER BY');
     } finally {
       await side.close();
       await adapter.disconnect();
@@ -1600,7 +1620,11 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       });
 
       // The adapter's own guard runs first; a raw statement through execute() proves the server
-      // refuses independently, with its own READONLY code.
+      // refuses independently. kira_ro's own grant is SELECT-only (support/clickhouse.ts) — verified
+      // empirically against clickhouse-server:26.3 that this INSERT hits that grant check
+      // (ACCESS_DENIED, code 497) before the app-level `readonly: 2` setting (query.ts's
+      // readonlySettings) would even matter, so the server's own independent refusal is grant-based,
+      // mapped to E_AUTH the same as every other ACCESS_DENIED case (errors.ts).
       let rejected: unknown;
       try {
         await readOnlyAdapter.execute(
@@ -1615,7 +1639,7 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       } catch (err) {
         rejected = err;
       }
-      expect((rejected as { code?: string }).code).toBe('E_QUERY');
+      expect((rejected as { code?: string }).code).toBe('E_AUTH');
     } finally {
       await readOnlyAdapter.disconnect();
     }
@@ -1658,7 +1682,11 @@ describe('clickhouse adapter (§9.1, P36)', () => {
       const slowPromise = adapter.execute(
         {
           path: path([{ kind: 'database', name: fixture.database }]),
-          statements: ['SELECT sleepEachRow(1) FROM numbers(30)'],
+          // max_block_size=1 keeps each block's sleep (1s) under the server's own
+          // function_sleep_max_microseconds_per_block cap (3s) — verified empirically against
+          // clickhouse-server:26.3 that the default block size batches all 30 rows into one block,
+          // whose 30s total sleep the server refuses outright before ever running.
+          statements: ['SELECT sleepEachRow(1) FROM numbers(30) SETTINGS max_block_size = 1'],
         },
         ctx,
       );

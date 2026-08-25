@@ -22,7 +22,7 @@
 --   wide_types       (35/36/37) — the type-diversity table, plus the big-integer and NULL/"null"/NaN cases
 --   generated_cols  (39) — a DEFAULT, a MATERIALIZED and an ALIAS column
 --   commented       (44) — a table comment and per-column comments
---   no_sorting_key  (38) — ENGINE = Memory: no sorting key, no total_rows
+--   no_sorting_key  (38) — ENGINE = Memory: no sorting key (total_rows is still reported)
 --   big_rows        (6/38/45) — 1,000,000 rows from numbers(1000000), one statement, no chunking
 
 -- -------------------------------------------------------------------------------------------
@@ -81,12 +81,13 @@ INSERT INTO nulls_and_unicode (id, label, note) VALUES (
   '😀🎉👍 emoji',
   concat('中文测试 日本語テスト 한국어 테스트 العربية עברית e', '́', ' combining acute')
 );
--- A 1 MB text value and a 256 KB "blob" value (plain bytes stored in a String column — ClickHouse
--- has no separate blob type, F24).
+-- A ~1 MB text value and a 256 KB "blob" value (plain bytes stored in a String column —
+-- ClickHouse has no separate blob type, F24). repeat()'s count is capped at 1,000,000 server-side,
+-- so this lands just under a full MB rather than exactly at one.
 INSERT INTO nulls_and_unicode (id, label, big_text, big_blob) VALUES (
   4,
   'oversized values',
-  repeat('a', 1048576),
+  repeat('a', 1000000),
   repeat('A', 262144)
 );
 
@@ -297,9 +298,10 @@ COMMENT 'a table with its own comment';
 INSERT INTO commented (id, name) VALUES (1, 'first'), (2, 'second');
 
 -- -------------------------------------------------------------------------------------------
--- no_sorting_key (38) — the Memory engine has no ORDER BY, no PARTITION BY and no part metadata
--- to report a row estimate from: system.tables.sorting_key is '' and total_rows is NULL here,
--- both D17/D21's null paths.
+-- no_sorting_key (38) — the Memory engine has no ORDER BY, no PARTITION BY and no part metadata:
+-- system.tables.sorting_key is '' here (D17/D21's null path). total_rows is NOT null though —
+-- checked against clickhouse-server 26.3.21.7, Memory keeps every row in an in-process array, so
+-- system.tables reports a real count (2) the same trivial way it would for any other engine.
 -- -------------------------------------------------------------------------------------------
 CREATE TABLE no_sorting_key (
   id    UInt32,

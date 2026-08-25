@@ -1577,6 +1577,9 @@ describe('sqlite adapter (§9.1, P35)', () => {
   });
 
   test('39. a locked database is a legible failure (F15/D26)', async () => {
+    // The adapter's own busy_timeout is 5000ms (client.ts's BUSY_TIMEOUT_MS, D6) — bun test's
+    // default per-test timeout is the same 5000ms, so this scenario needs more headroom than that
+    // to let the real timeout actually fire instead of racing the test runner's own.
     const { DatabaseSync } = await import('node:sqlite');
     const locker = new DatabaseSync(fixture.path, { timeout: 200 });
     locker.exec('BEGIN IMMEDIATE');
@@ -1599,7 +1602,7 @@ describe('sqlite adapter (§9.1, P35)', () => {
       locker.exec('ROLLBACK');
       locker.close();
     }
-  });
+  }, 10_000);
 
   test('40. multi-statement input is refused, not truncated (F9/D9)', async () => {
     const adapter = await createAdapter('sqlite', deps);

@@ -148,7 +148,10 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MysqlFixture> {
     // InnoDB transaction stays bounded. Materialisation-free, unlike a 1,000,000-deep recursive
     // CTE, which would need cte_max_recursion_depth raised past its 1,000 default.
     if (opts?.seedBigTable ?? true) {
-      await rootConn.query('CREATE TEMPORARY TABLE digits (d INT PRIMARY KEY)');
+      // A plain table, not TEMPORARY: MySQL's TEMPORARY tables can't be referenced more than once
+      // in the same query ("Can't reopen table"), and the six-way self-join below does exactly
+      // that. Dropped once the bulk insert is done.
+      await rootConn.query('CREATE TABLE digits (d INT PRIMARY KEY)');
       await rootConn.query('INSERT INTO digits (d) VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)');
       for (let outer = 0; outer < 10; outer++) {
         await rootConn.query(
@@ -160,6 +163,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MysqlFixture> {
           [outer],
         );
       }
+      await rootConn.query('DROP TABLE digits');
       await rootConn.query(`ANALYZE TABLE \`${DATABASE}\`.big_rows`);
     }
   } finally {

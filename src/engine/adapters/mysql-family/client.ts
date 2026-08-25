@@ -57,10 +57,12 @@ export function buildConnectionOptions(
 
   const sslmode = cfg.options.sslmode;
   if (typeof sslmode === 'string' && sslmode !== 'disable') {
-    if (sslmode === 'require' || sslmode === 'prefer') {
+    // verify-full deliberately uses the same `rejectUnauthorized: false` transport as
+    // require/prefer, not `ssl: true` — see the comment on the post-connect check in
+    // ConnectionSet.get() for why asking the driver's TLS layer itself to reject the handshake
+    // is not safe to do here.
+    if (sslmode === 'require' || sslmode === 'prefer' || sslmode === 'verify-full') {
       base.ssl = { rejectUnauthorized: false };
-    } else if (sslmode === 'verify-full') {
-      base.ssl = true;
     } else {
       opts.log('warn', `unknown sslmode "${sslmode}", ignoring`);
     }
@@ -104,6 +106,35 @@ export class ConnectionSet {
       connection = await createConnection(options);
     } catch (err) {
       throw mapError(err);
+    }
+    // verify-full: buildConnectionOptions deliberately never asks the driver's TLS layer to
+    // reject the handshake itself (rejectUnauthorized stays false even here). Checked against
+    // mysql:8.4 and mariadb npm driver 3.5.3 (2026-08-25): when the socket layer *is* the one
+    // rejecting a bad certificate, this driver races two of its own socket event handlers
+    // against each other and reports whichever wins — sometimes the raw Node TLS validation
+    // error, sometimes a generic ER_SOCKET_UNEXPECTED_CLOSE with no `.cause` back to the real
+    // reason — and under Bun's test runner specifically, that failure has been observed to reach
+    // the process as something no try/catch here (nor a bare `.rejects` on the caller's own
+    // promise) ever intercepts, a known class of Bun TLS/socket bug (e.g. oven-sh/bun#7332).
+    // Letting the handshake succeed and inspecting the driver's own post-handshake
+    // `info.selfSignedCertificate`/`info.tlsAuthorizationError` (set unconditionally by
+    // mariadb's handshake.js, never gated on rejectUnauthorized) avoids that failure path
+    // entirely, at the cost of one extra round trip before the connection is torn back down.
+    // Not in mariadb's own .d.ts (types/share.d.ts's ConnectionInfo), but set unconditionally by
+    // lib/cmd/handshake/auth/handshake.js's post-TLS callback — present on every connection info
+    // object at runtime, ssl or not.
+    const info = connection.info as unknown as {
+      selfSignedCertificate?: boolean;
+      tlsAuthorizationError?: unknown;
+    } | null;
+    if (this.cfg.options.sslmode === 'verify-full' && info?.selfSignedCertificate) {
+      const reason = info.tlsAuthorizationError;
+      await connection.end().catch(() => {});
+      throw new AdapterError(
+        'E_AUTH',
+        'TLS handshake failed: the server certificate could not be verified (sslmode=verify-full).',
+        reason,
+      );
     }
     this.connections.set(key, connection);
     this.touch(key);

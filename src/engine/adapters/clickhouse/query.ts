@@ -45,6 +45,17 @@ export interface RunOptions {
   queryId: string;
 }
 
+// The *Strings JSON formats (JSONCompactStringsEachRow* below) render every Nullable NULL as this
+// literal small-caps string instead of JSON null — chosen by ClickHouse itself specifically so it
+// can't collide with an empty string, verified empirically against clickhouse-server:26.3 (a
+// Nullable(String) NULL and '' come back as "ᴺᵁᴸᴸ" and "" respectively, never JSON `null`). Not
+// documented anywhere the adapter can link to; the sentinel itself is the only reliable signal.
+const NULL_SENTINEL = 'ᴺᵁᴸᴸ'; // "ᴺᵁᴸᴸ"
+
+function decodeRow(values: (string | null)[]): (string | null)[] {
+  return values.map((v) => (v === NULL_SENTINEL ? null : v));
+}
+
 /** Streams a row-returning statement, one values-array per row, on D16's wire format — the
  *  first row is column names, the second is column types, everything after is data. Registers
  *  itself with `track` but never calls `ctx.setCommand()`: `console.ts`'s execute() calls it once
@@ -79,7 +90,7 @@ export async function streamQuery(
         } else if (rowIndex === 1) {
           onHeader(names, values as string[]);
         } else {
-          onRow(values);
+          onRow(decodeRow(values));
         }
         rowIndex++;
       }

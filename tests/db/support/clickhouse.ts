@@ -80,6 +80,10 @@ async function start(): Promise<ClickHouseFixture> {
     .withUsername(ADMIN_USER)
     .withPassword(ADMIN_PASSWORD)
     .withStartupTimeout(STARTUP_TIMEOUT_MS)
+    // Without this, the official image's CLICKHOUSE_USER bootstrap grants kira_admin plain
+    // GRANT ALL ON *.* — which excludes ACCESS MANAGEMENT (CREATE USER, GRANT, ...) — so the
+    // CREATE USER statements below would fail with ACCESS_DENIED.
+    .withEnvironment({ CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1' })
     .start();
 
   const host = container.getHost();
@@ -103,9 +107,14 @@ async function start(): Promise<ClickHouseFixture> {
     CREATE USER IF NOT EXISTS ${USERNAME} IDENTIFIED WITH plaintext_password BY '${PASSWORD}';
     GRANT SELECT, INSERT, ALTER DELETE ON ${DATABASE}.* TO ${USERNAME};
     GRANT SELECT ON system.* TO ${USERNAME};
+    -- 'default' is ClickHouse's own always-present database (never seeded with anything here) —
+    -- scenario 3's tree enumeration expects it in the root listing the same way a fresh
+    -- ClickHouse user normally sees it, so it needs its own explicit grant same as kira_test.
+    GRANT SELECT ON default.* TO ${USERNAME};
     CREATE USER IF NOT EXISTS ${READONLY_USERNAME} IDENTIFIED WITH plaintext_password BY '${READONLY_PASSWORD}';
     GRANT SELECT ON ${DATABASE}.* TO ${READONLY_USERNAME};
     GRANT SELECT ON system.* TO ${READONLY_USERNAME};
+    GRANT SELECT ON default.* TO ${READONLY_USERNAME};
     `,
   );
 

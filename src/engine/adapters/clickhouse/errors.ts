@@ -9,9 +9,7 @@ interface ClickHouseDriverError {
 // code beyond this short list falls through to E_QUERY with the server's own message verbatim
 // (Adapter rule 4) — its own text ("Table default.t does not exist") is already better than
 // anything a wrapper would compose.
-const UNKNOWN_IDENTIFIER = '47';
 const NOT_IMPLEMENTED = '48';
-const UNKNOWN_TABLE = '60';
 const UNKNOWN_DATABASE = '81';
 const TIMEOUT_EXCEEDED = '159';
 const READONLY = '164';
@@ -36,7 +34,13 @@ export function mapError(err: unknown): AdapterError {
   const e = err as ClickHouseDriverError | undefined;
   const code = e?.code;
 
-  if (code === UNKNOWN_TABLE || code === UNKNOWN_DATABASE || code === UNKNOWN_IDENTIFIER) {
+  // D26 (revised): only UNKNOWN_DATABASE maps to E_NOT_FOUND here — connect()'s own bad-database
+  // check (2d) is the one place a raw driver error IS the adapter's catalog lookup. UNKNOWN_TABLE/
+  // UNKNOWN_IDENTIFIER, by contrast, mean a free-form statement (console/execute) referenced
+  // something invalid — every other adapter's mapError leaves that as plain E_QUERY (mysql-family's
+  // own equivalent test, 28, expects exactly that), and this adapter's own catalog-lookup paths
+  // (catalog.ts, mutate.ts) already throw E_NOT_FOUND explicitly wherever it actually applies.
+  if (code === UNKNOWN_DATABASE) {
     return new AdapterError('E_NOT_FOUND', message, err);
   }
   if (code === TIMEOUT_EXCEEDED || code === SOCKET_TIMEOUT) {

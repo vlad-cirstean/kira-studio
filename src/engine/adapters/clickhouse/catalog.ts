@@ -215,19 +215,46 @@ interface ConstraintRow {
   expression: string;
 }
 
-// F18: unlike SQLite (P35 D24, no CHECK catalog at all), ClickHouse has a real one — filtered to
-// CHECK; 'ASSUME' is a query-optimizer hint, not a constraint a user would recognise as one.
-export async function listCheckConstraints(
-  exec: QueryExecutor,
-  schema: string,
-  table: string,
-): Promise<ConstraintRow[]> {
-  const rows = await exec<ConstraintRow>(
-    `SELECT name, type, expression FROM system.constraints
-     WHERE database = {db:String} AND table = {tbl:String}`,
-    { db: schema, tbl: table },
-  );
-  return rows.filter((r) => r.type === 'CHECK');
+// F18 (revised): system.constraints is documented, but does not exist on the server this adapter
+// is built/tested against (checked against clickhouse/clickhouse-server:26.3, version()
+// 26.3.21.7 — SHOW TABLES FROM system has no such row, and querying it directly fails with
+// UNKNOWN_TABLE even for the admin user against a table that does have a CONSTRAINT). CHECK
+// constraints are only ever visible through the CREATE TABLE DDL text itself (SHOW CREATE TABLE /
+// system.tables.create_table_query), so this parses them out of that text instead of querying a
+// catalog table — no network round trip, and no grant can hide it either. 'ASSUME' is a
+// query-optimizer hint, not a constraint a user would recognise as one, so only CONSTRAINT ...
+// CHECK ... clauses are matched.
+const CHECK_CONSTRAINT_RE = /^CONSTRAINT\s+(`(?:[^`]|``)+`|\S+)\s+CHECK\s+([\s\S]+)$/i;
+
+export function listCheckConstraints(createTableQuery: string): ConstraintRow[] {
+  const start = createTableQuery.indexOf('(');
+  if (start === -1) return [];
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < createTableQuery.length; i++) {
+    if (createTableQuery[i] === '(') depth++;
+    else if (createTableQuery[i] === ')') {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (end === -1) return [];
+
+  const constraints: ConstraintRow[] = [];
+  for (const part of splitTopLevelCommas(createTableQuery.slice(start + 1, end))) {
+    const match = CHECK_CONSTRAINT_RE.exec(part.trim());
+    if (!match) continue;
+    const rawName = match[1];
+    const name =
+      rawName.startsWith('`') && rawName.endsWith('`')
+        ? rawName.slice(1, -1).replace(/``/g, '`')
+        : rawName;
+    constraints.push({ name, type: 'CHECK', expression: match[2].trim() });
+  }
+  return constraints;
 }
 
 export interface ReadTarget {

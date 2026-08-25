@@ -54,7 +54,7 @@ export async function buildDefinition(
     throw new AdapterError('E_QUERY', `no definition returned for "${schema}"."${object.name}"`);
   }
 
-  const checkRows = await catalog.listCheckConstraints(exec, schema, object.name);
+  const checkRows = catalog.listCheckConstraints(target.createTableQuery);
   const constraints = checkRows.map(toConstraintMeta);
 
   const notes = [
