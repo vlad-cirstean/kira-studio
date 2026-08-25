@@ -155,8 +155,13 @@ async function kindOf(page: Page, row: number): Promise<string> {
 }
 
 /** `json-invalid` is the only fixture kind whose expected detection differs from its own name. */
+// P42 D23: uuid and url are gone as detected formats (F19 — both were inert on selection) — the
+// fixture's own 'uuid'/'url' sample rows now detect as plain text, same as any other string with
+// no distinguishing shape.
 function expectedFormatFor(kind: string): string {
-  return kind === 'json-invalid' ? 'json' : kind;
+  if (kind === 'json-invalid') return 'json';
+  if (kind === 'uuid' || kind === 'url') return 'text';
+  return kind;
 }
 
 test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read-only', async ({
@@ -238,7 +243,9 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     page.locator('[data-testid="grid-header-cell"][data-column="uuid_a"]'),
   ).toBeVisible();
   await selectCell(page, 0, 'uuid_a');
-  await expect(panel).toHaveAttribute('data-detected', 'uuid');
+  // P42 D23: uuid is gone as a format — a real UUID column's value now detects as text, the
+  // same as it would for any string type_class column with no other distinguishing shape.
+  await expect(panel).toHaveAttribute('data-detected', 'text');
   await scrollColumnIntoView(page, 'ts_a');
   await selectCell(page, 0, 'ts_a');
   await expect(panel).toHaveAttribute('data-detected', 'iso8601');
@@ -581,27 +588,10 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   const encoded = page.locator('[data-testid="cell-editor-encoded"] .cm-content');
 
   // Fixture row order (0001_seed.sql's own INSERT order, already relied on by the sibling test's
-  // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds, 8=uuid.
-
-  // --- UUID generate — overwrites the buffer with a fresh v4 UUID, staged like any other edit --
-  await selectCell(page, 8, 'sample');
-  await panel.waitFor();
-  await expect(panel).toHaveAttribute('data-detected', 'uuid');
-  const beforeUuid = await encoded.innerText();
-  await expect(page.locator('[data-testid="cell-editor-uuid-generate"]')).toBeEnabled();
-  await page.click('[data-testid="cell-editor-uuid-generate"]');
-  const afterUuid = await encoded.innerText();
-  expect(afterUuid).not.toBe(beforeUuid);
-  expect(afterUuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="8"][data-column="sample"]'),
-  ).toHaveClass(/pending-edit/);
-  await page.click('[data-testid="toolbar-discard-changes"]');
-
-  // The generate button is disabled for every other format.
-  await selectCell(page, 0, 'sample'); // json row
-  await panel.waitFor();
-  await expect(page.locator('[data-testid="cell-editor-uuid-generate"]')).toBeDisabled();
+  // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds.
+  // P42 D23/D29: the old UUID-generate button (and row 8's 'uuid' detected format it exercised)
+  // is gone; a generators panel offering UUID among others replaces it in a later commit, with
+  // its own test.
 
   // --- timestamp translate pane (P24 D14/D15/D18/D19) --------------------------------------
   await selectCell(page, 5, 'sample'); // epochSeconds row

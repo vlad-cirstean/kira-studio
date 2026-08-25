@@ -30,14 +30,14 @@ const ELIGIBLE_BY_TYPE_CLASS: Record<TypeClass, readonly CellFormat[]> = {
   other: CELL_FORMATS,
 };
 
-// §5c: equal-score ties break on this order, highest first.
+// §5c: equal-score ties break on this order, highest first. P42 D23: uuid/url removed — every
+// remaining format here still has an entry (Array.indexOf returns -1, and -1 sorts first, for
+// anything missing one).
 const PRECEDENCE: readonly CellFormat[] = [
   'json',
   'xml',
   'sql',
-  'uuid',
   'iso8601',
-  'url',
   'epochMillis',
   'epochSeconds',
   'hex',
@@ -141,22 +141,14 @@ function detectSql(input: DetectInput): FormatGuess | null {
     : { format: 'sql', score: 0.45, reason: 'leading SQL keyword' };
 }
 
+// P42 D23/D24: uuid and url are gone as formats (F19 — both inert on selection), but this regex
+// survives as a guard: a dashed v4 UUID is 36 chars, 36 % 4 === 0, ≥ BASE64_MIN_LENGTH, matches
+// BASE64_URL_RE ('-' is in the URL-safe alphabet) and atob()-decodes — without this guard every
+// UUID column in the app would start detecting as base64 and open a decoded-text pane of
+// mojibake. `detectUrl` needed no such guard: a URL's ':' and '.' are outside both base64
+// alphabets and HEX_RE, and one line is never CSV, so it already falls through to `text` on its
+// own with nothing deleted here.
 const UUID_RE = /^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/;
-
-function detectUuid(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (!UUID_RE.test(t)) return null;
-  const score = input.dataType.toLowerCase().includes('uuid') ? 1.0 : 0.95;
-  return { format: 'uuid', score, reason: 'UUID shape' };
-}
-
-const URL_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s]+$/;
-
-function detectUrl(input: DetectInput): FormatGuess | null {
-  const t = trimmed(input);
-  if (t.length === 0 || t.length > 4096 || !URL_RE.test(t)) return null;
-  return { format: 'url', score: 0.9, reason: 'URL with a scheme' };
-}
 
 const HEX_RE = /^(0x)?([0-9a-fA-F]{2})+$/;
 
@@ -191,6 +183,7 @@ function detectBase64(input: DetectInput): FormatGuess | null {
   if (!isStd && !isUrlSafe) return null;
   if (t.length % 4 !== 0 || t.length < BASE64_MIN_LENGTH) return null;
   if (!/[^0-9a-fA-F]/.test(t)) return null; // purely hex-shaped — let hex win the overlap
+  if (UUID_RE.test(t)) return null; // a dashed UUID is base64-shaped too (P42 D24) — let it stay text
   const hasSpecial = /[+/=_-]/.test(t);
   const hasMixedCase = /[A-Z]/.test(t) && /[a-z]/.test(t) && /[0-9]/.test(t);
   if (!hasSpecial && !hasMixedCase) return null;
@@ -329,8 +322,6 @@ const DETECTORS: Record<CellFormat, (input: DetectInput) => FormatGuess | null> 
   epochSeconds: detectEpochSeconds,
   epochMillis: detectEpochMillis,
   iso8601: detectIso8601,
-  uuid: detectUuid,
-  url: detectUrl,
   csv: detectCsv,
   text: detectText,
 };

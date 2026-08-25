@@ -145,21 +145,6 @@ watch(
   { immediate: true },
 );
 
-// UUID generation: overwrites the buffer outright, same shape as applyBeautify's own "replace
-// doc.value" contract — Reset already exists for "I changed my mind."
-const canGenerateUuid = computed(() => effectiveFormat.value === 'uuid' && isEditable.value);
-const uuidGenerateTitle = computed<string>(() =>
-  canGenerateUuid.value ? 'Generate a new random UUID' : 'Available when the format is UUID.',
-);
-function generateUuid(): void {
-  if (!canGenerateUuid.value) return;
-  doc.value = crypto.randomUUID();
-  // The button sits outside `.editor-body`, so no focusout ever reaches onEditorBlur — this is a
-  // one-shot action like Ctrl+Enter, not a keystroke mid-edit, so it stages immediately rather
-  // than waiting on a blur that will never come.
-  saveEdit();
-}
-
 // P24 D14/D15: dates get the same translate-pane treatment as hex/base64 below — TimestampPane
 // owns its own readings/editing entirely; this file only decides *whether* to show it.
 const isTimestampFormat = computed(
@@ -344,19 +329,11 @@ const statusLine = computed(() => {
           <option v-for="f in CELL_FORMATS" :key="f" :value="f">{{ FORMAT_LABEL[f] }}</option>
         </select>
 
-        <!-- P40 D13: neither affordance serves a purpose in viewer mode — UUID-generate is
-             permanently disabled there anyway (canGenerateUuid requires isEditable), and its
-             disabled tooltip ("Available when the format is UUID") would be a false statement on
-             a cell whose format genuinely is UUID. EditBufferActions' own modified chip/byte
-             badge/Beautify/Revert describe an edit buffer that, in a viewer, can never be dirty. -->
+        <!-- P40 D13: EditBufferActions' own modified chip/byte badge/Beautify/Revert describe an
+             edit buffer that, in a viewer, can never be dirty. (P42: the UUID-generate button
+             that used to sit beside it is gone — D29's generators panel replaces it in a later
+             commit; the tree between the two commits simply has no generator, which is honest.) -->
         <template v-if="!viewerMode">
-          <IconButton
-            icon="sparkle"
-            data-testid="cell-editor-uuid-generate"
-            :disabled="!canGenerateUuid"
-            v-tooltip="uuidGenerateTitle"
-            @click="generateUuid"
-          />
           <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" />
         </template>
       </span>

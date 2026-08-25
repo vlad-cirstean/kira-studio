@@ -6,52 +6,52 @@ import {
 } from '../../../beautify';
 import type { EditorLanguageId } from '../../../editor/languages';
 
-/** §8.6's closed vocabulary, decided once (D8) — the same call P1 D4 made for `Caps`. */
+/** §8.6's closed vocabulary, decided once (D8). P42 D23/D25: uuid/url dropped (F19 — both were
+ *  inert on selection, changing nothing but a label and, for uuid, whether one button was
+ *  enabled); reordered common-first (D15) into three groups the picker separates (D27):
+ *  read-it-directly formats, then time, then binary encodings. */
 export const CELL_FORMATS = [
+  'text',
   'json',
   'xml',
+  'csv',
   'sql',
-  'base64',
-  'hex',
+  'iso8601',
   'epochSeconds',
   'epochMillis',
-  'iso8601',
-  'uuid',
-  'url',
-  'csv',
-  'text',
+  'base64',
+  'hex',
 ] as const;
 export type CellFormat = (typeof CELL_FORMATS)[number];
 
+/** P42 D25: only the label changed — 'Time (ISO…)' reads more plainly than the wire format's own
+ *  name. The key stays `iso8601` (a stored override value and a Playwright attribute); renaming
+ *  it would be a migration for a label change. */
 export const FORMAT_LABEL: Record<CellFormat, string> = {
+  text: 'Plain text',
   json: 'JSON',
   xml: 'XML / HTML',
+  csv: 'CSV',
   sql: 'SQL',
-  base64: 'Base64',
-  hex: 'Hex',
+  iso8601: 'Time (ISO…)',
   epochSeconds: 'Epoch (seconds)',
   epochMillis: 'Epoch (milliseconds)',
-  iso8601: 'ISO-8601',
-  uuid: 'UUID',
-  url: 'URL',
-  csv: 'CSV',
-  text: 'Plain text',
+  base64: 'Base64',
+  hex: 'Hex',
 };
 
 /** Which CodeMirror grammar renders a format; `plain` means no language extension. */
 export const FORMAT_LANGUAGE: Record<CellFormat, EditorLanguageId> = {
+  text: 'plain',
   json: 'json',
   xml: 'xml',
+  csv: 'plain',
   sql: 'sql',
-  base64: 'plain',
-  hex: 'plain',
+  iso8601: 'plain',
   epochSeconds: 'plain',
   epochMillis: 'plain',
-  iso8601: 'plain',
-  uuid: 'plain',
-  url: 'plain',
-  csv: 'plain',
-  text: 'plain',
+  base64: 'plain',
+  hex: 'plain',
 };
 
 /** True only where a lossless reformatter exists (D11): json and xml. */
