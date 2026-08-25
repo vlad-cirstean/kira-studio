@@ -13,6 +13,15 @@ import { handle } from './errors';
 
 const chooseSaveSchema = z.object({ defaultName: z.string() });
 
+// P35 D15: optional and additive — omitted (or {}) reproduces chooseOpen's exact pre-P35 behavior,
+// which is what keeps UploadObjectDialog.vue's own existing call untouched.
+const chooseOpenSchema = z
+  .object({
+    filters: z.array(z.object({ name: z.string(), extensions: z.array(z.string()) })).optional(),
+    title: z.string().optional(),
+  })
+  .optional();
+
 export function registerFilesHandlers(): void {
   handle(IPC.filesChooseSave, async (event, payload) => {
     const { defaultName } = chooseSaveSchema.parse(payload);
@@ -26,9 +35,14 @@ export function registerFilesHandlers(): void {
     return { canceled: res.canceled, filePath: res.filePath ?? null };
   });
 
-  handle(IPC.filesChooseOpen, async (event) => {
+  handle(IPC.filesChooseOpen, async (event, payload) => {
+    const args = chooseOpenSchema.parse(payload);
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const openOptions = { properties: ['openFile' as const] };
+    const openOptions = {
+      properties: ['openFile' as const],
+      ...(args?.filters ? { filters: args.filters } : {}),
+      ...(args?.title ? { title: args.title } : {}),
+    };
     const res = win
       ? await dialog.showOpenDialog(win, openOptions)
       : await dialog.showOpenDialog(openOptions);

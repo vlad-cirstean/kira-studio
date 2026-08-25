@@ -21,6 +21,7 @@ import type {
   AppInfo,
   ConnectionTestResult,
   EngineStatus,
+  FilesChooseOpenArgs,
   FilesChooseOpenResult,
   FilesChooseSaveResult,
   TreeChildrenResult,
@@ -65,7 +66,8 @@ export const control = {
 
   filesChooseSave: (defaultName: string): Promise<FilesChooseSaveResult> =>
     kira.filesChooseSave({ defaultName }),
-  filesChooseOpen: (): Promise<FilesChooseOpenResult> => kira.filesChooseOpen(),
+  filesChooseOpen: (args?: FilesChooseOpenArgs): Promise<FilesChooseOpenResult> =>
+    kira.filesChooseOpen(args),
 
   connectionsList: (): Promise<ConnectionSummary[]> => kira.connectionsList(),
   connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>

@@ -129,6 +129,14 @@ export interface FilesChooseOpenResult {
   file: { path: string; name: string; size: number } | null;
 }
 
+// P35 D15: additive — omitted entirely, chooseOpen behaves exactly as before (no filters, no
+// title). `filters` mirrors Electron's own `dialog.showOpenDialog` shape rather than inventing a
+// new one, since main just passes it straight through.
+export interface FilesChooseOpenArgs {
+  filters?: { name: string; extensions: string[] }[];
+  title?: string;
+}
+
 export interface KiraApi {
   appInfo(): Promise<AppInfo>;
   settingsGetAll(): Promise<Settings>;
@@ -156,7 +164,7 @@ export interface KiraApi {
   appFlushed(): void;
 
   filesChooseSave(args: { defaultName: string }): Promise<FilesChooseSaveResult>;
-  filesChooseOpen(): Promise<FilesChooseOpenResult>;
+  filesChooseOpen(args?: FilesChooseOpenArgs): Promise<FilesChooseOpenResult>;
 
   connectionsList(): Promise<ConnectionSummary[]>;
   connectionsCreate(input: ConnectionInput): Promise<ConnectionSummary>;

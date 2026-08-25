@@ -19,6 +19,7 @@ import type { TreeVisibility } from '../shared/domain/tree-filter';
 import type { LayoutPatch } from '../shared/layout';
 import type {
   EngineStatus,
+  FilesChooseOpenArgs,
   KiraApi,
   TreeChildrenResult,
   TreeDefinitionResult,
@@ -114,7 +115,7 @@ const kiraApi: KiraApi = {
   },
 
   filesChooseSave: (args: { defaultName: string }) => ipcRenderer.invoke(IPC.filesChooseSave, args),
-  filesChooseOpen: () => ipcRenderer.invoke(IPC.filesChooseOpen),
+  filesChooseOpen: (args?: FilesChooseOpenArgs) => ipcRenderer.invoke(IPC.filesChooseOpen, args),
 
   connectionsList: () => ipcRenderer.invoke(IPC.connectionsList),
   connectionsCreate: (input: ConnectionInput) => ipcRenderer.invoke(IPC.connectionsCreate, input),
