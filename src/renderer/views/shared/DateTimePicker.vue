@@ -53,10 +53,17 @@ function clamp(n: number, min: number, max: number): number {
 const selected = computed(() => partsOf(props.modelValue));
 const today = computed(() => partsOf(new Date()));
 
+// P42 D33a: the label cycles three views of the same navigation, days -> months -> years,
+// so reaching a date years away no longer costs dozens of single-month clicks. D33b: picking a
+// month or a year moves only *this* view state, never `selected` — the same rule prevMonth/
+// nextMonth already follow below, just for a bigger jump.
+type CalendarMode = 'days' | 'months' | 'years';
+const mode = ref<CalendarMode>('days');
+
 // The visible month is its own state, independent of the selected day — paging doesn't move the
-// selection until a day cell is actually clicked. Reset to the value's own month whenever the
-// value moves to a different month from outside (e.g. typing a new date into the pane's text
-// field, or the cell selection itself changing).
+// selection until a day cell is actually clicked. Reset to the value's own month (and back to the
+// day grid) whenever the value moves to a different month from outside (e.g. typing a new date
+// into the pane's text field, or the cell selection itself changing).
 const viewYear = ref(selected.value.y);
 const viewMonth = ref(selected.value.mo);
 watch(
@@ -64,8 +71,25 @@ watch(
   ([y, mo]) => {
     viewYear.value = y;
     viewMonth.value = mo;
+    mode.value = 'days';
   },
 );
+
+function cycleMode(): void {
+  mode.value = mode.value === 'days' ? 'months' : mode.value === 'months' ? 'years' : 'days';
+}
+function pickMonth(mo: number): void {
+  viewMonth.value = mo;
+  mode.value = 'days';
+}
+// A 16-year block, aligned to a multiple of 16 so paging never leaves the just-picked year
+// stranded at a block edge.
+const yearBlockStart = computed(() => Math.floor(viewYear.value / 16) * 16);
+const yearBlock = computed(() => Array.from({ length: 16 }, (_, i) => yearBlockStart.value + i));
+function pickYear(y: number): void {
+  viewYear.value = y;
+  mode.value = 'months';
+}
 
 const MONTH_NAMES = [
   'January',
@@ -98,6 +122,19 @@ function nextMonth(): void {
   } else {
     viewMonth.value += 1;
   }
+}
+
+// D33a: "the prev/next arrows stay and act on whatever the current mode pages" — one month in
+// the day grid, one year in the month grid, one 16-year block in the year grid.
+function pagePrev(): void {
+  if (mode.value === 'days') prevMonth();
+  else if (mode.value === 'months') viewYear.value -= 1;
+  else viewYear.value -= 16;
+}
+function pageNext(): void {
+  if (mode.value === 'days') nextMonth();
+  else if (mode.value === 'months') viewYear.value += 1;
+  else viewYear.value += 16;
 }
 
 interface DayCell {
@@ -146,6 +183,22 @@ function pickNow(): void {
   emit('update:modelValue', new Date());
 }
 
+const labelText = computed(() => {
+  if (mode.value === 'months') return String(viewYear.value);
+  if (mode.value === 'years') return `${yearBlockStart.value}–${yearBlockStart.value + 15}`;
+  return `${MONTH_NAMES[viewMonth.value]} ${viewYear.value}`;
+});
+const pagePrevTitle = computed(() =>
+  mode.value === 'days'
+    ? 'Previous month'
+    : mode.value === 'months'
+      ? 'Previous year'
+      : 'Previous 16 years',
+);
+const pageNextTitle = computed(() =>
+  mode.value === 'days' ? 'Next month' : mode.value === 'months' ? 'Next year' : 'Next 16 years',
+);
+
 // The three clock steppers, each a writable computed so <TextField type="number"> can v-model
 // straight onto it — TextField already draws the app-owned up/down stepper (primitives.css's
 // .stepper), so nothing here needs to reinvent that chrome, only clamp what a hand-typed value
@@ -186,36 +239,74 @@ const secondText = computed<string>({
       <IconButton
         icon="chevron-left"
         data-testid="datetime-picker-prev-month"
-        v-tooltip="'Previous month'"
-        @click="prevMonth"
+        v-tooltip="pagePrevTitle"
+        @click="pagePrev"
       />
-      <span class="dtp-month-label" data-testid="datetime-picker-month">
-        {{ MONTH_NAMES[viewMonth] }} {{ viewYear }}
-      </span>
+      <button
+        type="button"
+        class="dtp-month-label"
+        data-testid="datetime-picker-month"
+        v-tooltip="'Jump by month or year'"
+        @click="cycleMode"
+      >
+        {{ labelText }}
+      </button>
       <IconButton
         icon="chevron-right"
         data-testid="datetime-picker-next-month"
-        v-tooltip="'Next month'"
-        @click="nextMonth"
+        v-tooltip="pageNextTitle"
+        @click="pageNext"
       />
     </div>
-    <div class="dtp-weekdays">
-      <span v-for="w in WEEKDAY_LABELS" :key="w" class="dtp-weekday">{{ w }}</span>
-    </div>
-    <div class="dtp-days">
-      <button
-        v-for="cell in days"
-        :key="`${cell.year}-${cell.month}-${cell.day}`"
-        type="button"
-        class="dtp-day p-row"
-        data-testid="datetime-picker-day"
-        :data-in-month="cell.inMonth"
-        :data-selected="cell.isSelected"
-        :class="{ 'is-selected': cell.isSelected, 'is-today': cell.isToday, dim: !cell.inMonth }"
-        @click="pickDay(cell)"
-      >
-        {{ cell.day }}
-      </button>
+    <div class="dtp-body" data-testid="datetime-picker-mode" :data-mode="mode">
+      <template v-if="mode === 'days'">
+        <div class="dtp-weekdays">
+          <span v-for="w in WEEKDAY_LABELS" :key="w" class="dtp-weekday">{{ w }}</span>
+        </div>
+        <div class="dtp-days">
+          <button
+            v-for="cell in days"
+            :key="`${cell.year}-${cell.month}-${cell.day}`"
+            type="button"
+            class="dtp-day p-row"
+            data-testid="datetime-picker-day"
+            :data-in-month="cell.inMonth"
+            :data-selected="cell.isSelected"
+            :class="{ 'is-selected': cell.isSelected, 'is-today': cell.isToday, dim: !cell.inMonth }"
+            @click="pickDay(cell)"
+          >
+            {{ cell.day }}
+          </button>
+        </div>
+      </template>
+      <div v-else-if="mode === 'months'" class="dtp-grid4">
+        <button
+          v-for="(name, i) in MONTH_NAMES"
+          :key="name"
+          type="button"
+          class="dtp-day p-row"
+          data-testid="datetime-picker-month-cell"
+          :data-selected="i === viewMonth"
+          :class="{ 'is-selected': i === viewMonth }"
+          @click="pickMonth(i)"
+        >
+          {{ name.slice(0, 3) }}
+        </button>
+      </div>
+      <div v-else class="dtp-grid4">
+        <button
+          v-for="y in yearBlock"
+          :key="y"
+          type="button"
+          class="dtp-day p-row"
+          data-testid="datetime-picker-year-cell"
+          :data-selected="y === viewYear"
+          :class="{ 'is-selected': y === viewYear }"
+          @click="pickYear(y)"
+        >
+          {{ y }}
+        </button>
+      </div>
     </div>
     <div class="dtp-clock">
       <TextField
@@ -260,15 +351,35 @@ const secondText = computed<string>({
   justify-content: space-between;
 }
 
+/* P42 D33a: a plain <button> now, so the label itself is the mode-cycling control — reset to
+   look like the <span> it replaces rather than a bordered control. */
 .dtp-month-label {
+  border: none;
+  background: none;
+  padding: var(--kira-s-1) var(--kira-s-2);
+  border-radius: var(--kira-radius-sm);
   font-size: var(--kira-t-sm);
+  font-family: inherit;
   color: var(--kira-fg);
+  cursor: pointer;
+}
+
+.dtp-month-label:hover {
+  background: var(--kira-hover);
 }
 
 .dtp-weekdays,
 .dtp-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+/* The month grid (3x4) and year-block grid (4x4, item 19's "16-year block") share this — same
+   .dtp-day chip, just a 4-column grid instead of a 7-column one (D33a). */
+.dtp-grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
 }
 

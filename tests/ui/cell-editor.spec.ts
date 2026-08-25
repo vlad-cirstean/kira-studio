@@ -793,6 +793,39 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
     page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
   ).not.toHaveClass(/pending-edit/);
 
+  // --- month/year jump navigation (D33a/D33b): the label cycles days -> months -> years;
+  // picking a month or year moves only the *view* — never stages anything, same as the
+  // prev/next-month paging just exercised above. --------------------------------------------
+  await page.click('[data-testid="cell-editor-timestamp-calendar"]');
+  await expect(calendarPopover).toBeVisible();
+  const dtpMode = page.locator('[data-testid="datetime-picker-mode"]');
+  const monthLabel = page.locator('[data-testid="datetime-picker-month"]');
+  await expect(dtpMode).toHaveAttribute('data-mode', 'days');
+
+  await monthLabel.click(); // days -> months
+  await expect(dtpMode).toHaveAttribute('data-mode', 'months');
+  await monthLabel.click(); // months -> years
+  await expect(dtpMode).toHaveAttribute('data-mode', 'years');
+
+  const yearCell = page.locator('[data-testid="datetime-picker-year-cell"]').first();
+  const pickedYear = await yearCell.innerText();
+  await yearCell.click(); // picking a year returns to months
+  await expect(dtpMode).toHaveAttribute('data-mode', 'months');
+
+  const monthCell = page.locator('[data-testid="datetime-picker-month-cell"]').first();
+  const pickedMonth = await monthCell.innerText();
+  await monthCell.click(); // picking a month returns to days
+  await expect(dtpMode).toHaveAttribute('data-mode', 'days');
+  await expect(monthLabel).toContainText(pickedMonth);
+  await expect(monthLabel).toContainText(pickedYear);
+
+  // Nothing staged — only the view moved, exactly like the plain prev/next paging above.
+  await expect(
+    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
+  ).not.toHaveClass(/pending-edit/);
+  await page.keyboard.press('Escape');
+  await expect(calendarPopover).toHaveCount(0);
+
   // Picking a day and blurring stages exactly one pending edit.
   await page.click('[data-testid="cell-editor-timestamp-calendar"]');
   await page
