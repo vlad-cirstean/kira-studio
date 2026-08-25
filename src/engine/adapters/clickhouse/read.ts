@@ -1,4 +1,3 @@
-import type { ColumnMeta } from '../../../shared/domain/tree';
 import type { SortSpec } from '../../../shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
@@ -9,7 +8,7 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
-import { buildOrderBy } from '../sql-text';
+import { buildOrderBy, resolveProjection, safeInt } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import type { ClickHouseHandle } from './client';
 import { runCatalogQuery, streamQuery, type TrackQuery } from './query';
@@ -83,28 +82,6 @@ export function typeClassFor(declared: string): TypeClass {
   return 'other';
 }
 
-// App-generated integers only (pageSize+1, an offset already validated at the port boundary) —
-// inlined rather than bound, mirroring every other SQL adapter's identical discipline.
-function safeInt(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
-  }
-  return value;
-}
-
-function resolveProjection(target: ReadTarget, requested: string[] | null): ColumnMeta[] {
-  if (requested === null) return target.columns;
-  const byName = new Map(target.columns.map((c) => [c.name, c]));
-  const resolved: ColumnMeta[] = [];
-  for (const name of new Set(requested)) {
-    const col = byName.get(name);
-    if (!col) throw new AdapterError('E_NOT_FOUND', `unknown column in projection: ${name}`);
-    resolved.push(col);
-  }
-  resolved.sort((a, b) => a.position - b.position);
-  return resolved;
-}
-
 // D21: a requested sort is honoured as given; with none, the table's own sorting key is used
 // verbatim (F31 — the one ORDER BY ClickHouse can serve straight out of the parts' existing
 // order), rather than re-deriving a column list from is_in_sorting_key flags, which would be a
@@ -143,7 +120,7 @@ export async function readPage(
     throw new AdapterError('E_UNSUPPORTED', NO_KEYSET_MESSAGE);
   }
 
-  const projectedColumns = resolveProjection(target, req.projection);
+  const projectedColumns = resolveProjection(target.columns, req.projection);
   const columns: ColumnDescriptor[] = projectedColumns.map((c) => ({
     name: c.name,
     dataType: c.dataType,

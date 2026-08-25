@@ -1,6 +1,5 @@
 import type { Client } from 'pg';
 import type { SortDirection } from '../../../shared/domain/queries';
-import type { ColumnMeta } from '../../../shared/domain/tree';
 import type { SortSpec } from '../../../shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
@@ -17,6 +16,7 @@ import {
   decodePageToken,
   encodePageToken,
   requestFingerprint,
+  resolveProjection,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import { runQuery, type TrackQuery } from './query';
@@ -51,21 +51,6 @@ export function typeClassFor(dataType: string): TypeClass {
 export function normalizeCellText(value: string, typeClass: TypeClass): string {
   if (typeClass === 'binary' && value.startsWith('\\x')) return `0x${value.slice(2)}`;
   return value;
-}
-
-function resolveProjection(target: ReadTarget, requested: string[] | null): ColumnMeta[] {
-  if (requested === null) return target.columns;
-  const byName = new Map(target.columns.map((c) => [c.name, c]));
-  const resolved: ColumnMeta[] = [];
-  for (const name of new Set(requested)) {
-    const col = byName.get(name);
-    if (!col) throw new AdapterError('E_NOT_FOUND', `unknown column in projection: ${name}`);
-    resolved.push(col);
-  }
-  // Ordinal order, not request order — display order is a renderer concern, and D12's
-  // normalisation depends on the projection being treated as a set.
-  resolved.sort((a, b) => a.position - b.position);
-  return resolved;
 }
 
 interface EffectiveOrder {
@@ -134,7 +119,7 @@ export async function readPage(
   target: ReadTarget,
   req: Omit<ReadRequest, 'path'>,
 ): Promise<TabularPage> {
-  const projectedColumns = resolveProjection(target, req.projection);
+  const projectedColumns = resolveProjection(target.columns, req.projection);
   const order = computeEffectiveOrder(req.sort, target);
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';

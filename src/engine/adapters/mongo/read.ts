@@ -7,16 +7,9 @@ import {
 } from '../../../shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
-import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
+import { decodePageToken, encodePageToken, requestFingerprint, safeInt } from '../sql-text';
 import { mapError } from './errors';
 import { parseFilterObject } from './literal';
-
-function safeInt(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
-  }
-  return value;
-}
 
 function idText(doc: Document): string {
   return EJSON.stringify(doc._id, { relaxed: false });

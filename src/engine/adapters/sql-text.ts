@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { SortDirection } from '../../shared/domain/queries';
+import type { ColumnMeta } from '../../shared/domain/tree';
 import { AdapterError } from './errors';
 
-// The genuinely shared, driver-agnostic glue both SQL adapters' read.ts call — kept out of the
-// adapter folders because duplicating it would guarantee they drift (§5e). Everything
+// The genuinely shared, driver-agnostic glue the SQL adapters' read.ts modules call — kept out
+// of the adapter folders because duplicating it would guarantee they drift (§5e). Everything
 // dialect-shaped (quoting, LIMIT syntax, catalog SQL) stays in each adapter folder.
 
 export function buildOrderBy(
@@ -77,4 +78,32 @@ export function decodePageToken(token: string, expectedFingerprint: string): str
 
 export function requestFingerprint(parts: unknown): string {
   return createHash('sha1').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
+}
+
+// P39 F19: character-for-character the same in postgres/mysql-family/sqlite/clickhouse's read.ts
+// (postgres's own copy carried two extra comment lines). Takes the column list rather than each
+// adapter's own ReadTarget — this reads only ColumnMeta.name/.position, and the four ReadTargets
+// genuinely differ otherwise.
+export function resolveProjection(columns: ColumnMeta[], requested: string[] | null): ColumnMeta[] {
+  if (requested === null) return columns;
+  const byName = new Map(columns.map((c) => [c.name, c]));
+  const resolved: ColumnMeta[] = [];
+  for (const name of new Set(requested)) {
+    const col = byName.get(name);
+    if (!col) throw new AdapterError('E_NOT_FOUND', `unknown column in projection: ${name}`);
+    resolved.push(col);
+  }
+  // Ordinal order, not request order — display order is a renderer concern, and each adapter's
+  // own D12-style normalisation depends on the projection being treated as a set.
+  resolved.sort((a, b) => a.position - b.position);
+  return resolved;
+}
+
+// App-generated integers only (pageSize+1, a port-validated offset) — inlined into SQL rather
+// than bound, per each adapter's own note.
+export function safeInt(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
+  }
+  return value;
 }

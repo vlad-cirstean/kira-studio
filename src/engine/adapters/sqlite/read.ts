@@ -16,6 +16,8 @@ import {
   decodePageToken,
   encodePageToken,
   requestFingerprint,
+  resolveProjection,
+  safeInt,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import type { SqliteHandle } from './client';
@@ -43,28 +45,6 @@ export function typeClassFor(declaredType: string | null): TypeClass {
   if (base.includes('BLOB')) return 'binary';
   if (base.includes('REAL') || base.includes('FLOA') || base.includes('DOUB')) return 'number';
   return 'number'; // NUMERIC affinity catch-all: DECIMAL, NUMERIC, and anything else undeclared
-}
-
-// App-generated integers only (pageSize+1, an offset already validated at the port boundary) —
-// inlined rather than bound, mirroring the other SQL adapters' identical discipline.
-function safeInt(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
-  }
-  return value;
-}
-
-function resolveProjection(target: ReadTarget, requested: string[] | null): ColumnMeta[] {
-  if (requested === null) return target.columns;
-  const byName = new Map(target.columns.map((c) => [c.name, c]));
-  const resolved: ColumnMeta[] = [];
-  for (const name of new Set(requested)) {
-    const col = byName.get(name);
-    if (!col) throw new AdapterError('E_NOT_FOUND', `unknown column in projection: ${name}`);
-    resolved.push(col);
-  }
-  resolved.sort((a, b) => a.position - b.position);
-  return resolved;
 }
 
 // D22/F23: a rowid table's own rowid is not a declared column, so it needs a synthetic ColumnMeta
@@ -153,7 +133,7 @@ export function readPage(
   target: ReadTarget,
   req: Omit<ReadRequest, 'path'>,
 ): TabularPage {
-  const projectedColumns = resolveProjection(target, req.projection);
+  const projectedColumns = resolveProjection(target.columns, req.projection);
   const order = computeEffectiveOrder(req.sort, target);
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';

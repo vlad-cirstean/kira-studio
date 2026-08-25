@@ -1,6 +1,5 @@
 import type { Connection } from 'mariadb';
 import type { SortDirection } from '../../../shared/domain/queries';
-import type { ColumnMeta } from '../../../shared/domain/tree';
 import type { SortSpec } from '../../../shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
@@ -17,6 +16,8 @@ import {
   decodePageToken,
   encodePageToken,
   requestFingerprint,
+  resolveProjection,
+  safeInt,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import { runQuery, type TrackQuery } from './query';
@@ -41,29 +42,6 @@ export function typeClassFor(dataType: string): TypeClass {
   if (/^(binary|varbinary|tinyblob|blob|mediumblob|longblob|geometry)\b/.test(base))
     return 'binary';
   return 'text';
-}
-
-// App-generated integers only (pageSize+1, an offset already validated at the port boundary) —
-// inlined rather than bound, sidestepping any uncertainty about a `?` placeholder in LIMIT/OFFSET
-// on a given server version (§5b step 5's documented fallback).
-function safeInt(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new AdapterError('E_QUERY', `invalid ${label}: ${value}`);
-  }
-  return value;
-}
-
-function resolveProjection(target: ReadTarget, requested: string[] | null): ColumnMeta[] {
-  if (requested === null) return target.columns;
-  const byName = new Map(target.columns.map((c) => [c.name, c]));
-  const resolved: ColumnMeta[] = [];
-  for (const name of new Set(requested)) {
-    const col = byName.get(name);
-    if (!col) throw new AdapterError('E_NOT_FOUND', `unknown column in projection: ${name}`);
-    resolved.push(col);
-  }
-  resolved.sort((a, b) => a.position - b.position);
-  return resolved;
 }
 
 interface EffectiveOrder {
@@ -131,7 +109,7 @@ export async function readPage(
   target: ReadTarget,
   req: Omit<ReadRequest, 'path'>,
 ): Promise<TabularPage> {
-  const projectedColumns = resolveProjection(target, req.projection);
+  const projectedColumns = resolveProjection(target.columns, req.projection);
   const order = computeEffectiveOrder(req.sort, target);
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';
