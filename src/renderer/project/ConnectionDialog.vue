@@ -23,6 +23,7 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
   mariadb: 'MariaDB',
   mysql: 'MySQL',
+  sqlite: 'SQLite',
   mongodb: 'MongoDB',
   redis: 'Redis',
   kafka: 'Kafka',
@@ -30,11 +31,13 @@ const KIND_LABEL: Record<ConnectionKind, string> = {
   s3: 'S3',
 };
 // P34 D19: 'teal' is unused elsewhere in the rail and is the furthest free hue from MariaDB's
-// own 'blue' — the two engines a MySQL connection most often sits beside.
+// own 'blue' — the two engines a MySQL connection most often sits beside. P35 D29: 'violet' is
+// free too, and sits furthest from the three other SQL engines' blue/cyan/teal hues.
 const KIND_ACCENT: Record<ConnectionKind, string> = {
   postgres: 'cyan',
   mariadb: 'blue',
   mysql: 'teal',
+  sqlite: 'violet',
   mongodb: 'green',
   redis: 'red',
   kafka: 'amber',

@@ -5,12 +5,13 @@ export const connectionKindSchema = z.enum([
   'postgres',
   'mariadb',
   'mysql',
+  'sqlite',
   'mongodb',
   'redis',
   'kafka',
   'sqs',
   's3',
-]); // all v1 kinds; every one has an adapter as of P34
+]); // all v1 kinds; every one has an adapter as of P35
 export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 
 // The connection dialog's default port per kind (D27's "kind-driven default port", not a
@@ -80,13 +81,34 @@ const connectionFieldsSchema = z.object({
 // AWS profile" wording.
 export const AWS_STYLE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqs', 's3']);
 
+// Kinds whose "connection" is a local file path, not a network endpoint (P35 D10/D11). Fields
+// mode repurposes `database` for the absolute path; host/port/username/password are unused.
+export const FILE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqlite']);
+
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
   if (input.mode === 'fields') {
-    if (!AWS_STYLE_KINDS.has(input.kind) && !input.host) {
-      ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
-    }
-    if (!AWS_STYLE_KINDS.has(input.kind) && !input.port) {
-      ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
+    if (FILE_KINDS.has(input.kind)) {
+      const path = input.database?.trim() ?? '';
+      if (!path) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['database'],
+          message: 'A database file is required.',
+        });
+      } else if (!path.startsWith('/')) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['database'],
+          message: 'The database file must be an absolute path.',
+        });
+      }
+    } else {
+      if (!AWS_STYLE_KINDS.has(input.kind) && !input.host) {
+        ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
+      }
+      if (!AWS_STYLE_KINDS.has(input.kind) && !input.port) {
+        ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
+      }
     }
   } else {
     if (!input.uri || input.uri.trim() === '') {

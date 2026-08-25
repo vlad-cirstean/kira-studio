@@ -1,4 +1,5 @@
 import type { ConnectionInput, ConnectionKind } from './connection';
+import { FILE_KINDS } from './connection';
 
 export interface ParsedUri {
   scheme: string;
@@ -73,6 +74,12 @@ export function injectUriPassword(uri: string, password: string | null): string 
 // path host, or userinfo that would not survive an encodeURIComponent round trip. When false,
 // the connection dialog stays in URI mode (§8.12) rather than silently dropping information.
 export function canRoundTripToFields(parsed: ParsedUri, kind: ConnectionKind): boolean {
+  // P35 D13: `sqlite:////abs/path` -> pathname `//abs/path` -> parsed.database `/abs/path`
+  // (formatConnectionUri/parseConnectionUri's existing four-slash round trip, F28) — there is no
+  // host/port/credential shape to validate for a file kind, only that the path is absolute.
+  if (FILE_KINDS.has(kind)) {
+    return parsed.scheme === kind && !!parsed.database && parsed.database.startsWith('/');
+  }
   if (kind !== 'postgres') return false;
   if (parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql') return false;
   if (!parsed.host || parsed.host.includes(',') || parsed.host.startsWith('/')) return false;
