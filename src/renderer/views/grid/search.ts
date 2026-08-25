@@ -1,11 +1,6 @@
 import { cellText, isNull } from '@shared/protocol/page';
-import {
-  createSearchState,
-  runChunkedScan,
-  type SearchHandle,
-  type SearchQuery,
-} from '../shared/pageScan';
-import type { PageSearchApi } from '../shared/pageSearch';
+import { runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
+import { createPageSearch } from '../shared/pageSearch';
 import { isSearchFiltering, searchFilterState, setSearchFiltering } from '../shared/searchFilter';
 import { getPage, pageVersion } from './page';
 
@@ -21,10 +16,6 @@ export interface Match {
   start: number;
   end: number;
 }
-
-const { searchState, clearSearchState, matchedRows } = createSearchState<Match>();
-
-export { clearSearchState, matchedRows, searchState };
 
 export function runSearch(
   tabId: string,
@@ -61,12 +52,14 @@ export function runSearch(
   );
 }
 
-// P39 D9: what views/shared/PageSearchToolbar.vue binds to.
-export const pageSearchApi: PageSearchApi<Match> = {
-  runSearch,
-  clearSearchState,
+const {
   searchState,
   matchedRows,
+  api: pageSearchApi,
+} = createPageSearch<Match>({
+  runSearch,
   pageVersion,
   loadedRowCount: (tabId) => getPage(tabId)?.rowCount ?? 0,
-};
+});
+
+export { matchedRows, pageSearchApi, searchState };

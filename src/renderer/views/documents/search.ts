@@ -1,10 +1,5 @@
-import {
-  createSearchState,
-  runChunkedScan,
-  type SearchHandle,
-  type SearchQuery,
-} from '../shared/pageScan';
-import type { PageSearchApi } from '../shared/pageSearch';
+import { runChunkedScan, type SearchHandle, type SearchQuery } from '../shared/pageScan';
+import { createPageSearch } from '../shared/pageSearch';
 import { documentRow, getPage, pageVersion } from './page';
 
 export type { SearchHandle, SearchQuery };
@@ -14,12 +9,6 @@ export interface Match {
   start: number;
   end: number;
 }
-
-// Mirrors views/grid/search.ts's searchState, narrowed to one column (a document has no columns
-// to disambiguate a match's position within).
-const { searchState, clearSearchState, matchedRows } = createSearchState<Match>();
-
-export { clearSearchState, matchedRows, searchState };
 
 // P27 D9/P31 D20: DocumentView.vue's collapsed row shows only the `_id` until expanded (D1) —
 // exported so the view can build the *same* string a search matched against, and wrap the
@@ -64,12 +53,16 @@ export function runSearch(
   );
 }
 
-// P39 D9: what views/shared/PageSearchToolbar.vue binds to.
-export const pageSearchApi: PageSearchApi<Match> = {
-  runSearch,
-  clearSearchState,
+// Mirrors views/grid/search.ts's searchState, narrowed to one column (a document has no columns
+// to disambiguate a match's position within).
+const {
   searchState,
   matchedRows,
+  api: pageSearchApi,
+} = createPageSearch<Match>({
+  runSearch,
   pageVersion,
   loadedRowCount: (tabId) => getPage(tabId)?.rowCount ?? 0,
-};
+});
+
+export { matchedRows, pageSearchApi, searchState };
