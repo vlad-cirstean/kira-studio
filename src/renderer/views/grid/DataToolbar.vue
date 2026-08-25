@@ -61,6 +61,16 @@ const isWritable = computed(() => {
   return !!caps.value?.writable && !record?.readOnly;
 });
 
+// P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
+// addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so
+// isWritable alone is no longer enough to offer this button.
+const canDeleteRows = computed(() => isWritable.value && !!caps.value?.canDelete);
+const deleteRowTooltip = computed(() => {
+  if (canDeleteRows.value) return 'Delete selected row(s)';
+  if (!isWritable.value) return 'Connection is read-only';
+  return 'This connection does not support deleting rows';
+});
+
 const tabHasPending = computed(() => (tab.value ? hasPending(tab.value.id) : false));
 
 const previewOpen = ref(false);
@@ -335,8 +345,8 @@ function onDiscard(): void {
       <IconButton
         icon="trash"
         data-testid="toolbar-delete-row"
-        :disabled="!isWritable"
-        v-tooltip="isWritable ? 'Delete selected row(s)' : 'Connection is read-only'"
+        :disabled="!canDeleteRows"
+        v-tooltip="deleteRowTooltip"
         @click="onDeleteRow"
       />
       <IconButton

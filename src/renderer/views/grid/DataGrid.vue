@@ -176,9 +176,24 @@ const isWritable = computed(() => {
   const record = connectionsState.records.find((r) => r.id === t.connectionId);
   return !record?.readOnly;
 });
-// Gates whether double-click/Enter starts an inline edit (D2/D14) — the toolbar's add/delete/
-// preview/commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
-const canEditTable = computed(() => isWritable.value && hasPrimaryKey.value);
+// P36 D26: mirrors DataToolbar.vue's own caps computed — ClickHouse is the first tabular engine
+// with canUpdate/canDelete both false alongside canInsert:true (a MergeTree PRIMARY KEY is a
+// sparse index, not a unique key, so there is no addressable row to UPDATE/DELETE), so "writable"
+// alone can no longer stand in for "this row-level action is actually offered".
+const caps = computed(() => {
+  const connectionId = tab()?.connectionId;
+  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+});
+// Gates whether double-click/Enter starts an inline edit (D2/D14) — the toolbar's add/preview/
+// commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
+const canEditTable = computed(
+  () => isWritable.value && hasPrimaryKey.value && !!caps.value?.canUpdate,
+);
+// P36 D26: Delete row(s)/Delete row's own gate — deliberately not folded into canEditTable, since
+// an engine could in principle offer one of canUpdate/canDelete without the other.
+const canDeleteRows = computed(
+  () => isWritable.value && hasPrimaryKey.value && !!caps.value?.canDelete,
+);
 
 const dialect = computed(() => {
   const t = tab();
@@ -948,6 +963,7 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
       qualifiedName: qualifiedName(),
       snapshot: rowSnapshot,
       canEdit: canEditTable.value,
+      canDelete: canDeleteRows.value,
     }),
   );
 }
@@ -968,6 +984,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       text: dc.text,
       dialect: dialect.value,
       canEdit: canEditTable.value,
+      canDelete: canDeleteRows.value,
       isDeleted: isDeleted(row),
       startEdit: () => startEdit(row, displayCol),
       onPaste: () => void onPaste(),
@@ -1146,6 +1163,7 @@ function onKeydown(e: KeyboardEvent): void {
         qualifiedName: qualifiedName(),
         snapshot: rowSnapshot,
         canEdit: canEditTable.value,
+        canDelete: canDeleteRows.value,
       }),
       rowShortcut,
     );
@@ -1174,6 +1192,7 @@ function onKeydown(e: KeyboardEvent): void {
         qualifiedName: qualifiedName(),
         snapshot: rowSnapshot,
         canEdit: canEditTable.value,
+        canDelete: canDeleteRows.value,
       }),
       deleteShortcut,
     );

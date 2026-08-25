@@ -173,6 +173,93 @@ const DESCRIPTIONS: readonly { test: RegExp; text: string }[] = [
   },
 ];
 
+// --- ClickHouse's own type family -------------------------------------------------------------
+// P36 D33: matched case-sensitively against the *un-normalized* text, before normalize()'s
+// lowercasing — ClickHouse's own catalog always spells these in exact PascalCase (F24), which is
+// what lets "Int8" (an 8-bit signed integer here) resolve to its own entry instead of colliding
+// with the generic DESCRIPTIONS list's lowercase "int8" (Postgres/MariaDB's own shorthand for a
+// 64-bit bigint, a completely different width) — the two vocabularies use the same six characters
+// for unrelated meanings, and only case tells them apart.
+const CLICKHOUSE_DESCRIPTIONS: readonly { test: RegExp; text: string }[] = [
+  { test: /^UInt8$/, text: 'An 8-bit unsigned integer (0 to 255).' },
+  { test: /^UInt16$/, text: 'A 16-bit unsigned integer.' },
+  { test: /^UInt32$/, text: 'A 32-bit unsigned integer.' },
+  { test: /^UInt64$/, text: 'A 64-bit unsigned integer.' },
+  { test: /^UInt(128|256)$/, text: 'A 128- or 256-bit unsigned integer.' },
+  { test: /^Int8$/, text: 'An 8-bit signed integer (-128 to 127).' },
+  { test: /^Int16$/, text: 'A 16-bit signed integer.' },
+  { test: /^Int32$/, text: 'A 32-bit signed integer.' },
+  { test: /^Int64$/, text: 'A 64-bit signed integer.' },
+  { test: /^Int(128|256)$/, text: 'A 128- or 256-bit signed integer.' },
+  { test: /^Float32$/, text: 'A 32-bit (single-precision) floating-point number.' },
+  { test: /^Float64$/, text: 'A 64-bit (double-precision) floating-point number.' },
+  {
+    test: /^Decimal(32|64|128|256)?$/,
+    text: 'An exact, fixed-precision decimal number — no binary rounding.',
+  },
+  { test: /^Bool$/, text: 'A true/false value, stored as UInt8 under the hood.' },
+  { test: /^String$/, text: 'Variable-length text or binary data, with no declared maximum.' },
+  {
+    test: /^FixedString$/,
+    text: 'A fixed-length byte string, padded with zero bytes out to its declared length.',
+  },
+  { test: /^Date$/, text: 'A calendar date (from 1970), with no time-of-day or time zone.' },
+  { test: /^Date32$/, text: 'A calendar date with a wider range than Date (back to 1900).' },
+  {
+    test: /^DateTime$/,
+    text: 'A date and time with second precision, in a fixed named time zone.',
+  },
+  {
+    test: /^DateTime64$/,
+    text: 'A date and time with sub-second precision, in a fixed named time zone.',
+  },
+  { test: /^Time$/, text: 'A time of day, with no date.' },
+  { test: /^Time64$/, text: 'A time of day with sub-second precision, no date.' },
+  { test: /^UUID$/, text: 'A 128-bit universally unique identifier.' },
+  { test: /^IPv4$/, text: 'A 32-bit IPv4 host address.' },
+  { test: /^IPv6$/, text: 'A 128-bit IPv6 host address.' },
+  {
+    test: /^Enum(8|16)?$/,
+    text: 'A fixed set of named string values, each backed by a small integer.',
+  },
+  { test: /^Array$/, text: 'A variable-length list of values of one element type.' },
+  { test: /^Tuple$/, text: 'A fixed-length, ordered group of values, possibly of mixed types.' },
+  { test: /^Map$/, text: 'A key/value mapping of one key type to one value type.' },
+  { test: /^Nested$/, text: 'A table-like group of same-length array columns.' },
+  {
+    test: /^(Point|Ring|Polygon|MultiPolygon)$/,
+    text: 'A geometric shape, built from Array/Tuple of coordinates.',
+  },
+  { test: /^JSON$/, text: 'A semi-structured document with a dynamically inferred sub-schema.' },
+  {
+    test: /^(Aggregate|SimpleAggregate)Function$/,
+    text: 'An intermediate aggregation state, produced by an aggregate function.',
+  },
+];
+
+// P36 D33: strips Nullable(...) and LowCardinality(...) wrappers, recursively, in either nesting
+// order — the same two wrappers read.ts's own unwrapType (D17) strips server-side. Without this,
+// normalize()'s single, non-nested paren-stripping regex mangles "Nullable(LowCardinality(String))"
+// into "nullable)" (it stops at the *first* closing paren, the inner one) instead of reaching the
+// wrapped type at all.
+function unwrapClickHouseWrappers(dataType: string): string {
+  let inner = dataType.trim();
+  for (;;) {
+    const nullableMatch = /^Nullable\((.*)\)$/s.exec(inner);
+    if (nullableMatch?.[1] !== undefined) {
+      inner = nullableMatch[1].trim();
+      continue;
+    }
+    const lowCardMatch = /^LowCardinality\((.*)\)$/s.exec(inner);
+    if (lowCardMatch?.[1] !== undefined) {
+      inner = lowCardMatch[1].trim();
+      continue;
+    }
+    break;
+  }
+  return inner;
+}
+
 // Strips a length/precision qualifier — "varchar(64)" -> "varchar", "numeric(10,2)" -> "numeric"
 // — so the lookup above matches on the base type name alone (D28).
 function normalize(dataType: string): string {
@@ -184,7 +271,12 @@ function normalize(dataType: string): string {
 }
 
 export function typeDescription(dataType: string): string | null {
-  const type = normalize(dataType);
+  const unwrapped = unwrapClickHouseWrappers(dataType);
+  const chBase = unwrapped.replace(/\(.*$/s, '').trim();
+  const chMatch = CLICKHOUSE_DESCRIPTIONS.find((d) => d.test.test(chBase))?.text;
+  if (chMatch) return chMatch;
+
+  const type = normalize(unwrapped);
   // Arrays (Postgres's "integer[]", "text[]", …): describe by the element type rather than
   // listing every possible array shape as its own entry.
   const arrayMatch = type.match(/^(.+?)((?:\[\])+)$/);

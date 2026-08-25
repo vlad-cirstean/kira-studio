@@ -55,6 +55,7 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'mariadb',
   'mysql',
   'sqlite',
+  'clickhouse',
   'mongodb',
   'redis',
   'kafka',

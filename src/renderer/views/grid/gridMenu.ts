@@ -141,6 +141,8 @@ export interface CellMenuContext {
   text: string;
   dialect: SqlDialect | undefined;
   canEdit: boolean;
+  /** P36 D26: separate from canEdit — an engine can offer update without delete (or vice versa). */
+  canDelete: boolean;
   isDeleted: boolean;
   startEdit: () => void;
   /** P21 D12: DataGrid.vue's own onPaste — an existing, guarded handler this menu had no row for. */
@@ -231,7 +233,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       label: 'Delete row',
       icon: 'trash',
       danger: true,
-      disabled: !ctx.canEdit,
+      disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
       run: () => toggleDelete(ctx.tabId, [ctx.row]),
     },
@@ -254,6 +256,8 @@ export interface RowMenuContext {
   qualifiedName: string;
   snapshot: (row: number) => RowSnapshot;
   canEdit: boolean;
+  /** P36 D26: separate from canEdit — an engine can offer update without delete (or vice versa). */
+  canDelete: boolean;
 }
 
 function hasPendingChange(ctx: RowMenuContext): boolean {
@@ -331,7 +335,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       label: 'Delete row(s)',
       icon: 'trash',
       danger: true,
-      disabled: !ctx.canEdit,
+      disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
       run: () => toggleDelete(ctx.tabId, ctx.rows),
     },

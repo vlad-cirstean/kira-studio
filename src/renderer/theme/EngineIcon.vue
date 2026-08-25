@@ -119,6 +119,15 @@ const iconSize = computed(() => props.size ?? 16);
       />
     </template>
 
+    <!-- P36 D31: four equal bars plus one offset square — ClickHouse's own "columnar and fast"
+         identity, redrawn as plain shapes rather than the vendored logo mark, mirroring every
+         other engine's currentColor line-art convention. 1:1 with parts/_icons.html's i-clickhouse. -->
+    <path
+      v-if="kind === 'clickhouse'"
+      fill="currentColor"
+      d="M1.35 1.9h2.1v12.2h-2.1zM4.2 1.9h2.1v12.2H4.2zM7.05 1.9h2.1v12.2h-2.1zM9.9 1.9H12v12.2H9.9zM12.75 6.95h2.1v2.1h-2.1z"
+    />
+
     <path
       v-if="kind === 's3'"
       fill="none"
