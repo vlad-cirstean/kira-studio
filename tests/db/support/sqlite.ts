@@ -9,6 +9,9 @@ const DATABASE_FILE = 'kira_test.sqlite';
 
 export interface SqliteFixture {
   path: string;
+  /** The temp directory `path` lives in — sibling paths for a missing-file/directory/roundtrip
+   *  connect-failure test live here too, rather than each test managing its own mkdtemp. */
+  dir: string;
   config: ResolvedConnectionConfig; // ready to hand to the adapter
   stop(): Promise<void>;
 }
@@ -97,6 +100,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<SqliteFixture> 
 
   return {
     path,
+    dir,
     config,
     async stop() {
       // Playwright's workers:1 config runs every UI spec file sequentially in the same worker

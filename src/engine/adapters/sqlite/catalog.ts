@@ -335,9 +335,15 @@ export function getReadTarget(exec: QueryExecutor, schema: string, table: string
   // Independent of whether a primary key exists — read.ts's own fallback order (PK, else a
   // unique index, else rowid, D22) decides when this is actually consulted; a WITHOUT ROWID
   // table (wr === 1) always has its own declared PK by SQLite's own rule, so this is simply null
-  // there.
-  const [tableInfo] = exec<{ wr: number }>('SELECT wr FROM pragma_table_list(?)', [table]);
-  const isRowidTable = (tableInfo?.wr ?? 1) === 0;
+  // there. `type` has to be checked too: `pragma_table_list` reports `wr: 0` for a *view* as well
+  // (the field is meaningless there, not "false"), so `wr === 0` alone would tell a view it has an
+  // implicit rowid and then try to SELECT a column that does not exist on it (found empirically —
+  // reading order_summary crashed with "no such column: rowid" before this check existed).
+  const [tableInfo] = exec<{ type: string; wr: number }>(
+    'SELECT type, wr FROM pragma_table_list(?)',
+    [table],
+  );
+  const isRowidTable = tableInfo?.type !== 'view' && (tableInfo?.wr ?? 1) === 0;
   const rowidColumn = pickRowidColumn(columns, isRowidTable);
 
   return { qualifiedName: { schema, table }, columns, primaryKey, uniqueKeys, rowidColumn };
