@@ -125,4 +125,28 @@
   `isDockerAvailable()`, the same point every `tests/db/`-style spec fails at here (no Docker
   daemon, see above).
 
+## SQLite adapter (`node:sqlite`, P35)
+
+- The SQLite adapter and its tests use `node:sqlite`, a Node builtin — **no new dependency, no
+  native module, no build step**. It requires **Bun 1.4+, or Electron/Node 22.5+**; it is not in
+  Bun 1.3, which is what shows up as `node:sqlite is unavailable in this runtime` from the adapter
+  or `SQLITE_UNAVAILABLE_MESSAGE` from the test fixture if you hit it.
+- **`tests/db/sqlite.spec.ts` needs no Docker.** `tests/db/support/sqlite.ts` is a temp-file
+  fixture (`mkdtemp` + `node:sqlite`), not a Testcontainers harness — there is no container to
+  start, no image to pull, no daemon to reach. Its only environment dependency is `node:sqlite`
+  itself, gated by `sqliteAvailable()` the same way every other DB spec here gates on
+  `isDockerAvailable()`.
+- **`tests/ui/sqlite.spec.ts` runs unconditionally** (no Docker gate at all) — the one DB-backed UI
+  spec that actually executes in Claude Code's own Linux web container, where every other engine's
+  UI spec self-skips for lack of Docker. This sandbox's system Node (`/opt/node22`, 22.22+) has
+  `node:sqlite`, which is what `playwright test` actually runs under (Playwright's own test runner
+  is a Node program, not a Bun one) — confirmed empirically, not assumed.
+- This sandbox's own Bun (1.3.x) lacks `node:sqlite`, so `bun test tests/db/sqlite.spec.ts` here
+  reports the legible `SQLITE_UNAVAILABLE_MESSAGE` failure rather than actually running the
+  suite — the same class of environment gap `tests/db:kafka` hits for a different reason above.
+  The adapter itself was verified here by bundling the real source with `esbuild` and running it
+  under `ELECTRON_RUN_AS_NODE=1 electron` against a real temp-file database — the same technique
+  P32's Kafka smoke-testing established for "the target runtime differs from the one `bun test`
+  would use."
+
 Full spec: `docs/v1/SPEC.md`.

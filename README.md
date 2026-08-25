@@ -3,7 +3,7 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across eight database engines.
+Vue 3 — one workbench across nine database engines.
 
 ## Status
 
@@ -25,6 +25,7 @@ Vue 3 — one workbench across eight database engines.
 | PostgreSQL | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MariaDB | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
 | MySQL² | Grid | yes (SQL) | yes | yes | yes | yes | keyset | yes |
+| SQLite³ | Grid | yes (SQL) | yes | yes | yes | yes | keyset (+ rowid) | yes |
 | MongoDB | Documents | yes (shell-style) | yes | yes | yes | estimate only | cursor | yes |
 | Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | yes (string keys only) |
 | Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
@@ -39,6 +40,11 @@ called "SQL".
 `sslmode=require` is the documented default for MySQL 8's `caching_sha2_password` handshake: a
 plaintext connection needs either TLS or `allowPublicKeyRetrieval=true` (a per-connection option)
 the first time a given user authenticates, or the server refuses to send its RSA key.
+
+³ SQLite has no server, no auth, and no cancel — `caps.cancel` is `false`, the app's first honest
+one: `node:sqlite` has no `sqlite3_interrupt` and its whole API is synchronous, so a running
+statement blocks the event loop and an abort could never be delivered while one runs. A SQLite
+connection points at a file (Fields mode's Database file field) rather than a host/port.
 
 A couple of things worth knowing up front:
 
@@ -210,7 +216,7 @@ See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 
 ## Not in v1
 
-MySQL; SQLite as a connection target; light mode; Windows/Linux; DDL editing; export to
+Light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; multiple windows; credential encryption; SSH
 tunneling (planned for v2); code signing/notarization; unit tests. **Auto-update is deliberately
 absent and verified as such** — see [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) §7. SQL-table writes
