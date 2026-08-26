@@ -50,6 +50,21 @@ for name in package:mac package:mac:dir; do
   esac
 done
 
+# --- S6: the three safe Electron fuses are flipped off (P46 D77) -------------------------------
+for fuse in runAsNode enableNodeOptionsEnvironmentVariable enableNodeCliInspectArguments; do
+  if ! grep -qE "^\s*${fuse}:\s*false" electron-builder.yml; then
+    fail "$fuse fuse not disabled" "electron-builder.yml's electronFuses.$fuse is not set to false"
+  fi
+done
+if ! grep -qE '^\s*resetAdHocDarwinSignature:\s*true' electron-builder.yml; then
+  fail "resetAdHocDarwinSignature not set" "electron-builder.yml's electronFuses.resetAdHocDarwinSignature is not true — required once fuses are flipped, since this build ships identity: '-' (ad-hoc)"
+fi
+
+# --- S7: the file:// fuse this app depends on is never disabled (P46 D78) ----------------------
+if grep -qE '^\s*grantFileProtocolExtraPrivileges:\s*false' electron-builder.yml; then
+  fail "grantFileProtocolExtraPrivileges disabled" "electron-builder.yml sets grantFileProtocolExtraPrivileges: false — measured to brick the app outright, since the renderer's own <script type=module crossorigin> is loaded over file:// and gets CORS-refused without this fuse (P46 F71)"
+fi
+
 # --- Artifact checks (only if dist/ exists) ---------------------------------------------------
 if [ ! -d dist ]; then
   note "skipped A1-A5 — no dist/ build present"
