@@ -5,7 +5,7 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { setPage } from './page';
+import { getPage, setPage } from './page';
 
 // Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
 // memory (still no nesting to remember — a redis key's rows are always flat). `searchOpen`
@@ -63,10 +63,27 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findKeyValueTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
-  const effectiveCursor: PageCursor = cursor ?? {
-    mode: 'offset',
-    offset: tab.state.pageIndex * tab.state.pageSize,
-  };
+  let effectiveCursor: PageCursor;
+  if (cursor) {
+    effectiveCursor = cursor;
+  } else {
+    // P43 iter3 D40/F37: a hash/set/zset/stream key's page is cursor-paged (redis/read.ts's
+    // readScanFamily/readStream), and an `offset` cursor is neither honoured nor rejected by
+    // either — it falls through and silently restarts the scan from the beginning. So a
+    // no-cursor load (Refresh, a sibling tab's mutation, a post-Save reload) on any page but the
+    // first of a cursor-paged key must ask for page one honestly, by resetting the tab's own
+    // pager to match, rather than sending an offset the server ignores while the pager keeps
+    // claiming a page further in. A list key's own LRANGE offset strategy is unaffected — this
+    // only fires for a page that was already cursor-paged. Mirrors KeyValueView.vue's own
+    // prevDisabled, which reads the same `position.strategy` to answer the same question.
+    const currentPage = getPage(tabId);
+    if (currentPage && currentPage.position.strategy !== 'offset') {
+      effectiveCursor = { mode: 'offset', offset: 0 };
+      patchKeyValueTabState(tabId, { pageIndex: 0 });
+    } else {
+      effectiveCursor = { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize };
+    }
+  }
   const opId = crypto.randomUUID();
   rt.status = 'loading';
   rt.opId = opId;

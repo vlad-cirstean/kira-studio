@@ -24,6 +24,12 @@ export const ZSET_KEY = 'leaderboard';
 export const STREAM_KEY = 'events:log';
 export const HASH_KEY = 'user:1:profile';
 export const TTL_KEY = 'session:abc';
+// P43 iter3 D40/F37: large enough to leave `hash-max-listpack-entries` (default 128) behind and
+// become a real hashtable — only then does HSCAN genuinely page across multiple cursor rounds
+// (a listpack-encoded hash returns everything in one round regardless of COUNT), which is what a
+// UI test needs to page a hash key forward more than once before pressing Refresh.
+export const BIG_HASH_KEY = 'user:1:bighash';
+export const BIG_HASH_LENGTH = 5000;
 
 export async function seedRedis(conn: Redis): Promise<void> {
   // A root-level key with no ':' — namespace splitting must still surface it as a 'key' leaf
@@ -40,6 +46,10 @@ export async function seedRedis(conn: Redis): Promise<void> {
   await conn.set('user:1:email', 'alice@example.com');
   await conn.hset(HASH_KEY, HASH_FIELDS);
   await conn.set('user:2:name', 'Bob');
+
+  const bigHashFields: Record<string, string> = {};
+  for (let i = 0; i < BIG_HASH_LENGTH; i++) bigHashFields[`f${i}`] = `v${i}`;
+  await conn.hset(BIG_HASH_KEY, bigHashFields);
 
   const jobs = Array.from({ length: LIST_LENGTH }, (_, i) => `job-${i}`);
   await conn.rpush(LIST_KEY, ...jobs);

@@ -1,4 +1,5 @@
 import {
+  BIG_HASH_KEY,
   HASH_FIELDS,
   HASH_KEY,
   LIST_KEY,
@@ -39,6 +40,7 @@ const DB1_PATH = 'database:db1';
 const USER_NS_PATH = `${DB0_PATH}/namespace:user`;
 const USER_1_NS_PATH = `${USER_NS_PATH}/namespace:1`;
 const HASH_KEY_PATH = `${USER_1_NS_PATH}/key:${encodeURIComponent(HASH_KEY)}`;
+const BIG_HASH_KEY_PATH = `${USER_1_NS_PATH}/key:${encodeURIComponent(BIG_HASH_KEY)}`;
 const QUEUE_NS_PATH = `${DB0_PATH}/namespace:queue`;
 const LIST_KEY_PATH = `${QUEUE_NS_PATH}/key:${encodeURIComponent(LIST_KEY)}`;
 const SESSION_NS_PATH = `${DB0_PATH}/namespace:session`;
@@ -148,6 +150,38 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   await page.click('[data-testid="keyvalue-refresh"]');
   await expect(hashCellEditorPanel).toHaveCount(0);
 
+  // --- P43 iter3 D40/F37: a Refresh on a cursor-paged key (hash/set/zset/stream) returns the
+  // pager to the rows it actually served — a SCAN cursor cannot be resumed once the page that
+  // minted it is gone, so a reload must go back to page one and say so, rather than silently
+  // serving page one's rows under a pager that still claims to be further in. -------------------
+  await (await findRow(page, DB0_PATH)).dblclick();
+  await expect(browseView).toBeVisible();
+  await browseView.locator('[data-testid="browse-crumb"]').first().click();
+  await expect(browseView).toHaveAttribute('data-level', DB0_PATH);
+  await userRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', USER_NS_PATH);
+  await user1Row.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
+  const bigHashRow = browseView.locator(
+    `[data-testid="browse-row"][data-path="${BIG_HASH_KEY_PATH}"]`,
+  );
+  await expect(bigHashRow).toBeVisible();
+  await bigHashRow.dblclick();
+  const bigHashView = page.locator(
+    `[data-testid="keyvalue-view"][data-path="${BIG_HASH_KEY_PATH}"]`,
+  );
+  await expect(bigHashView).toBeVisible();
+  const bigHashFirstField = bigHashView.locator('[data-testid="keyvalue-field"]').first();
+  await expect(bigHashFirstField).toBeVisible({ timeout: 15_000 });
+  const firstFieldAtPageOne = await bigHashFirstField.innerText();
+  const bigHashNext = bigHashView.locator('[data-testid="keyvalue-next"]');
+  await bigHashNext.click(); // clicking a disabled button times out — the guard that this key
+  await bigHashNext.click(); // genuinely has more than one page to page through.
+  await bigHashView.locator('[data-testid="keyvalue-refresh"]').click();
+  await expect
+    .poll(() => bigHashFirstField.innerText(), { timeout: 15_000 })
+    .toBe(firstFieldAtPageOne);
+
   // --- open a list key's keyvalue tab: index/value rows, one page holds every seeded job ----
   // Opening the hash key's tab switched the active tab away from db0's Browse tab (still open,
   // just not active) — double-clicking the tree row again reactivates the same tab (§8.4's
@@ -213,7 +247,9 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   const consoleResult = consoleView.locator('[data-testid="console-result-grid"]');
   await expect(consoleResult).toHaveCount(1);
   await expect(consoleResult.locator('[data-testid="console-result-kv-row"]')).toHaveCount(1);
-  await expect(consoleResult.locator('[data-testid="console-result-kv-row"]')).toContainText('10');
+  // 11: the original 10 (P43 iter1's TTL_KEY delete above already removed one) plus D40's own
+  // BIG_HASH_KEY fixture (below), which this test's own db0 traversal never visits.
+  await expect(consoleResult.locator('[data-testid="console-result-kv-row"]')).toContainText('11');
 
   expect(consoleErrors).toEqual([]);
 });

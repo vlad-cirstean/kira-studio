@@ -739,4 +739,36 @@ describe('redis adapter (§9.1, P9)', () => {
       await adapter.disconnect();
     }
   });
+
+  // P43 iter3 D40/F37/D48: readScanFamily neither honours nor rejects an `offset` cursor — it
+  // falls through and restarts the SCAN from cursor '0'. Pinning that as the adapter's own
+  // contract (not merely reading it off the code) is what views/keyvalue/state.ts's D40 now
+  // depends on: a reload's fallback cursor on a cursor-paged key relies on exactly this behaviour
+  // to land back on page one rather than erroring or serving something mid-scan.
+  test('24. read: an offset cursor on a cursor-paged key restarts the scan, rather than seeking or erroring', async () => {
+    const adapter = await createAdapter('redis', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    try {
+      const page = await readKeyValue(
+        adapter,
+        {
+          path: keyPath(HASH_KEY),
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 100,
+          // A non-zero offset — the shape views/keyvalue/state.ts's old fallback cursor sent on a
+          // reload of a page it had already paged forward on.
+          cursor: { mode: 'offset', offset: 200 },
+        },
+        makeCtx(),
+      );
+      expect(page.redisType).toBe('hash');
+      expect(page.position.strategy).toBe('cursor');
+      expect(page.rowCount).toBe(Object.keys(HASH_FIELDS).length);
+      expect(kvPairs(page)).toEqual(HASH_FIELDS);
+    } finally {
+      await adapter.disconnect();
+    }
+  });
 });

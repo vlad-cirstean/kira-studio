@@ -85,7 +85,14 @@ async function readString(
 
 // Shared cursor-loop body for hash/set/zset (§8.8's per-type renderers): accumulates whole SCAN
 // rounds without slicing mid-round, so a round's remaining elements are never dropped (P9's read
-// notes) — the page can slightly overshoot req.pageSize, which is fine for a browse-only view.
+// notes) — the page can slightly overshoot req.pageSize by up to one SCAN_COUNT round. That is
+// fine for a browse-only view: slicing to req.pageSize instead would strand every element between
+// the slice point and the round boundary, because a SCAN cursor is not addressable inside a
+// round — the same class of bug P43 iter2's F18 fixed in readList by removing a clamp, not adding
+// one here (P43 iter3 F39/D48). What is not fine, and is not what this loop does, is treating an
+// `offset` cursor as addressable into this stream at all — `req.cursor.mode` below only ever
+// reads 'before'/'after', so an `offset` cursor silently restarts the scan from `'0'` rather than
+// seeking; views/keyvalue/state.ts's D40 is what keeps the renderer's own pager honest about that.
 async function readScanFamily(
   scanOnce: (cursor: string) => Promise<[string, string[]]>,
   pairSize: 1 | 2,
