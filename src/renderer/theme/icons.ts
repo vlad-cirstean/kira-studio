@@ -30,14 +30,46 @@ export function nodeIcon(kind: NodeKind | 'group'): string {
   return kind === 'group' ? 'folder' : KIND_ICON[kind];
 }
 
-export function columnTypeIcon(dataType: string): string {
+type ColumnTypeCategory = 'numeric' | 'boolean' | 'datetime' | 'json' | 'array' | 'uuid' | 'string';
+
+function columnTypeCategory(dataType: string): ColumnTypeCategory {
   const type = dataType.toLowerCase();
   if (/^(int|numeric|float|double|real|decimal|serial|bigint|smallint)/.test(type))
-    return 'symbol-numeric';
-  if (/^bool/.test(type)) return 'symbol-boolean';
-  if (/^(date|time|timestamp)/.test(type)) return 'calendar';
-  if (/^jsonb?/.test(type)) return 'symbol-object';
-  if (type.includes('[]')) return 'symbol-array';
-  if (/^uuid/.test(type)) return 'symbol-key';
-  return 'symbol-string';
+    return 'numeric';
+  if (/^bool/.test(type)) return 'boolean';
+  if (/^(date|time|timestamp)/.test(type)) return 'datetime';
+  if (/^jsonb?/.test(type)) return 'json';
+  if (type.includes('[]')) return 'array';
+  if (/^uuid/.test(type)) return 'uuid';
+  return 'string';
+}
+
+const CATEGORY_ICON: Record<ColumnTypeCategory, string> = {
+  numeric: 'symbol-numeric',
+  boolean: 'symbol-boolean',
+  datetime: 'calendar',
+  json: 'symbol-object',
+  array: 'symbol-array',
+  uuid: 'symbol-key',
+  string: 'symbol-string',
+};
+
+export function columnTypeIcon(dataType: string): string {
+  return CATEGORY_ICON[columnTypeCategory(dataType)];
+}
+
+// Reuses the connection-colour picker's own 8-hue palette (--kira-conn-*, D18) instead of
+// inventing a second colour system just for data-type badges.
+const CATEGORY_COLOR: Record<ColumnTypeCategory, string> = {
+  numeric: 'var(--kira-conn-blue)',
+  boolean: 'var(--kira-conn-violet)',
+  datetime: 'var(--kira-conn-orange)',
+  json: 'var(--kira-conn-teal)',
+  array: 'var(--kira-conn-amber)',
+  uuid: 'var(--kira-conn-red)',
+  string: 'var(--kira-conn-green)',
+};
+
+export function columnTypeColor(dataType: string): string {
+  return CATEGORY_COLOR[columnTypeCategory(dataType)];
 }

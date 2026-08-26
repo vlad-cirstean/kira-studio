@@ -2,7 +2,7 @@
 import type { ColumnMeta } from '@shared/domain/tree';
 import { openContextMenu } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { columnTypeIcon } from '../../theme/icons';
+import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
 
@@ -53,7 +53,11 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           @contextmenu="onContextMenu($event, col)"
         >
           <td class="def-col-icon">
-            <CodiconIcon :name="columnTypeIcon(col.dataType)" :size="13" />
+            <CodiconIcon
+              :name="columnTypeIcon(col.dataType)"
+              :size="13"
+              :style="{ color: columnTypeColor(col.dataType) }"
+            />
           </td>
           <td class="def-col-name">{{ col.name }}</td>
           <td class="def-col-key">
@@ -61,7 +65,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk">FK</span>
           </td>
           <td class="def-col-type mono">
-            {{ col.dataType }}
+            <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
             <span
               v-if="typeDescription(col.dataType)"
               class="type-info"
