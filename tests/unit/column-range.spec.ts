@@ -43,4 +43,11 @@ describe('columnRangeExtractor (P47 D5) — the rangeExtractor seam replacing vi
   test('6. a table with no columns extracts no range', () => {
     expect(columnRangeExtractor({ startIndex: 0, endIndex: 0 }, [0], 500, 100)).toEqual([]);
   });
+
+  test('7. a single-column table clamps on both sides at once, without duplicating index 0', () => {
+    const oneColOffsets = columnOffsets(['only'], { only: 100 });
+    expect(columnRangeExtractor({ startIndex: 0, endIndex: 0 }, oneColOffsets, 560, 12)).toEqual([
+      0,
+    ]);
+  });
 });
