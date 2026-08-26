@@ -2,12 +2,15 @@
 
 A visual database client (DataGrip/DBeaver class) for macOS. Electron + TypeScript + Vue 3.
 
-> Status: **P0–P31 implemented** on the v1 feature branch — see §10's phasing table for the record.
-> Where this spec and the tree disagree, the tree is authoritative; `README.md` describes what
-> shipped.
+> **This is the v1 record, not a living spec.** It documents what v1 was specified to be, phase by
+> phase (§10), kept as originally written rather than edited to track later changes. For the app
+> **as it stands today**, read [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) instead — where the two
+> disagree, the tree is authoritative over both, and ARCHITECTURE.md is authoritative for behavior.
+> See [`docs/v1/README.md`](README.md) for what this folder is.
 
-> **Start here:** read `AGENTS.md` first — the working agreement — before this spec. Per-phase
-> implementation plans live in `docs/plans/`.
+> Status: **P0–P37 implemented** (P38 skipped by user direction); P39 onward are user-directed
+> post-v1 phases — see §10's phasing table for the full record. Per-phase implementation plans live
+> in `docs/v1/plans/`.
 
 ---
 

@@ -1,16 +1,22 @@
 # Architecture reference
 
-This is the **current-state** companion to `docs/v1/SPEC.md`. SPEC's §10 phasing table is a
-decision *history* — what was built, in what order, and why, phase by phase, kept exactly as
-implemented. This file is the opposite cut: facts about the app **as it stands today**, organized
-by subsystem/engine so a future session can look something up without reconstructing it from
-phase-history prose. When the two ever appear to disagree, SPEC.md is authoritative for behavior
-and this file should be corrected to match.
+This file is **authoritative for the app as it stands today**: facts about the app itself —
+driver/dependency choices, protocol-level constraints, capability quirks and the structural reasons
+behind them — organized by subsystem/engine so a future session can look something up without
+reconstructing it from phase-history prose. Environment-specific operational notes (how to run
+Docker in Claude Code's own sandbox, how to work around a proxy block, which env var a headless
+Linux box needs) belong in `AGENTS.md`, not here.
 
-This file is for facts about the app itself — driver/dependency choices, protocol-level
-constraints, capability quirks and the structural reasons behind them. Environment-specific
-operational notes (how to run Docker in Claude Code's own sandbox, how to work around a proxy
-block, which env var a headless Linux box needs) belong in `AGENTS.md`, not here.
+The tree itself outranks this file — if they disagree, the tree is right and this file needs
+fixing, not the other way around. Where this file and `docs/v1/SPEC.md` disagree, this file is
+authoritative for behavior: SPEC.md is the record of what v1 was *specified* to be, phase by phase
+(§10), kept as originally written rather than corrected to match later reality — see
+`docs/v1/README.md` for what that folder is and isn't.
+
+**Related documents:** [`docs/PERF.md`](PERF.md) (performance budgets and measured results),
+[`docs/PACKAGING.md`](PACKAGING.md) (macOS build and packaging verification),
+[`docs/design/kira-design-system/`](design/kira-design-system/) (the workbench visual reference),
+[`AGENTS.md`](../AGENTS.md) (the working agreement for changes to this repo).
 
 ## Stack
 
