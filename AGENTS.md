@@ -196,4 +196,5 @@ it here.
   `xvfb-run -a bunx playwright test tests/ui/rabbitmq.spec.ts` run for real, failing only at the
   same Docker image-pull step every other Docker-gated spec hits here.
 
-Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/ARCHITECTURE.md`.
+Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
+phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

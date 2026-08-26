@@ -16,7 +16,7 @@ Vue 3 — one workbench across eleven database engines.
   one "Kira Studio wants to use your confidential information stored in…" prompt — **Always
   Allow** answers it permanently for that build.
 - **Credentials are encrypted at rest** via the macOS Keychain (`safeStorage`) — see
-  `docs/v1/SPEC.md` §6.
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Storage section.
 
 ## Supported engines
 
@@ -32,7 +32,7 @@ Vue 3 — one workbench across eleven database engines.
 | Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
 | SQS | Stream | no | yes | no | no | approximate | receive batches | insert + delete |
 | RabbitMQ⁵ | Stream | no | yes | no | no | no (live snapshot) | `basic.get` batches | insert only (publish) |
-| S3 | Key/value | no | no | no | no | per-object only | continuation token | read-only |
+| S3 | Key/value | no | no | no | no | per-object only | continuation token | yes (+ upload/download) |
 
 ¹ The console takes each engine's native command form, not SQL — that's why the column isn't
 called "SQL".
@@ -153,11 +153,13 @@ bun run dev        # electron-vite dev, HMR for the renderer
 | `bun run start` | Preview the production build |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
-| `bun run typecheck` | Runs all three splits below |
+| `bun run typecheck` | Runs all four splits below |
 | `bun run typecheck:node` | main + engine + preload (native TypeScript, `tsgo`) |
 | `bun run typecheck:web` | renderer, including `.vue` files (`vue-tsc`) |
-| `bun run typecheck:db` | `tests/db` |
+| `bun run typecheck:db` | `tests/db` + `tests/electron-db` |
+| `bun run typecheck:unit` | `tests/unit` |
 | `bun run test:db` | Testcontainers integration suite |
+| `bun run test:unit` | Unit suite — no external resource, finishes in about a second |
 | `bun run test:ui` | Builds, then runs Playwright against the real app |
 | `bun run package:mac` | `.dmg` + `.zip` + `.app`, unsigned arm64 |
 | `bun run package:mac:dir` | `.app` only (faster) |
@@ -173,13 +175,20 @@ six seconds. Bypass it for a work-in-progress commit with `git commit --no-verif
 
 ## Tests
 
-There are two suites, and deliberately no unit tests — behavior is covered end-to-end against real
-engines and a real UI instead.
+Four suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ui/`.
 
+- **`bun run test:unit`** — plain TypeScript modules exercised with fakes (a `bun:sqlite`-backed
+  Drizzle instance, a fake `requestAnimationFrame` queue, hand-written fake clients) rather than a
+  real container or a real Electron process. No external resource needed; finishes in about a
+  second. Sparse by design — added only where a unit test is a better fit than the UI coverage
+  below, never as a substitute for it.
 - **`bun run test:db`** — a Testcontainers integration suite against real engines. Requires Colima
   running (`colima start --cpu 4 --memory 6 --disk 40`); the harness resolves `DOCKER_HOST` from
   the active Docker context itself and prints a clear message if the daemon is unreachable. Kafka
-  and SQS run against `@testcontainers/kafka` and `@testcontainers/localstack`.
+  and SQS run against `@testcontainers/kafka` and `@testcontainers/localstack`. One file lives in
+  `tests/electron-db/` instead of `tests/db/` and runs under a real Electron process rather than
+  Bun (`bun run test:db:kafka`) — the native Kafka driver is built against Electron's own Node ABI
+  and can't load under Bun at all.
 - **`bun run test:ui`** — Playwright driving the built Electron app via `_electron.launch()`. It
   builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:ui`.
 - **Local fixture databases for manual testing** — see
@@ -192,8 +201,8 @@ engines and a real UI instead.
 Kira Studio runs as three processes: the Vue 3 renderer, an Electron main process for windowing
 and app-local storage, and every database driver isolated in its own `utilityProcess` ("engine").
 Control (connect, cancel, settings) flows through main; bulk result pages travel directly between
-renderer and engine over a `MessagePort`, skipping main entirely — see `docs/v1/SPEC.md` §4 for the
-diagram.
+renderer and engine over a `MessagePort`, skipping main entirely — see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Process model section for the diagram.
 
 Two facts worth knowing before reading further:
 - **Drivers live in a separate process**, so the renderer never touches a wire protocol directly.
@@ -208,23 +217,29 @@ src/engine     utilityProcess host — adapters, scheduler, cache
 src/preload    contextBridge surface between main and renderer
 src/renderer   the Vue 3 app
 src/shared     wire protocol + domain types shared across processes
+tests/unit     unit suite — no external resource
 tests/db       Testcontainers integration suite
+tests/electron-db  the one Testcontainers spec that needs a real Electron process (Kafka)
 tests/ui       Playwright end-to-end suite
-docs           specification, performance, packaging, per-phase plans
+docs           architecture, performance, packaging, design system; docs/v1 is the v1 record
 scripts/demo-dbs   local fixture databases for manual testing
 ```
 
-See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
+See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown as of v1 (docs/v1 is
+the v1 record — see `docs/v1/README.md`).
 
 ## Documentation
 
-- [`docs/v1/SPEC.md`](docs/v1/SPEC.md) — the full specification: scope, architecture, adapter model,
-  storage, caching, UI.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the current-state reference: stack, invariants,
+  adapter contract, per-engine facts, storage, caching, UI architecture, testing, process model.
+  Authoritative for behavior; the tree outranks it.
 - [`docs/PERF.md`](docs/PERF.md) — performance budgets, how each is measured, and the recorded
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
-- [`docs/v1/plans/`](docs/v1/plans/) — one implementation plan per phase, P0 through P23.
+- [`docs/v1/`](docs/v1/) — the v1 record, not a living spec (see `docs/v1/README.md`):
+  [`SPEC.md`](docs/v1/SPEC.md), the specification v1 was built against, and
+  [`plans/`](docs/v1/plans/), one implementation plan per phase, P0 through P45.
 - [`docs/design/kira-design-system/`](docs/design/kira-design-system/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
@@ -233,12 +248,13 @@ See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 ## Not in v1
 
 Light mode; Windows/Linux; DDL editing; export to
-CSV/JSON; connection folders; split editor groups; multiple windows; credential encryption; SSH
-tunneling (planned for v2); code signing/notarization; unit tests. **Auto-update is deliberately
-absent and verified as such** — see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7. SQL-table writes
-(add-row, delete-row, cell-edit) are staged as pending changes with a preview; MongoDB/Redis/
-Kafka/SQS writes are capability-gated per engine (see the table above) and execute immediately,
-with no staging or preview; S3 is read-only.
+CSV/JSON; connection folders; split editor groups; multiple windows; SSH tunneling (planned for
+v2); code signing/notarization. **Auto-update is deliberately absent and verified as such** — see
+[`docs/PACKAGING.md`](docs/PACKAGING.md) §7. SQL-table writes (add-row, delete-row, cell-edit) are
+staged as pending changes with a preview; MongoDB/Redis/Kafka/SQS/S3 writes are capability-gated
+per engine (see the table above) and execute immediately, with no staging or preview; S3
+additionally gets upload/download of a whole object via a native OS file dialog, not a value the
+staging model can show inline.
 
 ## License
 
