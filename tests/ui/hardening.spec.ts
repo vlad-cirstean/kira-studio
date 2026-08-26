@@ -158,3 +158,20 @@ test('the shared text field opts out of autofill (P46 D76)', async ({ kira }) =>
     'off',
   );
 });
+
+test('WebGL is off, plain 2d canvas still works (P46 D75)', async ({ kira }) => {
+  // Passes vacuously on this sandbox's Linux/xvfb runner: WebGL is already blocklisted there
+  // regardless of webgl: false ("ContextResult::kFatalFailure: WebGL1 blocklisted"), so this
+  // scenario cannot distinguish the option from a revert here — it is real coverage only on
+  // macOS. Written anyway per the plan's own §0 ground rule against implying coverage that does
+  // not exist; §8 of the plan records the same caveat as macOS-owed verification debt.
+  const result = await kira.window.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    const webgl = canvas.getContext('webgl');
+    const ctx2d = canvas.getContext('2d');
+    return { webgl: webgl === null, ctx2d: ctx2d !== null };
+  });
+
+  expect(result.webgl).toBe(true);
+  expect(result.ctx2d).toBe(true);
+});

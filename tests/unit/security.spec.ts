@@ -10,6 +10,7 @@ describe('src/main/security.ts — rendererWebPreferences (P46 D69/D73)', () => 
       nodeIntegration: false,
       devTools: true,
       spellcheck: false,
+      webgl: false,
     });
   });
 
@@ -21,5 +22,10 @@ describe('src/main/security.ts — rendererWebPreferences (P46 D69/D73)', () => 
   test('3. spellcheck is always false, regardless of isDev (P46 D74)', () => {
     expect(rendererWebPreferences({ preload: '/preload.js', isDev: true }).spellcheck).toBe(false);
     expect(rendererWebPreferences({ preload: '/preload.js', isDev: false }).spellcheck).toBe(false);
+  });
+
+  test('4. webgl is always false, regardless of isDev (P46 D75)', () => {
+    expect(rendererWebPreferences({ preload: '/preload.js', isDev: true }).webgl).toBe(false);
+    expect(rendererWebPreferences({ preload: '/preload.js', isDev: false }).webgl).toBe(false);
   });
 });

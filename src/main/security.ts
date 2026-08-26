@@ -8,6 +8,7 @@ export function rendererWebPreferences(opts: { preload: string; isDev: boolean }
     nodeIntegration: false,
     devTools: opts.isDev,
     spellcheck: false,
+    webgl: false,
   };
 }
 
