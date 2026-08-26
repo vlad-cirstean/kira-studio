@@ -10,7 +10,7 @@ import { log, sweepOldLogs } from './log';
 import { buildMenu } from './menu';
 import { wireOplog } from './oplog';
 import { createSecretCipher } from './secret-cipher';
-import { hardenSession } from './security';
+import { hardenCommandLine, hardenSession } from './security';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
@@ -19,6 +19,7 @@ import { getAllSettings } from './storage/repos/settings';
 import { createTreeService } from './tree-service';
 import { createWindow } from './window';
 
+hardenCommandLine(app.commandLine);
 app.setName('Kira Studio');
 if (process.env.KIRA_HOME) {
   app.setPath('userData', join(kiraHome(), 'electron'));

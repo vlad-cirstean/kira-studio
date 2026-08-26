@@ -175,3 +175,22 @@ test('WebGL is off, plain 2d canvas still works (P46 D75)', async ({ kira }) => 
   expect(result.webgl).toBe(true);
   expect(result.ctx2d).toBe(true);
 });
+
+test('the Chromium features this app has no user for are switched off at the command line (reverses P46 D79)', async ({
+  kira,
+}) => {
+  // This can only pin that the switches are still being passed, not that Chromium still honours
+  // them (D79's fail-open point stands) — there is no first-class API to assert the effect
+  // through, unlike hardenSession/hardenWindow above.
+  const hasSwitches = await kira.app.evaluate(({ app }) => [
+    app.commandLine.hasSwitch('disable-speech-api'),
+    app.commandLine.hasSwitch('disable-speech-synthesis-api'),
+    app.commandLine.hasSwitch('disable-translate'),
+    app.commandLine.hasSwitch('disable-background-networking'),
+    app.commandLine.hasSwitch('disable-domain-reliability'),
+    app.commandLine.hasSwitch('disable-component-update'),
+    app.commandLine.hasSwitch('disable-client-side-phishing-detection'),
+  ]);
+
+  expect(hasSwitches).toEqual([true, true, true, true, true, true, true]);
+});

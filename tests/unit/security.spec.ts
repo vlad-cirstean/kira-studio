@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { rendererWebPreferences } from '../../src/main/security';
+import { hardenCommandLine, rendererWebPreferences } from '../../src/main/security';
 
 describe('src/main/security.ts — rendererWebPreferences (P46 D69/D73)', () => {
   test('1. returns exactly the renderer web preferences this app sets — no more, no less', () => {
@@ -27,5 +27,21 @@ describe('src/main/security.ts — rendererWebPreferences (P46 D69/D73)', () => 
   test('4. webgl is always false, regardless of isDev (P46 D75)', () => {
     expect(rendererWebPreferences({ preload: '/preload.js', isDev: true }).webgl).toBe(false);
     expect(rendererWebPreferences({ preload: '/preload.js', isDev: false }).webgl).toBe(false);
+  });
+});
+
+describe('src/main/security.ts — hardenCommandLine (reverses P46 D79)', () => {
+  test('5. appends exactly the switches for capabilities this app has no call sites for', () => {
+    const appended: string[] = [];
+    hardenCommandLine({ appendSwitch: (feature) => appended.push(feature) });
+    expect(appended).toEqual([
+      'disable-speech-api',
+      'disable-speech-synthesis-api',
+      'disable-translate',
+      'disable-background-networking',
+      'disable-domain-reliability',
+      'disable-component-update',
+      'disable-client-side-phishing-detection',
+    ]);
   });
 });
