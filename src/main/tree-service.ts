@@ -21,8 +21,10 @@ export class DisconnectedError extends Error {
 export interface TreeChildrenResult {
   nodes: TreeNode[];
   source: 'cache' | 'server';
-  /** P43 iter2 D21/D22: never persisted — a truncated level is never written to metadata_cache
-   *  (below), so a `source: 'cache'` result is always complete and this is always `false`. */
+  /** P43 iter2 D21/D22: never persisted — a truncated level is never written to metadata_cache,
+   *  and P43 iter3 D38 also drops any older, complete-looking row a truncated refresh could not
+   *  replace (below) — so a `source: 'cache'` result is always complete and this is always
+   *  `false`. */
   truncated: boolean;
 }
 
@@ -95,7 +97,13 @@ export function createTreeService(
       // P43 iter2 D22: a truncated listing is a different, smaller answer than the real one — not
       // caching it means the next visit re-scans (and may well succeed) instead of serving the
       // same short list, possibly past an app restart, until the user happens to press Refresh.
+      // P43 iter3 D38/F38: a truncated *refresh* still has to answer for whatever complete listing
+      // is already sitting in the row from an earlier, smaller visit — leaving it would serve that
+      // stale answer back as `source: 'cache', truncated: false` on the very next ordinary load,
+      // which is D22's own guarantee broken one step later. Dropping is the same "cannot be
+      // trusted" call this function already makes on a schema-mismatched cache read, above.
       if (!result.truncated) await putCached(db, connectionId, path, 'children', result.nodes);
+      else await dropCached(db, connectionId, path);
       return { nodes: result.nodes, source: 'server', truncated: !!result.truncated };
     },
 

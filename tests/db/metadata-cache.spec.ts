@@ -1,8 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import type { ConnectionsService } from '../../src/main/connections';
+import type { EngineHost } from '../../src/main/engine-host';
 import type { KiraDb } from '../../src/main/storage/db';
 import { getCached, putCached } from '../../src/main/storage/repos/metadata-cache';
+import { createTreeService } from '../../src/main/tree-service';
 
 // P43 iter3 D36: repos/metadata-cache.ts needs no container — `putCached`/`getCached` take a
 // plain `KiraDb` (`ReturnType<typeof drizzle>` from `drizzle-orm/sqlite-proxy`), and a
@@ -87,9 +90,12 @@ describe('metadata cache — per-connection eviction cap (P43 iter3, D20/D36)', 
       await putCached(db, 'c1', `p${i}`, 'children', { i });
     }
     expect(rowCount(raw, 'c1')).toBe(200);
+    // Not asserting an exact eviction boundary: writes this tight can share a millisecond
+    // `fetched_at`, and D20's `ORDER BY fetched_at DESC` breaks a tie arbitrarily among the tied
+    // rows (scenario 2, below, is the guard that a tie never evicts the row just written — it
+    // does not promise a strict insertion-order boundary). p0 was written 260 writes ago, far
+    // outside any tie window with p259; p259 was the very last write.
     expect(await getCached(db, 'c1', 'p0', 'children')).toBeNull();
-    expect(await getCached(db, 'c1', 'p59', 'children')).toBeNull(); // the 60 oldest are the ones evicted
-    expect(await getCached(db, 'c1', 'p60', 'children')).toEqual({ i: 60 });
     expect(await getCached(db, 'c1', 'p259', 'children')).toEqual({ i: 259 });
   });
 
@@ -138,5 +144,92 @@ describe('metadata cache — per-connection eviction cap (P43 iter3, D20/D36)', 
     expect(await getCached(db, 'c1', 'ok', 'children')).toEqual({ small: true });
     expect(await getCached(db, 'c1', 'big', 'children')).toBeNull();
     expect(rowCount(raw, 'c1')).toBe(1);
+  });
+});
+
+// P43 iter3 D38/F38: createTreeService's own dependencies (`EngineHost`, `ConnectionsService`)
+// are plain interfaces over the engine/main-process boundary, not classes — a minimal stub of
+// each, covering only the two methods `children()` actually calls, drives the whole cache-aside
+// path over the same bun:sqlite harness above. `connections.stateOf` always answers 'connected'
+// so `requireConnected` never reaches `getConnection` (a real repo call this stub does not need).
+// `call` is cast rather than typed directly against `EngineHost['call']` — a generic method type
+// rejects a concrete-return-type implementation by assignment, but this stub only ever answers
+// one op (`children`), so the assertion is honest about what it actually returns.
+function fakeEngineHost(
+  children: () => Promise<{ nodes: unknown[]; truncated?: boolean }>,
+): EngineHost {
+  return { call: (async () => children()) as EngineHost['call'] } as unknown as EngineHost;
+}
+
+function fakeConnections(): ConnectionsService {
+  return {
+    stateOf: () => ({
+      connectionId: 'c1',
+      status: 'connected',
+      serverVersion: null,
+      error: null,
+      since: 0,
+      caps: null,
+    }),
+  } as unknown as ConnectionsService;
+}
+
+describe('tree-service — a truncated refresh does not leave a stale complete-looking cache row (P43 iter3 D38)', () => {
+  test('1. caches a complete listing, then a truncated refresh drops it rather than serving it stale', async () => {
+    const { db, raw } = makeDb();
+    seedConnection(raw, 'c1');
+    let truncated = false;
+    const service = createTreeService(
+      db,
+      fakeEngineHost(async () => ({
+        nodes: [{ kind: 'table', name: 'x', path: 'table:x', hasChildren: false }],
+        truncated,
+      })),
+      fakeConnections(),
+    );
+
+    // Monday: a complete listing lands and is cached.
+    const first = await service.children('c1', '', false);
+    expect(first).toEqual({
+      nodes: [{ kind: 'table', name: 'x', path: 'table:x', hasChildren: false }],
+      source: 'server',
+      truncated: false,
+    });
+    expect(rowCount(raw, 'c1')).toBe(1);
+
+    // The namespace grows too large; the user presses Refresh and gets truncated: true.
+    truncated = true;
+    const refreshed = await service.children('c1', '', true);
+    expect(refreshed.truncated).toBe(true);
+
+    // The row this refresh could not replace must be gone — not sitting there as a
+    // complete-looking answer for the next ordinary (non-refresh) visit to serve.
+    expect(rowCount(raw, 'c1')).toBe(0);
+    expect(await getCached(db, 'c1', '', 'children')).toBeNull();
+
+    // Navigating away and back (an ordinary load, refresh: false) must reach the engine again —
+    // never silently resurrect Monday's stale, complete-looking listing.
+    truncated = false;
+    const revisited = await service.children('c1', '', false);
+    expect(revisited.source).toBe('server');
+    expect(revisited.truncated).toBe(false);
+    expect(rowCount(raw, 'c1')).toBe(1);
+  });
+
+  test('2. a complete refresh still caches exactly as before — D38 narrows nothing on that path', async () => {
+    const { db, raw } = makeDb();
+    seedConnection(raw, 'c1');
+    const service = createTreeService(
+      db,
+      fakeEngineHost(async () => ({
+        nodes: [{ kind: 'table', name: 'y', path: 'table:y', hasChildren: false }],
+        truncated: false,
+      })),
+      fakeConnections(),
+    );
+    await service.children('c1', '', true);
+    expect(rowCount(raw, 'c1')).toBe(1);
+    const cached = await service.children('c1', '', false);
+    expect(cached.source).toBe('cache');
   });
 });
