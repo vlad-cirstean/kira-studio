@@ -5,7 +5,7 @@ See the [README](../README.md) for what the app is and how to run it.
 This doc is the P12 deliverable named by SPEC.md §2's two hard requirements (§2.1 "Silky UI",
 §2.2 "Small RAM footprint"): where each budget is measured, whether that measurement is automated
 or manual, and the numbers recorded from a real run. It is expected to be re-measured, not
-rewritten from scratch — `docs/plans/P12-hardening.md` is the frozen design record; this file is
+rewritten from scratch — `docs/v1/plans/P12-hardening.md` is the frozen design record; this file is
 the living one.
 
 Baseline machine: this repo's Linux/Xvfb dev container (headless, software-rendered Chromium — see

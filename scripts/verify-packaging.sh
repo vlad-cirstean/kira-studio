@@ -1,6 +1,6 @@
 #!/bin/sh
 # verify-packaging.sh — the executable form of P15's "auto-update configuration verified"
-# deliverable (docs/plans/P15-gh-tooling.md §2, §4). Runs on Linux and macOS, locally and in CI.
+# deliverable (docs/v1/plans/P15-gh-tooling.md §2, §4). Runs on Linux and macOS, locally and in CI.
 #
 # Static checks (S1-S5) always run. Artifact checks (A1-A5) run only when dist/ exists; otherwise
 # they print "skipped" and pass. Set KIRA_STRICT_UPDATE_CHECK=1 to make a leftover .blockmap

@@ -27,7 +27,7 @@
   --kira-search-match-current: var(--kira-warn);
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
-     Radius tier system (VS Code Modern UI, docs/design/vscode-modern-ui): sm for interactive
+     Radius tier system (VS Code Modern UI, docs/design/kira-design-system): sm for interactive
      controls (buttons, tabs, inputs, chips), the bare token for panel-level surfaces, lg for
      floating modal dialogs, pill for status-style chips. */
   --kira-radius-sm: 4px;
