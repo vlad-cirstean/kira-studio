@@ -58,6 +58,8 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 - Every operation that can exceed ~150 ms shows progress and a working stop button.
 - Every DB read goes through the cache layer (see Caching, below) — a cache miss is the only thing
   that produces a query.
+- The renderer loads no remote content, opens no window, and navigates nowhere but its own base
+  URL (see Renderer security surface, below).
 
 ## Adapter contract
 
@@ -423,6 +425,63 @@ a connection *can* be moved to its own process later (config flag) if a driver p
 one port to the renderer and one to the engine. Result pages travel renderer↔engine directly, as
 transferable `ArrayBuffer`s where the column type allows. Control messages (connect, cancel,
 settings) go through main so it stays the single source of truth for state and logging.
+
+## Renderer security surface
+
+`src/main/security.ts` is the one module that owns every default-on Electron/Chromium capability
+this app has turned off, plus the reason each was turned off — an audit against what the renderer
+actually does, not a blanket hardening pass (P46). `rendererWebPreferences()` builds the
+`webPreferences` object `window.ts` passes to `BrowserWindow`; `hardenSession()` runs once on
+`session.defaultSession` after `app.whenReady()`; `hardenWindow()` runs per window before its
+`loadURL`/`loadFile` call.
+
+| Turned off | Because |
+|---|---|
+| DevTools in a packaged build (`devTools: !app.isPackaged`) | No caller exists in a packaged renderer (no node integration, not on the `contextBridge` surface) — this closes the last path, `openDevTools()`, after the dev-menu's own keyboard gating already closed the shortcut one. |
+| Every Chromium permission, except the clipboard | Nothing else is used: no notification is ever raised, no geolocation/media/device API is called. `navigator.clipboard` is the one real user — both halves route through the permission *request* handler, under the names `clipboard-read` and `clipboard-sanitized-write`. |
+| `window.open` | Zero `window.open`, zero `target="_blank"`, zero `<a href>` anywhere in `src/renderer`/`src/shared`. File pickers are native `dialog` modals over IPC, not popups. |
+| Navigating the window away from its own base URL | The `<meta>` CSP has no say over top-level navigation — a renderer bug or a compromised dependency could otherwise send the whole window to a remote origin. Guarded on `will-frame-navigate` (fires before `will-navigate`, covers sub-frames too), allowing only URLs starting with `process.env.ELECTRON_RENDERER_URL ?? 'file://'` — `wc.reload()` and a dev-server full reload both still work through it. |
+| Attaching a `<webview>` | Makes `webviewTag: false` unbypassable. |
+| The spellchecker (`spellcheck: false` *and* `session.setSpellCheckerEnabled(false)` — neither implies the other) | The connection dialog's password field becomes plain `type="text"` once the eye toggle reveals it; a spellchecked field hands its contents to the platform spell checker. |
+| WebGL | The only `getContext()` calls in the tree are two `'2d'` contexts, both for text measurement. |
+| Autofill on every `TextField.vue`-backed input (`autocomplete="off"`) | Zero `<form>` elements means Chromium has no form owner to attach autofill heuristics to; the attribute is the actual per-input opt-out. |
+| Being a Node runtime once packaged (`electronFuses`: `runAsNode`/`enableNodeOptionsEnvironmentVariable`/`enableNodeCliInspectArguments`, all `false`) | Closes the one remaining "debuggable outside development" path after DevTools: a Node inspector on main is strictly more powerful than DevTools on the renderer. Measured against the real `out/main/index.js` running under a fuse-flipped copy of the Electron binary — it boots identically, including the engine's own `utilityProcess`. |
+
+**The clipboard allowlist is an allowlist, not a deny-all, because a deny-all breaks the app.**
+`navigator.clipboard.readText()`/`writeText()` are permissions like any other, and denying them
+throws `NotAllowedError` at `clipboard.ts`'s `copyText` (38 call sites) and the grid's own paste
+path — with no failure visible in this repo's Docker-free test subset, since the assertions that
+would catch it are Docker-gated. One shared `Set`, consulted by both the permission request and
+check handlers, so the two can never drift apart.
+
+**`grantFileProtocolExtraPrivileges` stays on. This is a rule, not a footnote: turning it off
+bricks the packaged app.** The built renderer is `<script type="module" crossorigin>`, loaded over
+`file://`, and this fuse is precisely what lets a `file://` page fetch a sibling `file://` module —
+without it, the module load is CORS-refused and the window never finishes booting. Electron's own
+packaging docs read as an invitation to disable it ("if you aren't serving pages from `file://` you
+should disable this fuse"); this app **is** serving from `file://`, which is exactly what makes the
+suggestion a trap here. `scripts/verify-packaging.sh`'s S7 fails the build if it is ever set to
+`false`.
+
+**Deliberately left alone, each a decision rather than an oversight:**
+- **Background throttling** stays on (the default). The quit-flush handshake is IPC-driven end to
+  end, and the app's one `setInterval` (the run-state ticker) only runs while an operation is in
+  flight — nothing on either path depends on a hidden window's timers *not* being throttled.
+- **Hardware acceleration** stays on. The grid's scroll budget (see Invariants, above, and
+  `docs/PERF.md` §1) depends on GPU compositing; disabling it would cost the one non-functional
+  requirement this whole phase exists in service of.
+- **`disableDialogs`/`safeDialogs`** stay off the table. `window.confirm()` gates six destructive
+  actions (deleting a key, an S3 object, a message, a document, a connection); replacing them with
+  the app's own confirmation UI is a UI change for a future phase, not a security setting to flip
+  here.
+
+**What actually holds this**, so a revert is never silent: `tests/ui/hardening.spec.ts` (Docker-free
+— pinned `webPreferences`, every permission scenario, the window-open/navigation/webview guards,
+the spellchecker, the autofill attribute, WebGL) and `tests/unit/security.spec.ts`/
+`tests/unit/menu.spec.ts` (the option object and the packaged-vs-dev menu template, neither needing
+Docker or even a real Electron — `security.ts`'s only `electron` import is `import type`). The three
+Electron fuses and the WebGL disable have real coverage only on a packaged macOS build; both are
+recorded as owed verification in `docs/v1/plans/P46-…md` §8, not silently assumed passing.
 
 ## Testing
 
