@@ -6,5 +6,6 @@ export function rendererWebPreferences(opts: { preload: string; isDev: boolean }
     contextIsolation: true,
     sandbox: true,
     nodeIntegration: false,
+    devTools: opts.isDev,
   };
 }

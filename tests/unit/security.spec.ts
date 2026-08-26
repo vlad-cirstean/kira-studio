@@ -8,12 +8,12 @@ describe('src/main/security.ts — rendererWebPreferences (P46 D69/D73)', () => 
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      devTools: true,
     });
   });
 
-  test('2. isDev does not (yet) change the returned preferences', () => {
-    const dev = rendererWebPreferences({ preload: '/preload.js', isDev: true });
-    const packaged = rendererWebPreferences({ preload: '/preload.js', isDev: false });
-    expect(dev).toEqual(packaged);
+  test('2. devTools is true for a dev build and false for a packaged one (P46 D70)', () => {
+    expect(rendererWebPreferences({ preload: '/preload.js', isDev: true }).devTools).toBe(true);
+    expect(rendererWebPreferences({ preload: '/preload.js', isDev: false }).devTools).toBe(false);
   });
 });
