@@ -143,6 +143,49 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await whereInput.press('Enter');
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
 
+  // --- P43 iter3 D43/D44/F32: the same context menu, driven from the keyboard alone. -----------
+  const contextMenu = page.locator('[data-testid="context-menu"]');
+  const filterByValueItem = page.locator('[data-testid="menu-item-filter-by-value"]');
+  await idCell.click({ button: 'right' });
+  await expect(contextMenu).toBeVisible();
+  for (let i = 0; i < 30; i++) {
+    if (await filterByValueItem.evaluate((el) => el.classList.contains('is-active'))) break;
+    await page.keyboard.press('ArrowDown');
+  }
+  await expect(filterByValueItem).toHaveClass(/is-active/);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(whereInput).toHaveValue(`"id" = '${idValue}'`);
+  await whereInput.fill('');
+  await whereInput.press('Enter');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
+
+  // ArrowDown from nothing active lands on the first navigable row.
+  await idCell.click({ button: 'right' });
+  await expect(contextMenu).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  const firstActiveId = await contextMenu.locator('.is-active').getAttribute('data-testid');
+  await page.keyboard.press('Escape');
+  await expect(contextMenu).toHaveCount(0);
+
+  // ArrowUp from nothing active wraps to the *last* navigable row, not off the end — and one more
+  // ArrowDown from there wraps back around to the very first row, closing the loop.
+  await idCell.click({ button: 'right' });
+  await expect(contextMenu).toBeVisible();
+  await page.keyboard.press('ArrowUp');
+  await expect(contextMenu.locator('.is-active')).toHaveCount(1);
+  const lastActiveId = await contextMenu.locator('.is-active').getAttribute('data-testid');
+  expect(lastActiveId).not.toBe(firstActiveId);
+  await page.keyboard.press('ArrowDown');
+  await expect(contextMenu.locator('.is-active')).toHaveAttribute(
+    'data-testid',
+    firstActiveId ?? '',
+  );
+
+  // Escape still closes it, exactly as before.
+  await page.keyboard.press('Escape');
+  await expect(contextMenu).toHaveCount(0);
+
   // --- P42 D15/D16/D17: press-drag across cells builds a rectangular range; the corner cell
   // selects everything (order_items has exactly 4 columns/3 rows, so this covers 3 of each). -----
   const grid = page.locator('[data-testid="data-grid"]');
@@ -224,6 +267,23 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   let decodedMs = 0;
   for (const c of ulid.slice(0, 10)) decodedMs = decodedMs * 32 + CROCKFORD.indexOf(c);
   expect(Math.abs(decodedMs - Date.now())).toBeLessThan(5 * 60 * 1000);
+
+  // --- P43 iter3 D43/D44/F32: the cell editor's own format picker, driven from the keyboard
+  // alone — P42 D27 replaced a native <select> (arrow-navigable, Enter-committable in every
+  // browser) with a mouse-only context menu; this restores the capability that regression took
+  // away. -----------------------------------------------------------------------------------
+  await page.click('[data-testid="cell-editor-format"]');
+  await expect(contextMenu).toBeVisible();
+  const jsonFormatItem = page.locator('[data-testid="menu-item-format-json"]');
+  for (let i = 0; i < 20; i++) {
+    if (await jsonFormatItem.evaluate((el) => el.classList.contains('is-active'))) break;
+    await page.keyboard.press('ArrowDown');
+  }
+  await expect(jsonFormatItem).toHaveClass(/is-active/);
+  await page.keyboard.press('Enter');
+  await expect(contextMenu).toHaveCount(0);
+  await expect(ulidCellEditorPanel).toHaveAttribute('data-format', 'json');
+
   await page.click('[data-testid="toolbar-discard-changes"]');
 
   // Shift-click still extends a range exactly as it did before drag-select existed.
