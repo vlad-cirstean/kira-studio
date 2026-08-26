@@ -258,7 +258,7 @@ function updateTip(el: HTMLElement, value: string | TooltipContent | null | unde
   el.setAttribute(TIP_ATTR, plainText);
   if (structured) el.setAttribute(PARTS_ATTR, JSON.stringify(value));
   else el.removeAttribute(PARTS_ATTR);
-  if (!hasForeignAccessibleName(el)) {
+  if (structured || !hasForeignAccessibleName(el)) {
     el.setAttribute('aria-label', plainText);
     el.setAttribute(OWNS_LABEL_ATTR, '');
   }
