@@ -8,6 +8,7 @@
   "references": [
     { "path": "./tsconfig.node.json" },
     { "path": "./tsconfig.web.json" },
-    { "path": "./tests/db/tsconfig.json" }
+    { "path": "./tests/db/tsconfig.json" },
+    { "path": "./tests/unit/tsconfig.json" }
   ]
 }
