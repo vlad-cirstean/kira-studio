@@ -7,6 +7,7 @@ import EngineIcon from '../theme/EngineIcon.vue';
 import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
 import type { TreeRowVm } from './state/tree';
+import { treeState } from './state/tree';
 
 // P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
 // different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
@@ -47,10 +48,26 @@ const connectionKind = computed(() => {
   return connectionRecord(props.row.connectionId)?.kind;
 });
 
+// Splits row.name on every case-insensitive occurrence of the live search query so only the
+// matched substring(s) get <mark>-ed, not the whole label.
 function highlightParts(): { text: string; hit: boolean }[] {
-  if (!props.row.matched) return [{ text: props.row.name, hit: false }];
-  const query = props.row.matched ? props.row.name : '';
-  return [{ text: query, hit: true }];
+  const query = treeState.search.trim().toLowerCase();
+  if (!props.row.matched || !query) return [{ text: props.row.name, hit: false }];
+  const name = props.row.name;
+  const lower = name.toLowerCase();
+  const parts: { text: string; hit: boolean }[] = [];
+  let i = 0;
+  while (i < name.length) {
+    const idx = lower.indexOf(query, i);
+    if (idx === -1) {
+      parts.push({ text: name.slice(i), hit: false });
+      break;
+    }
+    if (idx > i) parts.push({ text: name.slice(i, idx), hit: false });
+    parts.push({ text: name.slice(idx, idx + query.length), hit: true });
+    i = idx + query.length;
+  }
+  return parts;
 }
 
 const parts = computed(highlightParts);
@@ -230,8 +247,10 @@ function onContextMenu(e: MouseEvent): void {
 }
 
 .label mark {
-  background: var(--kira-focus);
-  color: var(--kira-accent-fg);
+  /* Same yellow search-match tint as DataGrid.vue/StreamView.vue/etc. (D21) — one highlight
+     color for every search-capable view in the app. */
+  background: var(--kira-search-match);
+  color: inherit;
   border-radius: 2px;
 }
 

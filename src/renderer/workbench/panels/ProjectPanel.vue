@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, ref } from 'vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SearchBox from '../../project/SearchBox.vue';
@@ -6,6 +7,20 @@ import { treeState } from '../../project/state/tree';
 import { connectionsState, openCreateDialog } from '../../state/connections';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+
+// Hidden by default (D-new): only the toggle button or typing a character reveals it, per the
+// panel header staying a plain title bar until search is actually wanted.
+const showSearch = ref(false);
+
+function revealSearch(): void {
+  if (showSearch.value) return;
+  showSearch.value = true;
+}
+
+function toggleSearch(): void {
+  showSearch.value = !showSearch.value;
+  if (!showSearch.value) treeState.search = '';
+}
 
 // VS Code's own file-explorer "type to search" pattern: a tree row holds real DOM focus once
 // selected (TreeRow.vue's roving tabindex), so a printable keystroke lands here via bubbling —
@@ -26,11 +41,19 @@ function onPanelKeydown(e: KeyboardEvent): void {
   // Already typing somewhere (the search box itself, a dialog field, …) — let it behave normally.
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
   const container = e.currentTarget as HTMLElement;
-  const input = container.querySelector<HTMLInputElement>('[data-testid="tree-search"]');
-  if (!input) return;
   e.preventDefault();
   treeState.search += e.key;
-  input.focus();
+  const wasHidden = !showSearch.value;
+  revealSearch();
+  // The search box only mounts once showSearch flips true, so a reveal-by-typing needs a tick
+  // before the input actually exists in the DOM to focus.
+  if (wasHidden) {
+    void nextTick(() => {
+      container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
+    });
+  } else {
+    container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
+  }
 }
 </script>
 
@@ -39,8 +62,16 @@ function onPanelKeydown(e: KeyboardEvent): void {
     <div class="p-panel-head">
       <span>Connections</span>
       <IconButton
-        icon="add"
+        icon="search"
         class="p-push"
+        :active="showSearch"
+        aria-label="Search connections"
+        v-tooltip="showSearch ? 'Hide search' : 'Search'"
+        data-testid="toggle-search"
+        @click="toggleSearch"
+      />
+      <IconButton
+        icon="add"
         aria-label="Add connection"
         v-tooltip="'New connection'"
         data-testid="add-connection"
@@ -48,7 +79,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
       />
     </div>
     <template v-if="connectionsState.records.length > 0">
-      <SearchBox />
+      <SearchBox v-if="showSearch" />
       <div class="min-h-0 flex-1">
         <ProjectTree />
       </div>
@@ -64,6 +95,12 @@ function onPanelKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+/* This panel's own header only — matches WorkbenchShell.vue's .tab-strip-slot (34px) exactly,
+   rather than raising the shared .p-panel-head primitive every other panel still uses at 26px. */
+.p-panel-head {
+  height: 34px;
+}
+
 .side-empty {
   flex: 1;
   min-height: 0;
