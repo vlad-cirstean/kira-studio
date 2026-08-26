@@ -1529,6 +1529,7 @@ defineExpose({ scrollCellIntoView });
             @keydown="onEditKeydown"
             @blur="commitEdit"
             @click.stop
+            @mousedown.stop
           />
           <template v-else-if="cellVm.isNull">
             <span class="cell-null">NULL</span>

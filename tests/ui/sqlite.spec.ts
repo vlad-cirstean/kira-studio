@@ -189,6 +189,29 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(cellTopLeft).toHaveClass(/sel-b/);
   await expect(cellTopLeft).toHaveClass(/sel-l/);
 
+  // --- P43 iter2 D35: an open inline editor is not a drag handle — a mousedown inside
+  // grid-cell-input must not bubble to the cell's own drag-select handler. --------------------
+  await cellTopLeft.dblclick();
+  const cellInput = page.locator('[data-testid="grid-cell-input"]');
+  await expect(cellInput).toBeVisible();
+  const cellInputBox = await cellInput.boundingBox();
+  if (!cellInputBox) throw new Error('cell input bounding box not found');
+  await page.mouse.move(
+    cellInputBox.x + cellInputBox.width / 2,
+    cellInputBox.y + cellInputBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    bottomRightBox.x + bottomRightBox.width / 2,
+    bottomRightBox.y + bottomRightBox.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(cellInput).toBeVisible();
+  expect(await grid.locator('.grid-cell.selected').count()).toBeLessThanOrEqual(1);
+  await page.keyboard.press('Escape');
+  await expect(cellInput).toHaveCount(0);
+
   // --- P43 iter2 F22/D31: a generated ULID's timestamp half decodes to now, not the 22nd
   // century — the assertion that fails by a factor of four against the pre-fix encoder. ----------
   const ulidCellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
