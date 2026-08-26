@@ -335,6 +335,62 @@ removed by user request as unwanted background work rather than kept as an opt-o
 **Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
 *Clear caches* action.
 
+## UI architecture
+
+Distilled facts about how the workbench is put together — not a restatement of `docs/v1/SPEC.md`
+§8's per-dialog field lists or its mockup-vs-shipped narrative, which stay where they are as the
+phase-by-phase record. This is the structural rules a future session needs to not reinvent.
+
+**A view is chosen by page kind, never by database type.** `Page` is a discriminated union
+(`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); the UI reads the page's own `kind`
+to decide grid vs. document view vs. key/value view vs. stream view. This is why a Postgres
+`jsonb` column can open in the document view and a Mongo `$group` result can open in the grid —
+the mapping is page-shape → view, not engine → view.
+
+**Tab identity is the tab's `id`, never its `path`.** A tab is `{ id, connectionId, path, kind,
+state }`; the same table/collection/key can be open in any number of tabs at once, each with fully
+independent paging, projection, sort, filter and scroll state. Every tab kind — `data`,
+`definition`, `document`, `keyvalue`, `stream`, `console`, `browse` — follows this rule, including
+Browse (below), where `state.levelPath` is the one piece of Browse-specific state layered on top
+of the same identity.
+
+**Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
+are not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
+nothing else until it is pressed — the same gate every view kind uses for this state, including
+Browse tabs.
+
+**The write model is staged for SQL tables, immediate everywhere else.** PostgreSQL/MariaDB/
+MySQL/SQLite table writes (add row, delete row, cell edit) accumulate in a per-tab pending-change
+set — nothing reaches the database until *Commit*, and *Preview command* renders the exact
+statements first. ClickHouse tables get add-row only, staged the same way (no addressable row to
+update/delete — a MergeTree `PRIMARY KEY` is a sparse index). MongoDB/Redis/Kafka/SQS/S3 write
+**immediately**, gated per adapter's `canInsert`/`canUpdate`/`canDelete` capability, with no
+staging or preview — there is no pending-change set to opt into for these engines at all. RabbitMQ
+gets add-row (publish) only, immediate, for the same reason ClickHouse's is add-only: no
+broker-assigned message identity to update or delete against.
+
+**The cell editor is a panel mounted by whichever view owns the tab**, not a global singleton —
+grid, documents, key/value, stream and console each mount their own instance, appearing only while
+their tab has a selected cell and disappearing the instant it doesn't (including across a tab
+switch). A view kind that never shows one (a definition tab) simply never mounts it — there is no
+central registry or visibility flag to keep in sync.
+
+**Browse panel: one level per screen, never a recursive tree.** Redis (a db index's key
+namespace) and S3 (a bucket's prefix/object space) are unbounded and arbitrarily nested, so their
+project-tree node is a leaf and a dedicated `browse` tab is the only place either is actually
+navigated, one lazy level at a time over the same `SCAN`/`ListObjectsV2` calls the tree would
+otherwise have made inline. The toolbar's **Up** button and a breadcrumb are the only ways to move
+between levels; there is no expand/collapse and no level is ever rendered nested under another.
+
+**Find/search and chunked scanning are shared machinery, not four reimplementations.** The grid,
+document, key/value and console-result views all call the same `createPageSearch` factory and the
+same `runChunkedScan` scanner (`views/shared/page/`) rather than each view owning its own find
+logic — one animation-frame-driven scan loop, one match-list/highlight model, one filter-toggle
+behavior, reused across all four call sites. A scan can carry an optional priority window (the
+rows currently on screen, reported by each view's own virtualization bounds) scanned first, so a
+find on a large loaded dataset highlights what's visible before continuing the ascending pass over
+the rest in the background.
+
 ## Process model
 
 ```
