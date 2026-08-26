@@ -549,13 +549,17 @@ function isSelectedNeighbor(row: number, displayCol: number): boolean {
   return isSelected(row, displayCol);
 }
 
-// A 'cell' selection publishes itself; a 'range' publishes its focus end — the moving end, the
-// cell the arrow keys are moving and the one the user last touched (D13). A 'row'/'column'
-// selection has no single value to render and publishes null.
+// A 'cell' selection publishes itself. A genuine multi-cell 'range' (drag-select, select-all) has
+// no single value to render, same as 'row'/'column' — only a degenerate one-cell range (e.g.
+// shift-clicking the already-selected cell) still counts as "one cell selected" and publishes its
+// focus end, the moving end the arrow keys move and the one the user last touched (D13).
 function selectionTarget(): { row: number; col: number } | null {
   const sel = rt()?.selection;
   if (!sel) return null;
-  if (sel.kind === 'cell' || sel.kind === 'range') return { row: sel.row, col: sel.col };
+  if (sel.kind === 'cell') return { row: sel.row, col: sel.col };
+  if (sel.kind === 'range' && sel.anchorRow === sel.row && sel.anchorCol === sel.col) {
+    return { row: sel.row, col: sel.col };
+  }
   return null;
 }
 
@@ -752,8 +756,12 @@ const colAnchor = ref<number | null>(null);
 // `{ kind: 'range', anchorRow, anchorCol, row, col }` shape shift-click already writes — so
 // copy, the cell menu and the cell-editor publish above need no changes at all. Plain variables,
 // not refs: this is read on every pointer event during a drag, and none of it is ever rendered.
-let dragging = false;
+// `dragMode` covers both cell-range drag (extends via extendSelectionTo) and gutter row-range
+// drag (extends via extendRowSelectionTo) — only one can ever be active, and both share the same
+// pointer-tracking/auto-scroll plumbing below.
+let dragMode: 'cell' | 'row' | null = null;
 let dragProducedRange = false;
+let rowDragProducedRange = false;
 let dragPointerX = 0;
 let dragPointerY = 0;
 let autoScrollRaf = 0;
@@ -781,10 +789,30 @@ function extendSelectionTo(row: number, displayCol: number): void {
   };
 }
 
-// The pointer's own position, re-checked against whatever cell is now underneath it — needed
+// Mirrors extendSelectionTo/onGutterClick's own shift-range shape: every row between the drag's
+// starting row (rowAnchor, set on mousedown) and the row now under the pointer.
+function extendRowSelectionTo(row: number): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry || rowAnchor.value === null) return;
+  const [a, b] = [rowAnchor.value, row].sort((x, y) => x - y);
+  const rows: number[] = [];
+  for (let r = a; r <= b; r++) rows.push(r);
+  rowDragProducedRange = true;
+  runtimeEntry.selection = { kind: 'row', rows };
+}
+
+// The pointer's own position, re-checked against whatever cell/row is now underneath it — needed
 // because auto-scroll moves cells under a pointer that never itself moves, which fires no native
 // mouseenter at all (the browser only re-hit-tests on real pointer movement).
 function extendFromPoint(x: number, y: number): void {
+  if (dragMode === 'row') {
+    const rowEl = document.elementFromPoint(x, y)?.closest<HTMLElement>('.grid-row[data-row]');
+    if (!rowEl) return;
+    const row = Number(rowEl.dataset.row);
+    if (Number.isNaN(row)) return;
+    extendRowSelectionTo(row);
+    return;
+  }
   const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('.grid-cell[data-row]');
   if (!el) return;
   const row = Number(el.dataset.row);
@@ -794,7 +822,7 @@ function extendFromPoint(x: number, y: number): void {
 }
 
 function autoScrollTick(): void {
-  if (!dragging) {
+  if (!dragMode) {
     autoScrollRaf = 0;
     return;
   }
@@ -822,13 +850,13 @@ function autoScrollTick(): void {
 }
 
 function onDragMouseMove(e: MouseEvent): void {
-  if (!dragging) return;
+  if (!dragMode) return;
   dragPointerX = e.clientX;
   dragPointerY = e.clientY;
 }
 
 function onDragMouseUp(): void {
-  dragging = false;
+  dragMode = null;
   if (autoScrollRaf) {
     cancelAnimationFrame(autoScrollRaf);
     autoScrollRaf = 0;
@@ -846,7 +874,7 @@ function onCellMouseDown(row: number, displayCol: number, e: MouseEvent): void {
   if (e.button !== 0 || e.shiftKey) return;
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
-  dragging = true;
+  dragMode = 'cell';
   dragProducedRange = false;
   dragPointerX = e.clientX;
   dragPointerY = e.clientY;
@@ -857,11 +885,40 @@ function onCellMouseDown(row: number, displayCol: number, e: MouseEvent): void {
 }
 
 function onCellMouseEnter(row: number, displayCol: number): void {
-  if (!dragging) return;
+  if (dragMode !== 'cell') return;
   extendSelectionTo(row, displayCol);
 }
 
+// Shift/Ctrl/Cmd fall through to onGutterClick's own shift-range/ctrl-toggle paths unchanged —
+// this only ever starts a drag on a plain primary-button press against the gutter.
+function onGutterMouseDown(row: number, e: MouseEvent): void {
+  if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey) return;
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  dragMode = 'row';
+  rowDragProducedRange = false;
+  dragPointerX = e.clientX;
+  dragPointerY = e.clientY;
+  runtimeEntry.selection = { kind: 'row', rows: [row] };
+  rowAnchor.value = row;
+  document.addEventListener('mousemove', onDragMouseMove);
+  document.addEventListener('mouseup', onDragMouseUp, { once: true });
+  autoScrollRaf = requestAnimationFrame(autoScrollTick);
+}
+
+function onGutterMouseEnter(row: number): void {
+  if (dragMode !== 'row') return;
+  extendRowSelectionTo(row);
+}
+
+// P42 D15's trailing-click guard (dragProducedRange), mirrored for the gutter: mousedown -> mouseup
+// -> click still fires on a real drag's own target, which would otherwise collapse the just-built
+// row range back down to a single row.
 function onGutterClick(row: number, e: MouseEvent): void {
+  if (rowDragProducedRange) {
+    rowDragProducedRange = false;
+    return;
+  }
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
   const sel = runtimeEntry.selection;
@@ -1552,8 +1609,11 @@ defineExpose({ scrollCellIntoView });
         <div
           class="gutter-cell"
           data-testid="grid-gutter-cell"
+          :data-row="rowVm.row"
           :class="{ dirty: rowVm.dirty, deleted: rowVm.deleted }"
           :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
+          @mousedown="onGutterMouseDown(rowVm.row, $event)"
+          @mouseenter="onGutterMouseEnter(rowVm.row)"
           @click="onGutterClick(rowVm.row, $event)"
           @contextmenu.prevent="onGutterContextMenu(rowVm.row, $event)"
         >
