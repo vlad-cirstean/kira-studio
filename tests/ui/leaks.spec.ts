@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ConnectionColor } from '@shared/domain/connection';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
@@ -207,9 +208,9 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
 
   expect(await page.evaluate(() => window.__kiraTreeConnectionIds?.())).toContain(connAId);
 
-  page.once('dialog', (dialog) => dialog.accept());
   await connectionRootRow(page, 'Leaks A').click({ button: 'right' });
   await page.click('[data-testid="menu-item-delete"]');
+  await acceptConfirm(page);
   await expect(connectionRootRow(page, 'Leaks A')).toHaveCount(0, { timeout: 10_000 });
 
   // A's two tabs are gone; B's tab is the only one left.

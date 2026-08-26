@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
@@ -218,9 +219,9 @@ test.describe('preconnect — sidecar lifecycle against a live connection', () =
     });
     const pid3 = Number.parseInt((await readFile(pidFile, 'utf8')).trim(), 10);
     expect(isAlive(pid3)).toBe(true);
-    page.once('dialog', (dialog) => dialog.accept());
     await row.click({ button: 'right' });
     await page.click('[data-testid="menu-item-delete"]');
+    await acceptConfirm(page);
     await expect(row).toHaveCount(0);
     await waitFor(() => !isAlive(pid3), 5000);
 

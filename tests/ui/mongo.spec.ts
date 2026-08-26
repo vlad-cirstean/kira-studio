@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
@@ -104,7 +105,6 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   test.setTimeout(240_000);
   if (!mongo) throw new Error('mongo fixture did not start');
   const { window: page } = kira;
-  page.on('dialog', (d) => d.accept());
 
   await connectMongo(page);
 
@@ -182,12 +182,13 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   // through DocumentTree.vue's flattened lines now, not a read-path CodeMirror (D19).
   await expect(editedRow.locator('[data-testid="document-tree"]')).toContainText('widget-1-edited');
 
-  // --- delete: the row's own Delete button (D5/D6), native confirm dialog (auto-accepted) ----
+  // --- delete: the row's own Delete button (D5/D6), confirm dialog (auto-accepted) -----------
   await setDocumentFilter(page, "{ name: 'widget-2' }");
   const deleteRow = page.locator('[data-testid="document-row"]');
   await expect(deleteRow).toHaveCount(1, { timeout: 10_000 });
   await expect(deleteRow.locator('[data-testid="document-delete"]')).toBeEnabled();
   await deleteRow.locator('[data-testid="document-delete"]').click();
+  await acceptConfirm(page);
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(0, { timeout: 10_000 });
 
   // --- delete via the context menu still works too (D7: the menu's shape is unchanged) ------
@@ -197,6 +198,7 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await menuDeleteRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-delete-document"]');
+  await acceptConfirm(page);
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(0, { timeout: 10_000 });
 
   // --- clear the filter: 25 seeded - 2 deleted (the edited one is renamed, not gone) --------
@@ -273,8 +275,8 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   );
   await page.click('[data-testid="console-run-statement"]');
   await consoleView.locator('.cm-content').click();
-  await page.keyboard.press('ControlOrMeta+End');
-  await page.keyboard.type('\ndb.widgets.find({ name: "long-value-doc" })');
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type('db.widgets.find({ name: "long-value-doc" })');
   await page.click('[data-testid="console-run-statement"]');
   const longValueResult = consoleView.locator('[data-testid="console-result-grid"]').last();
   await expect(longValueResult).toBeVisible();
@@ -334,7 +336,6 @@ test('mongodb — page-size-1000 render tripwires, truncated fallback, go-to-mat
   test.setTimeout(240_000);
   if (!mongo) throw new Error('mongo fixture did not start');
   const { window: page } = kira;
-  page.on('dialog', (d) => d.accept());
 
   await connectMongo(page);
   await expandRow(page, '');

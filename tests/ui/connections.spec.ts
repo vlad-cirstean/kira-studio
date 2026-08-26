@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 
 // No container needed — every scenario here only exercises connection CRUD against the local
 // SQLite store, never a real database connect. Must never skip (§12b), unlike tree.spec.ts.
@@ -193,8 +194,8 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   const duplicated = (await listConnections(page)).find((r) => r.name === 'Test PG copy');
   expect(duplicated).toBeDefined();
 
-  page.once('dialog', (dialog) => dialog.accept());
   await (await connectionRow(page, 'Test PG copy')).click({ button: 'right' });
   await page.click('[data-testid="menu-item-delete"]');
+  await acceptConfirm(page);
   await expect.poll(async () => (await listConnections(page)).length).toBe(beforeDuplicate);
 });

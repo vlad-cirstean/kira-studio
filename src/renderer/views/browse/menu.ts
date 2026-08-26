@@ -1,5 +1,6 @@
 import type { TreeNode } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
+import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import type { MenuItem } from '../../state/contextMenu';
 import { deleteObject, downloadObject, uploadMenuItem } from '../../state/objectStore';
@@ -130,7 +131,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
-        if (!window.confirm(`Delete object "${node.name}"? This cannot be undone.`)) return;
+        if (!(await confirmDialog(`Delete object "${node.name}"? This cannot be undone.`))) return;
         try {
           await deleteObject(connectionId, node.path, null);
           await reload(tabId);

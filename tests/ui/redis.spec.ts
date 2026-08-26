@@ -7,6 +7,7 @@ import {
   TTL_KEY,
 } from '../db/fixtures/0004_redis_seed';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
@@ -228,12 +229,17 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   await expect(ttlView.locator('[data-testid="keyvalue-memory"]')).not.toContainText('unknown');
 
   // --- P43 F11/D15: deleting the TTL key from its own tab refreshes the Browse tab still
-  // sitting on its container level (session) — no manual Refresh. --------------------------
-  await expect(browseView).toHaveAttribute('data-level', SESSION_NS_PATH);
-  await expect(ttlKeyRow).toBeVisible();
-  page.once('dialog', (d) => d.accept());
+  // sitting on its container level (session) — no manual Refresh. browseInvalidate() updates the
+  // Browse tab's own store state regardless of whether it's mounted right now (only one tab's
+  // view is ever mounted at a time, §8.4), so the effect is checked by switching back to it
+  // afterward and finding the row already gone, with no Refresh click in between. --------------
   await ttlView.locator('[data-testid="keyvalue-delete"]').click();
-  await expect(ttlKeyRow).toHaveCount(0, { timeout: 10_000 });
+  await acceptConfirm(page);
+  await expect(ttlView.locator('[data-testid="keyvalue-error"]')).toBeVisible({ timeout: 10_000 });
+  await (await findRow(page, DB0_PATH)).dblclick();
+  await expect(browseView).toBeVisible();
+  await expect(browseView).toHaveAttribute('data-level', SESSION_NS_PATH);
+  await expect(ttlKeyRow).toHaveCount(0);
 
   // --- console: generic redis command against db0, opened from the database node's menu -----
   await openRowMenu(page, DB0_PATH);
@@ -311,9 +317,10 @@ test('redis — browse tab: filter and Up (P41)', async ({ kira, consoleErrors }
   await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
 
   // --- filter: a plain substring match over the loaded level (D18) — 'user:1:name'/'user:1:email'
-  // /'user:1:profile' are the three keys at this level; 'profile' matches only the hash key. ------
+  // /'user:1:profile'/BIG_HASH_KEY ('user:1:bighash') are the four keys at this level; 'profile'
+  // matches only the hash key. -----------------------------------------------------------------
   const totalRows = await browseView.locator('[data-testid="browse-row"]').count();
-  expect(totalRows).toBe(3);
+  expect(totalRows).toBe(4);
   await browseView.locator('[data-testid="browse-filter"]').fill('profile');
   await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(1);
   await expect(browseView.locator('[data-testid="browse-count"]')).toContainText(

@@ -6,6 +6,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
+import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -432,8 +433,8 @@ function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
 
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
 // (documents/menu.ts) — one delete path, not two.
-function onDeleteRow(id: string): void {
-  if (!window.confirm(`Delete this document (_id: ${id})?`)) return;
+async function onDeleteRow(id: string): Promise<void> {
+  if (!(await confirmDialog(`Delete this document (_id: ${id})?`))) return;
   deleteDocument(props.tab.id, id)
     .then(() => setActionError(props.tab.id, null))
     .catch((err: unknown) => {

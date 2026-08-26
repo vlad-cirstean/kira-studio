@@ -9,6 +9,7 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
+import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { patchStreamTabState } from '../../state/tabs';
@@ -371,7 +372,9 @@ async function onDeleteMessage(): Promise<void> {
   if (selectedRow === null || selectedRow === undefined) return;
   const row = rowAt(selectedRow);
   if (!row?.key) return;
-  if (!window.confirm(`Delete this message (id: ${row.key})? This cannot be undone.`)) return;
+  if (!(await confirmDialog(`Delete this message (id: ${row.key})? This cannot be undone.`))) {
+    return;
+  }
   try {
     await deleteSqsMessage(props.tab.id, row.key);
     setActionError(props.tab.id, null);

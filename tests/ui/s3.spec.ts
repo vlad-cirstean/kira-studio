@@ -18,6 +18,7 @@ import {
   SECOND_DELETE_TARGET_KEY,
 } from '../db/fixtures/0007_s3_seed';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
@@ -549,15 +550,15 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   await expect(browseView).toBeVisible();
   await expect(browseView).toHaveAttribute('data-level', MUTABLE_BUCKET_PATH);
 
-  // --- delete from the Browse panel (F12: window.confirm, auto-accepted) -------------------------
+  // --- delete from the Browse panel (F12: confirm dialog, auto-accepted) ---------------------
   const deleteTargetRow = browseView.locator(
     `[data-testid="browse-row"][data-path="${DELETE_TARGET_PATH}"]`,
   );
   await expect(deleteTargetRow).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await deleteTargetRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-delete-object"]');
+  await acceptConfirm(page);
   await expect(deleteTargetRow).toHaveCount(0, { timeout: 10_000 });
 
   // --- delete from an open tab: the tab then shows the ordinary "gone" error, not a stale page --
@@ -570,8 +571,8 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
     `[data-testid="keyvalue-view"][data-path="${SECOND_DELETE_TARGET_PATH}"]`,
   );
   await expect(deletedView).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await deletedView.locator('[data-testid="keyvalue-delete"]').click();
+  await acceptConfirm(page);
   await expect(deletedView.locator('[data-testid="keyvalue-error"]')).toBeVisible({
     timeout: 10_000,
   });
@@ -592,13 +593,18 @@ test('s3 — delete, and the read-only guard', async ({ kira, consoleErrors }) =
   await expect(rootView).toBeVisible();
 
   const connRow = connectionRow(page, 'S3');
-  page.once('dialog', (d) => d.accept());
   await connRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-readonly"]');
+  await acceptConfirm(page);
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
+
+  // The reconnect flips rootView's tab behind the reconnect gate (D12) — it isn't re-hydrated
+  // automatically, so load it back before asserting on its toolbar buttons below.
+  await rootView.locator('[data-testid="keyvalue-reconnect-load"]').click();
+  await expect(rootView.locator('[data-testid="keyvalue-edit"]')).toBeVisible();
 
   // D18: Edit/Delete/Upload disabled with the read-only reason; Download stays enabled.
   await expect(rootView.locator('[data-testid="keyvalue-edit"]')).toBeDisabled();

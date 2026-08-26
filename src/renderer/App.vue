@@ -11,6 +11,7 @@ import { uploadDialogState } from './state/objectStore';
 import { settingsOpen } from './state/settings';
 import { activateNextTab, activatePrevTab, closeTab, tabsState } from './state/tabs';
 import AppTooltip from './workbench/AppTooltip.vue';
+import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
 import { initEngineState } from './workbench/state/engine';
 import { initTooltips } from './workbench/state/tooltip';
@@ -55,6 +56,7 @@ onUnmounted(() => {
   <WorkbenchShell />
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
+  <ConfirmDialog />
   <ContextMenu />
   <CommandPalette />
   <AppTooltip />
