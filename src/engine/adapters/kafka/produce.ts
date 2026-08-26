@@ -1,7 +1,9 @@
-import type { KafkaJS } from '@confluentinc/kafka-javascript';
+import type { LibrdKafkaError, MessageHeader } from '@confluentinc/kafka-javascript';
+import { Producer } from '@confluentinc/kafka-javascript';
 import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain/mutations';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertWritable } from '../errors';
+import type { RdConfig } from './client';
 import { mapError } from './errors';
 
 // Sentinel keys (mirrors mongo/mutate.ts's `$document` precedent): a new message is expressed
@@ -44,7 +46,7 @@ function assertInsert(op: MutationRowOp): asserts op is Extract<MutationRowOp, {
 function renderOpText(op: MutationRowOp, topic: string): string {
   assertInsert(op);
   const key = op.values[KEY_FIELD];
-  return `producer.send({ topic: '${topic}', messages: [{ key: ${key ? `'${key}'` : 'null'}, ... }] })`;
+  return `producer.produce('${topic}', null, Buffer.from(...), ${key ? `'${key}'` : 'null'})`;
 }
 
 /** Synchronous (Adapter rule 3): no network, no catalog lookup — mirrors mongo/mutate.ts's preview. */
@@ -52,8 +54,39 @@ export function preview(plan: MutationPlan, topic: string): string[] {
   return plan.ops.map((op) => renderOpText(op, topic));
 }
 
+// The classic node-rdkafka API's own header shape: an array of single-key objects, not a plain
+// Record (mirrors read.ts's headersToPlain, the same conversion in reverse).
+function toRdHeaders(headers: Record<string, string> | undefined): MessageHeader[] | undefined {
+  if (!headers) return undefined;
+  return Object.entries(headers).map(([key, value]) => ({ [key]: value }));
+}
+
+function connectProducer(producer: Producer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    producer.connect(undefined, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function flushProducer(producer: Producer, timeout: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    producer.flush(timeout, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function disconnectProducer(producer: Producer): Promise<void> {
+  return new Promise((resolve) => {
+    producer.disconnect(() => resolve());
+  });
+}
+
 export async function produce(
-  kafka: KafkaJS.Kafka,
+  rdConfig: RdConfig,
   topic: string,
   readOnly: boolean,
   plan: MutationPlan,
@@ -62,16 +95,22 @@ export async function produce(
   // §8.12's standard: enforced here, not only greyed out in the UI (mirrors mongo/mariadb).
   assertWritable(readOnly);
 
-  // P32 D11: the library's own recommendation for this await-each-send shape (MIGRATION.md) —
-  // without it every staged message pays the default batching delay, which a user watching a
-  // one-message produce would read as the app being slow. acks/compression/timeout are
-  // per-producer, not per-send, and the adapter sets none of them, so nothing else moves.
-  const producer = kafka.producer({ 'linger.ms': 0 } as never);
+  // The classic node-rdkafka Producer, not the KafkaJS-compat kafka.producer() — the compat
+  // wrapper unconditionally sets `dr_cb: true` (its own _producer.js), and node-rdkafka's delivery
+  // -report path adopts a raw malloc'd buffer into a V8 ArrayBuffer via Nan::NewBuffer(...)
+  // .ToLocalChecked() (callbacks.cc) without checking the result — under Electron's V8 sandbox
+  // (enabled at compile time, unlike standalone Node) that adoption always fails, and the
+  // unchecked ToLocalChecked() aborts the whole process. A non-null key plus dr_cb is exactly
+  // what reproduces it; never setting dr_cb sidesteps the crash rather than papering over it. The
+  // cost: produce() below reports "queued into librdkafka", not "the broker acknowledged this
+  // specific message" — flush() still proves the whole batch drained, just not which messages
+  // succeeded individually.
+  const producer = new Producer({ ...rdConfig, 'linger.ms': 0 } as never);
   ctx.setCommand(preview(plan, topic).join(';\n'));
 
   let affectedRows = 0;
   try {
-    await producer.connect();
+    await connectProducer(producer);
     for (const op of plan.ops) {
       assertInsert(op);
       const bodyText = op.values[BODY_FIELD];
@@ -79,23 +118,26 @@ export async function produce(
         throw new AdapterError('E_QUERY', 'a new message requires a $body');
       }
       const keyText = op.values[KEY_FIELD];
-      const headers = parseHeaders(op.values[HEADERS_FIELD]);
-      await producer.send({
+      const headers = toRdHeaders(parseHeaders(op.values[HEADERS_FIELD]));
+      producer.produce(
         topic,
-        messages: [{ key: keyText ?? null, value: bodyText, headers }],
-      });
+        null,
+        Buffer.from(bodyText, 'utf8'),
+        keyText ?? null,
+        undefined,
+        undefined,
+        headers,
+      );
       affectedRows++;
     }
-    // The library's own migration guide: `send()` resolving only means librdkafka accepted the
-    // message into its internal queue, not that the delivery-report dispatcher has drained it —
-    // disconnecting without this first races the native addon's teardown against that dispatcher
-    // (observed as a hard crash, not a catchable JS error).
-    await producer.flush({ timeout: 5000 });
+    // produce() above only queues into librdkafka's internal buffer — flush() is what actually
+    // hands everything to the broker and blocks until it's drained (or the timeout elapses).
+    await flushProducer(producer, 5000);
   } catch (err) {
     if (err instanceof AdapterError) throw err;
-    throw mapError(err);
+    throw mapError(err as LibrdKafkaError);
   } finally {
-    await producer.disconnect().catch(() => {});
+    await disconnectProducer(producer);
   }
 
   return { affectedRows };

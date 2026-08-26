@@ -114,7 +114,7 @@ class KafkaAdapter implements Adapter {
 
   async mutate(plan: MutationPlan, ctx: OpCtx): Promise<MutationResult> {
     const topic = this.resolveTopicTarget(plan.path);
-    return producer.produce(this.requireKafka(), topic, this.readOnly, plan, ctx);
+    return producer.produce(this.requireRdConfig(), topic, this.readOnly, plan, ctx);
   }
 
   async execute(): Promise<Page[]> {
@@ -140,8 +140,8 @@ class KafkaAdapter implements Adapter {
     return this.handle;
   }
 
-  private requireKafka(): KafkaClientHandle['kafka'] {
-    return this.requireHandle().kafka;
+  private requireRdConfig(): KafkaClientHandle['rdConfig'] {
+    return this.requireHandle().rdConfig;
   }
 
   private requireAdmin(): KafkaClientHandle['admin'] {
