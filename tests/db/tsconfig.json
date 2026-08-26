@@ -12,5 +12,5 @@
       "@shared/*": ["../../src/shared/*"]
     }
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../../src/renderer/env.d.ts"]
 }
