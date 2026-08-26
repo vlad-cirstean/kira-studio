@@ -60,6 +60,7 @@ function stepBy(dir: 1 | -1): void {
     <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <span v-if="prefix" class="ph">{{ prefix }}</span>
     <input
+      autocomplete="off"
       v-bind="$attrs"
       ref="inputRef"
       :type="type"

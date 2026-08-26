@@ -146,3 +146,15 @@ test('the built-in spellchecker is off (P46 D74)', async ({ kira }) => {
   // the real, verifiable signal that they did; the DOM attribute reflects page-authored intent,
   // not the platform feature's on/off state, and was never going to move.
 });
+
+test('the shared text field opts out of autofill (P46 D76)', async ({ kira }) => {
+  await kira.window.click('[data-testid="add-connection"]');
+  await expect(kira.window.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await kira.window.click('[data-testid="connection-kind-postgres"]');
+  await expect(kira.window.locator('[data-testid="connection-password"]')).toBeVisible();
+
+  await expect(kira.window.locator('[data-testid="connection-password"]')).toHaveAttribute(
+    'autocomplete',
+    'off',
+  );
+});
