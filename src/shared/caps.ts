@@ -69,6 +69,13 @@ export interface Caps {
    *  only engine where "add an item" means "pick a file", and the only one with a download at
    *  all. Gates the Download action outright; gates Upload together with canInsert. */
   fileTransfer: boolean;
+
+  /** P43 iter3 D46: the largest page this engine can actually serve in one read, when that is
+   *  below the picker's own ceiling. Absent means "every size the picker offers works" — ten of
+   *  the eleven adapters. Only rabbitmq sets it (a basic.get batch is one request, capped at
+   *  read.ts's MAX_POLL_MESSAGES, and every message in it is held unacked until the batch
+   *  finishes), so the stream toolbar can stop offering two sizes a poll can never serve. */
+  maxPageSize?: number;
 }
 
 // Crosses the engine<->main process boundary on connect (P2's ConnectInfo.caps addition) and
@@ -95,6 +102,7 @@ export const capsSchema = z.object({
   transactions: z.boolean(),
   cancel: z.boolean(),
   fileTransfer: z.boolean(),
+  maxPageSize: z.number().int().positive().optional(),
 });
 
 /**

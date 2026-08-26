@@ -135,6 +135,13 @@ test('kafka — connect, tree, stream tab (offsetWindow), console-free', async (
   });
   await expect(view.locator('[data-testid="stream-next"]')).toBeDisabled();
 
+  // --- P43 iter3 D46/F29: Kafka's offsetWindow strategy has no poll-batch ceiling — all four
+  // page sizes stay present, the guard that this commit exposes a cap rather than inventing one. -
+  await expect(view.locator('[data-testid="stream-page-size-10"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-100"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-1000"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-10000"]')).toBeVisible();
+
   const firstRow = view.locator('[data-testid="stream-row"]').first();
   await expect(firstRow.locator('[data-testid="stream-key"]')).toHaveText(/^key-\d$/);
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');

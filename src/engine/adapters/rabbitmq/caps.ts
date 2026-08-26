@@ -1,4 +1,5 @@
 import type { Caps } from '@shared/caps';
+import { MAX_POLL_MESSAGES } from './read';
 
 // §5.1's rabbitmq row: stream-shaped, batch pagination (poll-on-demand, no addressable position —
 // a basic.get batch has no offset or resumable cursor, D20), no exact count (a queue's message
@@ -38,4 +39,7 @@ export const rabbitmqCaps: Caps = {
   // broker has already handed back — those are still requeued by the endpoint's own reject step.
   cancel: true,
   fileTransfer: false,
+  // P43 iter3 D46/F29: exposes the same ceiling read.ts's own basic.get batch is capped at, so
+  // the stream toolbar's page-size picker can stop offering sizes a poll can never serve.
+  maxPageSize: MAX_POLL_MESSAGES,
 };

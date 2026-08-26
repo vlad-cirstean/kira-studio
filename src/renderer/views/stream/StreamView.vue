@@ -194,11 +194,29 @@ const statusLine = computed(() => {
   return parts.join(' · ');
 });
 
-// P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
-const PAGE_SIZE_OPTIONS = pageSizeOptions('stream-');
+// P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap. P43 iter3 D46: a
+// computed over caps.maxPageSize rather than the plain module-level constant every other view's
+// own pageSizeOptions() call still is — the ceiling is per-connection (only rabbitmq sets one),
+// so it can only be known once caps has actually arrived for this tab's connection.
+const PAGE_SIZE_OPTIONS = computed(() => pageSizeOptions('stream-', caps.value?.maxPageSize));
 function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
 }
+
+// P43 iter3 D46: a tab whose persisted pageSize predates this cap (or was set on a different
+// engine before a connection swap) is corrected to the largest size actually offered — required,
+// not cosmetic: PageSize is a closed union and SegmentedControl renders nothing selected when
+// model-value isn't among its own options.
+watch(
+  PAGE_SIZE_OPTIONS,
+  (options) => {
+    if (options.length === 0) return;
+    if (options.some((o) => o.value === props.tab.state.pageSize)) return;
+    const largest = options[options.length - 1];
+    if (largest) patchStreamTabState(props.tab.id, { pageSize: largest.value });
+  },
+  { immediate: true },
+);
 
 // Item 2's filter row (Kafka only) — local text buffers mirror FilterToolbar.vue's own
 // whereText/orderByText pattern (a plain string an <input> can bind to; `null` only exists in

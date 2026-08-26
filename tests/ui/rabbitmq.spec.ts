@@ -107,6 +107,14 @@ test('rabbitmq — engine picker, connect, tree, poll (requeue warning), publish
   await expect(view.locator('.no-rows')).toContainText('Click Poll to fetch messages');
   await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
 
+  // --- P43 iter3 D46/F29: the page-size picker offers only sizes a basic.get poll can actually
+  // serve (MAX_POLL_MESSAGES = 500) — 1k/10k would silently change nothing, a poll would still
+  // fetch 500 either way. ---------------------------------------------------------------------
+  await expect(view.locator('[data-testid="stream-page-size-10"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-100"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-1000"]')).toHaveCount(0);
+  await expect(view.locator('[data-testid="stream-page-size-10000"]')).toHaveCount(0);
+
   // --- 5. Poll renders rows whose key column holds the routing key -------------------------------
   await view.locator('[data-testid="stream-poll"]').click();
   const firstRow = view.locator('[data-testid="stream-row"]').first();

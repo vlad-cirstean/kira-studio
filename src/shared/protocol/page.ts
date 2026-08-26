@@ -55,6 +55,13 @@ export interface TextColumnChunk {
 export interface PagePosition {
   /** Absolute row offset when the page came from an offset query; null for a keyset page. */
   offset: number | null;
+  /** P43 iter3 F28/D47: informational and unread — a repo-wide grep (`grep -rn "position\.pageSize"
+   *  src/ tests/`) finds no consumer. Every adapter writes it (some as the size requested, some as
+   *  the size actually served — the two disagree by design where an adapter overshoots or clamps,
+   *  e.g. redis/read.ts's SCAN-family round overshoot), but nothing downstream reads it back, so
+   *  "requested or served?" has no observable answer. Not removed: it is on this validated wire
+   *  schema and on every page every adapter builds, so deleting it would be an eleven-adapter
+   *  change to delete something harmless. */
   pageSize: number;
   hasMore: boolean;
   nextToken: string | null;

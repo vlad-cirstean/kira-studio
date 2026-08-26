@@ -100,6 +100,14 @@ test('sqs — connect, flat queue tree, stream tab (batch, Poll-only)', async ({
   await expect(view.locator('.no-rows')).toContainText('Click Poll to fetch messages');
   await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
 
+  // --- P43 iter3 D46/F29: unlike rabbitmq's own basic.get ceiling, SQS genuinely honours every
+  // size the picker offers (read.ts's pollQueue loops ReceiveMessageCommand) — all four sizes
+  // stay present, the guard that this commit exposes a cap rather than inventing one. -----------
+  await expect(view.locator('[data-testid="stream-page-size-10"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-100"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-1000"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-page-size-10000"]')).toBeVisible();
+
   // --- Poll: fetches a real batch, populates the visibility-timeout badge and rows ---------------
   await view.locator('[data-testid="stream-poll"]').click();
   await expect(view.locator('[data-testid="stream-row"]').first()).toBeVisible({

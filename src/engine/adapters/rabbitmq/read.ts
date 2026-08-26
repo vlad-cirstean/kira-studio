@@ -12,7 +12,9 @@ import { request } from './query';
 // F9's own documented ceiling for a list endpoint's page_size, reused as this adapter's own poll
 // ceiling: every message in a `basic.get` batch is held unacked until the whole batch finishes
 // (F11), so a much larger batch would make that many messages briefly invisible to real consumers.
-const MAX_POLL_MESSAGES = 500;
+// Exported (P43 iter3 D46) so caps.ts can expose the same number as Caps.maxPageSize — one
+// definition, not a second copy the stream page-size picker could drift from.
+export const MAX_POLL_MESSAGES = 500;
 
 interface GetMessageRow {
   payload_bytes: number;
