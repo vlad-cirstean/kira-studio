@@ -7,6 +7,12 @@
 -- hand-assigned value, not a generated one. data_types_demo shows ClickHouse's own type
 -- vocabulary rather than a literal port of the others' columns, the same call
 -- scripts/demo-dbs/sqlite/seed.ts already makes for its own engine's types.
+--
+-- USE kira below is required: the official image's docker-entrypoint-initdb.d runner builds its
+-- clickhouse-client invocation with no --database flag (CLICKHOUSE_DB only creates the database,
+-- it does not select it for init scripts), so every CREATE TABLE without this landed in `default`
+-- — leaving `kira` empty and seed.sh's `--database kira` failing with UNKNOWN_TABLE.
+USE kira;
 
 -- ---------------------------------------------------------------------------
 -- customers
