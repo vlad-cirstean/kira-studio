@@ -93,13 +93,16 @@ function startSearch(autoScroll = true): void {
       (found, rowsScanned, _totalRows, soFar) => {
         if (handle !== thisHandle) return;
         foundSoFar.value = found;
-        // P43 iter2 F25/D34: `rowsScanned === 0` is scan.ts's own priority-tick marker (:104) —
-        // every main-pass tick reports the row it scanned up to, always > 0 on a non-empty page.
-        // The priority window's own `soFar` is a different, unrelated array (scan.ts:60-61's own
-        // comment), so an index into it means nothing once the main pass takes over and replaces
-        // `matches` wholesale — that transition is the one case an in-flight Enter's index must
-        // reset for. Every main-pass tick after that is strictly append-only and ascending, so an
-        // existing index keeps pointing at the same match as `soFar` grows underneath it.
+        // P43 iter2 F25/D34, corrected P43 iter3 F40: `rowsScanned === 0` is scan.ts's own
+        // priority-tick marker (:104) — every main-pass tick reports the row it scanned up to,
+        // always > 0 on a non-empty page. The priority window's own `soFar` is a different,
+        // unrelated array (scan.ts:60-61's own comment), so an index into it means nothing once
+        // the main pass starts and replaces `matches` wholesale — the reset below fires
+        // pre-emptively, on the priority tick itself, one animation frame *before* that
+        // replacement actually happens (scan.ts:105 calls runMainPass() synchronously at the end
+        // of the priority frame), not on the first main-pass tick after it. Every main-pass tick
+        // after that is strictly append-only and ascending, so an existing index keeps pointing
+        // at the same match as `soFar` grows underneath it.
         const previousIndex = props.api.searchState[props.tabId]?.index ?? -1;
         const index = rowsScanned === 0 ? -1 : previousIndex;
         props.api.searchState[props.tabId] = { matches: [...soFar], index, pending: true };
@@ -111,12 +114,30 @@ function startSearch(autoScroll = true): void {
     scanning.value = false;
     return;
   }
+  // P43 iter3 D41/F36a: seeded now that runSearch has actually started a scan — ticks are
+  // rAF-deferred, so this always lands before the first one — rather than earlier, which would
+  // also clear a still-valid previous match set out from under the grid on a synchronously
+  // thrown regex error above. Without a priority window (keyvalue's own search passes none,
+  // F36a), the first main-pass tick's `rowsScanned` is never 0, so nothing above would otherwise
+  // reset `previousIndex` away from whatever the *previous, completed* query left it at.
+  props.api.searchState[props.tabId] = { matches: [], index: -1, pending: true };
   handle = thisHandle;
   thisHandle.done.then((matches) => {
     if (handle !== thisHandle) return;
     scanning.value = false;
-    props.api.searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
-    if (autoScroll && matches.length > 0) emit('goToMatch', matches[0]);
+    // P43 iter3 D41/F36: a match the user navigated to mid-scan (D34) survives the scan
+    // finishing, instead of snapping back to the first hit and re-scrolling the viewport out
+    // from under them. During the main pass `soFar` *is* `matches` (scan.ts:84/:88 append into
+    // and resolve the same array), strictly ascending, so an index into the partial list still
+    // identifies the same match in the final one — the bounds check below is belt-and-braces for
+    // an F36a-inherited index, not the mechanism this relies on. autoScroll only fires when the
+    // user never navigated: a user who already moved the viewport themselves has already
+    // answered the question autoScroll exists to ask.
+    const navigatedIndex = props.api.searchState[props.tabId]?.index ?? -1;
+    const navigated = navigatedIndex >= 0 && navigatedIndex < matches.length;
+    const index = navigated ? navigatedIndex : matches.length > 0 ? 0 : -1;
+    props.api.searchState[props.tabId] = { matches, index };
+    if (autoScroll && !navigated && matches.length > 0) emit('goToMatch', matches[0]);
   });
 }
 

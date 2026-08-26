@@ -484,9 +484,19 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
   await page.press('[data-testid="search-input"]', 'Enter');
   const rowAfterSecondEnter = await page.locator('.search-match-current').getAttribute('data-row');
   expect(rowAfterSecondEnter).not.toBe(rowAfterFirstEnter);
-  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3', {
+
+  // P43 iter3 D41/F36: the match those two Enter presses navigated to (the second one — index 1
+  // of 3, "2 of 3") survives the scan finishing, and the viewport is not re-scrolled out from
+  // under the user once it does — the completion handler used to snap back to the first match
+  // and re-emit goToMatch(matches[0]) unconditionally, undoing D34's own tick-preserving fix the
+  // moment the scan actually finished.
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('2 of 3', {
     timeout: 15_000,
   });
+  await expect(page.locator('.search-match-current')).toHaveAttribute(
+    'data-row',
+    rowAfterSecondEnter ?? '',
+  );
 
   await page.click('[data-testid="search-close"]');
   await expect(searchToolbar).toHaveCount(0);
