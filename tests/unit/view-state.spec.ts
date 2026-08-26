@@ -9,20 +9,7 @@
 // wrappers a stub can satisfy — this file resolves the *older* of two in-flight loads *after* the
 // newer one, the exact interleaving no Playwright test can force, by holding both on manually
 // resolved promises.
-//
-// bridge/control.ts:33 reads window.kira at module scope, and state/tabs.ts:130 then *calls*
-// control.onFlushBeforeClose(...) at that same module scope — an empty `{ kira: {} }` throws on
-// import (`kira.onFlushBeforeClose is not a function`). Every window.kira.* property here answers
-// with a no-op subscriber instead; nothing this file asserts reads any of them.
-(globalThis as { window?: unknown }).window = {
-  kira: new Proxy(
-    {},
-    {
-      get: () => () => () => {},
-    },
-  ),
-  addEventListener: () => {},
-};
+import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
