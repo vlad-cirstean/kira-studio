@@ -33,6 +33,7 @@ export interface DataViewRuntime {
   actionError: string | null;
   opId: string | null; // the in-flight op, for the stop button (D2)
   count: { value: number; exact: boolean; stale: boolean } | null;
+  countOpId: string | null; // guards runCount against a stale response outliving a filter change
   meta: ObjectMeta | null; // from kira:tree:describe (L1) — the projection menu
   lastStrategy: 'keyset' | 'offset';
   nextToken: string | null;
@@ -49,6 +50,7 @@ function defaultRuntime(): DataViewRuntime {
     actionError: null,
     opId: null,
     count: null,
+    countOpId: null,
     meta: null,
     lastStrategy: 'offset',
     nextToken: null,
@@ -192,9 +194,11 @@ export async function runCount(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
+  const opId = crypto.randomUUID();
+  rt.countOpId = opId;
   try {
     const response = await data.count({
-      opId: crypto.randomUUID(),
+      opId,
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
@@ -202,6 +206,9 @@ export async function runCount(tabId: string): Promise<void> {
       // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
       refresh: rt.count?.stale === true,
     });
+    // A filter change since this count started already cleared rt.count/countOpId (setFilter) —
+    // an answer to the previous WHERE landing now would resurrect a total for the wrong query.
+    if (rt.countOpId !== opId) return;
     rt.count = { value: response.value, exact: response.exact, stale: response.stale };
   } catch {
     // Leave the previous count (if any) rather than blanking it on a failed refresh.
@@ -295,6 +302,7 @@ export async function setFilter(tabId: string, filter: string | null): Promise<v
   // don't do this: neither changes which rows match.
   const rt = ensureRuntime(tabId);
   rt.count = null;
+  rt.countOpId = null;
   patchDataTabState(tabId, { filter, pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 });
 }

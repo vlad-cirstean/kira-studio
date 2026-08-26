@@ -79,6 +79,9 @@ async function applyWhere(): Promise<void> {
   const t = tab.value;
   if (!t) return;
   const value = whereText.value.trim() === '' ? null : whereText.value.trim();
+  // A blur fires on every focus loss, not just an edit — re-applying an unchanged WHERE would
+  // reset paging/count for no reason (and, worse, race an in-flight runCount for this same filter).
+  if (value === (t.state.filter ?? null)) return;
   await setFilter(t.id, value);
   recordHistory(value, t.state.sort);
 }
