@@ -1,7 +1,7 @@
 # electron-builder.yml — unsigned (ad-hoc) local macOS build, arm64 only.
 appId: com.kirathecat.kira-studio          # §3 "bundle ID com.kirathecat.kira-studio"
 productName: Kira Studio                    # matches app.setName() in src/main/index.ts
-copyright: Copyright © 2026 kirathecat
+copyright: Copyright © 2026 Vlad Cirstean
 directories:
   output: dist                              # already gitignored (line 83)
 files:
