@@ -48,3 +48,43 @@ test('DevTools still opens in an unpackaged (dev/test) build (P46 D70)', async (
   // harness — this sandbox only ever launches unpackaged, so it cannot assert that branch itself.
   expect(opened).toBe(true);
 });
+
+test('every Chromium permission is denied except notifications/geolocation/media/device access this app never uses (P46 D71)', async ({
+  kira,
+}) => {
+  const result = await kira.window.evaluate(async () => {
+    const notif = await Notification.requestPermission();
+    const permQuery = await navigator.permissions.query({
+      name: 'notifications' as PermissionName,
+    });
+    const geo = await new Promise<string>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        () => resolve('ok'),
+        (err) => resolve(`error:${err.code}`),
+      );
+    });
+    return { notif, permQueryState: permQuery.state, geo };
+  });
+
+  expect(result.notif).toBe('denied');
+  expect(result.permQueryState).toBe('denied');
+  expect(result.geo).toBe('error:1'); // GeolocationPositionError.PERMISSION_DENIED
+});
+
+test('the clipboard still works — the one permission this app actually needs (P46 D71/F68)', async ({
+  kira,
+}) => {
+  await kira.app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.focus();
+  });
+
+  const result = await kira.window.evaluate(async () => {
+    const focused = document.hasFocus();
+    await navigator.clipboard.writeText('kira-hardening-clipboard-probe');
+    const read = await navigator.clipboard.readText();
+    return { focused, read };
+  });
+
+  expect(result.focused).toBe(true);
+  expect(result.read).toBe('kira-hardening-clipboard-probe');
+});

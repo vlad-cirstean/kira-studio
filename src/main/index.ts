@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { IPC } from '@shared/protocol/ipc';
-import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain, session } from 'electron';
 import { createConnectionsService } from './connections';
 import { pushEngineConfig } from './engine-config';
 import { startEngine } from './engine-host';
@@ -10,6 +10,7 @@ import { log, sweepOldLogs } from './log';
 import { buildMenu } from './menu';
 import { wireOplog } from './oplog';
 import { createSecretCipher } from './secret-cipher';
+import { hardenSession } from './security';
 import { openDb } from './storage/db';
 import { migrate } from './storage/migrate';
 import { ensureLayout, kiraHome } from './storage/paths';
@@ -59,6 +60,8 @@ function requestFlush(win: BrowserWindow): Promise<void> {
 
 async function main(): Promise<void> {
   await app.whenReady();
+
+  hardenSession(session.defaultSession);
 
   // Packaged builds get their Dock/About-panel icon from electron-builder's `mac.icon`
   // (electron-builder.yml), baked into the bundle's Info.plist/icns — this call only covers
