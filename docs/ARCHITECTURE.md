@@ -12,6 +12,47 @@ constraints, capability quirks and the structural reasons behind them. Environme
 operational notes (how to run Docker in Claude Code's own sandbox, how to work around a proxy
 block, which env var a headless Linux box needs) belong in `AGENTS.md`, not here.
 
+## Stack
+
+| Concern | Choice | Note |
+|---|---|---|
+| Shell | Electron (latest stable) | native title bar, macOS 13+, `arm64` only |
+| Language | TypeScript 7 (native compiler) for `.ts` | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
+| Package manager / scripts / test runner | Bun | Electron runs on its embedded Node — Bun is tooling only |
+| Build | electron-vite | Vite HMR for renderer, esbuild for main/engine |
+| UI | Vue 3 (`<script setup>`, Composition API) | |
+| Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
+| Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
+| Icons | `@vscode/codicons` | UI chrome |
+| Validation | Zod | runtime validation at every trust boundary: IPC control-channel payloads, stored settings/layout/connection rows read back from SQLite, connection-dialog input |
+| Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
+| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed through **Drizzle ORM** | `drizzle-orm/sqlite-proxy` over `node:sqlite` (`better-sqlite3` as the driver fallback) — implementation detail behind the storage module |
+| Packaging | electron-builder | unsigned local builds; signing/notarization after v1 |
+| DB tests | Testcontainers (Node) | real containers, real data; Colima |
+| UI tests | Playwright `_electron.launch` | every change validated |
+| Logging | `electron-log` | main process only (`electron-log/main`), scoped loggers (`log.scope(name)`); the engine `utilityProcess` keeps writing to stdout/stderr, which main pipes into the same sink — single log file, single source of truth |
+
+Driver libraries — the best-maintained option per engine: `pg`, `mariadb`, `mongodb`, `ioredis`,
+`@confluentinc/kafka-javascript` (native, heavier, but actively maintained where `kafkajs` has
+stalled), `@aws-sdk/client-sqs`, `@aws-sdk/client-s3`.
+
+App identity: organisation **kirathecat**, bundle ID `com.kirathecat.kira-studio`. No auto-update.
+
+## Invariants
+
+Rules that follow from the app's two hard non-functional requirements — silky UI and a small RAM
+footprint. The budget numbers themselves (and what's actually measured) live in
+[`docs/PERF.md`](PERF.md) §1, not here — this section is the *rules*, not the numbers.
+
+- The renderer never imports a database driver and never parses a wire protocol.
+- No DOM node per cell for off-screen rows — the grid is virtualized in both axes.
+- No Vue reactivity on row data. Rows live in plain frozen typed structures; the grid reads them
+  imperatively and re-renders on an explicit version counter.
+- Long lists (tree, log panel, document view) are virtualized too.
+- Every operation that can exceed ~150 ms shows progress and a working stop button.
+- Every DB read goes through the cache layer (see Caching, below) — a cache miss is the only thing
+  that produces a query.
+
 ## Adapter contract
 
 Every engine is one directory under `src/engine/adapters/`, implementing the `Adapter` interface
@@ -320,3 +361,48 @@ a connection *can* be moved to its own process later (config flag) if a driver p
 one port to the renderer and one to the engine. Result pages travel renderer↔engine directly, as
 transferable `ArrayBuffer`s where the column type allows. Control messages (connect, cancel,
 settings) go through main so it stays the single source of truth for state and logging.
+
+## Testing
+
+Four suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ui/`.
+
+**Isolation from the dev server.** The container-backed and UI suites run against their own
+`KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
+`~/.kira-studio` or a database a running `bun run dev` session is connected to. Running the tests
+must not disconnect, lock out, or otherwise disturb a `bun run dev` instance already running on the
+same machine. One exception is deliberate (P25 F10): on a real macOS dev machine, the Keychain item
+`safeStorage` uses is named after the app and shared with the developer's own login keychain, so a
+UI test that saves a connection password touches the same OS-level encryption key a `bun run dev`
+session would. This is safe — each test's *secrets* stay isolated in its own temp `KIRA_HOME`'s
+`kira.sqlite`, only the underlying key is shared, the same as any two processes signed as this app
+would share it, and no test ever rotates or clears that key.
+
+**`tests/unit/` needs nothing external and finishes in about a second** (`bun test tests/unit`) —
+plain TypeScript modules exercised with fakes (a `bun:sqlite`-backed Drizzle instance restating a
+table's DDL by hand, a fake `requestAnimationFrame` queue, a hand-written fake client implementing
+one method) rather than a real container or a real Electron process. A shared `window` stub
+(`tests/unit/support/window.ts`) is imported by every spec that needs one, rather than each spec
+declaring its own — Bun's module registry is shared across every spec file in one test run, so
+whichever spec's stub loads first wins for the whole run.
+
+**`tests/db/` and `tests/electron-db/` need a real external resource** — a Testcontainers-managed
+Docker container per engine (`bun test tests/db`, requires Colima on macOS or a Docker daemon on
+Linux) — and one file in `electron-db/` needs a real Electron process on top of that, because the
+native Kafka driver is built against Electron's own Node ABI and cannot load under Bun at all (see
+the Kafka section above). One container per engine, one fixture module per engine that seeds a
+realistic dataset: wide tables, `NULL`s, unicode, large text/blob, nested JSON, composite PKs,
+self-referencing and multi-hop FKs, ≥ 1 M rows in one table to exercise paging and counts.
+Scenarios per engine: connect/disconnect, tree enumeration, describe, definition, first page, deep
+page, count, projection, sort, filter, cancel-mid-query (asserted **server-side** — the query must
+actually be gone from `pg_stat_activity` / `SHOW PROCESSLIST` / `currentOp`), cache hit/miss
+behaviour, add/delete row, command preview correctness. Local-only for now — no CI wiring in v1.
+
+**`tests/ui/`** (`bun run test:ui`) runs Playwright's `_electron.launch()` against the built app,
+driving the real UI against the real containers. Every change is validated with it before it is
+called done. Coverage: panel toggles, settings persistence, connection CRUD, tree expansion and
+caching (assert query counts via the op log), opening the same table twice with independent state,
+all pagination controls, projection, search toolbar modes, stop button, cell editor autodetect +
+beautify, document expand/collapse, PK/FK navigation, every context menu opening with the right
+items, copy/paste, the sticky ancestor band's exact geometry and handoff across a scroll, and the
+checkbox tree filter's kind/tri-state/name-filter/persistence behavior. Plus a memory/perf smoke
+test asserting the RSS budget and no dropped frames while scrolling 10k rows.
