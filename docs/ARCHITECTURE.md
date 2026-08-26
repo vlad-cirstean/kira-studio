@@ -24,8 +24,34 @@ tab instead, SPEC.md §8.18) — and the UI reads *only* `Caps`, never a `connec
 decide what to show. `registry.ts` lazily `import()`s each adapter directory so an unused engine's
 driver is never loaded into the engine process's baseline memory.
 
-Full per-database mapping table (tree shape, pagination, exact count, cancel mechanism): SPEC.md
-§5.1.
+### Per-database mapping
+
+| DB | Tree levels | Default view | Pagination | Exact count | Cancel mechanism |
+|---|---|---|---|---|---|
+| PostgreSQL | database → schema → tables (ungrouped), views/matviews/functions/sequences grouped into per-kind folders | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `pg_cancel_backend(pid)` on a side connection |
+| MariaDB | database → tables (ungrouped), views/routines grouped into per-kind folders (routines labelled "Routines") | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
+| MySQL | database → tables (ungrouped), views/routines grouped into per-kind folders (routines labelled "Routines"); no sequences (MySQL has no SEQUENCE engine) | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
+| SQLite | one `database` node per `PRAGMA database_list` entry (in practice always exactly `main`) → tables (ungrouped), views grouped into a folder; no sequences or routines (SQLite has neither) | tabular | keyset on PK, else a unique index, else the table's own implicit `rowid` (never mutation identity); `LIMIT/OFFSET` only for a view or a text-sorted request | yes (`count(*)` measured at ~9 ms/1M rows) | none — SQLite has no interruptible statement (`sqlite3_interrupt` doesn't exist in `node:sqlite`, and the whole API is synchronous) |
+| ClickHouse | one node per `system.databases` row → tables (ungrouped), views/materialized views grouped into per-kind folders; no sequences or routines (ClickHouse has neither); `system` is kept, not hidden | tabular | `LIMIT/OFFSET` only — a MergeTree `PRIMARY KEY` is a sparse index, with no unique row key to build a keyset cursor on | yes (`count()` reads part metadata) | `KILL QUERY WHERE query_id = '<id>' SYNC` on a second HTTP request (the client's own connection pool already has one free) |
+| MongoDB | database → collections (ungrouped, indexes shown in the definition view) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `AbortSignal` on the cursor, `killOp` fallback |
+| Redis | db index (a leaf — its key namespace is unbounded, browsed in a Browse tab) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
+| Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | close the assigned consumer, `AbortSignal` |
+| SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | `AbortSignal` on the SDK call |
+| S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
+| RabbitMQ | one `database` node per virtual host (reuses the `database` kind, labelled "Virtual host") → queues (ungrouped), exchanges (grouped into an "Exchanges" folder); bindings live in the definition view, never the tree, since a binding has no name or ID of its own | stream | `basic.get` batches of up to 500 messages through the management HTTP API, no addressable position | no — `messages` is a live snapshot of a moving queue, never a transactional count | `AbortSignal` on the HTTP request (no server-side kill — there is no long-running query left executing after the socket closes) |
+
+**SQS/RabbitMQ read policy.** Reads are **never automatic**. The stream view has an explicit
+**Poll** button with a visible warning. For SQS, `ReceiveMessage` makes messages invisible to real
+consumers for the visibility timeout; for RabbitMQ, `basic.get` (via the management API) requeues
+every message it returns rather than removing it — nothing is lost, but each poll can reorder a
+queue's messages and marks them redelivered on the next poll. Nothing is fetched on tab open, on
+refresh, or on a timer for either engine. SQS's authentication is by **named AWS profile** (static
+keys accepted only in URI mode); RabbitMQ's is HTTP basic auth against the management API, on port
+**15672**, not AMQP's own 5672 — the adapter has no AMQP client at all, so an `amqp://` URI is
+refused at connect rather than silently tried.
+
+Cancellation is never "stop showing the result" — it is always forwarded to the server. If a driver
+cannot cancel, the capability is absent and the stop button says so rather than lying.
 
 Every adapter maps its own driver's thrown errors from its own `errors.ts`, exported as one
 `mapError(err): AdapterError` (P39) — the closed `AdapterErrorCode` set, with the driver's message
