@@ -86,6 +86,11 @@ export async function produce(
       });
       affectedRows++;
     }
+    // The library's own migration guide: `send()` resolving only means librdkafka accepted the
+    // message into its internal queue, not that the delivery-report dispatcher has drained it —
+    // disconnecting without this first races the native addon's teardown against that dispatcher
+    // (observed as a hard crash, not a catchable JS error).
+    await producer.flush({ timeout: 5000 });
   } catch (err) {
     if (err instanceof AdapterError) throw err;
     throw mapError(err);

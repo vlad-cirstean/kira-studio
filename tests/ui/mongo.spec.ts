@@ -270,8 +270,10 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   // renders through the same DocumentTree.vue as the data tab's own document view (D11 above). ---
   await consoleView.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+A');
+  // The console's statement grammar is a no-eval JSON5-lite literal parser (literal.ts) — it has
+  // no method-call support, so the value must be a literal string, not a `.repeat()` expression.
   await page.keyboard.type(
-    'db.widgets.insertOne({ name: "long-value-doc", blob: "y".repeat(3000) })',
+    `db.widgets.insertOne({ name: "long-value-doc", blob: "${'y'.repeat(3000)}" })`,
   );
   await page.click('[data-testid="console-run-statement"]');
   await consoleView.locator('.cm-content').click();

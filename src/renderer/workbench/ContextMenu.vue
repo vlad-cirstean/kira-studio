@@ -147,13 +147,11 @@ function onKeydown(e: KeyboardEvent): void {
 onMounted(() => {
   document.addEventListener('mousedown', onDocMouseDown, true);
   document.addEventListener('keydown', onKeydown);
-  window.addEventListener('scroll', closeContextMenu, true);
   window.addEventListener('blur', closeContextMenu);
 });
 onUnmounted(() => {
   document.removeEventListener('mousedown', onDocMouseDown, true);
   document.removeEventListener('keydown', onKeydown);
-  window.removeEventListener('scroll', closeContextMenu, true);
   window.removeEventListener('blur', closeContextMenu);
   if (submenuTimer) clearTimeout(submenuTimer);
 });
