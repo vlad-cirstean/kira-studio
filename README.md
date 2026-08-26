@@ -225,7 +225,7 @@ See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
 - [`docs/v1/plans/`](docs/v1/plans/) — one implementation plan per phase, P0 through P23.
-- [`docs/v1/design/kira-design-system/`](docs/v1/design/kira-design-system/) — the workbench visual
+- [`docs/design/kira-design-system/`](docs/design/kira-design-system/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
 - [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md) — local fixture databases.

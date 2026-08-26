@@ -154,9 +154,9 @@ playwright-report/
 .claude/
 
 # Design canvas — the seeded page is a 3 MB build product (it bundles the
-# canvas editor). Rebuild it with docs/v1/design/kira-design-system/build.mjs
+# canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
 # and the design skill's seed-canvas.mjs; the design itself lives in parts/.
-docs/v1/design/*/[a-z]*-design-system.html
+docs/design/*/[a-z]*-design-system.html
 
 # SQLite demo database — a build product of scripts/demo-dbs/sqlite/seed.ts,
 # regenerated on demand (P35 D36); the other seven engines' demo data lives
