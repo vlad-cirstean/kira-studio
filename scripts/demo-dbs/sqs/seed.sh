@@ -19,9 +19,9 @@ send_messages() {
 }
 
 create_queue orders-queue
-send_messages orders-queue 5
+send_messages orders-queue 15
 
 create_queue drain-queue
-send_messages drain-queue 7
+send_messages drain-queue 15
 
 create_queue empty-queue

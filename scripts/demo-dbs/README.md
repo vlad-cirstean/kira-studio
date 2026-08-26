@@ -124,8 +124,8 @@ anywhere: ClickHouse has none of them (F16/F17), so every id is a hand-assigned 
 RabbitMQ gets its own small message-broker topology rather than a row-shaped port of the others
 (P37 D40): a `kira` virtual host holding three exchanges (`orders.direct`, `events.fanout`,
 `events.topic`, the last two bound to each other so the tree's exchange definition view has a real
-exchange-to-exchange binding to show on both sides), an `orders` queue (20 messages, an
-`orders-ttl` policy), a `notifications` queue (8 messages, fanned out from `events.fanout`), an
+exchange-to-exchange binding to show on both sides), an `orders` queue (40 messages, an
+`orders-ttl` policy), a `notifications` queue (20 messages, fanned out from `events.fanout`), an
 `empty-queue`, and a `large-queue` (2,000 messages — enough to demonstrate the app's own 500-message
 poll clamp without a multi-minute seed, since RabbitMQ's management API publishes one message per
 HTTP request with no bulk path the way Kafka's console producer has). The seed runs on the host,
@@ -139,18 +139,18 @@ MongoDB mirrors this with the same collections (`customers`, `addresses`,
 references and the same index set (unique, single-field, compound, text,
 geospatial).
 
-Redis has no schema; the seed creates 20k keys of each core data type: hashes
+Redis has no schema; the seed creates 25k keys of each core data type: hashes
 (`user:<id>`), strings (`session:<id>`), a sorted set (`leaderboard`), a set
 (`active:users`), a list (`recent:events`), and a stream (`events`), plus TTLs.
 
-Kafka gets three topics: `orders` (2 partitions, 6 keyed JSON messages, `{seq}` payloads),
+Kafka gets three topics: `orders` (2 partitions, 15 keyed JSON messages, `{seq}` payloads),
 `empty-topic` (0 messages, to exercise an empty topic in the tree), and `large-topic` (4
 partitions, 20k keyed JSON messages — the same scale as the relational seeds' `orders` table, to
 exercise pagination/large-message-count rendering). A `kira-demo-group` consumer group is
 registered by draining `orders` once during seeding, so the consumer-groups view isn't empty
 either.
 
-SQS gets three queues: `orders-queue` (5 messages), `drain-queue` (7 messages, a second queue so
+SQS gets three queues: `orders-queue` (15 messages), `drain-queue` (15 messages, a second queue so
 polling one doesn't race the other's `VisibilityTimeout`), and `empty-queue` (0 messages).
 
 S3 gets three buckets. `kira-demo-bucket` carries the full P33 (download/upload/delete/bounded

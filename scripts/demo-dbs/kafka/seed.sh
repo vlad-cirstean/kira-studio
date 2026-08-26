@@ -15,7 +15,7 @@ kafka-topics --bootstrap-server "$BROKER" --create --if-not-exists \
 kafka-topics --bootstrap-server "$BROKER" --create --if-not-exists \
   --topic large-topic --partitions 4 --replication-factor 1
 
-for i in $(seq 0 5); do
+for i in $(seq 0 14); do
   echo "key-${i}:{\"seq\":${i}}"
 done | kafka-console-producer --broker-list "$BROKER" --topic orders \
   --property "parse.key=true" --property "key.separator=:"
@@ -30,4 +30,4 @@ seq 0 19999 | awk '{ printf "key-%d:{\"seq\":%d}\n", $1, $1 }' | \
 # some consumer has actually joined it and consumed at least one message. `|| true` because the
 # console consumer's timeout path can exit non-zero even after delivering every message.
 kafka-console-consumer --bootstrap-server "$BROKER" --topic orders --group kira-demo-group \
-  --from-beginning --max-messages 6 --timeout-ms 10000 >/dev/null 2>&1 || true
+  --from-beginning --max-messages 15 --timeout-ms 10000 >/dev/null 2>&1 || true

@@ -64,13 +64,13 @@ declare_queue empty-queue
 
 declare_queue large-queue
 
-echo "==> messages: orders (20)"
-for i in $(seq 0 19); do
+echo "==> messages: orders (40)"
+for i in $(seq 0 39); do
   publish "orders.direct" orders "{\"seq\":${i}}"
 done
 
-echo "==> messages: notifications (8)"
-for i in $(seq 0 7); do
+echo "==> messages: notifications (20)"
+for i in $(seq 0 19); do
   publish "events.fanout" "" "{\"event\":\"order.created\",\"seq\":${i}}"
 done
 

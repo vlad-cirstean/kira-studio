@@ -1,10 +1,10 @@
 -- Kira Studio — Redis seed data (idempotent)
 -- Run: docker exec -i kira-redis redis-cli EVAL "$(cat scripts/redis/seed.lua)" 0
--- ~20k keys of each Redis data type.
+-- ~25k keys of each Redis data type.
 
 redis.call('FLUSHDB')
 
-local N = 20000
+local N = 25000
 local tiers = {'bronze', 'silver', 'gold', 'platinum'}
 local statuses = {'active', 'suspended', 'deleted'}
 
