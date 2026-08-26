@@ -64,12 +64,21 @@ function startSearch(autoScroll = true): void {
   errorMessage.value = null;
   if (query.value === '') {
     props.api.clearSearchState(props.tabId);
+    handle = null;
     return;
   }
   scanning.value = true;
   foundSoFar.value = 0;
+  // P43 iter2 F24/D33: `runChunkedScan`'s own `done` resolves with the partial match list on
+  // cancellation (a useful contract on its own — it's how cancel() can be awaited at all) — but a
+  // superseded scan's `resolve` still lands on a *later* animation frame, after `startSearch` has
+  // already replaced `handle` with a new one. Capturing this call's own handle in `thisHandle` and
+  // testing identity (below, both in onProgress and in `.then`) is what keeps a superseded scan's
+  // tick or resolution from ever touching `searchState`/`scanning` again — including the
+  // close()/onUnmounted() case, where the "newer handle" is simply `null` (both null it out below).
+  let thisHandle: SearchHandle<M>;
   try {
-    handle = props.api.runSearch(
+    thisHandle = props.api.runSearch(
       props.tabId,
       {
         text: query.value,
@@ -81,9 +90,19 @@ function startSearch(autoScroll = true): void {
       // searchState itself, not just this toolbar's local counter, so highlighting updates as the
       // scan runs rather than only once at the end (F29). `pending: true` is what tells
       // matchedRows() (search.ts) not to filter on an answer the scan hasn't finished yet.
-      (found, _rowsScanned, _totalRows, soFar) => {
+      (found, rowsScanned, _totalRows, soFar) => {
+        if (handle !== thisHandle) return;
         foundSoFar.value = found;
-        props.api.searchState[props.tabId] = { matches: [...soFar], index: -1, pending: true };
+        // P43 iter2 F25/D34: `rowsScanned === 0` is scan.ts's own priority-tick marker (:104) —
+        // every main-pass tick reports the row it scanned up to, always > 0 on a non-empty page.
+        // The priority window's own `soFar` is a different, unrelated array (scan.ts:60-61's own
+        // comment), so an index into it means nothing once the main pass takes over and replaces
+        // `matches` wholesale — that transition is the one case an in-flight Enter's index must
+        // reset for. Every main-pass tick after that is strictly append-only and ascending, so an
+        // existing index keeps pointing at the same match as `soFar` grows underneath it.
+        const previousIndex = props.api.searchState[props.tabId]?.index ?? -1;
+        const index = rowsScanned === 0 ? -1 : previousIndex;
+        props.api.searchState[props.tabId] = { matches: [...soFar], index, pending: true };
       },
     );
   } catch (err) {
@@ -92,7 +111,9 @@ function startSearch(autoScroll = true): void {
     scanning.value = false;
     return;
   }
-  handle.done.then((matches) => {
+  handle = thisHandle;
+  thisHandle.done.then((matches) => {
+    if (handle !== thisHandle) return;
     scanning.value = false;
     props.api.searchState[props.tabId] = { matches, index: matches.length > 0 ? 0 : -1 };
     if (autoScroll && matches.length > 0) emit('goToMatch', matches[0]);
@@ -127,6 +148,7 @@ function goPrev(): void {
 
 function close(): void {
   handle?.cancel();
+  handle = null;
   props.api.clearSearchState(props.tabId);
   // P24 D7: a closed toolbar must never leave rows hidden with no visible cause.
   setSearchFiltering(props.tabId, false);
@@ -152,6 +174,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   handle?.cancel();
+  handle = null;
   props.api.clearSearchState(props.tabId);
   // P24 D7: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too.
@@ -240,7 +263,11 @@ onUnmounted(() => {
       <!-- P42 D38: `scanning` now wins over a non-empty `entry` — a scan in progress publishes
            partial matches into searchState too (so highlighting can show them immediately), and
            without this order swap that partial entry's own non-zero length would make the branch
-           above print a growing, and misleading, "0 of N" instead of "N…". -->
+           above print a growing, and misleading, "0 of N" instead of "N…". P43 iter2 F24/D33: the
+           order swap alone doesn't cover every path here — a superseded scan's own stale `.then`
+           used to set `scanning` false while a newer scan was still genuinely running, falling
+           through to this same branch with a partial `index: -1` entry underneath it; that path is
+           closed by `startSearch`'s own handle-identity check, not by this template. -->
       <span class="p-sm muted search-count" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">

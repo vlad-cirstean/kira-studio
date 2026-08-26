@@ -459,6 +459,35 @@ test('data view — pagination, count, projection, sort, filter, search, stop, c
     await page.click('[data-testid="search-next"]');
   }
 
+  // P43 iter2 D33: closing the toolbar while a scan is still in flight must not let that scan's
+  // own late resolution repaint matches into a toolbar that no longer exists — restart the scan,
+  // close immediately while `search-count` still reads "…", and confirm nothing reappears once
+  // the scan would otherwise have finished.
+  await page.fill('[data-testid="search-input"]', '^9999$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('…');
+  await page.click('[data-testid="search-close"]');
+  await expect(searchToolbar).toHaveCount(0);
+  await page.waitForTimeout(1_000);
+  await expect(page.locator('.search-match')).toHaveCount(0);
+
+  // P43 iter2 D34: a progress tick mid-scan must not snap the current match back to the first
+  // hit — press Enter twice while `search-count` is still mid-scan and confirm the current match
+  // actually advances instead of resetting each time.
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.fill('[data-testid="search-input"]', '^(100|5000|9000)$');
+  await expect(page.locator('.search-match').first()).toBeVisible({ timeout: 2_000 });
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('…');
+  await page.press('[data-testid="search-input"]', 'Enter');
+  const rowAfterFirstEnter = await page.locator('.search-match-current').getAttribute('data-row');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('…');
+  await page.press('[data-testid="search-input"]', 'Enter');
+  const rowAfterSecondEnter = await page.locator('.search-match-current').getAttribute('data-row');
+  expect(rowAfterSecondEnter).not.toBe(rowAfterFirstEnter);
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3', {
+    timeout: 15_000,
+  });
+
   await page.click('[data-testid="search-close"]');
   await expect(searchToolbar).toHaveCount(0);
 
