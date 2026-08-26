@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import { wheelToHorizontal } from '../../../wheelScroll';
 import { rowsVersion, visibleLines } from './rows';
 
 // One expanded document's body, rendered as flat indented key/value lines out of visibleLines()
@@ -14,6 +15,16 @@ const lines = computed(() => {
   return visibleLines(props.tabId, props.row);
 });
 
+// P43 iter3 D42/F31: a long scalar value is revealed by scrolling this list sideways rather than
+// by wrapping it — rows.ts's rowHeight() is exact and measurement-free (one LINE_H per visible
+// node), so a wrapped line would break the VirtualList prefix sum that depends on it. Same
+// TabStrip.vue/ConsoleView.vue idiom: chrome-less scrolling (the CSS below) plus a wheel handler,
+// since a plain mouse wheel produces only a vertical axis.
+const treeRef = ref<HTMLElement | null>(null);
+function onWheel(e: WheelEvent): void {
+  if (wheelToHorizontal(treeRef.value, e)) e.preventDefault();
+}
+
 // D12: coloured with the existing --kira-syntax-* tokens — 'bson' (a shell constructor call like
 // ObjectId(...), or a canonical-EJSON fallback for a type this app's shell has no constructor for)
 // reuses --kira-syntax-function, the same hue CodeMirror already gives a function-call name.
@@ -26,7 +37,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 </script>
 
 <template>
-  <div class="document-tree" data-testid="document-tree">
+  <div class="document-tree" data-testid="document-tree" ref="treeRef" @wheel="onWheel">
     <div
       v-for="line in lines"
       :key="line.node.path"
@@ -67,6 +78,16 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
   padding: var(--kira-s-2) 0;
   font-family: var(--kira-font-family);
   font-size: var(--kira-t-sm);
+  /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
+     the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
+     accounting (rows.ts) is untouched. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.document-tree::-webkit-scrollbar {
+  display: none;
 }
 
 .tree-line {
@@ -76,6 +97,10 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
   gap: var(--kira-s-1);
   padding-right: var(--kira-s-4);
   white-space: nowrap;
+  /* A line only as wide as its own content grows the scroller's scrollWidth past the panel — a
+     plain 100% width would clip at the viewport instead of revealing the rest on scroll. */
+  width: max-content;
+  min-width: 100%;
 }
 
 .tree-twisty {
@@ -103,8 +128,9 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 }
 
 .tree-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* P43 iter3 D42: no longer clipped — .tree-line's own max-content width lets this grow past
+     the panel instead, reachable by scrolling .document-tree sideways. */
+  flex-shrink: 0;
 }
 
 .tree-summary {

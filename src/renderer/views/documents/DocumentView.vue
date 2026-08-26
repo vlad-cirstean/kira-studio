@@ -760,8 +760,10 @@ onUnmounted(() => {
               :style="{ height: `${rowHeights[index]}px` }"
               @contextmenu="onRowContextMenu($event, item.view.id, item.body)"
             >
-              <!-- Publishes the whole document to the cell editor (see the `watch` above). The
-                   expand toggle and the Edit/Delete buttons below are nested inside this same click
+              <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
+                   selectRow) — this view mounts no cell editor dock to publish a selection into
+                   (§8.7: a document's own row is already the read/write surface). The expand
+                   toggle and the Edit/Delete buttons below are nested inside this same click
                    target — clicking any of them also reselects the row, which is harmless (selecting
                    the row you just acted on is never wrong), so their own handlers stop propagation
                    rather than double-firing selectRow with the same index. -->

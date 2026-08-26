@@ -262,6 +262,68 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await expect(secondDocRow).toHaveCount(1);
   await expect(secondResult.locator('[data-testid="document-tree"]')).toHaveCount(0);
 
+  // --- P43 iter3 D42/F31: a long scalar value in an expanded document is reachable by scrolling
+  // the tree sideways rather than by wrapping — and the row's own height does not grow to fit it
+  // (rows.ts's rowHeight() stays exact, unmeasured). A console find() result, exercised here,
+  // renders through the same DocumentTree.vue as the data tab's own document view (D11 above). ---
+  await consoleView.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type(
+    'db.widgets.insertOne({ name: "long-value-doc", blob: "y".repeat(3000) })',
+  );
+  await page.click('[data-testid="console-run-statement"]');
+  await consoleView.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type('\ndb.widgets.find({ name: "long-value-doc" })');
+  await page.click('[data-testid="console-run-statement"]');
+  const longValueResult = consoleView.locator('[data-testid="console-result-grid"]').last();
+  await expect(longValueResult).toBeVisible();
+  const longValueRow = longValueResult.locator('[data-testid="console-result-doc-row"]');
+  await expect(longValueRow).toHaveCount(1);
+  await longValueRow.locator('[data-testid="document-toggle-expand"]').click();
+  const consoleTreeValue = longValueResult
+    .locator('[data-testid="document-tree-value"]')
+    .filter({ hasText: 'yyyy' });
+  await expect(consoleTreeValue).toBeVisible();
+  const consoleRowHeight = await longValueRow.evaluate((el) => el.getBoundingClientRect().height);
+  const [consoleScrollWidth, consoleClientWidth] = await consoleTreeValue.evaluate((el) => {
+    const tree = el.closest('[data-testid="document-tree"]');
+    if (!tree) throw new Error('expected an ancestor document-tree');
+    return [tree.scrollWidth, tree.clientWidth];
+  });
+  expect(consoleScrollWidth).toBeGreaterThan(consoleClientWidth);
+  // The row's own rendered height is unaffected by the value's real (much greater) width — a
+  // handful of scalar-field lines' worth of pixels, not thousands, which is what a height that
+  // scaled with the value's length (wrapping, or a horizontal scrollbar stealing vertical space)
+  // would produce. The structural half of D42's claim is that rows.ts is untouched at all (see
+  // the commit's own diff-empty guard) — this is its one observable, DOM-measured consequence.
+  expect(consoleRowHeight).toBeLessThan(150);
+
+  // --- the same claim on the data tab's own DocumentView — reactivating the widgets tab (§8.4's
+  // identity rule) resumes the same tab this test opened at the very start. -----------------------
+  await (await findRow(page, WIDGETS_PATH)).dblclick();
+  const widgetsView = page.locator('[data-testid="document-view"]');
+  await expect(widgetsView).toBeVisible();
+  await setDocumentFilter(page, "{ name: 'long-value-doc' }");
+  const longValueDocRow = page.locator('[data-testid="document-row"]');
+  await expect(longValueDocRow).toHaveCount(1, { timeout: 10_000 });
+  await expect(longValueDocRow.locator('[data-testid="document-tree"]')).toBeVisible();
+  const dataTabTreeValue = longValueDocRow
+    .locator('[data-testid="document-tree-value"]')
+    .filter({ hasText: 'yyyy' });
+  await expect(dataTabTreeValue).toBeVisible();
+  const dataTabRowHeight = await longValueDocRow.evaluate(
+    (el) => el.getBoundingClientRect().height,
+  );
+  const [dataTabScrollWidth, dataTabClientWidth] = await dataTabTreeValue.evaluate((el) => {
+    const tree = el.closest('[data-testid="document-tree"]');
+    if (!tree) throw new Error('expected an ancestor document-tree');
+    return [tree.scrollWidth, tree.clientWidth];
+  });
+  expect(dataTabScrollWidth).toBeGreaterThan(dataTabClientWidth);
+  expect(dataTabRowHeight).toBeLessThan(150);
+  await setDocumentFilter(page, '');
+
   expect(consoleErrors).toEqual([]);
 });
 
