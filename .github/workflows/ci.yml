@@ -68,7 +68,7 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run package:mac:dir
-      - name: Assert packaged bundle (docs/v1/PACKAGING.md §4 items 1-3, 9)
+      - name: Assert packaged bundle (docs/PACKAGING.md §4 items 1-3, 9)
         run: |
           set -eu
           APP="dist/mac-arm64/Kira Studio.app"
