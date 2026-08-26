@@ -2,7 +2,7 @@ import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
-import { registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
+import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
@@ -57,13 +57,32 @@ export function toggleResultDocExpanded(tabId: string, resultKey: string, id: st
   else rt.expandedDocIds.add(key);
 }
 
+// P43 iter2 F23a: `rt.expandedDocIds` is keyed `${resultKey}:${docId}` — a result's own keys are
+// contiguous under one prefix by construction (resultPageKey's `seq` never repeats), so pruning
+// by prefix is correct without touching any other result's entries.
+function pruneExpandedDocIds(rt: ConsoleViewRuntime, key: string): void {
+  const prefix = `${key}:`;
+  for (const id of rt.expandedDocIds) {
+    if (id.startsWith(prefix)) rt.expandedDocIds.delete(id);
+  }
+}
+
 // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 // state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
 // `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
 // there is no second reference here left to release before the record itself is dropped).
+// P43 iter2 F23/D32: dropRows(result.key) is the same release for views/shared/document/rows.ts's
+// own per-result parse cache — unregisterDocumentRows alone only drops the *source* pointer
+// (rows.ts:25-27's own `rowSources.delete`), leaving every already-parsed document tree for that
+// result retained under a key `nextSeq` guarantees is never reused, for the life of the process.
 registerTabRuntimeCleanup((tabId) => {
   const rt = runtime[tabId];
-  if (rt) for (const result of rt.results) unregisterDocumentRows(result.key);
+  if (rt) {
+    for (const result of rt.results) {
+      unregisterDocumentRows(result.key);
+      dropRows(result.key);
+    }
+  }
   delete runtime[tabId];
 });
 
@@ -80,6 +99,8 @@ function dropResults(tabId: string): void {
   for (const result of rt.results) {
     dropPage(result.key);
     unregisterDocumentRows(result.key);
+    dropRows(result.key);
+    pruneExpandedDocIds(rt, result.key);
   }
   rt.results = [];
   rt.activeKey = null;
@@ -95,6 +116,8 @@ export function closeResult(tabId: string, key: string): void {
   if (index === -1) return;
   dropPage(key);
   unregisterDocumentRows(key);
+  dropRows(key);
+  pruneExpandedDocIds(rt, key);
   rt.results.splice(index, 1);
   if (rt.activeKey === key) {
     rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
@@ -113,6 +136,8 @@ export function closeOtherResults(tabId: string, key: string): void {
     if (result.key !== key) {
       dropPage(result.key);
       unregisterDocumentRows(result.key);
+      dropRows(result.key);
+      pruneExpandedDocIds(rt, result.key);
     }
   }
   rt.results = [keep];
@@ -128,6 +153,8 @@ export function closeResultsToTheRight(tabId: string, key: string): void {
   for (const result of dropped) {
     dropPage(result.key);
     unregisterDocumentRows(result.key);
+    dropRows(result.key);
+    pruneExpandedDocIds(rt, result.key);
   }
   rt.results = rt.results.slice(0, index + 1);
   if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;

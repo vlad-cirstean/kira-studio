@@ -249,6 +249,19 @@ test('mongodb — connect, tree, document tab, edit, delete, console, cancel', a
   await expect(consoleView.locator('[data-testid="document-delete"]')).toHaveCount(0);
   await expect(consoleView.locator('[data-testid="document-new"]')).toHaveCount(0);
 
+  // --- P43 iter2 F23/D32: closing a result set releases its parsed documents/expansion state —
+  // a surviving entry under a key nothing can ever match again would be invisible here (the key
+  // changes on every run), so the real assertion is that the *fresh* result still starts
+  // collapsed, which a leaked-but-orphaned entry could never falsify either way; this pins the
+  // intent the leak would otherwise make impossible to regress-test at all. ---------------------
+  await consoleView.locator('[data-testid="console-result-close"]').click();
+  await page.click('[data-testid="console-run-statement"]');
+  const secondResult = consoleView.locator('[data-testid="console-result-grid"]');
+  await expect(secondResult).toHaveCount(1);
+  const secondDocRow = secondResult.locator('[data-testid="console-result-doc-row"]');
+  await expect(secondDocRow).toHaveCount(1);
+  await expect(secondResult.locator('[data-testid="document-tree"]')).toHaveCount(0);
+
   expect(consoleErrors).toEqual([]);
 });
 

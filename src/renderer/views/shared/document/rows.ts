@@ -5,6 +5,7 @@
 // on the page, which is exactly the frame budget this phase exists to protect.
 import { reactive } from 'vue';
 import { formatBytes } from '../../../format';
+import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';
 
 // P42 D9: this module used to import documentRow from views/documents/page.ts directly — the one
@@ -170,6 +171,21 @@ export function resetRows(tabId: string): void {
   }
   rowsVersion.n++;
 }
+
+/** P43 iter2 F23/D32: releases everything this module holds for one scope — a closed document
+ *  tab, or a closed console result set whose key nothing can ever match again (state.ts's own
+ *  `nextSeq`). Distinct from `resetRows` above, which keeps the entry because the same scope is
+ *  about to hold a *new* page — `dropRows` is for a scope that is never coming back. Registered
+ *  as a tab-runtime cleanup: a document tab's own scope is its tab id, so the same close path
+ *  every other per-tab store already uses (state/tabRuntime.ts) covers it for free; console
+ *  result scopes are dropped explicitly by console/state.ts instead, since a result set's own
+ *  lifetime is shorter than its tab's. */
+export function dropRows(scope: string): void {
+  tabRows.delete(scope);
+  rowsVersion.n++;
+}
+
+registerTabRuntimeCleanup(dropRows);
 
 const HEAD_H = 26; // --kira-h-md
 const LINE_H = 18; // --kira-h-xs, OperationsPanel's own row height
