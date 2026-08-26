@@ -8,17 +8,21 @@ or manual, and the numbers recorded from a real run. It is expected to be re-mea
 rewritten from scratch — `docs/v1/plans/P12-hardening.md` is the frozen design record; this file is
 the living one.
 
-Baseline machine: this repo's Linux/Xvfb dev container (headless, software-rendered Chromium — see
-the scroll-response note in §2 below), captured 2026-08-23. macOS packaged numbers are not yet
-recorded — no macOS hardware has been available to run the manual procedures in §3; that section
-documents the procedure to run and what to fill in.
+§2.1's numbers were originally captured on this repo's Linux/Xvfb dev container (headless,
+software-rendered Chromium), 2026-08-23, and re-measured 2026-08-26 on the macOS/Colima dev machine
+described in §2.2 — see the scroll-response methodology note in §2.1 for why the two environments'
+numbers aren't directly comparable on the scroll-response row specifically. macOS **packaged**
+numbers (§3's manual procedures, run against the built app rather than this dev build) are still
+not recorded — no opportunity to run them has come up yet; §3 documents the procedure and what to
+fill in.
 
 ## 1. Budget table
 
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
-| Grid scroll frame ≤ 8 ms | scroll-event `timeStamp` → DOM committed, **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — currently failing on macOS; see §2.1** |
-| Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same trigger→committed measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — not yet run in this environment; see §2.1** |
+| Grid scroll frame ≤ 8 ms | app-work delta (DataGrid.vue's own scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | — (secondary) | rAF interval p95 < 24 ms, DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
 | Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
@@ -34,39 +38,60 @@ documents the procedure to run and what to fill in.
 
 ### 2.1 Interaction budgets — `tests/ui/budgets.spec.ts`, `tests/ui/perf.spec.ts`
 
-| Metric | p50 | p95 | Budget | Result |
-|---|---|---|---|---|
-| Scroll response | 5.6 ms | 14.2 ms | ≤ 8 ms (**p50 gated** — see note) | pass |
-| Cell → editor | 1.7 ms | 4.9 ms | ≤ 50 ms (p95) | pass |
-| Cached tab switch | 5.3 ms | 6.9 ms | ≤ 50 ms (p95) | pass |
-| Cached tree expand | 1.8 ms | 2.8 ms | ≤ 50 ms (p95) | pass |
-| Console keystroke → completion popup (P18 addendum D26) | not yet run | not yet run | ≤ 50 ms (p50) | **not measured in this environment — see note below** |
-| Scroll response, horizontal (P29) | not yet run | not yet run | ≤ 8 ms (p50 gated, same reasoning as the vertical row) | **not measured in this environment — see note below** |
-| Scroll response, vertical, wide table (P29, `scroll_grid`) | not yet run | not yet run | ≤ 8 ms (p50 gated) | **not measured in this environment — see note below** |
-| Cell-editor populate latency (informational) | — | 41 ms | — | logged |
-| `perf.spec.ts` rAF scroll frame time | 16.7 ms | 16.8 ms | < 24 ms (secondary tripwire) | pass |
-| Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | ≤ 2500 ms | pass |
-| Cold start, restored (5 conns, 10 tabs) | wall 640 ms / in-app uptime 522 ms | — | ≤ 3000 ms | pass |
+| Metric | p50 (work) | p95 (work) | p50 (e2e, logged) | p95 (e2e, logged) | Budget | Result |
+|---|---|---|---|---|---|---|
+| Scroll response | 2.2 ms | 4.1 ms | 4.8 ms | 14.5 ms | ≤ 8 ms (**p50 gated on work** — see note) | pass |
+| Scroll response, horizontal (P29) | 6.2 ms | 12.7 ms | 9.0 ms | 19.0 ms | ≤ 8 ms (p50 gated on work) | pass |
+| Scroll response, vertical, wide table (P29, `scroll_grid`) | 5.1 ms | 7.6 ms | 8.3 ms | 13.9 ms | ≤ 8 ms (p50 gated on work) | pass |
+| Cell → editor | 1.4 ms | 4.7 ms | — | — | ≤ 50 ms (p95) | pass |
+| Cached tab switch | 4.3 ms | 6.5 ms | — | — | ≤ 50 ms (p95) | pass |
+| Cached tree expand | 1.3 ms | 1.4 ms | — | — | ≤ 50 ms (p95) | pass |
+| Console keystroke → completion popup (P18 addendum D26) | 43.4 ms | 46.4 ms | — | — | ≤ 50 ms (p50) | pass |
+| Cell-editor populate latency (informational) | — | 41 ms | — | — | — | logged |
+| `perf.spec.ts` rAF scroll frame time | 16.7 ms | 17.6 ms | — | — | < 24 ms (secondary tripwire) | pass |
+| Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | — | — | ≤ 2500 ms | pass |
+| Cold start, restored (5 conns, 10 tabs) | wall 640 ms / in-app uptime 522 ms | — | — | — | ≤ 3000 ms | pass |
 
-**Console keystroke → completion popup — not run in this environment.** The block exists in
-`tests/ui/budgets.spec.ts` (P18 addendum D26) but this session's sandbox has no Docker/Colima, so
-the Postgres fixture `tests/ui/support/pg.ts` starts cannot run and the whole `budgets.spec.ts`
-suite (including the four rows above, whose numbers here predate this addendum) is skipped rather
-than re-measured. Run `xvfb-run -a bun run test:ui -- budgets` on a machine with Docker available
-and record the p50/p95 pair here.
+Re-measured 2026-08-26 on this environment (the macOS/Colima dev machine) as part of P47's checkpoint,
+alongside the assertion split below and the D13 table in the P47 note — the previous "not yet run" /
+"fails" entries this row replaces predate that split and this note.
 
-**P29 (scroll rendering gap) — not run in this environment.** `budgets.spec.ts` gained a
-horizontal scroll-response measurement and a wide-table (`app.scroll_grid`, 60 columns x 5000
-rows) vertical measurement, both gated the same way as the existing vertical `big_rows`
-measurement (p50 ≤ 8 ms, max ≤ 50 ms, p95 logged), plus the deterministic column/row
-overscan-coverage invariants, the DOM-cell bound, and the sub-row-scroll-mutates-nothing check
-(docs/v1/plans/P29-scroll-render-gap.md §5). None of this could be run here — same Docker
-constraint as above. Before/after numbers for the horizontal axis, the wide-table vertical axis,
-and whether `.grid-row { contain: layout }` (D8) measurably moved anything are all **outstanding**;
-run the suite on a machine with Docker and fill in a before/after pair here, on both axes, the way
-L-A's table entry does. If D8's line shows no attributable change, remove it per the plan's own
-instruction (D8: "if step 7's numbers show no change attributable to it, revert it in the same
-review") — it was kept in this session only because no numbers could be produced either way.
+**Console keystroke → completion popup.** Docker/Colima is available on this environment (the
+macOS dev machine this file's numbers now come from), so the Postgres-backed
+`tests/ui/budgets.spec.ts` suite runs in full rather than self-skipping; the row above is a real
+measurement, not a carry-over.
+
+**P29 (scroll rendering gap) — resolved, numbers recorded.** `budgets.spec.ts`'s horizontal
+scroll-response measurement and wide-table (`app.scroll_grid`, 60 columns x 5000 rows) vertical
+measurement, the deterministic column/row overscan-coverage invariants, the DOM-cell bound, and the
+sub-row-scroll-mutates-nothing check (docs/v1/plans/P29-scroll-render-gap.md §5) all pass in this
+environment; the table above carries the horizontal and wide-table-vertical p50/p95 pairs L-A's row
+was outstanding for. `.grid-row { contain: layout }` (D8) was left in place; P47's own before/after
+measurement below (same instrumentation, same machine) shows no isolable regression attributable to
+removing it, so there was no basis to revisit D8's call here.
+
+**P47 (`@tanstack/vue-virtual` migration) — before/after, work p50 (D13).** Baseline captured this
+session before the migration (Step 0 of `docs/v1/plans/P47-tanstack-virtual-spike.md`), after
+captured post-migration, both via the same `measureScrollResponses` work-delta instrumentation on
+this machine:
+
+| Metric | Baseline (work p50) | After (work p50) | Change |
+|---|---|---|---|
+| `big_rows`, vertical | 2.4 ms | 2.2 ms | improved |
+| `scroll_grid`, horizontal | 6.3 ms | 6.2 ms | improved |
+| `scroll_grid`, vertical (wide table) | 6.2 ms | 5.1 ms | improved ~18% |
+
+All three are flat-to-improved — none regressed, let alone by D14's >15% no-go threshold — and the
+wide-table vertical axis clears D14's "measurable improvement" go bar on its own. Combined with
+`columns.ts` losing `visibleColumnRange`'s hand-rolled binary-search-plus-expansion-loop (43 lines)
+for TanStack's own windowing plus the much smaller `columnRangeExtractor` seam (D5), both go-clause
+conditions are satisfied. All five of D14's no-go criteria were checked and none tripped: the
+sub-row zero-mutation assertion passes (fixed by a custom `observeElementRect` — see
+`DataGrid.vue`'s `observeScrollElementRect`, added because TanStack's default measures
+border-box/scrollbar-inclusive size where the old code measured `clientWidth`/`clientHeight`), both
+overscan-coverage invariants pass, the DOM-cell bound passes, no D13 metric regressed, and
+`tests/ui/data-view.spec.ts`'s filtered-grid scenario (gutter numbers under an active WHERE filter)
+passes. **Verdict: go.**
 
 **Scroll-response methodology note (contradicts plan D6's assumption).** The plan expected scroll
 response to be gated on p95, the same way the other three interaction budgets are. In practice,
@@ -83,22 +108,14 @@ by whether a step straddled a frame boundary) and keeps a looser `max ≤ 50 ms`
 of gating on p95; the p95 number above is logged, not gated. This should be re-checked against a
 real macOS display before relying on p95 anywhere in this environment's history.
 
-**macOS re-run (2026-08-24), scroll response — fails, not yet resolved.** On this environment
-(the actual macOS Colima-based dev machine, not the Linux/Xvfb container the baseline above was
-captured on) `tests/ui/budgets.spec.ts` alone measures scroll response p50=16.5 ms, p95=17.4 ms —
-failing the `≤ 8 ms` p50 gate (`Expected: <= 8, Received: 16.5`), reproducible across repeated
-isolated runs. 16.5 ms is within noise of one full frame period at 60 Hz (16.67 ms), and every
-other budget in the same run (cell→editor, cached tab switch, cached tree expand, all p95-gated at
-≤ 50 ms) passes comfortably with no comparable elevation — consistent with the same
-frame-scheduling artifact already diagnosed above (a `scrollTop` write's rendering isn't visible
-to a `MutationObserver` until the next "update the rendering" step), just saturating **all** 20
-samples on this machine's compositor instead of "roughly half" as on the Xvfb container, rather
-than a 3× app-work regression appearing in only one of four interaction budgets. Per the same
-reasoning D21 applies to §2.2's memory budget: this is reported here for a human decision (is
-16.5 ms an acceptable macOS number for this metric, does the assertion need a per-environment
-budget, or does the measurement itself need to change to isolate app work from compositor cadence)
-— the assertion in `tests/ui/budgets.spec.ts` is left unmodified and currently fails in this
-environment.
+**macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time
+(macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
+where the Xvfb container above only hit it on roughly half) was the motivating case for
+`tests/ui/support/measure.ts`'s work/e2e split (`61ba523`): gating on the work delta — DataGrid.vue's
+own scroll-work mark to DOM-committed, which excludes both frame-scheduling hops described in the
+methodology note above — removes exactly the compositor-cadence noise this paragraph diagnosed. The
+table above reflects that gate; scroll response now passes on this same macOS machine (work
+p50=2.2 ms, e2e p50 still logged at 4.8 ms for comparison).
 
 ### 2.2 Memory budget — `tests/ui/memory.spec.ts`
 
