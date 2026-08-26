@@ -14,7 +14,7 @@ services:
       - kira-pg-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kira -d kira"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -34,7 +34,7 @@ services:
       - kira-mariadb-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -56,7 +56,7 @@ services:
       - kira-mysql-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot", "--silent"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -78,7 +78,7 @@ services:
       - kira-clickhouse-data:/var/lib/clickhouse
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8123/ping"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -95,7 +95,7 @@ services:
       - kira-mongo-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -110,7 +110,7 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 20
 
@@ -140,8 +140,14 @@ services:
     volumes:
       - kira-kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
-      interval: 2s
+      # Not kafka-broker-api-versions (every other service's healthcheck is a native binary; this
+      # one's a JVM wrapper script) — at a 2s interval it was bootstrapping a fresh 256MB-heap JVM
+      # ~30x/minute indefinitely, sustaining ~65-100% CPU on this one container alone. A bare
+      # /dev/tcp connect attempt confirms the broker's listener is accepting connections, which is
+      # all this healthcheck is used for (no service in this file gates on it via depends_on), at
+      # effectively zero cost.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
+      interval: 10s
       timeout: 5s
       retries: 30
 
@@ -160,7 +166,7 @@ services:
       - kira-sqs-data:/var/lib/localstack
     healthcheck:
       test: ["CMD", "bash", "-c", "curl -sf http://localhost:4566/_localstack/health"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 30
 
@@ -182,7 +188,7 @@ services:
       - kira-rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 2s
+      interval: 10s
       timeout: 5s
       retries: 30
 
