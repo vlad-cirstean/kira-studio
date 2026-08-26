@@ -232,6 +232,68 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(cellTopLeft).toHaveClass(/sel-b/);
   await expect(cellTopLeft).toHaveClass(/sel-l/);
 
+  // --- P43 iter3 D45/F33: a whole-row or whole-column selection draws its own end caps — before
+  // this fix, isSelected(row, -1)/isSelected(row, columnCount) both read "selected" for a `row`
+  // selection (the mirror for `column`), so the outermost cells thought they had a selected
+  // neighbour just past the edge and drew no cap there. -----------------------------------------
+  const columnNames = await grid
+    .locator('[data-testid="grid-header-cell"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-column')));
+  const firstColumnName = columnNames[0];
+  const lastColumnName = columnNames[columnNames.length - 1];
+  if (!firstColumnName || !lastColumnName) throw new Error('expected at least one grid column');
+
+  await grid
+    .locator('[data-testid="grid-row"][data-row="0"] [data-testid="grid-gutter-cell"]')
+    .click();
+  const rowFirstCell = page.locator(
+    `[data-testid="grid-cell"][data-row="0"][data-column="${firstColumnName}"]`,
+  );
+  const rowLastCell = page.locator(
+    `[data-testid="grid-cell"][data-row="0"][data-column="${lastColumnName}"]`,
+  );
+  await expect(rowFirstCell).toHaveClass(/sel-l/);
+  await expect(rowFirstCell).not.toHaveClass(/sel-r/);
+  await expect(rowLastCell).toHaveClass(/sel-r/);
+  await expect(rowLastCell).not.toHaveClass(/sel-l/);
+
+  await page.click(`[data-testid="grid-header-select"][data-column="${firstColumnName}"]`);
+  const colFirstRowCell = page.locator(
+    `[data-testid="grid-cell"][data-row="0"][data-column="${firstColumnName}"]`,
+  );
+  const colLastRowCell = page.locator(
+    `[data-testid="grid-cell"][data-row="2"][data-column="${firstColumnName}"]`,
+  );
+  await expect(colFirstRowCell).toHaveClass(/sel-t/);
+  await expect(colFirstRowCell).not.toHaveClass(/sel-b/);
+  await expect(colLastRowCell).toHaveClass(/sel-b/);
+  await expect(colLastRowCell).not.toHaveClass(/sel-t/);
+
+  // Re-run P42's own 3×3 range assertions unchanged — the guard that bounding the probe did not
+  // double any internal seam (the bug P42 D21 exists to prevent).
+  await page.mouse.move(topLeftBox.x + topLeftBox.width / 2, topLeftBox.y + topLeftBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    bottomRightBox.x + bottomRightBox.width / 2,
+    bottomRightBox.y + bottomRightBox.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(grid.locator('.grid-cell.selected')).toHaveCount(9);
+  await expect(cellTopLeft).toHaveClass(/sel-t/);
+  await expect(cellTopLeft).toHaveClass(/sel-l/);
+  await expect(cellTopLeft).not.toHaveClass(/sel-r/);
+  await expect(cellTopLeft).not.toHaveClass(/sel-b/);
+  await expect(cellBottomRight).toHaveClass(/sel-b/);
+  await expect(cellBottomRight).toHaveClass(/sel-r/);
+  await expect(cellBottomRight).not.toHaveClass(/sel-t/);
+  await expect(cellBottomRight).not.toHaveClass(/sel-l/);
+  await expect(middleCell).not.toHaveClass(/sel-t/);
+  await expect(middleCell).not.toHaveClass(/sel-r/);
+  await expect(middleCell).not.toHaveClass(/sel-b/);
+  await expect(middleCell).not.toHaveClass(/sel-l/);
+  await cellTopLeft.click();
+
   // --- P43 iter2 D35: an open inline editor is not a drag handle — a mousedown inside
   // grid-cell-input must not bubble to the cell's own drag-select handler. --------------------
   await cellTopLeft.dblclick();

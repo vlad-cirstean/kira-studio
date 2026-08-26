@@ -492,6 +492,23 @@ function isSelected(row: number, displayCol: number): boolean {
   return false;
 }
 
+// P43 iter3 D45/F33: the perimeter-edge probe's own neighbour check, bounded by the grid's own
+// extents — a `row`/`column` selection's `isSelected` (above) answers a row or column membership
+// question with no notion of the *other* axis, so `isSelected(3, -1)` and `isSelected(3,
+// columnCount)` both read as "selected" today, and the row's first/last cells think they have a
+// selected neighbour just past the edge and draw no end cap there. Fixed at this probe, not
+// inside `isSelected` itself: `isSelected` answers "is this cell in the selection", and (3, -1)
+// isn't a cell, so teaching it geometry it has no other use for would add a bounds check to every
+// one of the O(rows × cols) calls rowVms already makes (F14a's own concern) rather than only the
+// narrow path a *selected* cell's own four neighbour probes run on, below.
+function isSelectedNeighbor(row: number, displayCol: number): boolean {
+  const rowCount = page.value?.rowCount ?? 0;
+  if (row < 0 || row >= rowCount || displayCol < 0 || displayCol >= columnOrder.value.length) {
+    return false;
+  }
+  return isSelected(row, displayCol);
+}
+
 // A 'cell' selection publishes itself; a 'range' publishes its focus end — the moving end, the
 // cell the arrow keys are moving and the one the user last touched (D13). A 'row'/'column'
 // selection has no single value to render and publishes null.
@@ -1028,11 +1045,12 @@ const renderRows = computed<RowVM[]>(() => {
           selected,
           // P42 D21: an edge is drawn only where it sits on the selection's own outer
           // perimeter — computed only for a selected cell, since an unselected one never draws
-          // any of these regardless.
-          selEdgeTop: selected && !isSelected(row - 1, c),
-          selEdgeRight: selected && !isSelected(row, c + 1),
-          selEdgeBottom: selected && !isSelected(row + 1, c),
-          selEdgeLeft: selected && !isSelected(row, c - 1),
+          // any of these regardless. P43 iter3 D45: bounded by the grid's own extents, so a
+          // whole-row/whole-column selection's outermost cells draw their own end caps too.
+          selEdgeTop: selected && !isSelectedNeighbor(row - 1, c),
+          selEdgeRight: selected && !isSelectedNeighbor(row, c + 1),
+          selEdgeBottom: selected && !isSelectedNeighbor(row + 1, c),
+          selEdgeLeft: selected && !isSelectedNeighbor(row, c - 1),
           searchMatch: isSearchMatch(row, c),
           searchMatchCurrent: isCurrentSearchMatch(row, c),
           pendingEdit: dc.staged,
@@ -1459,6 +1477,8 @@ defineExpose({ scrollCellIntoView });
             role="button"
             aria-label="Select column"
             class="header-select-zone"
+            data-testid="grid-header-select"
+            :data-column="columnOrder[c]"
             @click.stop="onHeaderSelectClick(c, $event)"
           />
           <span
