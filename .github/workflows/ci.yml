@@ -56,6 +56,19 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  db-unit-tests:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run test:unit
+      - run: bun run test:db
+
   package-smoke:
     needs: checks
     if: github.event_name != 'pull_request'
