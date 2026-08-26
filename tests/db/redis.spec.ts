@@ -8,6 +8,7 @@ import { redisCaps } from '../../src/engine/adapters/redis/caps';
 import { createAdapter } from '../../src/engine/adapters/registry';
 import { handleMutate, handleRead } from '../../src/engine/data';
 import {
+  BIG_HASH_KEY,
   BIG_LIST_KEY,
   BIG_LIST_LENGTH,
   HASH_FIELDS,
@@ -150,7 +151,14 @@ describe('redis adapter (§9.1, P9)', () => {
         makeCtx(),
       );
       // Leaf 'key' nodes store the complete literal key, not just the local segment (D3).
-      expect(user1Children.map((n) => n.name)).toEqual(['user:1:email', 'user:1:name', HASH_KEY]);
+      // BIG_HASH_KEY ('user:1:bighash') sorts first — a sibling seeded for the HSCAN-paging tests
+      // below, not something this enumeration test itself cares about.
+      expect(user1Children.map((n) => n.name)).toEqual([
+        BIG_HASH_KEY,
+        'user:1:email',
+        'user:1:name',
+        HASH_KEY,
+      ]);
       expect(user1Children.every((n) => n.kind === 'key' && n.hasChildren === false)).toBe(true);
     } finally {
       await adapter.disconnect();
