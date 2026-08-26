@@ -189,6 +189,20 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(cellTopLeft).toHaveClass(/sel-b/);
   await expect(cellTopLeft).toHaveClass(/sel-l/);
 
+  // --- P43 iter2 F22/D31: a generated ULID's timestamp half decodes to now, not the 22nd
+  // century — the assertion that fails by a factor of four against the pre-fix encoder. ----------
+  const ulidCellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(ulidCellEditorPanel).toBeVisible();
+  await page.click('[data-testid="cell-editor-generate"]');
+  await page.click('[data-testid="cell-editor-generate-ulid"]');
+  const ulid = (await ulidCellEditorPanel.locator('.cm-content').innerText()).trim();
+  expect(ulid).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+  const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  let decodedMs = 0;
+  for (const c of ulid.slice(0, 10)) decodedMs = decodedMs * 32 + CROCKFORD.indexOf(c);
+  expect(Math.abs(decodedMs - Date.now())).toBeLessThan(5 * 60 * 1000);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+
   // Shift-click still extends a range exactly as it did before drag-select existed.
   await cellTopLeft.click();
   await cellBottomRight.click({ modifiers: ['Shift'] });
