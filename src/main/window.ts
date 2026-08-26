@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
+import { isDevBuild } from './env';
 import { log } from './log';
+import { rendererWebPreferences } from './security';
 import type { KiraDb } from './storage/db';
 import { getAllLayout, setLayout } from './storage/repos/layout';
 
@@ -17,12 +19,10 @@ export async function createWindow(db: KiraDb): Promise<BrowserWindow> {
     show: false,
     minWidth: 900,
     minHeight: 600,
-    webPreferences: {
+    webPreferences: rendererWebPreferences({
       preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-    },
+      isDev: isDevBuild,
+    }),
   });
 
   win.once('ready-to-show', () => win.show());

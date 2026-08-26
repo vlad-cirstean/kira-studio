@@ -7,9 +7,7 @@ function sendToFocusedWindow(channel: string): void {
   window?.webContents.send(channel);
 }
 
-export function buildMenu(): Menu {
-  const isDev = !app.isPackaged;
-
+export function buildMenu({ isDev }: { isDev: boolean }): Menu {
   const appMenu: MenuItemConstructorOptions = {
     label: app.name,
     submenu: [

@@ -4,6 +4,7 @@ import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain } from 'electron'
 import { createConnectionsService } from './connections';
 import { pushEngineConfig } from './engine-config';
 import { startEngine } from './engine-host';
+import { isDevBuild } from './env';
 import { registerIpc } from './ipc/registry';
 import { log, sweepOldLogs } from './log';
 import { buildMenu } from './menu';
@@ -21,7 +22,7 @@ app.setName('Kira Studio');
 if (process.env.KIRA_HOME) {
   app.setPath('userData', join(kiraHome(), 'electron'));
 }
-Menu.setApplicationMenu(buildMenu());
+Menu.setApplicationMenu(buildMenu({ isDev: isDevBuild }));
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -66,7 +67,7 @@ async function main(): Promise<void> {
   // `app.whenReady()`: `setIcon()` sets `NSApp.applicationIconImage` (also what the native About
   // panel reads — `setAboutPanelOptions({ iconPath })` is documented linux/win32 only, no darwin
   // support), and pre-ready native calls have already bitten this app once (see secretCipher below).
-  if (!app.isPackaged) {
+  if (isDevBuild) {
     app.dock?.setIcon(join(__dirname, '../../build/icon.png'));
   }
 
