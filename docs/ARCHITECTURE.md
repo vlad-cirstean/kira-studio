@@ -192,9 +192,81 @@ result is shown moved.
 
 ## Storage
 
-`~/.kira-studio/kira.sqlite` (`0600`), via Drizzle. Credentials are encrypted at rest through
-Electron's `safeStorage` (Keychain-backed on macOS); see SPEC.md §6 for the storage schema and the
-secret-cipher design.
+`~/.kira-studio/` (dir `0700`), containing `kira.sqlite` (`0600`) and `logs/`.
+
+Credentials in the `connections` table's `password` column are **encrypted at rest** (P25) via
+Electron's `safeStorage` (Keychain-derived on macOS) as a `kira:v1:<base64>` envelope — plaintext
+never touches disk for a connection created or edited since, and a row left plaintext by an older
+build is upgraded in place on the next launch. The connection dialog's credential note reflects
+the platform's actual backend rather than a fixed warning. Linux — development/CI only, v1 targets
+macOS only — has no real keychain support: behind an explicit `KIRA_INSECURE_SECRETS=1` env var it
+falls back to Chromium's `basic_text` obfuscation (a hardcoded key, not a real keychain); without
+it, secret storage is unavailable and a write carrying a password is refused rather than silently
+stored in the clear. The column is still accessed only through a `SecretStore` indirection (now
+paired with a `SecretCipher`, `main/secret-cipher.ts` — the only file that imports `safeStorage`),
+so a future re-key or a real cross-platform secret store stays a contained change.
+
+```
+schema_version(version)
+settings(key, value)                                   -- fonts, sizes, budgets, toggles
+connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
+            uri, options_json, preconnect, preconnect_sidecar, created_at, updated_at, sort_order)
+connection_filters(id, connection_id, node_kind, pattern, is_regex, action)  -- hide/show rules
+saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
+                                                       -- saved filters/queries per table + console
+filter_history(id, connection_id, path, where_text, order_by_json, used_at)
+                                                       -- history list of past filters/sorts
+metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
+op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
+       command, error)                                  -- rotated, capped
+ui_layout(key, value)                                   -- panel sizes, visibility
+tabs(id, connection_id, path, kind, state_json, order, active)  -- session restore
+```
+
+Migrations are forward-only numbered SQL files applied on startup. Table access goes through
+**Drizzle ORM** schema definitions that mirror the migration files. Every row read back out of
+`settings`, `ui_layout` and `connections` is parsed through a **Zod** schema before use, so a
+hand-edited or stale-shape row fails loudly instead of propagating `undefined`s into the UI.
+
+S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
+repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
+**named profile** goes in `username`, and static keys (accepted only in URI mode, per the SQS
+read policy in the per-engine mapping table above) go in `uri`. `options_json` holds two
+independent overrides: `endpoint` (a non-AWS S3-compatible target — LocalStack, MinIO) and
+`bucket` (scopes the whole tree to one bucket via `HeadBucketCommand` instead of
+`ListBucketsCommand`, for IAM credentials that can only ever see that one bucket and commonly
+deny `s3:ListAllMyBuckets` outright).
+
+SQLite connections reuse the same columns again, the same way: `database` holds the **absolute
+file path** on disk, and `host`/`port`/`username`/`password` are all unused — there is no server
+and no credential, only a file Kira opens.
+
+## Caching
+
+Three tiers, each with an explicit invalidation story.
+
+**L1 — metadata** (databases, schemas, tables, columns, PK/FK, indexes, object definitions).
+Persisted in `metadata_cache`. Survives restart. **No TTL** — an entry is dropped only when its
+connection is deleted, and the whole connection's metadata is refreshed on **every reconnect**.
+Plus manual *Refresh* from the tree context menu. This is what makes the project panel instant on
+launch and what lets panel search work without touching the database.
+
+**L2 — result pages.** In-memory LRU in the engine, byte-budgeted (default 64 MB, configurable).
+Key = hash of `{connectionId, path, filter, projection, sort, pageSize, pageToken}`. Never
+persisted. Invalidated by: manual refresh, any local mutation on the same target, disconnect.
+
+**L3 — counts.** `{connectionId, path, filter} → {count, at}`. TTL 5 min, and immediately marked
+*stale* (shown greyed with a refresh affordance) after any local mutation. Counts are only
+computed on explicit user request — never automatically, because they are the most expensive read
+in the app.
+
+**No speculative fetching.** A page is loaded only in direct response to a user action — Next/
+Previous, a filter/sort/projection change, Refresh, or the Count button. There is no background
+prefetch of the next page and no automatic count-on-open; both existed at one point and were
+removed by user request as unwanted background work rather than kept as an opt-out setting.
+
+**Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
+*Clear caches* action.
 
 ## Process model
 
