@@ -198,6 +198,27 @@ secret-cipher design.
 
 ## Process model
 
-Three processes: the Vue 3 renderer, an Electron main process (windowing, storage, IPC), and every
-database driver isolated in its own `utilityProcess` ("engine"), reached over a `MessagePort`. See
-SPEC.md §4 for the full diagram and rationale.
+```
+┌─────────────┐   MessagePort (bulk data)   ┌──────────────┐
+│  renderer   │◄───────────────────────────►│    engine    │  utilityProcess
+│  (Vue, UI)  │                             │  (drivers)   │
+└──────┬──────┘                             └──────┬───────┘
+       │ ipcRenderer (control, storage, dialogs)   │ lifecycle, config
+       └────────────────────┬──────────────────────┘
+                     ┌──────┴──────┐
+                     │    main     │  windows, menus, SQLite, settings, op log
+                     └─────────────┘
+```
+
+**Why a separate engine process.** Driver work (socket reads, protocol parsing, row decoding) is
+CPU-bursty. In the main process it would stall window/menu handling; in the renderer it would drop
+frames. In its own process it is fully parallel and its memory is separately capped and reclaimable.
+
+**One engine for all connections**, not one per connection: a V8 isolate costs ~35 MB, so
+per-connection processes would blow the RAM budget at 5 connections. The adapter host is written so
+a connection *can* be moved to its own process later (config flag) if a driver proves unstable.
+
+**Bulk data skips the main process.** At window creation, main creates a `MessageChannel` and hands
+one port to the renderer and one to the engine. Result pages travel renderer↔engine directly, as
+transferable `ArrayBuffer`s where the column type allows. Control messages (connect, cancel,
+settings) go through main so it stays the single source of truth for state and logging.
