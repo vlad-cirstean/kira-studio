@@ -39,6 +39,14 @@ export function startKafka(): Promise<KafkaFixture> {
 async function start(): Promise<KafkaFixture> {
   const container = await new KafkaContainer(IMAGE)
     .withKraft()
+    // KafkaContainer's own KRaft defaults (kafka-container.js) set the offsets-topic replication
+    // factor and the transaction-log min ISR down to 1 for a single-broker cluster, but miss the
+    // transaction-log replication factor itself — that stays at Kafka's default of 3. With only
+    // one broker to replicate to, __transaction_state can never be created, so any transactional
+    // producer (test 21's commit-marker seed) wedges the broker's InitProducerId handling
+    // indefinitely. Nothing to do with Electron or the client library — a bare single-node Kafka
+    // gotcha.
+    .withEnvironment({ KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1' })
     .withStartupTimeout(STARTUP_TIMEOUT_MS)
     .start();
 

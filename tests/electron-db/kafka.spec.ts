@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { KafkaJS, Producer } from '@confluentinc/kafka-javascript';
 import { encodeKafkaStreamFilter, type KafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { NodePath } from '@shared/domain/tree';
 import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
@@ -688,7 +689,6 @@ describe('kafka adapter (§9.1, P10)', () => {
   // itself does — the seed file (0005_kafka_seed.ts) is what stays client-free (D26/F24), not
   // this suite, which already requires the real ABI build to run at all.
   test("21. read: a partition ending in a transaction's commit marker still terminates (D26)", async () => {
-    const { KafkaJS } = await import('@confluentinc/kafka-javascript');
     const GAP_TOPIC = 'gap-topic';
     const rdConfig = { 'bootstrap.servers': `${fixture.host}:${fixture.port}` };
     const kafka = new KafkaJS.Kafka(rdConfig as never);
@@ -703,19 +703,33 @@ describe('kafka adapter (§9.1, P10)', () => {
       await admin.disconnect();
     }
 
-    const txProducer = kafka.producer({
-      kafkaJS: { transactionalId: 'kira-test-gap-txn' },
+    // The classic node-rdkafka Producer, not kafka.producer({kafkaJS: {...}}) — the KafkaJS-compat
+    // producer unconditionally sets dr_cb: true on every instance (_producer.js's #finalizedConfig,
+    // no way to override it from the outside), which is exactly the config that crashes under
+    // Electron's V8 sandbox (see produce.ts's own comment on the same bug). The classic Producer
+    // exposes transactions directly (initTransactions/beginTransaction/commitTransaction), so
+    // there's no need for the compat wrapper's dr_cb-forcing transaction() helper at all.
+    const txProducer = new Producer({
+      ...rdConfig,
+      'transactional.id': 'kira-test-gap-txn',
+      'linger.ms': 0,
     } as never);
-    await txProducer.connect();
-    try {
-      const tx = await txProducer.transaction();
-      await tx.send({
-        topic: GAP_TOPIC,
-        messages: [{ key: 'gap-key', value: JSON.stringify({ seq: 0 }) }],
+    // .bind() collapses an overloaded method (initTransactions/commitTransaction both have a
+    // (cb) and a (timeout, cb) form) down to a single signature, which then mis-infers `call`'s
+    // arg count — wrapping in an arrow instead keeps each call's own overload intact.
+    const call = (fn: (cb: (err: unknown) => void) => void): Promise<void> =>
+      new Promise((resolve, reject) => {
+        fn((err) => (err ? reject(err) : resolve()));
       });
-      await tx.commit();
+    await call((cb) => txProducer.connect(undefined as never, cb));
+    try {
+      await call((cb) => txProducer.initTransactions(cb));
+      await call((cb) => txProducer.beginTransaction(cb));
+      txProducer.produce(GAP_TOPIC, null, Buffer.from(JSON.stringify({ seq: 0 })), 'gap-key');
+      await call((cb) => txProducer.flush(5000, cb));
+      await call((cb) => txProducer.commitTransaction(cb));
     } finally {
-      await txProducer.disconnect();
+      await new Promise<void>((resolve) => txProducer.disconnect(() => resolve()));
     }
 
     const adapter = await createAdapter('kafka', deps);

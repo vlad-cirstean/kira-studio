@@ -26,7 +26,7 @@
     "typecheck:unit": "tsgo --noEmit -p tests/unit/tsconfig.json",
     "pretest:ui": "sh scripts/native-electron-build.sh",
     "test:ui": "electron-vite build && playwright test",
-    "test:db": "bun test tests/db",
+    "test:db": "bun test tests/db && bun run test:db:kafka",
     "test:unit": "bun test tests/unit",
     "pretest:db:kafka": "sh scripts/native-electron-build.sh",
     "test:db:kafka": "bunx esbuild tests/electron-db/kafka.spec.ts --bundle --platform=node --external:electron --external:@confluentinc/kafka-javascript --external:ssh2 --external:cpu-features --outfile=out/tests/kafka-suite.cjs && ELECTRON_RUN_AS_NODE=1 electron out/tests/kafka-suite.cjs",
