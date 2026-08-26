@@ -252,6 +252,21 @@ test('s3 — connect, bucket/prefix/object tree, object browser via KeyValueView
   await expect(nestedObjectRow).toBeVisible();
   await expect(nestedObjectRow).toHaveAttribute('data-kind', 'object');
 
+  // --- P43 iter3 D39/F35: descend into a nested prefix and press Up right behind it, with no
+  // wait between the two — same regression guard as redis.spec.ts's own version, for S3's own
+  // catalog (up to MAX_LIST_ROUNDS ListObjectsV2 calls per level). The level the breadcrumb and
+  // the row list settle on must be the level Up actually asked for. -----------------------------
+  const upButton = browseView.locator('[data-testid="browse-up"]');
+  await upButton.click();
+  await expect(browseView).toHaveAttribute('data-level', REPORTS_PREFIX_PATH);
+  const reportsRowCount = await browseView.locator('[data-testid="browse-row"]').count();
+  await nestedPrefixRow.dblclick();
+  await upButton.click();
+  await expect(browseView).toHaveAttribute('data-level', REPORTS_PREFIX_PATH);
+  await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(reportsRowCount);
+  await nestedPrefixRow.dblclick();
+  await expect(browseView).toHaveAttribute('data-level', NESTED_PREFIX_PATH);
+
   // --- object context menu (the moved keyMenu/objectMenu shape): Open/Open-in-new-tab/Copy name,
   //     no empty menu -------------------------------------------------------------------------------
   await nestedObjectRow.click({ button: 'right' });

@@ -24,6 +24,11 @@ export interface BrowseViewRuntime {
   filter: string;
   /** The row that holds the list's roving tab stop, by path. */
   selected: string | null;
+  /** P43 iter3 D39: monotonic per tab. `load()` captures it before its own await and drops its
+   *  result on all three exit paths if a newer load has started since — the same supersession
+   *  guard grid/documents/keyvalue/stream all keep as `opId`, expressed as a counter because
+   *  `kira:tree:children` is not a cancellable engine op and has no op id to compare (D16, above). */
+  loadSeq: number;
 }
 
 function defaultRuntime(): BrowseViewRuntime {
@@ -35,6 +40,7 @@ function defaultRuntime(): BrowseViewRuntime {
     truncated: false,
     filter: '',
     selected: null,
+    loadSeq: 0,
   };
 }
 
@@ -66,15 +72,19 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   const level = currentLevel(tabId);
   if (level === null) return;
   const rt = ensureRuntime(tabId);
+  const seq = ++rt.loadSeq;
   rt.status = 'loading';
   rt.error = null;
   rt.actionError = null;
+  rt.truncated = false;
   try {
     const result = await control.treeChildren(tab.connectionId, level, opts?.refresh ?? false);
+    if (rt.loadSeq !== seq) return; // superseded by a newer load
     rt.nodes = result.nodes;
     rt.truncated = result.truncated;
     rt.status = 'idle';
   } catch (err) {
+    if (rt.loadSeq !== seq) return; // superseded by a newer load
     const failure = classifyLoadError(err);
     if (failure.kind === 'disconnected') {
       rt.status = 'idle';

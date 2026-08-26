@@ -304,5 +304,16 @@ test('redis — browse tab: filter and Up (P41)', async ({ kira, consoleErrors }
   await expect(browseView).toHaveAttribute('data-level', DB0_PATH);
   await expect(upButton).toBeDisabled();
 
+  // --- P43 iter3 D39/F35: descend into a namespace and press Up right behind it, with no wait
+  // between the two — the level the breadcrumb and the row list settle on must be the level Up
+  // actually asked for. This local fixture answers too fast to force the race F35 describes (a
+  // slow adapter's listing landing after the user has already moved on); this is the regression
+  // guard `load()`'s new `loadSeq` check exists to keep passing, not the race's reproduction. ------
+  const db0RowCount = await browseView.locator('[data-testid="browse-row"]').count();
+  await userRow.dblclick();
+  await upButton.click();
+  await expect(browseView).toHaveAttribute('data-level', DB0_PATH);
+  await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(db0RowCount);
+
   expect(consoleErrors).toEqual([]);
 });
