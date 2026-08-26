@@ -131,3 +131,18 @@ test('the renderer cannot navigate itself to a remote origin (P46 D72/F66)', asy
   expect(stillThere.url).toContain('out/renderer/index.html');
   expect(stillThere.statusBar).toBe(true);
 });
+
+test('the built-in spellchecker is off (P46 D74)', async ({ kira }) => {
+  const enabled = await kira.app.evaluate(({ session }) =>
+    session.defaultSession.isSpellCheckerEnabled(),
+  );
+  expect(enabled).toBe(false);
+
+  // Deliberately NOT asserting an input's DOM `spellcheck` IDL property here — measured, not
+  // assumed: it stays `true` by web-platform default on a bare `<input>` regardless of either
+  // webPreferences.spellcheck or setSpellCheckerEnabled(false) (verified against a freshly
+  // created element in this app's own renderer). Both levers turn off Chromium's actual
+  // dictionary-lookup/suggestion engine — session.defaultSession.isSpellCheckerEnabled() above is
+  // the real, verifiable signal that they did; the DOM attribute reflects page-authored intent,
+  // not the platform feature's on/off state, and was never going to move.
+});

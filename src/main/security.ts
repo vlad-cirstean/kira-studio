@@ -7,6 +7,7 @@ export function rendererWebPreferences(opts: { preload: string; isDev: boolean }
     sandbox: true,
     nodeIntegration: false,
     devTools: opts.isDev,
+    spellcheck: false,
   };
 }
 
@@ -16,6 +17,7 @@ export function rendererWebPreferences(opts: { preload: string; isDev: boolean }
 const ALLOWED_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-write']);
 
 export function hardenSession(session: Session): void {
+  session.setSpellCheckerEnabled(false);
   session.setPermissionRequestHandler((_wc, permission, callback) =>
     callback(ALLOWED_PERMISSIONS.has(permission)),
   );
