@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import { type Range, useVirtualizer } from '@tanstack/vue-virtual';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
@@ -20,11 +21,11 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import {
   alignmentFor,
   columnOffsets,
+  columnRangeExtractor,
   initialWidths,
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
-  visibleColumnRange,
 } from '../shared/page/columns';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { setVisibleRows } from '../shared/page/visibleRows';
@@ -136,7 +137,9 @@ const widths = computed<Record<string, number>>(() => {
 });
 
 const offsets = computed(() => columnOffsets(columnOrder.value, widths.value));
-const totalWidth = computed(() => offsets.value[offsets.value.length - 1] ?? 0);
+// P47 D6/D7: colVirtualizer's paddingStart is GUTTER_WIDTH, so its own getTotalSize() already
+// is what the template used to compute by hand as `totalWidth + GUTTER_WIDTH`.
+const totalWidth = computed(() => colVirtualizer.value.getTotalSize());
 
 const pending = computed(() => pendingFor(props.tabId));
 const insertRows = computed(() => pending.value?.inserts ?? []);
@@ -259,8 +262,10 @@ function rowAtDisplayPosition(pos: number): number {
   return dr ? (dr[pos] ?? pos) : pos;
 }
 
+// P47 D7: pending-insert rows stay outside rowVirtualizer's count (they're never filtered, so
+// there's nothing to virtualize), but still contribute to the sizer's total height.
 const totalHeight = computed(
-  () => (displayRowCount.value + insertRows.value.length) * rowHeight.value,
+  () => rowVirtualizer.value.getTotalSize() + insertRows.value.length * rowHeight.value,
 );
 
 // The gutter shows the row's position in the whole result set, not just this page's fetched
@@ -274,9 +279,6 @@ const rowNumberBase = computed(() => {
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const scrollLeft = ref(0);
-const viewportHeight = ref(0);
-const viewportWidth = ref(0);
-let resizeObserver: ResizeObserver | null = null;
 
 function syncScrollState(): void {
   const el = containerRef.value;
@@ -285,35 +287,49 @@ function syncScrollState(): void {
   scrollLeft.value = el.scrollLeft;
 }
 
-// A fling can fire many native `scroll` events within a single frame — updating scrollTop/Left
-// (and so re-rendering the visible row/column window) synchronously on every one of them is
-// wasted work that only makes it more likely the main thread falls behind the compositor-driven
-// scroll position. Coalescing to one update per animation frame keeps the re-render in step with
-// what's actually going to paint. The initial mount call bypasses this (calls syncScrollState
-// directly) so a restored scroll position renders its correct row window on the very first paint
-// rather than one frame late at scrollTop 0.
+// P47 D10: the app's own scroll-work perf mark moved into markScrollWork, called from each
+// virtualizer's onChange — this rAF now only feeds the 300ms scroll-position persistence watcher
+// below. A fling can fire many native `scroll` events within a single frame; coalescing
+// syncScrollState to one call per animation frame keeps that watcher in step with what actually
+// painted instead of firing on every event.
 let scrollRaf = 0;
 function onScroll(): void {
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
-    window.__kiraGridScrollWorkStart?.(performance.now());
     syncScrollState();
   });
+}
+
+// P47 D10: called synchronously from each virtualizer's onChange — after both of Chromium's
+// scheduling hops and before Vue's render job, the same point onScroll's rAF marked before.
+function markScrollWork(): void {
+  window.__kiraGridScrollWorkStart?.(performance.now());
+}
+
+// TanStack's default observeElementRect reports the scroll element's border-box size
+// (ResizeObserver's borderBoxSize / getBoundingClientRect), which does NOT subtract a visible
+// scrollbar's own thickness the way clientWidth/clientHeight do. On a wide table (a horizontal
+// scrollbar present) that ~12-15px discrepancy put the vertical overscan window's end boundary
+// exactly on a knife's edge, flipping a row in/out of the DOM for a 4px sub-row scroll —
+// budgets.spec.ts's zero-mutation assertion (:336). Measuring clientWidth/clientHeight instead
+// keeps outerSize identical to the pre-migration viewportWidth/viewportHeight (:308-309, deleted).
+function observeScrollElementRect(
+  instance: { scrollElement: Element | null },
+  cb: (rect: { width: number; height: number }) => void,
+): (() => void) | undefined {
+  const el = instance.scrollElement as HTMLElement | null;
+  if (!el) return undefined;
+  const handler = () => cb({ width: el.clientWidth, height: el.clientHeight });
+  handler();
+  const observer = new ResizeObserver(handler);
+  observer.observe(el);
+  return () => observer.disconnect();
 }
 
 onMounted(() => {
   const el = containerRef.value;
   if (!el) return;
-  viewportHeight.value = el.clientHeight;
-  viewportWidth.value = el.clientWidth;
-  resizeObserver = new ResizeObserver(([entry]) => {
-    if (!entry) return;
-    viewportHeight.value = entry.contentRect.height;
-    viewportWidth.value = entry.contentRect.width;
-  });
-  resizeObserver.observe(el);
-
   const t = tab();
   if (t) {
     el.scrollTop = t.state.scrollTop;
@@ -322,7 +338,6 @@ onMounted(() => {
   syncScrollState();
 });
 onUnmounted(() => {
-  resizeObserver?.disconnect();
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
   // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
   // tab is gone — clearing it just stops the timer firing against an unmounted component.
@@ -335,34 +350,59 @@ onUnmounted(() => {
 // P24 D3: in *display-position* space (0..displayRowCount), not page-row space — the rows a
 // filter hides are never virtualized at all, which is what keeps the unfiltered path's arithmetic
 // untouched (displayRowCount === page.rowCount when there's no filter).
-const rowRange = computed(() => {
-  const total = displayRowCount.value;
-  const overscanRows = Math.ceil(OVERSCAN_PX / rowHeight.value);
-  const start = Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - overscanRows);
-  const end = Math.min(
-    total,
-    Math.ceil((scrollTop.value + viewportHeight.value) / rowHeight.value) + overscanRows,
-  );
-  return { start, end };
-});
-const colRange = computed(() =>
-  visibleColumnRange(
-    scrollLeft.value,
-    viewportWidth.value,
-    offsets.value,
-    OVERSCAN_PX,
-    MAX_OVERSCAN_COLUMNS,
-  ),
+// P47 D6: paddingStart reserves the sticky header's rowHeight band / the gutter's GUTTER_WIDTH
+// band, since the virtualizers read raw scrollTop/scrollLeft (.grid-sizer content space), where
+// row 0 starts one row down and column 0 starts at GUTTER_WIDTH.
+const rowVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: displayRowCount.value, // display-position space (P29 D11), NOT page rows
+    getScrollElement: () => containerRef.value,
+    estimateSize: () => rowHeight.value,
+    overscan: Math.ceil(OVERSCAN_PX / rowHeight.value),
+    paddingStart: rowHeight.value,
+    observeElementRect: observeScrollElementRect,
+    onChange: markScrollWork,
+  })),
+);
+// P47 D5: overscan: 0 because the pixel budget is applied by columnRangeExtractor instead —
+// TanStack's own item-count overscan is the wrong unit for a 40-480px column (P29 D2).
+const colVirtualizer = useVirtualizer(
+  computed(() => ({
+    horizontal: true,
+    count: columnOrder.value.length,
+    getScrollElement: () => containerRef.value,
+    estimateSize: (i: number) => (offsets.value[i + 1] ?? 0) - (offsets.value[i] ?? 0),
+    overscan: 0,
+    paddingStart: GUTTER_WIDTH,
+    rangeExtractor: (range: Range) =>
+      columnRangeExtractor(range, offsets.value, OVERSCAN_PX, MAX_OVERSCAN_COLUMNS),
+    observeElementRect: observeScrollElementRect,
+    onChange: markScrollWork,
+  })),
 );
 
-// The visible window as four *numbers*, not two objects (F4/D4): rowRange/colRange are computeds
-// returning fresh object literals, so Vue's Object.is comparison always counts them as changed —
-// a 1px scroll would otherwise re-render every visible cell for byte-identical DOM. A primitive
-// computed only notifies its own dependents when the number itself changes.
-const rowStart = computed(() => rowRange.value.start);
-const rowEnd = computed(() => rowRange.value.end);
-const colStart = computed(() => colRange.value.startIndex);
-const colEnd = computed(() => colRange.value.endIndex);
+// P47 D3: the visible window stays four *numbers*, not the virtualizers' own item arrays — the
+// library re-notifies Vue on every isScrolling transition and on every options-object recompute
+// even when the index range hasn't moved (F8/F9); a primitive computed only notifies its own
+// dependents when the number itself changes, exactly as rowRange/colRange did pre-migration.
+const rowStart = computed(() => rowVirtualizer.value.getVirtualItems()[0]?.index ?? 0);
+const rowEnd = computed(() => {
+  const items = rowVirtualizer.value.getVirtualItems();
+  const last = items[items.length - 1];
+  return last ? last.index + 1 : 0; // exclusive, matching the old rowRange contract
+});
+const colStart = computed(() => colVirtualizer.value.getVirtualItems()[0]?.index ?? 0);
+const colEnd = computed(() => {
+  const items = colVirtualizer.value.getVirtualItems();
+  const last = items[items.length - 1];
+  return last ? last.index + 1 : 0;
+});
+
+// P47 D9: estimateSize is read during a measurements recompute but is not itself a dependency
+// that triggers one, so a column-width drag or a density switch must invalidate by hand or the
+// overscan window is computed from stale sizes.
+watch(offsets, () => colVirtualizer.value.measure());
+watch(rowHeight, () => rowVirtualizer.value.measure());
 
 const visibleRows = computed<{ row: number; pos: number }[]>(() => {
   const out: { row: number; pos: number }[] = [];
@@ -1427,7 +1467,7 @@ defineExpose({ scrollCellIntoView });
     <div
       v-else-if="page"
       class="grid-sizer"
-      :style="{ width: `${totalWidth + GUTTER_WIDTH}px`, height: `${totalHeight + rowHeight}px` }"
+      :style="{ width: `${totalWidth}px`, height: `${totalHeight}px` }"
     >
       <div class="header-row" :style="{ height: `${rowHeight}px` }">
         <div

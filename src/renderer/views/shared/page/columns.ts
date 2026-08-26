@@ -1,5 +1,6 @@
 import type { ColumnDescriptor, TabularPage } from '@shared/protocol/page';
 import { cellText, isNull } from '@shared/protocol/page';
+import type { Range } from '@tanstack/vue-virtual';
 
 const MIN_WIDTH = 64;
 const MAX_WIDTH = 480;
@@ -51,7 +52,7 @@ export function initialWidths(page: TabularPage): Record<string, number> {
 
 /**
  * Prefix sums over `order`, recomputed only when widths or order change (a computed() in the
- * caller) — not per scroll frame, which visibleColumnRange() below is cheap enough for.
+ * caller) — not per scroll frame, which columnRangeExtractor() below is cheap enough for.
  */
 export function columnOffsets(order: string[], widths: Record<string, number>): number[] {
   const offsets: number[] = [0];
@@ -63,39 +64,26 @@ export function columnOffsets(order: string[], widths: Record<string, number>): 
   return offsets;
 }
 
-export interface ColumnRange {
-  startIndex: number;
-  endIndex: number;
-}
-
-// The row axis has had overscan since P12; the column axis had none (F3 in P29's plan) — the
-// asymmetry the "worse horizontally" report traces to. Buffer in pixels, not a column count: a
-// column is 40-480 px wide, so "N columns of overscan" is a different distance on every table.
-export function visibleColumnRange(
-  scrollLeft: number,
-  viewportWidth: number,
+// P47 D5: @tanstack/vue-virtual's own `rangeExtractor` seam, replacing visibleColumnRange (P29).
+// TanStack already computes the exact visible range (range.startIndex/endIndex, the latter
+// **inclusive**, unlike this function's old {startIndex, endIndex} contract where endIndex was
+// exclusive) — only the pixel-budget expansion below is this app's own. The row axis has had
+// overscan since P12; the column axis had none (F3 in P29's plan) — the asymmetry the "worse
+// horizontally" report traces to. Buffer in pixels, not a column count: a column is 40-480 px
+// wide, so "N columns of overscan" is a different distance on every table.
+export function columnRangeExtractor(
+  range: Pick<Range, 'startIndex' | 'endIndex'>,
   offsets: number[],
   /** Extra rendered width on each side. */
   overscanPx: number,
   /** Hard cap per side, so a table of narrow columns can't multiply the DOM without bound. */
   maxOverscanColumns: number,
-): ColumnRange {
+): number[] {
   const n = offsets.length - 1;
-  if (n <= 0) return { startIndex: 0, endIndex: 0 };
-
-  // The exact visible range, no buffer — same binary-search-then-linear-walk shape as before.
-  let lo = 0;
-  let hi = n;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (offsets[mid + 1] <= scrollLeft) lo = mid + 1;
-    else hi = mid;
-  }
-  let end = lo;
-  while (end < n && offsets[end] < scrollLeft + viewportWidth) end++;
+  if (n <= 0) return [];
 
   // Expand each side by columns whose combined width covers overscanPx, capped independently.
-  let startIndex = lo;
+  let startIndex = range.startIndex;
   let leftPx = 0;
   let leftCount = 0;
   while (startIndex > 0 && leftPx < overscanPx && leftCount < maxOverscanColumns) {
@@ -103,16 +91,18 @@ export function visibleColumnRange(
     leftPx += offsets[startIndex + 1] - offsets[startIndex];
     leftCount++;
   }
-  let endIndex = end;
+  let last = range.endIndex;
   let rightPx = 0;
   let rightCount = 0;
-  while (endIndex < n && rightPx < overscanPx && rightCount < maxOverscanColumns) {
-    rightPx += offsets[endIndex + 1] - offsets[endIndex];
-    endIndex++;
+  while (last < n - 1 && rightPx < overscanPx && rightCount < maxOverscanColumns) {
+    last++;
+    rightPx += offsets[last + 1] - offsets[last];
     rightCount++;
   }
 
-  return { startIndex, endIndex };
+  const out: number[] = [];
+  for (let i = startIndex; i <= last; i++) out.push(i);
+  return out;
 }
 
 // §8.5's type-aware right-alignment for numerics.
