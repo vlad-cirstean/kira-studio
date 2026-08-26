@@ -496,6 +496,21 @@ export function activateTab(id: string): void {
   saveNow();
 }
 
+// Tab-strip drag-reorder: called live on every dragover as the dragged tab crosses another one's
+// midpoint, same "splice out, splice in" shape as ColumnsMenu.vue's own column drag. `from`/`to`
+// are plain indices into the already-ordered array, not ids, since the strip tracks the dragged
+// tab's current index itself.
+export function moveTab(from: number, to: number): void {
+  if (from === to) return;
+  const tabs = tabsState.tabs;
+  if (from < 0 || from >= tabs.length || to < 0 || to >= tabs.length) return;
+  const next = [...tabs];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  tabsState.tabs = next;
+  saveNow();
+}
+
 // D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's
 // own left-to-right visual order (`tabsState.tabs` is already kept in that order).
 function stepTab(delta: 1 | -1): void {

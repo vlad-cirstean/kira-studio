@@ -14,6 +14,7 @@ import {
   closeTab,
   closeToTheRight,
   duplicateTab,
+  moveTab,
   tabsState,
 } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -137,6 +138,23 @@ watch(
 function onWheel(e: WheelEvent): void {
   if (wheelToHorizontal(stripRef.value, e)) e.preventDefault();
 }
+
+// Drag-reorder (same shape as ColumnsMenu.vue's column drag): moveTab splices tabsState.tabs
+// live as the dragged tab crosses another one's midpoint, so the strip itself needs no local copy.
+const dragIndex = ref<number | null>(null);
+
+function onDragStart(index: number): void {
+  dragIndex.value = index;
+}
+function onDragOver(index: number): void {
+  const from = dragIndex.value;
+  if (from === null || from === index) return;
+  moveTab(from, index);
+  dragIndex.value = index;
+}
+function onDragEnd(): void {
+  dragIndex.value = null;
+}
 </script>
 
 <template>
@@ -148,20 +166,24 @@ function onWheel(e: WheelEvent): void {
     @wheel="onWheel"
   >
     <button
-      v-for="tab in tabs"
+      v-for="(tab, index) in tabs"
       :key="tab.id"
       type="button"
       class="p-tab"
-      :class="{ 'is-active': tab.active }"
+      :class="{ 'is-active': tab.active, 'is-dragging': dragIndex === index }"
       data-testid="tab"
       :data-tab-id="tab.id"
       :data-tab-kind="tab.kind"
       :data-active="tab.active"
       :data-color="colorFor(tab)"
       :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
+      draggable="true"
       @click="onClick(tab)"
       @auxclick.middle="onMiddleClick(tab)"
       @contextmenu.prevent="onContextMenu($event, tab)"
+      @dragstart="onDragStart(index)"
+      @dragover.prevent="onDragOver(index)"
+      @dragend="onDragEnd"
     >
       <span class="p-tab-rail" />
       <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
@@ -206,6 +228,10 @@ function onWheel(e: WheelEvent): void {
    strip genuinely adds (the icon/title/close layout, the close button's hover reveal) stays here. */
 .p-tab:hover:not(.is-active) {
   background: var(--kira-hover);
+}
+
+.p-tab.is-dragging {
+  opacity: 0.5;
 }
 
 .tab-icon {
