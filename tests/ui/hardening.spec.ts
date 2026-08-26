@@ -88,3 +88,46 @@ test('the clipboard still works — the one permission this app actually needs (
   expect(result.focused).toBe(true);
   expect(result.read).toBe('kira-hardening-clipboard-probe');
 });
+
+test('window.open is denied and no second window is created (P46 D72/F65)', async ({ kira }) => {
+  const countBefore = await kira.app.evaluate(
+    ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+  );
+
+  const openedHandle = await kira.window.evaluate(() => {
+    const handle = window.open('https://example.com/', '_blank');
+    return handle === null;
+  });
+
+  const countAfter = await kira.app.evaluate(
+    ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+  );
+
+  expect(openedHandle).toBe(true);
+  expect(countBefore).toBe(1);
+  expect(countAfter).toBe(1);
+});
+
+test('the renderer cannot navigate itself to a remote origin (P46 D72/F66)', async ({ kira }) => {
+  // A plain locator .toBeVisible() wait here fights Playwright's own navigation-lifecycle
+  // tracking — location.href triggers a real (if immediately prevented) navigation attempt, and
+  // the locator wait hangs on "waiting for navigation to finish...". Reading the URL and the DOM
+  // straight from the main process's webContents sidesteps that entirely, the same way F66's own
+  // reproduction did.
+  await kira.window.evaluate(() => {
+    location.href = 'https://kira-studio.invalid/';
+  });
+  await kira.window.waitForTimeout(300);
+
+  const stillThere = await kira.app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return { url: '', statusBar: false };
+    const statusBar = await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="status-bar"]') !== null`,
+    );
+    return { url: win.webContents.getURL(), statusBar };
+  });
+
+  expect(stillThere.url).toContain('out/renderer/index.html');
+  expect(stillThere.statusBar).toBe(true);
+});

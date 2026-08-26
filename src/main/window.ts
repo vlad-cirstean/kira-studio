@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
 import { isDevBuild } from './env';
 import { log } from './log';
-import { rendererWebPreferences } from './security';
+import { hardenWindow, rendererWebPreferences } from './security';
 import type { KiraDb } from './storage/db';
 import { getAllLayout, setLayout } from './storage/repos/layout';
 
@@ -45,6 +45,8 @@ export async function createWindow(db: KiraDb): Promise<BrowserWindow> {
   // D8: deliberately not flushing the pending bounds write here — `before-quit` already holds
   // for the renderer's own flush, and a synchronous setLayout here would race db.close().
   win.on('closed', () => clearTimeout(timer));
+
+  hardenWindow(win, process.env.ELECTRON_RENDERER_URL ?? 'file://');
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL);

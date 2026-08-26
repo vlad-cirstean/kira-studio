@@ -1,4 +1,4 @@
-import type { Session, WebPreferences } from 'electron';
+import type { BrowserWindow, Session, WebPreferences } from 'electron';
 
 export function rendererWebPreferences(opts: { preload: string; isDev: boolean }): WebPreferences {
   return {
@@ -21,4 +21,14 @@ export function hardenSession(session: Session): void {
   );
   session.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission));
   session.setDevicePermissionHandler(() => false);
+}
+
+export function hardenWindow(win: BrowserWindow, appBaseUrl: string): void {
+  const wc = win.webContents;
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // will-frame-navigate, not will-navigate: it fires first and covers sub-frames too (P46 F66).
+  wc.on('will-frame-navigate', (event) => {
+    if (!event.url.startsWith(appBaseUrl)) event.preventDefault();
+  });
+  wc.on('will-attach-webview', (event) => event.preventDefault());
 }
