@@ -7,8 +7,9 @@ Vue 3 — one workbench across eleven database engines.
 
 ## Status
 
-- **v1 is in development.** There are no published binaries yet — you build it from source (see
-  [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md)).
+- **Beta — v1 is in development.** Expect bugs and breaking changes between builds. There are no
+  published binaries yet — you build it from source (see [Development](#development) and
+  [`docs/PACKAGING.md`](docs/PACKAGING.md)).
 - **macOS 13+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1. One consequence: because each new build is unsigned, macOS treats it as a different

@@ -1,8 +1,8 @@
 {
   "name": "kira-studio",
   "version": "0.1.0",
-  "description": "A visual database client (DataGrip/DBeaver class) for macOS, covering MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, and S3.",
-  "author": "kirathecat",
+  "description": "A visual database client for macOS, covering MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, and S3.",
+  "author": "Vlad Cirstean",
   "license": "MIT",
   "private": true,
   "main": "out/main/index.js",
