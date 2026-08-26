@@ -36,7 +36,7 @@
     "verify:packaging": "sh scripts/verify-packaging.sh"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.9",
+    "@biomejs/biome": "2.5.10",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.0",
     "@codemirror/lang-json": "6.0.2",
@@ -59,7 +59,7 @@
     "@testcontainers/postgresql": "12.1.0",
     "@testcontainers/rabbitmq": "12.1.0",
     "@testcontainers/redis": "12.1.0",
-    "@types/node": "26.2.0",
+    "@types/node": "26.3.0",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
@@ -72,22 +72,22 @@
     "tailwindcss": "4.3.3",
     "testcontainers": "12.1.0",
     "typescript": "5.9.3",
-    "vite": "7.3.6",
+    "vite": "8.2.2",
     "vue": "3.5.41",
     "vue-tsc": "3.3.11"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1116.0",
-    "@aws-sdk/client-sqs": "3.1116.0",
-    "@aws-sdk/credential-providers": "3.1116.0",
+    "@aws-sdk/client-s3": "3.1118.0",
+    "@aws-sdk/client-sqs": "3.1118.0",
+    "@aws-sdk/credential-providers": "3.1118.0",
     "@clickhouse/client": "1.23.1",
     "@confluentinc/kafka-javascript": "1.10.0",
-    "bson": "6",
+    "bson": "7.3.2",
     "drizzle-orm": "0.45.2",
     "electron-log": "5.4.4",
     "ioredis": "6.0.0",
     "mariadb": "3.5.3",
-    "mongodb": "6",
+    "mongodb": "7.6.0",
     "pg": "8.23.0",
     "zod": "4.4.3"
   }
