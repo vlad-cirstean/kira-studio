@@ -5,10 +5,10 @@ import type { OpRecord } from '../../src/shared/domain/ops';
 // no container, no Electron main process, nothing DOM-shaped read by either module. Vue's
 // reactivity core (ref/computed/watchEffect) runs the same anywhere with no DOM. The one obstacle
 // is bridge/control.ts:33's `const kira = window.kira;` at module scope (state/ops.ts's own
-// import), which a stub object below satisfies — state/ops.ts imports nothing else DOM-shaped.
+// import), which the shared stub below satisfies — state/ops.ts imports nothing else DOM-shaped.
 // Both modules under test are imported dynamically, after the stub is installed: a static import
 // is hoisted and would run before this file's own code has a chance to set `globalThis.window`.
-(globalThis as { window?: unknown }).window = { kira: {} };
+import './support/window';
 
 const { opsState } = await import('../../src/renderer/state/ops');
 const { useRunState } = await import('../../src/renderer/state/runState');
