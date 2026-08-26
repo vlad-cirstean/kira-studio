@@ -169,7 +169,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // SPEC.md §2's 8ms figure is explicitly "(120 Hz displays)" — a per-frame work budget, not a
   // display-independent latency. The end-to-end number (trigger → DOM commit, logged above) is
   // dominated by two stacked frame-scheduling waits that aren't app work — see measure.ts's
-  // measureScrollResponses doc comment — so it stays logged only, for docs/v1/PERF.md, not gated.
+  // measureScrollResponses doc comment — so it stays logged only, for docs/PERF.md, not gated.
   // The budget is asserted against the work-only number instead: DataGrid.vue's own mark of when
   // its post-scheduling work actually starts, to the same DOM-commit signal.
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(8);

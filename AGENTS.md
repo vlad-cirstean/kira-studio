@@ -1,7 +1,7 @@
 # Working agreement
 
 Facts about the app itself — driver choices, protocol constraints, capability quirks and why —
-live in `docs/v1/ARCHITECTURE.md`, not here. This file is process and environment only: how this
+live in `docs/ARCHITECTURE.md`, not here. This file is process and environment only: how this
 team works, and how to run things in whichever box a session happens to be on.
 
 **Opus plans, Sonnet implements.**
@@ -108,7 +108,7 @@ team works, and how to run things in whichever box a session happens to be on.
 
 ## Native Kafka driver — building and testing in this environment (P32)
 
-See `docs/v1/ARCHITECTURE.md`'s Kafka section for *why* (ABI-specific native addon, Bun can't load
+See `docs/ARCHITECTURE.md`'s Kafka section for *why* (ABI-specific native addon, Bun can't load
 it at all, no consumer-group join on browse). This section is only about running it here.
 
 - **Electron's ABI is the only one that matters for this app.** `scripts/native-electron-build.sh`
@@ -137,7 +137,7 @@ it at all, no consumer-group join on browse). This section is only about running
 
 ## SQLite adapter — testing in this environment (P35)
 
-See `docs/v1/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies on
+See `docs/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies on
 (`node:sqlite`, runtime version floor). This section is only about running it here.
 
 - **`tests/db/sqlite.spec.ts` needs no Docker.** `tests/db/support/sqlite.ts` is a temp-file
@@ -160,7 +160,7 @@ See `docs/v1/ARCHITECTURE.md`'s SQLite section for what the adapter itself relie
 
 ## ClickHouse adapter — testing in this environment (P36)
 
-See `docs/v1/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts (no
+See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts (no
 per-request `database` override, why `canUpdate`/`canDelete` are permanently false). This section
 is only about running it here.
 
@@ -178,7 +178,7 @@ is only about running it here.
 
 ## RabbitMQ adapter — testing in this environment (P37)
 
-See `docs/v1/ARCHITECTURE.md`'s RabbitMQ section for the adapter's own design facts (no
+See `docs/ARCHITECTURE.md`'s RabbitMQ section for the adapter's own design facts (no
 dependency, the `-management` image requirement, the `%2F` vhost encoding, why `canUpdate`/
 `canDelete` are permanently false, poll-requeues-not-consumes). This section is only about running
 it here.
@@ -196,4 +196,4 @@ it here.
   `xvfb-run -a bunx playwright test tests/ui/rabbitmq.spec.ts` run for real, failing only at the
   same Docker image-pull step every other Docker-gated spec hits here.
 
-Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/v1/ARCHITECTURE.md`.
+Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/ARCHITECTURE.md`.

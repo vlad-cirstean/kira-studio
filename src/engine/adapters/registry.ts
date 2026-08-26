@@ -8,7 +8,7 @@ import { AdapterError } from './errors';
 // @clickhouse/client (P36 D2) — rabbitmq/ imports no driver at all, just fetch (P37 D1) — ...), so
 // loading all ten eagerly meant every driver was resident in the engine process from boot,
 // including for a session with a single Postgres connection (measured: >100MB of the engine's
-// baseline RSS — P12 memory.spec.ts's lever L-A, docs/v1/PERF.md). This is the only importer of
+// baseline RSS — P12 memory.spec.ts's lever L-A, docs/PERF.md). This is the only importer of
 // these directories, so deferring the import here is enough to defer the driver too.
 const loaders: Partial<Record<ConnectionKind, (deps: AdapterDeps) => Promise<Adapter>>> = {
   postgres: async (deps) => (await import('./postgres')).createPostgresAdapter(deps),

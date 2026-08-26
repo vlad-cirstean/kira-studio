@@ -8,7 +8,7 @@ Vue 3 — one workbench across eleven database engines.
 ## Status
 
 - **v1 is in development.** There are no published binaries yet — you build it from source (see
-  [Development](#development) and [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md)).
+  [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md)).
 - **macOS 13+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1. One consequence: because each new build is unsigned, macOS treats it as a different
@@ -97,7 +97,7 @@ A couple of things worth knowing up front:
 - **Operations panel** — every DB operation live, with duration, rows, command, cancel, re-run,
   and a persisted op log with retention.
 - **Caching** — three tiers: persisted metadata, a byte-budgeted in-memory result-page LRU, and
-  counts; with prefetch and a hit-rate readout (see [`docs/v1/PERF.md`](docs/v1/PERF.md)).
+  counts; with prefetch and a hit-rate readout (see [`docs/PERF.md`](docs/PERF.md)).
 - **Keyboard & command palette** — a deliberately minimal VS Code-flavoured set: `⌘,` settings,
   `⌘B` project panel, `⌘J` operations panel, `⇧⌘P` palette, `⌘F` find, `F5` refresh, `⌘↩` run
   statement, `⇧⌘↩` run all, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close tab, `⇧⌘W` close window.
@@ -136,7 +136,7 @@ right-click → Open, or:
 xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
 ```
 
-See [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) for the electron-builder config and the full
+See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the electron-builder config and the full
 verification checklist.
 
 ## Development
@@ -220,9 +220,9 @@ See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 
 - [`docs/v1/SPEC.md`](docs/v1/SPEC.md) — the full specification: scope, architecture, adapter model,
   storage, caching, UI.
-- [`docs/v1/PERF.md`](docs/v1/PERF.md) — performance budgets, how each is measured, and the recorded
+- [`docs/PERF.md`](docs/PERF.md) — performance budgets, how each is measured, and the recorded
   numbers.
-- [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) — macOS build, electron-builder config, verification
+- [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
   checklist.
 - [`docs/v1/plans/`](docs/v1/plans/) — one implementation plan per phase, P0 through P23.
 - [`docs/v1/design/kira-design-system/`](docs/v1/design/kira-design-system/) — the workbench visual
@@ -235,7 +235,7 @@ See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 Light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; multiple windows; credential encryption; SSH
 tunneling (planned for v2); code signing/notarization; unit tests. **Auto-update is deliberately
-absent and verified as such** — see [`docs/v1/PACKAGING.md`](docs/v1/PACKAGING.md) §7. SQL-table writes
+absent and verified as such** — see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7. SQL-table writes
 (add-row, delete-row, cell-edit) are staged as pending changes with a preview; MongoDB/Redis/
 Kafka/SQS writes are capability-gated per engine (see the table above) and execute immediately,
 with no staging or preview; S3 is read-only.

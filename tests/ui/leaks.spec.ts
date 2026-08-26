@@ -238,7 +238,7 @@ test('leak sweep — tab/store symmetry, connection delete, L3 bound, cache-clea
   // --- scenario 4: L3 is bounded (F19, D19) -----------------------------------------------------
   // Drive many more distinct {path, filter} combinations than D19's ~2 000-entry budget could
   // ever hold, and assert the map stops growing at the budget instead of tracking the request
-  // count — the failure this replaces was an unbounded `Map` (docs/v1/PERF.md §4 item 1).
+  // count — the failure this replaces was an unbounded `Map` (docs/PERF.md §4 item 1).
   const COMBOS = 2500;
   const CONCURRENCY = 25;
   for (let start = 0; start < COMBOS; start += CONCURRENCY) {

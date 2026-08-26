@@ -6,7 +6,7 @@ const DROP_MS = 30 * 60 * 1000;
 // Nominal, not measured (P13 D19): an entry is four scalars plus a key, the variance between
 // entries is noise, and a fixed cost keeps L3 the same `ByteLru` shape as L2 instead of a
 // separate accounting scheme. ~2 000 entries before eviction — well past any realistic browsing
-// session, while still a real bound (was an unbounded `Map`, docs/v1/PERF.md §4 item 1).
+// session, while still a real bound (was an unbounded `Map`, docs/PERF.md §4 item 1).
 const COUNT_ENTRY_BYTES = 128;
 const L3_BUDGET_BYTES = 256 * 1024;
 
