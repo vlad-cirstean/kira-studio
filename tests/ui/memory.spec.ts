@@ -83,7 +83,7 @@ async function waitForGrid(page: Page): Promise<void> {
     .toBeGreaterThan(0);
 }
 
-test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) => {
+test('5 connections / 11 tabs total RSS stays under 350 MB', async ({ kira }) => {
   test.setTimeout(600_000);
   if (!pg || !mariadb || !mongo || !redis) throw new Error('a fixture did not start');
   const { app, window: page } = kira;
@@ -273,7 +273,9 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
   await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
   await collapseRoot(page, 'Memory Mongo');
 
-  // --- Redis: 2 keyvalue tabs (counter, session:abc), reached through db0's own Browse tab (P41) -
+  // --- Redis: 2 keyvalue tabs (counter, session:abc), reached through db0's own Browse tab (P41) —
+  // that Browse tab is itself a persistent tab-strip entry (reused, not duplicated, by the second
+  // dblclick below), so Redis contributes 3 tabs total, not 2. -----------------------------------
   await connectAndExpand(page, 'Memory Redis');
   const redisDb0Row = await findRow(page, REDIS_DB0_PATH);
   await redisDb0Row.dblclick();
@@ -302,11 +304,11 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
   await expect(page.locator('[data-testid="keyvalue-view"]')).toBeVisible();
   await collapseRoot(page, 'Memory Redis');
 
-  await expect(page.locator('[data-testid="tab"]')).toHaveCount(10);
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(11);
 
   // --- measure: min of 10 readings over an idle window, asserted against the budget -------------
   const series = await sampleRssSeries(app);
-  console.log(`memory.spec.ts loaded (5 connections / 10 tabs):\n${formatRssSeries(series)}`);
+  console.log(`memory.spec.ts loaded (5 connections / 11 tabs):\n${formatRssSeries(series)}`);
   const minTotal = Math.min(...series.map((s) => s.totalBytes));
   expect(minTotal).toBeLessThan(350 * 1024 * 1024);
 
@@ -350,6 +352,6 @@ test('5 connections / 10 tabs total RSS stays under 350 MB', async ({ kira }) =>
 
   const afterTeardown = await sampleRssSeries(app);
   console.log(
-    `memory.spec.ts after disconnect/close (5 connections / 10 tabs released):\n${formatRssSeries(afterTeardown)}`,
+    `memory.spec.ts after disconnect/close (5 connections / 11 tabs released):\n${formatRssSeries(afterTeardown)}`,
   );
 });
