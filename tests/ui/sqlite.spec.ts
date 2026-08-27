@@ -28,7 +28,10 @@ async function typeInto(
   page: Page,
   text: string,
 ): Promise<void> {
-  await view.locator('.cm-content').click();
+  // .first(): the query editor's own CodeMirror instance is always first in DOM order (before
+  // results-body/CellEditorDock, ConsoleView.vue's own template order) — once a result cell has
+  // been clicked, a second .cm-content (the read-only cell editor's own) exists too.
+  await view.locator('.cm-content').first().click();
   await page.keyboard.type(text);
 }
 
@@ -439,6 +442,29 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(bigCellPanel.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
   await expect(bigCellPanel).toHaveAttribute('data-format', 'json');
   await expect(bigCellPanel.locator('[data-testid="cell-editor-invalid"]')).toHaveCount(0);
+
+  // --- P49 F9/D4: the console's own column axis — a wide result no longer renders every column
+  // of every visible row unconditionally. One row, 200 columns: the DOM-cell count below proves
+  // real windowing (not an assertion that would pass either way), and scrolling to the far right
+  // proves the windowed columns are still positioned correctly, not just fewer in number. --------
+  const wideColumns = Array.from({ length: 200 }, (_, i) => `${i} AS c${i}`).join(', ');
+  await typeInto(consoleView, page, `\nSELECT ${wideColumns};`);
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results).toContainText('c0');
+  const wideCellCount = await results.locator('[data-testid="console-result-cell"]').count();
+  expect(wideCellCount).toBeGreaterThan(0);
+  expect(wideCellCount).toBeLessThan(200);
+  const resultBody = results.locator('.body');
+  await resultBody.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+  });
+  await expect(
+    results.locator('[data-testid="console-result-cell"]', { hasText: '199' }),
+  ).toBeVisible();
+  const wideCellCountAfterScroll = await results
+    .locator('[data-testid="console-result-cell"]')
+    .count();
+  expect(wideCellCountAfterScroll).toBeLessThan(200);
 
   expect(consoleErrors).toEqual([]);
 });

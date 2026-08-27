@@ -28,6 +28,9 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  MAX_OVERSCAN_COLUMNS,
+  OVERSCAN_PX,
+  observeScrollElementRect,
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
@@ -59,13 +62,6 @@ import { parseTextSortTerms } from './sortTerms';
 import { runtime, setSort } from './state';
 
 const props = defineProps<{ tabId: string }>();
-
-/** How far the compositor may outrun the main thread before a gap can show. 560 px = the row
- *  axis's own overscan since P12 (20 rows x 28 px at comfortable density), now applied to the
- *  column axis too (P29 D2). */
-const OVERSCAN_PX = 560;
-/** Per side. Bounds the DOM when columns are narrow enough that 560 px is a dozen of them. */
-const MAX_OVERSCAN_COLUMNS = 12;
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
@@ -323,25 +319,8 @@ function markScrollWork(): void {
   window.__kiraGridScrollWorkStart?.(performance.now());
 }
 
-// TanStack's default observeElementRect reports the scroll element's border-box size
-// (ResizeObserver's borderBoxSize / getBoundingClientRect), which does NOT subtract a visible
-// scrollbar's own thickness the way clientWidth/clientHeight do. On a wide table (a horizontal
-// scrollbar present) that ~12-15px discrepancy put the vertical overscan window's end boundary
-// exactly on a knife's edge, flipping a row in/out of the DOM for a 4px sub-row scroll —
-// budgets.spec.ts's zero-mutation assertion (:336). Measuring clientWidth/clientHeight instead
-// keeps outerSize identical to the pre-migration viewportWidth/viewportHeight (:308-309, deleted).
-function observeScrollElementRect(
-  instance: { scrollElement: Element | null },
-  cb: (rect: { width: number; height: number }) => void,
-): (() => void) | undefined {
-  const el = instance.scrollElement as HTMLElement | null;
-  if (!el) return undefined;
-  const handler = () => cb({ width: el.clientWidth, height: el.clientHeight });
-  handler();
-  const observer = new ResizeObserver(handler);
-  observer.observe(el);
-  return () => observer.disconnect();
-}
+// P49 F3/D4: observeScrollElementRect moved to columns.ts so ConsoleResultGrid.vue's own column
+// virtualizer can share it rather than growing a second copy — see its doc comment there.
 
 onMounted(() => {
   const el = containerRef.value;

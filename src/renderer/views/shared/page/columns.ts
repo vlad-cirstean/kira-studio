@@ -15,6 +15,11 @@ export const GUTTER_WIDTH = 56;
 // P48 F9: the 96px fallback both grids' own widths computeds used when neither a stored width
 // nor a measured one is available yet.
 export const DEFAULT_COLUMN_WIDTH = 96;
+// P49 F9/D4: the pixel overscan budget and per-side column cap DataGrid.vue's own column
+// virtualizer used, now shared with ConsoleResultGrid.vue's own column axis too.
+export const OVERSCAN_PX = 560;
+/** Per side. Bounds the DOM when columns are narrow enough that 560 px is a dozen of them. */
+export const MAX_OVERSCAN_COLUMNS = 12;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 
@@ -112,6 +117,25 @@ export function columnRangeExtractor(
   const out: number[] = [];
   for (let i = startIndex; i <= last; i++) out.push(i);
   return out;
+}
+
+// P49 F3/D4: TanStack's default observeElementRect reports the scroll element's border-box size
+// (ResizeObserver's borderBoxSize/getBoundingClientRect), which does NOT subtract a visible
+// scrollbar's own thickness the way clientWidth/clientHeight do — on a wide table that discrepancy
+// put a virtualizer's overscan boundary on a knife's edge (P47 F3). Measuring clientWidth/
+// clientHeight instead is DataGrid.vue's own fix, hoisted here so ConsoleResultGrid.vue's column
+// virtualizer shares it rather than growing its own copy.
+export function observeScrollElementRect(
+  instance: { scrollElement: Element | null },
+  cb: (rect: { width: number; height: number }) => void,
+): (() => void) | undefined {
+  const el = instance.scrollElement as HTMLElement | null;
+  if (!el) return undefined;
+  const handler = () => cb({ width: el.clientWidth, height: el.clientHeight });
+  handler();
+  const observer = new ResizeObserver(handler);
+  observer.observe(el);
+  return () => observer.disconnect();
 }
 
 // §8.5's type-aware right-alignment for numerics.

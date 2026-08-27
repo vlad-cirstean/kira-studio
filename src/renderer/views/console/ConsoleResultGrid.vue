@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import { type Range, useVirtualizer } from '@tanstack/vue-virtual';
 import { computed, ref, watch } from 'vue';
 import {
   clearSelectedCellFor,
@@ -21,9 +22,14 @@ import {
 import {
   alignmentFor,
   columnHeaderTooltip,
+  columnOffsets,
+  columnRangeExtractor,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  MAX_OVERSCAN_COLUMNS,
+  OVERSCAN_PX,
+  observeScrollElementRect,
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { createMatchIndex } from '../shared/page/search';
@@ -99,6 +105,57 @@ const totalWidth = computed(() => {
     GUTTER_WIDTH,
   );
 });
+
+// The find toolbar's go-to-match, the column virtualizer's own scroll element (below) and the
+// template's own scrollToIndex call all resolve through whichever of the three <VirtualList>
+// branches is currently mounted — Vue always exposes `$el` on a template ref regardless of
+// defineExpose (VirtualList.vue's own root element, needed as the column virtualizer's scroll
+// element since it isn't a stable containerRef the way DataGrid.vue's own is).
+const listRef = ref<{ scrollToIndex: (index: number) => void; $el: HTMLElement } | null>(null);
+
+// P49 F9/D4: a console result never persists a reorder the way a data tab's columnOrder does —
+// this is just page.columns' own natural order, kept as its own computed so columnOffsets has the
+// same `order` shape DataGrid.vue's own columnOrder computed gives it.
+const columnOrder = computed<string[]>(() =>
+  page.value?.kind === 'tabular' ? page.value.columns.map((c) => c.name) : [],
+);
+const offsets = computed(() => columnOffsets(columnOrder.value, widths.value));
+
+// P49 F9/D4: the SQL grid's own column axis (P29/P47) — a console result windows its columns the
+// same way instead of rendering every one of every visible row unconditionally (F9's own finding:
+// a wide `SELECT *` here was unbounded in both directions). `getScrollElement` reads `listRef` at
+// call time, not `containerRef.value` the way DataGrid.vue does — this panel's own scroll element
+// is whichever of the three <VirtualList> branches below is currently mounted (see `listRef`
+// below), not one stable container.
+const colVirtualizer = useVirtualizer(
+  computed(() => ({
+    horizontal: true,
+    count: page.value?.kind === 'tabular' ? page.value.columns.length : 0,
+    getScrollElement: () => listRef.value?.$el ?? null,
+    estimateSize: (i: number) => (offsets.value[i + 1] ?? 0) - (offsets.value[i] ?? 0),
+    overscan: 0,
+    paddingStart: GUTTER_WIDTH,
+    rangeExtractor: (range: Range) =>
+      columnRangeExtractor(range, offsets.value, OVERSCAN_PX, MAX_OVERSCAN_COLUMNS),
+    observeElementRect: observeScrollElementRect,
+  })),
+);
+const colStart = computed(() => colVirtualizer.value.getVirtualItems()[0]?.index ?? 0);
+const colEnd = computed(() => {
+  const items = colVirtualizer.value.getVirtualItems();
+  const last = items[items.length - 1];
+  return last ? last.index + 1 : 0;
+});
+const visibleColumnIndices = computed(() => {
+  const out: number[] = [];
+  for (let c = colStart.value; c < colEnd.value; c++) out.push(c);
+  return out;
+});
+// P49 F9/D4 (mirrors DataGrid.vue's own P47 D9 comment): estimateSize is read during a
+// measurements recompute but is not itself a dependency that triggers one, so a font change
+// (which resets widths' own measuring context) must invalidate by hand or the overscan window is
+// computed from stale sizes.
+watch(offsets, () => colVirtualizer.value.measure());
 
 // P40 D10/D17: the same "hide non-matching rows" toggle grid/documents/keyvalue share (P24 D2) —
 // a filtered row keeps its real page-row number in the gutter, same as those views.
@@ -221,7 +278,6 @@ function isCurrentSearchMatch(row: number, col: number): boolean {
 // The find toolbar's go-to-match (P40 D10) — rowIndices is the *filtered* array when the filter
 // toggle is on, so a match's page-row number has to be looked up by position rather than assumed
 // to equal it, same as DocumentView.vue's own onGoToMatch.
-const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 function goToMatch(match: Match): void {
   const index = rowIndices.value.indexOf(match.row);
   if (index >= 0) listRef.value?.scrollToIndex(index);
@@ -306,43 +362,49 @@ function selectKeyValueRow(row: number): void {
       @visible-range="onVisibleRangeIndices"
     >
       <template #header>
-        <div class="row header-row p-thead" :style="{ height: `${rowHeight}px` }">
+        <div class="row header-row col-virtual p-thead" :style="{ height: `${rowHeight}px` }">
           <div class="gutter-cell header-gutter p-th" />
           <div
-            v-for="col in page.columns"
-            :key="col.name"
+            v-for="c in visibleColumnIndices"
+            :key="page.columns[c].name"
             class="cell header-cell p-th"
-            :class="cellClass({ alignRight: alignmentFor(col) === 'right' })"
-            :style="{ width: `${widths[col.name]}px` }"
-            v-tooltip="headerTitleFor(col)"
+            :class="cellClass({ alignRight: alignmentFor(page.columns[c]) === 'right' })"
+            :style="{
+              left: `${GUTTER_WIDTH + offsets[c]}px`,
+              width: `${offsets[c + 1] - offsets[c]}px`,
+            }"
+            v-tooltip="headerTitleFor(page.columns[c])"
           >
-            <span class="name">{{ col.name }}</span>
+            <span class="name">{{ page.columns[c].name }}</span>
           </div>
         </div>
       </template>
       <template #default="{ item: r }">
         <div
-          class="row"
+          class="row col-virtual"
           data-testid="console-result-row"
           :data-row="r"
           :style="{ height: `${rowHeight}px` }"
         >
           <div class="gutter-cell p-td gutter">{{ r + 1 }}</div>
           <div
-            v-for="(col, c) in page.columns"
-            :key="col.name"
+            v-for="c in visibleColumnIndices"
+            :key="page.columns[c].name"
             class="cell p-td"
             data-testid="console-result-cell"
             :data-null="cellAt(r, c).isNull"
             :class="
               cellClass({
-                alignRight: alignmentFor(col) === 'right',
+                alignRight: alignmentFor(page.columns[c]) === 'right',
                 selected: isSelected(r, c),
                 searchMatch: isSearchMatch(r, c),
                 searchMatchCurrent: isCurrentSearchMatch(r, c),
               })
             "
-            :style="{ width: `${widths[col.name]}px` }"
+            :style="{
+              left: `${GUTTER_WIDTH + offsets[c]}px`,
+              width: `${offsets[c + 1] - offsets[c]}px`,
+            }"
             @click="selectTabularCell(r, c)"
           >
             <template v-if="cellAt(r, c).isNull">
@@ -460,6 +522,17 @@ function selectKeyValueRow(row: number): void {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* P49 F9/D4: the tabular header/body rows window their columns now (visibleColumnIndices), so
+   their cells can no longer rely on flex flow to land at the right horizontal position — a cell
+   whose neighbours are virtualized out of the DOM would otherwise slide left to fill the gap.
+   `.row.col-virtual` establishes the positioned ancestor its own `.cell`/`.gutter-cell` children
+   resolve their `left` against (below); `display: flex` above still applies harmlessly since an
+   absolutely-positioned child is removed from flex flow regardless — the kv row below is the only
+   other `.row` consumer and stays exactly as flex-laid-out as before. */
+.row.col-virtual {
+  position: relative;
+}
+
 /* header-row also carries the shared .p-thead primitive (background, base border) — this just
    pins the stronger border-strong colour Console.html's thead uses, since a same-specificity
    scoped rule for .row would otherwise win over the global .p-thead one for that property. */
@@ -470,17 +543,32 @@ function selectKeyValueRow(row: number): void {
 /* Width only: header cells add the shared .p-th primitive (data cells .p-td, gutter cells
    .p-td.gutter — "tabular body shared by grid / kv / stream / console") for padding, colour,
    border and font-size, so those aren't re-declared here. kv/doc rows below don't use those
-   primitives (their layout isn't a fixed-width column grid), so they keep their own rules. */
+   primitives (their layout isn't a fixed-width column grid), so they keep their own rules.
+   P49 F9/D4: absolutely positioned (only `.col-virtual` rows use `.gutter-cell` at all) — its own
+   `left: 0` never moves, so this stays a plain rule rather than an inline style like the data
+   cells' own `left` below. */
 .gutter-cell {
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
   width: var(--gutter-width);
 }
 
 .cell {
-  flex-shrink: 0;
   overflow: hidden;
   white-space: nowrap;
   cursor: default;
+}
+
+/* P49 F9/D4: only the tabular header/body cells are windowed and need `left` as an inline style
+   (below) — the kv row's own two `.cell` consumers (`.kv-field`/`.kv-value`) stay flex-laid-out,
+   unaffected by an ancestor rule scoped to these two specific class combinations. */
+.cell.header-cell,
+.cell.p-td {
+  position: absolute;
+  top: 0;
+  height: 100%;
 }
 
 .cell.align-right {
