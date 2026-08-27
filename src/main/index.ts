@@ -111,6 +111,19 @@ async function main(): Promise<void> {
     settings.advanced.opLogRetentionDays,
   );
 
+  // Status-bar CPU/memory readout: app.getAppMetrics() is a synchronous, cheap OS-level read
+  // (tests/ui/support/measure.ts already samples it this way), so a 5s interval is far more
+  // than the cost warrants — it's picked for a readable status bar, not to spare the syscall.
+  // cpu.percentCPUUsage is a delta since the *previous* getAppMetrics() call, not since launch,
+  // so summing across processes each tick gives a live app-wide load figure for free.
+  const APP_METRICS_INTERVAL_MS = 5000;
+  const metricsTimer = setInterval(() => {
+    const metrics = app.getAppMetrics();
+    const cpuPercent = metrics.reduce((sum, m) => sum + m.cpu.percentCPUUsage, 0);
+    const memoryBytes = metrics.reduce((sum, m) => sum + m.memory.workingSetSize * 1024, 0);
+    broadcast(IPC.appMetrics, { cpuPercent, memoryBytes });
+  }, APP_METRICS_INTERVAL_MS);
+
   registerIpc({ db, engineHost, connections, tree });
 
   let generation = 0;
@@ -140,6 +153,7 @@ async function main(): Promise<void> {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
+    clearInterval(metricsTimer);
     void Promise.all(BrowserWindow.getAllWindows().map(requestFlush)).then(async () => {
       await connections.shutdown();
       engineHost.stop();

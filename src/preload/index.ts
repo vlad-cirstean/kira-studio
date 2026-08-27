@@ -18,6 +18,7 @@ import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import type {
+  AppMetricsSample,
   EngineStatus,
   FilesChooseOpenArgs,
   KiraApi,
@@ -113,6 +114,8 @@ const kiraApi: KiraApi = {
     ipcRenderer.invoke(IPC.opsRecent, args) as Promise<OpRecord[]>,
   opsCancel: (args: { opId: string }) => ipcRenderer.invoke(IPC.opsCancel, args),
   onOpUpdate: (cb: (record: OpRecord) => void) => onEvent(IPC.opUpdate, cb),
+
+  onAppMetrics: (cb: (sample: AppMetricsSample) => void) => onEvent(IPC.appMetrics, cb),
 
   tabsList: () => ipcRenderer.invoke(IPC.tabsList) as Promise<TabRecord[]>,
   tabsSave: (args: { tabs: TabRecord[] }) => ipcRenderer.invoke(IPC.tabsSave, args),

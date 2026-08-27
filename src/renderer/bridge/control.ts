@@ -20,6 +20,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import type {
   AppInfo,
+  AppMetricsSample,
   ConnectionTestResult,
   EngineStatus,
   FilesChooseOpenArgs,
@@ -123,6 +124,8 @@ export const control = {
   opsRecent: (limit: number): Promise<OpRecord[]> => kira.opsRecent({ limit }),
   opsCancel: (opId: string): Promise<void> => kira.opsCancel({ opId }),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => kira.onOpUpdate(cb),
+
+  onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) => kira.onAppMetrics(cb),
 
   tabsList: (): Promise<TabRecord[]> => kira.tabsList(),
   tabsSave: (tabs: TabRecord[]): Promise<void> => kira.tabsSave(plain({ tabs })),

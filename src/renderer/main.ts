@@ -3,6 +3,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
+import { initAppMetrics } from './state/appMetrics';
 import { initCacheStats } from './state/cacheStats';
 import { hydrateConnections } from './state/connections';
 import { hydrateOps } from './state/ops';
@@ -58,6 +59,7 @@ window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
 
 async function bootstrap(): Promise<void> {
   initCacheStats();
+  initAppMetrics();
   await Promise.all([
     hydrateLayout(),
     hydrateSettings(),

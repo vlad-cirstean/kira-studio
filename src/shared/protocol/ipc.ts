@@ -83,6 +83,7 @@ export const IPC = {
   connectionsChanged: 'kira:connections:changed',
   settingsChanged: 'kira:settings:changed',
   opUpdate: 'kira:op:update',
+  appMetrics: 'kira:app:metrics',
 } as const;
 
 export interface AppInfo {
@@ -96,6 +97,13 @@ export interface AppInfo {
 export interface EngineStatus {
   alive: boolean;
   pid: number | null;
+}
+
+// Summed across every `app.getAppMetrics()` process entry (browser, renderer, GPU, utility) — a
+// single app-wide readout for the status bar, not a per-process breakdown.
+export interface AppMetricsSample {
+  cpuPercent: number;
+  memoryBytes: number;
 }
 
 export interface ConnectionTestResult {
@@ -215,6 +223,8 @@ export interface KiraApi {
   opsRecent(args: { limit: number }): Promise<OpRecord[]>;
   opsCancel(args: { opId: string }): Promise<void>;
   onOpUpdate(cb: (record: OpRecord) => void): () => void;
+
+  onAppMetrics(cb: (sample: AppMetricsSample) => void): () => void;
 
   tabsList(): Promise<TabRecord[]>;
   tabsSave(args: { tabs: TabRecord[] }): Promise<void>;
