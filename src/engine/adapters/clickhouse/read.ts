@@ -8,7 +8,13 @@ import {
 } from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
-import { buildOrderBy, resolveProjection, safeInt } from '../sql-text';
+import {
+  buildOrderBy,
+  parseCountValue,
+  resolveProjection,
+  safeInt,
+  whereClause,
+} from '../sql-text';
 import type { ReadTarget } from './catalog';
 import type { ClickHouseHandle } from './client';
 import { runCatalogQuery, streamQuery, type TrackQuery } from './query';
@@ -137,7 +143,7 @@ export async function readPage(
 
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.table)}`;
   const selectList = projectedColumns.map((c) => quoteIdent(c.name)).join(', ');
-  const whereSql = req.filter && req.filter.trim() !== '' ? `WHERE (${req.filter})` : '';
+  const whereSql = whereClause(req.filter);
   const orderBySql = computeOrderBySql(req.sort, target);
   const limit = safeInt(req.pageSize + 1, 'page size');
   const offset = safeInt(req.cursor.offset, 'offset');
@@ -193,14 +199,10 @@ export async function countRows(
   nextQueryId: () => string,
 ): Promise<{ value: number; exact: boolean }> {
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.table)}`;
-  const whereSql = filter && filter.trim() !== '' ? `WHERE (${filter})` : '';
-  const sql = [`SELECT count() AS n`, `FROM ${relationSql}`, whereSql].filter(Boolean).join('\n');
+  const sql = [`SELECT count() AS n`, `FROM ${relationSql}`, whereClause(filter)]
+    .filter(Boolean)
+    .join('\n');
 
   const rows = await runCatalogQuery<{ n: string }>(h, ctx, sql, { queryId: nextQueryId() }, track);
-  const raw = rows[0]?.n;
-  const value = Number(raw ?? '0');
-  if (!Number.isFinite(value)) {
-    throw new AdapterError('E_QUERY', `count returned a non-numeric result: ${String(raw)}`);
-  }
-  return { value, exact: true };
+  return { value: parseCountValue(rows[0]?.n ?? '0'), exact: true };
 }

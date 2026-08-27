@@ -14,9 +14,11 @@ import {
   buildScanOrderBy,
   computeEffectiveOrder,
   decodePageToken,
+  parseCountValue,
   requestFingerprint,
   resolveFetchColumns,
   resolveProjection,
+  whereClause,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import { runQuery, type TrackQuery } from './query';
@@ -98,9 +100,7 @@ export async function readPage(
     return params.length;
   };
 
-  // The filter is always parenthesised (§5b step 4) — combined with a keyset predicate by a
-  // bare AND, an unparenthesised `a = 1 OR b = 2` would silently change the user's meaning.
-  let whereSql = req.filter && req.filter.trim() !== '' ? `WHERE (${req.filter})` : '';
+  let whereSql = whereClause(req.filter);
 
   const fingerprint = requestFingerprint({
     path: target.qualifiedName,
@@ -195,17 +195,13 @@ export async function countRows(
   filter: string | null,
 ): Promise<{ value: number; exact: boolean }> {
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.relation)}`;
-  const whereSql = filter && filter.trim() !== '' ? `WHERE (${filter})` : '';
-  const sql = [`SELECT count(*) AS n`, `FROM ${relationSql}`, whereSql].filter(Boolean).join('\n');
+  const sql = [`SELECT count(*) AS n`, `FROM ${relationSql}`, whereClause(filter)]
+    .filter(Boolean)
+    .join('\n');
 
   const rows = await runQuery<[string]>(client, sql, [], ctx, track, {
     rowMode: 'array',
     textMode: true,
   });
-  const raw = rows[0]?.[0];
-  const value = raw === undefined ? Number.NaN : Number(raw);
-  if (!Number.isFinite(value)) {
-    throw new AdapterError('E_QUERY', `count returned a non-numeric result: ${String(raw)}`);
-  }
-  return { value, exact: true };
+  return { value: parseCountValue(rows[0]?.[0]), exact: true };
 }

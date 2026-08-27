@@ -14,10 +14,12 @@ import {
   buildScanOrderBy,
   computeEffectiveOrder,
   decodePageToken,
+  parseCountValue,
   requestFingerprint,
   resolveFetchColumns,
   resolveProjection,
   safeInt,
+  whereClause,
 } from '../sql-text';
 import type { ReadTarget } from './catalog';
 import type { SqliteHandle } from './client';
@@ -104,7 +106,7 @@ export function readPage(
   const selectList = fetchColumns.map((c) => quoteIdent(c.name)).join(', ');
 
   const params: SqliteParam[] = [];
-  let whereSql = req.filter && req.filter.trim() !== '' ? `WHERE (${req.filter})` : '';
+  let whereSql = whereClause(req.filter);
 
   const fingerprint = requestFingerprint({
     path: target.qualifiedName,
@@ -187,16 +189,12 @@ export function countRows(
   filter: string | null,
 ): { value: number; exact: boolean } {
   const relationSql = `${quoteIdent(target.qualifiedName.schema)}.${quoteIdent(target.qualifiedName.table)}`;
-  const whereSql = filter && filter.trim() !== '' ? `WHERE (${filter})` : '';
-  const sql = [`SELECT count(*) AS n`, `FROM ${relationSql}`, whereSql].filter(Boolean).join('\n');
+  const sql = [`SELECT count(*) AS n`, `FROM ${relationSql}`, whereClause(filter)]
+    .filter(Boolean)
+    .join('\n');
 
   const rows = runQuery<unknown[]>(h, sql, [], ctx, { rowsAsArray: true, readBigInts: true });
-  const raw = rows[0]?.[0];
-  const value = typeof raw === 'bigint' ? Number(raw) : Number(raw);
-  if (!Number.isFinite(value)) {
-    throw new AdapterError('E_QUERY', `count returned a non-numeric result: ${String(raw)}`);
-  }
-  return { value, exact: true };
+  return { value: parseCountValue(rows[0]?.[0]), exact: true };
 }
 
 // D3/D21: the value->text codec. Switches on the *value's* own JS type, never the column's

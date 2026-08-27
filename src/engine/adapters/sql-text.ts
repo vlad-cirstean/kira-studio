@@ -116,6 +116,23 @@ export function safeInt(value: number, label: string): number {
   return value;
 }
 
+// P48 F24: `WHERE (<filter>)` or '' — always parenthesised (§5b step 4), so a keyset predicate
+// joined by a bare AND never silently changes the user's own filter's meaning (an unparenthesised
+// `a = 1 OR b = 2` would). Byte-identical across postgres/mysql-family/sqlite/clickhouse's read.ts.
+export function whereClause(filter: string | null): string {
+  return filter && filter.trim() !== '' ? `WHERE (${filter})` : '';
+}
+
+// P48 F24: count(*)'s scalar, with the shared non-numeric refusal — identical modulo the relation
+// name and the driver call across all four SQL adapters' countRows.
+export function parseCountValue(raw: unknown): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new AdapterError('E_QUERY', `count returned a non-numeric result: ${String(raw)}`);
+  }
+  return value;
+}
+
 // P39 iter2 F13: character-for-character the same in clickhouse/mysql-family/postgres/sqlite's
 // definition.ts — nothing in it is dialect-shaped, a `;` terminates a statement in every SQL
 // dialect this app speaks.
