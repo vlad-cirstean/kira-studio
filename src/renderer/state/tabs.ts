@@ -639,5 +639,3 @@ export function findStreamTab(id: string): StreamTabRecord | null {
 export function findBrowseTab(id: string): BrowseTabRecord | null {
   return asBrowseTab(tabsState.tabs.find((t) => t.id === id));
 }
-
-export const activeDataTab = computed<DataTabRecord | null>(() => asDataTab(activeTab.value));

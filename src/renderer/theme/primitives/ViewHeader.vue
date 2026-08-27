@@ -5,10 +5,10 @@ import CodiconIcon from '../CodiconIcon.vue';
 import { connColorVar } from '../connColor';
 import EngineIcon from '../EngineIcon.vue';
 
-// P16 design system: "every non-grid view opens with this" 28px identity band — a connection
-// dot, an icon, a target (optional dimmed path prefix + name), then badges, then a trailing
-// slot pushed to the right. The grid (Main.html) has no view-head; it opens straight on its
-// toolbar, so DataView.vue doesn't use this component.
+// P16 design system: "every view opens with this" 28px identity band — a connection dot, an
+// icon, a target (optional dimmed path prefix + name), then badges, then a trailing slot pushed
+// to the right. P48 F1: the grid (Main.html) hand-rolled this itself until DataView.vue joined
+// every other view as a ViewChrome consumer.
 const props = defineProps<{
   icon: string;
   iconColor?: string;

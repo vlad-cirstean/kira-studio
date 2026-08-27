@@ -529,6 +529,11 @@ onUnmounted(() => {
           />
         </div>
 
+        <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
+             (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
+             leading sep. -->
+        <div class="sep" />
+
         <SegmentedControl
           :model-value="tab.state.pageSize"
           :options="PAGE_SIZE_OPTIONS"

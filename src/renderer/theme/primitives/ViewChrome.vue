@@ -27,6 +27,12 @@ const props = defineProps<{
   nameTestid?: string;
   refreshTestid?: string;
   stopTestid?: string;
+  // P48 D8: the grid's own `data-testid="data-toolbar"`/`"filter-toolbar"` (pre-dating this
+  // component) survive on the bands themselves rather than a nested `.p-toolbar` the grid would
+  // otherwise have to keep — nesting `.p-toolbar` inside `.p-toolbar` doubles the band height and
+  // border.
+  toolbarTestid?: string;
+  toolbar2Testid?: string;
 }>();
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
@@ -54,7 +60,7 @@ const runState = useRunState(() => props.tab.id);
   </ViewHeader>
 
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connection?.color) }" />
-  <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }">
+  <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }" :data-testid="toolbarTestid">
     <div class="group">
       <IconButton icon="refresh" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
       <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
@@ -81,7 +87,7 @@ const runState = useRunState(() => props.tab.id);
          controls to its left (see docs/design/kira-design-system LAW 12). -->
     <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
   </div>
-  <div v-if="$slots['toolbar-2']" class="p-toolbar last">
+  <div v-if="$slots['toolbar-2']" class="p-toolbar last" :data-testid="toolbar2Testid">
     <slot name="toolbar-2" />
   </div>
 

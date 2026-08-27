@@ -1,68 +1,50 @@
 <script setup lang="ts">
-import type { PageSize } from '@shared/domain/tabs';
+import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { useRunState } from '../../state/runState';
-import { activeDataTab } from '../../state/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import RunState from '../../theme/primitives/RunState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
-import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { getPage } from './page';
-import {
-  addInsertRow,
-  commitPending,
-  discardInsertRow,
-  discardPending,
-  hasPending,
-  pendingFor,
-  toggleDelete,
-} from './pendingChanges';
+import { addInsertRow, discardInsertRow, pendingFor, toggleDelete } from './pendingChanges';
 import {
   goFirst,
   goLast,
   goNext,
   goPrev,
   goToPage,
-  reload,
-  reloadAfterMutation,
   runCount,
   runtime,
-  setActionError,
   setPageSize,
-  stop,
   toggleSearchOpen,
 } from './state';
 
-// Item 4 (regression pass, task batch P46-2): this toolbar's own Refresh must behave like the
-// Reconnect & load button when the active tab sits behind that gate (DataView.vue is the one view
-// whose toolbar was never swapped out for the gate, D9's own precedent for every other view) —
-// DataView.vue owns the useConnectionGate() call (it needs `tab` non-null, this component reads
-// the nullable activeDataTab instead) and hands the two pieces this needs down as plain props.
-const props = defineProps<{ needsReconnect: boolean }>();
-const emit = defineEmits<{ reconnect: [] }>();
+// P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
+// nullable, globally-computed activeDataTab — this component only ever renders while its tab is
+// the active one (DataView.vue's own v-else-if chain), so the two agreed in practice, but the
+// nullable-tab plumbing this used to need (fourteen `if (!tab.value) return` guards) existed only
+// because of the divergence, not a real case.
+const props = defineProps<{ tab: DataTabRecord }>();
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('');
 
-const tab = computed(() => activeDataTab.value);
-const rt = computed(() => (tab.value ? runtime[tab.value.id] : undefined));
+const rt = computed(() => runtime[props.tab.id]);
 
 const caps = computed(() => {
-  const connectionId = tab.value?.connectionId;
+  const connectionId = props.tab.connectionId;
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
 
-// The 5 mutation buttons (add/delete/preview/commit/discard) are gated on writability alone —
-// never on whether the table has a primary key. A no-PK table still rejects at the per-cell
-// edit level (readOnlyReasonFor) and at the server (assertKeyIsPrimaryKey); gating the toolbar
-// too would just be a second, redundant guard.
+// The 4 mutation buttons (add/delete) are gated on writability alone — never on whether the table
+// has a primary key. A no-PK table still rejects at the per-cell edit level (readOnlyReasonFor)
+// and at the server (assertKeyIsPrimaryKey); gating the toolbar too would just be a second,
+// redundant guard.
 const isWritable = computed(
-  () => !!caps.value?.writable && !connectionRecord(tab.value?.connectionId)?.readOnly,
+  () => !!caps.value?.writable && !connectionRecord(props.tab.connectionId)?.readOnly,
 );
 
 // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
@@ -75,13 +57,7 @@ const deleteRowTooltip = computed(() => {
   return 'This connection does not support deleting rows';
 });
 
-const tabHasPending = computed(() => (tab.value ? hasPending(tab.value.id) : false));
-
-const previewOpen = ref(false);
-
-const runState = useRunState(() => tab.value?.id);
-
-const pageDisplay = computed(() => (tab.value ? tab.value.state.pageIndex + 1 : 1));
+const pageDisplay = computed(() => props.tab.state.pageIndex + 1);
 
 // A plain `:value="pageDisplay"` fights the user's typing: any unrelated reactive read this
 // component makes (rt.value's status/count/etc.) forces a re-render, and Vue reasserts the bound
@@ -94,48 +70,37 @@ watch(pageDisplay, (v) => {
 });
 const pageCount = computed(() => {
   const count = rt.value?.count;
-  const size = tab.value?.state.pageSize;
+  const size = props.tab.state.pageSize;
   if (!count || !size) return null;
   return Math.max(1, Math.ceil(count.value / size));
 });
 
-function onRefresh(): void {
-  if (!tab.value) return;
-  if (props.needsReconnect) {
-    emit('reconnect');
-    return;
-  }
-  void reload(tab.value.id);
-}
 function onFirst(): void {
-  if (tab.value) void goFirst(tab.value.id);
+  void goFirst(props.tab.id);
 }
 function onPrev(): void {
-  if (tab.value) void goPrev(tab.value.id);
+  void goPrev(props.tab.id);
 }
 function onNext(): void {
-  if (tab.value) void goNext(tab.value.id);
+  void goNext(props.tab.id);
 }
 function onLast(): void {
-  if (tab.value) void goLast(tab.value.id);
+  void goLast(props.tab.id);
 }
 function onCount(): void {
-  if (tab.value) void runCount(tab.value.id);
-}
-function onStop(): void {
-  if (tab.value) stop(tab.value.id);
+  void runCount(props.tab.id);
 }
 function onPageSize(size: PageSize): void {
-  if (tab.value) void setPageSize(tab.value.id, size);
+  void setPageSize(props.tab.id, size);
 }
 function onJump(e: Event): void {
   const value = Number((e.target as HTMLInputElement).value);
-  if (tab.value && Number.isFinite(value) && value >= 1) {
-    void goToPage(tab.value.id, value - 1);
+  if (Number.isFinite(value) && value >= 1) {
+    void goToPage(props.tab.id, value - 1);
   }
 }
 function onToggleSearch(): void {
-  if (tab.value) toggleSearchOpen(tab.value.id);
+  toggleSearchOpen(props.tab.id);
 }
 
 const columnsOpen = ref(false);
@@ -146,7 +111,7 @@ const columnsOpen = ref(false);
 const columnCountLabel = computed(() => {
   const total = rt.value?.meta?.columns.length;
   if (!total) return null;
-  const projection = tab.value?.state.projection;
+  const projection = props.tab.state.projection;
   return `${projection ? projection.length : total} / ${total}`;
 });
 
@@ -158,29 +123,17 @@ const columnCountLabel = computed(() => {
 // the exact numbers already live in the tooltip below (columnCountLabel), which is where every
 // other detail in this icon-only toolbar lives.
 const columnsIndicator = computed(() => {
-  const state = tab.value?.state;
-  if (!state) return false;
+  const state = props.tab.state;
   return state.projection !== null || state.columnOrder !== null;
 });
 
-// P16 design system's warn chip: "N rows edited" — the count is already tracked per-tab by
-// pendingChanges.ts (edits + deletes + inserts), just not summed anywhere for display yet.
-const pendingCount = computed(() => {
-  const t = tab.value;
-  const p = t ? pendingFor(t.id) : undefined;
-  if (!p) return 0;
-  return p.edits.size + p.deletes.size + p.inserts.length;
-});
-
 function onAddRow(): void {
-  const t = tab.value;
-  if (!t) return;
-  const p = getPage(t.id);
+  const p = getPage(props.tab.id);
   if (!p) return;
   // P36 D28: a generated column is never seeded — the server computes it, and an explicit NULL
   // for it would make the insert fail outright on an engine that enforces this (F18).
   addInsertRow(
-    t.id,
+    props.tab.id,
     p.columns.filter((c) => !c.generated).map((c) => c.name),
   );
 }
@@ -189,11 +142,10 @@ function onAddRow(): void {
 // pending-insert row (DataGrid.vue's synthetic row indices) — deleting one of those discards it
 // outright rather than staging a delete op that could never resolve to a real primary key.
 function onDeleteRow(): void {
-  const t = tab.value;
-  const r = t ? runtime[t.id] : undefined;
+  const r = runtime[props.tab.id];
   const sel = r?.selection;
-  if (!t || !sel) return;
-  const p = getPage(t.id);
+  if (!sel) return;
+  const p = getPage(props.tab.id);
   const rowCount = p?.rowCount ?? 0;
 
   let rows: number[];
@@ -205,229 +157,135 @@ function onDeleteRow(): void {
   } else return;
 
   const realRows = rows.filter((row) => row < rowCount);
-  if (realRows.length) toggleDelete(t.id, realRows);
+  if (realRows.length) toggleDelete(props.tab.id, realRows);
 
-  const inserts = pendingFor(t.id)?.inserts ?? [];
+  const inserts = pendingFor(props.tab.id)?.inserts ?? [];
   for (const row of rows.filter((row) => row >= rowCount)) {
     const insert = inserts[row - rowCount];
-    if (insert) discardInsertRow(t.id, insert.id);
+    if (insert) discardInsertRow(props.tab.id, insert.id);
   }
-}
-
-// P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
-// refusal) used to be an unhandled promise rejection — no try/catch here and no async-aware
-// @click. The staged set already survives a failure (clearPending only runs on success); what was
-// missing was telling the user why.
-async function onCommit(): Promise<void> {
-  const t = tab.value;
-  if (!t?.connectionId) return;
-  try {
-    await commitPending(t.connectionId, t.path, t.id);
-    setActionError(t.id, null);
-    await reloadAfterMutation(t.id);
-  } catch (err) {
-    setActionError(t.id, err instanceof Error ? err.message : String(err));
-  }
-}
-
-function onDiscard(): void {
-  const t = tab.value;
-  if (!t) return;
-  discardPending(t.id);
-  // P43 F5/D7: a discard resolves the very staging that a prior actionError was about — an error
-  // strip surviving it would be pointing at a change that no longer exists.
-  setActionError(t.id, null);
 }
 </script>
 
 <template>
-  <div v-if="tab" class="data-toolbar p-toolbar" data-testid="data-toolbar">
-    <!-- LAW 01/10: Refresh, then Stop (always present, greyed when idle). The run-state ring
-         itself moved to the very end of this toolbar (below) — never a bar across the top of the
-         view (DataView.vue), and never a control whose changing width reflows anything to its
-         left. -->
-    <div class="group">
-      <IconButton
-        icon="refresh"
-        v-tooltip="'Refresh'"
-        data-testid="toolbar-refresh"
-        :disabled="!!rt?.opId"
-        @click="onRefresh"
-      />
-      <IconButton
-        icon="debug-stop"
-        :class="{ 'is-live': !!rt?.opId }"
-        v-tooltip="'Stop'"
-        data-testid="toolbar-stop"
-        :disabled="!rt?.opId"
-        @click="onStop"
-      />
-    </div>
+  <!-- LAW 01/10: ViewChrome's own Refresh/Stop group renders ahead of this slot's content, so
+       the leading sep below matches every other view's #toolbar (KeyValueView.vue,
+       DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
+  <div class="sep" />
 
-    <div class="sep" />
+  <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
+       has no notion of "row 1–200" to display without the count query having already run). -->
+  <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
+    <IconButton
+      icon="chevron-left"
+      v-tooltip="'First page'"
+      data-testid="pager-first"
+      :disabled="tab.state.pageIndex === 0"
+      @click="onFirst"
+    />
+    <IconButton
+      icon="chevron-left"
+      v-tooltip="'Previous page'"
+      data-testid="pager-prev"
+      :disabled="tab.state.pageIndex === 0"
+      @click="onPrev"
+    />
+    <span class="page-label p-sm muted">
+      page
+      <div class="page-input">
+        <TextField
+          v-model="pageInputValue"
+          type="number"
+          min="1"
+          hide-stepper
+          data-testid="pager-page-input"
+          @change="onJump"
+        />
+      </div>
+      <template v-if="pageCount"> of {{ pageCount }}</template>
+    </span>
+    <IconButton
+      icon="chevron-right"
+      v-tooltip="'Next page'"
+      data-testid="pager-next"
+      :disabled="!rt?.hasMore"
+      @click="onNext"
+    />
+    <IconButton
+      icon="chevron-right"
+      v-tooltip="pageCount ? 'Last page' : 'Count rows first'"
+      data-testid="pager-last"
+      :disabled="!pageCount"
+      @click="onLast"
+    />
+  </div>
 
-    <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
-         has no notion of "row 1–200" to display without the count query having already run). -->
-    <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
-      <IconButton
-        icon="chevron-left"
-        v-tooltip="'First page'"
-        data-testid="pager-first"
-        :disabled="tab.state.pageIndex === 0"
-        @click="onFirst"
-      />
-      <IconButton
-        icon="chevron-left"
-        v-tooltip="'Previous page'"
-        data-testid="pager-prev"
-        :disabled="tab.state.pageIndex === 0"
-        @click="onPrev"
-      />
-      <span class="page-label p-sm muted">
-        page
-        <div class="page-input">
-          <TextField
-            v-model="pageInputValue"
-            type="number"
-            min="1"
-            hide-stepper
-            data-testid="pager-page-input"
-            @change="onJump"
-          />
-        </div>
-        <template v-if="pageCount"> of {{ pageCount }}</template>
-      </span>
-      <IconButton
-        icon="chevron-right"
-        v-tooltip="'Next page'"
-        data-testid="pager-next"
-        :disabled="!rt?.hasMore"
-        @click="onNext"
-      />
-      <IconButton
-        icon="chevron-right"
-        v-tooltip="pageCount ? 'Last page' : 'Count rows first'"
-        data-testid="pager-last"
-        :disabled="!pageCount"
-        @click="onLast"
-      />
-    </div>
+  <SegmentedControl
+    :model-value="tab.state.pageSize"
+    :options="PAGE_SIZE_OPTIONS"
+    data-testid="page-size-picker"
+    @update:model-value="onPageSize"
+  />
 
-    <SegmentedControl
-      :model-value="tab.state.pageSize"
-      :options="PAGE_SIZE_OPTIONS"
-      data-testid="page-size-picker"
-      @update:model-value="onPageSize"
+  <div class="sep" />
+
+  <div class="group">
+    <IconButton
+      icon="symbol-number"
+      data-testid="toolbar-count"
+      :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
+      v-tooltip="
+        rt?.count
+          ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
+          : 'Count all rows'
+      "
+      @click="onCount"
     />
 
-    <div class="sep" />
-
-    <div class="group">
+    <div class="columns-anchor">
       <IconButton
-        icon="symbol-number"
-        data-testid="toolbar-count"
-        :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
-        v-tooltip="
-          rt?.count
-            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
-            : 'Count all rows'
-        "
-        @click="onCount"
+        icon="list-selection"
+        data-testid="toolbar-columns"
+        :indicator="columnsIndicator"
+        :active="columnsOpen"
+        v-tooltip="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
+        @click="columnsOpen = !columnsOpen"
       />
-
-      <div class="columns-anchor">
-        <IconButton
-          icon="list-selection"
-          data-testid="toolbar-columns"
-          :indicator="columnsIndicator"
-          :active="columnsOpen"
-          v-tooltip="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
-          @click="columnsOpen = !columnsOpen"
-        />
-        <ColumnsMenu
-          v-if="columnsOpen"
-          :tab-id="tab.id"
-          :caps="caps"
-          @close="columnsOpen = false"
-        />
-      </div>
+      <ColumnsMenu v-if="columnsOpen" :tab-id="tab.id" :caps="caps" @close="columnsOpen = false" />
     </div>
+  </div>
 
-    <div class="sep" />
+  <div class="sep" />
 
-    <div class="group">
-      <IconButton
-        icon="add"
-        data-testid="toolbar-add-row"
-        :disabled="!isWritable"
-        v-tooltip="isWritable ? 'Add a row' : 'Connection is read-only'"
-        @click="onAddRow"
-      />
-      <IconButton
-        icon="trash"
-        data-testid="toolbar-delete-row"
-        :disabled="!canDeleteRows"
-        v-tooltip="deleteRowTooltip"
-        @click="onDeleteRow"
-      />
-      <IconButton
-        icon="search"
-        :active="!!rt?.searchOpen"
-        v-tooltip="'Search this page'"
-        data-testid="toolbar-search"
-        @click="onToggleSearch"
-      />
-    </div>
-
-    <span class="p-push" />
-
-    <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
-         accent-filled control on the whole screen. The preview-command eye sits in this same
-         group (only ever relevant while there is something pending to preview) rather than off
-         in the count/columns group above. -->
-    <div v-if="tabHasPending" class="group">
-      <span class="p-chip warn">{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span>
-      <div class="preview-anchor">
-        <IconButton
-          icon="eye"
-          data-testid="toolbar-preview-command"
-          :disabled="!isWritable"
-          v-tooltip="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
-          @click="previewOpen = !previewOpen"
-        />
-        <PreviewCommandPanel v-if="previewOpen && tab" :tab-id="tab.id" @close="previewOpen = false" />
-      </div>
-      <IconButton
-        icon="discard"
-        data-testid="toolbar-discard-changes"
-        :disabled="!isWritable"
-        v-tooltip="'Discard pending changes'"
-        @click="onDiscard"
-      />
-      <IconButton
-        icon="save"
-        tone="primary"
-        data-testid="toolbar-commit-changes"
-        :disabled="!isWritable"
-        v-tooltip="'Commit pending changes'"
-        @click="onCommit"
-      />
-    </div>
-
-    <!-- The shared RunState primitive (LAW 12), same component/host every other view's toolbar
-         ends with (ViewChrome.vue) — sitting after the unconditional p-push above means its
-         growing/shrinking label can never reflow the pager/page-size/count/columns controls to
-         its left (the bug this fixes — see DataView.vue's own note on this LAW). Driven by
-         opsState via useRunState, same as every ViewChrome-hosted view, so it now shows the
-         query's real elapsed time instead of the literal words "fetching…"/"query failed". -->
-    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
+  <div class="group">
+    <IconButton
+      icon="add"
+      data-testid="toolbar-add-row"
+      :disabled="!isWritable"
+      v-tooltip="isWritable ? 'Add a row' : 'Connection is read-only'"
+      @click="onAddRow"
+    />
+    <IconButton
+      icon="trash"
+      data-testid="toolbar-delete-row"
+      :disabled="!canDeleteRows"
+      v-tooltip="deleteRowTooltip"
+      @click="onDeleteRow"
+    />
+    <IconButton
+      icon="search"
+      :active="!!rt?.searchOpen"
+      v-tooltip="'Search this page'"
+      data-testid="toolbar-search"
+      @click="onToggleSearch"
+    />
   </div>
 </template>
 
 <style scoped>
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
-   p-seg, p-input, p-chip, p-count, p-run-state) — only the bits those primitives don't cover
-   (the pager's own layout, the page-jump input's width, live/stale colour states) live here. */
+   p-seg, p-input, p-chip, p-count) — only the bits those primitives don't cover (the pager's own
+   layout, the page-jump input's width, live/stale colour states) live here. */
 
 .pager {
   gap: var(--kira-s-1);
@@ -457,8 +315,7 @@ function onDiscard(): void {
   text-align: center;
 }
 
-.columns-anchor,
-.preview-anchor {
+.columns-anchor {
   position: relative;
 }
 </style>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
 import type { DocumentTabRecord, PageSize } from '@shared/domain/tabs';
-import { decodePath, pathTail } from '@shared/domain/tree';
+import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
@@ -38,6 +38,7 @@ import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
+import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
@@ -135,16 +136,7 @@ const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--k
 
 // The view-head's breadcrumb prefix ("connection / database / "): derived from the already
 // loaded connection record and the tab's own path, purely for display — no new state.
-const pathPrefix = computed(() => {
-  const connectionId = props.tab.connectionId;
-  if (!connectionId) return '';
-  const connectionName = connectionRecord(connectionId)?.name;
-  const segments = decodePath(connectionId, props.tab.path).segments;
-  const parts = [connectionName, ...segments.slice(0, -1).map((s) => s.name)].filter(
-    (p): p is string => !!p,
-  );
-  return parts.length ? `${parts.join(' / ')} / ` : '';
-});
+const pathPrefix = computed(() => ancestorPathPrefix(props.tab.connectionId, props.tab.path));
 
 const searchText = ref(props.tab.state.search);
 
