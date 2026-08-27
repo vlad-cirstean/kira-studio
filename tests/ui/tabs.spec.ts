@@ -187,12 +187,14 @@ test('tabs — independent state, context menu, colours, session restore', async
   await expect(page.locator('[data-testid="tab-strip-empty"]')).toBeVisible();
   await expect(page.locator('[data-testid="main-view"]')).toContainText('Kira Studio');
 
-  // --- colours: the tab and toolbar band both carry the connection colour token -----------
+  // --- colours: the tab and toolbar rail both carry the connection colour token -----------
+  // P16's ViewChrome extraction (1cb84bb) renamed the tinted band to `.p-toolbar-rail` — this
+  // assertion still targeted the pre-P16 `.toolbar-band` class and so never matched anything.
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   const tab = page.locator('[data-testid="tab"]');
   await expect(tab).toHaveAttribute('data-color', 'blue');
   await expect(tab).toHaveAttribute('style', /--kira-conn-blue/);
-  await expect(page.locator('.toolbar-band')).toHaveAttribute('style', /--kira-conn-blue/);
+  await expect(page.locator('.p-toolbar-rail')).toHaveAttribute('style', /--kira-conn-blue/);
 
   await openRowMenu(page, '');
   await page.hover('[data-testid="menu-item-color"]');
@@ -200,7 +202,7 @@ test('tabs — independent state, context menu, colours, session restore', async
   await page.click('[data-testid="menu-item-color-magenta"]');
   await expect(tab).toHaveAttribute('data-color', 'magenta');
   await expect(tab).toHaveAttribute('style', /--kira-conn-magenta/);
-  await expect(page.locator('.toolbar-band')).toHaveAttribute('style', /--kira-conn-magenta/);
+  await expect(page.locator('.p-toolbar-rail')).toHaveAttribute('style', /--kira-conn-magenta/);
 
   // --- session restore: three tabs across two connections ---------------------------------
   // tab A already open on connection 1 (order_items, from the colours step above). Add a

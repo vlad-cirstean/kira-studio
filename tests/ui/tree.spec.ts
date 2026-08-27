@@ -530,6 +530,9 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   });
 
   // --- search: cached-only, matches + ancestors, incomplete note --------------------------
+  // 7bdfc32 hid the search box behind a toggle (ProjectPanel.vue's showSearch) — it no longer
+  // mounts, and data-testid="tree-search" no longer exists, until this reveals it.
+  await page.click('[data-testid="toggle-search"]');
   await page.fill('[data-testid="tree-search"]', 'order');
   await expect(page.locator('[data-testid="search-incomplete-note"]')).toBeVisible();
   await expect(await findRow(page, ORDER_ITEMS_PATH)).toBeVisible();
