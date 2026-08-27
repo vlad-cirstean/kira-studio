@@ -1,6 +1,6 @@
 {
   "name": "kira-studio",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "A visual database client for macOS, covering MariaDB, PostgreSQL, MongoDB, Redis, Kafka, SQS, and S3.",
   "author": "Vlad Cirstean",
   "license": "MIT",

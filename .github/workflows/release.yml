@@ -24,13 +24,17 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
 
-      - name: Verify tag matches package.json version
+      - name: Set package.json version from the release tag
         run: |
           set -eu
           TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(node -p "require('./package.json').version")"
-          [ "$TAG" = "$PKG" ] || {
-            echo "tag $GITHUB_REF_NAME does not match package.json version $PKG" >&2; exit 1; }
+          node -e "
+            const fs = require('node:fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.argv[1];
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          " "$TAG"
+          echo "package.json version set to $TAG (from tag $GITHUB_REF_NAME)"
 
       - run: bun run lint
       - run: bun run typecheck
