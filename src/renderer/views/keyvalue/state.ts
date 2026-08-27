@@ -19,6 +19,9 @@ export interface KeyValueViewRuntime {
   actionError: string | null;
   opId: string | null;
   count: { value: number; exact: boolean; stale: boolean } | null;
+  /** P48 F17/D15: the grid's own countOpId guard (P43 F7/D10), ported here — this view has no
+   *  filter to change, but Refresh carries the same late-response race. */
+  countOpId: string | null;
   rowCount: number;
   hasMore: boolean;
   nextToken: string | null;
@@ -33,6 +36,7 @@ function defaultRuntime(): KeyValueViewRuntime {
     actionError: null,
     opId: null,
     count: null,
+    countOpId: null,
     rowCount: 0,
     hasMore: false,
     nextToken: null,
@@ -124,14 +128,19 @@ export async function runCount(tabId: string): Promise<void> {
   const tab = findKeyValueTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
+  const opId = crypto.randomUUID();
+  rt.countOpId = opId;
   try {
     const response = await data.count({
-      opId: crypto.randomUUID(),
+      opId,
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
       filter: null,
     });
+    // A Refresh since this count started already stamped a newer countOpId — an answer to the
+    // previous request landing now would resurrect a stale total.
+    if (rt.countOpId !== opId) return;
     rt.count = { value: response.value, exact: response.exact, stale: response.stale };
   } catch {
     // Leave the previous count (if any) rather than blanking it on a failed refresh.

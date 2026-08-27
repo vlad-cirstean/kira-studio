@@ -23,6 +23,10 @@ export interface DocumentViewRuntime {
   actionError: string | null;
   opId: string | null;
   count: { value: number; exact: boolean; stale: boolean } | null;
+  /** P48 F17/D15: the grid's own countOpId guard (P43 F7/D10), ported here — a filter change
+   *  since this count started already cleared rt.count/countOpId (setSearch), and an answer to
+   *  the previous filter landing now would resurrect a total for the wrong query. */
+  countOpId: string | null;
   rowCount: number;
   hasMore: boolean;
   nextToken: string | null;
@@ -38,6 +42,7 @@ function defaultRuntime(): DocumentViewRuntime {
     actionError: null,
     opId: null,
     count: null,
+    countOpId: null,
     rowCount: 0,
     hasMore: false,
     nextToken: null,
@@ -115,14 +120,19 @@ export async function runCount(tabId: string): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
+  const opId = crypto.randomUUID();
+  rt.countOpId = opId;
   try {
     const response = await data.count({
-      opId: crypto.randomUUID(),
+      opId,
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
       filter: tab.state.search.trim() === '' ? null : tab.state.search,
     });
+    // A filter change since this count started already cleared rt.count/countOpId (setSearch) —
+    // an answer to the previous filter landing now would resurrect a total for the wrong query.
+    if (rt.countOpId !== opId) return;
     rt.count = { value: response.value, exact: response.exact, stale: response.stale };
   } catch {
     // Leave the previous count (if any) rather than blanking it on a failed refresh (estimate
@@ -209,7 +219,9 @@ export function setSearch(tabId: string, text: string): void {
   resetTokens(tabId);
   // P43 F7/D10: same reasoning as views/grid/state.ts's setFilter — a count taken under the
   // previous search text answers a different question, not a drifted answer to this one.
-  ensureRuntime(tabId).count = null;
+  const rt = ensureRuntime(tabId);
+  rt.count = null;
+  rt.countOpId = null;
   patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
   void load(tabId);
 }
