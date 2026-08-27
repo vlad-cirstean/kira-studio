@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { anchoredPosition } from '../anchoredPosition';
 
 // Shared chrome for every trigger-anchored popover/menu (ColumnsMenu, FilterHistoryMenu,
 // ConsoleSavedMenu, PreviewCommandPanel): a full-viewport transparent backdrop that closes the
@@ -48,32 +49,17 @@ function reposition(): void {
   const anchorEl = backdropEl.value?.parentElement;
   if (!anchorEl) return;
   const rect = anchorEl.getBoundingClientRect();
-  const gap = 4;
-  const naturalLeft = props.anchor === 'left' ? rect.left : rect.right - props.width;
-  // Same overflow risk as the vertical clamp below, just sideways: a `left`-anchored trigger near
-  // the right edge of a wide panel (the timestamp calendar button in particular) pushes a
-  // fixed-width popover straight past the window's right edge with nothing to stop it.
-  const maxLeft = Math.max(gap, window.innerWidth - gap - props.width);
-  const left = Math.min(Math.max(naturalLeft, gap), maxLeft);
-  const horiz = { left: `${left}px` };
-
   // Before the popover has ever rendered, popoverEl has no height to measure yet — reposition()
   // runs again once it does (see the nextTick call in onMounted below), so the first paint's
   // guess is corrected before the user can see it.
   const popoverHeight = popoverEl.value?.offsetHeight ?? 0;
-  const spaceBelow = window.innerHeight - rect.bottom - gap;
-  const spaceAbove = rect.top - gap;
-  const opensUpward = popoverHeight > spaceBelow && spaceAbove > spaceBelow;
-  const naturalTop = opensUpward ? rect.top - gap - popoverHeight : rect.bottom + gap;
-
-  // Neither side is guaranteed to actually have room for the popover's full height — the cell
-  // editor panel this anchors from is itself docked to the bottom of the window, so on a short
-  // window even the "better" of the two sides can still be too small. Clamp the result so the
-  // popover always stays fully on-screen instead of running off the top/bottom edge.
-  const maxTop = Math.max(gap, window.innerHeight - gap - popoverHeight);
-  const top = Math.min(Math.max(naturalTop, gap), maxTop);
-
-  popoverPosition.value = { top: `${top}px`, ...horiz };
+  const { left, top } = anchoredPosition(
+    rect,
+    { width: props.width, height: popoverHeight },
+    { width: window.innerWidth, height: window.innerHeight },
+    { align: props.anchor, strategy: 'menu' },
+  );
+  popoverPosition.value = { top: `${top}px`, left: `${left}px` };
 }
 
 // Browsers don't fire blur/focusout when the focused element is simply removed from the DOM —

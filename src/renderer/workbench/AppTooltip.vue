@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // P22 D4/D5: the app-owned tooltip singleton, mounted once beside <ContextMenu /> in App.vue.
-// Placement mirrors ErrorPopover.vue's own position() (F8) rather than a new positioning
-// dependency: below-left of the trigger, clamped into the viewport, flipped above on overflow.
+// Placement is theme/anchoredPosition.ts's default 'callout' strategy (P49 D12), the same one
+// ErrorPopover.vue uses: below-left of the trigger, clamped into the viewport, flipped above on
+// overflow.
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { anchoredPosition } from '../theme/anchoredPosition';
 import { getAnchorRect, tooltipState } from './state/tooltip';
 
 const tipRef = ref<HTMLElement | null>(null);
@@ -14,10 +16,10 @@ async function position(): Promise<void> {
   const anchor = getAnchorRect();
   if (!el || !anchor) return;
   const p = el.getBoundingClientRect();
-  let left = anchor.left;
-  let top = anchor.bottom + 4;
-  if (left + p.width > window.innerWidth) left = Math.max(4, window.innerWidth - p.width - 4);
-  if (top + p.height > window.innerHeight) top = Math.max(4, anchor.top - p.height - 4);
+  const { left, top } = anchoredPosition(anchor, p, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   style.value = { left: `${left}px`, top: `${top}px` };
 }
 

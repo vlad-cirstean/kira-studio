@@ -4,6 +4,7 @@
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
+import { anchoredPosition } from '../theme/anchoredPosition';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 
@@ -21,10 +22,10 @@ async function position(): Promise<void> {
   if (!trigger || !popover) return;
   const t = trigger.getBoundingClientRect();
   const p = popover.getBoundingClientRect();
-  let left = t.left;
-  let top = t.bottom + 4;
-  if (left + p.width > window.innerWidth) left = Math.max(4, window.innerWidth - p.width - 4);
-  if (top + p.height > window.innerHeight) top = Math.max(4, t.top - p.height - 4);
+  const { left, top } = anchoredPosition(t, p, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   style.value = { left: `${left}px`, top: `${top}px` };
 }
 
