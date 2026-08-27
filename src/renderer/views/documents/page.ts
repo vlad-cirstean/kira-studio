@@ -21,9 +21,9 @@ export interface DocumentRow {
 export function documentRow(tabId: string, row: number): DocumentRow | null {
   const page = getPage(tabId);
   if (!page || row < 0 || row >= page.rowCount) return null;
-  const id = store.cached(tabId, `id:${row}`, (decoder) => cellText(page.ids, row, decoder)) ?? '';
+  const id = store.cached(tabId, row, 'id', (decoder) => cellText(page.ids, row, decoder)) ?? '';
   const body =
-    store.cached(tabId, `body:${row}`, (decoder) => cellText(page.bodies, row, decoder)) ?? '';
+    store.cached(tabId, row, 'body', (decoder) => cellText(page.bodies, row, decoder)) ?? '';
   return { id, body, isTruncated: isTruncated(page.bodies, row) };
 }
 

@@ -22,15 +22,15 @@ export function streamRow(tabId: string, row: number): StreamRow | null {
   const page = getPage(tabId);
   if (!page || row < 0 || row >= page.rowCount) return null;
 
-  const cached = (key: string, chunk: Parameters<typeof cellText>[0]): string =>
-    store.cached(tabId, key, (decoder) => cellText(chunk, row, decoder)) ?? '';
+  const cached = (subKey: string, chunk: Parameters<typeof cellText>[0]): string =>
+    store.cached(tabId, row, subKey, (decoder) => cellText(chunk, row, decoder)) ?? '';
 
   return {
-    key: isNull(page.keys, row) ? null : cached(`key:${row}`, page.keys),
-    headers: cached(`headers:${row}`, page.headers),
-    attrs: cached(`attrs:${row}`, page.attrs),
-    timestamp: isNull(page.timestamps, row) ? null : cached(`timestamp:${row}`, page.timestamps),
-    body: cached(`body:${row}`, page.bodies),
+    key: isNull(page.keys, row) ? null : cached('key', page.keys),
+    headers: cached('headers', page.headers),
+    attrs: cached('attrs', page.attrs),
+    timestamp: isNull(page.timestamps, row) ? null : cached('timestamp', page.timestamps),
+    body: cached('body', page.bodies),
     isTruncated: isTruncated(page.bodies, row),
   };
 }

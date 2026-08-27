@@ -19,8 +19,8 @@ export function keyValueRow(tabId: string, row: number): KeyValueRow | null {
   const page = getPage(tabId);
   if (!page || row < 0 || row >= page.rowCount) return null;
   const field =
-    store.cached(tabId, `field:${row}`, (decoder) => cellText(page.fields, row, decoder)) ?? '';
+    store.cached(tabId, row, 'field', (decoder) => cellText(page.fields, row, decoder)) ?? '';
   const value =
-    store.cached(tabId, `value:${row}`, (decoder) => cellText(page.values, row, decoder)) ?? '';
+    store.cached(tabId, row, 'value', (decoder) => cellText(page.values, row, decoder)) ?? '';
   return { field, value, isTruncated: isTruncated(page.values, row) };
 }
