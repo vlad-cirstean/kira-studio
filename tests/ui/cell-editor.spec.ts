@@ -453,14 +453,18 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
+  // 44600e1: selectionTarget() now treats ANY genuine multi-cell range as having no single value
+  // to show — same-column shift-click included — the same as a row/column selection, rather than
+  // resolving to its focus end. Only a degenerate one-cell range (the click landing back on the
+  // already-selected cell) still counts as "one cell selected".
   await page.locator('[data-testid="grid-cell"][data-row="2"][data-column="sample"]').click({
     modifiers: ['Shift'],
   });
-  await expect(panel).toHaveAttribute('data-cell-key', `${tabId}:2:sample`);
+  await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
 
-  // A row selection carries no single cell to show — the panel now auto-hides entirely rather
-  // than staying mounted with a "no cell selected" placeholder (no more manual toggle to have
-  // pinned it open).
+  // A row selection carries no single cell to show either — the panel auto-hides entirely rather
+  // than staying mounted with a "no cell selected" placeholder (no manual toggle to have pinned it
+  // open).
   await page.locator('[data-testid="grid-gutter-cell"]').first().click();
   await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
 
