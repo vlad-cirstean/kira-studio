@@ -20,6 +20,7 @@
     "electron.vite.config.ts",
     "playwright.config.ts",
     "tests/ui/**/*.ts",
-    "tests/db/support/**/*.ts"
+    "tests/db/support/**/*.ts",
+    "tests/ipc/**/*.ts"
   ]
 }
