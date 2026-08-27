@@ -263,7 +263,9 @@ describe('postgres adapter (§9.1)', () => {
         makeCtx(),
       );
       const bigRows = appChildren.find((n) => n.name === 'big_rows');
-      expect(bigRows?.detail).toMatch(/^~[\d,]+ rows$/);
+      // Item 7: abbreviated (1M, not 1,000,000) — big_rows seeds ~1,000,000 rows, well past the
+      // 1000-row abbreviation floor (abbreviateCount, @shared/format).
+      expect(bigRows?.detail).toMatch(/^~[\d.]+[KMBT]? rows$/);
 
       const bigRowsMeta = await adapter.describe(
         path([

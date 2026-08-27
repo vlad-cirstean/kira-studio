@@ -38,7 +38,7 @@ import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
 import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import { rowMenu } from './menu';
@@ -76,6 +76,16 @@ import {
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
+
+// Item (regression pass, task batch P46-5): registered here, at setup's own top level, rather
+// than inside onMounted below (P42 D9's original placement) — Vue's first render already reads
+// `rows` (and so, transitively, this source) before onMounted ever fires, so registering it there
+// raced every remount: switching back to an already-loaded tab skipped load() (data was already
+// there), so nothing ever forced `rows` to recompute after the late registration landed, leaving
+// its first, empty-sourced result cached for good. A restored tab returning empty on reopen was
+// the reported symptom (never a fresh load — this only shows up once a tab is loaded and remounts
+// without reloading, so the fresh-open path this comment used to describe never hit it).
+registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
 const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -446,6 +456,10 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+function onRefresh(): void {
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+}
+
 function onExpandAll(): void {
   setAllExpanded(
     props.tab.id,
@@ -471,13 +485,14 @@ let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
   // P42 D9: this tab's own page.ts documentRow is where views/shared/document/rows.ts's
-  // functions resolve `props.tab.id` to actual rows — registered before load() so nothing ever
-  // reads through a missing source.
-  registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
+  // functions resolve `props.tab.id` to actual rows — now registered at setup's own top level
+  // (see the comment up there for why), not here.
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
-  unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
+  // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
+  // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
+  unregisterCommand = registerCommand('view.refresh', onRefresh);
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
@@ -490,14 +505,13 @@ onUnmounted(() => {
 
 <template>
   <div class="document-view" data-testid="document-view" :data-path="tab.path">
-    <ReconnectGate
-      v-if="needsReconnect"
-      container-testid="document-reconnect"
-      button-testid="document-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
+    <!-- Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
+         `false`, not `undefined` — ViewChrome.vue's own `:disabled="canRefresh === false"` made
+         omitting can-refresh here silently mean "always disabled", regardless of connection or
+         load state. Every other gated view already passes something explicit (BrowseView/
+         KeyValueView's own literal `true`, mirrored here) — this was the one view (Stream too,
+         same fix) that didn't, and so had a permanently-grey Refresh button the whole time. -->
     <ViewChrome
-      v-else
       :tab="tab"
       icon="json"
       :icon-color="iconColor"
@@ -506,8 +520,9 @@ onUnmounted(() => {
       target-testid="document-target"
       refresh-testid="document-refresh"
       stop-testid="document-stop"
+      :can-refresh="true"
       :can-stop="running"
-      @refresh="reload(tab.id)"
+      @refresh="onRefresh"
       @stop="onStop"
     >
       <template #badges>
@@ -661,6 +676,7 @@ onUnmounted(() => {
             placeholder="Filter (e.g. { name: 'a' })"
             data-testid="document-search"
             :candidates="filterCandidates"
+            language="mongo"
             @enter="onSearchInput"
             @blur="onSearchInput"
           />
@@ -673,6 +689,7 @@ onUnmounted(() => {
             v-tooltip="'Mongo sort document: 1 = ascending, -1 = descending'"
             data-testid="document-sort"
             :candidates="sortCandidates"
+            language="mongo"
             @enter="onSortInput"
             @blur="onSortInput"
           />
@@ -704,6 +721,17 @@ onUnmounted(() => {
         />
       </template>
 
+      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           the body — the part that actually needs a live connection — swaps for the gate. -->
+      <ReconnectGate
+        v-if="needsReconnect"
+        container-testid="document-reconnect"
+        button-testid="document-reconnect-load"
+        @reconnect="onReconnectAndLoad"
+      />
+      <template v-else>
       <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
         <CodeMirrorHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
         <div class="edit-actions">
@@ -864,6 +892,7 @@ onUnmounted(() => {
           </template>
         </VirtualList>
       </div>
+      </template>
     </ViewChrome>
   </div>
 </template>

@@ -274,7 +274,8 @@ describe('clickhouse adapter (§9.1, P36)', () => {
         makeCtx(),
       );
       const bigRows = dbChildren.find((n) => n.name === 'big_rows');
-      expect(bigRows?.detail).toBe('~1,000,000 rows');
+      // Item 7: abbreviated (1M, not 1,000,000) — abbreviateCount, @shared/format.
+      expect(bigRows?.detail).toBe('~1M rows');
 
       const bigRowsMeta = await adapter.describe(
         path([

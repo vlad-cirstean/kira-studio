@@ -227,16 +227,12 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(resultTabs1).toHaveCount(2);
   await expect(results1).toHaveCount(1);
   await expect(results1.first()).toContainText('20');
-  await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText(
-    '2 result sets',
-  );
+  await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText('2 results');
 
   // "Run all" appends both statements' results on top of the two chips already there.
   await page.click('[data-testid="console-run-all"]');
   await expect(resultTabs1).toHaveCount(4);
-  await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText(
-    '4 result sets',
-  );
+  await expect(consoleView1.locator('[data-testid="console-status"]')).toContainText('4 results');
   await expect(results1.first()).toContainText('10');
   await resultTabs1.nth(1).click();
   await expect(results1.first()).toContainText('20');
@@ -293,13 +289,17 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(restoredTab).toBeVisible();
   await restoredTab.click();
   const restoredView = relaunched.window.locator('[data-testid="console-view"]');
-  await expect(restoredView.locator('[data-testid="console-reconnect"]')).toBeVisible();
-  await expect(restoredView.locator('.cm-content')).toHaveCount(0);
+  // Item 2/4 (regression pass, task batch P46-3/4): the query text itself is real, already-typed
+  // SQL that doesn't need a live connection to display, so the editor is always visible — and the
+  // console has no separate "Reconnect & load" gate any more (item 4): Run/Run all reconnect a
+  // restored tab on demand, the same job the removed gate used to require a separate press for.
+  await expect(restoredView.locator('[data-testid="console-reconnect"]')).toHaveCount(0);
+  await expect(restoredView.locator('.cm-content')).toContainText('restore-check');
 
-  await relaunched.window.click('[data-testid="console-reconnect-load"]');
-  await expect(restoredView.locator('.cm-content')).toContainText('restore-check', {
-    timeout: 15_000,
-  });
+  await relaunched.window.click('[data-testid="console-run-statement"]');
+  const restoredResults = restoredView.locator('[data-testid="console-result-grid"]');
+  await expect(restoredResults).toHaveCount(1, { timeout: 15_000 });
+  await expect(restoredResults.first()).toContainText('restore-check');
 
   // --- scenario 7: undo/redo (P18 addendum D15) ---------------------------------------------
   // relaunch() above closed the original app/window (fixtures.ts's launch() calls

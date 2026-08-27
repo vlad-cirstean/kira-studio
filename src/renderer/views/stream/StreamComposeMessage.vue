@@ -5,6 +5,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import { produceKafkaMessage, publishRabbitMessage, sendSqsMessage } from './mutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
@@ -98,6 +99,7 @@ async function submit(): Promise<void> {
             rows="6"
             placeholder="Message body"
             data-testid="stream-add-message-body"
+            @keydown="wrapSelectionOnType"
           />
         </label>
 
@@ -109,6 +111,7 @@ async function submit(): Promise<void> {
             rows="3"
             placeholder='{"source": "manual"}'
             data-testid="stream-add-message-headers"
+            @keydown="wrapSelectionOnType"
           />
         </label>
 

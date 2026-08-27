@@ -21,11 +21,9 @@ export function mapError(err: unknown): AdapterError {
     return new AdapterError('E_AUTH', message, err);
   }
   // A bucket/object gone at read time (deleted concurrently, or a bad path typed by hand) is
-  // E_QUERY, not E_NOT_FOUND: every DISCONNECTED_CODES set (views/keyvalue/state.ts and friends)
-  // treats E_NOT_FOUND as "the connection itself is gone" and gates the tab behind a Reconnect
-  // prompt with no error shown — reconnecting re-reads the same missing key and gates again,
-  // silently and forever. sqs/errors.ts's own "a nonexistent queue is E_QUERY" precedent (see
-  // sqs.spec.ts) is the same call for the same reason.
+  // E_QUERY, not E_NOT_FOUND — a plain data-level condition against a connection that is still
+  // perfectly live, same as sqs/errors.ts's own "a nonexistent queue is E_QUERY" precedent (see
+  // sqs.spec.ts).
   const code = (err as { code?: string } | undefined)?.code;
   if (name === 'TimeoutError' || code === 'ETIMEDOUT') {
     return new AdapterError('E_TIMEOUT', message, err);

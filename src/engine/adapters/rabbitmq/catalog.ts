@@ -1,4 +1,5 @@
 import { encodePath, type TreeNode } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import type { OpCtx } from '../adapter';
 import type { RabbitHandle } from './client';
 import { request, requestAll } from './query';
@@ -53,7 +54,10 @@ export async function listVhosts(h: RabbitHandle, ctx: OpCtx): Promise<TreeNode[
 
 function queueDetail(row: QueueRow): string {
   const type = row.type ?? 'classic';
-  const messages = typeof row.messages === 'number' ? row.messages.toLocaleString() : '~';
+  // Item 7 (regression pass, task batch P46-2): same K/M/B/T abbreviation every other connection
+  // kind's tree count now uses — a busy queue's message count is exactly the "very long number"
+  // the user flagged, same as a redis DB's key count or a SQL table's row estimate.
+  const messages = typeof row.messages === 'number' ? abbreviateCount(row.messages) : '~';
   return `${messages} messages · ${type}`;
 }
 

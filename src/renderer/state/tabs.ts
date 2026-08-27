@@ -600,9 +600,10 @@ export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
 
-// A read that comes back E_NOT_FOUND/E_ENGINE_DOWN/E_CONNECT means the adapter is gone —
-// flip the tab back to the Reconnect & load affordance rather than showing a red error
-// (views/grid/state.ts's load()).
+// A read that comes back E_ENGINE_DOWN/E_CONNECT means the adapter is gone — flip the tab back
+// to the Reconnect & load affordance rather than showing a red error (views/grid/state.ts's
+// load()). Item 4 (P46-2): deliberately not E_NOT_FOUND — several adapters also throw that for an
+// ordinary query-time not-found against a still-live connection (viewOp.ts's own comment).
 export function unmarkHydrated(id: string): void {
   tabsState.hydrated.delete(id);
 }

@@ -15,7 +15,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
 import IndexesSection from './IndexesSection.vue';
@@ -37,7 +37,9 @@ const rt = computed(() => runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
 
 function onRefresh(): void {
-  void load(props.tab.id, { refresh: true });
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    load(props.tab.id, { refresh: true }),
+  );
 }
 
 // "Open query console" mirrors project/menus.ts's own consoleMenuItem: the tab's own connection
@@ -131,15 +133,7 @@ const breadcrumb = computed(() => {
     :data-source="rt?.source ?? ''"
     data-read-only-reason="definition-not-editable"
   >
-    <ReconnectGate
-      v-if="needsReconnect"
-      variant="default"
-      container-testid="definition-reconnect"
-      button-testid="definition-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
     <ViewChrome
-      v-else
       :tab="tab"
       icon="code"
       :path="breadcrumb"
@@ -219,6 +213,17 @@ const breadcrumb = computed(() => {
         </div>
       </template>
 
+      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           the body — the part that actually needs a live connection — swaps for the gate. -->
+      <ReconnectGate
+        v-if="needsReconnect"
+        container-testid="definition-reconnect"
+        button-testid="definition-reconnect-load"
+        @reconnect="onReconnectAndLoad"
+      />
+      <template v-else>
       <div v-if="pane === 'source'" class="editor-body">
         <CodeMirrorHost
           :doc="document"
@@ -252,6 +257,7 @@ const breadcrumb = computed(() => {
       </div>
       <!-- LAW — there is no editor status line: identity moved to the view header above,
            duration to the toolbar's run-state, and this tab has no pending edits to report. -->
+      </template>
     </ViewChrome>
   </div>
 </template>

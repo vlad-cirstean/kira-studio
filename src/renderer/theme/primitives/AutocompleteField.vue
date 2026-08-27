@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { EditorLanguageId } from '../../editor/languages';
+import type { SqlDialect } from '../../views/shared/sqlIdent';
 import CodiconIcon from '../CodiconIcon.vue';
+import { wrapSelectionOnType } from '../wrapSelection';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './completion';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
@@ -27,9 +31,22 @@ const props = withDefaults(
     prefix?: string;
     placeholder?: string;
     invalid?: boolean;
+    /** Item 2: a read-only CodeMirrorHost, stacked behind this field's own (still fully in
+     *  charge) `<input>`, painting the same text through the query console's own SQL/Mongo
+     *  grammar and colours (kiraHighlightStyle) — `undefined`/`'plain'` keeps today's unstyled
+     *  look. Never the interactive surface itself: switching this field over to CodeMirror
+     *  outright would trade its own hand-rolled completion popup for CodeMirror's, and — the
+     *  actual blocker — break every existing `locator.fill()` call across the SQL/Mongo engine
+     *  specs, which only works on a real `<input>`/`<textarea>`/`[contenteditable]` element, not a
+     *  wrapper div around one. */
+    language?: EditorLanguageId;
+    /** Only consulted when `language === 'sql'`, forwarded to CodeMirrorHost unchanged. */
+    sqlDialect?: SqlDialect;
   }>(),
   { candidates: () => [] },
 );
+
+const highlighted = computed(() => !!props.language && props.language !== 'plain');
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -131,6 +148,12 @@ function accept(completion: Completion): void {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  // Item 5: a bracket/quote typed over a selection wraps it (wrapSelection.ts) rather than
+  // running through the completion machinery below — onInput's own listener picks up the
+  // synthetic 'input' event this dispatches, same as any other edit.
+  const before = (e.target as HTMLInputElement).value;
+  wrapSelectionOnType(e);
+  if ((e.target as HTMLInputElement).value !== before) return;
   // Ctrl+Space / Cmd+Space: explicit "show me everything", matching completionKeymap's own
   // binding (docs/v1/plans/P18-autocomplete.md realities #8) so the console and these plain fields
   // share one muscle memory.
@@ -173,6 +196,18 @@ function onKeydown(e: KeyboardEvent): void {
   } else if (e.key === 'Escape') emit('escape');
 }
 
+// The overlay is `pointer-events: none` (purely paint, see the template) and never scrolls on its
+// own — it has no scrollbar and the user can never focus it to drag one. A native text `<input>`
+// fires its own 'scroll' event as its internal text pans to keep the caret in view once the value
+// overflows the box; mirroring that onto the overlay's `.cm-scroller` (still `overflow: hidden`,
+// which honours a programmatic scrollLeft same as any other overflow value) keeps the coloured
+// text panned to the exact same offset as the invisible real text sitting on top of it.
+const overlayRootRef = ref<HTMLElement | null>(null);
+function onInputScroll(e: Event): void {
+  const scroller = overlayRootRef.value?.querySelector<HTMLElement>('.cm-scroller');
+  if (scroller) scroller.scrollLeft = (e.target as HTMLInputElement).scrollLeft;
+}
+
 function onBlur(e: FocusEvent): void {
   // A click on a suggestion fires this blur first (mousedown steals focus before the click
   // handler runs) — closing here first would make the click land on nothing. The suggestion
@@ -208,24 +243,45 @@ onBeforeUnmount(() => {
     :class="{ 'is-invalid': invalid }"
   >
     <span v-if="prefix" class="ph">{{ prefix }}</span>
-    <input
-      ref="inputRef"
-      v-bind="$attrs"
-      :value="modelValue"
-      :placeholder="placeholder"
-      autocomplete="off"
-      spellcheck="false"
-      role="combobox"
-      aria-autocomplete="list"
-      :aria-expanded="open"
-      :aria-controls="listId"
-      :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
-      @input="onInput"
-      @click="onClick"
-      @keyup="onKeyup"
-      @keydown="onKeydown"
-      @blur="onBlur"
-    />
+    <span class="input-wrap">
+      <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
+           behind the real input rather than the input itself. `key` remounts it on a language
+           change (there are only ever two call sites today, each fixed to one language for its
+           whole lifetime, so this never actually fires — cheap insurance all the same). The
+           surrounding div (not the component itself) is what `overlayRootRef` needs to be an
+           actual DOM node `.querySelector` can walk — a `ref` on <CodeMirrorHost> would resolve to
+           its exposed `{ focus }` object instead (defineExpose), not its root element. -->
+      <div v-if="highlighted" ref="overlayRootRef" class="highlight-overlay" aria-hidden="true">
+        <CodeMirrorHost
+          :key="language"
+          :doc="modelValue"
+          :language="language ?? 'plain'"
+          :sql-dialect="sqlDialect"
+          :read-only="true"
+          single-line
+        />
+      </div>
+      <input
+        ref="inputRef"
+        v-bind="$attrs"
+        :value="modelValue"
+        :placeholder="placeholder"
+        :class="{ 'has-overlay': highlighted }"
+        autocomplete="off"
+        spellcheck="false"
+        role="combobox"
+        aria-autocomplete="list"
+        :aria-expanded="open"
+        :aria-controls="listId"
+        :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
+        @input="onInput"
+        @click="onClick"
+        @keyup="onKeyup"
+        @keydown="onKeydown"
+        @blur="onBlur"
+        @scroll="onInputScroll"
+      />
+    </span>
   </span>
   <ul
     v-if="open && filtered.length > 0"
@@ -255,6 +311,61 @@ onBeforeUnmount(() => {
 <style scoped>
 .autocomplete-field {
   position: relative;
+}
+
+.input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Paint-only and never scrolled by the user directly (see onInputScroll) — sized/positioned to
+   sit exactly under the real `<input>` next to it, not the whole `.p-input` box (which may also
+   carry a `prefix` span ahead of this wrapper). `kira-font-family` is a monospace stack
+   (tokens.css), so the overlay's character grid lines up with the native input's own
+   character-for-character regardless of which of the two engines is laying out any given glyph —
+   the one property this trick actually depends on. */
+.highlight-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* `.cm-editor` sizes to its one line of content (CodeMirrorHost's own singleLine CSS), not to
+     this inset:0 box — centering it here is what lines its text up with the native input's own
+     vertically-centered line box (`.input-wrap`'s own align-items: center) regardless of the
+     current font-size setting. */
+  display: flex;
+  align-items: center;
+}
+
+.highlight-overlay :deep(.cm-editor) {
+  width: 100%;
+  background: transparent !important;
+}
+
+.highlight-overlay :deep(.cm-scroller) {
+  font-family: var(--kira-font-family) !important;
+  font-size: var(--kira-t-sm) !important;
+  line-height: normal !important;
+  background: transparent !important;
+}
+
+.highlight-overlay :deep(.cm-content) {
+  caret-color: transparent;
+}
+
+/* The real input stays the only interactive/focusable/selectable element — its own text is
+   painted transparent so only the overlay's coloured glyphs underneath show through, while its
+   native caret (caret-color, unaffected by `color`) and selection painting keep working exactly
+   as before. Only applied when an overlay actually exists (`highlighted`) — every other field
+   using this component keeps today's plain look untouched. */
+.input-wrap input.has-overlay {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  caret-color: var(--kira-fg);
 }
 
 .autocomplete-suggestions {

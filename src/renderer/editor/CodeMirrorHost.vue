@@ -16,6 +16,7 @@ import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { ConsoleDiagnostic } from './diagnostics';
 import { type EditorLanguageId, languageExtension } from './languages';
 import { kiraEditorTheme, kiraHighlightStyle } from './theme';
+import { wrapSelectionOnType } from './wrapSelection';
 
 const props = defineProps<{
   doc: string;
@@ -35,6 +36,11 @@ const props = defineProps<{
    *  theming, so a caller (the console) never imports @codemirror/lint. Ignored (no linting) when
    *  absent, which every prior host stays. */
   lintSource?: (doc: string) => ConsoleDiagnostic[];
+  /** A one-line toolbar field's own syntax-highlighted overlay (AutocompleteField.vue) rather
+   *  than a document editor: no line-number gutter, no wrapping regardless of the appearance
+   *  setting (there is only ever one line to wrap), and the root sizes to that one line instead of
+   *  filling its container. */
+  singleLine?: boolean;
 }>();
 
 // Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
@@ -70,6 +76,7 @@ const wordWrapCompartment = new Compartment();
 // `true` (the unconditional behavior this replaces, F11), read fresh on every (re)configure
 // rather than captured once, same as the other four compartments' own resolve*() functions.
 function resolveWordWrap(): Extension[] {
+  if (props.singleLine) return [];
   return settingsState.appearance.wordWrap ? [EditorView.lineWrapping] : [];
 }
 
@@ -160,9 +167,15 @@ onMounted(() => {
   const state = EditorState.create({
     doc: props.doc,
     extensions: [
-      lineNumbers(),
+      ...(props.singleLine ? [] : [lineNumbers()]),
       highlightSpecialChars(),
       wordWrapCompartment.of(resolveWordWrap()),
+      // Item 5 (task batch P46-2): wrapSelection.ts's own doc comment covers why this is a custom,
+      // selection-only handler rather than @codemirror/autocomplete's closeBrackets(). Static (no
+      // prop toggles it, hence no compartment) — a read-only host sets EditorView.editable.of(false)
+      // below, so its DOM is never actually editable and no beforeinput event (this handler's only
+      // trigger) ever fires there; safe to include on every host regardless of `readOnly`.
+      wrapSelectionOnType,
       keymap.of(defaultKeymap),
       autocompleteCompartment.of(resolveAutocomplete()),
       lintCompartment.of(resolveLint()),
@@ -263,7 +276,7 @@ watch(
 </script>
 
 <template>
-  <div ref="rootRef" class="cm-host"></div>
+  <div ref="rootRef" class="cm-host" :class="{ 'cm-host--single-line': singleLine }"></div>
 </template>
 
 <style scoped>
@@ -275,5 +288,34 @@ watch(
 
 .cm-host :deep(.cm-editor) {
   height: 100%;
+}
+
+.cm-host--single-line,
+.cm-host--single-line :deep(.cm-editor) {
+  height: auto;
+}
+
+.cm-host--single-line :deep(.cm-scroller) {
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.cm-host--single-line :deep(.cm-content) {
+  padding: 0;
+}
+
+/* Item 2 regression (task batch P46-2): CodeMirror's base theme puts 6px of left/right padding
+   on .cm-line itself, independent of .cm-content's own padding above — zeroing only .cm-content
+   left this untouched, so AutocompleteField.vue's overlay painted every character ~6px (about one
+   monospace character at this font size) to the right of the real, invisible <input>'s own text
+   and caret. Looked like the colored text was permanently "one character behind" the actual
+   cursor as you typed. */
+.cm-host--single-line :deep(.cm-line) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.cm-host--single-line :deep(.cm-gutters) {
+  display: none;
 }
 </style>

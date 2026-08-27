@@ -1,21 +1,20 @@
 <script setup lang="ts">
-import CodiconIcon from '../CodiconIcon.vue';
 import AppButton from './AppButton.vue';
 
 // §8.4: a restored tab shows only this gate until pressed — nothing loads automatically. Every
-// data/stream/keyvalue/document/definition/console view opens on the same `.p-empty` + button shape
-// while `needsReconnect` holds; only the icon/label (StreamView alone shows both) and the
-// button's own testid/variant vary per view, which is why those are props rather than baked in.
+// data/stream/keyvalue/document/definition/console view opens on exactly the same `.p-empty` +
+// primary button shape while `needsReconnect` holds — item 4: this used to vary (StreamView alone
+// showed an icon and a "Not connected" label; DefinitionView alone downgraded the button to
+// `variant: 'default'`), which read as the gate looking different depending on which view you'd
+// landed on for no reason tied to the view itself. Only the button's own testid varies now, since
+// that's the one thing a caller genuinely needs to address independently.
 withDefaults(
   defineProps<{
-    icon?: string;
-    label?: string;
     buttonTestid: string;
     buttonLabel?: string;
     containerTestid: string;
-    variant?: 'default' | 'primary';
   }>(),
-  { buttonLabel: 'Reconnect & load', variant: 'primary' },
+  { buttonLabel: 'Reconnect & load' },
 );
 
 const emit = defineEmits<{ reconnect: [] }>();
@@ -23,14 +22,7 @@ const emit = defineEmits<{ reconnect: [] }>();
 
 <template>
   <div class="p-empty" :data-testid="containerTestid">
-    <CodiconIcon v-if="icon" :name="icon" :size="24" class="big" />
-    <span v-if="label" class="label">{{ label }}</span>
-    <AppButton
-      :variant="variant"
-      kind="dialog"
-      :data-testid="buttonTestid"
-      @click="emit('reconnect')"
-    >
+    <AppButton variant="primary" kind="dialog" :data-testid="buttonTestid" @click="emit('reconnect')">
       {{ buttonLabel }}
     </AppButton>
   </div>

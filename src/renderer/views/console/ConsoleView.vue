@@ -13,7 +13,6 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { wheelToHorizontal } from '../../wheelScroll';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
@@ -43,7 +42,7 @@ const props = defineProps<{ tab: ConsoleTabRecord }>();
 
 // A console tab hydrates without loading anything (there is nothing to load until a statement
 // runs), so no onLoad is passed.
-const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
+const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -119,16 +118,30 @@ watch(
   },
 );
 
+// Item 4 (regression pass, task batch P46-4): the console has no Refresh button — Run/Run all are
+// its own two start verbs (see the #toolbar comment above) — so they're what now carries the
+// gate's own job: pressing either on a restored/disconnected tab reconnects first, exactly what
+// the removed "Reconnect & load" gate used to require a separate press for.
+async function ensureConnectedForRun(): Promise<void> {
+  if (needsReconnect.value) await onReconnectAndLoad();
+}
+
 function runStatement(): void {
   const stmt = statementAtCursor(props.tab.state.text, cursorPos.value);
   if (!stmt) return;
-  void run(props.tab.id, [stmt.text]);
+  void (async () => {
+    await ensureConnectedForRun();
+    await run(props.tab.id, [stmt.text]);
+  })();
 }
 
 function runAll(): void {
   const statements = splitSqlStatements(props.tab.state.text).map((s) => s.text);
   if (statements.length === 0) return;
-  void run(props.tab.id, statements);
+  void (async () => {
+    await ensureConnectedForRun();
+    await run(props.tab.id, statements);
+  })();
 }
 
 function onStop(): void {
@@ -146,7 +159,23 @@ function onCloseSearch(): void {
   if (r) r.searchOpen = false;
 }
 
-const resultGridRef = ref<{ goToMatch: (match: Match) => void } | null>(null);
+const resultGridRef = ref<{
+  goToMatch: (match: Match) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+} | null>(null);
+// Item (regression pass, task batch P46-4): expand-all/collapse-all only make sense while the
+// active result is document-shaped (Mongo) — same getPage(key)?.kind check iconForResult below
+// already makes, just gating a different pair of buttons instead of an icon.
+const activeResultIsDocument = computed(
+  () => getPage(rt.value?.activeKey ?? '')?.kind === 'document',
+);
+function onExpandAllResults(): void {
+  resultGridRef.value?.expandAll();
+}
+function onCollapseAllResults(): void {
+  resultGridRef.value?.collapseAll();
+}
 function onGoToMatch(match: Match): void {
   resultGridRef.value?.goToMatch(match);
 }
@@ -220,7 +249,7 @@ const statusLine = computed(() => {
   if (r.status === 'running') return 'Running…';
   if (r.status === 'cancelled') return 'Cancelled';
   if (r.status === 'idle' && r.results.length > 0) {
-    return `${r.results.length} result set${r.results.length === 1 ? '' : 's'}`;
+    return `${r.results.length} result${r.results.length === 1 ? '' : 's'}`;
   }
   return '';
 });
@@ -228,28 +257,25 @@ const statusLine = computed(() => {
 
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
-    <ReconnectGate
-      v-if="needsReconnect"
-      container-testid="console-reconnect"
-      button-testid="console-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
     <ViewChrome
-      v-else
       :tab="tab"
       icon="terminal"
       :name="targetTail?.name ?? tab.path ?? 'Console'"
       target-testid="console-target"
+      refresh-testid="console-refresh"
       stop-testid="console-stop"
-      :can-refresh="false"
+      :can-refresh="needsReconnect"
       :can-stop="running"
+      @refresh="onReconnectAndLoad"
       @stop="onStop"
     >
       <!-- The console's search_path/schema control and the "writes go to production" chip from
            Console.html both need tracked data this app does not have yet (no per-console
-           schema, no per-connection write-warning flag) — skipped rather than faked. Refresh is
-           permanently disabled here (reserved slot, same as the definition view's Stop): Run/Run all are
-           the console's two start verbs, and neither one is "refresh". -->
+           schema, no per-connection write-warning flag) — skipped rather than faked. Refresh
+           itself still isn't a third start verb (Run/Run all cover that, and now reconnect on
+           their own — see runStatement/runAll above): it stays disabled whenever there's nothing
+           to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
+           permanently-grey button sitting in the rail for no reason a user can see. -->
       <template #toolbar>
         <AppButton
           icon="play"
@@ -322,6 +348,14 @@ const statusLine = computed(() => {
         </MessageStrip>
       </template>
 
+      <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
+           whole ViewChrome (header, toolbar and all) with the reconnect gate — item 4 fixed that
+           inconsistency for them, and the console never had a Refresh button to carry the same
+           reconnect-or-continue job, only Run/Run all (see runStatement/runAll above). With those
+           two now reconnecting on demand, the console's own separate "Reconnect & load" gate had
+           nothing left to gate — the editor already stayed visible behind it (item 2), and running
+           a restored tab's query now reconnects itself, so the button was just a second, redundant
+           way to do what pressing Run already does. Removed rather than kept as a no-op. -->
       <div class="editor-body">
         <CodeMirrorHost
           ref="editorHost"
@@ -342,37 +376,57 @@ const statusLine = computed(() => {
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <div
-          ref="resultStripRef"
-          class="result-strip p-toolbar"
-          data-testid="console-result-strip"
-          @wheel="onResultStripWheel"
-        >
-          <button
-            v-for="(result, i) in rt.results"
-            :key="result.key"
-            type="button"
-            class="p-tab result-tab"
-            :class="{ 'is-active': result.key === rt.activeKey }"
-            data-testid="console-result-tab"
-            :data-active="result.key === rt.activeKey"
-            @click="setActiveResult(tab.id, result.key)"
-            @auxclick.middle="onResultMiddleClick(result.key)"
-            @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
+        <div class="result-strip-row p-toolbar">
+          <div
+            ref="resultStripRef"
+            class="result-strip"
+            data-testid="console-result-strip"
+            @wheel="onResultStripWheel"
           >
-            <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
-            <span class="result-tab-title">Result {{ i + 1 }}</span>
-            <span
-              class="result-close"
-              role="button"
-              aria-label="Close result"
-              data-testid="console-result-close"
-              @click.stop="closeResult(tab.id, result.key)"
+            <button
+              v-for="(result, i) in rt.results"
+              :key="result.key"
+              type="button"
+              class="p-tab result-tab"
+              :class="{ 'is-active': result.key === rt.activeKey }"
+              data-testid="console-result-tab"
+              :data-active="result.key === rt.activeKey"
+              @click="setActiveResult(tab.id, result.key)"
+              @auxclick.middle="onResultMiddleClick(result.key)"
+              @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
             >
-              <CodiconIcon name="close" :size="11" />
-            </span>
-          </button>
+              <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
+              <span class="result-tab-title">Result {{ i + 1 }}</span>
+              <span
+                class="result-close"
+                role="button"
+                aria-label="Close result"
+                data-testid="console-result-close"
+                @click.stop="closeResult(tab.id, result.key)"
+              >
+                <CodiconIcon name="close" :size="11" />
+              </span>
+            </button>
+          </div>
           <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
+          <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
+               result — DocumentView.vue's own expand-all/collapse-all pair, needed here now that
+               a document row's only other way to reveal its full body (the cell editor dock) is
+               gone as a redundant second copy of this same DocumentTree (P42 D11). -->
+          <template v-if="activeResultIsDocument">
+            <IconButton
+              icon="expand-all"
+              v-tooltip="'Expand all'"
+              data-testid="console-expand-all"
+              @click="onExpandAllResults"
+            />
+            <IconButton
+              icon="collapse-all"
+              v-tooltip="'Collapse all'"
+              data-testid="console-collapse-all"
+              @click="onCollapseAllResults"
+            />
+          </template>
         </div>
         <SearchToolbar
           v-if="rt.searchOpen"
@@ -439,15 +493,33 @@ const statusLine = computed(() => {
 
 /* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
    TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
-   here. The trailing status text keeps data-testid="console-status": the "N result sets" /
-   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4).
+   here. The trailing status text keeps data-testid="console-status": the "N results" /
+   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4, wording
+   revised on the P46-2 regression pass — "result sets" read as a second, unrelated concept
+   sitting right next to a strip of chips already called "results" everywhere else in the UI).
    P42 D6: a step smaller than the app's primary tabs (--kira-h-sm/--kira-t-xs vs. --kira-h-md/
    --kira-t-sm) — the only way a secondary, in-panel strip actually reads as secondary — and
    scrollable under the wheel once new-result-by-default (D5) means a working session accumulates
    chips. No .p-tab-rail: every result set in one console belongs to the same connection, so a
-   colour rail here would carry no information the main tab strip's own rail doesn't already. */
-.result-strip {
+   colour rail here would carry no information the main tab strip's own rail doesn't already.
+   Item 6: the status text used to sit *inside* the same scrolling flex row as the chips
+   themselves, `.p-push`ed to the far end of that row's *content* — once enough chips
+   accumulated to overflow the strip, that end sat off past the visible edge, so the status text
+   (the running/result-count readout) scrolled out of view along with the chips that pushed past
+   it. Splitting the chips into their own scrollable child, sized to the *remaining* width by
+   `flex: 1; min-width: 0`, keeps `.result-strip-row` itself unscrolled and exactly toolbar-width —
+   `.p-push`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
+   scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
+.result-strip-row {
   gap: var(--kira-s-2);
+}
+
+.result-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }

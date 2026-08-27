@@ -28,7 +28,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { deleteSqsMessage } from './mutations';
 import { getPage, pageVersion, streamRow } from './page';
@@ -172,6 +172,10 @@ watch(
 
 function onStop(): void {
   stop(props.tab.id);
+}
+
+function onRefresh(): void {
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
 }
 
 function onPoll(): void {
@@ -447,7 +451,9 @@ onMounted(() => {
   if (!needsReconnect.value && !isBatch.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
-  unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
+  // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
+  // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
+  unregisterCommand = registerCommand('view.refresh', onRefresh);
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
@@ -459,16 +465,11 @@ onUnmounted(() => {
 
 <template>
   <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
-    <ReconnectGate
-      v-if="needsReconnect"
-      icon="debug-disconnect"
-      label="Not connected"
-      container-testid="stream-reconnect"
-      button-testid="stream-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
+    <!-- Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
+         `false`, not `undefined` — ViewChrome.vue's own `:disabled="canRefresh === false"` made
+         omitting can-refresh here silently mean "always disabled", regardless of connection or
+         load state (DocumentView.vue had the identical bug, same fix). -->
     <ViewChrome
-      v-else
       :tab="tab"
       icon="broadcast"
       :icon-color="iconColor"
@@ -477,8 +478,9 @@ onUnmounted(() => {
       name-testid="stream-target"
       refresh-testid="stream-refresh"
       stop-testid="stream-stop"
+      :can-refresh="true"
       :can-stop="running"
-      @refresh="reload(tab.id)"
+      @refresh="onRefresh"
       @stop="onStop"
     >
       <template #head-trailing>
@@ -721,6 +723,17 @@ onUnmounted(() => {
       />
       </template>
 
+      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           the body — the part that actually needs a live connection — swaps for the gate. -->
+      <ReconnectGate
+        v-if="needsReconnect"
+        container-testid="stream-reconnect"
+        button-testid="stream-reconnect-load"
+        @reconnect="onReconnectAndLoad"
+      />
+      <template v-else>
       <div class="list-body" data-testid="stream-list">
         <EmptyState
           v-if="isBatch && !rt?.polled"
@@ -864,6 +877,7 @@ onUnmounted(() => {
           </div>
         </template>
       </div>
+      </template>
     </ViewChrome>
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
   </div>

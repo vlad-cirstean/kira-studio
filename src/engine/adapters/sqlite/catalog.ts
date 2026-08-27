@@ -6,6 +6,7 @@ import {
   type IndexMeta,
   type TreeNode,
 } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import type { SqliteParam } from './query';
 
 // Every function takes an `exec` rather than a handle directly, so every catalog query is routed
@@ -120,7 +121,7 @@ export function listTablesAndViews(exec: QueryExecutor, schema: string): TreeNod
         ]),
         // P19 D5: every relation is a leaf — a table/view's columns live in the definition view.
         hasChildren: false,
-        detail: estimate !== null ? `~${estimate.toLocaleString()} rows` : undefined,
+        detail: estimate !== null ? `~${abbreviateCount(estimate)} rows` : undefined,
       };
     });
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue';
 import CodiconIcon from '../CodiconIcon.vue';
+import { wrapSelectionOnType } from '../wrapSelection';
 
 // P4. inheritAttrs is off because the one attribute every call site actually needs to land
 // correctly — data-testid — belongs on the real <input> a test drives, not on this wrapping
@@ -67,6 +68,7 @@ function stepBy(dir: 1 | -1): void {
       :value="modelValue"
       :placeholder="placeholder"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+      @keydown="wrapSelectionOnType"
       @keydown.enter="emit('enter')"
       @blur="emit('blur', $event)"
     />

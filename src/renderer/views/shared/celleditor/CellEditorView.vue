@@ -2,12 +2,14 @@
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../../../editor/CodeMirrorHost.vue';
+import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import type { EditorLanguageId } from '../../../editor/languages';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
 import { connectionRecord } from '../../../state/connections';
 import { type MenuItem, openContextMenu } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import { columnTypeColor } from '../../../theme/icons';
 import IconButton from '../../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
@@ -54,11 +56,22 @@ const isEmptyValue = computed(() => selectedCell.value.value === '');
 const isTruncatedValue = computed(() => selectedCell.value.truncated);
 
 // §5a: a NULL value runs no detector at all.
+//
+// Reads `detectionText` (declared below with the rest of `useEditBuffer` — a forward reference
+// safe here since this is a lazy computed, not eagerly evaluated) rather than the stored value:
+// auto-detection (and so validateFormat's "is my json broken" check below) used to be pinned to
+// whatever the *original* value looked like, so typing a syntax error into an already-valid JSON
+// cell was caught, but typing a fresh JSON/timestamp value into a plain-text or empty cell never
+// was — the auto format never moved off `text` no matter what you typed, since nothing here re-ran
+// against the keystrokes. `detectionText` mirrors the stored value on cell switch and the main
+// editor's own direct edits, exactly reproducing the old "detect against the value in hand"
+// behaviour but live — see its own declaration for why it deliberately does *not* mirror `doc`
+// itself (a translate pane's byte-level round-trip would otherwise fight its own pane).
 const detected = computed<FormatGuess[]>(() => {
   const c = selectedCell.value;
   if (c.value === null) return [];
   return detectFormat({
-    text: c.value,
+    text: detectionText.value,
     typeClass: c.column.typeClass,
     dataType: c.column.dataType,
     columnName: c.column.name,
@@ -133,6 +146,32 @@ const buffer = useEditBuffer({
 });
 const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
 
+// What `detected` above actually reads — deliberately a separate ref from `doc`, not an alias for
+// it, and deliberately not updated on every keystroke either. `doc` also receives byte-level
+// round-trip writes from the decoded-text pane (onDecodedInput) and TimestampPane, each re-encoding
+// a pane-managed value that is *already* known to be that exact format; re-running detection
+// against those intermediate encodings (or even the main editor's own direct edits, once a
+// translate-pane format is already in effect) risks the pane's own output falling out of its own
+// format mid-keystroke — base64's 20-char floor rejects plenty of genuinely valid short base64 —
+// which would hide the very pane the user is typing into. Once the effective format is one of
+// PINNED_FORMATS (hex/base64/the three timestamp encodings — every format with a translate pane),
+// it stays put for the rest of that cell's editing session, same as before this feature existed;
+// only the plain read-it-directly formats (text/json/xml/csv/sql, none of which own a pane) keep
+// re-detecting live, which is exactly the set item 1's ask cares about ("is my json broken").
+const PINNED_FORMATS = new Set<CellFormat>([
+  'hex',
+  'base64',
+  'iso8601',
+  'epochSeconds',
+  'epochMillis',
+]);
+const detectionText = ref(selectedCell.value.value ?? '');
+
+function onMainDocInput(text: string): void {
+  doc.value = text;
+  if (!PINNED_FORMATS.has(effectiveFormat.value)) detectionText.value = text;
+}
+
 let lastKey: string | null = null;
 let lastValue: string | null = null;
 
@@ -147,6 +186,7 @@ watch(
     lastKey = key;
     lastValue = c.value;
     buffer.reseed();
+    detectionText.value = c.value ?? '';
   },
   { immediate: true },
 );
@@ -269,6 +309,23 @@ const formatProblem = computed(() =>
     : validateFormat(effectiveFormat.value, doc.value, isTruncatedValue.value),
 );
 
+// Item 1 (regression pass, task batch P46-2): a red border on the format picker read as "the
+// format choice itself is wrong", which isn't the claim being made — the *value* doesn't parse as
+// whatever format is in effect. Squiggly-underlining the actual offending text is what every code
+// editor does for exactly this ("your JSON is broken, your timestamp is wrong"), and this app
+// already has the whole mechanism built for the console (CodeMirrorHost's `lintSource` prop,
+// @codemirror/lint under the hood) — reused as-is rather than inventing a second lint UI. A
+// validator with no offset (xml/csv/base64/hex/timestamp) underlines the whole value; one with an
+// offset (json/sql) underlines the single character it points at.
+function cellLintSource(): ConsoleDiagnostic[] {
+  const problem = formatProblem.value;
+  if (!problem) return [];
+  const text = doc.value;
+  const from = Math.min(problem.offset ?? 0, text.length);
+  const to = problem.offset === undefined ? text.length : Math.min(from + 1, text.length);
+  return [{ from, to: Math.max(to, from), severity: 'error', message: problem.message }];
+}
+
 // P42 D28: the trigger's own tooltip explains the effective format, the same map the picker's
 // own rows read (FORMAT_HELP) — one source, two surfaces, no way to drift.
 const formatHint = computed(() => FORMAT_HELP[effectiveFormat.value]);
@@ -336,6 +393,11 @@ const dataTypeHint = computed(
   () => typeDescription(selectedCell.value.column.dataType) ?? undefined,
 );
 
+// Item 3: the same numeric/boolean/datetime/json/array/uuid/string palette the Structure pane's
+// own Type column already colors its text by (columnTypeColor, theme/icons.ts) — one category
+// classifier for both surfaces rather than a second color scheme invented just for this badge.
+const dataTypeColor = computed(() => columnTypeColor(selectedCell.value.column.dataType));
+
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
 // "X (manual)" segment here would just repeat what's a few pixels to the right. A timestamp
@@ -378,7 +440,9 @@ const statusLine = computed(() => {
       :name="`${targetLabel} · row ${selectedCell.row + 1}`"
       target-testid="cell-editor-target"
     >
-      <span class="p-badge" v-tooltip="dataTypeHint">{{ selectedCell.column.dataType }}</span>
+      <span class="p-badge" v-tooltip="dataTypeHint" :style="{ color: dataTypeColor }">{{
+        selectedCell.column.dataType
+      }}</span>
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
@@ -387,10 +451,10 @@ const statusLine = computed(() => {
       }}</span>
       <span
         v-if="formatProblem"
-        class="p-chip warn"
+        class="p-chip err invalid-chip"
         data-testid="cell-editor-invalid"
         v-tooltip="formatProblem.message"
-        >invalid</span
+        >{{ formatProblem.message }}</span
       >
 
       <span class="format-group">
@@ -398,7 +462,6 @@ const statusLine = computed(() => {
           type="button"
           class="p-select bordered format-select"
           data-testid="cell-editor-format"
-          :class="{ 'is-invalid': !!formatProblem }"
           :disabled="isNullValue"
           v-tooltip="formatHint"
           @click="openFormatMenu"
@@ -481,7 +544,8 @@ const statusLine = computed(() => {
           :language="language"
           :sql-dialect="sqlDialect"
           :read-only="!isEditable"
-          @update:doc="doc = $event"
+          :lint-source="cellLintSource"
+          @update:doc="onMainDocInput"
         />
       </div>
 
@@ -569,8 +633,13 @@ const statusLine = computed(() => {
   cursor: default;
 }
 
-.format-select.is-invalid {
-  border-color: var(--kira-error);
+/* The message chip (formatProblem) truncates the same way status-badge does — the squiggly
+   underline in the editor below and this chip's own tooltip both carry the untruncated text. */
+.invalid-chip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .generate-anchor {

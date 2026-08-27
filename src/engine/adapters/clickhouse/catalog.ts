@@ -1,4 +1,5 @@
 import { type ColumnMeta, encodePath, type IndexMeta, type TreeNode } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import { AdapterError } from '../errors';
 import { unwrapType } from './read';
 
@@ -91,7 +92,7 @@ export async function listTablesAndViews(exec: QueryExecutor, schema: string): P
         ]),
         // P19 D5: every relation is a leaf — a table/view's columns live in describe()/definition().
         hasChildren: false,
-        detail: estimate !== null ? `~${estimate.toLocaleString()} rows` : undefined,
+        detail: estimate !== null ? `~${abbreviateCount(estimate)} rows` : undefined,
       };
     });
 }

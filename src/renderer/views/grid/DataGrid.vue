@@ -18,6 +18,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
   alignmentFor,
   columnOffsets,
@@ -718,6 +719,7 @@ function onCellDblClick(row: number, displayCol: number): void {
 // The input is a descendant of the grid's own keydown-handling container, so without stopping
 // propagation Enter/Escape would also fall through to onKeydown and move the selection.
 function onEditKeydown(e: KeyboardEvent): void {
+  wrapSelectionOnType(e);
   if (e.key === 'Enter') {
     e.preventDefault();
     commitEdit();
@@ -1731,6 +1733,7 @@ defineExpose({ scrollCellIntoView });
             class="cell-input"
             :value="insert.values[columnOrder[c]] ?? ''"
             @input="onInsertInput($event, insert.id, columnOrder[c])"
+            @keydown="wrapSelectionOnType"
           />
         </div>
       </div>

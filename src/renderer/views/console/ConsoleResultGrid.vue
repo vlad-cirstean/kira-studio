@@ -30,7 +30,7 @@ import {
   setVisibleWindow,
 } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
-import { isResultDocExpanded, toggleResultDocExpanded } from './state';
+import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
 
 // A lightweight, read-only sibling of DataGrid.vue (§8.14) — not a retrofit of it. A console
 // result has no pager, no sort, no pending-changes, no persisted column widths/order: every one
@@ -157,8 +157,20 @@ function onToggleDocExpanded(id: string): void {
   toggleResultDocExpanded(props.tabId, props.pageKey, id);
 }
 
-function docRowAt(row: number) {
-  return documentRow(props.pageKey, row) ?? { id: '', body: '', isTruncated: false };
+// Item (regression pass, task batch P46-4): DocumentView.vue's own expand-all/collapse-all pair,
+// exposed the same way goToMatch already is (ConsoleView.vue calls through this ref) — its
+// toolbar lives one level up since these two buttons only make sense while the active result is
+// document-shaped, a fact ConsoleView.vue's own getPage(activeKey) check decides, not this panel.
+function expandAll(): void {
+  setAllResultDocsExpanded(
+    props.tabId,
+    props.pageKey,
+    documentRows.value.map((v) => v.id),
+    true,
+  );
+}
+function collapseAll(): void {
+  setAllResultDocsExpanded(props.tabId, props.pageKey, [], false);
 }
 
 function kvRowAt(row: number) {
@@ -211,7 +223,7 @@ function goToMatch(match: Match): void {
   const index = rowIndices.value.indexOf(match.row);
   if (index >= 0) listRef.value?.scrollToIndex(index);
 }
-defineExpose({ goToMatch });
+defineExpose({ goToMatch, expandAll, collapseAll });
 
 function publish(selectedCell: Omit<SelectedCell, 'tabId' | 'connectionId' | 'path'>): void {
   publishSelectedCell({
@@ -241,32 +253,14 @@ function selectTabularCell(row: number, col: number): void {
   });
 }
 
-// A console document/key-value result has no ColumnDescriptor of its own (P8's DocumentPage/
-// KeyValuePage carry fixed semantic columns, not a caller projection) — built the same way
-// DocumentView.vue's own publisher does, so the cell editor's format detector still recognizes it
-// as JSON (P40 F11/D13: nothing here beautifies on seed — the cell editor gets the raw body text
-// exactly as stored, only syntax-highlighted, until Beautify is pressed). This is the *publish*
-// path only — what the row itself shows, once expanded, is the parsed DocumentTree (P42 D11),
-// not this same raw text.
+// Item (regression pass, task batch P46-4): a document row no longer publishes into the shared
+// cellSelection slot — the expanded DocumentTree right below it (P42 D11) already shows exactly
+// this same body, so the cell editor dock used to pop up and show it a second time for no reason
+// the real Mongo data tab's own DocumentView.vue doesn't (it has no cell editor at all). `selected`
+// still tracks the last-clicked row for its own highlight, the same convention DocumentView.vue's
+// rows use independent of any editor.
 function selectDocumentRow(row: number): void {
   selected.value = { row, col: 0 };
-  const doc = docRowAt(row);
-  const column: ColumnDescriptor = {
-    name: 'document',
-    dataType: 'document',
-    typeClass: 'json',
-    nullable: false,
-    isPrimaryKey: true,
-    generated: false,
-  };
-  publish({
-    columnIndex: 0,
-    column,
-    row,
-    value: doc.body,
-    truncated: doc.isTruncated,
-    hasPrimaryKey: true,
-  });
 }
 
 function selectKeyValueRow(row: number): void {

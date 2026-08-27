@@ -7,7 +7,17 @@ import { control } from '../../bridge/control';
 // disconnected branch additionally sets `status = 'idle'` before unmarkHydrated, for a reason its
 // own comment records) — classifyLoadError() returns a classification rather than performing the
 // reaction, so every caller keeps its own exact lines.
-const DISCONNECTED_CODES = new Set(['E_NOT_FOUND', 'E_ENGINE_DOWN', 'E_CONNECT']);
+//
+// Item 4 (task batch P46-2): E_NOT_FOUND used to sit in this set alongside E_ENGINE_DOWN, on the
+// theory that "not found" meant "the connection is gone". It doesn't — several adapters also throw
+// E_NOT_FOUND for an ordinary query-time condition against a perfectly live connection (an unknown
+// column in a stale projection/sort, a dropped table, a bad path segment), and reload()/reload-
+// after-refresh code paths were hitting exactly that, unmarking hydration and popping the
+// Reconnect & load gate over a table whose connection had never actually dropped. data.ts's/
+// control.ts's own "no active adapter" throw is the one true "connection is gone" signal, and now
+// carries E_ENGINE_DOWN, not E_NOT_FOUND, so this set no longer needs to (and must not) treat every
+// not-found as a disconnect.
+const DISCONNECTED_CODES = new Set(['E_ENGINE_DOWN', 'E_CONNECT']);
 
 export interface LoadFailure {
   kind: 'cancelled' | 'disconnected' | 'error';

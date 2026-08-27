@@ -1,4 +1,5 @@
 import { encodePath, type TreeNode } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import type { Redis } from 'ioredis';
 import type { OpCtx, TreeChildren } from '../adapter';
 import { AdapterError } from '../errors';
@@ -32,7 +33,11 @@ export async function listDatabases(primary: Redis): Promise<TreeNode[]> {
       // is navigated in a Browse tab (§8.18, gated on caps.keyBrowser), reached via
       // listNamespaceChildren below, which still enumerates it for that second, live caller.
       hasChildren: false,
-      detail: `${keys} key${keys === 1 ? '' : 's'}`,
+      // Item 7 (regression pass, task batch P46-2): the same K/M/B/T abbreviation the SQL-family
+      // adapters' own row-estimate detail uses — a redis DB's key count is exactly the kind of
+      // unbounded number that made that fix necessary, and the tree should read one way for it
+      // regardless of which connection kind produced it.
+      detail: `${abbreviateCount(keys)} key${keys === 1 ? '' : 's'}`,
     });
   }
   nodes.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));

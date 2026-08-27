@@ -43,8 +43,12 @@ export async function handleRead(
 
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    // The renderer turns this into the tab's Reconnect & load affordance.
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    // The renderer turns this into the tab's Reconnect & load affordance. E_ENGINE_DOWN
+    // specifically — not E_NOT_FOUND, which several adapters also throw for an ordinary
+    // query-time "not found" (unknown column, dropped table) that has nothing to do with the
+    // connection itself, and must not gate the tab behind Reconnect & load (viewOp.ts's
+    // DISCONNECTED_CODES).
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
 
   const path = decodePath(req.connectionId, req.path);
@@ -89,7 +93,7 @@ export async function handleCount(payload: unknown): Promise<CountResponse> {
 
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
 
   const path = decodePath(req.connectionId, req.path);
@@ -115,7 +119,7 @@ export async function handlePreview(payload: unknown): Promise<PreviewResponse> 
   const req: PreviewRequestWire = previewRequestWireSchema.parse(payload);
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
   const plan: MutationPlan = { path: decodePath(req.connectionId, req.path), ops: req.ops };
   return { statements: adapter.preview(plan) };
@@ -125,7 +129,7 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
   const req: MutateRequestWire = mutateRequestWireSchema.parse(payload);
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
 
   const path = decodePath(req.connectionId, req.path);
@@ -161,7 +165,7 @@ export async function handleObjectDownload(payload: unknown): Promise<ObjectDown
   const req: ObjectDownloadRequestWire = objectDownloadRequestWireSchema.parse(payload);
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
 
   const path = decodePath(req.connectionId, req.path);
@@ -180,7 +184,7 @@ export async function handleExecute(payload: unknown): Promise<ExecuteResponse> 
   const req: ExecuteRequestWire = executeRequestWireSchema.parse(payload);
   const adapter = getLiveAdapter(req.connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${req.connectionId} has no active adapter`);
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${req.connectionId} has no active adapter`);
   }
 
   const path = decodePath(req.connectionId, req.path);

@@ -26,7 +26,10 @@ const deps: AdapterDeps = {
 function requireAdapter(connectionId: string) {
   const adapter = getLiveAdapter(connectionId);
   if (!adapter) {
-    throw new AdapterError('E_NOT_FOUND', `connection ${connectionId} has no active adapter`);
+    // E_ENGINE_DOWN, not E_NOT_FOUND — see data.ts's handleRead's own comment: several adapters
+    // also throw E_NOT_FOUND for an ordinary query-time "not found" unrelated to the connection,
+    // and that must not gate the tab behind Reconnect & load (viewOp.ts's DISCONNECTED_CODES).
+    throw new AdapterError('E_ENGINE_DOWN', `connection ${connectionId} has no active adapter`);
   }
   return adapter;
 }

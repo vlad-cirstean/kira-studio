@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { wrapSelectionOnType } from '../theme/wrapSelection';
 import { closePalette, paletteCommands, paletteState } from './state';
 
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -33,6 +34,7 @@ function runAt(index: number): void {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  wrapSelectionOnType(e);
   if (e.key === 'Escape') {
     e.preventDefault();
     closePalette();

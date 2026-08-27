@@ -34,7 +34,7 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow, pageVersion } from './page';
@@ -527,6 +527,10 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+function onRefresh(): void {
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+}
+
 // "row(s)" doesn't fit a keyspace — these are keys/fields, not table rows — and cursor-based
 // pagination (the SCAN family) has no absolute "1-14 of 14" range to show, so this mirrors
 // DocumentView's own "N loaded / of ~ total" pattern instead of Main.html's literal range.
@@ -547,7 +551,9 @@ onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
-  unregisterCommand = registerCommand('view.refresh', () => void reload(props.tab.id));
+  // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
+  // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
+  unregisterCommand = registerCommand('view.refresh', onRefresh);
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
 
@@ -559,14 +565,7 @@ onUnmounted(() => {
 
 <template>
   <div class="keyvalue-view" data-testid="keyvalue-view" :data-path="tab.path">
-    <ReconnectGate
-      v-if="needsReconnect"
-      container-testid="keyvalue-reconnect"
-      button-testid="keyvalue-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
     <ViewChrome
-      v-else
       :tab="tab"
       :icon="page?.redisType === 'object' ? 'file' : 'key'"
       :icon-color="iconColor"
@@ -577,7 +576,7 @@ onUnmounted(() => {
       stop-testid="keyvalue-stop"
       :can-stop="running"
       :can-refresh="true"
-      @refresh="reload(tab.id)"
+      @refresh="onRefresh"
       @stop="onStop"
     >
       <template #badges>
@@ -800,6 +799,17 @@ onUnmounted(() => {
         </MessageStrip>
       </template>
 
+      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           the body — the part that actually needs a live connection — swaps for the gate. -->
+      <ReconnectGate
+        v-if="needsReconnect"
+        container-testid="keyvalue-reconnect"
+        button-testid="keyvalue-reconnect-load"
+        @reconnect="onReconnectAndLoad"
+      />
+      <template v-else>
       <SearchToolbar
         v-if="rt?.searchOpen"
         :tab-id="tab.id"
@@ -880,6 +890,7 @@ onUnmounted(() => {
           </template>
         </div>
       </div>
+      </template>
     </ViewChrome>
     <CellEditorDock :tab-id="tab.id" />
   </div>

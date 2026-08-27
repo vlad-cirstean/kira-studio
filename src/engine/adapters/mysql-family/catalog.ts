@@ -5,6 +5,7 @@ import {
   type IndexMeta,
   type TreeNode,
 } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 
 // Every function takes an `exec` rather than a `Connection` directly, so every catalog query is
 // routed through query.ts's runQuery — cancellable and command-logged like any other query.
@@ -73,7 +74,7 @@ export async function listTablesAndRoutines(
     // TABLE_ROWS is an InnoDB estimate and can be far off — a hint in the tree; Σ count all is
     // the exact answer.
     const detail =
-      kind === 'table' && estimate !== null ? `~${estimate.toLocaleString()} rows` : undefined;
+      kind === 'table' && estimate !== null ? `~${abbreviateCount(estimate)} rows` : undefined;
     return {
       kind,
       name: row.name,

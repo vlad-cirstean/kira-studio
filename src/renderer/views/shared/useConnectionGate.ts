@@ -42,3 +42,20 @@ export function useConnectionGate(
 
   return { connectionStatus, needsReconnect, onReconnectAndLoad };
 }
+
+// Item 4 (regression pass, task batch P46-2): every gated view's toolbar Refresh button used to
+// call its own plain reload unconditionally, including while the tab sat behind the Reconnect
+// gate — a doomed call against a connection nothing has reconnected yet, and no better than doing
+// nothing since the gate was already covering the body. Pressing Refresh on an unloaded tab should
+// do what a user actually means by it: reconnect and load, exactly what the gate's own button does.
+export function refreshOrReconnect(
+  needsReconnect: boolean,
+  onReconnectAndLoad: () => Promise<void>,
+  refresh: () => void | Promise<void>,
+): void {
+  if (needsReconnect) {
+    void onReconnectAndLoad();
+    return;
+  }
+  void refresh();
+}

@@ -6,6 +6,7 @@ import {
   type NodeKind,
   type TreeNode,
 } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import type { QueryResultRow } from 'pg';
 import { AdapterError } from '../errors';
 
@@ -105,7 +106,7 @@ export async function listRelationsAndFunctions(
     // Postgres uses -1 for "never analysed" — render nothing, never the raw -1.
     const detail =
       (kind === 'table' || kind === 'matview') && estimate !== null && estimate >= 0
-        ? `~${estimate.toLocaleString()} rows`
+        ? `~${abbreviateCount(estimate)} rows`
         : undefined;
     return {
       kind,

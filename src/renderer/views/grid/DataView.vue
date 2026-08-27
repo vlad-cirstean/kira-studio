@@ -10,7 +10,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewHeader from '../../theme/primitives/ViewHeader.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
@@ -92,7 +92,13 @@ onMounted(() => {
       const rt = runtime[props.tab.id];
       if (rt) rt.searchOpen = !rt.searchOpen;
     }),
-    registerCommand('view.refresh', () => void reload(props.tab.id)),
+    // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
+    // no-op while the tab sits behind the reconnect gate (same bug the toolbar's own Refresh
+    // button had, item 4's first pass) — the keyboard-shortcut/command-palette path needs the
+    // same reconnect-or-refresh semantics as the visible button, not a second, unguarded one.
+    registerCommand('view.refresh', () =>
+      refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id)),
+    ),
   ];
 });
 
@@ -145,7 +151,7 @@ function onCloseSearch(): void {
          inside the view. -->
     <div class="toolbar-band" :style="railStyle">
       <div class="p-toolbar-rail" :style="railStyle" />
-      <DataToolbar />
+      <DataToolbar :needs-reconnect="needsReconnect" @reconnect="onReconnectAndLoad" />
       <FilterToolbar />
       <!-- Below the filter row, not floating over the grid it searches — the "docks at the
            bottom of the result" placement from Toolbars.html overlapped the last visible row,

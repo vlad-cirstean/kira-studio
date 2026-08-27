@@ -14,7 +14,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
-import { useConnectionGate } from '../shared/useConnectionGate';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { menuForNode } from './menu';
 import { ascend, descend, goToLevel, load, reload, runtime, selectRow, setFilter } from './state';
 
@@ -62,7 +62,7 @@ function onUp(): void {
 }
 
 function onReload(): void {
-  void reload(props.tab.id);
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
 }
 
 // D18: a plain substring filter over the loaded level, never a second server call.
@@ -131,14 +131,7 @@ onMounted(() => {
 
 <template>
   <div class="browse-view" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
-    <ReconnectGate
-      v-if="needsReconnect"
-      container-testid="browse-reconnect"
-      button-testid="browse-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
     <ViewChrome
-      v-else
       :tab="tab"
       :icon="headerIcon"
       :path="pathPrefix"
@@ -201,7 +194,17 @@ onMounted(() => {
         </MessageStrip>
       </template>
 
-      <div class="p-panel body-panel">
+      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           the body — the part that actually needs a live connection — swaps for the gate. -->
+      <ReconnectGate
+        v-if="needsReconnect"
+        container-testid="browse-reconnect"
+        button-testid="browse-reconnect-load"
+        @reconnect="onReconnectAndLoad"
+      />
+      <div v-else class="p-panel body-panel">
         <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
         <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
           No items

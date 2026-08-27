@@ -5,6 +5,7 @@ import { control } from '../../bridge/control';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import SavedListMenu from './SavedListMenu.vue';
 
 // Generic across every filter-bearing view (SQL's FilterToolbar.vue, Document's own filter row) —
@@ -202,6 +203,7 @@ async function saveCurrent(): Promise<void> {
           v-model="textPrompt.value"
           type="text"
           data-testid="text-prompt-input"
+          @keydown="wrapSelectionOnType"
           @keydown.enter="submitPrompt"
           @keydown.escape="cancelPrompt"
         />

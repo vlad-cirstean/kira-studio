@@ -36,6 +36,14 @@ import {
   stop,
 } from './state';
 
+// Item 4 (regression pass, task batch P46-2): this toolbar's own Refresh must behave like the
+// Reconnect & load button when the active tab sits behind that gate (DataView.vue is the one view
+// whose toolbar was never swapped out for the gate, D9's own precedent for every other view) —
+// DataView.vue owns the useConnectionGate() call (it needs `tab` non-null, this component reads
+// the nullable activeDataTab instead) and hands the two pieces this needs down as plain props.
+const props = defineProps<{ needsReconnect: boolean }>();
+const emit = defineEmits<{ reconnect: [] }>();
+
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('');
@@ -91,7 +99,12 @@ const pageCount = computed(() => {
 });
 
 function onRefresh(): void {
-  if (tab.value) void reload(tab.value.id);
+  if (!tab.value) return;
+  if (props.needsReconnect) {
+    emit('reconnect');
+    return;
+  }
+  void reload(tab.value.id);
 }
 function onFirst(): void {
   if (tab.value) void goFirst(tab.value.id);

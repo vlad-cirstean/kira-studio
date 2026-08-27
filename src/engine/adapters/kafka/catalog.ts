@@ -1,5 +1,6 @@
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { encodePath, type TreeNode } from '@shared/domain/tree';
+import { abbreviateCount } from '@shared/format';
 import { mapError } from './errors';
 
 // Internal topics/groups (consumer offsets, transaction state, ...) are Kafka-internal
@@ -37,7 +38,10 @@ async function listTopics(admin: KafkaJS.Admin): Promise<TreeNode[]> {
         // P23 D3: a topic no longer expands in the tree — its partitions moved into the
         // definition view. `detail` keeps the count as the tree's at-a-glance summary.
         hasChildren: false,
-        detail: `${count} partition${count === 1 ? '' : 's'}`,
+        // Item 7 (regression pass, task batch P46-2): same K/M/B/T abbreviation every other
+        // connection kind's tree count now uses (@shared/format's abbreviateCount) — a partition
+        // count rarely needs it, but the tree should read one way regardless of connection kind.
+        detail: `${abbreviateCount(count)} partition${count === 1 ? '' : 's'}`,
       };
     });
   nodes.sort((a, b) => a.name.localeCompare(b.name));

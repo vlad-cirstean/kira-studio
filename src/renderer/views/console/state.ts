@@ -57,6 +57,27 @@ export function toggleResultDocExpanded(tabId: string, resultKey: string, id: st
   else rt.expandedDocIds.add(key);
 }
 
+// Item (regression pass, task batch P46-4): the expand-all/collapse-all toolbar pair
+// DocumentView.vue's own document tab has (its own state.ts's setAllExpanded) — added here once
+// the console's document results lost their other way to see a whole document at a glance (the
+// cell editor dock, now removed as a redundant second copy of the same DocumentTree, P42 D11).
+// Unlike that tab's map (absent = expanded, D2/D32's own comment), this Set's model is the
+// opposite — absent = collapsed (this file's own defaultRuntime comment) — so *expand* all adds
+// every id instead of clearing the set, and *collapse* all prunes by prefix same as a result close.
+export function setAllResultDocsExpanded(
+  tabId: string,
+  resultKey: string,
+  ids: string[],
+  expand: boolean,
+): void {
+  const rt = ensureRuntime(tabId);
+  if (!expand) {
+    pruneExpandedDocIds(rt, resultKey);
+    return;
+  }
+  for (const id of ids) rt.expandedDocIds.add(`${resultKey}:${id}`);
+}
+
 // P43 iter2 F23a: `rt.expandedDocIds` is keyed `${resultKey}:${docId}` — a result's own keys are
 // contiguous under one prefix by construction (resultPageKey's `seq` never repeats), so pruning
 // by prefix is correct without touching any other result's entries.
