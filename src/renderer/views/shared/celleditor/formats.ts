@@ -24,16 +24,16 @@ export const CELL_FORMATS = [
 ] as const;
 export type CellFormat = (typeof CELL_FORMATS)[number];
 
-/** P42 D25: only the label changed — 'Time (ISO…)' reads more plainly than the wire format's own
- *  name. The key stays `iso8601` (a stored override value and a Playwright attribute); renaming
- *  it would be a migration for a label change. */
+/** P42 D25: only the label changed — 'Time (ISO 8601)' reads more plainly than the wire format's
+ *  own name. The key stays `iso8601` (a stored override value and a Playwright attribute);
+ *  renaming it would be a migration for a label change. */
 export const FORMAT_LABEL: Record<CellFormat, string> = {
   text: 'Plain text',
   json: 'JSON',
   xml: 'XML / HTML',
   csv: 'CSV',
   sql: 'SQL',
-  iso8601: 'Time (ISO…)',
+  iso8601: 'Time (ISO 8601)',
   epochSeconds: 'Epoch (seconds)',
   epochMillis: 'Epoch (milliseconds)',
   base64: 'Base64',

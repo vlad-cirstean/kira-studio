@@ -209,8 +209,9 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     });
     if (rt.opId !== opId) return; // superseded by a newer run
 
-    // P40 D6, default flipped P42 D5: the toolbar toggle decides append vs. replace — on (the
-    // default) keeps every run's own result set(s) rather than dropping what came before.
+    // P40 D6, default re-flipped back on P46-2: the toolbar toggle decides append vs. replace — on
+    // (the default, shown unpressed — see ConsoleView.vue) keeps stacking each run's result
+    // set(s) on top of the last; pressing it drops what came before so every run starts fresh.
     if (!tab.state.newResultSet) dropResults(tabId);
     const newResults = response.pages.map((page) => {
       const key = resultPageKey(tabId, rt.nextSeq++);

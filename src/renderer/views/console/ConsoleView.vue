@@ -271,12 +271,13 @@ const statusLine = computed(() => {
           Run all
         </AppButton>
         <div class="sep"></div>
-        <!-- P40 D6, default flipped P42 D5: append a new result set instead of replacing the
-             current ones. On by default and per-tab; clicking it off is what makes a run replace
-             the active result set instead, for someone who wants to keep re-running one query. -->
+        <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
+             the current ones. On (appending) by default and per-tab, shown unpressed — pressing
+             this is what makes a run replace the last result set instead of stacking a new one,
+             so the pressed/"active" look tracks *replace* mode, the inverse of the stored flag. -->
         <IconButton
           icon="layers"
-          :active="!!tab.state.newResultSet"
+          :active="!tab.state.newResultSet"
           data-testid="console-new-result-toggle"
           v-tooltip="
             tab.state.newResultSet

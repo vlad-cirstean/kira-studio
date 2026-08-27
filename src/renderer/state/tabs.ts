@@ -36,6 +36,7 @@ import { clearPending } from '../views/grid/pendingChanges';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { clearSelectedCellFor } from './cellSelection';
+import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
 import { cleanupTabRuntime } from './tabRuntime';
@@ -205,6 +206,14 @@ function openTab<S>(
     );
     if (existing) {
       activateTab(existing.id);
+      // Reopening (double-click, "recent tables", …) against a connection that's live right
+      // now reads as "load this" just as much as a brand-new tab does — without this, a tab
+      // left unhydrated by an earlier disconnect (or never hydrated after a session restore)
+      // stays stuck behind the reconnect gate until its own button is clicked, even though the
+      // very re-open that just happened proves the connection needs no reconnecting at all.
+      if (connectionsState.states[connectionId]?.status === 'connected') {
+        tabsState.hydrated.add(existing.id);
+      }
       return { id: existing.id, reused: true };
     }
   }

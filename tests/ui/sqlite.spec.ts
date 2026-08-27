@@ -373,8 +373,9 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   // gate), so it is where these get real, non-Docker-gated coverage. Kept short — console.spec.ts
   // (Postgres-backed) covers the deeper scenarios (chip switching, ×, filtering).
   const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
-  // P42 D5: appending is the default now — running again with no click adds a second chip.
-  await expect(newResultToggle).toHaveClass(/is-active/);
+  // P46-2: appending is the default now, shown unpressed — running again with no click adds a
+  // second chip.
+  await expect(newResultToggle).not.toHaveClass(/is-active/);
   await typeInto(consoleView, page, '\nSELECT 2;');
   await page.click('[data-testid="console-run-statement"]');
   const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
@@ -393,9 +394,10 @@ test('sqlite — engine picker, no network fields, database file, connect, tree,
   await expect(resultTabs).toHaveCount(1);
   await expect(results).toContainText('2');
 
-  // Toggling it off is what makes a run reuse the current result set instead of appending.
+  // Pressing it (now shown active) is what makes a run replace the current result set instead of
+  // appending.
   await newResultToggle.click();
-  await expect(newResultToggle).not.toHaveClass(/is-active/);
+  await expect(newResultToggle).toHaveClass(/is-active/);
   await typeInto(consoleView, page, '\nSELECT 3;');
   await page.click('[data-testid="console-run-statement"]');
   await expect(resultTabs).toHaveCount(1);

@@ -54,12 +54,11 @@ export type DefinitionTabState = z.infer<typeof definitionTabStateSchema>;
 
 // Only the editor's own text is session state (§8.4) — the last run's results are runtime-only,
 // like `views/definition/state.ts`'s `definition` field, and never round-trip through `tabs.save`.
-// `newResultSet` (P40 D6, flipped P42 D5): the toolbar toggle deciding whether a run appends a
-// new result set or reuses the current one. `.default(true)` only ever fires for an *absent* key,
-// so the two histories read differently: a tab saved before P40 (no key at all) restores
-// appending, the new default; a tab whose owner explicitly turned the toggle off restores
-// reusing, because the stored `false` still wins over the default. That is deliberate — an
-// explicit preference outranks a changed default.
+// `newResultSet` (P40 D6, re-flipped back on P46-2): the toolbar toggle deciding whether a run
+// appends a new result set (stacking) or replaces the current one with a fresh single result.
+// `.default(true)` only ever fires for an *absent* key, so a tab saved before this field existed
+// restores to the same "stack a new result per run" behavior a brand-new tab gets — the toggle is
+// opt-in to *replacing*, not opt-in to stacking (pressed/activated means "off").
 export const consoleTabStateSchema = z.object({
   text: z.string(),
   newResultSet: z.boolean().default(true),

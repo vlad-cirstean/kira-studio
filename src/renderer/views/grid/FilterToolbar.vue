@@ -4,7 +4,6 @@ import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { connectionRecord } from '../../state/connections';
 import { activeDataTab } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -65,8 +64,6 @@ watch(
   },
   { immediate: true },
 );
-
-const isStructuredSort = computed(() => tab.value?.state.sort?.kind === 'structured');
 
 function recordHistory(where: string | null, orderBy: SortSpec | null): void {
   const t = tab.value;
@@ -178,9 +175,6 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
         @blur="applyOrderBy"
       />
     </div>
-    <span v-if="isStructuredSort" class="p-chip info" v-tooltip="'Sort came from clicking a column header'">
-      <CodiconIcon name="sort-precedence" :size="13" />from header
-    </span>
     <AppButton v-tooltip="'Empty both fields and refetch'" @click="onClear"> Clear </AppButton>
   </div>
 </template>

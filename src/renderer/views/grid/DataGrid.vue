@@ -568,9 +568,23 @@ function selectionTarget(): { row: number; col: number } | null {
 // §2.1 forbids. `pageVersion` in the dependency list is what makes the still-highlighted cell
 // republish against a *new* page after paging/filtering/refreshing, so the panel and the grid
 // never disagree about which cell is shown.
+//
+// Reactive twin of `dragMode === 'cell'` below (that one stays a plain variable, read on every
+// pointer event during a drag and never itself rendered) — this watch needs to react to a cell
+// drag starting/ending. Without it, dragging back over the press cell mid-drag briefly re-creates
+// a degenerate `{anchor…} === {row,col}` range (extendSelectionTo has no way to tell "passing
+// through" from "landed here"), which selectionTarget() reads as a completed one-cell selection —
+// flashing the cell editor open and shut for that one frame before the drag continues past it.
+const cellDragActive = ref(false);
 watch(
-  [() => rt()?.selection, () => pageVersion.n, () => props.tabId],
+  [() => rt()?.selection, () => pageVersion.n, () => props.tabId, cellDragActive],
   () => {
+    // A live cell drag mutates `selection` on every pointer move (extendSelectionTo) — including,
+    // transiently, back into the degenerate one-cell shape selectionTarget() below treats as a
+    // completed selection whenever the pointer passes back over the press cell. Skipping entirely
+    // while the drag is active (re-evaluated once it ends, since cellDragActive is itself a
+    // dependency here) leaves the panel showing whatever it showed before the drag started.
+    if (cellDragActive.value) return;
     const p = page.value;
     const t = tab();
     const target = selectionTarget();
@@ -767,23 +781,27 @@ let dragPointerY = 0;
 let autoScrollRaf = 0;
 const AUTO_SCROLL_EDGE = 24;
 const AUTO_SCROLL_STEP = 12;
+// `cellDragActive` (the one reactive exception to this block's "plain variables" rule) is
+// declared above, near the cell-editor publish watch that's its only reader — see the comment
+// there for why it needs to be reactive at all.
+
+// The cell a `cell`-mode drag started on. Set on mousedown and read as the range's fixed anchor
+// for the rest of that drag — kept separate from `runtimeEntry.selection` itself so a press that
+// never turns into a drag leaves the selection (and so the cell-editor publish above) untouched
+// until the click actually completes; see onCellMouseDown.
+let cellDownRow: number | null = null;
+let cellDownCol: number | null = null;
 
 function extendSelectionTo(row: number, displayCol: number): void {
   const runtimeEntry = rt();
-  if (!runtimeEntry) return;
+  if (!runtimeEntry || cellDownRow === null || cellDownCol === null) return;
   const sel = runtimeEntry.selection;
-  const anchor =
-    sel?.kind === 'range'
-      ? { row: sel.anchorRow, col: sel.anchorCol }
-      : sel?.kind === 'cell'
-        ? { row: sel.row, col: sel.col }
-        : { row, col: displayCol };
-  if (sel?.kind !== 'range' && anchor.row === row && anchor.col === displayCol) return;
+  if (sel?.kind !== 'range' && cellDownRow === row && cellDownCol === displayCol) return;
   dragProducedRange = true;
   runtimeEntry.selection = {
     kind: 'range',
-    anchorRow: anchor.row,
-    anchorCol: anchor.col,
+    anchorRow: cellDownRow,
+    anchorCol: cellDownCol,
     row,
     col: displayCol,
   };
@@ -857,6 +875,7 @@ function onDragMouseMove(e: MouseEvent): void {
 
 function onDragMouseUp(): void {
   dragMode = null;
+  cellDragActive.value = false;
   if (autoScrollRaf) {
     cancelAnimationFrame(autoScrollRaf);
     autoScrollRaf = 0;
@@ -869,16 +888,22 @@ function onDragMouseUp(): void {
 
 // Shift falls through to onCellClick's own extend path unchanged — this only ever starts a drag
 // on a plain primary-button press. `.grid-cell` is already `user-select: none`, so there is no
-// native text selection to fight.
+// native text selection to fight. Deliberately does NOT commit `runtimeEntry.selection` itself:
+// doing so here published the cell editor on mere press, before the click was ever released. The
+// press cell is only recorded (cellDownRow/Col) as the drag's anchor; a plain click's own
+// selection commit — and so the cell-editor publish — happens in onCellClick once the click
+// actually completes, and a real drag commits progressively via extendSelectionTo instead.
 function onCellMouseDown(row: number, displayCol: number, e: MouseEvent): void {
   if (e.button !== 0 || e.shiftKey) return;
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
   dragMode = 'cell';
+  cellDragActive.value = true;
   dragProducedRange = false;
   dragPointerX = e.clientX;
   dragPointerY = e.clientY;
-  runtimeEntry.selection = { kind: 'cell', row, col: displayCol };
+  cellDownRow = row;
+  cellDownCol = displayCol;
   document.addEventListener('mousemove', onDragMouseMove);
   document.addEventListener('mouseup', onDragMouseUp, { once: true });
   autoScrollRaf = requestAnimationFrame(autoScrollTick);
@@ -1870,11 +1895,12 @@ defineExpose({ scrollCellIntoView });
 }
 
 /* README/FIX: a row with a staged edit gets the same 2px warn rail the mockup's
-   .tr.dirty .td.gutter::before draws — never a background tint across the whole row. */
-.gutter-cell.dirty {
-  position: relative;
-}
-
+   .tr.dirty .td.gutter::before draws — never a background tint across the whole row.
+   `.gutter-cell` is already `position: sticky` (a valid containing block for an absolutely
+   positioned child in its own right) — an added `position: relative` here used to override that
+   sticky positioning outright (a two-class selector beats the base rule's one), unpinning a
+   dirty/deleted/inserted row's index cell so it scrolled away horizontally with the rest of the
+   row instead of staying put. */
 .gutter-cell.dirty::before {
   content: '';
   position: absolute;
@@ -1888,10 +1914,6 @@ defineExpose({ scrollCellIntoView });
 /* P31 D31/F30: a row staged for deletion gets its own red rail — mutually exclusive with .dirty
    above (isDirtyRow no longer counts a delete), since a row headed for deletion will not have any
    staged edits applied. */
-.gutter-cell.deleted {
-  position: relative;
-}
-
 .gutter-cell.deleted::before {
   content: '';
   position: absolute;
@@ -1904,10 +1926,6 @@ defineExpose({ scrollCellIntoView });
 
 /* A pending-insert row is not "edited" (nothing existing changed) — same 2px rail treatment,
    coloured ok/green instead of warn/yellow so the two staged-change kinds read apart at a glance. */
-.gutter-cell.inserted {
-  position: relative;
-}
-
 .gutter-cell.inserted::before {
   content: '';
   position: absolute;

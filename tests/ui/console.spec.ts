@@ -220,9 +220,8 @@ test('Query console — open, run statement/all, errors, saved queries, session 
   await expect(results1).toHaveCount(1);
   await expect(results1.first()).toContainText('10');
 
-  // P42 D5: appending is the default now, so "Run statement" on the second statement (cursor
-  // lands inside it after typing) adds a new chip rather than replacing the first one's — one
-  // grid stays MOUNTED at a time regardless (P40 D2), and the newest run's result is the active one.
+  // P46-2: appending is the default — no toggle needed. One grid stays MOUNTED at a time
+  // regardless (P40 D2), and the newest run's result is the active one.
   await typeInto(consoleView1, page, '\nSELECT 20 AS b;');
   await page.click('[data-testid="console-run-statement"]');
   await expect(resultTabs1).toHaveCount(2);
@@ -381,9 +380,10 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
   const results = consoleView.locator('[data-testid="console-result-grid"]');
 
-  // --- default (on, P42 D5): running again appends a new result set instead of replacing --------
+  // --- default (P46-2): running again appends a new result set instead of replacing, shown
+  // unpressed until the toggle below is actually pressed -----------------------------------------
   const newResultToggle = consoleView.locator('[data-testid="console-new-result-toggle"]');
-  await expect(newResultToggle).toHaveClass(/is-active/);
+  await expect(newResultToggle).not.toHaveClass(/is-active/);
 
   await typeInto(consoleView, page, 'SELECT 1 AS n;');
   await page.click('[data-testid="console-run-statement"]');
@@ -407,9 +407,10 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   await expect(resultTabs.first()).toContainText('Result 1');
   await expect(results).toContainText('2');
 
-  // --- toggle off: running now replaces the current result set instead of appending (D6) --------
+  // --- toggle on (now shown pressed): running replaces the current result set instead of
+  // appending (D6) ---------------------------------------------------------------------------------
   await newResultToggle.click();
-  await expect(newResultToggle).not.toHaveClass(/is-active/);
+  await expect(newResultToggle).toHaveClass(/is-active/);
 
   await typeInto(consoleView, page, '\nSELECT 3 AS n;');
   await page.click('[data-testid="console-run-statement"]');
@@ -471,7 +472,7 @@ test('Query console — result-tab right-click: close, close others, close to th
   const resultTabs = consoleView.locator('[data-testid="console-result-tab"]');
   const results = consoleView.locator('[data-testid="console-result-grid"]');
 
-  // Three chips, appending by default (P42 D5).
+  // Three chips, appending by default (P46-2) — no toggle needed.
   await typeInto(consoleView, page, 'SELECT 1 AS n;');
   await page.click('[data-testid="console-run-statement"]');
   await typeInto(consoleView, page, '\nSELECT 2 AS n;');

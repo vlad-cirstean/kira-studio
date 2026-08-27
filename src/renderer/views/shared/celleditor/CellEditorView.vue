@@ -13,6 +13,7 @@ import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../EditBufferActions.vue';
 import { sqlDialectFor } from '../sqlIdent';
+import { typeDescription } from '../typeGlossary';
 import { useEditBuffer } from '../useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
@@ -329,6 +330,12 @@ const targetLabel = computed(() => {
   return `${tail?.name ?? c.path}.${c.column.name}`;
 });
 
+// Same glossary the grid's own column header reads (headerTitleFor in DataGrid.vue) — hovering
+// the data-type badge here should explain the type exactly as hovering the header already does.
+const dataTypeHint = computed(
+  () => typeDescription(selectedCell.value.column.dataType) ?? undefined,
+);
+
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /
 // "X (manual)" segment here would just repeat what's a few pixels to the right. A timestamp
@@ -371,7 +378,7 @@ const statusLine = computed(() => {
       :name="`${targetLabel} · row ${selectedCell.row + 1}`"
       target-testid="cell-editor-target"
     >
-      <span class="p-badge">{{ selectedCell.column.dataType }}</span>
+      <span class="p-badge" v-tooltip="dataTypeHint">{{ selectedCell.column.dataType }}</span>
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
