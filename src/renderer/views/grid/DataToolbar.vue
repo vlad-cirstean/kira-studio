@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
+import Pager from '../shared/page/Pager.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { getPage } from './page';
@@ -57,24 +57,6 @@ const deleteRowTooltip = computed(() => {
   return 'This connection does not support deleting rows';
 });
 
-const pageDisplay = computed(() => props.tab.state.pageIndex + 1);
-
-// A plain `:value="pageDisplay"` fights the user's typing: any unrelated reactive read this
-// component makes (rt.value's status/count/etc.) forces a re-render, and Vue reasserts the bound
-// value on the DOM input regardless of whether pageDisplay itself changed — wiping out whatever
-// the user has typed but not yet committed. Mirroring it through its own ref, kept in sync with
-// pageDisplay only when the page actually advances, avoids the fight.
-const pageInputValue = ref(String(pageDisplay.value));
-watch(pageDisplay, (v) => {
-  pageInputValue.value = String(v);
-});
-const pageCount = computed(() => {
-  const count = rt.value?.count;
-  const size = props.tab.state.pageSize;
-  if (!count || !size) return null;
-  return Math.max(1, Math.ceil(count.value / size));
-});
-
 function onFirst(): void {
   void goFirst(props.tab.id);
 }
@@ -87,17 +69,14 @@ function onNext(): void {
 function onLast(): void {
   void goLast(props.tab.id);
 }
+function onJump(pageIndex: number): void {
+  void goToPage(props.tab.id, pageIndex);
+}
 function onCount(): void {
   void runCount(props.tab.id);
 }
 function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
-}
-function onJump(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (Number.isFinite(value) && value >= 1) {
-    void goToPage(props.tab.id, value - 1);
-  }
 }
 function onToggleSearch(): void {
   toggleSearchOpen(props.tab.id);
@@ -175,50 +154,20 @@ function onDeleteRow(): void {
 
   <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
        has no notion of "row 1–200" to display without the count query having already run). -->
-  <div class="group pager" data-testid="pager" :data-pagination="rt?.lastStrategy">
-    <IconButton
-      icon="chevron-left"
-      v-tooltip="'First page'"
-      data-testid="pager-first"
-      :disabled="tab.state.pageIndex === 0"
-      @click="onFirst"
-    />
-    <IconButton
-      icon="chevron-left"
-      v-tooltip="'Previous page'"
-      data-testid="pager-prev"
-      :disabled="tab.state.pageIndex === 0"
-      @click="onPrev"
-    />
-    <span class="page-label p-sm muted">
-      page
-      <div class="page-input">
-        <TextField
-          v-model="pageInputValue"
-          type="number"
-          min="1"
-          hide-stepper
-          data-testid="pager-page-input"
-          @change="onJump"
-        />
-      </div>
-      <template v-if="pageCount"> of {{ pageCount }}</template>
-    </span>
-    <IconButton
-      icon="chevron-right"
-      v-tooltip="'Next page'"
-      data-testid="pager-next"
-      :disabled="!rt?.hasMore"
-      @click="onNext"
-    />
-    <IconButton
-      icon="chevron-right"
-      v-tooltip="pageCount ? 'Last page' : 'Count rows first'"
-      data-testid="pager-last"
-      :disabled="!pageCount"
-      @click="onLast"
-    />
-  </div>
+  <Pager
+    :page-index="tab.state.pageIndex"
+    :page-size="tab.state.pageSize"
+    :count="rt?.count?.value ?? null"
+    :has-more="!!rt?.hasMore"
+    testid-prefix=""
+    last-tooltip="Count rows first"
+    :strategy="rt?.lastStrategy"
+    @first="onFirst"
+    @prev="onPrev"
+    @next="onNext"
+    @last="onLast"
+    @jump="onJump"
+  />
 
   <SegmentedControl
     :model-value="tab.state.pageSize"
@@ -284,36 +233,8 @@ function onDeleteRow(): void {
 
 <style scoped>
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
-   p-seg, p-input, p-chip, p-count) — only the bits those primitives don't cover (the pager's own
-   layout, the page-jump input's width, live/stale colour states) live here. */
-
-.pager {
-  gap: var(--kira-s-1);
-}
-
-.page-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  white-space: nowrap;
-}
-
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so the fixed width and centred text live on this
-   wrapper/its :deep() descendants instead of a class/style on the <TextField> tag itself
-   (DocumentView.vue's same `.filter-field` precedent). */
-.page-input {
-  width: 46px;
-}
-
-.page-input :deep(.p-input) {
-  width: 100%;
-  padding: 0 var(--kira-s-2);
-}
-
-.page-input :deep(input) {
-  text-align: center;
-}
+   p-seg, p-input, p-chip, p-count) — the pager's own layout/page-jump-input styling lives in
+   Pager.vue now; only the columns anchor's positioning is left here. */
 
 .columns-anchor {
   position: relative;

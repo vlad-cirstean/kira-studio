@@ -18,7 +18,6 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
@@ -34,6 +33,7 @@ import {
 } from '../shared/document/rows';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import Pager from '../shared/page/Pager.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
@@ -204,22 +204,8 @@ function onPageSize(size: PageSize): void {
   setPageSize(props.tab.id, size);
 }
 
-// Mirrors DataToolbar.vue's own pageDisplay/pageInputValue/pageCount/onJump exactly, now that
-// goFirst/goLast/goToPage give Document the same absolute-offset jump SQL has.
-const pageDisplay = computed(() => props.tab.state.pageIndex + 1);
-const pageInputValue = ref(String(pageDisplay.value));
-watch(pageDisplay, (v) => {
-  pageInputValue.value = String(v);
-});
-const pageCount = computed(() => {
-  const count = rt.value?.count;
-  const size = props.tab.state.pageSize;
-  if (!count || !size) return null;
-  return Math.max(1, Math.ceil(count.value / size));
-});
-function onJump(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (Number.isFinite(value) && value >= 1) void goToPage(props.tab.id, value - 1);
+function onJump(pageIndex: number): void {
+  void goToPage(props.tab.id, pageIndex);
 }
 
 const projectionOpen = ref(false);
@@ -527,50 +513,19 @@ onUnmounted(() => {
              next/last, then page-size, then a count/columns-equivalent group, then the
              add/search group. Mongo supports an arbitrary skip()/limit() offset, so — unlike
              Redis/Kafka/SQS's cursor-only pagination — a real page-N jump box applies here too. -->
-        <div class="group pager" data-testid="document-pager">
-          <IconButton
-            icon="chevron-left"
-            v-tooltip="'First page'"
-            data-testid="document-pager-first"
-            :disabled="tab.state.pageIndex === 0"
-            @click="goFirst(tab.id)"
-          />
-          <IconButton
-            icon="arrow-left"
-            data-testid="document-prev"
-            :disabled="tab.state.pageIndex === 0"
-            v-tooltip="'Previous page'"
-            @click="goPrev(tab.id)"
-          />
-          <span class="page-label p-sm muted">
-            page
-            <div class="page-input">
-              <TextField
-                v-model="pageInputValue"
-                type="number"
-                min="1"
-                hide-stepper
-                data-testid="document-pager-page-input"
-                @change="onJump"
-              />
-            </div>
-            <template v-if="pageCount"> of {{ pageCount }}</template>
-          </span>
-          <IconButton
-            icon="arrow-right"
-            data-testid="document-next"
-            :disabled="!rt?.hasMore"
-            v-tooltip="'Next page'"
-            @click="goNext(tab.id)"
-          />
-          <IconButton
-            icon="chevron-right"
-            v-tooltip="pageCount ? 'Last page' : 'Count documents first'"
-            data-testid="document-pager-last"
-            :disabled="!pageCount"
-            @click="goLast(tab.id)"
-          />
-        </div>
+        <Pager
+          :page-index="tab.state.pageIndex"
+          :page-size="tab.state.pageSize"
+          :count="rt?.count?.value ?? null"
+          :has-more="!!rt?.hasMore"
+          testid-prefix="document-"
+          last-tooltip="Count documents first"
+          @first="goFirst(tab.id)"
+          @prev="goPrev(tab.id)"
+          @next="goNext(tab.id)"
+          @last="goLast(tab.id)"
+          @jump="onJump"
+        />
         <div class="sep"></div>
         <SegmentedControl
           :model-value="tab.state.pageSize"
@@ -902,31 +857,6 @@ onUnmounted(() => {
    moves onto this wrapper instead of a style attribute on the component tag itself. */
 .history-anchor {
   position: relative;
-}
-
-/* Mirrors DataToolbar.vue's own .pager/.page-label/.page-input rules exactly. */
-.pager {
-  gap: var(--kira-s-1);
-}
-
-.page-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  white-space: nowrap;
-}
-
-.page-input {
-  width: 46px;
-}
-
-.page-input :deep(.p-input) {
-  width: 100%;
-  padding: 0 var(--kira-s-2);
-}
-
-.page-input :deep(input) {
-  text-align: center;
 }
 
 .filter-field {
