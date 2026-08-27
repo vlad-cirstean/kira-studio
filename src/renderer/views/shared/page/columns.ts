@@ -1,11 +1,20 @@
-import type { ColumnDescriptor, TabularPage } from '@shared/protocol/page';
+import type { ColumnDescriptor, TabularPage, TypeClass } from '@shared/protocol/page';
 import { cellText, isNull } from '@shared/protocol/page';
 import type { Range } from '@tanstack/vue-virtual';
+import { typeClassColor } from '../../../theme/icons';
+import { typeDescription } from '../typeGlossary';
 
 const MIN_WIDTH = 64;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;
+
+// P48 F9: DataGrid.vue's own gutter width and ConsoleResultGrid.vue's copy of it, spelled a
+// third way as a bare `56` in the latter's own CSS — one constant behind all three.
+export const GUTTER_WIDTH = 56;
+// P48 F9: the 96px fallback both grids' own widths computeds used when neither a stored width
+// nor a measured one is available yet.
+export const DEFAULT_COLUMN_WIDTH = 96;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 
@@ -58,7 +67,7 @@ export function columnOffsets(order: string[], widths: Record<string, number>): 
   const offsets: number[] = [0];
   let cursor = 0;
   for (const name of order) {
-    cursor += widths[name] ?? MIN_WIDTH;
+    cursor += widths[name] ?? DEFAULT_COLUMN_WIDTH;
     offsets.push(cursor);
   }
   return offsets;
@@ -139,4 +148,22 @@ export function pageColumnIndexFor(page: TabularPage, order: string[], displayCo
   const name = order[displayCol];
   if (name === undefined) return -1;
   return nameIndexFor(page).get(name) ?? -1;
+}
+
+// P48 F7: the column-header tooltip object DataGrid.vue and ConsoleResultGrid.vue each built —
+// deliberately the same shape (P42 D19/D20's own comment), differing only in whether a DB
+// comment line is available to fold into `body`. `dataType` is passed in rather than read off
+// `col` directly: DataGrid.vue overlays a DESCRIBE-derived dataType where the console has none.
+export function columnHeaderTooltip(
+  col: { name: string; typeClass: TypeClass },
+  dataType: string,
+  comment?: string | null,
+): { title: string; meta?: string; metaColor?: string; body?: string } {
+  const description = dataType ? typeDescription(dataType) : null;
+  return {
+    title: col.name,
+    meta: dataType || undefined,
+    metaColor: typeClassColor(col.typeClass) || undefined,
+    body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
+  };
 }

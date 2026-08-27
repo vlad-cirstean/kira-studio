@@ -22,8 +22,11 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
   alignmentFor,
+  columnHeaderTooltip,
   columnOffsets,
   columnRangeExtractor,
+  DEFAULT_COLUMN_WIDTH,
+  GUTTER_WIDTH,
   initialWidths,
   pageColumnIndexFor,
   resetMeasureCtx,
@@ -33,7 +36,6 @@ import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import { typeDescription } from '../shared/typeGlossary';
 import {
   columnsToTsv,
   parseDelimited,
@@ -58,7 +60,6 @@ import { runtime, setSort } from './state';
 
 const props = defineProps<{ tabId: string }>();
 
-const GUTTER_WIDTH = 56;
 /** How far the compositor may outrun the main thread before a gap can show. 560 px = the row
  *  axis's own overscan since P12 (20 rows x 28 px at comfortable density), now applied to the
  *  column axis too (P29 D2). */
@@ -124,23 +125,10 @@ function colorForColumn(name: string): string {
 // TooltipContent itself (views/* may not import workbench/*, §11); the object literal's shape
 // alone is what v-tooltip's own type checks against, the same way every plain-string call site
 // already satisfies that directive with no import of its own.
-function headerTitleFor(name: string): {
-  title: string;
-  meta?: string;
-  metaColor?: string;
-  body?: string;
-} {
-  const dataType = dataTypeFor(name);
-  const description = dataType ? typeDescription(dataType) : null;
-  const comment = columnMetaByName.value.get(name)?.comment;
-  return {
-    title: name,
-    meta: dataType || undefined,
-    // Item (regression pass, task batch P46-7): colorForColumn's own typeClass-backed colour —
-    // the same one the cell editor's badge and this column's own body cells below use.
-    metaColor: colorForColumn(name) || undefined,
-    body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
-  };
+// P48 F7: columns.ts's own columnHeaderTooltip — ConsoleResultGrid.vue builds the same shape.
+function headerTitleFor(name: string) {
+  const column = columnByName.value.get(name) ?? { name, typeClass: 'other' as const };
+  return columnHeaderTooltip(column, dataTypeFor(name), columnMetaByName.value.get(name)?.comment);
 }
 
 // P31 D11: a font change drops columns.ts's memoized measuring context (so the next measurement
@@ -159,7 +147,8 @@ const widths = computed<Record<string, number>>(() => {
   const stored = tab()?.state.columnWidths ?? {};
   const measured = initialWidths(p);
   const out: Record<string, number> = {};
-  for (const name of columnOrder.value) out[name] = stored[name] ?? measured[name] ?? 96;
+  for (const name of columnOrder.value)
+    out[name] = stored[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH;
   return out;
 });
 
@@ -524,7 +513,7 @@ let resizing: { name: string; startX: number; startWidth: number } | null = null
 
 function onResizeStart(e: PointerEvent, name: string): void {
   e.stopPropagation();
-  resizing = { name, startX: e.clientX, startWidth: widths.value[name] ?? 96 };
+  resizing = { name, startX: e.clientX, startWidth: widths.value[name] ?? DEFAULT_COLUMN_WIDTH };
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 }
 function onResizeMove(e: PointerEvent): void {

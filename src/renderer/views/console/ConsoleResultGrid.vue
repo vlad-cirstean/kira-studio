@@ -8,7 +8,6 @@ import {
 } from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { cellClass } from '../../theme/cellClass';
-import { typeClassColor } from '../../theme/icons';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
@@ -19,10 +18,16 @@ import {
   rowView,
   togglePath,
 } from '../shared/document/rows';
-import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
+import {
+  alignmentFor,
+  columnHeaderTooltip,
+  DEFAULT_COLUMN_WIDTH,
+  GUTTER_WIDTH,
+  initialWidths,
+  resetMeasureCtx,
+} from '../shared/page/columns';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { typeDescription } from '../shared/typeGlossary';
 import {
   cell,
   documentRow,
@@ -69,22 +74,9 @@ const page = computed(() => {
 // comment: "console results are always read-only regardless" — there is no column to have one).
 // P42 D19/D20: structured the same way DataGrid.vue's own twin changed with it — deliberately the
 // same shape minus the comment, so the two can't re-drift the way P40 D16 already closed once.
-function headerTitleFor(col: ColumnDescriptor): {
-  title: string;
-  meta?: string;
-  metaColor?: string;
-  body?: string;
-} {
-  const description = col.dataType ? typeDescription(col.dataType) : null;
-  return {
-    title: col.name,
-    meta: col.dataType || undefined,
-    // Item (regression pass, task batch P46-7): DataGrid.vue's own twin change, mirrored — reads
-    // this column's own typeClass (the adapter's authoritative verdict) rather than re-guessing
-    // one from its dataType string.
-    metaColor: typeClassColor(col.typeClass),
-    body: description ?? undefined,
-  };
+// P48 F7: columns.ts's own columnHeaderTooltip, called with no comment (a console result has none).
+function headerTitleFor(col: ColumnDescriptor) {
+  return columnHeaderTooltip(col, col.dataType);
 }
 
 // P31 D11/F13: same reasoning as DataGrid.vue's own widths computed — without this, a font
@@ -102,7 +94,10 @@ const widths = computed<Record<string, number>>(() => {
 const totalWidth = computed(() => {
   const p = page.value;
   if (p?.kind !== 'tabular') return 0;
-  return p.columns.reduce((sum, c) => sum + (widths.value[c.name] ?? 96), 56);
+  return p.columns.reduce(
+    (sum, c) => sum + (widths.value[c.name] ?? DEFAULT_COLUMN_WIDTH),
+    GUTTER_WIDTH,
+  );
 });
 
 // P40 D10/D17: the same "hide non-matching rows" toggle grid/documents/keyvalue share (P24 D2) —
@@ -307,7 +302,7 @@ function selectKeyValueRow(row: number): void {
       :items="rowIndices"
       :row-height="rowHeight"
       class="body"
-      :style="{ '--total-width': `${totalWidth}px` }"
+      :style="{ '--total-width': `${totalWidth}px`, '--gutter-width': `${GUTTER_WIDTH}px` }"
       @visible-range="onVisibleRangeIndices"
     >
       <template #header>
@@ -478,7 +473,7 @@ function selectKeyValueRow(row: number): void {
    primitives (their layout isn't a fixed-width column grid), so they keep their own rules. */
 .gutter-cell {
   flex-shrink: 0;
-  width: 56px;
+  width: var(--gutter-width);
 }
 
 .cell {
