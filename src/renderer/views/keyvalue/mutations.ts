@@ -1,62 +1,40 @@
 import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
 import { data } from '../../bridge/data';
 import { findKeyValueTab, openKeyValueTab } from '../../state/tabs';
-import { browseInvalidate, reloadTabsForTarget } from '../../state/viewCommands';
+import { browseInvalidate } from '../../state/viewCommands';
+import { createImmediateMutator } from '../shared/immediateMutation';
 import { reload } from './state';
 
-// Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline
-// exactly) — no pendingChanges.ts-style staged plan, no preview step. Every action calls
-// data.mutate directly and reloads the tab's current page on success so the view reflects the
-// server's own state rather than an optimistic local patch.
+// Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline exactly) — no
+// pendingChanges.ts-style staged plan, no preview step.
 //
 // The same two reserved sentinels as engine/adapters/redis/mutate.ts (`_key`/`$value`) — see
 // that file's own comment for why `plan.path` alone can't name the target key.
 const KEY_SENTINEL = '_key';
 const VALUE_SENTINEL = '$value';
 
+const mutate = createImmediateMutator({ findTab: findKeyValueTab, reload });
+
 export async function saveValueEdit(
   tabId: string,
   keyName: string,
   newValue: string,
 ): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [
-      {
-        kind: 'update',
-        key: { [KEY_SENTINEL]: keyName },
-        changes: { [VALUE_SENTINEL]: newValue },
-      },
-    ],
-  });
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  await mutate(tabId, [
+    { kind: 'update', key: { [KEY_SENTINEL]: keyName }, changes: { [VALUE_SENTINEL]: newValue } },
+  ]);
 }
 
 export async function deleteKey(tabId: string, keyName: string): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [{ kind: 'delete', key: { [KEY_SENTINEL]: keyName } }],
-  });
   // The key this tab was showing is now gone — reload still runs (mirrors deleteDocument's own
   // unconditional reload) so a stale row set never lingers; the read that follows surfaces the
   // ordinary "key no longer exists" query-time condition (read.ts's own precedent) rather than
   // this module inventing a second way to report the same fact.
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
-  // P43 F11/D15: a deleted key's own container level (the level a Browse tab shows) just lost a
-  // member — a no-op when no Browse tab is open (browseInvalidate's own contract).
-  browseInvalidate(tab.connectionId, pathParent(tab.path) ?? '');
+  await mutate(tabId, [{ kind: 'delete', key: { [KEY_SENTINEL]: keyName } }], (tab) => {
+    // P43 F11/D15: a deleted key's own container level (the level a Browse tab shows) just lost
+    // a member — a no-op when no Browse tab is open (browseInvalidate's own contract).
+    browseInvalidate(tab.connectionId, pathParent(tab.path) ?? '');
+  });
 }
 
 // Scoped to string-type keys only (same D2 as edit — see redis/mutate.ts's assertEditableType).

@@ -1,29 +1,19 @@
-import { data } from '../../bridge/data';
 import { findStreamTab } from '../../state/tabs';
-import { reloadTabsForTarget } from '../../state/viewCommands';
+import { createImmediateMutator } from '../shared/immediateMutation';
 import { reload } from './state';
 
 // Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
 // (P8's ground rules), extended to streams. Each op uses the `$`-prefixed sentinel fields
 // kafka/produce.ts and sqs/mutate.ts's adapters agree on (mirrors mongo/mutate.ts's `$document`).
+const mutate = createImmediateMutator({ findTab: findStreamTab, reload });
 
 export async function produceKafkaMessage(
   tabId: string,
   fields: { key: string | null; body: string; headers: string | null },
 ): Promise<void> {
-  const tab = findStreamTab(tabId);
-  if (!tab?.connectionId) return;
   const values: Record<string, string | null> = { $key: fields.key, $body: fields.body };
   if (fields.headers !== null) values.$headers = fields.headers;
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [{ kind: 'insert', values }],
-  });
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  await mutate(tabId, [{ kind: 'insert', values }]);
 }
 
 export async function sendSqsMessage(
@@ -31,19 +21,9 @@ export async function sendSqsMessage(
   body: string,
   headers: string | null,
 ): Promise<void> {
-  const tab = findStreamTab(tabId);
-  if (!tab?.connectionId) return;
   const values: Record<string, string | null> = { $body: body };
   if (headers !== null) values.$headers = headers;
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [{ kind: 'insert', values }],
-  });
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  await mutate(tabId, [{ kind: 'insert', values }]);
 }
 
 // P37 D25/D32: publish-only — rabbitmq/mutate.ts's $routingKey/$exchange/$properties join the
@@ -61,36 +41,16 @@ export async function publishRabbitMessage(
     persistent: boolean;
   },
 ): Promise<void> {
-  const tab = findStreamTab(tabId);
-  if (!tab?.connectionId) return;
   const values: Record<string, string | null> = { $body: fields.body };
   if (fields.headers !== null) values.$headers = fields.headers;
   if (fields.routingKey !== null) values.$routingKey = fields.routingKey;
   if (fields.exchange !== null) values.$exchange = fields.exchange;
   if (fields.persistent) values.$properties = JSON.stringify({ delivery_mode: 2 });
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [{ kind: 'insert', values }],
-  });
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  await mutate(tabId, [{ kind: 'insert', values }]);
 }
 
 // `messageId` mirrors sqs/mutate.ts's ID_FIELD — the row's own `key` column, which read.ts
 // already sets to the SQS MessageId (P10's row shape), echoed straight back.
 export async function deleteSqsMessage(tabId: string, messageId: string): Promise<void> {
-  const tab = findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.mutate({
-    opId: crypto.randomUUID(),
-    tabId,
-    connectionId: tab.connectionId,
-    path: tab.path,
-    ops: [{ kind: 'delete', key: { messageId } }],
-  });
-  await reload(tabId);
-  reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+  await mutate(tabId, [{ kind: 'delete', key: { messageId } }]);
 }
