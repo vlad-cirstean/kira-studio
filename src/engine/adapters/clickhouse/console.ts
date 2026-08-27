@@ -5,7 +5,7 @@ import {
   type TabularPage,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import type { ClickHouseHandle } from './client';
 import { runCommand, streamQuery, type TrackQuery } from './query';
@@ -84,7 +84,7 @@ export async function execute(
 
   const pages: TabularPage[] = [];
   for (const sql of statements) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     if (isRowReturning(sql)) {
       pages.push(await runRowReturning(h, ctx, sql, track, nextQueryId));
     } else {

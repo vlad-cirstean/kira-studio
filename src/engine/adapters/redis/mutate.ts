@@ -2,7 +2,7 @@ import type { MutationPlan, MutationResult, MutationRowOp } from '@shared/domain
 import { encodePath } from '@shared/domain/tree';
 import type { Redis } from 'ioredis';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertWritable } from '../errors';
+import { AdapterError, assertWritable, throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 
 // The reserved sentinels for redis mutations, expressed through the existing relational-shaped
@@ -100,7 +100,7 @@ export async function mutate(
   let affectedRows = 0;
   try {
     for (const op of plan.ops) {
-      if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+      throwIfCancelled(ctx);
       if (op.kind === 'update') {
         const key = keyNameFrom(op.key, 'update');
         const value = valueFrom(op.changes, 'update');

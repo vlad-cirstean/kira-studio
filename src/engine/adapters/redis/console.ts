@@ -5,7 +5,7 @@ import {
   type PagePosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import type { DbConnectionSet } from './client';
 import { mapError } from './errors';
 
@@ -99,7 +99,7 @@ export async function execute(
   const conn = await set.get(dbIndex);
   const pages: Page[] = [];
   for (const line of lines) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     const [command, ...args] = tokenize(line);
     if (!command) continue;
     try {

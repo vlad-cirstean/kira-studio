@@ -12,7 +12,7 @@ import {
 import type { ObjectTransferResult } from '@shared/domain/object-store';
 import { OBJECT_UPLOAD_MAX_BYTES } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 import { formatBytes } from './read';
 
@@ -31,7 +31,7 @@ export async function downloadObject(
   destPath: string,
   ctx: OpCtx,
 ): Promise<ObjectTransferResult> {
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   ctx.setCommand(`GetObject s3://${bucket}/${key} -> ${destPath}`);
 
   // HeadObject first — a real "no such object" error before any local file is even created,

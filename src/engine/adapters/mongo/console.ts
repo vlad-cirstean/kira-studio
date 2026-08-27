@@ -8,7 +8,7 @@ import {
 import { EJSON } from 'bson';
 import type { Collection, Db, Document } from 'mongodb';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 import { LiteralParser } from './literal';
 
@@ -186,7 +186,7 @@ export async function execute(db: Db, ctx: OpCtx, statements: string[]): Promise
 
   const pages: Page[] = [];
   for (const text of statements) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     const parsed = parseStatement(text);
     try {
       pages.push(await runStatement(db, parsed, ctx));

@@ -3,7 +3,7 @@ import { KafkaConsumer } from '@confluentinc/kafka-javascript';
 import { parseKafkaStreamFilter } from '@shared/domain/streamFilter';
 import { createStreamPageBuilder, type PagePosition, type StreamPage } from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
 import type { KafkaClientHandle } from './client';
 import { mapError } from './errors';
@@ -85,7 +85,7 @@ async function freshWindows(
   } catch (err) {
     throw mapError(err);
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
 
   let filter: ReturnType<typeof parseKafkaStreamFilter>;
   try {
@@ -116,7 +116,7 @@ async function freshWindows(
     } catch (err) {
       throw mapError(err);
     }
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     for (const entry of byTimestamp) {
       if (start.has(entry.partition)) start.set(entry.partition, entry.offset);
     }
@@ -213,7 +213,7 @@ export async function readTopic(
     const builder = createStreamPageBuilder({ visibilityTimeoutSeconds: null });
     return builder.finish(finishPosition(windows, false, fingerprint, req.pageSize));
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
 
   const consumer = new KafkaConsumer(
     {
@@ -264,7 +264,7 @@ export async function readTopic(
     const allEof = (): boolean => [...remainingPartitions].every((p) => eofPartitions.has(p));
 
     while (collected < req.pageSize && !allDone() && !allEof()) {
-      if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+      throwIfCancelled(ctx);
       const messages = await consumeBatch(consumer, req.pageSize - collected);
       if (messages.length === 0) {
         emptyPolls++;
@@ -294,7 +294,7 @@ export async function readTopic(
       }
     }
 
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
 
     // P43 iter2 F19/D26: a partition's own `end` was frozen from its high watermark at browse
     // start, and `partition.eof` from librdkafka means the consumer's position *reached* that
@@ -331,7 +331,7 @@ export async function countTopic(
   } catch (err) {
     throw mapError(err);
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   const value = offsets.reduce((sum, o) => sum + Number(BigInt(o.high) - BigInt(o.low)), 0);
   return { value, exact: true };
 }

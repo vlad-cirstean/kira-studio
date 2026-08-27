@@ -14,7 +14,7 @@ import {
 } from '@shared/domain/object-store';
 import { encodePath } from '@shared/domain/tree';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertWritable } from '../errors';
+import { AdapterError, assertWritable, throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 import { formatBytes } from './read';
 import { openUploadBody } from './transfer';
@@ -217,7 +217,7 @@ export async function mutate(
 
   let affectedRows = 0;
   for (const op of plan.ops) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     if (op.kind === 'update') {
       await applyUpdate(client, ctx, bucket, op);
     } else if (op.kind === 'delete') {

@@ -7,7 +7,7 @@ import {
 } from '@shared/protocol/page';
 import type { Connection, FieldInfo } from 'mariadb';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertNotCancelled } from '../errors';
+import { AdapterError, assertNotCancelled, throwIfCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import { type TrackQuery, typeCastString } from './query';
@@ -146,7 +146,7 @@ export async function execute(
 
   const pages: TabularPage[] = [];
   for (const sql of statements) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     pages.push(buildPage(await runRaw(conn, sql, ctx, track)));
   }
   return pages;

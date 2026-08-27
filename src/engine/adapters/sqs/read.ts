@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-sqs';
 import { createStreamPageBuilder, type PagePosition, type StreamPage } from '@shared/protocol/page';
 import type { OpCtx, ReadRequest } from '../adapter';
-import { AdapterError } from '../errors';
+import { throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 
 const RECEIVE_LIMIT = 10; // ReceiveMessage's own hard per-call cap on MaxNumberOfMessages
@@ -85,7 +85,7 @@ export async function pollQueue(
 
   ctx.setCommand(`ReceiveMessage ${queueUrl}`);
   while (collected < req.pageSize) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     const batchLimit = Math.min(RECEIVE_LIMIT, req.pageSize - collected);
     let result: { Messages?: Message[] };
     try {

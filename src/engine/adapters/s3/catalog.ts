@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { encodePath, type TreeNode } from '@shared/domain/tree';
 import type { OpCtx, TreeChildren } from '../adapter';
-import { AdapterError } from '../errors';
+import { throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 
 // Never an unbudgeted listing (ground rules, mirrors redis/catalog.ts's own SCAN_COUNT/
@@ -78,7 +78,7 @@ export async function listPrefixChildren(
   let rounds = 0;
 
   do {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     let commonPrefixes: { Prefix?: string }[];
     let contents: { Key?: string }[];
     try {

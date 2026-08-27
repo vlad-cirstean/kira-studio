@@ -5,7 +5,7 @@ import {
 } from '@shared/protocol/page';
 import type { Redis } from 'ioredis';
 import type { OpCtx, ReadRequest } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { decodePageToken, encodePageToken, requestFingerprint } from '../sql-text';
 import { mapError } from './errors';
 
@@ -45,7 +45,7 @@ async function readMeta(conn: Redis, key: string, ctx: OpCtx): Promise<KeyMeta> 
   } catch {
     memoryBytes = null; // best-effort (§8.8)
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   return {
     redisType: rawType as KeyValuePage['redisType'],
     ttlMs: pttl >= 0 ? pttl : null,
@@ -59,7 +59,7 @@ async function readString(
   meta: KeyMeta,
   ctx: OpCtx,
 ): Promise<KeyValuePage> {
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   let value: string | null;
   try {
     value = await conn.get(key);
@@ -122,7 +122,7 @@ async function readScanFamily(
   let exhausted = false;
 
   do {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     const [nextCursor, elements] = await scanOnce(cursor);
     cursor = nextCursor;
     for (let i = 0; i < elements.length; i += pairSize) {
@@ -242,7 +242,7 @@ async function readList(
   } catch (err) {
     throw mapError(err);
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
 
   let total: number;
   try {
@@ -299,7 +299,7 @@ async function readStream(
   } catch (err) {
     throw mapError(err);
   }
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
 
   const probedExtra = entries.length > req.pageSize;
   const kept = probedExtra ? entries.slice(0, req.pageSize) : entries;
@@ -376,7 +376,7 @@ export async function countKey(
     throw mapError(err);
   }
   if (rawType === 'none') throw new AdapterError('E_QUERY', `key no longer exists: ${key}`);
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
 
   try {
     switch (rawType) {

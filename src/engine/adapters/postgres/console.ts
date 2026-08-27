@@ -6,7 +6,7 @@ import {
 } from '@shared/protocol/page';
 import type { Client, QueryArrayConfig } from 'pg';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertNotCancelled } from '../errors';
+import { AdapterError, assertNotCancelled, throwIfCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
 import { mapError } from './errors';
 import type { TrackQuery } from './query';
@@ -148,7 +148,7 @@ export async function execute(
 
   const results: RawResult[] = [];
   for (const sql of statements) {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     results.push(await runRaw(client, sql, [], ctx, track));
   }
 

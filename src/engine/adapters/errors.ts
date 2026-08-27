@@ -61,3 +61,17 @@ export function assertNotCancelled(ctx: OpCtx): void {
     throw new AdapterError('E_CANCELLED', 'operation was cancelled before it started');
   }
 }
+
+// P48 F21: assertNotCancelled's mid-flight sibling — the check adapters re-run after an await,
+// not before starting. Twenty-six identical copies across eight adapters. The message differs from
+// assertNotCancelled's on purpose: that one reports a cancel that landed before the call started.
+export function throwIfCancelled(ctx: OpCtx): void {
+  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+}
+
+// P48 F24: the "did connect() ever run" guard ten adapters open their private handle accessors
+// with, byte-identical every time.
+export function requireConnected<T>(handle: T | null | undefined): T {
+  if (!handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
+  return handle;
+}

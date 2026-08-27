@@ -12,7 +12,7 @@ import {
   type PagePosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
-import { AdapterError } from '../errors';
+import { throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 
 export function formatBytes(n: number): string {
@@ -59,7 +59,7 @@ export async function readObject(
   key: string,
   ctx: OpCtx,
 ): Promise<KeyValuePage> {
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   ctx.setCommand(`GetObject s3://${bucket}/${key}`);
 
   let head: HeadObjectCommandOutput;
@@ -105,7 +105,7 @@ export async function readObject(
       } catch (err) {
         throw mapError(err);
       }
-      if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+      throwIfCancelled(ctx);
       // Lossy on purpose (fatal: false) — a binary object opened for preview degrades to U+FFFD
       // replacement characters rather than the whole read failing; the ContentType/size fields
       // above already tell the user what they're looking at.
@@ -135,7 +135,7 @@ export async function countObject(
   key: string,
   ctx: OpCtx,
 ): Promise<{ value: number; exact: boolean }> {
-  if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+  throwIfCancelled(ctx);
   ctx.setCommand(`HeadObject s3://${bucket}/${key}`);
   let res: HeadObjectCommandOutput;
   try {

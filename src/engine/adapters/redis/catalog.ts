@@ -2,7 +2,7 @@ import { encodePath, type TreeNode } from '@shared/domain/tree';
 import { abbreviateCount } from '@shared/format';
 import type { Redis } from 'ioredis';
 import type { OpCtx, TreeChildren } from '../adapter';
-import { AdapterError } from '../errors';
+import { AdapterError, throwIfCancelled } from '../errors';
 import { mapError } from './errors';
 
 // Never an unbudgeted SCAN (ground rules): a fixed COUNT hint per round-trip, and a hard cap on
@@ -66,7 +66,7 @@ export async function listNamespaceChildren(
   let rounds = 0;
 
   do {
-    if (ctx.signal.aborted) throw new AdapterError('E_CANCELLED', 'operation was cancelled');
+    throwIfCancelled(ctx);
     let result: [string, string[]];
     try {
       result = await conn.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', SCAN_COUNT);
