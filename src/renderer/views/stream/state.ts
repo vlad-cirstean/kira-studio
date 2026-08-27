@@ -4,9 +4,9 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { connectionsState } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findStreamTab, patchStreamTabState, unmarkHydrated } from '../../state/tabs';
+import { findStreamTab, patchStreamTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
-import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { recordStreamFilterUse } from './streamFilterHistory';
 
@@ -72,11 +72,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   const effectiveCursor: PageCursor = cursor ?? { mode: 'offset', offset: 0 };
-  const opId = crypto.randomUUID();
-  rt.status = 'loading';
-  rt.opId = opId;
-  rt.error = null;
-  rt.actionError = null;
+  const opId = beginOp(rt);
   rt.polled = true;
 
   // Kafka-only (item 2); always null for SQS, since StreamView.vue never lets an SQS tab's three
@@ -121,19 +117,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.visibilityTimeoutSeconds = response.page.visibilityTimeoutSeconds;
     rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
   } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      rt.status = 'cancelled';
-      return;
-    }
-    if (failure.kind === 'disconnected') {
-      unmarkHydrated(tabId);
-      return;
-    }
-    rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
+    applyLoadFailure(rt, opId, err, tabId);
   }
 }
 

@@ -2,9 +2,9 @@ import type { KeyValueTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findKeyValueTab, patchKeyValueTabState, unmarkHydrated } from '../../state/tabs';
+import { findKeyValueTab, patchKeyValueTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
-import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { getPage, setPage } from './page';
 
 // Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
@@ -82,11 +82,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
       effectiveCursor = { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize };
     }
   }
-  const opId = crypto.randomUUID();
-  rt.status = 'loading';
-  rt.opId = opId;
-  rt.error = null;
-  rt.actionError = null;
+  const opId = beginOp(rt);
 
   try {
     const response = await data.read({
@@ -113,19 +109,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.nextToken = response.page.position.nextToken;
     rt.prevToken = response.page.position.prevToken;
   } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      rt.status = 'cancelled';
-      return;
-    }
-    if (failure.kind === 'disconnected') {
-      unmarkHydrated(tabId);
-      return;
-    }
-    rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
+    applyLoadFailure(rt, opId, err, tabId);
   }
 }
 

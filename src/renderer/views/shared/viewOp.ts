@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { unmarkHydrated } from '../../state/tabs';
 
 // P39 F12/F13: grid/state.ts, documents/state.ts, keyvalue/state.ts, stream/state.ts and
 // console/state.ts each declared the same DISCONNECTED_CODES set and the same code/message
@@ -91,4 +92,57 @@ export function createRuntimeStore<R>(makeDefault: () => R): {
   }
 
   return { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } as never;
+}
+
+interface OpPreambleRuntime {
+  status: string;
+  opId: string | null;
+  error: { code: string; message: string } | null;
+  actionError: string | null;
+}
+
+// P48 F14: the op-start preamble — status/opId/error/actionError, after a crypto.randomUUID() —
+// byte-identical across grid/documents/keyvalue/stream's state.ts. Returns the op id it stamped,
+// for the caller's own request and its `if (rt.opId !== opId) return` supersession checks.
+export function beginOp(rt: OpPreambleRuntime): string {
+  const opId = crypto.randomUUID();
+  rt.status = 'loading';
+  rt.opId = opId;
+  rt.error = null;
+  rt.actionError = null;
+  return opId;
+}
+
+interface LoadFailureRuntime {
+  status: string;
+  opId: string | null;
+  error: { code: string; message: string } | null;
+}
+
+// P48 F14: the four-view failure tail, accrued one level past P39's own classifyLoadError
+// extraction — cancelled/disconnected/error react identically in grid/documents/keyvalue/stream's
+// state.ts, and now in console/state.ts too via `onDisconnected`, the one extra line
+// (`rt.status = 'idle'`) its own disconnected branch needs before unmarkHydrated (its own comment
+// explains why: left at 'running', the Stop button would come back permanently red).
+export function applyLoadFailure(
+  rt: LoadFailureRuntime,
+  opId: string,
+  err: unknown,
+  tabId: string,
+  opts?: { onDisconnected?(): void },
+): void {
+  if (rt.opId !== opId) return;
+  rt.opId = null;
+  const failure = classifyLoadError(err);
+  if (failure.kind === 'cancelled') {
+    rt.status = 'cancelled';
+    return;
+  }
+  if (failure.kind === 'disconnected') {
+    opts?.onDisconnected?.();
+    unmarkHydrated(tabId);
+    return;
+  }
+  rt.status = 'error';
+  rt.error = { code: failure.code, message: failure.message };
 }

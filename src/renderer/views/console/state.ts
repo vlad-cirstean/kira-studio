@@ -1,9 +1,9 @@
 import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findConsoleTab, patchConsoleTabState, unmarkHydrated } from '../../state/tabs';
+import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
 import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
-import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { applyLoadFailure, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
 /** One result set of a run. `key` is identity and never changes while the result is open — the
@@ -249,28 +249,18 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     rt.status = 'idle';
     rt.opId = null;
   } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      // Same discipline as the data grid's stop button: the previous results stay exactly as
-      // they were rather than being blanked.
-      rt.status = 'cancelled';
-      return;
-    }
-    if (failure.kind === 'disconnected') {
-      // unmarkHydrated swaps ViewChrome out for ReconnectGate immediately, but `status` still
-      // has to drop out of 'running' here — ConsoleView's `running`/`canStop` read it directly,
-      // and onReconnectAndLoad only ever calls markHydrated(), never touches `rt`. Left as
-      // 'running', the Stop button would come back permanently enabled (and, since it now tints
-      // red while live) permanently red the moment the tab reconnects, for as long as the tab
-      // stays open.
-      rt.status = 'idle';
-      unmarkHydrated(tabId);
-      return;
-    }
-    rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
+    // Cancelled: same discipline as the data grid's stop button — the previous results stay
+    // exactly as they were rather than being blanked. Disconnected: `status` has to drop out of
+    // 'running' before unmarkHydrated swaps ViewChrome out for ReconnectGate — ConsoleView's
+    // `running`/`canStop` read it directly, and onReconnectAndLoad only ever calls
+    // markHydrated(), never touches `rt`. Left as 'running', the Stop button would come back
+    // permanently enabled (and, since it now tints red while live) permanently red the moment the
+    // tab reconnects, for as long as the tab stays open.
+    applyLoadFailure(rt, opId, err, tabId, {
+      onDisconnected: () => {
+        rt.status = 'idle';
+      },
+    });
   }
 }
 

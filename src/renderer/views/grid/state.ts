@@ -5,14 +5,14 @@ import type { PageCursor } from '@shared/protocol/data-ops';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findDataTab, patchDataTabState, unmarkHydrated } from '../../state/tabs';
+import { findDataTab, patchDataTabState } from '../../state/tabs';
 import {
   registerDataQueryCommands,
   registerTabCount,
   registerTabReload,
   reloadTabsForTarget,
 } from '../../state/viewCommands';
-import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
 
@@ -101,11 +101,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     mode: 'offset',
     offset: tab.state.pageIndex * tab.state.pageSize,
   };
-  const opId = crypto.randomUUID();
-  rt.status = 'loading';
-  rt.opId = opId;
-  rt.error = null;
-  rt.actionError = null;
+  const opId = beginOp(rt);
 
   try {
     const response = await data.read({
@@ -141,22 +137,10 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.lastStrategy = strategy;
     if (!rt.meta) void loadMeta(tabId);
   } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      // A stop button that blanks the grid is worse than the query the user stopped — the
-      // previously rendered page stays exactly as it was.
-      rt.status = 'cancelled';
-      return;
-    }
-    if (failure.kind === 'disconnected') {
-      // Same entry point as a restored tab: one component, two ways in.
-      unmarkHydrated(tabId);
-      return;
-    }
-    rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
+    // A stop button that blanks the grid is worse than the query the user stopped — the
+    // previously rendered page stays exactly as it was. Disconnected: same entry point as a
+    // restored tab, one component, two ways in.
+    applyLoadFailure(rt, opId, err, tabId);
   }
 }
 
