@@ -5,6 +5,7 @@ import {
   type TabularPage,
 } from '@shared/protocol/page';
 import type { Client, QueryArrayConfig } from 'pg';
+import { withAbortRace } from '../abort';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertNotCancelled, throwIfCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
@@ -47,33 +48,11 @@ async function runRaw(
     types: { getTypeParser: () => (v: string) => v },
   };
 
-  return new Promise<RawResult>((resolve, reject) => {
-    let settled = false;
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release?.();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    client
-      .query(config)
-      .then((result: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        resolve(result as RawResult);
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        reject(mapError(err));
-      });
-  });
+  return withAbortRace<RawResult>(
+    ctx,
+    () => client.query(config) as unknown as Promise<RawResult>,
+    { release, mapError },
+  );
 }
 
 // A statement with no output columns (INSERT/UPDATE/DELETE/DDL/…) gets a synthetic single-cell

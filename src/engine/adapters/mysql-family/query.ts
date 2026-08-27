@@ -1,6 +1,7 @@
 import type { Connection, FieldInfo, TypeCastFunction, TypeCastNextFunction } from 'mariadb';
+import { withAbortRace } from '../abort';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertNotCancelled } from '../errors';
+import { assertNotCancelled } from '../errors';
 import { mapError } from './errors';
 
 export interface RunningQuery {
@@ -81,33 +82,8 @@ export async function runQuery<R = unknown>(
   // waiting — the server-side kill is entirely adapter.cancel()'s job (KILL QUERY over a side
   // connection, using the threadId tracked above); engine/scheduler/ops.ts's cancelOp()
   // triggers both, in that order — the same discipline as Postgres's pg_cancel_backend path.
-  return new Promise<R[]>((resolve, reject) => {
-    let settled = false;
-
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    issue(queryOptions, params)
-      .then((rows: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        resolve(rows as R[]);
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        reject(mapError(err));
-      });
-  });
+  const rows = await withAbortRace(ctx, () => issue(queryOptions, params), { release, mapError });
+  return rows as R[];
 }
 
 export interface CommandOptions {
@@ -133,32 +109,10 @@ export async function runCommand(
 
   const release = track({ threadId: conn.threadId });
 
-  return new Promise<{ affectedRows: number }>((resolve, reject) => {
-    let settled = false;
-
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    conn
-      .query({ sql }, params)
-      .then((result: { affectedRows?: number }) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        resolve({ affectedRows: result.affectedRows ?? 0 });
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        reject(mapError(err));
-      });
-  });
+  const result = await withAbortRace<{ affectedRows?: number }>(
+    ctx,
+    () => conn.query({ sql }, params),
+    { release, mapError },
+  );
+  return { affectedRows: result.affectedRows ?? 0 };
 }

@@ -1,6 +1,7 @@
 import type { Client, QueryArrayConfig, QueryConfig, QueryResultRow } from 'pg';
+import { withAbortRace } from '../abort';
 import type { OpCtx } from '../adapter';
-import { AdapterError, assertNotCancelled } from '../errors';
+import { assertNotCancelled } from '../errors';
 import { mapError } from './errors';
 
 export interface RunningQuery {
@@ -77,33 +78,8 @@ export async function runQuery<R extends QueryResultRow = QueryResultRow>(
   // tracked above); engine/scheduler/ops.ts's cancelOp() triggers both, in that order. This is
   // the single most misunderstood part of this design — do not "fix" it by trying to make the
   // query itself abort here.
-  return new Promise<R[]>((resolve, reject) => {
-    let settled = false;
-
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release?.();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    issue()
-      .then((result) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        resolve(result.rows as R[]);
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        reject(mapError(err));
-      });
-  });
+  const result = await withAbortRace(ctx, issue, { release, mapError });
+  return result.rows as R[];
 }
 
 export interface CommandOptions {
@@ -130,32 +106,10 @@ export async function runCommand(
   const backendPid = (client as unknown as { processID?: number }).processID;
   const release = typeof backendPid === 'number' ? track({ backendPid }) : undefined;
 
-  return new Promise<{ rowCount: number }>((resolve, reject) => {
-    let settled = false;
-
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release?.();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    client
-      .query(sql, params)
-      .then((result: { rowCount: number | null }) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        resolve({ rowCount: result.rowCount ?? 0 });
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release?.();
-        reject(mapError(err));
-      });
-  });
+  const result = await withAbortRace<{ rowCount: number | null }>(
+    ctx,
+    () => client.query(sql, params),
+    { release, mapError },
+  );
+  return { rowCount: result.rowCount ?? 0 };
 }

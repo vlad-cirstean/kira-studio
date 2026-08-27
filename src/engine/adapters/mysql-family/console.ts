@@ -6,6 +6,7 @@ import {
   type TypeClass,
 } from '@shared/protocol/page';
 import type { Connection, FieldInfo } from 'mariadb';
+import { withAbortRace } from '../abort';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertNotCancelled, throwIfCancelled } from '../errors';
 import { singleStatusPage } from '../sql-text';
@@ -76,33 +77,16 @@ async function runRaw(
   assertNotCancelled(ctx);
   const release = track({ threadId: conn.threadId });
 
-  return new Promise<QueryResultShape>((resolve, reject) => {
-    let settled = false;
-    const onAbort = (): void => {
-      if (settled) return;
-      settled = true;
-      release();
-      reject(new AdapterError('E_CANCELLED', 'operation was cancelled'));
-    };
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
-
-    conn
-      .query({ sql, rowsAsArray: true, typeCast: typeCastString })
-      .then((result: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        resolve(result as QueryResultShape);
-      })
-      .catch((err: unknown) => {
-        if (settled) return;
-        settled = true;
-        ctx.signal.removeEventListener('abort', onAbort);
-        release();
-        reject(mapError(err));
-      });
-  });
+  return withAbortRace<QueryResultShape>(
+    ctx,
+    () =>
+      conn.query({
+        sql,
+        rowsAsArray: true,
+        typeCast: typeCastString,
+      }) as unknown as Promise<QueryResultShape>,
+    { release, mapError },
+  );
 }
 
 function buildPage(result: QueryResultShape): TabularPage {
