@@ -7,10 +7,10 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
 import { typeClassColor } from '../../theme/icons';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
+import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import {
   type DocumentRowView,
@@ -376,56 +376,34 @@ function selectKeyValueRow(row: number): void {
       @visible-range="onVisibleRangeDocs"
     >
       <template #default="{ item: view }">
-        <div
-          class="doc-row"
+        <DocumentRow
           data-testid="console-result-doc-row"
           :data-row="view.index"
-          :data-id="view.id"
-          :class="{
-            open: isResultDocExpanded(tabId, pageKey, view.id),
-            selected: isSelected(view.index, 0),
-            'search-match': isSearchMatch(view.index, 0),
-            'search-match-current': isCurrentSearchMatch(view.index, 0),
-          }"
+          :view="view"
+          :scope="pageKey"
+          :expanded="isResultDocExpanded(tabId, pageKey, view.id)"
+          :selected="isSelected(view.index, 0)"
+          :search-match="isSearchMatch(view.index, 0)"
+          :search-match-current="isCurrentSearchMatch(view.index, 0)"
+          @toggle="onToggleDocExpanded(view.id)"
+          @select="selectDocumentRow(view.index)"
         >
-          <div class="doc-head" @click="selectDocumentRow(view.index)">
-            <button
-              type="button"
-              class="expand-toggle"
-              data-testid="document-toggle-expand"
-              :aria-label="isResultDocExpanded(tabId, pageKey, view.id) ? 'Collapse' : 'Expand'"
-              @click.stop="onToggleDocExpanded(view.id)"
+          <template #body>
+            <div
+              v-if="isResultDocExpanded(tabId, pageKey, view.id)"
+              class="doc-body-tree"
+              data-testid="document-body"
             >
-              <CodiconIcon
-                :name="isResultDocExpanded(tabId, pageKey, view.id) ? 'chevron-down' : 'chevron-right'"
-                :size="13"
+              <DocumentTree
+                v-if="view.root"
+                :tab-id="pageKey"
+                :row="view.index"
+                @toggle-path="(path) => togglePath(pageKey, view.index, path)"
               />
-            </button>
-            <span class="doc-id" data-testid="document-id">{{ view.idLabel }}</span>
-            <span class="p-badge" data-testid="document-field-count">{{ view.fieldCount }} fields</span>
-            <span class="p-badge" data-testid="document-byte-badge">{{ view.byteLabel }}</span>
-            <span
-              v-if="view.isTruncated"
-              class="p-badge warn"
-              v-tooltip="'value truncated'"
-              data-testid="document-truncated"
-              >truncated</span
-            >
-          </div>
-          <div
-            v-if="isResultDocExpanded(tabId, pageKey, view.id)"
-            class="doc-body-tree"
-            data-testid="document-body"
-          >
-            <DocumentTree
-              v-if="view.root"
-              :tab-id="pageKey"
-              :row="view.index"
-              @toggle-path="(path) => togglePath(pageKey, view.index, path)"
-            />
-            <pre v-else class="doc-body-text">{{ documentRow(pageKey, view.index)?.body }}</pre>
-          </div>
-        </div>
+              <pre v-else class="doc-body-text">{{ documentRow(pageKey, view.index)?.body }}</pre>
+            </div>
+          </template>
+        </DocumentRow>
       </template>
     </VirtualList>
     <VirtualList
@@ -570,73 +548,17 @@ function selectKeyValueRow(row: number): void {
   padding: var(--kira-s-2);
 }
 
-/* P42 D11: the same head/DocumentTree pair the Mongo data tab renders (DocumentView.vue), read
-   only — no edit/delete affordance, no editing chip. */
-.doc-row {
-  display: flex;
-  flex-direction: column;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+/* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
+   this panel only styles its own #body slot content, read only (no edit/delete affordance, no
+   editing chip). `:deep()` since `.doc-row` is that component's own root, outside this panel's
+   scope-id — the one place this copy genuinely differed from the document view's (F11): no
+   pointer cursor over the row outside its head. */
+:deep(.doc-row) {
   cursor: default;
 }
 
 .row.selected {
   background: var(--kira-select);
-}
-
-.doc-head {
-  height: var(--kira-h-md);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-3);
-  cursor: pointer;
-}
-
-.doc-head:hover {
-  background: var(--kira-hover);
-}
-
-.doc-row.open > .doc-head {
-  background: var(--kira-bg-elevated);
-}
-
-/* The row currently published to the cell editor (this panel's own selectDocumentRow) — a left
-   rail, never a full-row tint, so it stays legible under .open's own background and a search
-   match's highlight at the same time (DocumentView.vue's own rule, mirrored). */
-.doc-row.selected > .doc-head {
-  box-shadow: inset 2px 0 0 var(--kira-accent);
-}
-
-.doc-row.search-match {
-  background: var(--kira-search-match);
-}
-
-.doc-row.search-match-current {
-  background: var(--kira-search-match-current);
-}
-
-.expand-toggle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0;
-}
-
-.doc-id {
-  flex-shrink: 0;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--kira-font-family);
-  font-size: var(--kira-t-md);
-  color: var(--kira-fg);
 }
 
 .doc-body-tree {

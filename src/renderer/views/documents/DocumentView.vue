@@ -9,7 +9,6 @@ import { registerCommand } from '../../shortcuts/commands';
 import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -20,6 +19,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
+import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
 import {
@@ -723,53 +723,27 @@ onUnmounted(() => {
           @visible-range="onVisibleRange"
         >
           <template #default="{ item, index }">
-            <div
-              class="doc-row"
-              :class="{
-                open: isDocumentExpanded(tab.id, item.view.id),
-                selected: rt?.selectedRow === index,
-                'search-match': isSearchMatch(item.view.index),
-                'search-match-current': isCurrentSearchMatch(item.view.index),
-              }"
+            <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
+                 selectRow) — this view mounts no cell editor dock to publish a selection into
+                 (§8.7: a document's own row is already the read/write surface). The expand
+                 toggle and the Edit/Delete buttons below are nested inside this same click
+                 target — clicking any of them also reselects the row, which is harmless (selecting
+                 the row you just acted on is never wrong), so their own handlers stop propagation
+                 rather than double-firing selectRow with the same index. -->
+            <DocumentRow
               data-testid="document-row"
-              :data-id="item.view.id"
               :style="{ height: `${rowHeights[index]}px` }"
               @contextmenu="onRowContextMenu($event, item.view.id, item.body)"
+              :view="item.view"
+              :scope="tab.id"
+              :expanded="isDocumentExpanded(tab.id, item.view.id)"
+              :selected="rt?.selectedRow === index"
+              :search-match="isSearchMatch(item.view.index)"
+              :search-match-current="isCurrentSearchMatch(item.view.index)"
+              @toggle="toggleExpanded(tab.id, item.view.id)"
+              @select="onRowClick(index)"
             >
-              <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
-                   selectRow) — this view mounts no cell editor dock to publish a selection into
-                   (§8.7: a document's own row is already the read/write surface). The expand
-                   toggle and the Edit/Delete buttons below are nested inside this same click
-                   target — clicking any of them also reselects the row, which is harmless (selecting
-                   the row you just acted on is never wrong), so their own handlers stop propagation
-                   rather than double-firing selectRow with the same index. -->
-              <div class="doc-head" @click="onRowClick(index)">
-                <button
-                  type="button"
-                  class="expand-toggle"
-                  data-testid="document-toggle-expand"
-                  :aria-label="isDocumentExpanded(tab.id, item.view.id) ? 'Collapse' : 'Expand'"
-                  @click.stop="toggleExpanded(tab.id, item.view.id)"
-                >
-                  <CodiconIcon
-                    :name="isDocumentExpanded(tab.id, item.view.id) ? 'chevron-down' : 'chevron-right'"
-                    :size="13"
-                  />
-                </button>
-                <span class="doc-id" data-testid="document-id">{{ item.view.idLabel }}</span>
-                <span class="p-badge" data-testid="document-field-count"
-                  >{{ item.view.fieldCount }} fields</span
-                >
-                <span class="p-badge" data-testid="document-byte-badge">{{
-                  item.view.byteLabel
-                }}</span>
-                <span
-                  v-if="item.view.isTruncated"
-                  class="p-badge warn"
-                  v-tooltip="'value truncated'"
-                  data-testid="document-truncated"
-                  >truncated</span
-                >
+              <template #actions>
                 <span class="doc-head-spacer"></span>
                 <div class="doc-row-actions">
                   <span v-if="editingId === item.view.id" class="p-chip warn">editing</span>
@@ -789,53 +763,55 @@ onUnmounted(() => {
                     @click.stop="onDeleteRow(item.view.id)"
                   />
                 </div>
-              </div>
-              <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
-                   collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
-                   substring in <mark> inside the same string documents/search.ts's scanner matched
-                   against, so it cannot disagree with the offsets. Only while collapsed: an
-                   expanded document's own body is out of scope (§6). -->
-              <div
-                v-if="isSearchMatch(item.view.index) && !isDocumentExpanded(tab.id, item.view.id)"
-                class="doc-preview-match"
-                data-testid="document-search-preview"
-              >
-                <template v-for="(seg, si) in previewSegments(item.view.index, item.body)" :key="si">
-                  <mark v-if="seg.matched">{{ seg.text }}</mark>
-                  <template v-else>{{ seg.text }}</template>
-                </template>
-              </div>
-              <div
-                v-if="isDocumentExpanded(tab.id, item.view.id)"
-                class="doc-body"
-                data-testid="document-body"
-              >
-                <!-- The editor is the same code surface the definition view and the console views
-                     use — the only difference is the language. -->
-                <template v-if="editingId === item.view.id">
-                  <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
-                  <div class="edit-actions">
-                    <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
-                    <span class="edit-actions-spacer"></span>
-                    <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
-                      Save
-                    </AppButton>
-                    <AppButton data-testid="document-edit-cancel" @click="cancelEdit">
-                      Cancel
-                    </AppButton>
-                  </div>
-                </template>
-                <DocumentTree
-                  v-else-if="item.view.root"
-                  :tab-id="tab.id"
-                  :row="item.view.index"
-                  @toggle-path="(path) => togglePath(tab.id, item.view.index, path)"
-                />
-                <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
-                     object) falls back to raw text rather than a tree that has nothing to walk. -->
-                <CodeMirrorHost v-else :doc="item.body" language="json" :read-only="true" />
-              </div>
-            </div>
+              </template>
+              <template #body>
+                <!-- P31 D20/F21: a search match said nothing about *which* document matched (the
+                     collapsed row otherwise shows only `_id`, per D1) — this wraps the matched
+                     substring in <mark> inside the same string documents/search.ts's scanner matched
+                     against, so it cannot disagree with the offsets. Only while collapsed: an
+                     expanded document's own body is out of scope (§6). -->
+                <div
+                  v-if="isSearchMatch(item.view.index) && !isDocumentExpanded(tab.id, item.view.id)"
+                  class="doc-preview-match"
+                  data-testid="document-search-preview"
+                >
+                  <template v-for="(seg, si) in previewSegments(item.view.index, item.body)" :key="si">
+                    <mark v-if="seg.matched">{{ seg.text }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
+                </div>
+                <div
+                  v-if="isDocumentExpanded(tab.id, item.view.id)"
+                  class="doc-body"
+                  data-testid="document-body"
+                >
+                  <!-- The editor is the same code surface the definition view and the console views
+                       use — the only difference is the language. -->
+                  <template v-if="editingId === item.view.id">
+                    <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
+                    <div class="edit-actions">
+                      <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
+                      <span class="edit-actions-spacer"></span>
+                      <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
+                        Save
+                      </AppButton>
+                      <AppButton data-testid="document-edit-cancel" @click="cancelEdit">
+                        Cancel
+                      </AppButton>
+                    </div>
+                  </template>
+                  <DocumentTree
+                    v-else-if="item.view.root"
+                    :tab-id="tab.id"
+                    :row="item.view.index"
+                    @toggle-path="(path) => togglePath(tab.id, item.view.index, path)"
+                  />
+                  <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
+                       object) falls back to raw text rather than a tree that has nothing to walk. -->
+                  <CodeMirrorHost v-else :doc="item.body" language="json" :read-only="true" />
+                </div>
+              </template>
+            </DocumentRow>
           </template>
         </VirtualList>
       </div>
@@ -904,51 +880,11 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* The row's own total height is set inline from documentRows.ts's rowHeight() (P27 D20) — CSS
-   only distributes it between the fixed-height head and whatever's left for the body, never
-   restates the number itself. */
-.doc-row {
-  display: flex;
-  flex-direction: column;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.doc-head {
-  height: var(--kira-h-md);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4);
-  cursor: pointer;
-}
-
-.doc-head:hover {
-  background: var(--kira-hover);
-}
-
-.doc-row.open > .doc-head {
-  background: var(--kira-bg-elevated);
-}
-
-/* The row currently published to the cell editor (this view's `watch` above) — a left rail,
-   never a full-row tint, so it stays legible under `.open`'s own background and a search match's
-   highlight at the same time. */
-.doc-row.selected > .doc-head {
-  box-shadow: inset 2px 0 0 var(--kira-accent);
-}
-
-/* P31 D20: the same color-mix tint / solid-current pair DataGrid.vue and KeyValueView.vue use —
-   a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
-   still reads through it) since a document match has no single cell to point at. */
-.doc-row.search-match {
-  background: var(--kira-search-match);
-}
-
-.doc-row.search-match-current {
-  background: var(--kira-search-match-current);
-}
-
+/* P48 F10-F12: the row shell and its head (.doc-row/.doc-head and friends, .expand-toggle,
+   .doc-id) now live in views/shared/document/DocumentRow.vue — this view only styles its own
+   #actions/#body slot content. The row's own total height is set inline from
+   documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
+   head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
   padding: 0 var(--kira-s-4) var(--kira-s-2);
   font-family: var(--kira-font-family);
@@ -960,8 +896,10 @@ onUnmounted(() => {
 }
 
 /* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not
-   inheritance) — this compound selector is what actually flips it on the current match. */
-.doc-row.search-match-current .doc-preview-match {
+   inheritance) — this compound selector is what actually flips it on the current match.
+   :deep() on the ancestor half: `.doc-row.search-match-current` is DocumentRow.vue's own root
+   now, outside this component's scope-id — only `.doc-preview-match` itself needs scoping. */
+:deep(.doc-row.search-match-current) .doc-preview-match {
   color: var(--kira-bg);
 }
 
@@ -969,29 +907,6 @@ onUnmounted(() => {
   background: var(--kira-warn);
   color: var(--kira-bg);
   border-radius: var(--kira-radius-sm);
-}
-
-.expand-toggle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0;
-}
-
-.doc-id {
-  flex-shrink: 0;
-  font-family: var(--kira-font-family);
-  font-size: var(--kira-t-md);
-  color: var(--kira-fg);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Pushes .doc-row-actions to the trailing edge, the same role .doc-preview played before D1
