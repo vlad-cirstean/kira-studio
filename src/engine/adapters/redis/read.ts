@@ -2,6 +2,7 @@ import {
   createKeyValuePageBuilder,
   type KeyValuePage,
   type PagePosition,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { Redis } from 'ioredis';
 import type { OpCtx, ReadRequest } from '../adapter';
@@ -72,15 +73,7 @@ async function readString(
     memoryBytes: meta.memoryBytes,
   });
   if (value !== null) builder.push('value', value);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(1));
 }
 
 // Shared cursor-loop body for hash/set/zset (§8.8's per-type renderers): accumulates whole SCAN

@@ -2,7 +2,7 @@ import {
   createKeyValuePageBuilder,
   type KeyValuePage,
   type Page,
-  type PagePosition,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError, throwIfCancelled } from '../errors';
@@ -73,15 +73,7 @@ function resultToPage(command: string, reply: unknown): KeyValuePage {
     builder.push(command.toUpperCase(), formatReplyItem(reply));
     pageSize = 1;
   }
-  const position: PagePosition = {
-    offset: 0,
-    pageSize,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(pageSize));
 }
 
 // One op-log row for the whole batch (P5.5 D9's precedent, mirrored from mysql-family/console.ts and

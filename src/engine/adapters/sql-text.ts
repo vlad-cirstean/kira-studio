@@ -4,8 +4,8 @@ import type { ColumnMeta } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import { AdapterError } from './errors';
 
@@ -139,15 +139,7 @@ export function singleStatusPage(text: string, dataType: string): TabularPage {
   ];
   const builder = createTabularPageBuilder(columns);
   builder.appendRow([text]);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(1));
 }
 
 export interface EffectiveOrder {

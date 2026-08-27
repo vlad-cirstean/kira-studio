@@ -3,7 +3,7 @@ import {
   createDocumentPageBuilder,
   type DocumentPage,
   type Page,
-  type PagePosition,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import { EJSON } from 'bson';
 import type { Collection, Db, Document } from 'mongodb';
@@ -74,15 +74,7 @@ function docsToPage(docs: Document[]): DocumentPage {
     const id = doc._id !== undefined ? EJSON.stringify(doc._id, { relaxed: false }) : '';
     builder.push(id, EJSON.stringify(doc, { relaxed: false }));
   }
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: docs.length,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(docs.length));
 }
 
 // Console results that are an acknowledgement rather than a document set (insert/update/delete/
@@ -90,15 +82,7 @@ function docsToPage(docs: Document[]): DocumentPage {
 function statusPage(status: Record<string, unknown>): DocumentPage {
   const builder = createDocumentPageBuilder();
   builder.push('', EJSON.stringify(status, { relaxed: false }));
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(1));
 }
 
 async function runStatement(

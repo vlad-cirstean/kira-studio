@@ -2,8 +2,8 @@ import type { StatementSync } from 'node:sqlite';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError, assertNotCancelled } from '../errors';
@@ -50,15 +50,7 @@ function runOneStatement(stmt: StatementSync): TabularPage {
       builder.appendRow(row.map(toCellText));
       rowCount++;
     }
-    const position: PagePosition = {
-      offset: 0,
-      pageSize: rowCount,
-      hasMore: false,
-      nextToken: null,
-      prevToken: null,
-      strategy: 'offset',
-    };
-    return builder.finish(position);
+    return builder.finish(unpagedPosition(rowCount));
   } catch (err) {
     throw mapError(err);
   }

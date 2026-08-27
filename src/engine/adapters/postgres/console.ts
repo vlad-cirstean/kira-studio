@@ -1,8 +1,8 @@
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { Client, QueryArrayConfig } from 'pg';
 import { withAbortRace } from '../abort';
@@ -84,15 +84,7 @@ function buildPage(result: RawResult, typeNames: Map<number, string>): TabularPa
       row.map((v, i) => (v === null ? null : normalizeCellText(v, columns[i].typeClass))),
     );
   }
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: result.rows.length,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(result.rows.length));
 }
 
 async function lookupTypeNames(

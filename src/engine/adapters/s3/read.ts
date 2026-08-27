@@ -9,7 +9,7 @@ import {
   createKeyValuePageBuilder,
   type KeyValuePage,
   OBJECT_BODY_PREVIEW_BYTES,
-  type PagePosition,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { throwIfCancelled } from '../errors';
@@ -114,15 +114,7 @@ export async function readObject(
     }
   }
 
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: 1,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(1));
 }
 
 // A HeadObjectCommand (no body transfer) — cheap enough to answer the toolbar's Count button with

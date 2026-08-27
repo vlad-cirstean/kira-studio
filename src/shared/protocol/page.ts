@@ -78,6 +78,21 @@ export const pagePositionSchema = z.object({
   strategy: z.enum(['keyset', 'offset', 'cursor', 'offsetWindow', 'batch']),
 });
 
+// P48 F23: a page that is the whole result — no offset, no continuation, nothing more to fetch.
+// Ten adapters' console/read paths wrote this six-field literal out by hand, its only variable
+// being pageSize; the wire shape lives here beside its own schema, not under engine/adapters/,
+// since callers span SQL and non-SQL adapters alike.
+export function unpagedPosition(rowCount: number): PagePosition {
+  return {
+    offset: 0,
+    pageSize: rowCount,
+    hasMore: false,
+    nextToken: null,
+    prevToken: null,
+    strategy: 'offset',
+  };
+}
+
 export interface TabularPage {
   kind: 'tabular';
   columns: ColumnDescriptor[];

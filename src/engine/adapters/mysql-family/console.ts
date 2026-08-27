@@ -1,9 +1,9 @@
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
   type TypeClass,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { Connection, FieldInfo } from 'mariadb';
 import { withAbortRace } from '../abort';
@@ -108,15 +108,7 @@ function buildPage(result: QueryResultShape): TabularPage {
 
   const builder = createTabularPageBuilder(columns);
   for (const row of result) builder.appendRow(row);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: result.length,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return builder.finish(position);
+  return builder.finish(unpagedPosition(result.length));
 }
 
 export async function execute(

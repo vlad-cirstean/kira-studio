@@ -1,8 +1,8 @@
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
+  unpagedPosition,
 } from '@shared/protocol/page';
 import type { OpCtx } from '../adapter';
 import { AdapterError, throwIfCancelled } from '../errors';
@@ -59,15 +59,7 @@ async function runRowReturning(
     },
   );
   if (!builder) builder = createTabularPageBuilder(columns);
-  const position: PagePosition = {
-    offset: 0,
-    pageSize: rowCount,
-    hasMore: false,
-    nextToken: null,
-    prevToken: null,
-    strategy: 'offset',
-  };
-  return (builder as ReturnType<typeof createTabularPageBuilder>).finish(position);
+  return (builder as ReturnType<typeof createTabularPageBuilder>).finish(unpagedPosition(rowCount));
 }
 
 export async function execute(
