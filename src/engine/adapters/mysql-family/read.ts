@@ -1,4 +1,3 @@
-import type { SortDirection } from '@shared/domain/queries';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
@@ -10,12 +9,14 @@ import type { Connection } from 'mariadb';
 import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import {
+  assertKeysetSupported,
   buildKeysetPredicate,
-  buildOrderBy,
+  buildScanOrderBy,
   computeEffectiveOrder,
   decodePageToken,
   encodePageToken,
   requestFingerprint,
+  resolveFetchColumns,
   resolveProjection,
   safeInt,
 } from '../sql-text';
@@ -59,29 +60,12 @@ export async function readPage(
   );
   const isTextSort = req.sort?.kind === 'text';
   const wantsKeyset = req.cursor.mode === 'after' || req.cursor.mode === 'before';
+  assertKeysetSupported(wantsKeyset, isTextSort, order.keysetEligible);
 
-  if (wantsKeyset && (isTextSort || !order.keysetEligible)) {
-    throw new AdapterError(
-      'E_UNSUPPORTED',
-      'keyset pagination is unavailable for this sort; the client must use an offset cursor',
-    );
-  }
-
-  const projectedNames = new Set(projectedColumns.map((c) => c.name));
-  const columnByName = new Map(target.columns.map((c) => [c.name, c]));
-  const hiddenColumns = order.keysetEligible
-    ? order.keysetColumns
-        .filter((name) => !projectedNames.has(name))
-        .map((name) => {
-          const col = columnByName.get(name);
-          if (!col)
-            throw new AdapterError('E_QUERY', `keyset tiebreaker column not found: ${name}`);
-          return col;
-        })
-    : [];
-  const fetchColumns = [...projectedColumns, ...hiddenColumns];
-  const keysetColumnIndex = new Map(
-    order.keysetColumns.map((name) => [name, fetchColumns.findIndex((c) => c.name === name)]),
+  const { fetchColumns, keysetColumnIndex } = resolveFetchColumns(
+    projectedColumns,
+    target.columns,
+    order,
   );
 
   const columns: ColumnDescriptor[] = projectedColumns.map((c) => ({
@@ -109,18 +93,7 @@ export async function readPage(
   });
 
   const reverseRows = req.cursor.mode === 'before' && order.keysetEligible;
-  let orderBySql = '';
-  if (isTextSort && req.sort?.kind === 'text') {
-    orderBySql = req.sort.text;
-  } else if (order.terms.length > 0) {
-    const scanTerms = reverseRows
-      ? order.terms.map((t) => ({
-          column: t.column,
-          direction: (t.direction === 'asc' ? 'desc' : 'asc') as SortDirection,
-        }))
-      : order.terms;
-    orderBySql = buildOrderBy(scanTerms, quoteIdent);
-  }
+  const orderBySql = buildScanOrderBy(req.sort, order, reverseRows, quoteIdent);
 
   if (wantsKeyset && req.cursor.mode !== 'offset') {
     const token = req.cursor.token;

@@ -142,6 +142,21 @@ export function singleStatusPage(text: string, dataType: string): TabularPage {
   return builder.finish(unpagedPosition(1));
 }
 
+// P48 F24: byte-identical in postgres/mysql-family/sqlite's read.ts, wantsKeyset/isTextSort
+// computed one line above the call at every site.
+export function assertKeysetSupported(
+  wantsKeyset: boolean,
+  isTextSort: boolean,
+  eligible: boolean,
+): void {
+  if (wantsKeyset && (isTextSort || !eligible)) {
+    throw new AdapterError(
+      'E_UNSUPPORTED',
+      'keyset pagination is unavailable for this sort; the client must use an offset cursor',
+    );
+  }
+}
+
 export interface EffectiveOrder {
   terms: { column: string; direction: SortDirection }[];
   keysetEligible: boolean;
@@ -204,4 +219,53 @@ export function computeEffectiveOrder(
     keysetColumns: terms.map((t) => t.column),
     keysetDirection: direction,
   };
+}
+
+// P48 F24: postgres/mysql-family/sqlite's read.ts each resolved the same "tiebreaker columns not
+// already projected must still be fetched" step, byte-identical except how each looks up a
+// column by name — sqlite's rowid-aware resolver (resolveKeysetColumnMeta) doesn't have a plain
+// column list to search, so it is passed in as `resolveHidden` rather than assumed.
+export function resolveFetchColumns(
+  projected: ColumnMeta[],
+  all: ColumnMeta[],
+  order: EffectiveOrder,
+  resolveHidden?: (name: string) => ColumnMeta,
+): { fetchColumns: ColumnMeta[]; keysetColumnIndex: Map<string, number> } {
+  const projectedNames = new Set(projected.map((c) => c.name));
+  const columnByName = new Map(all.map((c) => [c.name, c]));
+  const resolve =
+    resolveHidden ??
+    ((name: string): ColumnMeta => {
+      const col = columnByName.get(name);
+      if (!col) throw new AdapterError('E_QUERY', `keyset tiebreaker column not found: ${name}`);
+      return col;
+    });
+  const hiddenColumns = order.keysetEligible
+    ? order.keysetColumns.filter((name) => !projectedNames.has(name)).map(resolve)
+    : [];
+  const fetchColumns = [...projected, ...hiddenColumns];
+  const keysetColumnIndex = new Map(
+    order.keysetColumns.map((name) => [name, fetchColumns.findIndex((c) => c.name === name)]),
+  );
+  return { fetchColumns, keysetColumnIndex };
+}
+
+// P48 F24: the scan ORDER BY — a text sort verbatim, else the effective terms with every
+// direction flipped when the fetch runs backwards for a `before` cursor (D7's reversal),
+// byte-identical across the three keyset-capable adapters.
+export function buildScanOrderBy(
+  sort: SortSpec | null,
+  order: EffectiveOrder,
+  reverseRows: boolean,
+  quote: (s: string) => string,
+): string {
+  if (sort?.kind === 'text') return sort.text;
+  if (order.terms.length === 0) return '';
+  const scanTerms = reverseRows
+    ? order.terms.map((t) => ({
+        column: t.column,
+        direction: (t.direction === 'asc' ? 'desc' : 'asc') as SortDirection,
+      }))
+    : order.terms;
+  return buildOrderBy(scanTerms, quote);
 }
