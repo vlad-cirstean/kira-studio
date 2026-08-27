@@ -18,6 +18,7 @@ import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
+import { settingsState } from '../../state/settings';
 import { browseInvalidate } from '../../state/viewCommands';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
@@ -30,11 +31,13 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
@@ -127,6 +130,11 @@ function rowAt(i: number) {
   void pageVersion.n;
   return keyValueRow(props.tab.id, i);
 }
+
+// P49 F7/D5: matches the density this row's own CSS (`--kira-row-height`) already resolves to —
+// VirtualList needs the pixel value in JS for its offset math, the CSS var alone isn't reachable
+// from there.
+const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function ttlText(ttlMs: number | null): string {
   if (ttlMs === null) return 'no expiry';
@@ -503,9 +511,25 @@ function onCloseSearch(): void {
   setSearchOpen(props.tab.id, false);
 }
 
-const tbodyRef = ref<HTMLElement | null>(null);
+// P49 F7/D5: rowIndices is the *filtered* array when the filter toggle is on, so a match's page-row
+// number has to be looked up by position rather than assumed to equal it — same as
+// ConsoleResultGrid.vue's/DocumentView.vue's own goToMatch, now that this view's rows are
+// virtualized too (a plain querySelector can no longer find an off-screen row's DOM node).
+const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 function onGoToMatch(match: Match): void {
-  tbodyRef.value?.querySelector(`[data-row="${match.row}"]`)?.scrollIntoView({ block: 'nearest' });
+  const index = rowIndices.value.indexOf(match.row);
+  if (index >= 0) listRef.value?.scrollToIndex(index);
+}
+
+// P49 F7/D5: closes the hole keyvalue/search.ts's own runSearch doc comment named — until this
+// view virtualized its rows, nothing ever reported a visible window, so a find's priority scan
+// always started from row 0 with no on-screen rows to prioritize first.
+function onVisibleRangeIndices(range: { start: number; end: number }): void {
+  const list = rowIndices.value;
+  const from = list[range.start];
+  const to = list[Math.max(range.start, range.end - 1)];
+  if (from === undefined || to === undefined) return;
+  setVisibleRows(props.tab.id, from, to + 1);
 }
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per row.
@@ -826,7 +850,7 @@ onUnmounted(() => {
             <span class="name">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
           </div>
         </div>
-        <div class="tbody" ref="tbodyRef" data-testid="keyvalue-list">
+        <div class="tbody" data-testid="keyvalue-list">
           <EmptyState
             v-if="!rt || rt.rowCount === 0"
             :icon="rt ? 'database' : 'loading'"
@@ -844,44 +868,50 @@ onUnmounted(() => {
               Show all rows
             </AppButton>
           </EmptyState>
-          <template v-else>
-            <div
-              v-for="i in rowIndices"
-              :key="i"
-              class="kv-row"
-              data-testid="keyvalue-row"
-              :data-row="i"
-              @click="onRowClick(i)"
-              @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.field, rowAt(i)!.value)"
-            >
-              <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
+          <VirtualList
+            v-else
+            ref="listRef"
+            :items="rowIndices"
+            :row-height="rowHeight"
+            @visible-range="onVisibleRangeIndices"
+          >
+            <template #default="{ item: i }">
               <div
-                class="p-td kv-col-field"
-                :class="{
-                  'search-match': isSearchMatch(i, 'field'),
-                  'search-match-current': isCurrentSearchMatch(i, 'field'),
-                }"
-                v-tooltip="rowAt(i)?.field"
-                data-testid="keyvalue-field"
+                class="kv-row"
+                data-testid="keyvalue-row"
+                :data-row="i"
+                @click="onRowClick(i)"
+                @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.field, rowAt(i)!.value)"
               >
-                {{ rowAt(i)?.field }}
-              </div>
-              <div
-                class="p-td kv-col-value"
-                :class="{
-                  'search-match': isSearchMatch(i, 'value'),
-                  'search-match-current': isCurrentSearchMatch(i, 'value'),
-                }"
-                v-tooltip="rowAt(i)?.value"
-                data-testid="keyvalue-value"
-              >
-                {{ rowAt(i)?.value }}
-                <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" v-tooltip="'value truncated'"
-                  >truncated</span
+                <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
+                <div
+                  class="p-td kv-col-field"
+                  :class="{
+                    'search-match': isSearchMatch(i, 'field'),
+                    'search-match-current': isCurrentSearchMatch(i, 'field'),
+                  }"
+                  v-tooltip="rowAt(i)?.field"
+                  data-testid="keyvalue-field"
                 >
+                  {{ rowAt(i)?.field }}
+                </div>
+                <div
+                  class="p-td kv-col-value"
+                  :class="{
+                    'search-match': isSearchMatch(i, 'value'),
+                    'search-match-current': isCurrentSearchMatch(i, 'value'),
+                  }"
+                  v-tooltip="rowAt(i)?.value"
+                  data-testid="keyvalue-value"
+                >
+                  {{ rowAt(i)?.value }}
+                  <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" v-tooltip="'value truncated'"
+                    >truncated</span
+                  >
+                </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </VirtualList>
         </div>
       </div>
       </template>
@@ -910,7 +940,10 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  /* P49 D5: VirtualList owns scrolling internally now (its own `.virtual-list { overflow: auto }`,
+     height:100% against this flex:1/min-height:0 parent) — EmptyState's two branches above never
+     needed to scroll either. */
+  overflow: hidden;
 }
 
 .kv-col-gutter {

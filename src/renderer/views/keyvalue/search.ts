@@ -45,10 +45,9 @@ export function runSearch(
     })),
     q,
     onProgress,
-    // P42 D39: KeyValueView.vue renders every loaded row directly (no VirtualList), so nothing
-    // ever calls setVisibleRows for this tab and this always resolves to `undefined` — the same
-    // plain ascending scan as before D37. Still gains D38's progressive publication, which needs
-    // no visible-window input at all.
+    // P42 D39/P49 D5: KeyValueView.vue now reports its own visible window (VirtualList's
+    // visible-range emit), so this scans on-screen rows first instead of always starting cold at
+    // row 0 — closing the gap this comment used to record.
     { priority: visibleRowsOf(tabId) ?? undefined },
   );
 }

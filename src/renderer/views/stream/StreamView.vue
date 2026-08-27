@@ -12,6 +12,7 @@ import {
 import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
+import { settingsState } from '../../state/settings';
 import { patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
@@ -24,6 +25,7 @@ import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
@@ -118,6 +120,13 @@ function rowAt(i: number) {
   void pageVersion.n;
   return streamRow(props.tab.id, i);
 }
+
+// P49 F7/D5: `.stream-row` never had an explicit height before this view was virtualized — its
+// rows sized themselves off whichever cell had text (`.p-td`'s own line-height), which is why
+// `.stream-row`'s CSS rule below carries none — VirtualList needs one fixed pixel value for its
+// offset math, so this adopts the same density-driven height DataGrid.vue/ConsoleResultGrid.vue/
+// KeyValueView.vue already use rather than inventing a fourth number.
+const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
   e.preventDefault();
@@ -400,11 +409,14 @@ const currentMatchRow = computed(() => {
   return s && s.index >= 0 ? (s.matches[s.index] ?? null) : null;
 });
 
-const scrollContainerRef = ref<HTMLDivElement | null>(null);
+// P49 F7/D5: rowIndices is the *filtered* array when the filter toggle is on, so a match's page-row
+// number has to be looked up by position rather than assumed to equal it — same as
+// KeyValueView.vue's/ConsoleResultGrid.vue's own goToMatch, now that this view's rows are
+// virtualized too (a plain querySelector can no longer find an off-screen row's DOM node).
+const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 function onGoToMatch(row: number): void {
-  scrollContainerRef.value
-    ?.querySelector(`[data-row-index="${row}"]`)
-    ?.scrollIntoView({ block: 'nearest' });
+  const index = rowIndices.value.indexOf(row);
+  if (index >= 0) listRef.value?.scrollToIndex(index);
 }
 function onCloseSearch(): void {
   setSearchOpen(props.tab.id, false);
@@ -818,68 +830,68 @@ onUnmounted(() => {
             </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
-          <div class="tbody-scroll" ref="scrollContainerRef">
-            <div
-              v-for="i in rowIndices"
-              :key="i"
-              class="stream-row"
-              data-testid="stream-row"
-              :data-row-index="i"
-              :class="{
-                selected: rt?.selectedRow === i,
-                'search-match': matchSet.has(i),
-                'search-match-current': currentMatchRow === i,
-              }"
-              @click="onRowClick(i)"
-              @contextmenu="onRowContextMenu($event, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '')"
-            >
-              <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
+          <VirtualList ref="listRef" class="tbody-scroll" :items="rowIndices" :row-height="rowHeight">
+            <template #default="{ item: i }">
               <div
-                class="p-td"
-                :class="cellClass({ isNull: rowAt(i)?.key === null })"
-                :style="{ width: `${widthFor('key')}px` }"
-                data-testid="stream-key"
-                @click.stop="onCellClick(i, 'key', rowAt(i)?.key ?? null)"
+                class="stream-row"
+                data-testid="stream-row"
+                :data-row-index="i"
+                :class="{
+                  selected: rt?.selectedRow === i,
+                  'search-match': matchSet.has(i),
+                  'search-match-current': currentMatchRow === i,
+                }"
+                @click="onRowClick(i)"
+                @contextmenu="onRowContextMenu($event, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '')"
               >
-                {{ rowAt(i)?.key ?? '(none)' }}
-              </div>
-              <div
-                class="p-td"
-                :style="{ width: `${widthFor('timestamp')}px` }"
-                data-testid="stream-timestamp"
-                @click.stop="onCellClick(i, 'timestamp', rowAt(i)?.timestamp ?? null)"
-              >
-                {{ rowAt(i)?.timestamp ?? '' }}
-              </div>
-              <div
-                class="p-td"
-                :style="{ width: `${widthFor('headers')}px` }"
-                data-testid="stream-headers"
-                @click.stop="onCellClick(i, 'headers', rowAt(i)?.headers ?? null)"
-              >
-                {{ rowAt(i)?.headers }}
-              </div>
-              <div
-                class="p-td"
-                :style="{ width: `${widthFor('attrs')}px` }"
-                data-testid="stream-attrs"
-                @click.stop="onCellClick(i, 'attrs', rowAt(i)?.attrs ?? null)"
-              >
-                {{ rowAt(i)?.attrs }}
-              </div>
-              <div
-                class="p-td msg-body"
-                style="flex: 1"
-                data-testid="stream-body"
-                @click.stop="onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated)"
-              >
-                {{ rowAt(i)?.body }}
-                <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" v-tooltip="'body truncated'"
-                  >(truncated)</span
+                <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
+                <div
+                  class="p-td"
+                  :class="cellClass({ isNull: rowAt(i)?.key === null })"
+                  :style="{ width: `${widthFor('key')}px` }"
+                  data-testid="stream-key"
+                  @click.stop="onCellClick(i, 'key', rowAt(i)?.key ?? null)"
                 >
+                  {{ rowAt(i)?.key ?? '(none)' }}
+                </div>
+                <div
+                  class="p-td"
+                  :style="{ width: `${widthFor('timestamp')}px` }"
+                  data-testid="stream-timestamp"
+                  @click.stop="onCellClick(i, 'timestamp', rowAt(i)?.timestamp ?? null)"
+                >
+                  {{ rowAt(i)?.timestamp ?? '' }}
+                </div>
+                <div
+                  class="p-td"
+                  :style="{ width: `${widthFor('headers')}px` }"
+                  data-testid="stream-headers"
+                  @click.stop="onCellClick(i, 'headers', rowAt(i)?.headers ?? null)"
+                >
+                  {{ rowAt(i)?.headers }}
+                </div>
+                <div
+                  class="p-td"
+                  :style="{ width: `${widthFor('attrs')}px` }"
+                  data-testid="stream-attrs"
+                  @click.stop="onCellClick(i, 'attrs', rowAt(i)?.attrs ?? null)"
+                >
+                  {{ rowAt(i)?.attrs }}
+                </div>
+                <div
+                  class="p-td msg-body"
+                  style="flex: 1"
+                  data-testid="stream-body"
+                  @click.stop="onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated)"
+                >
+                  {{ rowAt(i)?.body }}
+                  <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" v-tooltip="'body truncated'"
+                    >(truncated)</span
+                  >
+                </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </VirtualList>
         </template>
       </div>
       </template>
@@ -918,6 +930,9 @@ onUnmounted(() => {
 }
 
 .stream-row {
+  /* P49 F7/D5: previously unset (sized off whatever text a cell happened to hold) — now fixed,
+     matching the density-driven rowHeight computed VirtualList's offset math needs. */
+  height: var(--kira-row-height);
   display: flex;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   cursor: pointer;

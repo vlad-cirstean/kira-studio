@@ -174,6 +174,11 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   await expect(bigHashView).toBeVisible();
   const bigHashFirstField = bigHashView.locator('[data-testid="keyvalue-field"]').first();
   await expect(bigHashFirstField).toBeVisible({ timeout: 15_000 });
+  // P49 F7/D5: this page holds 100 rows (defaultKeyValueTabState's own pageSize) — with rows now
+  // virtualized, the DOM should hold far fewer, proving this is real windowing rather than an
+  // assertion that would pass either way.
+  const bigHashRowCount = await bigHashView.locator('[data-testid="keyvalue-row"]').count();
+  expect(bigHashRowCount).toBeLessThan(100);
   const firstFieldAtPageOne = await bigHashFirstField.innerText();
   const bigHashNext = bigHashView.locator('[data-testid="keyvalue-next"]');
   await bigHashNext.click(); // clicking a disabled button times out — the guard that this key
@@ -202,9 +207,14 @@ test('redis — connect, tree, keyvalue tabs, console', async ({ kira, consoleEr
   const listView = page.locator(`[data-testid="keyvalue-view"][data-path="${LIST_KEY_PATH}"]`);
   await expect(listView).toBeVisible();
   await expect(listView.locator('[data-testid="keyvalue-type"]')).toHaveText('list');
-  await expect(listView.locator('[data-testid="keyvalue-row"]')).toHaveCount(LIST_LENGTH, {
-    timeout: 15_000,
-  });
+  // P49 F7/D5: rows are virtualized now — a DOM node count can no longer stand in for "the whole
+  // list loaded in one page" (the viewport may render fewer nodes than LIST_LENGTH), so this reads
+  // the status line's own loaded-count instead, the same number the DOM-node count used to imply.
+  await expect(listView.locator('[data-testid="keyvalue-status"]')).toContainText(
+    `${LIST_LENGTH} loaded`,
+    { timeout: 15_000 },
+  );
+  await expect(listView.locator('[data-testid="keyvalue-row"]').first()).toBeVisible();
   await expect(listView.locator('[data-testid="keyvalue-prev"]')).toBeDisabled();
   await expect(listView.locator('[data-testid="keyvalue-next"]')).toBeDisabled();
 
