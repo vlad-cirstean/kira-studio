@@ -48,7 +48,9 @@ import {
   runtime,
   setActionError,
   setPageSize,
+  setSearchOpen,
   stop,
+  toggleSearchOpen,
 } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
@@ -494,12 +496,10 @@ function onRowClick(i: number): void {
 // --- search: filters the already-loaded page only, never a new query (mirrors
 // views/grid/search.ts's discipline exactly — see keyvalue/search.ts). ------------------------------
 function onToggleSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = !r.searchOpen;
+  toggleSearchOpen(props.tab.id);
 }
 function onCloseSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = false;
+  setSearchOpen(props.tab.id, false);
 }
 
 const tbodyRef = ref<HTMLElement | null>(null);

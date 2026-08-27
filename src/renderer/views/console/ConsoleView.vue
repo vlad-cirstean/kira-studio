@@ -33,8 +33,10 @@ import {
   runtime,
   setActiveResult,
   setNewResultSet,
+  setSearchOpen,
   setText,
   stop,
+  toggleSearchOpen,
 } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
@@ -151,12 +153,10 @@ function onStop(): void {
 // --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
 // KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
 function onToggleSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = !r.searchOpen;
+  toggleSearchOpen(props.tab.id);
 }
 function onCloseSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = false;
+  setSearchOpen(props.tab.id, false);
 }
 
 const resultGridRef = ref<{

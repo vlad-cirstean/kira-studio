@@ -15,7 +15,7 @@ import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
 import { type Match, pageSearchApi } from './search';
-import { load, reload, runtime } from './state';
+import { load, reload, runtime, setSearchOpen, toggleSearchOpen } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
@@ -88,10 +88,7 @@ onMounted(() => {
   // `v-else-if` chain), so registering here — rather than switching on tab kind in a global
   // dispatcher — is what makes Find/Refresh always act on the currently visible data tab.
   unregisterCommands = [
-    registerCommand('view.find', () => {
-      const rt = runtime[props.tab.id];
-      if (rt) rt.searchOpen = !rt.searchOpen;
-    }),
+    registerCommand('view.find', () => toggleSearchOpen(props.tab.id)),
     // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
     // no-op while the tab sits behind the reconnect gate (same bug the toolbar's own Refresh
     // button had, item 4's first pass) — the keyboard-shortcut/command-palette path needs the
@@ -112,8 +109,7 @@ function onGoToMatch(match: Match): void {
   dataGridRef.value?.scrollCellIntoView(match.row, match.col);
 }
 function onCloseSearch(): void {
-  const runtimeEntry = runtime[props.tab.id];
-  if (runtimeEntry) runtimeEntry.searchOpen = false;
+  setSearchOpen(props.tab.id, false);
 }
 </script>
 

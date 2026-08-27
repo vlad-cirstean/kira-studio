@@ -61,9 +61,10 @@ function defaultRuntime(): DataViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<DataViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
+  createRuntimeStore<DataViewRuntime>(defaultRuntime);
 
-export { runtime };
+export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
 // directly (reality 18), so it registers here instead.
@@ -73,10 +74,7 @@ registerTabRuntimeCleanup((tabId) => {
 
 /** P43 F5/D7: written by DataToolbar.vue's own catch around commitPending — see actionError's own
  *  doc comment above for why this is a sibling of `error`, not a reuse of it. */
-export function setActionError(tabId: string, message: string | null): void {
-  const rt = runtime[tabId];
-  if (rt) rt.actionError = message;
-}
+export { setActionError };
 
 async function loadMeta(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);

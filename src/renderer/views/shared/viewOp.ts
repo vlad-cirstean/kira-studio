@@ -47,10 +47,25 @@ export function stopOp(rt: { opId: string | null } | undefined): void {
  *  pager button's `disabled` binding) would ever be notified. Each view keeps its own
  *  `registerTabRuntimeCleanup` call — the cleanup body genuinely differs (console's also clears
  *  `results`) — and its own `defaultRuntime()`, since the six runtime shapes differ. */
+type HasActionError = { actionError: string | null };
+type HasSearchOpen = { searchOpen: boolean };
+
+// P48 F15/F16: setActionError (five identical four-line functions) and the search-open toggle
+// (five onToggleSearch, four onCloseSearch copies) both reduce to "read/write one field on this
+// tab's runtime" — the same shape ensureRuntime's own record already owns. The three setters below
+// are conditionally present on the returned object, keyed off whether R actually carries the
+// field: browse's runtime has actionError but no searchOpen (no find toolbar), console's has
+// searchOpen but no actionError (nothing to mutate) — a store built over either type only ever
+// exposes the setters that field supports, so calling the wrong one is a type error, not a no-op.
 export function createRuntimeStore<R>(makeDefault: () => R): {
   runtime: Record<string, R>;
   ensureRuntime(tabId: string): R;
-} {
+} & (R extends HasActionError
+  ? { setActionError(tabId: string, message: string | null): void }
+  : object) &
+  (R extends HasSearchOpen
+    ? { toggleSearchOpen(tabId: string): void; setSearchOpen(tabId: string, open: boolean): void }
+    : object) {
   const runtime = reactive({} as Record<string, R>);
 
   function ensureRuntime(tabId: string): R {
@@ -60,5 +75,20 @@ export function createRuntimeStore<R>(makeDefault: () => R): {
     return runtime[tabId];
   }
 
-  return { runtime, ensureRuntime };
+  function setActionError(tabId: string, message: string | null): void {
+    const rt = runtime[tabId] as unknown as HasActionError | undefined;
+    if (rt) rt.actionError = message;
+  }
+
+  function toggleSearchOpen(tabId: string): void {
+    const rt = runtime[tabId] as unknown as HasSearchOpen | undefined;
+    if (rt) rt.searchOpen = !rt.searchOpen;
+  }
+
+  function setSearchOpen(tabId: string, open: boolean): void {
+    const rt = runtime[tabId] as unknown as HasSearchOpen | undefined;
+    if (rt) rt.searchOpen = open;
+  }
+
+  return { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } as never;
 }

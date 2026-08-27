@@ -69,9 +69,11 @@ import {
   setAllExpanded,
   setPageSize,
   setSearch,
+  setSearchOpen,
   setSort,
   stop,
   toggleExpanded,
+  toggleSearchOpen,
 } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
@@ -270,13 +272,11 @@ async function commitCreate(): Promise<void> {
 }
 
 function onToggleSearch(): void {
-  const r = runtime[props.tab.id];
-  if (r) r.searchOpen = !r.searchOpen;
+  toggleSearchOpen(props.tab.id);
 }
 
 function onCloseSearch(): void {
-  const r = runtime[props.tab.id];
-  if (r) r.searchOpen = false;
+  setSearchOpen(props.tab.id, false);
 }
 
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);

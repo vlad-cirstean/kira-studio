@@ -44,7 +44,8 @@ function defaultRuntime(): BrowseViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<BrowseViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, setActionError } =
+  createRuntimeStore<BrowseViewRuntime>(defaultRuntime);
 
 export { runtime };
 
@@ -53,10 +54,7 @@ registerTabRuntimeCleanup((tabId) => {
 });
 
 /** P43 F6/D7: written by browse/menu.ts's own catch around a row's Delete item. */
-export function setActionError(tabId: string, message: string | null): void {
-  const rt = runtime[tabId];
-  if (rt) rt.actionError = message;
-}
+export { setActionError };
 
 /** The level a tab is currently showing — `''` in session state means "the tab's own container
  *  path" (D14), so a freshly opened tab and one restored at its root agree. */

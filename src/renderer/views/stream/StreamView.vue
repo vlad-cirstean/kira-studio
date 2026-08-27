@@ -47,7 +47,9 @@ import {
   selectRow,
   setActionError,
   setPageSize,
+  setSearchOpen,
   stop,
+  toggleSearchOpen,
 } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
@@ -389,8 +391,7 @@ async function onDeleteMessage(): Promise<void> {
 
 // Item 5: toggles the client-side, current-page-only search bar (DataView.vue's same pattern).
 function onToggleSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = !r.searchOpen;
+  toggleSearchOpen(props.tab.id);
 }
 
 const matchSet = computed(() => new Set(searchState[props.tab.id]?.matches ?? []));
@@ -406,8 +407,7 @@ function onGoToMatch(row: number): void {
     ?.scrollIntoView({ block: 'nearest' });
 }
 function onCloseSearch(): void {
-  const r = rt.value;
-  if (r) r.searchOpen = false;
+  setSearchOpen(props.tab.id, false);
 }
 
 // Item 4: per-column resize for the four fixed-width columns (mirrors DataGrid.vue's own

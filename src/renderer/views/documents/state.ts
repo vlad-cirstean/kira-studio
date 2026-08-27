@@ -47,9 +47,10 @@ function defaultRuntime(): DocumentViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<DocumentViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
+  createRuntimeStore<DocumentViewRuntime>(defaultRuntime);
 
-export { runtime };
+export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup((tabId) => {
@@ -57,10 +58,7 @@ registerTabRuntimeCleanup((tabId) => {
 });
 
 /** P43 F6/D7: written by DocumentView.vue's own catches around commitCreate/commitEdit/deleteDocument. */
-export function setActionError(tabId: string, message: string | null): void {
-  const rt = runtime[tabId];
-  if (rt) rt.actionError = message;
-}
+export { setActionError };
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findDocumentTab(tabId);

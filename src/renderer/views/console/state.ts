@@ -42,9 +42,10 @@ function defaultRuntime(): ConsoleViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, toggleSearchOpen, setSearchOpen } =
+  createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
 
-export { runtime };
+export { runtime, setSearchOpen, toggleSearchOpen };
 
 export function isResultDocExpanded(tabId: string, resultKey: string, id: string): boolean {
   return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;

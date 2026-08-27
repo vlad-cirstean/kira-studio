@@ -34,6 +34,7 @@ import {
   setActionError,
   setPageSize,
   stop,
+  toggleSearchOpen,
 } from './state';
 
 // Item 4 (regression pass, task batch P46-2): this toolbar's own Refresh must behave like the
@@ -134,8 +135,7 @@ function onJump(e: Event): void {
   }
 }
 function onToggleSearch(): void {
-  const r = tab.value ? runtime[tab.value.id] : undefined;
-  if (r) r.searchOpen = !r.searchOpen;
+  if (tab.value) toggleSearchOpen(tab.value.id);
 }
 
 const columnsOpen = ref(false);

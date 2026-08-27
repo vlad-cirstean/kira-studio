@@ -53,9 +53,10 @@ function defaultRuntime(): StreamViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<StreamViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
+  createRuntimeStore<StreamViewRuntime>(defaultRuntime);
 
-export { runtime };
+export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup((tabId) => {
@@ -64,10 +65,7 @@ registerTabRuntimeCleanup((tabId) => {
 
 /** P43 F6/D7: written by StreamView.vue's own catch around onDeleteMessage (SQS only — Kafka/
  *  RabbitMQ have no addressable delete). */
-export function setActionError(tabId: string, message: string | null): void {
-  const rt = runtime[tabId];
-  if (rt) rt.actionError = message;
-}
+export { setActionError };
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findStreamTab(tabId);

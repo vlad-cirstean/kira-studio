@@ -41,9 +41,10 @@ function defaultRuntime(): KeyValueViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<KeyValueViewRuntime>(defaultRuntime);
+const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
+  createRuntimeStore<KeyValueViewRuntime>(defaultRuntime);
 
-export { runtime };
+export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
 registerTabRuntimeCleanup((tabId) => {
@@ -54,10 +55,7 @@ registerTabRuntimeCleanup((tabId) => {
  *  editError/objectSaveError/addError refs already cover the edit/add surfaces (F6's own table),
  *  this is what was missing: delete has no popover to hold a local ref, so it gets the shared
  *  per-tab field every other immediate-mutation view uses. */
-export function setActionError(tabId: string, message: string | null): void {
-  const rt = runtime[tabId];
-  if (rt) rt.actionError = message;
-}
+export { setActionError };
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findKeyValueTab(tabId);
