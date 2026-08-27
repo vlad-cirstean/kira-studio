@@ -116,7 +116,15 @@ write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contr
 `adapter.ts`: enforced on the engine side, not only greyed out in the UI). It also holds
 `assertNotCancelled(ctx)` (P39 iter3) — Adapter rule 2's pre-flight cancellation check (`throw`s
 `E_CANCELLED` if `ctx.signal` is already aborted), replacing nine copies of the same guard across
-postgres/mysql-family/rabbitmq/clickhouse/sqlite.
+postgres/mysql-family/rabbitmq/clickhouse/sqlite. It also holds (P48) `throwIfCancelled(ctx)` —
+`assertNotCancelled`'s mid-flight sibling, the check an adapter re-runs after an `await` rather than
+before a call starts, with a message that says so ("operation was cancelled", no "before it
+started") — replacing twenty-six identical copies across eight adapters, and `requireConnected(handle)`,
+replacing ten identical "did `connect()` ever run" guards each adapter's private handle accessors
+opened with. `postgres/query.ts` and `mysql-family/query.ts`'s own callback-style abort/settle race
+(cancel arriving after the driver's callback already resolved, or vice versa) is unified behind a
+new `engine/adapters/abort.ts`'s `withAbortRace(ctx, run, opts)`, replacing six near-identical copies
+across their `query.ts`/`console.ts` modules.
 
 `src/engine/adapters/sql-text.ts` holds the genuinely shared, driver-agnostic SQL text/planning
 glue the SQL adapters' `read.ts` modules call — `resolveProjection`/`safeInt` (P39),
@@ -124,7 +132,14 @@ glue the SQL adapters' `read.ts` modules call — `resolveProjection`/`safeInt` 
 — the keyset-eligibility rule (which sort terms admit a keyset predicate, and the tiebreaker that
 makes one) that postgres/mysql-family/sqlite's `read.ts` each wrote out identically; each call site
 still passes its own tiebreaker expression (sqlite's keeps its rowid fallback, since only sqlite's
-`ReadTarget` has a `rowidColumn` field to fall back to).
+`ReadTarget` has a `rowidColumn` field to fall back to). P48 added the rest of the SQL read path's
+keyset planning here too: `assertKeysetSupported`/`resolveFetchColumns`/`buildScanOrderBy`, then
+`buildKeysetPosition` — collapsing three 28-line `strategy`/`hasMore`/`nextToken`/`prevToken`/
+`position` blocks (postgres, mysql-family, sqlite) and their three `keysetValuesOf` closures into
+one, each caller passing only its own `cellAt` reader — plus `whereClause`/`parseCountValue` (the
+filter clause and numeric count-result parse `read.ts`'s `readPage`/`countRows` share across all
+four SQL adapters including ClickHouse) and `primaryKeyFromIndexes`/`resolveKeyShape`, moved out of
+postgres's and mysql-family's own `catalog.ts` where each had its own copy.
 
 `src/engine/adapters/sql-mutate.ts` (P39 iter2) holds the SQL adapters' shared mutation guards —
 `orderedOps` (delete, then update, then insert, regardless of the plan's own array order),
@@ -398,6 +413,27 @@ behavior, reused across all four call sites. A scan can carry an optional priori
 rows currently on screen, reported by each view's own virtualization bounds) scanned first, so a
 find on a large loaded dataset highlights what's visible before continuing the ascending pass over
 the rest in the background.
+
+**Every `ViewChrome` consumer looks the same because it mounts the same primitives, not because
+each view re-derives the look.** P48 closed the SQL grid's own last holdout — `DataView.vue` now
+mounts `<ViewChrome>` exactly like documents/keyvalue/stream/console/definition, its badges and PK
+chip in `#badges`/`#head-trailing`, `DataToolbar`/`FilterToolbar` in `#toolbar`/`#toolbar-2` — so
+every data-view kind now shares one toolbar-mounting shape, not six independently-styled ones. The
+per-tab runtime store (`createRuntimeStore`) owns `setActionError`/`toggleSearchOpen`/
+`setSearchOpen` rather than each view re-implementing them; `views/shared/viewOp.ts`'s `beginOp`/
+`applyLoadFailure` are the one load-op preamble and load-failure tail behind every view's own
+`load()` except Browse (which supersedes by `loadSeq`, not `opId`, and has no `E_CANCELLED`
+branch — a genuinely different shape, not a missed adoption); `views/shared/page/store.ts` is the
+one two-level page-cache implementation behind all five page modules (grid, documents, keyvalue,
+stream, console); `views/shared/immediateMutation.ts` is the one write body behind documents/
+keyvalue/stream's ten immediate-mutation functions; `views/shared/page/Pager.vue` is the one pager
+behind both the SQL grid and the document list (previously two independently-maintained
+prev/next/count implementations); `views/shared/document/DocumentRow.vue` is the one Mongo
+document-row component behind both the document view's editable row and the console's read-only
+copy of it; and `views/shared/page/columns.ts`'s `columnHeaderTooltip`/`GUTTER_WIDTH`/
+`DEFAULT_COLUMN_WIDTH` are the one column-header tooltip and the one pair of layout constants
+behind the grid and the console's own tabular result, ending three different spellings of the same
+two numbers the two had drifted into.
 
 ## Process model
 
