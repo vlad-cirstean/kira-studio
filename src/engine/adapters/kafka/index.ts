@@ -14,7 +14,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, noQueryConsole, unsupported } from '../errors';
+import { AdapterError, noQueryConsole, requireConnected, unsupported } from '../errors';
 import { kafkaCaps } from './caps';
 import * as catalog from './catalog';
 import { connectKafka, type KafkaClientHandle } from './client';
@@ -136,8 +136,7 @@ class KafkaAdapter implements Adapter {
   }
 
   private requireHandle(): KafkaClientHandle {
-    if (!this.handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.handle;
+    return requireConnected(this.handle);
   }
 
   private requireRdConfig(): KafkaClientHandle['rdConfig'] {

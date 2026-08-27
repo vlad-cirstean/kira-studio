@@ -15,7 +15,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
 import { sqliteCaps } from './caps';
 import * as catalog from './catalog';
 import { openDatabase, type SqliteHandle } from './client';
@@ -263,8 +263,7 @@ class SqliteAdapter implements Adapter {
   }
 
   private requireHandle(): SqliteHandle {
-    if (!this.handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.handle;
+    return requireConnected(this.handle);
   }
 
   private execFor(ctx: OpCtx): catalog.QueryExecutor {

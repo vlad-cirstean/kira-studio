@@ -9,6 +9,7 @@ import {
 import { abbreviateCount } from '@shared/format';
 import type { QueryResultRow } from 'pg';
 import { AdapterError } from '../errors';
+import { resolveKeyShape } from '../sql-text';
 
 // Every function below takes an `exec` rather than a `pg.Client` directly, so every catalog
 // query is routed through query.ts's runQuery — cancellable and command-logged like any other
@@ -255,10 +256,6 @@ export async function listIndexes(exec: QueryExecutor, relOid: string): Promise<
   }));
 }
 
-export function primaryKeyFromIndexes(indexes: IndexMeta[]): string[] | null {
-  return indexes.find((idx) => idx.primary)?.columns ?? null;
-}
-
 export interface ReadTarget {
   oid: string;
   qualifiedName: { schema: string; relation: string };
@@ -280,13 +277,7 @@ export async function getReadTarget(
   // concurrent queries at one Client.
   const rawColumns = await listColumns(exec, schema, relation);
   const indexes = await listIndexes(exec, info.oid);
-  const primaryKey = primaryKeyFromIndexes(indexes);
-  const pkColumns = new Set(primaryKey ?? []);
-  const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
-  const nullableByName = new Map(columns.map((c) => [c.name, c.nullable]));
-  const uniqueKeys = indexes
-    .filter((idx) => idx.unique && idx.columns.every((c) => nullableByName.get(c) === false))
-    .map((idx) => idx.columns);
+  const { columns, primaryKey, uniqueKeys } = resolveKeyShape(rawColumns, indexes);
   return { oid: info.oid, qualifiedName: { schema, relation }, columns, primaryKey, uniqueKeys };
 }
 

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { SortDirection, SortSpec } from '@shared/domain/queries';
-import type { ColumnMeta } from '@shared/domain/tree';
+import type { ColumnMeta, IndexMeta } from '@shared/domain/tree';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
@@ -11,9 +11,9 @@ import {
 } from '@shared/protocol/page';
 import { AdapterError } from './errors';
 
-// The genuinely shared, driver-agnostic glue the SQL adapters' read.ts modules call — kept out
-// of the adapter folders because duplicating it would guarantee they drift (§5e). Everything
-// dialect-shaped (quoting, LIMIT syntax, catalog SQL) stays in each adapter folder.
+// The genuinely shared, driver-agnostic glue the SQL adapters' read.ts and catalog.ts modules
+// call — kept out of the adapter folders because duplicating it would guarantee they drift (§5e).
+// Everything dialect-shaped (quoting, LIMIT syntax, catalog SQL) stays in each adapter folder.
 
 export function buildOrderBy(
   terms: { column: string; direction: SortDirection }[],
@@ -131,6 +131,27 @@ export function parseCountValue(raw: unknown): number {
     throw new AdapterError('E_QUERY', `count returned a non-numeric result: ${String(raw)}`);
   }
   return value;
+}
+
+// P48 F24: byte-identical in postgres/mysql-family's catalog.ts.
+export function primaryKeyFromIndexes(indexes: IndexMeta[]): string[] | null {
+  return indexes.find((idx) => idx.primary)?.columns ?? null;
+}
+
+// P48 F24: the seven lines after primaryKeyFromIndexes that derive columns/pkColumns/
+// nullableByName/uniqueKeys, byte-identical in postgres/mysql-family's getReadTarget.
+export function resolveKeyShape(
+  rawColumns: ColumnMeta[],
+  indexes: IndexMeta[],
+): { columns: ColumnMeta[]; primaryKey: string[] | null; uniqueKeys: string[][] } {
+  const primaryKey = primaryKeyFromIndexes(indexes);
+  const pkColumns = new Set(primaryKey ?? []);
+  const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
+  const nullableByName = new Map(columns.map((c) => [c.name, c.nullable]));
+  const uniqueKeys = indexes
+    .filter((idx) => idx.unique && idx.columns.every((c) => nullableByName.get(c) === false))
+    .map((idx) => idx.columns);
+  return { columns, primaryKey, uniqueKeys };
 }
 
 // P39 iter2 F13: character-for-character the same in clickhouse/mysql-family/postgres/sqlite's

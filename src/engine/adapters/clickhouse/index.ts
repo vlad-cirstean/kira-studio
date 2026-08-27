@@ -15,7 +15,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
 import { clickhouseCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
@@ -251,8 +251,7 @@ class ClickHouseAdapter implements Adapter {
   }
 
   private requireHandle(): ClickHouseHandle {
-    if (!this.handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.handle;
+    return requireConnected(this.handle);
   }
 
   // D8's own refinement: a per-top-level-call closure rather than an instance-level Map, since

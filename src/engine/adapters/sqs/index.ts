@@ -14,7 +14,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, noQueryConsole, unsupported } from '../errors';
+import { AdapterError, noQueryConsole, requireConnected, unsupported } from '../errors';
 import { sqsCaps } from './caps';
 import * as catalog from './catalog';
 import { connectSqs } from './client';
@@ -137,8 +137,7 @@ class SqsAdapter implements Adapter {
   }
 
   private requireClient(): SQSClient {
-    if (!this.client) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.client;
+    return requireConnected(this.client);
   }
 
   private resolveQueueTarget(path: NodePath): string {

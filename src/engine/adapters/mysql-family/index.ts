@@ -16,7 +16,8 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
+import { primaryKeyFromIndexes } from '../sql-text';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
 import { buildConnectionOptions, ConnectionSet } from './client';
@@ -177,7 +178,7 @@ class MysqlFamilyAdapter implements Adapter {
       databaseSegment.name,
       objectSegment.name,
     );
-    const primaryKey = catalog.primaryKeyFromIndexes(indexes);
+    const primaryKey = primaryKeyFromIndexes(indexes);
     const pkColumns = new Set(primaryKey ?? []);
     const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
 
@@ -369,8 +370,7 @@ class MysqlFamilyAdapter implements Adapter {
   }
 
   private async requireConnection(database: string | null) {
-    if (!this.connectionSet) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.connectionSet.get(database);
+    return requireConnected(this.connectionSet).get(database);
   }
 
   private execFor(conn: Connection, ctx: OpCtx): QueryExecutor {

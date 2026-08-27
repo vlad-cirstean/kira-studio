@@ -14,7 +14,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
 import { redisCaps } from './caps';
 import * as catalog from './catalog';
 import { connectRedis, type DbConnectionSet } from './client';
@@ -152,8 +152,7 @@ class RedisAdapter implements Adapter {
   }
 
   private requireSet(): DbConnectionSet {
-    if (!this.set) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.set;
+    return requireConnected(this.set);
   }
 
   private resolveKeyTarget(path: NodePath): { dbIndex: number; key: string } {

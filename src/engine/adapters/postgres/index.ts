@@ -15,7 +15,8 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
+import { primaryKeyFromIndexes } from '../sql-text';
 import { postgresCaps } from './caps';
 import type { QueryExecutor } from './catalog';
 import * as catalog from './catalog';
@@ -172,7 +173,7 @@ class PostgresAdapter implements Adapter {
     const indexes = await catalog.listIndexes(exec, info.oid);
     const foreignKeys = await catalog.listForeignKeys(exec, info.oid, databaseSegment.name);
     const referencedBy = await catalog.listReferencedBy(exec, info.oid, databaseSegment.name);
-    const primaryKey = catalog.primaryKeyFromIndexes(indexes);
+    const primaryKey = primaryKeyFromIndexes(indexes);
     const pkColumns = new Set(primaryKey ?? []);
     const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
 
@@ -365,8 +366,7 @@ class PostgresAdapter implements Adapter {
   }
 
   private async requireClient(database: string | null) {
-    if (!this.clientSet) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.clientSet.get(database);
+    return requireConnected(this.clientSet).get(database);
   }
 
   private execFor(client: Client, ctx: OpCtx): QueryExecutor {

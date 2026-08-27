@@ -14,7 +14,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, noQueryConsole, unsupported } from '../errors';
+import { AdapterError, noQueryConsole, requireConnected, unsupported } from '../errors';
 import { s3Caps } from './caps';
 import * as catalog from './catalog';
 import { connectS3 } from './client';
@@ -144,8 +144,7 @@ class S3Adapter implements Adapter {
   }
 
   private requireClient(): S3Client {
-    if (!this.client) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.client;
+    return requireConnected(this.client);
   }
 
   private resolveObjectTarget(path: NodePath): { bucket: string; key: string } {

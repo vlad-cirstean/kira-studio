@@ -15,7 +15,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, unsupported } from '../errors';
+import { AdapterError, requireConnected, unsupported } from '../errors';
 import { mongoCaps } from './caps';
 import * as catalog from './catalog';
 import { connectMongo } from './client';
@@ -226,8 +226,7 @@ class MongoAdapter implements Adapter {
   }
 
   private requireClient(): MongoClient {
-    if (!this.client) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.client;
+    return requireConnected(this.client);
   }
 
   private dbFor(name: string): Db {

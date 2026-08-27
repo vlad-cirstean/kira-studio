@@ -14,7 +14,7 @@ import type {
   ReadRequest,
   TreeChildren,
 } from '../adapter';
-import { AdapterError, noQueryConsole, unsupported } from '../errors';
+import { AdapterError, noQueryConsole, requireConnected, unsupported } from '../errors';
 import { rabbitmqCaps } from './caps';
 import * as catalog from './catalog';
 import { buildHandle, type RabbitHandle } from './client';
@@ -187,8 +187,7 @@ class RabbitMqAdapter implements Adapter {
   }
 
   private requireHandle(): RabbitHandle {
-    if (!this.handle) throw new AdapterError('E_CONNECT', 'adapter is not connected');
-    return this.handle;
+    return requireConnected(this.handle);
   }
 
   private requireObjectPath(

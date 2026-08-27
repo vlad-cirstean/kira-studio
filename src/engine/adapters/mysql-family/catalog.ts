@@ -6,6 +6,7 @@ import {
   type TreeNode,
 } from '@shared/domain/tree';
 import { abbreviateCount } from '@shared/format';
+import { resolveKeyShape } from '../sql-text';
 
 // Every function takes an `exec` rather than a `Connection` directly, so every catalog query is
 // routed through query.ts's runQuery — cancellable and command-logged like any other query.
@@ -185,10 +186,6 @@ export async function listIndexes(
   }));
 }
 
-export function primaryKeyFromIndexes(indexes: IndexMeta[]): string[] | null {
-  return indexes.find((idx) => idx.primary)?.columns ?? null;
-}
-
 interface ForeignKeyRow {
   name: string;
   column_name: string;
@@ -322,12 +319,6 @@ export async function getReadTarget(
 ): Promise<ReadTarget> {
   const rawColumns = await listColumns(exec, database, table);
   const indexes = await listIndexes(exec, database, table);
-  const primaryKey = primaryKeyFromIndexes(indexes);
-  const pkColumns = new Set(primaryKey ?? []);
-  const columns = rawColumns.map((col) => ({ ...col, isPrimaryKey: pkColumns.has(col.name) }));
-  const nullableByName = new Map(columns.map((c) => [c.name, c.nullable]));
-  const uniqueKeys = indexes
-    .filter((idx) => idx.unique && idx.columns.every((c) => nullableByName.get(c) === false))
-    .map((idx) => idx.columns);
+  const { columns, primaryKey, uniqueKeys } = resolveKeyShape(rawColumns, indexes);
   return { qualifiedName: { database, table }, columns, primaryKey, uniqueKeys };
 }
