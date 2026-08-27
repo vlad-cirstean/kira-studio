@@ -1,7 +1,6 @@
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
-  type PagePosition,
   type TabularPage,
   type TypeClass,
 } from '@shared/protocol/page';
@@ -10,11 +9,11 @@ import type { OpCtx, ReadRequest } from '../adapter';
 import { AdapterError } from '../errors';
 import {
   assertKeysetSupported,
+  buildKeysetPosition,
   buildKeysetPredicate,
   buildScanOrderBy,
   computeEffectiveOrder,
   decodePageToken,
-  encodePageToken,
   requestFingerprint,
   resolveFetchColumns,
   resolveProjection,
@@ -148,46 +147,17 @@ export async function readPage(
   if (reverseRows) builder.reverse();
 
   const displayRows = reverseRows ? [...keptRows].reverse() : keptRows;
-  const rowCount = displayRows.length;
 
-  const keysetValuesOf = (row: (string | null)[]): string[] =>
-    order.keysetColumns.map((name) => {
-      const idx = keysetColumnIndex.get(name) ?? -1;
-      const v = idx >= 0 ? row[idx] : null;
-      if (v === null)
-        throw new AdapterError('E_QUERY', `keyset tiebreaker column "${name}" was NULL`);
-      return v;
-    });
-
-  // Reflects whether keyset navigation is available from here, not which cursor mode this
-  // particular fetch used — an eligible sort reports 'keyset' even on the very first (offset 0)
-  // page, so the renderer can page forward/back by token from then on (§5c).
-  const strategy: PagePosition['strategy'] = order.keysetEligible ? 'keyset' : 'offset';
-  const hasMore = rowCount === 0 ? false : req.cursor.mode === 'before' ? true : probedExtra;
-
-  let nextToken: string | null = null;
-  let prevToken: string | null = null;
-  if (order.keysetEligible && rowCount > 0) {
-    const hasForward = req.cursor.mode === 'before' ? true : probedExtra;
-    const hasBackward =
-      req.cursor.mode === 'before'
-        ? probedExtra
-        : req.cursor.mode === 'after'
-          ? true
-          : req.cursor.offset > 0;
-    if (hasForward)
-      nextToken = encodePageToken(keysetValuesOf(displayRows[rowCount - 1]), fingerprint);
-    if (hasBackward) prevToken = encodePageToken(keysetValuesOf(displayRows[0]), fingerprint);
-  }
-
-  const position: PagePosition = {
-    offset: req.cursor.mode === 'offset' ? req.cursor.offset : null,
+  const position = buildKeysetPosition({
+    cursor: req.cursor,
     pageSize: req.pageSize,
-    hasMore,
-    nextToken,
-    prevToken,
-    strategy,
-  };
+    displayRows,
+    probedExtra,
+    order,
+    keysetColumnIndex,
+    fingerprint,
+    cellAt: (row, i) => row[i],
+  });
 
   return builder.finish(position);
 }

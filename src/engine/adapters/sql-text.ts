@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { SortDirection, SortSpec } from '@shared/domain/queries';
 import type { ColumnMeta } from '@shared/domain/tree';
+import type { PageCursor } from '@shared/protocol/data-ops';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
+  type PagePosition,
   type TabularPage,
   unpagedPosition,
 } from '@shared/protocol/page';
@@ -268,4 +270,71 @@ export function buildScanOrderBy(
       }))
     : order.terms;
   return buildOrderBy(scanTerms, quote);
+}
+
+// P48 F24: hasMore/nextToken/prevToken/strategy and the PagePosition they go into — D7's whole
+// forward-and-backward token rule, a 28-line block byte-identical across postgres/mysql-family/
+// sqlite's read.ts except how each turns a fetched row's cell into text (`cellAt`).
+export function buildKeysetPosition<Row>(args: {
+  cursor: PageCursor;
+  pageSize: number;
+  displayRows: Row[];
+  probedExtra: boolean;
+  order: EffectiveOrder;
+  keysetColumnIndex: Map<string, number>;
+  fingerprint: string;
+  cellAt: (row: Row, index: number) => string | null;
+}): PagePosition {
+  const {
+    cursor,
+    pageSize,
+    displayRows,
+    probedExtra,
+    order,
+    keysetColumnIndex,
+    fingerprint,
+    cellAt,
+  } = args;
+  const rowCount = displayRows.length;
+
+  // Reflects whether keyset navigation is available from here, not which cursor mode this
+  // particular fetch used — an eligible sort reports 'keyset' even on the very first (offset 0)
+  // page, so the renderer can page forward/back by token from then on (§5c).
+  const strategy: PagePosition['strategy'] = order.keysetEligible ? 'keyset' : 'offset';
+
+  // hasMore answers "is there a next page forward" regardless of which direction this page was
+  // fetched in: a 'before' fetch always has a forward page (we navigated back from it); an
+  // 'after'/'offset' fetch has one iff the pageSize+1 probe row showed up.
+  const hasMore = rowCount === 0 ? false : cursor.mode === 'before' ? true : probedExtra;
+
+  const keysetValuesOf = (row: Row): string[] =>
+    order.keysetColumns.map((name) => {
+      const idx = keysetColumnIndex.get(name) ?? -1;
+      const v = idx >= 0 ? cellAt(row, idx) : null;
+      if (v === null) {
+        throw new AdapterError('E_QUERY', `keyset tiebreaker column "${name}" was NULL`);
+      }
+      return v;
+    });
+
+  let nextToken: string | null = null;
+  let prevToken: string | null = null;
+  if (order.keysetEligible && rowCount > 0) {
+    const hasForward = cursor.mode === 'before' ? true : probedExtra;
+    const hasBackward =
+      cursor.mode === 'before' ? probedExtra : cursor.mode === 'after' ? true : cursor.offset > 0;
+    if (hasForward) {
+      nextToken = encodePageToken(keysetValuesOf(displayRows[rowCount - 1]), fingerprint);
+    }
+    if (hasBackward) prevToken = encodePageToken(keysetValuesOf(displayRows[0]), fingerprint);
+  }
+
+  return {
+    offset: cursor.mode === 'offset' ? cursor.offset : null,
+    pageSize,
+    hasMore,
+    nextToken,
+    prevToken,
+    strategy,
+  };
 }

@@ -13,9 +13,11 @@ import { describe, expect, test } from 'bun:test';
 import type { ColumnMeta } from '@shared/domain/tree';
 import { AdapterError } from '../../src/engine/adapters/errors';
 import {
+  buildKeysetPosition,
   buildKeysetPredicate,
   computeEffectiveOrder,
   decodePageToken,
+  type EffectiveOrder,
   encodePageToken,
   requestFingerprint,
   resolveProjection,
@@ -151,6 +153,85 @@ describe('buildKeysetPredicate (P44 F44)', () => {
     expect(buildKeysetPredicate(['"id"'], 'asc', 'before', 1, placeholder)).toBe('("id") < ($1)');
     expect(buildKeysetPredicate(['"id"'], 'desc', 'after', 1, placeholder)).toBe('("id") < ($1)');
     expect(buildKeysetPredicate(['"id"'], 'desc', 'before', 1, placeholder)).toBe('("id") > ($1)');
+  });
+});
+
+describe('buildKeysetPosition (P48 F24, step 5)', () => {
+  const fp = requestFingerprint({ path: 't', pageSize: 2 });
+  const eligibleOrder: EffectiveOrder = {
+    terms: [{ column: 'id', direction: 'asc' }],
+    keysetEligible: true,
+    keysetColumns: ['id'],
+    keysetDirection: 'asc',
+  };
+  const keysetColumnIndex = new Map([['id', 0]]);
+  const cellAt = (row: string[], i: number): string | null => row[i];
+
+  test("14. an 'after' page with a next page reports strategy 'keyset' and both tokens", () => {
+    const position = buildKeysetPosition({
+      cursor: { mode: 'after', token: 'x' },
+      pageSize: 2,
+      displayRows: [['1'], ['2']],
+      probedExtra: true,
+      order: eligibleOrder,
+      keysetColumnIndex,
+      fingerprint: fp,
+      cellAt,
+    });
+    expect(position.strategy).toBe('keyset');
+    expect(position.offset).toBeNull();
+    expect(position.hasMore).toBe(true);
+    expect(position.nextToken && decodePageToken(position.nextToken, fp)).toEqual(['2']);
+    expect(position.prevToken && decodePageToken(position.prevToken, fp)).toEqual(['1']);
+  });
+
+  test("15. a 'before' page always reports hasMore true, regardless of probedExtra", () => {
+    const position = buildKeysetPosition({
+      cursor: { mode: 'before', token: 'x' },
+      pageSize: 2,
+      displayRows: [['5'], ['6']],
+      probedExtra: false,
+      order: eligibleOrder,
+      keysetColumnIndex,
+      fingerprint: fp,
+      cellAt,
+    });
+    expect(position.hasMore).toBe(true);
+    expect(position.prevToken).toBeNull();
+    expect(position.nextToken && decodePageToken(position.nextToken, fp)).toEqual(['6']);
+  });
+
+  test('16. an offset page at 0 never has a prevToken', () => {
+    const position = buildKeysetPosition({
+      cursor: { mode: 'offset', offset: 0 },
+      pageSize: 2,
+      displayRows: [['1'], ['2']],
+      probedExtra: true,
+      order: eligibleOrder,
+      keysetColumnIndex,
+      fingerprint: fp,
+      cellAt,
+    });
+    expect(position.offset).toBe(0);
+    expect(position.prevToken).toBeNull();
+    expect(position.nextToken && decodePageToken(position.nextToken, fp)).toEqual(['2']);
+  });
+
+  test('17. an offset page at >0 gets a prevToken once keyset-eligible', () => {
+    const position = buildKeysetPosition({
+      cursor: { mode: 'offset', offset: 20 },
+      pageSize: 2,
+      displayRows: [['21'], ['22']],
+      probedExtra: false,
+      order: eligibleOrder,
+      keysetColumnIndex,
+      fingerprint: fp,
+      cellAt,
+    });
+    expect(position.offset).toBe(20);
+    expect(position.hasMore).toBe(false);
+    expect(position.nextToken).toBeNull();
+    expect(position.prevToken && decodePageToken(position.prevToken, fp)).toEqual(['21']);
   });
 });
 
