@@ -16,6 +16,7 @@ import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
+import { typeClassColor } from '../../theme/icons';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
@@ -96,6 +97,23 @@ const columnMetaByName = computed(() => {
   return map;
 });
 
+// The DESCRIBE-derived dataType (columnMetaByName) when it has loaded, else the page's own
+// ColumnDescriptor — shared by the header tooltip and the body cells' own type colour below so
+// the two can never show a column two different colours depending on which one asked first.
+function dataTypeFor(name: string): string {
+  return columnMetaByName.value.get(name)?.dataType ?? columnByName.value.get(name)?.dataType ?? '';
+}
+
+// Item (regression pass, task batch P46-7): the *colour* always reads the page's own
+// ColumnDescriptor.typeClass — the adapter's own authoritative typeClassFor() verdict — rather
+// than re-deriving one from dataTypeFor's display string above. Re-guessing independently in the
+// renderer is exactly how "datetime" and "longtext" both fell through to no colour at all; this
+// can't drift the same way because it never re-parses anything the server didn't already decide.
+function colorForColumn(name: string): string {
+  const typeClass = columnByName.value.get(name)?.typeClass;
+  return typeClass ? typeClassColor(typeClass) : '';
+}
+
 // Header hover: data type always (falls back to the page's own descriptor if DESCRIBE metadata
 // hasn't loaded yet), plus the column's DB comment when it has one.
 // P31 D29/F29: name, then dataType, then the glossary description (if any), then the DB comment
@@ -105,14 +123,21 @@ const columnMetaByName = computed(() => {
 // TooltipContent itself (views/* may not import workbench/*, §11); the object literal's shape
 // alone is what v-tooltip's own type checks against, the same way every plain-string call site
 // already satisfies that directive with no import of its own.
-function headerTitleFor(name: string): { title: string; meta?: string; body?: string } {
-  const meta = columnMetaByName.value.get(name);
-  const dataType = meta?.dataType ?? columnByName.value.get(name)?.dataType ?? '';
+function headerTitleFor(name: string): {
+  title: string;
+  meta?: string;
+  metaColor?: string;
+  body?: string;
+} {
+  const dataType = dataTypeFor(name);
   const description = dataType ? typeDescription(dataType) : null;
-  const comment = meta?.comment;
+  const comment = columnMetaByName.value.get(name)?.comment;
   return {
     title: name,
     meta: dataType || undefined,
+    // Item (regression pass, task batch P46-7): colorForColumn's own typeClass-backed colour —
+    // the same one the cell editor's badge and this column's own body cells below use.
+    metaColor: colorForColumn(name) || undefined,
     body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
   };
 }
@@ -1122,6 +1147,12 @@ interface CellVM {
   editing: boolean;
   navKind: 'fk' | 'pk' | null;
   classes: Record<string, boolean>;
+  /** '' when nothing should override the cell's own CSS-driven colour (NULL, an FK link, a
+   *  pending edit, or the current search match all already carry their own meaningful colour via
+   *  .grid-cell's class rules — a data-type colour stacked on top of any of those would silently
+   *  replace a higher-priority signal, since an inline style always wins over a class). Otherwise
+   *  the column's own colorForColumn. */
+  color: string;
 }
 
 interface RowVM {
@@ -1145,6 +1176,14 @@ const renderRows = computed<RowVM[]>(() => {
   // Per-render only, keyed by row: cellNavEntry's own narrow value map (P29 D6), built at most
   // once even though several columns of the same row can each carry a nav affordance.
   const navCache = new Map<number, Record<string, string | null>>();
+  // Item (regression pass, task batch P46-6/7): once per column, not once per cell —
+  // colorForColumn is a pure function of the column name, so every row of the same column shares
+  // one answer; a whole viewport's worth of rows re-deriving it per cell would be the same
+  // 7-11-calls-per-cell problem P29 D5 (this computed's own comment above) already fixed once.
+  const colorByCol = new Map<number, string>();
+  for (const c of cols) {
+    colorByCol.set(c, colorForColumn(names[c] ?? ''));
+  }
   const out: RowVM[] = [];
   for (const { row, pos } of visibleRows.value) {
     const cells: CellVM[] = [];
@@ -1153,6 +1192,8 @@ const renderRows = computed<RowVM[]>(() => {
       const dc = displayCell(row, c);
       const nav = cellNavEntry(row, c, navCache);
       const selected = isSelected(row, c);
+      const isFk = isForeignKeyDisplayCol(c) && !dc.isNull;
+      const isCurrentMatch = isCurrentSearchMatch(row, c);
       cells.push({
         col: c,
         name,
@@ -1164,6 +1205,10 @@ const renderRows = computed<RowVM[]>(() => {
         staged: dc.staged,
         editing: isEditing(row, c),
         navKind: nav?.kind ?? null,
+        // NULL, an FK link, a pending edit and the current search match each already carry their
+        // own meaningful colour via .grid-cell's own class rules (.cell-null, .fk, .pending-edit,
+        // .search-match-current) — skipped here so the inline style never silently outranks one.
+        color: dc.isNull || isFk || dc.staged || isCurrentMatch ? '' : (colorByCol.get(c) ?? ''),
         classes: cellClass({
           alignRight: alignFor(c) === 'right',
           selected,
@@ -1176,9 +1221,9 @@ const renderRows = computed<RowVM[]>(() => {
           selEdgeBottom: selected && !isSelectedNeighbor(row + 1, c),
           selEdgeLeft: selected && !isSelectedNeighbor(row, c - 1),
           searchMatch: isSearchMatch(row, c),
-          searchMatchCurrent: isCurrentSearchMatch(row, c),
+          searchMatchCurrent: isCurrentMatch,
           pendingEdit: dc.staged,
-          fk: isForeignKeyDisplayCol(c) && !dc.isNull,
+          fk: isFk,
           hasNav: !!nav,
         }),
       });
@@ -1660,6 +1705,7 @@ defineExpose({ scrollCellIntoView });
             left: `${cellVm.left}px`,
             width: `${cellVm.width}px`,
             scrollMarginTop: `${rowHeight}px`,
+            color: cellVm.color || undefined,
           }"
           @mousedown="onCellMouseDown(rowVm.row, cellVm.col, $event)"
           @mouseenter="onCellMouseEnter(rowVm.row, cellVm.col)"

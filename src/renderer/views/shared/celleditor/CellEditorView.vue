@@ -9,7 +9,7 @@ import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state
 import { connectionRecord } from '../../../state/connections';
 import { type MenuItem, openContextMenu } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
-import { columnTypeColor } from '../../../theme/icons';
+import { typeClassColor } from '../../../theme/icons';
 import IconButton from '../../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
@@ -393,10 +393,11 @@ const dataTypeHint = computed(
   () => typeDescription(selectedCell.value.column.dataType) ?? undefined,
 );
 
-// Item 3: the same numeric/boolean/datetime/json/array/uuid/string palette the Structure pane's
-// own Type column already colors its text by (columnTypeColor, theme/icons.ts) — one category
-// classifier for both surfaces rather than a second color scheme invented just for this badge.
-const dataTypeColor = computed(() => columnTypeColor(selectedCell.value.column.dataType));
+// Item (regression pass, task batch P46-7): reads the column's own typeClass — the adapter's own
+// authoritative typeClassFor() verdict — rather than re-guessing a category from its dataType
+// string a second time (columnTypeColor, theme/icons.ts, still does that guess for the one
+// caller, the Structure pane, that has no typeClass at all to read instead).
+const dataTypeColor = computed(() => typeClassColor(selectedCell.value.column.typeClass));
 
 // The format itself is never restated here — the format-select right next to this badge already
 // shows it ("Auto — X" when detected, or the manually chosen format), so a leading "detected X" /

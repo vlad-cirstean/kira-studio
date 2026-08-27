@@ -23,6 +23,10 @@ const TIP_ATTR = 'data-kira-tip';
 export interface TooltipContent {
   title: string;
   meta?: string;
+  /** The data-type badge's own colour (columnTypeColor, theme/icons.ts) — the only caller of
+   *  `meta` today is a column-type hint, and the badge is what carries the colour visibly rather
+   *  than the plain a11y text these get joined into (toPlainText below), so this never affects it. */
+  metaColor?: string;
   body?: string;
 }
 

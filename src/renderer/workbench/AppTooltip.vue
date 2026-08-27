@@ -58,7 +58,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
       <template v-if="tooltipState.parts">
         <div class="tip-head">
           <span class="tip-title">{{ tooltipState.parts.title }}</span>
-          <span v-if="tooltipState.parts.meta" class="tip-meta">{{ tooltipState.parts.meta }}</span>
+          <span
+            v-if="tooltipState.parts.meta"
+            class="tip-meta"
+            :style="
+              tooltipState.parts.metaColor ? { color: tooltipState.parts.metaColor } : undefined
+            "
+            >{{ tooltipState.parts.meta }}</span
+          >
         </div>
         <div v-if="tooltipState.parts.body" class="tip-body">{{ tooltipState.parts.body }}</div>
       </template>
@@ -100,10 +107,24 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   font-weight: 600;
 }
 
+/* (regression pass, task batch P46-6): a plain --kira-fg-muted span at --kira-t-xs read as
+   near-invisible next to the bold title beside it — the one caller of `meta` (a column's data
+   type) needs this to actually register at a glance, the same bar the cell editor's own type
+   badge (CellEditorView.vue's `.p-badge`) already clears. A real pill — background, padding,
+   rounded corners, bolder weight and a full step up in size — instead of a second, unstyled text
+   run is what gets it there; `metaColor` (columnTypeColor, when set) colours the text against it. */
 .tip-meta {
-  color: var(--kira-fg-muted);
+  height: var(--kira-h-xs);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
   font-family: var(--kira-font-family);
-  font-size: var(--kira-t-xs);
+  font-size: var(--kira-t-sm);
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .tip-body {

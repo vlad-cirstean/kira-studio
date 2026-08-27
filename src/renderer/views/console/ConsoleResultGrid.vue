@@ -9,6 +9,7 @@ import {
 import { appearanceVersion, settingsState } from '../../state/settings';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { cellClass } from '../../theme/cellClass';
+import { typeClassColor } from '../../theme/icons';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import {
@@ -67,9 +68,22 @@ const page = computed(() => {
 // comment: "console results are always read-only regardless" — there is no column to have one).
 // P42 D19/D20: structured the same way DataGrid.vue's own twin changed with it — deliberately the
 // same shape minus the comment, so the two can't re-drift the way P40 D16 already closed once.
-function headerTitleFor(col: ColumnDescriptor): { title: string; meta?: string; body?: string } {
+function headerTitleFor(col: ColumnDescriptor): {
+  title: string;
+  meta?: string;
+  metaColor?: string;
+  body?: string;
+} {
   const description = col.dataType ? typeDescription(col.dataType) : null;
-  return { title: col.name, meta: col.dataType || undefined, body: description ?? undefined };
+  return {
+    title: col.name,
+    meta: col.dataType || undefined,
+    // Item (regression pass, task batch P46-7): DataGrid.vue's own twin change, mirrored — reads
+    // this column's own typeClass (the adapter's authoritative verdict) rather than re-guessing
+    // one from its dataType string.
+    metaColor: typeClassColor(col.typeClass),
+    body: description ?? undefined,
+  };
 }
 
 // P31 D11/F13: same reasoning as DataGrid.vue's own widths computed — without this, a font
