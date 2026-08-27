@@ -20,6 +20,7 @@ import {
   togglePath,
 } from '../shared/document/rows';
 import { alignmentFor, initialWidths, resetMeasureCtx } from '../shared/page/columns';
+import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { typeDescription } from '../shared/typeGlossary';
 import {
@@ -214,19 +215,12 @@ watch([() => props.pageKey, () => pageVersion.n], () => {
 
 // P40 D10: rebuilt only when the search result changes (a completed scan or prev/next), not per
 // cell — mirrors KeyValueView.vue's own matchIndex.
-const matchIndex = computed(() => {
-  const entry = searchState[props.tabId];
-  if (!entry) return null;
-  const set = new Set<string>();
-  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
-  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
-});
+const matchIndex = createMatchIndex(searchState, () => props.tabId);
 function isSearchMatch(row: number, col: number): boolean {
-  return matchIndex.value?.set.has(`${row}:${col}`) ?? false;
+  return matchIndex.value?.has(row, col) ?? false;
 }
 function isCurrentSearchMatch(row: number, col: number): boolean {
-  const current = matchIndex.value?.current;
-  return !!current && current.row === row && current.col === col;
+  return matchIndex.value?.isCurrent(row, col) ?? false;
 }
 
 // The find toolbar's go-to-match (P40 D10) — rowIndices is the *filtered* array when the filter

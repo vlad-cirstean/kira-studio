@@ -32,6 +32,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -508,19 +509,12 @@ function onGoToMatch(match: Match): void {
 }
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per row.
-const matchIndex = computed(() => {
-  const entry = searchState[props.tab.id];
-  if (!entry) return null;
-  const set = new Set<string>();
-  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
-  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
-});
+const matchIndex = createMatchIndex(searchState, () => props.tab.id);
 function isSearchMatch(row: number, col: 'field' | 'value'): boolean {
-  return matchIndex.value?.set.has(`${row}:${col}`) ?? false;
+  return matchIndex.value?.has(row, col) ?? false;
 }
 function isCurrentSearchMatch(row: number, col: 'field' | 'value'): boolean {
-  const current = matchIndex.value?.current;
-  return !!current && current.row === row && current.col === col;
+  return matchIndex.value?.isCurrent(row, col) ?? false;
 }
 
 function onStop(): void {

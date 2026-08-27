@@ -1,4 +1,4 @@
-import { reactive } from 'vue';
+import { type ComputedRef, computed, reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import type { SearchHandle, SearchQuery } from './scan';
 import { matchedRowsOf } from './searchFilter';
@@ -84,4 +84,29 @@ export function createPageSearch<M extends { row: number }>(opts: {
       loadedRowCount: opts.loadedRowCount,
     },
   };
+}
+
+// P48 F8: DataGrid.vue, KeyValueView.vue and ConsoleResultGrid.vue each built this same
+// Set<string>-of-"row:col" plus current-match computed, rebuilt only when the search result
+// changes (a completed scan or prev/next), not per cell — differing only in `col`'s type
+// ('field' | 'value' for a key/value row, a page column index everywhere else). `tabId` is a
+// function, not a plain string, so the computed re-tracks when a caller's own prop changes.
+export function createMatchIndex<C>(
+  state: Record<string, { matches: { row: number; col: C }[]; index: number }>,
+  tabId: () => string,
+): ComputedRef<{
+  has(row: number, col: C): boolean;
+  isCurrent(row: number, col: C): boolean;
+} | null> {
+  return computed(() => {
+    const entry = state[tabId()];
+    if (!entry) return null;
+    const set = new Set<string>();
+    for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
+    const current = entry.index >= 0 ? entry.matches[entry.index] : undefined;
+    return {
+      has: (row: number, col: C) => set.has(`${row}:${col}`),
+      isCurrent: (row: number, col: C) => !!current && current.row === row && current.col === col,
+    };
+  });
 }

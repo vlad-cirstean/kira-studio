@@ -1,5 +1,6 @@
 import {
   eachMatch,
+  emptyScan,
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
@@ -39,9 +40,7 @@ export function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') {
-    return { cancel() {}, done: Promise.resolve([]) };
-  }
+  if (!page || q.text === '') return emptyScan();
 
   return runChunkedScan<Match>(
     page.rowCount,

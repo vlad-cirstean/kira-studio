@@ -29,6 +29,7 @@ import {
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
+import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { sqlDialectFor } from '../shared/sqlIdent';
@@ -658,26 +659,19 @@ watch(
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per cell —
 // matches are keyed by the page's own column index, not display position.
-const matchIndex = computed(() => {
-  const entry = searchState[props.tabId];
-  if (!entry) return null;
-  const set = new Set<string>();
-  for (const m of entry.matches) set.add(`${m.row}:${m.col}`);
-  return { set, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
-});
+const matchIndex = createMatchIndex(searchState, () => props.tabId);
 
 function isSearchMatch(row: number, displayCol: number): boolean {
   const p = page.value;
   if (!p) return false;
   const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
-  return matchIndex.value?.set.has(`${row}:${pageCol}`) ?? false;
+  return matchIndex.value?.has(row, pageCol) ?? false;
 }
 function isCurrentSearchMatch(row: number, displayCol: number): boolean {
   const p = page.value;
   if (!p) return false;
   const pageCol = pageColumnIndexFor(p, columnOrder.value, displayCol);
-  const current = matchIndex.value?.current;
-  return !!current && current.row === row && current.col === pageCol;
+  return matchIndex.value?.isCurrent(row, pageCol) ?? false;
 }
 
 function isDeleted(row: number): boolean {

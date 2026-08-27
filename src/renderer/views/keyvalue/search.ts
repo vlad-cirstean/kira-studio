@@ -1,6 +1,6 @@
-import { cellText } from '@shared/protocol/page';
 import {
-  eachMatch,
+  emptyScan,
+  keyValueRowScanner,
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
@@ -33,23 +33,16 @@ export function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') {
-    return { cancel() {}, done: Promise.resolve([]) };
-  }
-
-  const decoder = new TextDecoder();
-  const fields = page.fields;
-  const values = page.values;
+  if (!page || q.text === '') return emptyScan();
 
   return runChunkedScan<Match>(
     page.rowCount,
-    (row, pattern, out) => {
-      function scanCell(col: 'field' | 'value', text: string): void {
-        eachMatch(pattern, text, (start, end) => out.push({ row, col, start, end }));
-      }
-      scanCell('field', cellText(fields, row, decoder));
-      scanCell('value', cellText(values, row, decoder));
-    },
+    keyValueRowScanner(page, ['field', 'value'], (row, col, start, end) => ({
+      row,
+      col,
+      start,
+      end,
+    })),
     q,
     onProgress,
     // P42 D39: KeyValueView.vue renders every loaded row directly (no VirtualList), so nothing

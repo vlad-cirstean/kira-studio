@@ -1,3 +1,5 @@
+import { cellText, isNull, type TabularPage, type TextColumnChunk } from '@shared/protocol/page';
+
 // P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
 // cancel/zero-width-match/onProgress/resolve semantics, differing only in the per-row scan body.
@@ -114,5 +116,50 @@ export function runChunkedScan<M>(
       cancelled = true;
     },
     done,
+  };
+}
+
+// P48 F9: grid/documents/keyvalue/console's search.ts each repeated this same four-line early-out
+// for "no page yet, or an empty query" — a scan that never starts.
+export function emptyScan<M>(): SearchHandle<M> {
+  return { cancel() {}, done: Promise.resolve([]) };
+}
+
+/** P48 F9: the tabular per-row scan body grid/search.ts and console/search.ts's tabular branch
+ *  each wrote out — every column, skipping a null cell. `make` builds the caller's own Match
+ *  shape from the (row, col, start, end) the scan found. */
+export function tabularRowScanner<M>(
+  page: Pick<TabularPage, 'columns' | 'chunks'>,
+  make: (row: number, col: number, start: number, end: number) => M,
+): (row: number, pattern: RegExp, out: M[]) => void {
+  const decoder = new TextDecoder();
+  const colCount = page.columns.length;
+  const chunks = page.chunks; // a definite alias — narrowing does not persist into the closure
+  return (row, pattern, out) => {
+    for (let col = 0; col < colCount; col++) {
+      const chunk = chunks[col];
+      if (isNull(chunk, row)) continue;
+      const text = cellText(chunk, row, decoder);
+      eachMatch(pattern, text, (start, end) => out.push(make(row, col, start, end)));
+    }
+  };
+}
+
+/** P48 F9: the two-chunk field/value scan keyvalue/search.ts and console/search.ts's keyvalue
+ *  branch each wrote out, differing only in whether `col` is spelled `'field'|'value'` or `0|1`
+ *  — `cols` supplies whichever pair the caller's own Match shape uses. Neither chunk is ever
+ *  null by construction (KeyValuePageBuilder.push takes plain strings), so — unlike
+ *  tabularRowScanner — there is no isNull check to share. */
+export function keyValueRowScanner<M, C>(
+  page: { fields: TextColumnChunk; values: TextColumnChunk },
+  cols: [C, C],
+  make: (row: number, col: C, start: number, end: number) => M,
+): (row: number, pattern: RegExp, out: M[]) => void {
+  const decoder = new TextDecoder();
+  return (row, pattern, out) => {
+    const fieldText = cellText(page.fields, row, decoder);
+    eachMatch(pattern, fieldText, (start, end) => out.push(make(row, cols[0], start, end)));
+    const valueText = cellText(page.values, row, decoder);
+    eachMatch(pattern, valueText, (start, end) => out.push(make(row, cols[1], start, end)));
   };
 }

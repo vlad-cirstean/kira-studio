@@ -1,9 +1,12 @@
-import { cellText, isNull, type TextColumnChunk } from '@shared/protocol/page';
+import { cellText, isNull } from '@shared/protocol/page';
 import {
   eachMatch,
+  emptyScan,
+  keyValueRowScanner,
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
+  tabularRowScanner,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
 import { visibleRowsOf } from '../shared/page/visibleRows';
@@ -23,19 +26,6 @@ export interface Match {
   end: number;
 }
 
-function scanChunk(
-  row: number,
-  col: number,
-  chunk: TextColumnChunk,
-  decoder: TextDecoder,
-  pattern: RegExp,
-  out: Match[],
-): void {
-  if (isNull(chunk, row)) return;
-  const text = cellText(chunk, row, decoder);
-  eachMatch(pattern, text, (start, end) => out.push({ row, col, start, end }));
-}
-
 // Searches the active result set's loaded page only, never the server (§8.5's D28, every other
 // view's own precedent).
 export function runSearch(
@@ -49,27 +39,17 @@ export function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = activePage(tabId);
-  if (!page || q.text === '') {
-    return { cancel() {}, done: Promise.resolve([]) };
-  }
+  if (!page || q.text === '') return emptyScan();
 
-  const decoder = new TextDecoder();
   // P42 D39: the rows ConsoleResultGrid.vue's VirtualList currently has on screen (D37) — keyed
   // by tabId like every other search.ts/PageSearchApi entry point here (D9), not by result key,
   // since only the active result set is ever rendered (and therefore reportable) at a time.
   const priority = { priority: visibleRowsOf(tabId) ?? undefined };
 
   if (page.kind === 'tabular') {
-    const colCount = page.columns.length;
-    const chunks = page.chunks;
     return runChunkedScan<Match>(
       page.rowCount,
-      (row, pattern, out) => {
-        for (let col = 0; col < colCount; col++) {
-          const chunk = chunks[col];
-          if (chunk) scanChunk(row, col, chunk, decoder, pattern, out);
-        }
-      },
+      tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end })),
       q,
       onProgress,
       priority,
@@ -77,10 +57,15 @@ export function runSearch(
   }
 
   if (page.kind === 'document') {
+    const decoder = new TextDecoder();
     const bodies = page.bodies;
     return runChunkedScan<Match>(
       page.rowCount,
-      (row, pattern, out) => scanChunk(row, 0, bodies, decoder, pattern, out),
+      (row, pattern, out) => {
+        if (isNull(bodies, row)) return;
+        const text = cellText(bodies, row, decoder);
+        eachMatch(pattern, text, (start, end) => out.push({ row, col: 0, start, end }));
+      },
       q,
       onProgress,
       priority,
@@ -90,15 +75,10 @@ export function runSearch(
   // A console result is only ever tabular, document or keyvalue (ConsoleResultGrid.vue's own
   // three template branches) — never StreamPage, so this narrows the same way resultPages.ts's
   // keyValueRow() does rather than assuming the else branch away.
-  if (page.kind !== 'keyvalue') return { cancel() {}, done: Promise.resolve([]) };
-  const fields = page.fields;
-  const values = page.values;
+  if (page.kind !== 'keyvalue') return emptyScan();
   return runChunkedScan<Match>(
     page.rowCount,
-    (row, pattern, out) => {
-      scanChunk(row, 0, fields, decoder, pattern, out);
-      scanChunk(row, 1, values, decoder, pattern, out);
-    },
+    keyValueRowScanner(page, [0, 1], (row, col, start, end) => ({ row, col, start, end })),
     q,
     onProgress,
     priority,

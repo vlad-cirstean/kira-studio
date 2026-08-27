@@ -1,9 +1,9 @@
-import { cellText, isNull } from '@shared/protocol/page';
 import {
-  eachMatch,
+  emptyScan,
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
+  tabularRowScanner,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
 import { visibleRowsOf } from '../shared/page/visibleRows';
@@ -27,24 +27,11 @@ export function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') {
-    return { cancel() {}, done: Promise.resolve([]) };
-  }
-
-  const decoder = new TextDecoder();
-  const colCount = page.columns.length;
-  const chunks = page.chunks; // a definite alias — narrowing does not persist into scanRow below
+  if (!page || q.text === '') return emptyScan();
 
   return runChunkedScan<Match>(
     page.rowCount,
-    (row, pattern, out) => {
-      for (let col = 0; col < colCount; col++) {
-        const chunk = chunks[col];
-        if (isNull(chunk, row)) continue;
-        const text = cellText(chunk, row, decoder);
-        eachMatch(pattern, text, (start, end) => out.push({ row, col, start, end }));
-      }
-    },
+    tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end })),
     q,
     onProgress,
     // P42 D39: the rows DataGrid.vue currently has on screen, scanned first (D37) — the ones the
