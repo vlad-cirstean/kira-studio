@@ -1019,6 +1019,15 @@ Required coverage, by package — this is the acceptance criterion for each phas
 until G1 has a recorded number and a recorded verdict. An amber result stops for the repo owner
 rather than being resolved by the implementing session.
 
+**G1 recorded: Go.** Re-run on a real Apple Silicon Mac (the same machine P51 part 4 used) —
+`docs/PERF.md` §2.4 has the full number, both instruments, the process set, and three real bugs
+found and fixed getting there (a `CFBundleExecutable` mismatch breaking code signing, dangling
+`npm`/`npx` symlinks from the vendor script's own trimming step breaking it too, and
+`internal/metrics`' plain substring match over-counting other running apps' idle WebKit helpers on
+macOS — all fixed, not worked around). Config (2), the actual G1 scenario, measured **261.7 MB**
+against the ≤ 300 MB threshold — a real, wide margin, and a ≈58% reduction against Electron's
+620–626 MB baseline. **P53 is authorized to start.**
+
 Everything after G1 is ordinary phased work under `AGENTS.md`'s normal loop: each of P53–P57 gets its
 own Opus plan sequencing that phase against the then-current tree, implemented by Sonnet, with the
 architectural decisions in §4–§10 of this document treated as settled rather than re-derived.

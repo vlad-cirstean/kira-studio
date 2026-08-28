@@ -287,6 +287,87 @@ opposite (wrong) case for a "go" here, and the real macOS number could easily go
 what this sandbox shows. Treat this section as motivation for taking the macOS re-run seriously,
 not as a substitute for it.
 
+### 2.4 P52 gate G1 — real macOS arm64 result and verdict: **Go**
+
+**This is the gate's actual verdict.** Re-run per P52 §15 on the same real Apple Silicon Mac (arm64,
+macOS 26.5.2) P51 part 4 used, with the app actually built, signed, and launched — not inferred.
+Same instrument and method as §2.3: `shell/cmd/g1measure` (`internal/metrics`'
+`gopsutil`-based RSS summation), 10 samples 1 s apart after the window is shown and idle, minimum
+taken, cross-checked against plain `ps -o rss=` on the identical process set — both agreed to
+within rounding on every run below.
+
+| Config (min of 10) | `g1measure` | `ps` cross-check |
+|---|---|---|
+| (1) Blank | 216.3 MB | 216.3 MB |
+| (2) Real renderer (actual Vue app, 9 boot-path DB reads) | **261.7 MB** | 261.6 MB |
+
+| Process (config 2, at min sample) | RSS |
+|---|---|
+| `kira-studio-shell` (Go) | 103.1 MB |
+| vendored `node` (engine, ping-only) | 40.6 MB |
+| `com.apple.WebKit.WebContent` | 71.9 MB |
+| `com.apple.WebKit.GPU` | 30.4 MB |
+| `com.apple.WebKit.Networking` | 15.2 MB |
+
+**Verdict per §3.3's thresholds: 261.7 MB ≤ 300 MB = Go.** A real, wide margin under the ceiling —
+confirms §2.3's own hypothesis that WKWebView (a thin, mostly-shared system framework on its actual
+target platform) is nothing like WebKitGTK's full separate library instance on Linux, which read
+above Electron's own baseline. Against `docs/PERF.md` §2.2's 620–626 MB Electron baseline, this is a
+**≈58% reduction** before a single line of `src/main` has been ported. Secondary hard check also
+passes: the engine child alone is 40.6–41.6 MB across both configs, well under the 150 MB ceiling.
+
+**Per P52 §15, this clears the gate: P53 (porting `src/main`'s business logic into `shell/`) is
+authorized to start.**
+
+**Three real bugs surfaced getting this number, all fixed in this pass, not merely worked around:**
+
+1. **`build/darwin/Info.plist` and `Info.dev.plist`'s `CFBundleExecutable` was `kira_studio_shell`
+   (underscores) while the Taskfile's own `APP_NAME` — and the binary it actually builds and copies
+   into the bundle — is `kira-studio-shell` (hyphens).** This mismatch broke `codesign --verify
+   --deep --strict` outright and would have broken a Finder/LaunchServices launch of a distributed
+   build. Fixed by correcting both plists to `kira-studio-shell`, matching the Taskfile's own name
+   rather than the other way around (`APP_NAME` is referenced across dozens of Taskfile paths;
+   the plists were the one place actually wrong).
+2. **`scripts/vendor-node.sh` deleted `lib/node_modules/npm` (P51 part 4's 81 MB trim) but left
+   `bin/npm` and `bin/npx` as dangling symlinks into it** (plus `bin/corepack`, unneeded for the
+   same reason). A dangling symlink anywhere under `Contents/` fails `codesign --deep --strict`'s
+   resource-envelope validation with a bare, unhelpful `No such file or directory`. Fixed by having
+   the vendor script remove all three symlinks itself, at vendor time, so a signed build never
+   contains them in the first place.
+3. **`internal/metrics.MatchingPIDs`' plain executable-path substring match over-counts on macOS.**
+   WKWebView's helper processes (`com.apple.WebKit.WebContent`/`.GPU`/`.Networking`) are reparented
+   to `launchd` (`ppid=1`) — there is no pid-tree relationship to this app — so a naive
+   `"com.apple.WebKit"` substring match also matches *every other running app's* idle WebKit
+   helpers. Confirmed concretely on this machine: it silently added ~87 MB from Messages' and
+   Notes' own background helpers, inflating a real 261.7 MB reading to a reported ≈300 MB — a
+   difference that could flip a borderline result across a threshold, and would equally overcount
+   the shipped app's own future `kira:app:metrics` readout for any user with Mail/Safari/Messages
+   open. Fixed with `internal/metrics.AppProcessSet` (`responsible_darwin.go`/`responsible_other.go`):
+   on darwin, a helper pid is counted only when macOS's own
+   `responsibility_get_pid_responsible_for_pid` — the same private-but-stable mechanism Activity
+   Monitor itself uses to group XPC helpers under their real launching app — resolves it back to
+   one of this app's own anchor pids; on every other platform (where this repo's own Linux findings
+   already confirmed WebKitGTK's helpers are true `ppid` children) helper pids are kept unfiltered,
+   unchanged from before. `g1measure` was updated to use it (`-anchor`/`-helper` flags replacing the
+   old flat `-match`) and re-verified: it now finds exactly this app's 5 processes, zero stray ones,
+   with no manual pid filtering.
+
+**One measurement-methodology note, not a bug:** config (1) must be launched the same way real users
+launch the app — via Finder/`open` (LaunchServices) — for `responsibility_get_pid_responsible_for_pid`
+to attribute WebKit helpers correctly at all; a directly-`exec`'d binary (e.g. `./kira-studio-shell &`
+from a shell) does not establish the same responsibility chain, and undercounts by omitting the
+helpers entirely (observed directly: an `exec`'d blank-config run found only 2 of the real 5
+processes). `KIRA_G1_BLANK=1` can still reach a `open`-launched process via `launchctl setenv
+KIRA_G1_BLANK 1` beforehand (`launchctl unsetenv` after) — LaunchServices doesn't otherwise pass
+through a launching shell's own environment.
+
+**What this does not close:** `shell/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
+`ios`, `android` and `docker` were `wails3 init`'s default scaffold, unconditionally generated
+regardless of target — never wired to anything this macOS-only app needs. Removed in this pass
+(`shell/Taskfile.yml`'s `includes:` now lists only `common`/`darwin`), along with the now-dead
+`build:server`/`build:docker`/`run:docker`/`setup:docker` tasks and their `.gitignore` entries.
+Unrelated to G1 itself, but found and cleaned up in the same session.
+
 ### L2 cache note (D19)
 
 L2's 64 MB default budget and its `> budget / 2` no-cache refusal rule (a single page whose byte

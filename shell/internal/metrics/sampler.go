@@ -109,3 +109,64 @@ func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
 	}
 	return out, nil
 }
+
+// AppProcessSet finds this app's own process set: pids matching anchorNeedles directly (this
+// app's own executables — e.g. the Go binary and the vendored Node child, which live under a
+// bundle path unique to this app), plus pids matching helperNeedles (e.g. "com.apple.WebKit" for
+// WKWebView's XPC helpers) that are actually this app's own helpers — not simply every process on
+// the machine whose executable happens to match the substring.
+//
+// Why this exists: a native webview's helper processes are not children of this app in the ppid
+// sense (WKWebView's are reparented to launchd, ppid=1), so MatchingPIDs alone over-matches —
+// confirmed on a real machine measuring P52 gate G1: "com.apple.WebKit" matched Messages' and
+// Notes' own idle WebContent/GPU/Networking helpers too, inflating a 215 MB reading to 300 MB.
+// On darwin, macOS itself tracks which process is "responsible" for launching each XPC service
+// (the same mechanism Activity Monitor uses to group them visually) via
+// responsibility_get_pid_responsible_for_pid, so helper pids are kept only when that resolves to
+// one of the anchor pids. On every other platform responsiblePID returns -1 (unknown), so helper
+// pids are kept unfiltered — correct there specifically because P52 §2.3 already confirmed
+// WebKitGTK's own helpers really are ppid children on Linux, so this over-match risk doesn't arise.
+func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
+	anchors, err := unionMatchingPIDs(anchorNeedles)
+	if err != nil {
+		return nil, err
+	}
+	anchorSet := make(map[int32]bool, len(anchors))
+	for _, pid := range anchors {
+		anchorSet[pid] = true
+	}
+
+	helpers, err := unionMatchingPIDs(helperNeedles)
+	if err != nil {
+		return nil, err
+	}
+
+	out := append([]int32{}, anchors...)
+	for _, pid := range helpers {
+		if anchorSet[pid] {
+			continue // already counted as an anchor
+		}
+		if resp := responsiblePID(pid); resp == -1 || anchorSet[resp] {
+			out = append(out, pid)
+		}
+	}
+	return out, nil
+}
+
+func unionMatchingPIDs(needles []string) ([]int32, error) {
+	seen := map[int32]bool{}
+	var out []int32
+	for _, n := range needles {
+		pids, err := MatchingPIDs(n)
+		if err != nil {
+			return nil, err
+		}
+		for _, pid := range pids {
+			if !seen[pid] {
+				seen[pid] = true
+				out = append(out, pid)
+			}
+		}
+	}
+	return out, nil
+}

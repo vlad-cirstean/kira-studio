@@ -65,6 +65,14 @@ EXTRACTED="$WORK_DIR/node-v${NODE_VERSION}-${OS}-${ARCH}"
 
 rm -rf "$EXTRACTED/include" "$EXTRACTED/lib/node_modules/npm"
 
+# bin/npm and bin/npx are symlinks into the node_modules/npm dir just removed — left in place
+# they're dangling, which breaks `codesign --deep --strict` (it fails resource validation trying
+# to stat a symlink target that doesn't exist), and neither is ever invoked at runtime: the engine
+# child is always spawned as `node <script>` directly, never via npm/npx. corepack's symlink
+# points elsewhere (lib/node_modules/corepack, not touched above) and stays valid, but it is
+# equally unneeded at runtime, so it goes too for the same reason npm/npx do.
+rm -f "$EXTRACTED/bin/npm" "$EXTRACTED/bin/npx" "$EXTRACTED/bin/corepack"
+
 rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 mv "$EXTRACTED" "$DEST"
