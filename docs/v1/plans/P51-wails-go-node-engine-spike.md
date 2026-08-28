@@ -1,14 +1,14 @@
 # P51 — Wails (Go) shell + Go app core + Node engine child process, migration spike
 
-> This document is the plan only. **No Wails install, no Go toolchain install, no scaffold, no code
-> change, no dependency addition, no measurement has been performed.** Producing this document is the
-> entirety of this phase's work on P51 so far — the actual spike (standing up a Wails shell, designing
-> the renderer↔Go bridge, designing the Go↔Node engine transport, resolving packaging/signing,
-> triaging `src/main` module by module, measuring anything) does not start until the repo owner
-> reviews this plan and explicitly signs off. **The word "spike" in this phase's name does not change
-> that**: every phase in this repo follows `AGENTS.md`'s "Opus plans, then explicit sign-off, then
-> Sonnet implements" loop, and this phase is no exception. **Do not begin implementation from this
-> document alone.**
+> This document is the plan. **The repo owner has explicitly signed off on starting the spike**
+> (2026-08-28), and `docs/v1/plans/P51-spike-report-part1.md` is the first installment of the
+> report §6 asks for — the subset answerable from a Linux sandbox with no macOS machine and with
+> `wails.io`/`v3.wails.io` still egress-blocked. It covers §3.1, §3.2, §3.3, §3.6 and §3.10 with a
+> real installed toolchain, a real generated Wails v3 project, and two measured Go↔Node prototypes.
+> **§3.4, §3.5, §3.7 and the native-shell half of §3.8 remain untouched** — they need the macOS arm64
+> machine §5 Q4 already named, which is still not available. Read the report before assuming any
+> open question below is closed; this header is intentionally terse and the report is the source of
+> truth for what has actually been verified.
 
 ## 0. What this phase is, and what it replaces
 
@@ -598,4 +598,8 @@ The eventual spike's deliverable is a **written report**, committed alongside th
 - An explicit **go/no-go recommendation**.
 
 **No implementation phase starts until the repo owner has reviewed that report and signed off.** This
-document does not authorize a spike; it scopes one.
+document scoped the spike; `docs/v1/plans/P51-spike-report-part1.md` is that report's first
+installment, covering everything answerable without a macOS machine. Signing off on *this plan*
+authorized starting the spike — it is not, on its own, sign-off on the go/no-go recommendation the
+finished report will eventually make, which still needs §3.4/§3.5/§3.7 and a macOS machine before
+it can be written.
