@@ -62,15 +62,19 @@ team works, and how to run things in whichever box a session happens to be on.
   **`mirror.gcr.io` (Google's public read-through cache of Docker Hub) is not blocked** and works
   from this sandbox (P50) — pointing an image reference at it (`mirror.gcr.io/library/mariadb:...`
   etc., or configuring it as a registry mirror) unblocks real containers for mariadb, mysql, redis,
-  rabbitmq and localstack (sqs) here. Two exceptions found so far: **ClickHouse** —
-  `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile:{hard:262144,
-  soft:262144}})`, and this sandbox's own `ulimit -Hn` is fixed at 20000 and cannot be raised even
-  as root (confirmed: a plain `docker run` with no custom ulimits works fine standalone) — so this
-  one adapter's container-backed tests stay unrunnable here regardless of registry. **Kafka** — see
-  the Native Kafka driver section below; the blocker there is the ABI rebuild, not the image pull.
-  Bun's own `testcontainers` integration has also been observed to hang indefinitely in this specific
-  sandbox on images that pull and run fine under plain Node with the identical image — a sandbox
-  quirk of the Bun runtime here, not a real bug (confirmed fine on a real machine).
+  rabbitmq and localstack (sqs) here. **ClickHouse** needs one more workaround on top of the
+  registry mirror: `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile:
+  {hard:262144, soft:262144}})`, and this sandbox's own `ulimit -Hn` is fixed at 20000 and cannot
+  be raised even as root (confirmed: a plain `docker run` with no custom ulimits works fine
+  standalone) — so a container started the stock way never comes up here. `hostConfig` is
+  `protected` on testcontainers' own `GenericContainer`, so a small subclass that clears
+  `this.hostConfig.Ulimits = []` in its constructor (only reachable from a subclass, never through
+  `ClickHouseContainer`'s own public API) unblocks it; see `tests/ipc/clickhouse/container.ts`.
+  **Kafka** — `confluentinc/cp-kafka` pulls fine via `mirror.gcr.io` too; see the Native Kafka
+  driver section below for the separate, now-resolved ABI-rebuild blocker. Bun's own
+  `testcontainers` integration has also been observed to hang indefinitely in this specific sandbox
+  on images that pull and run fine under plain Node with the identical image — a sandbox quirk of
+  the Bun runtime here, not a real bug (confirmed fine on a real machine).
 
 ## Electron binary (for `tests/ui/`)
 
@@ -120,17 +124,22 @@ generated rather than hand-written. This section is only about running it here.
   `writeFixtureModule`) — run `bunx biome check --write tests/ipc/<adapter>/<adapter>.fixture.ts`
   afterward to match the repo's own formatting convention before committing; the content does not
   change, only the quoting.
-- **Which adapters' backend halves are Docker-gated here, and which stay unrunnable regardless of
-  Docker**: mariadb, mysql, redis, rabbitmq and sqs's backend specs all ran for real against
-  containers pulled via `mirror.gcr.io` (Docker section above) in this sandbox. **ClickHouse**'s
-  backend spec was not written at all — the ulimit blocker (Docker section above) means no real
-  fixture could ever be captured here, and P50's own D5 forbids hand-writing one, so this adapter's
-  IPC-boundary split stays deferred; `tests/ui/clickhouse.spec.ts` was left in place rather than
-  deleted with nothing to replace it. **Kafka** is the same shape for a different reason: its
-  backend half needs the native ABI rebuild (Native Kafka driver section below), confirmed still
-  blocked here (`scripts/native-electron-build.sh` fails with the same `403` fetching Electron's
-  C++ headers), so no real fixture could be captured for it either — `tests/ui/kafka.spec.ts` also
-  stays in place, undeleted, for the same D5 reason.
+- **Which adapters' backend halves are Docker-gated here, and which needed extra work**: mariadb,
+  mysql, redis, rabbitmq and sqs's backend specs all ran for real against containers pulled via
+  `mirror.gcr.io` (Docker section above) in this sandbox, no extra workaround needed. **ClickHouse**
+  needed its own container-start helper (`tests/ipc/clickhouse/container.ts`, the ulimit-clearing
+  subclass described in the Docker section above) rather than reusing
+  `tests/db/support/clickhouse.ts`'s own `startClickHouse()` — that file's `ClickHouseContainer`
+  construction is private to its own `start()`, not exposed for subclassing, and P50's own D1
+  forbids editing `tests/db/` — but once that workaround existed, its backend spec ran for real
+  against a real container too, exactly like the other five. **Kafka** needed the native driver
+  rebuilt first (Native Kafka driver section below) — once that was done, its backend spec ran
+  for real too, with one adapter-specific finding of its own: a read fans across both partitions
+  and interleaves them by arrival, not by key/offset order, so the fixture sorts the captured
+  page by key before writing it (`tests/ipc/kafka/kafka.backend.spec.ts`'s `sortStreamByKey`,
+  same reasoning as redis's own HSCAN-reordering finding above), and the consumer group's
+  coordinator host:port (a fresh Docker-assigned hostname and host-mapped port every run) is
+  frozen the same way ClickHouse's `.inner_id.<uuid>` is.
 
 ## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/ui/` specs, P25)
 
@@ -165,23 +174,35 @@ it at all, no consumer-group join on browse). This section is only about running
   `prepackage:mac`. It caches a successful build under `.cache/native/confluent-kafka-javascript/<abi>.node`
   and writes a marker beside the built module, so a matching ABI skips the rebuild entirely on
   every run after the first.
-- **Claude Code's Linux web containers**: `electron-rebuild` (what
-  `native-electron-build.sh` calls to do the real work) needs to download Electron's C++ headers
-  from `artifacts.electronjs.org`, which this environment's proxy blocks (403). This means
-  `predev`, `pretest:ui`, `pretest:db:kafka` and `prepackage:mac` all fail here whenever the cache
-  doesn't already hold a matching-ABI build — there is no known workaround in this environment (F20).
+- **Claude Code's Linux web containers**: `electron-rebuild` (what `native-electron-build.sh` calls
+  to do the real work) needs to download Electron's C++ headers from `artifacts.electronjs.org` —
+  this specific proxy 403 has been observed to come and go across sessions in this environment (it
+  was gone by P50), so treat it as worth retrying rather than a permanent wall. The header fetch
+  succeeding still isn't the whole story here: `@confluentinc/kafka-javascript`'s own build
+  (`util/configure.js`) passes librdkafka's `mklove` configure script `--install-deps
+  --source-deps-only --enable-static`, which always tries to build zlib/libcurl/libcrypto/zstd
+  from source rather than looking at system packages first — and two of those source tarballs
+  (`zlib.net`, `curl.se`) are hosts this environment's proxy hard-blocks (403 on the CONNECT
+  itself, confirmed via the proxy's own `__agentproxy/status` recent-failures log), regardless of
+  what dev packages are installed. **The fix**: `util/configure.js` reads `CKJS_LINKING` — set to
+  `dynamic`, it passes `./configure` no flags at all, which links dynamically against the system's
+  own `libssl-dev`/`zlib1g-dev`/`libcurl4-openssl-dev` (already present, or `apt-get install`-able)
+  instead of vendoring anything, so it never touches the two blocked hosts:
+  `CKJS_LINKING=dynamic bunx electron-rebuild --only @confluentinc/kafka-javascript`. Confirmed:
+  `ldd` on the resulting `.node` resolves every shared library, it loads under
+  `ELECTRON_RUN_AS_NODE=1 electron`, and `bun run test:db:kafka` (all 21 cases) and this phase's
+  own `tests/ipc/kafka/kafka.backend.spec.ts` both pass against a real broker. Cache the result the
+  same way `native-electron-build.sh` does (`cp` the built `.node` to
+  `.cache/native/confluent-kafka-javascript/<abi>.node`, write the ABI to the `.native-abi` marker)
+  so later runs in the same session skip the rebuild.
   `native-electron-build.sh` backs up the existing `.node` file before attempting a rebuild and
   restores it on failure, specifically because `node-gyp`/`electron-rebuild` deletes
   `build/Release` *before* attempting the build — without the backup, a failed rebuild attempt in
   an unsupported environment would destroy the Node-ABI bootstrap binary `bun install` provided,
-  corrupting `node_modules` rather than just failing cleanly.
-- What still works here despite the above: `bun run build` (electron-vite's
-  `externalizeDepsPlugin()` never bundles or executes the native module — it just leaves the
-  `require()` call for Electron's own runtime resolution), `bun run lint`/`typecheck`, and running
-  `tests/electron-db/kafka.spec.ts`'s bundle under `ELECTRON_RUN_AS_NODE=1 electron` far enough to
-  confirm `node:test` exists and every import resolves — it then fails cleanly at
-  `isDockerAvailable()`, the same point every `tests/db/`-style spec fails at here (no Docker
-  daemon, see above).
+  corrupting `node_modules` rather than just failing cleanly. `native-electron-build.sh` itself
+  doesn't yet set `CKJS_LINKING=dynamic`, so a plain `predev`/`pretest:ui`/`pretest:db:kafka` run
+  still hits the from-source path here; export the variable before invoking it (or the underlying
+  `electron-rebuild` command directly, as above) until the script itself is updated.
 
 ## SQLite adapter — testing in this environment (P35)
 
@@ -214,15 +235,16 @@ is only about running it here.
 
 - **`tests/db/clickhouse.spec.ts` needs Docker** (`@testcontainers/clickhouse`, image
   `clickhouse/clickhouse-server`) — same `isDockerAvailable()` gate as every other Testcontainers
-  spec, and the same image-pull limitation applies here as elsewhere in this sandbox (Docker's
-  daemon is reachable, but pulling images from Docker Hub through the outbound proxy returns
-  `403`). `tests/ui/clickhouse.spec.ts` is Docker-gated the same way, not unconditional like
-  SQLite's — ClickHouse needs a real server, there's no local-file equivalent.
-- Verified in this sandbox the same way SQLite's own hard-to-run pieces were: real, targeted checks
-  against actual dependencies where a live container wasn't reachable — `splitSqlStatements` run
-  standalone against both new SQL fixture files via an esbuild-bundled script, and
-  `xvfb-run -a bunx playwright test tests/ui/clickhouse.spec.ts` run for real, failing only at the
-  same Docker image-pull step every other Docker-gated spec hits here.
+  spec. Direct Docker Hub pulls are blocked here (403 through the outbound proxy, Docker section
+  above), but `mirror.gcr.io/clickhouse/clickhouse-server:26.3` pulls fine and can be re-tagged to
+  the plain Docker Hub name the code hardcodes, with no code change needed for the pull itself.
+  `@testcontainers/clickhouse`'s own hardcoded ulimit request is the separate blocker that actually
+  stops a container from starting here — see the Docker section above and
+  `tests/ipc/clickhouse/container.ts`'s `NoUlimitClickHouseContainer`.
+- P50 split the old `tests/ui/clickhouse.spec.ts` into `tests/ipc/clickhouse/` (backend + frontend
+  halves sharing one fixture, see `docs/ARCHITECTURE.md`'s Testing section) — both halves run for
+  real in this sandbox now, the backend half against a real container started via the ulimit
+  workaround above.
 
 ## RabbitMQ adapter — testing in this environment (P37)
 
