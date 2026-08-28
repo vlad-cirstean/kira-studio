@@ -57,10 +57,20 @@ team works, and how to run things in whichever box a session happens to be on.
   either way.
 - **On Claude Code's Linux web containers specifically**, the outbound network policy blocks
   `production.cloudfront.docker.com` (403, gateway policy denial) — the CDN host Docker Hub
-  redirects every blob download to. `docker pull` therefore resolves manifests fine but can never
-  actually fetch an image's layers, so `tests/db/`'s testcontainers-backed suites cannot run there
-  at all (they hang/fail waiting on a container that never starts). This is an environment network
-  policy limit, not a Docker config problem — don't spend time working around it.
+  redirects every blob download to. Direct Docker Hub pulls therefore resolve manifests fine but
+  can never actually fetch an image's layers. `quay.io` is blocked the same way (403).
+  **`mirror.gcr.io` (Google's public read-through cache of Docker Hub) is not blocked** and works
+  from this sandbox (P50) — pointing an image reference at it (`mirror.gcr.io/library/mariadb:...`
+  etc., or configuring it as a registry mirror) unblocks real containers for mariadb, mysql, redis,
+  rabbitmq and localstack (sqs) here. Two exceptions found so far: **ClickHouse** —
+  `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile:{hard:262144,
+  soft:262144}})`, and this sandbox's own `ulimit -Hn` is fixed at 20000 and cannot be raised even
+  as root (confirmed: a plain `docker run` with no custom ulimits works fine standalone) — so this
+  one adapter's container-backed tests stay unrunnable here regardless of registry. **Kafka** — see
+  the Native Kafka driver section below; the blocker there is the ABI rebuild, not the image pull.
+  Bun's own `testcontainers` integration has also been observed to hang indefinitely in this specific
+  sandbox on images that pull and run fine under plain Node with the identical image — a sandbox
+  quirk of the Bun runtime here, not a real bug (confirmed fine on a real machine).
 
 ## Electron binary (for `tests/ui/`)
 
@@ -83,6 +93,44 @@ team works, and how to run things in whichever box a session happens to be on.
   `smoke.spec.ts`, `startup.spec.ts`, `workbench.spec.ts`, `connections.spec.ts`,
   `secrets.spec.ts` all pass) — most other specs still `test.skip()` cleanly via
   `isDockerAvailable()` rather than fail, per the Docker note above.
+
+## `tests/ipc/` — building and testing in this environment (P50)
+
+See `docs/ARCHITECTURE.md`'s Testing section for what this tier is and why the fixture is
+generated rather than hand-written. This section is only about running it here.
+
+- **The backend half needs the Electron binary from the section above, but no `xvfb`** — it never
+  opens a window. `scripts/run-ipc-backend.sh` bundles each `tests/ipc/**/*.backend.spec.ts` (plus
+  the harness's own Docker-free self-test) with esbuild — `--bundle --platform=node --format=cjs
+  --loader:.sql=text --external:electron --external:@confluentinc/kafka-javascript --external:ssh2
+  --external:cpu-features` — then runs the bundle under `ELECTRON_RUN_AS_NODE=1 electron`, one
+  process per spec file, sequentially (each file's container helper is a module-scope memo assuming
+  one file per process). `node_modules/.bin` needs to be on `PATH` for the bare `electron` the
+  script invokes to resolve. `tests/db/support/*.ts`'s `.sql`-reading helpers resolve their seed
+  file relative to `__dirname`, which is `out/tests/ipc/` once bundled, not `tests/db/fixtures/` —
+  the script copies the fixtures directory beside the bundle output to fix this, rather than editing
+  `tests/db/` itself.
+- **The frontend half needs `xvfb`** (`bun run test:ipc:fe`, i.e. `electron-vite build && playwright
+  test --project=ipc-frontend`) for the same reason every other `tests/ui/`-style Playwright run
+  does on a display-less Linux container: `xvfb-run -a bunx playwright test --project=ipc-frontend`.
+  It needs no Docker, no container and no native driver — confirmed here for mariadb, mysql, redis,
+  rabbitmq and sqs.
+- **Regenerating a fixture** (`KIRA_IPC_FIXTURES=write sh scripts/run-ipc-backend.sh`) writes each
+  backend spec's own `<adapter>.fixture.ts` via raw `JSON.stringify` (quoted keys, `capture.ts`'s
+  `writeFixtureModule`) — run `bunx biome check --write tests/ipc/<adapter>/<adapter>.fixture.ts`
+  afterward to match the repo's own formatting convention before committing; the content does not
+  change, only the quoting.
+- **Which adapters' backend halves are Docker-gated here, and which stay unrunnable regardless of
+  Docker**: mariadb, mysql, redis, rabbitmq and sqs's backend specs all ran for real against
+  containers pulled via `mirror.gcr.io` (Docker section above) in this sandbox. **ClickHouse**'s
+  backend spec was not written at all — the ulimit blocker (Docker section above) means no real
+  fixture could ever be captured here, and P50's own D5 forbids hand-writing one, so this adapter's
+  IPC-boundary split stays deferred; `tests/ui/clickhouse.spec.ts` was left in place rather than
+  deleted with nothing to replace it. **Kafka** is the same shape for a different reason: its
+  backend half needs the native ABI rebuild (Native Kafka driver section below), confirmed still
+  blocked here (`scripts/native-electron-build.sh` fails with the same `403` fetching Electron's
+  C++ headers), so no real fixture could be captured for it either — `tests/ui/kafka.spec.ts` also
+  stays in place, undeleted, for the same D5 reason.
 
 ## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/ui/` specs, P25)
 

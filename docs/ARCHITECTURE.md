@@ -521,7 +521,9 @@ recorded as owed verification in `docs/v1/plans/P46-…md` §8, not silently ass
 
 ## Testing
 
-Four suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ui/`.
+Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `ui/`. `ipc/` is the odd one
+out — it is two suites in one directory, a `node:test` backend half and a Playwright frontend half
+per adapter, sharing one fixture module by design (P50, below).
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
@@ -554,12 +556,46 @@ page, count, projection, sort, filter, cancel-mid-query (asserted **server-side*
 actually be gone from `pg_stat_activity` / `SHOW PROCESSLIST` / `currentOp`), cache hit/miss
 behaviour, add/delete row, command preview correctness. Local-only for now — no CI wiring in v1.
 
+**`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real IPC
+boundary — the control channel (`window.kira.*` → `ipcMain.handle` in `src/main/ipc/*`) and the
+bulk-data port (a `MessagePort` between `renderer/bridge/port.ts` and `engine/rpc.ts`, bypassing
+main entirely). Per adapter, one folder holds three files: `<adapter>.backend.spec.ts` drives the
+real `handleFrame`/`dispatch`/`TreeService` stack against a real container with no renderer at all
+(`bun run test:ipc:be`, one `ELECTRON_RUN_AS_NODE=1 electron` process per spec file, because
+`src/main/ipc/*`/`engine/{control,rpc}.ts` import `electron` and some adapters — sqlite, kafka —
+cannot load under Bun at any ABI); `<adapter>.frontend.spec.ts` drives the real Vue UI with both IPC
+halves mocked (`ipcMain` handlers swapped in the main process for the control channel — `window.kira`
+itself is frozen and non-configurable, so renderer-side mocking is impossible — and a fresh
+`MessageChannel` port for the bulk-data side), via `bun run test:ipc:fe`, which needs no Docker, no
+container and no native driver; and `<adapter>.fixture.ts` is the one file both halves import. That
+fixture is **generated, never hand-written**: `KIRA_IPC_FIXTURES=write bun run test:ipc:be` captures
+real responses from a real container and writes the module, and every subsequent run of the backend
+spec asserts its own real responses against that same committed file. This is the tier's anti-drift
+guarantee, stated once because it is easy to state wrong: **a frontend spec cannot mock a shape the
+backend has stopped producing without that same fixture module's own backend assertion failing
+first.** Wall-clock and other non-reproducible fields (timestamps, ephemeral ports, randomly
+generated ids, approximate row-count estimates) are frozen to fixed placeholders in the fixture
+after being validated structurally against the real value, never invented.
+
 **`tests/ui/`** (`bun run test:ui`) runs Playwright's `_electron.launch()` against the built app,
 driving the real UI against the real containers. Every change is validated with it before it is
-called done. Coverage: panel toggles, settings persistence, connection CRUD, tree expansion and
-caching (assert query counts via the op log), opening the same table twice with independent state,
-all pagination controls, projection, search toolbar modes, stop button, cell editor autodetect +
-beautify, document expand/collapse, PK/FK navigation, every context menu opening with the right
+called done. After P50 it holds two things: three full-stack anchors that stay whole rather than
+split at the IPC boundary — `sqlite.spec.ts` (Docker-free, the only DB-backed UI spec that runs in
+every environment this repo runs in), `mongo.spec.ts` (Docker-backed, the document page kind, a real
+write path end to end) and `s3.spec.ts` (the only spec exercising `src/main/ipc/files.ts`'s real
+save/open dialogs and `DATA_OP.objectDownload`, whose contract — the engine writes the file itself,
+bytes never transit main or the renderer — no mock can honestly stand in for) — and the remaining
+non-adapter specs, unchanged: panel toggles, settings persistence, connection CRUD, tree expansion
+and caching (assert query counts via the op log), opening the same table twice with independent
+state, all pagination controls, projection, search toolbar modes, stop button, cell editor autodetect
++ beautify, document expand/collapse, PK/FK navigation, every context menu opening with the right
 items, copy/paste, the sticky ancestor band's exact geometry and handoff across a scroll, and the
 checkbox tree filter's kind/tri-state/name-filter/persistence behavior. Plus a memory/perf smoke
 test asserting the RSS budget and no dropped frames while scrolling 10k rows.
+
+**Parallelism.** `playwright.config.ts` runs two projects on purpose, not by oversight: `e2e` (the
+`tests/ui/` specs above) stays `workers: 1, fullyParallel: false` because its `budgets`/`perf`/
+`memory`/`startup`/`leaks` specs assert wall-clock and RSS numbers that CPU contention would move;
+`ipc-frontend` (`tests/ipc/**/*.frontend.spec.ts`) runs `fullyParallel` because it contends over
+nothing — each test gets its own `KIRA_HOME`, its own Chromium profile, and no shared socket or
+container at all.
