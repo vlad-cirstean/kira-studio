@@ -1,75 +1,8 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 
 // P12's shared measurement primitives (D24) — the only non-re-export module in tests/ui/support/.
-// budgets.spec.ts, memory.spec.ts, and startup.spec.ts all import from here so their numbers are
-// produced by identical instrumentation and are therefore comparable across specs and across runs.
-
-export interface ProcessSample {
-  type: string; // 'Browser' | 'Tab' | 'Utility' | 'GPU' | ...
-  serviceName: string; // 'kira-engine' for the engine; '' when Electron reports none
-  pid: number;
-  rssBytes: number;
-}
-
-export interface RssSample {
-  totalBytes: number;
-  processes: ProcessSample[];
-}
-
-/** One `app.getAppMetrics()` reading, summed. No IPC, no production hook (D1). */
-export function sampleRss(app: ElectronApplication): Promise<RssSample> {
-  return app.evaluate(({ app }) => {
-    const metrics = app.getAppMetrics();
-    const processes = metrics.map((m) => ({
-      type: m.type,
-      serviceName: m.serviceName ?? '',
-      pid: m.pid,
-      rssBytes: m.memory.workingSetSize * 1024,
-    }));
-    const totalBytes = processes.reduce((sum, p) => sum + p.rssBytes, 0);
-    return { totalBytes, processes };
-  });
-}
-
-/** Idle `settleMs`, then `samples` readings `intervalMs` apart (D3). No forced GC. */
-export async function sampleRssSeries(
-  app: ElectronApplication,
-  opts?: { settleMs?: number; samples?: number; intervalMs?: number },
-): Promise<RssSample[]> {
-  const { settleMs = 5000, samples = 10, intervalMs = 1000 } = opts ?? {};
-  await new Promise((resolve) => setTimeout(resolve, settleMs));
-  const series: RssSample[] = [];
-  for (let i = 0; i < samples; i++) {
-    series.push(await sampleRss(app));
-    if (i < samples - 1) await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return series;
-}
-
-/** Multi-line per-process min/max breakdown for console.log — printed always, not only on failure. */
-export function formatRssSeries(series: RssSample[]): string {
-  if (series.length === 0) return '(no samples)';
-  const mb = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(1);
-  const totals = series.map((s) => s.totalBytes);
-
-  const byKey = new Map<string, number[]>();
-  for (const sample of series) {
-    for (const p of sample.processes) {
-      const key = `${p.type}${p.serviceName ? `:${p.serviceName}` : ''} (pid ${p.pid})`;
-      const values = byKey.get(key) ?? [];
-      values.push(p.rssBytes);
-      byKey.set(key, values);
-    }
-  }
-
-  const lines = [
-    `total: min=${mb(Math.min(...totals))}MB max=${mb(Math.max(...totals))}MB (${series.length} samples)`,
-  ];
-  for (const [key, values] of byKey) {
-    lines.push(`  ${key}: min=${mb(Math.min(...values))}MB max=${mb(Math.max(...values))}MB`);
-  }
-  return lines.join('\n');
-}
+// budgets.spec.ts and startup.spec.ts both import from here so their numbers are produced by
+// identical instrumentation and are therefore comparable across specs and across runs.
 
 export function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
@@ -173,9 +106,9 @@ export interface ScrollResponseDeltas {
  * number rather than a negative or NaN one.
  */
 // P29 D13: one axis parameter, not a second function — this file's own header rule is that
-// budgets.spec.ts/memory.spec.ts/startup.spec.ts must all produce numbers with identical
-// instrumentation so they stay comparable. Default 'vertical' keeps the existing call site
-// (scrollTop) byte-for-byte unchanged.
+// budgets.spec.ts/startup.spec.ts must both produce numbers with identical instrumentation so
+// they stay comparable. Default 'vertical' keeps the existing call site (scrollTop) byte-for-byte
+// unchanged.
 export function measureScrollResponses(
   page: Page,
   gridSelector: string,

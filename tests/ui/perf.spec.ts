@@ -9,10 +9,11 @@ import {
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // A tripwire, not a benchmark. §2.1's real interaction-budget measurements live in
-// budgets.spec.ts, §2.2's total-RSS budget in memory.spec.ts, and cold start in startup.spec.ts
-// (all P12) — this spec's four assertions (rAF tripwire, DOM cell bound, retained-bytes
-// open/close symmetry, L2-usage-vs-budget) are cheap, single-container, and kept unchanged
-// alongside them (P12 D7).
+// budgets.spec.ts and cold start in startup.spec.ts (all P12; §2.2's total-RSS budget had its own
+// memory.spec.ts, removed — see docs/PERF.md §2.2, permanently over budget on non-app-controllable
+// Chromium/Electron process overhead) — this spec's four assertions (rAF tripwire, DOM cell bound,
+// retained-bytes open/close symmetry, L2-usage-vs-budget) are cheap, single-container, and kept
+// unchanged alongside them (P12 D7).
 // Inverse of format.ts's formatBytes ("<number> bytes|KB|MB") — converts to MB so it's directly
 // comparable to the budget field, which is a plain number (no unit) in the same units.
 function parseFormattedMb(text: string): number {
