@@ -162,3 +162,12 @@ docs/design/*/[a-z]*-design-system.html
 # regenerated on demand (P35 D36); the other seven engines' demo data lives
 # in containers instead, so this is the one on-disk artifact of the set.
 scripts/demo-dbs/sqlite/*.sqlite
+
+# P51 NeutralinoJS spike shell (docs/v1/plans/P51-neutralino-migration-spike.md)
+# — neutralino/bin/ is ~22 MB of platform binaries `neu update` regenerates;
+# neutralino/resources/ is built from out/renderer/ by
+# scripts/build-neutralino-shell.sh (D4/D6). .tmp/ is the CLI's own
+# auth-info/log scratch dir.
+neutralino/bin/
+neutralino/resources/
+neutralino/.tmp/

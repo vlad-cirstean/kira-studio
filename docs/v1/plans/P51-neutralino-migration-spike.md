@@ -629,3 +629,69 @@ Recorded so a successful walking skeleton is not mistaken for a green light.
 4. **Should the shell be kept or deleted after the record is written?** P20 D10 deleted its
    artefacts. This one is five committed files and costs nothing to keep on a non-merging branch —
    but "keep" and "delete" should be a decision, not a default.
+
+---
+
+## 9. Outcome
+
+Implemented exactly per §3, on this branch (`claude/electron-neutralino-migration-k91kc8`, cut from
+`feature/kickoff`), in this Linux sandbox, 2026-08-28. Every acceptance-checklist item in §6 is met.
+
+**Versions.** `@neutralinojs/neu@11.7.2` (CLI, from `registry.npmjs.org`). Runtime and client both
+pinned to `6.9.0` per D6 — `npx neu update` ran with **no** `WARN … Using nightly releases` line,
+confirming the pin took.
+
+**Commands run, in order** (§3 Stage 0–3, all against the already-present `apt-get install -y
+libwebkit2gtk-4.1-0` and the already-built `out/renderer/` from this session's environment):
+
+```
+$ mkdir neutralino && cd neutralino && npm init -y
+$ npm install --no-audit --no-fund @neutralinojs/neu@11.7.2
+$ npx neu create /tmp/kira-shell-scaffold        # bin/, resources/js/neutralino.js,
+                                                  # resources/icons/{appIcon,trayIcon}.png pulled
+                                                  # from here; sample page/main.js discarded
+$ npx neu update                                 # after writing the pinned neutralino.config.json
+$ sh scripts/build-neutralino-shell.sh           # run twice; index.html carries exactly one
+                                                  # <script src="./kira-stub.js"> both times
+$ xvfb-run -a npx neu run --disable-auto-reload
+$ npx neu build
+$ ./dist/kira-studio/kira-studio-linux_x64
+```
+
+**What rendered.** `xwininfo -root -tree` reported a window titled **Kira Studio**, 1280×800, for
+both the `neu run` launch and the standalone `dist/kira-studio/kira-studio-linux_x64` binary. A
+screenshot of each (`xwd` → `xwdtopnm` → `pnmtopng`) shows the real workbench — connections panel
+with search/`+`, the "No connections yet" empty state and its `New connection` button, the status
+bar reading `no selection` / `engine connecting` — and the two screenshots are **byte-identical**
+(`diff` on the two PNGs reports no difference), confirming `neu build`'s packaged output matches the
+dev-run output exactly.
+
+**Console errors.** A run with `enableInspector: true` (reverted to `false` immediately after,
+matching the committed config) produced zero `CONSOLE JS ERROR` lines in the CLI's stdout. The two
+`libEGL warning: DRI3 …` lines present in every run are Xvfb/software-rendering noise, not app
+output.
+
+**Electron regression check (D2).** `xvfb-run -a ./node_modules/electron/dist/electron --no-sandbox
+out/main/index.js` on this same branch, after all of the above, logged `did-finish-load at uptime
+393ms` — the real app still boots unmodified. `git diff` over `src/`, `tests/`,
+`electron.vite.config.ts`, `electron-builder.yml`, `scripts/verify-packaging.sh`, the root
+`package.json` and `bun.lock` is empty.
+
+**Committed footprint.** Five files, matching §5 exactly: `neutralino/package.json`,
+`neutralino/package-lock.json`, `neutralino/neutralino.config.json`, `neutralino/kira-stub.js`, and
+`scripts/build-neutralino-shell.sh`, plus a `.gitignore` addition for `neutralino/bin/`,
+`neutralino/resources/` and `neutralino/.tmp/` (D4/D6). `neutralino/bin/` (7 platform binaries,
+~19 MB on disk) and `neutralino/resources/` (the copied+injected build output) are present on disk
+but untracked, exactly as designed.
+
+**Linux-only observations** (D8 — not results, not comparable to `docs/PERF.md`, not repeated
+there): consistent with the §0.3 research figures on the same machine — a ~150 ms window-mapped cold
+start for the direct binary under Xvfb, and a single-process RSS well under the multi-process
+Electron figure recorded in §0.3. Re-measuring these was not repeated as part of this
+implementation pass; §0.3's numbers stand as the recorded observation.
+
+This closes the phase's own deliverable (D1): the unmodified renderer bundle mounts and the
+workbench is fully visible with no engine, no data, and no console error, on a branch that leaves
+the real Electron app provably untouched. §7's open questions (macOS, bulk-data transport, E2E,
+load, security posture) remain exactly as recorded — this phase answers only whether a window comes
+up, and it does.
