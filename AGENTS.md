@@ -279,5 +279,57 @@ it here.
   halves sharing one fixture, see `docs/ARCHITECTURE.md`'s Testing section) — both halves run for
   real in this sandbox now against a real container pulled the way above.
 
+## Wails v3 / Go — building and testing in this environment (P51)
+
+See `docs/v1/plans/P51-wails-go-node-engine-spike.md` and its `P51-spike-report-part{1,2,3}.md` for
+the actual design findings. This section is only the reusable environment setup, so it doesn't have
+to be re-derived next time.
+
+- **`wails.io` and `v3.wails.io` are egress-blocked in this sandbox** (403 at the CONNECT-tunnel
+  stage, confirmed repeatedly) — the official docs cannot be read from here. **`proxy.golang.org` is
+  not blocked**, so `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` works fine and pulls
+  the whole module tree (including transitively vendored source under `$GOPATH/pkg/mod`, which is
+  actually a *better* source than the docs site — it's the real, current source for whatever version
+  just got installed). Go's own toolchain auto-upgrades if the module demands a newer one
+  (`go1.24.7` → `go1.26.7` for `wails/v3@v3.0.0-beta.15`) — that happens automatically via
+  `proxy.golang.org` too, no separate step needed.
+- **The `wails3` CLI itself needs GTK4 + WebKitGTK dev headers to build on Linux**, even though the
+  app being developed targets macOS — this is purely so the CLI's own Linux build (and any
+  Linux-hosted `wails3 dev`) can embed a webview locally:
+  `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config`. Without it, `go install` fails
+  at `internal/operatingsystem` with a `pkg-config` error naming `gtk4`/`webkitgtk-6.0`. `wails3
+  doctor` confirms a clean environment afterward.
+- **`wails3 init` → `go mod tidy` → `wails3 generate bindings` → `npm run build` (frontend) →
+  `go build`** all work end to end and produce a real running Linux/GTK4 binary — confirmed with a
+  scaffolded `vanilla`-template project. Useful for validating the binding model or reading the
+  installed `@wailsio/runtime` npm package's actual `dist/` output (truer than trusting a GitHub
+  branch, since it's exactly what a real `npm install` would pull for that Wails version).
+- **`wails3 task dev` genuinely works here, including the native window under `xvfb-run`** — but the
+  *first* build takes about **60 seconds** (native compile, icon/binding generation, Vite cold
+  start). Backgrounding it and giving up after 15–25s (a short `sleep` or a short `timeout N`) looks
+  exactly like a sandbox limitation but isn't — it's just impatience. The pattern that works: start
+  it backgrounded inside **one** shell invocation, poll a log file or the port in a loop instead of a
+  fixed sleep, run the checks, then tear it down — all in that same invocation. Give the Bash tool a
+  correspondingly long `timeout` (e.g. 120–150s) rather than relying on the tool's default.
+- **A background process started in one shell invocation cannot be signaled (`kill`/`pkill`) from a
+  later, separate invocation** — it still shows up in that later call's `ps aux` (the process table
+  view is shared), but the signal doesn't land, so it survives as an unreapable zombie for the rest
+  of the session. This isn't specific to Wails; it bit every attempt to start `wails3 dev` in one
+  call and clean it up or re-check it from another. **Do everything — start, poll, test, and kill —
+  inside one shell invocation**, never split across calls expecting to manage the same process later.
+  A leftover `Xvfb`/`wails3 dev` process from a prior attempt squatting on a dev port is the usual
+  symptom; picking a fresh port sidesteps it rather than fighting the zombie.
+- **On Linux, `/wails/runtime` and `/wails/stream/*` are not reachable over plain HTTP, even from
+  `wails3 dev`'s own dev server port** — confirmed with `curl`, reproducibly, on a clean port with no
+  stale-process contamination. `pkg/application/linux_cgo.go`
+  (`webkit_web_context_register_uri_scheme`, registering `wails://`) is why: WebKitGTK loads the app
+  through a custom URI scheme intercepted **inside** the native process, not a real TCP listener. The
+  dev server's `devServerURL` is an upstream the Go process itself fetches Vite content from
+  internally — it is not the address the webview's own runtime/stream calls travel over. **`curl` or
+  a plain browser tab can never exercise real Wails bindings this way**, on this platform — only an
+  actual `wails://`-registered webview can. (Not yet checked whether macOS's WKWebView transport
+  works the same way — the scheme-registration code is platform-specific, so this is Linux-confirmed
+  only, not assumed to generalize.)
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
