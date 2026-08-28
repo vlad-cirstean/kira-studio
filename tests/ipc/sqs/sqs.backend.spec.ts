@@ -202,13 +202,15 @@ describe('sqs IPC boundary', () => {
         path: emptyQueueNode.path,
         filter: null,
       };
+      // value:0/exact:false on an empty queue is already proven at the adapter level with the
+      // same fixture data (tests/db/sqs.spec.ts) — handleCount passes both through verbatim, so
+      // re-asserting them here would add nothing (P50's own db-vs-ipc overlap review). The
+      // fixture's own deepEqual still pins both values via the snapshot push below.
       const countResult = await harness.dataOp<{
         value: number;
         exact: boolean;
         source: string;
       }>(DATA_OP.count, countPayload);
-      assert.equal(countResult.value, 0);
-      assert.equal(countResult.exact, false);
       portSnapshots.push({
         op: DATA_OP.count,
         payload: countPayload,

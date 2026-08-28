@@ -94,12 +94,11 @@ describe('rabbitmq IPC boundary', () => {
       });
       const vhostNode = findByName(root.nodes, config.database ?? 'kira', 'database');
 
+      // D16: the nameless default exchange never appears as a row at all — already proven at the
+      // adapter level (tests/db/rabbitmq.spec.ts) with the identical fixture data; control.ts/
+      // tree-service.ts can only re-wrap and cache what the adapter returns, so re-asserting it
+      // here would add nothing (P50's own db-vs-ipc overlap review).
       const vhostChildren = await harness.children(config.id, vhostNode.path);
-      // D16: the nameless default exchange never appears as a row at all.
-      assert.equal(
-        vhostChildren.nodes.some((n) => n.kind === 'exchange' && n.name === ''),
-        false,
-      );
       controlSnapshots.push({
         channel: IPC.treeChildren,
         args: { connectionId: config.id, path: vhostNode.path, refresh: false },
@@ -130,10 +129,10 @@ describe('rabbitmq IPC boundary', () => {
       let pollLogical = decodePage(pollResult.page as Parameters<typeof decodePage>[0]);
       assert.equal(pollLogical.kind, 'stream');
       if (pollLogical.kind === 'stream') {
+        // D32/scenario 5: the key column carries the routing key (the seed sets it to the queue's
+        // own name) — already proven at the adapter level with the same fixture data
+        // (tests/db/rabbitmq.spec.ts), so only the page-is-real precondition is re-asserted here.
         assert.ok(pollLogical.keys.length > 0);
-        // D32/scenario 5: the key column carries the routing key, which the seed sets to the
-        // queue's own name for these messages.
-        assert.equal(pollLogical.keys[0], 'orders');
         // The seed publishes these messages at container-start time (real wall-clock), so their
         // timestamps differ run to run — frozen for the fixture, same D6 pattern as everywhere
         // else a wall-clock value has turned up in this phase.
