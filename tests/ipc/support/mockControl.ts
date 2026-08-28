@@ -31,10 +31,14 @@ export async function installControlMocks(
     // undefined by every caller that doesn't pass a third argument. Comparing raw JSON.stringify
     // output would make that call fail to match a fixture recorded from a caller that never set
     // the key in the first place, so both sides drop undefined-valued keys before comparing.
+    // `tabId` is excluded outright — it is a per-tab UUID the renderer generates at tab-open time
+    // (definition/state.ts's own load()), never reproducible from a fixture, same reasoning
+    // mockPort.ts's own matchKey already applies to the bulk-data port's opId/tabId.
     function canonical(value: unknown): string {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const out: Record<string, unknown> = {};
         for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+          if (key === 'tabId') continue;
           const v = (value as Record<string, unknown>)[key];
           if (v !== undefined) out[key] = v;
         }

@@ -157,16 +157,28 @@ export async function installMockPort(
       return `${op}:${JSON.stringify(payload)}`;
     }
 
-    const byKey = new Map<string, PortSnapshot>();
-    for (const snap of snaps) byKey.set(matchKey(snap.op, snap.payload), snap);
+    // Two or more snapshots can share one (op, payload) key on purpose — e.g. a poll before and
+    // after a publish to the same queue at the same offset (P50 §4.4's rabbitmq split): the
+    // request is identical both times, only the broker's answer changed. Grouped by key, in
+    // fixture order; the Nth call to that exact key returns the Nth snapshot, and every call past
+    // the last one keeps returning the last (mirrors mockControl.ts's own sequencing).
+    const byKey = new Map<string, PortSnapshot[]>();
+    for (const snap of snaps) {
+      const key = matchKey(snap.op, snap.payload);
+      const group = byKey.get(key) ?? [];
+      group.push(snap);
+      byKey.set(key, group);
+    }
+    const cursors = new Map<string, number>();
 
     const seen: { op: string; payload: unknown }[] = [];
     const channel = new MessageChannel();
     channel.port2.onmessage = (event: MessageEvent) => {
       const req = event.data as { kind: 'req'; id: number; op: string; payload: unknown };
       seen.push({ op: req.op, payload: req.payload });
-      const snap = byKey.get(matchKey(req.op, req.payload));
-      if (!snap) {
+      const key = matchKey(req.op, req.payload);
+      const group = byKey.get(key);
+      if (!group) {
         channel.port2.postMessage({
           kind: 'res',
           id: req.id,
@@ -175,6 +187,9 @@ export async function installMockPort(
         });
         return;
       }
+      const at = cursors.get(key) ?? 0;
+      cursors.set(key, at + 1);
+      const snap = group[Math.min(at, group.length - 1)];
       const reply = () =>
         channel.port2.postMessage({
           kind: 'res',
