@@ -258,8 +258,11 @@ has to land on it. Open:
   (5.6 ms p50 scroll against an 8 ms budget) hold.
 
 **Partial finding, and how it was obtained — treat as best current knowledge, not settled.**
-`wails.io` and `v3.wails.io` are **blocked by this environment's egress proxy**, so the official
-documentation could not be read from here. Reading the v3 runtime source on GitHub directly
+`wails.io` and `v3.wails.io` are **blocked by this environment's egress proxy** — retried and
+reconfirmed on 2026-08-28: both `WebFetch` and a raw `curl` to each domain fail identically, with the
+`curl` failing at the CONNECT-tunnel stage with a 403, meaning this is a genuine network-level block
+in this sandbox, not a tool-specific restriction. The official documentation has still never been read
+from here. Reading the v3 runtime source on GitHub directly
 (`v3/internal/runtime/desktop/@wailsio/runtime/src/runtime.ts`, `calls.ts`, master branch, read
 2026-08-28) shows the default binding transport is a **`fetch()` to a local HTTP endpoint at
 `window.location.origin + "/wails/runtime"`, with a `JSON.stringify(...)` body**, whose response is
@@ -273,8 +276,12 @@ cancellable. Two things follow, both for the spike to confirm rather than assume
   is a *hypothesis* from reading one file of a beta-branch runtime, not a design.
 
 **The spike must verify all of this against Wails' own current documentation and a real build**, from
-a machine with unrestricted network access. Note also that Wails v3 is **beta** (v2 is the stable
-line) — which line to target is itself a question this plan does not answer.
+a machine with unrestricted network access.
+
+**Decided: target Wails v3, beta status accepted.** v3 is the only line this document has any direct
+evidence about — the `setTransport()` escape hatch above is the one concrete lead on avoiding a full
+JSON round-trip for bulk data, and it does not exist to check in v2. The repo owner accepted v3's beta
+status explicitly rather than defaulting to v2's stability. This closes former open question 3 in §5.
 
 ### 3.3 The Go↔Node engine transport
 
@@ -441,13 +448,20 @@ vendor-published or generic-benchmark figures — and note that `app.getAppMetri
 here. Finding the replacement instrument is part of the work, and it is also what the app's own
 status-bar CPU/memory readout (`IPC.appMetrics`) needs, not just the tests.
 
-### 3.8 E2E testing — decision carried over, not reopened
+### 3.8 E2E testing — decision carried over, not reopened, and the spike's first step
+
+**Decided: this is the spike's literal step one**, ahead of the transport and packaging work in
+§3.2–§3.4 — the same sequencing the deleted Tauri plan used for `tauri-driver`'s macOS support. This
+closes former open question 2 in §5. Not because the E2E decision below is contingent on the answer —
+it isn't, it is unconditional either way — but because it is cheap to confirm and it is the same class
+of finding that closed P20 outright, so it belongs at the front of the report rather than the back.
 
 Wails also embeds the system webview (WKWebView on macOS), so it inherits the same problem: **Apple
 ships no WebDriver server for WKWebView.**
 
 What could be established from here, and how — `wails.io` and `v3.wails.io` are **egress-blocked in
-this environment**, so this comes from GitHub and search results, not official docs:
+this environment, reconfirmed 2026-08-28** (§3.2) — so this comes from GitHub and search results, not
+official docs:
 
 - **No first-party Wails WebDriver story surfaced.** The closest thing is discussion `wailsapp/wails`
   #4205, *"[v2] end-to-end testing?"*, where the recommended approach is to run `wails dev` and point
@@ -534,30 +548,35 @@ renderer branches on, and `src/main/storage/db.ts`'s 200-entry statement cache a
 
 ## 5. Open questions for the repo owner
 
-Most of what the deleted plan asked is answered by §1's premises. What genuinely remains:
+Most of what the deleted plan asked is answered by §1's premises. Two more were resolved in review
+after this document's first draft; one genuinely remains open.
 
-1. **Which Go↔Node transport should the spike prototype first (§3.3)** — stdio pipes, or a Unix domain
+**Resolved:**
+
+1. ~~Should the E2E/testing finding for Wails be checked before any other spike work?~~ **Yes —
+   decided. This is the spike's literal step one (§3.8).**
+2. ~~Wails v2 (stable) or v3 (beta)?~~ **v3, beta status accepted (§3.2).** The `setTransport()` lead
+   on avoiding a JSON round-trip for bulk data only exists on v3.
+
+**Still open:**
+
+3. **Which Go↔Node transport should the spike prototype first (§3.3)** — stdio pipes, or a Unix domain
    socket? Stdio is closest to today's `stdio: 'pipe'` fork and ties the channel's lifetime to the
    child for free; a socket is easier to reconnect to and keeps stdout/stderr free for the logging path
    `engine-host.ts` uses today. A default of "stdio first, socket only if something forces it" is the
    plan's suggestion, but it is the repo owner's call.
-2. **Should the E2E/testing finding for Wails (§3.8) be checked before any other spike work**, the way
-   the deleted plan recommended checking `tauri-driver`'s macOS support first? The argument against is
-   that §3.8's decision is already unconditional, so nothing waits on the answer. The argument for is
-   that it is cheap and it is the same class of finding that closed P20.
-3. **Wails v2 (stable) or v3 (beta)?** §3.2's one concrete finding comes from v3's runtime source. v3's
-   binding ergonomics and its `setTransport` escape hatch look more useful for §3.2's bulk-data
-   question, but v3 is beta and this is a shipped app.
 4. **Is there a macOS arm64 machine available for the spike at all?** `docs/PERF.md` §3's manual
    procedures remain unfilled for exactly this reason, and P20's §8 Q1 asked the same thing. A
    Linux-only investigation cannot answer §3.4, §3.5 or §3.7 — and this environment cannot even reach
-   Wails' own documentation (§4).
+   Wails' own documentation, confirmed twice now (§3.2, §3.8).
 
 ## 6. Decision gate
 
 The eventual spike's deliverable is a **written report**, committed alongside this plan, covering:
 
-- Every open question in §3, answered against a **real Wails build and Wails' own current
+- **§3.8's E2E/WebDriver finding, checked first**, before any transport or packaging work — per §5's
+  resolved sequencing decision.
+- Every other open question in §3, answered against a **real Wails build and Wails' own current
   documentation** rather than inference, wherever that is possible.
 - A concrete **design for the renderer↔Go bridge** (§3.2) and for **bulk data** — including whether
   `docs/ARCHITECTURE.md`'s "bulk data skips the main process" invariant survives in any form, and a
