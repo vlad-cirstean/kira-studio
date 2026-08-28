@@ -60,10 +60,27 @@ team works, and how to run things in whichever box a session happens to be on.
   redirects every blob download to. Direct Docker Hub pulls therefore resolve manifests fine but
   can never actually fetch an image's layers. `quay.io` is blocked the same way (403).
   **`mirror.gcr.io` (Google's public read-through cache of Docker Hub) is not blocked** and works
-  from this sandbox (P50) — pointing an image reference at it (`mirror.gcr.io/library/mariadb:...`
-  etc., or configuring it as a registry mirror) unblocks real containers for mariadb, mysql, redis,
-  rabbitmq and localstack (sqs) here. **ClickHouse** needs one more workaround on top of the
-  registry mirror: `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile:
+  from this sandbox (P50). None of `tests/db/support/*.ts`'s own `IMAGE` constants point at it —
+  they hardcode the plain Docker Hub name (`mariadb:11.4`, `clickhouse/clickhouse-server:26.3`,
+  etc.) — so the fix is to pull the mirrored name once per session and re-tag it locally to the
+  plain name the code expects, not to edit any source file:
+  ```
+  docker pull mirror.gcr.io/library/mariadb:11.4   # official (unnamespaced) image: needs library/
+  docker tag mirror.gcr.io/library/mariadb:11.4 mariadb:11.4
+  docker pull mirror.gcr.io/confluentinc/cp-kafka:8.0.7   # already namespaced: no library/ prefix
+  docker tag mirror.gcr.io/confluentinc/cp-kafka:8.0.7 confluentinc/cp-kafka:8.0.7
+  ```
+  The rule: a Docker Hub *official* image (no namespace in its plain name — `mariadb`, `mysql`,
+  `postgres`, `redis`, `rabbitmq`, `mongo`) lives under `library/` on the actual registry, so the
+  mirror path needs that prefix even though the plain name doesn't have it; an image that already
+  carries its own namespace (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
+  `localstack/localstack`) mirrors at that same path with no `library/` inserted. Confirmed
+  working for every adapter this repo uses — mariadb, mysql, postgres, redis, rabbitmq, mongo (all
+  via `library/`), and clickhouse, kafka, localstack (s3/sqs, no `library/`) — pulling `docker
+  images` after the retag shows both the `mirror.gcr.io/...` and the plain-name tag pointing at the
+  identical image id, so `tests/db/support/*.ts` finds the plain name it hardcodes with zero code
+  changes. **ClickHouse** needs one more workaround on top of the retag above:
+  `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile:
   {hard:262144, soft:262144}})`, and this sandbox's own `ulimit -Hn` is fixed at 20000 and cannot
   be raised even as root (confirmed: a plain `docker run` with no custom ulimits works fine
   standalone) — so a container started the stock way never comes up here. `hostConfig` is
