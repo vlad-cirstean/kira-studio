@@ -1,0 +1,27 @@
+// Package appcore is the Go analogue of src/main/ipc/deps.ts — the one Deps struct embedded by
+// value into each bound service, and the startup-ordering entry point (src/main/index.ts).
+package appcore
+
+import (
+	"database/sql"
+
+	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
+	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
+)
+
+// Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
+// IpcDeps shape as closely as each phase's scope allows. M1 carries only what the nine boot-path
+// reads and the engine ping need; connections/secrets/tree land in P54-P55.
+type Deps struct {
+	DB          *sql.DB
+	EngineHost  *enginehost.Host
+	NodeVersion string
+	StartedAt   int64 // unix millis, for engineStatus/appInfo-style diagnostics later
+
+	Settings    *repos.SettingsRepo
+	Layout      *repos.LayoutRepo
+	Tabs        *repos.TabsRepo
+	Connections *repos.ConnectionsRepo
+	Ops         *repos.OpsRepo
+	Filters     *repos.FiltersRepo
+}

@@ -36,7 +36,11 @@
     "prepackage:mac": "sh scripts/native-electron-build.sh",
     "package:mac": "electron-vite build && electron-builder --mac --arm64 --publish never",
     "package:mac:dir": "electron-vite build && electron-builder --mac --arm64 --dir --publish never",
-    "verify:packaging": "sh scripts/verify-packaging.sh"
+    "verify:packaging": "sh scripts/verify-packaging.sh",
+    "build:wails": "vite build -c vite.wails.config.ts",
+    "dev:wails": "bun run build:wails && cd shell && wails3 task dev",
+    "test:go": "cd shell && go test ./...",
+    "package:wails": "cd shell && wails3 task darwin:package && sh scripts/sign-bundle.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",

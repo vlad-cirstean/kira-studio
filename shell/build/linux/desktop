@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Kira Studio Shell
+Comment=A visual database client for macOS
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/kira_studio_shell %u
+Terminal=false
+Type=Application
+Icon=kira_studio_shell
+Categories=Utility;
+StartupWMClass=kira_studio_shell
+
+ 

@@ -212,6 +212,81 @@ process overhead present even with zero connections. This is reported here for a
 accepting a higher budget for this class of app; measuring only the app-attributable delta instead
 of total RSS) — not silently patched.
 
+### 2.3 P52 gate G1 — Wails/Go walking-skeleton RSS (Linux sandbox; not the gate's own verdict)
+
+**Status: measured, and explicitly NOT a G1 verdict.** P52 §3.3 defines G1 against a real macOS
+arm64 build (the same machine P51 part 4 used) matching WKWebView's helper processes, because
+that is the platform this migration ships on. This sandbox is Linux x86_64 with WebKitGTK
+2.52.3 — a structurally different webview implementation from WKWebView, not a stand-in for it.
+The numbers below are real, reproducible measurements of the real M1 walking skeleton, kept here
+because they are the first concrete evidence that §0.2's stated risk ("the system-webview saving
+might be smaller than the vendored-Node cost that replaces Electron's own Node") is not
+hypothetical — but per P52 §15, **P53 does not start until this same procedure is re-run on real
+macOS hardware and produces a recorded go/amber/no-go verdict.** Nothing below substitutes for
+that.
+
+**Instrument, built and verified as part of this gate (P52 §3.3's "finding the replacement
+instrument is part of the work"):** `shell/cmd/g1measure`, a small standalone tool over
+`internal/metrics`' own `gopsutil`-based `MatchingPIDs`/RSS summation — the same package
+`internal/metrics.Sampler` uses for the app's own `kira:app:metrics` events (§8.4), so the gate is
+measured with the app's real instrument, not a one-off script. **Cross-checked against plain `ps
+--forest`**, which is how the process set below was actually discovered (see note below) — a
+single self-reported number is exactly what P51 §3.7 warns against.
+
+**The process set was not obvious, confirming §3.3's own warning — just not in the way §3.3
+anticipated.** On macOS, the warning is that WKWebView's helper processes are *not* children of
+the app in the pid-tree sense and must be found by matching the `.app` bundle instead. On Linux,
+the opposite structural surprise showed up: WebKitGTK's `WebKitNetworkProcess` and
+`WebKitWebProcess` **are** children of the Go process (confirmed via `ps --forest`), but
+`WebKitWebProcess` itself is re-executed through two layered `bwrap` (bubblewrap sandbox)
+wrapper processes first — trivial RSS themselves (1.6-2.2 MB each) but their presence is easy to
+miss if the match rule is naive. `shell/cmd/g1measure -match` accounts for all of it explicitly:
+`kira-studio-shell,runtime/node/bin/node,webkitgtk,bwrap`.
+
+**Method:** identical to the removed `tests/e2e/memory.spec.ts`'s own methodology (§2.2) —
+10 samples, 1 second apart, after the window is shown and idle, minimum taken — so these numbers
+are directly comparable in shape (not platform) to §2.2's table.
+
+**Configuration (1) — blank** (`KIRA_G1_BLANK=1`, a static page making the one `AppService.Info()`
+call): **min of 10 samples = 616.3 MB.**
+
+| Process | RSS at min sample |
+|---|---|
+| `kira-studio-shell` (Go) | 266.4 MB |
+| vendored `node` (engine, ping-only) | 45.1 MB |
+| `WebKitNetworkProcess` | 48.3 MB |
+| `WebKitWebProcess` | 252.7 MB |
+| `bwrap` × 2 | 3.7 MB |
+
+**Configuration (2) — real renderer** (the actual `src/renderer` Vue app, the nine boot-path
+reads against a real, empty Go SQLite database — §3.2's actual G1 scenario): **min of 10 samples
+= 689.5 MB.**
+
+| Process | RSS at min sample |
+|---|---|
+| `kira-studio-shell` (Go) | 274.7 MB |
+| vendored `node` (engine, ping-only) | 45.0 MB |
+| `WebKitNetworkProcess` | 48.2 MB |
+| `WebKitWebProcess` | 317.8 MB |
+| `bwrap` × 2 | 3.7 MB |
+
+**Secondary hard check (§3.3): the engine child's own RSS, ping-only idle, must be ≤ 150 MB.**
+Measured 45-46 MB in both configurations — **passes**, and this half of the check is genuinely
+platform-independent (it is the same vendored Node binary answering the same one op, regardless
+of which webview surrounds it), unlike the headline number above.
+
+**What this Linux number does and does not say.** Read literally against §2.2's 620-626 MB
+Electron baseline, configuration (2)'s 689.5 MB is *higher*, not lower — on this platform, this
+build is not smaller than Electron. The reason is legible in the table: `WebKitWebProcess` alone
+(252.7-317.8 MB) is a full, separate WebKitGTK library instance, not a thin OS-supplied surface —
+structurally closer to Electron's own Browser+GPU cost than to what WKWebView is expected to cost
+on macOS, where it is a shared system framework most of whose weight is already resident for any
+app using it. **This is exactly why P52 §0.2 refused to let this migration proceed past a scaffold
+without measuring the real target platform first** — a Linux-only measurement would have made the
+opposite (wrong) case for a "go" here, and the real macOS number could easily go either way from
+what this sandbox shows. Treat this section as motivation for taking the macOS re-run seriously,
+not as a substitute for it.
+
 ### L2 cache note (D19)
 
 L2's 64 MB default budget and its `> budget / 2` no-cache refusal rule (a single page whose byte

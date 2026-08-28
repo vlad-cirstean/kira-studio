@@ -342,5 +342,72 @@ have to be re-derived next time.
   works the same way — the scheme-registration code is platform-specific, so this is Linux-confirmed
   only, not assumed to generalize.)
 
+**P52 implementation findings, worth keeping for P53+:**
+
+- **A fresh container has none of the P51 toolchain installed — it does not persist across
+  sessions.** `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` and
+  `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` (via `export
+  PATH=$PATH:$(go env GOPATH)/bin`) both have to be re-run at the start of any new session before
+  `wails3` is on `PATH`.
+- **`wails3 init -n "<Name With Spaces>" -d <dir>` creates `<dir>/<Sanitized_Name>/`, not
+  `<dir>/` itself** — the project lands one directory deeper than expected. Flatten it
+  (`mv <dir>/<Sanitized_Name>/* <dir>/ && rmdir ...`) rather than fighting the flag for an exact
+  target directory.
+- **The vanilla scaffold's `build/ios/` and `build/android/` ship a `package main` with no
+  `func main()` on non-mobile build tags** (the real `func main()` only exists behind `//go:build
+  ios`) — `go build ./...` fails on `build/ios` with "function main is undeclared" unless those
+  directories are removed (and their Taskfile.yml `includes:` entries dropped) for a macOS/Linux-only
+  product.
+- **`sql.Open("sqlite3", path)` (mattn/go-sqlite3) is lazy** — the database file does not exist on
+  disk until the first real query. `os.Chmod(path, 0o600)` right after `sql.Open` fails with "no
+  such file or directory"; the four startup pragmas (which force the first real connection) must
+  run before the chmod, not after.
+- **Injecting a build-time-only `<script>` into `src/renderer/index.html` without editing that
+  file** (needed so a Wails-specific bootstrap shim can exist without touching `src/`, which
+  Electron's build must never see): a `transformIndexHtml` hook that returns an inline
+  `<script type="module">import '@bare-specifier';</script>` tag is silently NOT bundled by
+  Vite/Rollup — inline module scripts injected this way stay as literal unresolved text in the
+  output HTML. The fix is to register the shim as its own `rollupOptions.input` entry, then use
+  `transformIndexHtml`'s `order: 'post'` hook (which receives `ctx.bundle`) to find that entry's
+  actual emitted chunk and inject a real `<script type="module" src="./assets/<hashed-name>.js">`
+  tag pointing at it.
+- **A CSP `script-src 'self'` (already present in `src/renderer/index.html` for the Electron
+  build) blocks any inline `<script>` with no `src`**, silently — no catchable JS error, just
+  nothing runs. This bit both the shim-injection approach above (fixed by giving it a real `src`)
+  and an attempted inline window-error-handler diagnostic (fixed by moving it to its own file
+  under `frontend/dist/assets/` and referencing it with a plain `<script src="...">`, still
+  same-origin so still allowed under `'self'`).
+- **`wails3 generate bindings -b` imports `/wails/runtime.js` in every generated file** (`-b` =
+  "use the bundled runtime instead of the npm package") — that path is resolved by Wails' own
+  asset server inside a real webview, not an npm package. Vite must be told
+  `build.rollupOptions.external: [/^\/wails\//]` or it fails trying to resolve it at build time.
+- **On Linux, `go:embed` a static "blank" test page separately from the real frontend
+  (`//go:embed blank/index.html`) and switch `AssetOptions.Handler` on an env var** is a cheap way
+  to build gate G1's two required configurations (P52 §3.2) without two separate binaries — use
+  `fs.Sub(embeddedFS, "blank")` so the page serves at `/`, not `/blank/`.
+- **Screenshotting a headless WebKitGTK window is a genuinely useful boot-smoke-test technique in
+  this sandbox**: `apt-get install -y xdotool imagemagick`, then `xdotool search --name
+  "<window title>"` to get the window id and `import -window <id> out.png` to capture it. Reading
+  the PNG back distinguishes "the real app rendered" from "blank page because JS threw before
+  `mount()`" in a way `ps`/log output cannot — there is no devtools/remote-debugging story in this
+  sandbox, so this is the practical substitute.
+- **On Linux, WebKitGTK's `WebKitNetworkProcess`/`WebKitWebProcess` genuinely are children of the
+  embedding Go process** (confirmed via `ps --forest`) — unlike WKWebView's helper processes on
+  macOS, which P52 §3.3 already documents as *not* being children. `WebKitWebProcess` itself is
+  additionally wrapped through two `bwrap` (bubblewrap) re-exec hops first; both have trivial RSS
+  (1-2 MB) but a process-set match rule that doesn't account for them undercounts. A **measured,
+  reproducible finding, not yet a G1 verdict**: on this platform, `WebKitWebProcess` alone
+  (~250-320 MB for a real Vue app) is heavy enough that this build's total RSS (~620-690 MB, see
+  `docs/PERF.md` §2.3) lands at-or-above Electron's own 620-626 MB baseline rather than under it —
+  the opposite of the hoped-for saving. This is Linux/WebKitGTK-specific and explicitly must not be
+  read as an answer for macOS/WKWebView, which is a structurally different (shared-framework, not
+  a bundled library) webview implementation; §2.3 records why this sandbox cannot produce G1's
+  actual verdict.
+- **Exporting an env var and immediately backgrounding the same compound command with `&&
+  ... &` backgrounds the export too** — `export FOO=bar && some-command &` runs the whole `&&`
+  chain as one background job, so `FOO` never reaches the parent shell's environment and every
+  later foreach/foreground command in the same script sees it unset. Put `export` statements on
+  their own line before the line that backgrounds the long-running command.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
