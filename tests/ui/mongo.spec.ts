@@ -12,6 +12,14 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // The third engine through the real UI (P8, mirrors mariadb.spec.ts's discipline for the
 // second): document-shaped pages, not tabular grids, are the point of this spec — it proves
 // DocumentView.vue's expand/edit/delete and the shell-style console work against a live server.
+//
+// P50 §4.1: this is one of three full-stack specs kept whole rather than split at the IPC
+// boundary (the other two: sqlite.spec.ts, s3.spec.ts) — the Docker-backed anchor. Something has
+// to keep proving the Testcontainers-plus-real-container path still wires all the way through,
+// and it cannot be sqlite (no container at all). Mongo is the pick because its page kind
+// (DocumentPage) is covered by nothing else in the kept set, and it carries a real write path end
+// to end (edit, delete, delete-via-menu), a real cancel, and a console. Postgres was the other
+// candidate and there is no tests/ui/postgres.spec.ts to be it.
 test.describe.configure({ timeout: 240_000 });
 
 let mongo: MongoFixture | null = null;

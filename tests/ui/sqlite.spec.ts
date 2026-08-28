@@ -8,6 +8,16 @@ import { expandRow, findRow, openRowMenu, treeContainer } from './support/tree';
 // fixture needs none of that. That makes this the one DB-backed UI spec that actually executes in
 // every environment this repo runs in, including Claude Code's own Linux web container, where
 // every other engine's UI spec self-skips for lack of Docker (AGENTS.md).
+//
+// P50 §4.1: this is one of three full-stack specs kept whole rather than split at the IPC
+// boundary (the other two: mongo.spec.ts, s3.spec.ts) — the Docker-free anchor, i.e. the sole
+// remaining proof that the full app (real main process, real engine, real renderer) still wires
+// together end to end in an environment with no container runtime at all. Its content is also
+// overwhelmingly frontend already (selection edges, context-menu keyboard nav, the cell editor's
+// format picker, console result chips, column virtualisation, word wrap), riding on a backend
+// cheap enough that splitting it would trade this spec's universal runnability for no wall-clock
+// win. mariadb/mysql/clickhouse/rabbitmq/sqs/kafka's own splits (tests/ipc/) cover every other SQL
+// engine's IPC boundary; this file is the one place that boundary is never mocked.
 
 let sqlite: SqliteFixture | null = null;
 

@@ -31,6 +31,16 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // the point of this spec is the object browser's tree (bucket → prefix/object, lazy, '/'-
 // delimited) and KeyValueView.vue's reuse for a non-redis "key" — plus the context-menu and
 // full-key-identity fixes the P17 validation pass found missing.
+//
+// P50 §4.1: this is one of three full-stack specs kept whole rather than split at the IPC
+// boundary (the other two: sqlite.spec.ts, mongo.spec.ts) — the widest stack of the ten. It is the
+// only spec exercising src/main/ipc/files.ts (a real dialog.showSaveDialog on download, a real
+// dialog.showOpenDialog on upload) and the only one covering DATA_OP.objectDownload, whose whole
+// contract is that the engine writes the file itself and bytes never transit main or the renderer
+// — a mocked port cannot honestly stand in for that (it would answer `{ bytes: n }` while no file
+// appeared on disk, and the assertion that matters is the file). It also covers the object-store
+// tree, the KeyValuePage shape reused for an object, the browse tab, delete, the read-only guard,
+// and the over-limit/binary refusals — three main-process surfaces in one spec.
 test.describe.configure({ timeout: 240_000 });
 
 let s3: S3Fixture | null = null;
