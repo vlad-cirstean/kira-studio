@@ -1,14 +1,19 @@
 # P51 — Wails (Go) shell + Go app core + Node engine child process, migration spike
 
 > This document is the plan. **The repo owner has explicitly signed off on starting the spike**
-> (2026-08-28), and `docs/v1/plans/P51-spike-report-part1.md` is the first installment of the
-> report §6 asks for — the subset answerable from a Linux sandbox with no macOS machine and with
-> `wails.io`/`v3.wails.io` still egress-blocked. It covers §3.1, §3.2, §3.3, §3.6 and §3.10 with a
-> real installed toolchain, a real generated Wails v3 project, and two measured Go↔Node prototypes.
+> (2026-08-28), and `docs/v1/plans/P51-spike-report-part1.md` + `-part2.md` are the first two
+> installments of the report §6 asks for — the subset answerable from a Linux sandbox with no macOS
+> machine and with `wails.io`/`v3.wails.io` still egress-blocked. Part 1 covers §3.1, §3.2, §3.3, §3.6
+> and §3.10 with a real installed toolchain, a real generated Wails v3 project, and two measured
+> Go↔Node prototypes. Part 2 reads the Wails v3 Go source directly (not just the client runtime) and
+> turns §3.2's bulk-data bridge from a hypothesis into a concrete design: a named `Stream()` carrying
+> raw bytes for bulk pages, alongside the default JSON `Call` binding for everything else — grounded
+> in source, but **not yet driven against a live running app** (two attempts hit this sandbox's own
+> background-process lifecycle limits, not a Wails limitation; see part 2's last section).
 > **§3.4, §3.5, §3.7 and the native-shell half of §3.8 remain untouched** — they need the macOS arm64
-> machine §5 Q4 already named, which is still not available. Read the report before assuming any
-> open question below is closed; this header is intentionally terse and the report is the source of
-> truth for what has actually been verified.
+> machine §5 Q4 already named, which is still not available. Read both report parts before assuming
+> any open question below is closed; this header is intentionally terse and the reports are the
+> source of truth for what has actually been verified.
 
 ## 0. What this phase is, and what it replaces
 
