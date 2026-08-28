@@ -97,16 +97,15 @@ framing on top of Wails' frame (e.g., embed the request id as the first bytes of
 symmetric with how `PortRequest.id` works today). That is real design work the next installment
 should do, not something this reading of the source settles by itself.
 
-## Why this is not (yet) an end-to-end live confirmation
+## Why this was not yet an end-to-end live confirmation (superseded by part 3)
 
-Two attempts were made this session to actually drive the wire protocol above against a running
-`wails3 dev` server (which the Taskfile confirms listens on a real port, `-port 9245`, for exactly
-this dev-mode-in-a-browser use case) — first via `nohup … & disown`, then via the harness's own
-`run_in_background` mechanism. Both times the backgrounded `xvfb-run wails3 task dev` process was
-torn down (once mid-build, once immediately) before the dev server itself came up, with no Wails-side
-error in either case. This reads as this sandbox's own handling of long-lived background processes
-across tool-call boundaries, not a Wails limitation — the same category of environment friction as
-§3.4/§3.5/§3.7's macOS gap, just Linux-side instead. **The design above is grounded in the actual Go
-and JS source of the transport, which is stronger evidence than a black-box HTTP probe would have
-been, but nobody has yet watched a real `StreamConn.Send` reach a real browser tab from this
-sandbox.** Worth retrying in an environment where a background server survives between commands.
+Two attempts were made this session to drive the wire protocol above against a running `wails3 dev`
+server, both of which gave up after 15–25 seconds. **`P51-spike-report-part3.md` found the real cause
+was simply not waiting long enough** — the first build takes about 60 seconds — and got a live server
+up and reachable in the same sandbox. It also found something concretely new: on Linux, the
+`/wails/runtime` and `/wails/stream/*` endpoints this section designs against are served through
+WebKitGTK's registered `wails://` scheme, reachable only from inside a real webview, not over plain
+HTTP even in dev mode. The bridge design above still stands (it was always grounded in source, not in
+the failed live attempt), but **live confirmation of `StreamConn.Send` reaching a real frontend still
+requires driving an actual webview, not `curl`** — read part 3 before treating this section's design
+as end-to-end verified.
