@@ -1,6 +1,6 @@
 // P44 F43: shared/domain/sql-split.ts is a hand-written six-regime lexer that decides what SQL
 // actually gets sent to the server (views/console/ConsoleView.vue's "Run statement"/"Run all"),
-// and nothing in tests/ calls it directly. The only existing coverage is tests/ui/console.spec.ts,
+// and nothing in tests/ calls it directly. The only existing coverage is tests/e2e/console.spec.ts,
 // which is Docker-gated (isDockerAvailable() -> test.skip) and has never run in this sandbox — and
 // even on a box with containers, reproducing a dollar-quoted-body split means typing a multi-line
 // PL/pgSQL function into CodeMirror and reading what the server rejects. Six direct expects over a

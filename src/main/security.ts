@@ -30,7 +30,7 @@ export function hardenSession(session: Session): void {
 // reasoning still holds — these are fail-open (Chromium silently ignores a switch name it no
 // longer recognises, so a future Electron bump can re-enable the target with nothing to catch
 // it) and unlike hardenSession/hardenWindow there is no first-class API to assert the *effect*
-// through. What tests/ui/hardening.spec.ts can and does pin is that the switch is still being
+// through. What tests/e2e/hardening.spec.ts can and does pin is that the switch is still being
 // passed (`app.commandLine.hasSwitch(...)`) — not that Chromium still honours it. Every name here
 // targets a capability this app has zero call sites for (grepped: no speechSynthesis/
 // SpeechRecognition, no net.request/fetch from main — F76 already found no crash reporter/updater

@@ -6,7 +6,7 @@ import type { ControlSnapshot } from './types';
  * renderer, because `window.kira` is deeply frozen and non-configurable, and
  * `renderer/bridge/control.ts` binds it at module scope regardless (F4). The mock therefore sits
  * *behind* the real `contextBridge` and the real `ipcRenderer.invoke`, so a frontend spec still
- * crosses the real structured-clone boundary. `tests/ui/s3.spec.ts`'s own `dialog` stub via
+ * crosses the real structured-clone boundary. `tests/e2e/s3.spec.ts`'s own `dialog` stub via
  * `app.evaluate` is the existing precedent this generalises (F5).
  *
  * Every invoke this installs is logged on `globalThis.__kiraIpcLog`; read it back with

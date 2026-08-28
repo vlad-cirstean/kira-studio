@@ -3,7 +3,7 @@ import { opsState } from './ops';
 
 // One shared ticker for the whole app instead of a per-view setInterval: started only while at
 // least one op is running, stopped otherwise, so RunState.vue's ring/elapsed-time never leaks a
-// timer when a view unmounts mid-run (tests/ui/leaks.spec.ts).
+// timer when a view unmounts mid-run (tests/e2e/leaks.spec.ts).
 const now = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | null = null;
 

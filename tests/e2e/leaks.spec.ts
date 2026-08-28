@@ -11,7 +11,7 @@ import {
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // P13's own regression spec for its leak sweep (F4-F7, F19, F20). One Postgres container, per
-// the per-spec convention every other tests/ui/*.spec.ts follows.
+// the per-spec convention every other tests/e2e/*.spec.ts follows.
 test.describe.configure({ timeout: 600_000 });
 
 let pg: PgFixture | null = null;

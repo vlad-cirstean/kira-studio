@@ -19,7 +19,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // and it cannot be sqlite (no container at all). Mongo is the pick because its page kind
 // (DocumentPage) is covered by nothing else in the kept set, and it carries a real write path end
 // to end (edit, delete, delete-via-menu), a real cancel, and a console. Postgres was the other
-// candidate and there is no tests/ui/postgres.spec.ts to be it.
+// candidate and there is no tests/e2e/postgres.spec.ts to be it.
 test.describe.configure({ timeout: 240_000 });
 
 let mongo: MongoFixture | null = null;

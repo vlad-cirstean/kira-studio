@@ -20,7 +20,7 @@ import { openHarness } from '../support/harness';
 import type { ControlSnapshot, PortSnapshot } from '../support/types';
 import { controlSnapshots as savedControl, portSnapshots as savedPort } from './kafka.fixture';
 
-// P50 §4.4 — kafka. The Add-Connection-dialog flow is left to tests/ui/connections.spec.ts (kept,
+// P50 §4.4 — kafka. The Add-Connection-dialog flow is left to tests/e2e/connections.spec.ts (kept,
 // unchanged); this split's frontend half starts from an already-listed connection. "Consumer
 // groups" is a frontend-only grouping over real consumerGroup-kind nodes at root — same reasoning
 // as mysql's "Routines"/clickhouse's "Views" findings (P50 §4.4) — no backend "folder" node kind

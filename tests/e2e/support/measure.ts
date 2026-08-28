@@ -1,6 +1,6 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 
-// P12's shared measurement primitives (D24) — the only non-re-export module in tests/ui/support/.
+// P12's shared measurement primitives (D24) — the only non-re-export module in tests/e2e/support/.
 // budgets.spec.ts and startup.spec.ts both import from here so their numbers are produced by
 // identical instrumentation and are therefore comparable across specs and across runs.
 

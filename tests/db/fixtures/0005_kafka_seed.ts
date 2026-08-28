@@ -9,7 +9,7 @@ export const ORDERS_MESSAGE_COUNT = 6; // > one partition's worth, so browsing g
 export const CONSUMER_GROUP = 'kira-test-group';
 
 // P32 D26: the seed runs the broker's own CLI inside the container instead of a JS Kafka client —
-// this is what keeps a JS client out of the Playwright/Node process entirely (F24), so `tests/ui`
+// this is what keeps a JS client out of the Playwright/Node process entirely (F24), so `tests/e2e`
 // never needs anything but the Electron-ABI build of the driver under test. It also stops the seed
 // from registering CONSUMER_GROUP by *joining* it, which was a standing absurdity in a phase about
 // not joining groups.

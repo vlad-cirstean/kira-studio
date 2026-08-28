@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   );
 
   // Status-bar CPU/memory readout: app.getAppMetrics() is a synchronous, cheap OS-level read
-  // (tests/ui/support/measure.ts already samples it this way), so a 5s interval is far more
+  // (tests/e2e/support/measure.ts already samples it this way), so a 5s interval is far more
   // than the cost warrants — it's picked for a readable status bar, not to spare the syscall.
   // cpu.percentCPUUsage is a delta since the *previous* getAppMetrics() call, not since launch,
   // so summing across processes each tick gives a live app-wide load figure for free.

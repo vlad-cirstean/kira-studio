@@ -72,7 +72,7 @@ and their output inspected directly:
 **P32 update:** this table predates the Kafka adapter's native driver and has not been re-run since
 — `prepackage:mac`'s `native-electron-build.sh` step needs a real `electron-rebuild` against
 Electron's headers, which this sandbox's proxy blocks (the same F20 finding that blocks it for
-`predev`/`pretest:ui`). `scripts/verify-packaging.sh`'s new A6 check (the driver's `.node` is
+`predev`/`pretest:e2e`). `scripts/verify-packaging.sh`'s new A6 check (the driver's `.node` is
 present and unpacked under `app.asar.unpacked`, and absent from inside `app.asar` itself) exists
 but has not been run against a real package for the same reason. This table's own asar/unpack/size
 numbers are all pre-P32 and need a fresh run once the driver's macOS build is verified (plan step
@@ -160,7 +160,7 @@ those gaps; the DB test suite and the §4 human items remain deliberately out of
 **What runs on every push/PR** (`.github/workflows/ci.yml`, `macos-15`, pinned rather than
 `macos-latest` so a runner-image change can't silently swap architecture or toolchain): `checks`
 (lint, typecheck, build, `bun run verify:packaging`) on every push and PR to `main`;
-`ui-smoke` (`bun run test:ui`) after `checks` passes;
+`e2e-smoke` (`bun run test:e2e`) after `checks` passes;
 `package-smoke` (`bun run package:mac:dir` plus the bundle assertions in §3/§4 items 1-3/9) after
 `checks` passes, skipped on pull requests. No dependency caching and no pinned Bun version — this
 repo pins neither elsewhere, and a stale cache serving old Electron would be a green CI for a build
@@ -170,7 +170,7 @@ nobody actually made.
 virtualization, so the Testcontainers-backed DB suite cannot run there at all. SPEC.md §9.1 already
 scoped this suite as local-only for v1. The consequence: of the 26 UI specs, only the five that need
 no container (`smoke`, `workbench`, `connections`, `startup`, `secrets` as of P25) really execute in
-`ui-smoke`; the rest skip with `DOCKER_UNAVAILABLE_MESSAGE`, not a failure. **The DB suite and the
+`e2e-smoke`; the rest skip with `DOCKER_UNAVAILABLE_MESSAGE`, not a failure. **The DB suite and the
 container-backed UI specs stay a local, pre-merge responsibility — CI does not replace them.**
 
 **Cutting a release** (`.github/workflows/release.yml`, triggered on tags matching `v*.*.*`):

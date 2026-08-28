@@ -160,7 +160,8 @@ bun run dev        # electron-vite dev, HMR for the renderer
 | `bun run typecheck:unit` | `tests/unit` |
 | `bun run test:db` | Testcontainers integration suite |
 | `bun run test:unit` | Unit suite — no external resource, finishes in about a second |
-| `bun run test:ui` | Builds, then runs Playwright against the real app |
+| `bun run test:e2e` | Builds, then runs Playwright against the real app |
+| `bun run test:ipc` | IPC-boundary suite: real backend + mocked-IPC frontend (see below) |
 | `bun run package:mac` | `.dmg` + `.zip` + `.app`, unsigned arm64 |
 | `bun run package:mac:dir` | `.app` only (faster) |
 | `bun run verify:packaging` | Confirms the packaging config still ships no auto-update behavior |
@@ -175,7 +176,7 @@ six seconds. Bypass it for a work-in-progress commit with `git commit --no-verif
 
 ## Tests
 
-Four suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ui/`.
+Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`.
 
 - **`bun run test:unit`** — plain TypeScript modules exercised with fakes (a `bun:sqlite`-backed
   Drizzle instance, a fake `requestAnimationFrame` queue, hand-written fake clients) rather than a
@@ -189,8 +190,13 @@ Four suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ui/`.
   `tests/electron-db/` instead of `tests/db/` and runs under a real Electron process rather than
   Bun (`bun run test:db:kafka`) — the native Kafka driver is built against Electron's own Node ABI
   and can't load under Bun at all.
-- **`bun run test:ui`** — Playwright driving the built Electron app via `_electron.launch()`. It
-  builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:ui`.
+- **`bun run test:ipc`** — per-adapter IPC-boundary suite (see
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): `test:ipc:be` drives the real
+  control-channel/data-op stack against a real container with no Electron renderer at all;
+  `test:ipc:fe` drives the real rendered UI in Playwright with both IPC halves mocked. Both read
+  from one fixture module per adapter, generated from a real backend run rather than hand-written.
+- **`bun run test:e2e`** — Playwright driving the built Electron app via `_electron.launch()`. It
+  builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:e2e`.
 - **Local fixture databases for manual testing** — see
   [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): ten of the eleven engines (SQLite
   needs no container), a ~20k-row e-commerce dataset for the relational/document/key-value stores
@@ -220,7 +226,8 @@ src/shared     wire protocol + domain types shared across processes
 tests/unit     unit suite — no external resource
 tests/db       Testcontainers integration suite
 tests/electron-db  the one Testcontainers spec that needs a real Electron process (Kafka)
-tests/ui       Playwright end-to-end suite
+tests/ipc      per-adapter IPC-boundary suite — real backend + mocked-IPC frontend
+tests/e2e      Playwright end-to-end suite
 docs           architecture, performance, packaging, design system; docs/v1 is the v1 record
 scripts/demo-dbs   local fixture databases for manual testing
 ```

@@ -1,12 +1,12 @@
-import { expect, test } from '../../ui/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
+import { expect, test } from '../../e2e/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
 import { installControlMocks } from '../support/mockControl';
 import { installMockPort } from '../support/mockPort';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './clickhouse.fixture';
 
 // P50 §4.4 — clickhouse's frontend half, same shape as mysql's (§4.4). The engine-picker/Add
-// Connection dialog flow is left to tests/ui/connections.spec.ts (kept, unchanged, generic
+// Connection dialog flow is left to tests/e2e/connections.spec.ts (kept, unchanged, generic
 // connection-dialog UI) — this spec starts from an already-listed connection.
 
 interface TreeNodeLike {

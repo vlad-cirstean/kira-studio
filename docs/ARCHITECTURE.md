@@ -198,7 +198,7 @@ keeps executing a query after the original socket closes.
 The Kafka adapter's driver wraps a native NAN addon (built against V8's C++ API, not N-API) — it is
 **ABI-specific per JS runtime**, not portable the way a pure-JS dependency is, and it must be
 rebuilt for Electron's own ABI before use (`scripts/native-electron-build.sh`, wired as `predev`/
-`pretest:ui`/`pretest:db:kafka`/`prepackage:mac`). **Bun cannot load this addon at any ABI** —
+`pretest:e2e`/`pretest:db:kafka`/`prepackage:mac`). **Bun cannot load this addon at any ABI** —
 confirmed empirically, not just from the docs (a matching-ABI build still crashes with `undefined
 symbol: v8::FunctionTemplate::SetClassName` when required from Bun) — which is why the Kafka
 adapter suite runs under `ELECTRON_RUN_AS_NODE=1 electron` (`tests/electron-db/kafka.spec.ts`, on
@@ -511,7 +511,7 @@ suggestion a trap here. `scripts/verify-packaging.sh`'s S7 fails the build if it
   the app's own confirmation UI is a UI change for a future phase, not a security setting to flip
   here.
 
-**What actually holds this**, so a revert is never silent: `tests/ui/hardening.spec.ts` (Docker-free
+**What actually holds this**, so a revert is never silent: `tests/e2e/hardening.spec.ts` (Docker-free
 — pinned `webPreferences`, every permission scenario, the window-open/navigation/webview guards,
 the spellchecker, the autofill attribute, WebGL) and `tests/unit/security.spec.ts`/
 `tests/unit/menu.spec.ts` (the option object and the packaged-vs-dev menu template, neither needing
@@ -521,7 +521,7 @@ recorded as owed verification in `docs/v1/plans/P46-…md` §8, not silently ass
 
 ## Testing
 
-Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `ui/`. `ipc/` is the odd one
+Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`. `ipc/` is the odd one
 out — it is two suites in one directory, a `node:test` backend half and a Playwright frontend half
 per adapter, sharing one fixture module by design (P50, below).
 
@@ -577,25 +577,27 @@ first.** Wall-clock and other non-reproducible fields (timestamps, ephemeral por
 generated ids, approximate row-count estimates) are frozen to fixed placeholders in the fixture
 after being validated structurally against the real value, never invented.
 
-**`tests/ui/`** (`bun run test:ui`) runs Playwright's `_electron.launch()` against the built app,
-driving the real UI against the real containers. Every change is validated with it before it is
-called done. After P50 it holds two things: three full-stack anchors that stay whole rather than
-split at the IPC boundary — `sqlite.spec.ts` (Docker-free, the only DB-backed UI spec that runs in
-every environment this repo runs in), `mongo.spec.ts` (Docker-backed, the document page kind, a real
-write path end to end) and `s3.spec.ts` (the only spec exercising `src/main/ipc/files.ts`'s real
-save/open dialogs and `DATA_OP.objectDownload`, whose contract — the engine writes the file itself,
-bytes never transit main or the renderer — no mock can honestly stand in for) — and the remaining
-non-adapter specs, unchanged: panel toggles, settings persistence, connection CRUD, tree expansion
-and caching (assert query counts via the op log), opening the same table twice with independent
-state, all pagination controls, projection, search toolbar modes, stop button, cell editor autodetect
-+ beautify, document expand/collapse, PK/FK navigation, every context menu opening with the right
-items, copy/paste, the sticky ancestor band's exact geometry and handoff across a scroll, and the
-checkbox tree filter's kind/tri-state/name-filter/persistence behavior. Plus a memory/perf smoke
-test asserting the RSS budget and no dropped frames while scrolling 10k rows.
+**`tests/e2e/`** (renamed from `tests/ui/`, P50 — `bun run test:e2e`) runs Playwright's
+`_electron.launch()` against the built app, driving the real UI against the real containers. Every
+change is validated with it before it is called done. After P50 it holds two things: three
+full-stack anchors that stay whole rather than split at the IPC boundary — `sqlite.spec.ts`
+(Docker-free, the only DB-backed spec that runs in every environment this repo runs in),
+`mongo.spec.ts` (Docker-backed, the document page kind, a real write path end to end) and
+`s3.spec.ts` (the only spec exercising `src/main/ipc/files.ts`'s real save/open dialogs and
+`DATA_OP.objectDownload`, whose contract — the engine writes the file itself, bytes never transit
+main or the renderer — no mock can honestly stand in for) — and the remaining non-adapter specs,
+unchanged: panel toggles, settings persistence, connection CRUD, tree expansion and caching (assert
+query counts via the op log), opening the same table twice with independent state, all pagination
+controls, projection, search toolbar modes, stop button, cell editor autodetect + beautify, document
+expand/collapse, PK/FK navigation, every context menu opening with the right items, copy/paste, the
+sticky ancestor band's exact geometry and handoff across a scroll, and the checkbox tree filter's
+kind/tri-state/name-filter/persistence behavior. Plus a perf smoke test asserting no dropped frames
+while scrolling 10k rows (the RSS budget's own `memory.spec.ts` was removed — permanently over
+budget on Chromium/Electron process overhead no app-level change can address; see `docs/PERF.md`
+§2.2).
 
 **Parallelism.** `playwright.config.ts` runs two projects on purpose, not by oversight: `e2e` (the
-`tests/ui/` specs above) stays `workers: 1, fullyParallel: false` because its `budgets`/`perf`/
-`memory`/`startup`/`leaks` specs assert wall-clock and RSS numbers that CPU contention would move;
-`ipc-frontend` (`tests/ipc/**/*.frontend.spec.ts`) runs `fullyParallel` because it contends over
-nothing — each test gets its own `KIRA_HOME`, its own Chromium profile, and no shared socket or
-container at all.
+`tests/e2e/` specs above) stays `workers: 1, fullyParallel: false` because its `budgets`/`perf`/
+`startup`/`leaks` specs assert wall-clock numbers that CPU contention would move; `ipc-frontend`
+(`tests/ipc/**/*.frontend.spec.ts`) runs `fullyParallel` because it contends over nothing — each
+test gets its own `KIRA_HOME`, its own Chromium profile, and no shared socket or container at all.

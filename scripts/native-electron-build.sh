@@ -7,7 +7,7 @@
 # v8::FunctionTemplate::SetClassName). So the binary `bun install` leaves behind is a bootstrap
 # only — useful for a driver-level Node spike, never the thing the shipped app loads — and this
 # script is what guarantees the on-disk .node is actually built for Electron's ABI before anything
-# that loads the driver (dev, test:ui, test:db:kafka, packaging) runs.
+# that loads the driver (dev, test:e2e, test:db:kafka, packaging) runs.
 #
 # Cannot run in Claude Code's Linux web container: Electron's headers host
 # (artifacts.electronjs.org) is proxy-blocked there (P32 F20), so step 4 below has nowhere to

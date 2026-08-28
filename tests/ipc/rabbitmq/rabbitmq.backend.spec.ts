@@ -13,7 +13,7 @@ import { openHarness } from '../support/harness';
 import type { ControlSnapshot, PortSnapshot } from '../support/types';
 import { controlSnapshots as savedControl, portSnapshots as savedPort } from './rabbitmq.fixture';
 
-// P50 §4.4 — rabbitmq. The Add-Connection-dialog flow is left to tests/ui/connections.spec.ts
+// P50 §4.4 — rabbitmq. The Add-Connection-dialog flow is left to tests/e2e/connections.spec.ts
 // (kept, unchanged); this split's frontend half starts from an already-listed connection. The
 // "Exchanges" folder heading is a frontend-only grouping over real exchange-kind nodes, same
 // reasoning as mysql's "Routines" (P50 §4.4) — no backend "folder" node kind exists.

@@ -195,7 +195,7 @@ function onWindowBlur(): void {
 
 /** Installs the single document-level listener set (D3). Called once from App.vue's onMounted,
  *  alongside the existing `control.on*` subscriptions; returns its own teardown so a test (or a
- *  future remount) leaves nothing behind — `tests/ui/leaks.spec.ts` exercises this. */
+ *  future remount) leaves nothing behind — `tests/e2e/leaks.spec.ts` exercises this. */
 export function initTooltips(): () => void {
   let rafId: number | null = null;
   let pendingX = 0;

@@ -93,7 +93,7 @@ team works, and how to run things in whichever box a session happens to be on.
   on images that pull and run fine under plain Node with the identical image — a sandbox quirk of
   the Bun runtime here, not a real bug (confirmed fine on a real machine).
 
-## Electron binary (for `tests/ui/`)
+## Electron binary (for `tests/e2e/`)
 
 - **Claude Code's Linux web containers**: `bun install` does not fetch the Electron binary —
   `node_modules/electron/install.js` downloads it via `@electron/get`, which fails in this
@@ -132,7 +132,7 @@ generated rather than hand-written. This section is only about running it here.
   the script copies the fixtures directory beside the bundle output to fix this, rather than editing
   `tests/db/` itself.
 - **The frontend half needs `xvfb`** (`bun run test:ipc:fe`, i.e. `electron-vite build && playwright
-  test --project=ipc-frontend`) for the same reason every other `tests/ui/`-style Playwright run
+  test --project=ipc-frontend`) for the same reason every other `tests/e2e/`-style Playwright run
   does on a display-less Linux container: `xvfb-run -a bunx playwright test --project=ipc-frontend`.
   It needs no Docker, no container and no native driver — confirmed here for mariadb, mysql, redis,
   rabbitmq and sqs.
@@ -158,7 +158,7 @@ generated rather than hand-written. This section is only about running it here.
   coordinator host:port (a fresh Docker-assigned hostname and host-mapped port every run) is
   frozen the same way ClickHouse's `.inner_id.<uuid>` is.
 
-## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/ui/` specs, P25)
+## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/e2e/` specs, P25)
 
 - Credentials are encrypted via Electron's `safeStorage`, which is Keychain-backed on macOS and
   has **no real backing store on Linux** — a bare Linux dev/CI container has no `gnome-keyring` or
@@ -167,13 +167,13 @@ generated rather than hand-written. This section is only about running it here.
 - **On Claude Code's Linux web containers and any other Linux dev machine**: set
   `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev` or the Playwright harness) to
   opt into a Linux-only development fallback (Chromium's `basic_text` obfuscation — a hardcoded
-  key, not real encryption). `tests/ui/fixtures.ts` already sets this for every test by default,
-  so the normal `xvfb-run -a bun run test:ui` loop needs no extra step; it only matters for a
+  key, not real encryption). `tests/e2e/fixtures.ts` already sets this for every test by default,
+  so the normal `xvfb-run -a bun run test:e2e` loop needs no extra step; it only matters for a
   manual `bun run dev` session or a one-off `electron out/main/index.js` launch outside the test
   harness.
 - **On macOS**, this variable is ignored outright — `safeStorage` uses the real Keychain and
   `KIRA_INSECURE_SECRETS` can never weaken it, even if accidentally left set in an environment.
-  `tests/ui/secrets.spec.ts`'s scenario 1 is the guard that this stays true: it fails loudly
+  `tests/e2e/secrets.spec.ts`'s scenario 1 is the guard that this stays true: it fails loudly
   (never skips) if `available`/`backend` on `darwin` don't read `true`/`'keychain'`.
 - Without the variable, Linux resolves to secret storage being **unavailable** — a password-bearing
   save fails visibly (the dialog's `connection-save-error`) rather than silently falling back to
@@ -187,7 +187,7 @@ it at all, no consumer-group join on browse). This section is only about running
 
 - **Electron's ABI is the only one that matters for this app.** `scripts/native-electron-build.sh`
   rebuilds the driver for Electron's own ABI (read from `node_modules/electron/abi_version`) before
-  anything that loads it runs — wired as `predev`, `pretest:ui`, `pretest:db:kafka` and
+  anything that loads it runs — wired as `predev`, `pretest:e2e`, `pretest:db:kafka` and
   `prepackage:mac`. It caches a successful build under `.cache/native/confluent-kafka-javascript/<abi>.node`
   and writes a marker beside the built module, so a matching ABI skips the rebuild entirely on
   every run after the first.
@@ -217,7 +217,7 @@ it at all, no consumer-group join on browse). This section is only about running
   `build/Release` *before* attempting the build — without the backup, a failed rebuild attempt in
   an unsupported environment would destroy the Node-ABI bootstrap binary `bun install` provided,
   corrupting `node_modules` rather than just failing cleanly. `native-electron-build.sh` itself
-  doesn't yet set `CKJS_LINKING=dynamic`, so a plain `predev`/`pretest:ui`/`pretest:db:kafka` run
+  doesn't yet set `CKJS_LINKING=dynamic`, so a plain `predev`/`pretest:e2e`/`pretest:db:kafka` run
   still hits the from-source path here; export the variable before invoking it (or the underlying
   `electron-rebuild` command directly, as above) until the script itself is updated.
 
@@ -231,9 +231,9 @@ See `docs/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies o
   start, no image to pull, no daemon to reach. Its only environment dependency is `node:sqlite`
   itself, gated by `sqliteAvailable()` the same way every other DB spec here gates on
   `isDockerAvailable()`.
-- **`tests/ui/sqlite.spec.ts` runs unconditionally** (no Docker gate at all) — the one DB-backed UI
+- **`tests/e2e/sqlite.spec.ts` runs unconditionally** (no Docker gate at all) — the one DB-backed e2e
   spec that actually executes in Claude Code's own Linux web container, where every other engine's
-  UI spec self-skips for lack of Docker. This sandbox's system Node (`/opt/node22`, 22.22+) has
+  e2e spec self-skips for lack of Docker. This sandbox's system Node (`/opt/node22`, 22.22+) has
   `node:sqlite`, which is what `playwright test` actually runs under (Playwright's own test runner
   is a Node program, not a Bun one) — confirmed empirically, not assumed.
 - This sandbox's own Bun (1.3.x) lacks `node:sqlite`, so `bun test tests/db/sqlite.spec.ts` here
@@ -271,17 +271,13 @@ dependency, the `-management` image requirement, the `%2F` vhost encoding, why `
 it here.
 
 - **`tests/db/rabbitmq.spec.ts` needs Docker** (`@testcontainers/rabbitmq`, image
-  `rabbitmq:4.3.5-management-alpine`) — same `isDockerAvailable()` gate and the same image-pull
-  limitation as every other Testcontainers spec in this sandbox (Docker's daemon is reachable, but
-  pulling images through the outbound proxy returns `403`). `tests/ui/rabbitmq.spec.ts` is
-  Docker-gated the same way, not unconditional like SQLite's — there is no local-file equivalent
-  for a message broker.
-- Verified in this sandbox the same way ClickHouse's own hard-to-run pieces were: a standalone
-  esbuild bundle exercised against a mocked `fetch` (connect/probe classification, vhost scoping
-  and the `%2F` decode, the default-exchange filter, the exact stream-column mapping, publish
-  round-trips, every mutation refusal), and
-  `xvfb-run -a bunx playwright test tests/ui/rabbitmq.spec.ts` run for real, failing only at the
-  same Docker image-pull step every other Docker-gated spec hits here.
+  `rabbitmq:4.3.5-management-alpine`) — same `isDockerAvailable()` gate as every other
+  Testcontainers spec in this sandbox. `mirror.gcr.io/library/rabbitmq:4.3.5-management-alpine`
+  pulls fine and re-tags to the plain Docker Hub name the code hardcodes (Docker section above),
+  unlike direct Docker Hub (`403` through the outbound proxy).
+- P50 split the old `tests/ui/rabbitmq.spec.ts` into `tests/ipc/rabbitmq/` (backend + frontend
+  halves sharing one fixture, see `docs/ARCHITECTURE.md`'s Testing section) — both halves run for
+  real in this sandbox now against a real container pulled the way above.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

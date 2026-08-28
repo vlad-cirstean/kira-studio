@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from '../../ui/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
+import { expect, test } from '../../e2e/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
 import { installControlMocks, readControlLog } from '../support/mockControl';
 import { installMockPort } from '../support/mockPort';
 import { controlSnapshots, portSnapshots } from './mariadb.fixture';

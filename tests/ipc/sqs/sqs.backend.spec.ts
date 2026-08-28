@@ -15,7 +15,7 @@ import type { ControlSnapshot, PortSnapshot } from '../support/types';
 import { controlSnapshots as savedControl, portSnapshots as savedPort } from './sqs.fixture';
 
 // P50 §4.4 — sqs. The connectionsCreate (uri mode) flow is left to
-// tests/ui/connections.spec.ts (kept, unchanged) — this split's frontend half starts from an
+// tests/e2e/connections.spec.ts (kept, unchanged) — this split's frontend half starts from an
 // already-listed connection, same as every other adapter split. `opsRecent` (the ops-log
 // assertions the original spec makes — no describe op, no error op, after opening/refreshing the
 // definition tab) is mocked to return `[]` on the frontend half: true by construction here (this

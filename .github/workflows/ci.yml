@@ -29,7 +29,7 @@ jobs:
       - run: bun run build
       - run: bun run verify:packaging
 
-  ui-smoke:
+  e2e-smoke:
     needs: checks
     runs-on: macos-15
     timeout-minutes: 25
@@ -48,7 +48,7 @@ jobs:
           security unlock-keychain -p "$P" kira-ci.keychain-db
           security default-keychain -s kira-ci.keychain-db
           security list-keychains -d user -s kira-ci.keychain-db login.keychain-db
-      - run: bun run test:ui
+      - run: bun run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

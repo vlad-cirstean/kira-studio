@@ -24,8 +24,8 @@ import { readStream } from '../db/support/page';
 // Bun cannot load the native driver at any ABI (F21). node:test/node:assert/strict replace
 // bun:test/expect mechanically — every assertion here is the same check, not a new one. The
 // fixture/support files stay under tests/db/ and stay client-free (0005_kafka_seed.ts, support/
-// kafka.ts, support/docker.ts, support/page.ts) since tests/ui/kafka.spec.ts also imports them,
-// from a third runtime again.
+// kafka.ts, support/docker.ts, support/page.ts) since tests/ipc/kafka/kafka.backend.spec.ts also
+// imports them, from a third runtime again.
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 

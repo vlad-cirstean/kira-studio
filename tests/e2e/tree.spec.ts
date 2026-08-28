@@ -14,7 +14,7 @@ import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from '.
 // The Playwright Page fixture is bound to a local variable named `page` (not `window`, unlike
 // fixtures.ts's own naming) so that a bare `window` reference inside a `page.evaluate()`
 // callback below resolves to the real browser global (`window.kira`, from src/preload/index.ts)
-// instead of being shadowed by a same-named local variable — see tests/ui/global.d.ts.
+// instead of being shadowed by a same-named local variable — see tests/e2e/global.d.ts.
 test.describe.configure({ timeout: 240_000 });
 
 let pg: PgFixture | null = null;

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from '../../ui/fixtures';
-import { acceptConfirm } from '../../ui/support/dialogs';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
+import { expect, test } from '../../e2e/fixtures';
+import { acceptConfirm } from '../../e2e/support/dialogs';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
 import { installControlMocks } from '../support/mockControl';
 import { installMockPort } from '../support/mockPort';
 import type { ControlSnapshot } from '../support/types';

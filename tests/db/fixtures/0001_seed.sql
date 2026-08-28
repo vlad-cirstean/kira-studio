@@ -152,7 +152,7 @@ INSERT INTO app.nested_json (id, data) VALUES (
 -- ---------------------------------------------------------------------------------------------
 -- formats — one row per §8.6 autodetect format, all in a plain `text` column so the detector
 -- has to work from the value alone (typeClass 'text' enables every detector, §5a). `kind` names
--- the expected detection and is asserted by tests/ui/cell-editor.spec.ts, which looks rows up
+-- the expected detection and is asserted by tests/e2e/cell-editor.spec.ts, which looks rows up
 -- by that value rather than by insertion order (P3 D20).
 -- ---------------------------------------------------------------------------------------------
 CREATE TABLE app.formats (

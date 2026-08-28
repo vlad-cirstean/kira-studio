@@ -18,7 +18,7 @@ import { type ClickHouseIpcFixture, startClickHouse } from './container';
 // comment: a MergeTree PRIMARY KEY is a sparse index, not a uniqueness constraint, so a row can
 // never be addressed unambiguously). The engine-picker/Add-Connection-dialog flow in the original
 // tests/ui/clickhouse.spec.ts is generic connection-dialog UI already covered by
-// tests/ui/connections.spec.ts (kept, unchanged) — this split's frontend half starts from an
+// tests/e2e/connections.spec.ts (kept, unchanged) — this split's frontend half starts from an
 // already-listed connection, like every other adapter split.
 //
 // This adapter's container needs its own start() (./container.ts), not

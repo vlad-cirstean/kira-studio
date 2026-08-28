@@ -11,7 +11,7 @@ import {
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // P12 §2.1's real interaction budgets (D5/D6), measured for real against §3 of
-// docs/v1/plans/P12-hardening.md — tests/ui/perf.spec.ts's rAF/DOM-cell tripwires stay unchanged
+// docs/v1/plans/P12-hardening.md — tests/e2e/perf.spec.ts's rAF/DOM-cell tripwires stay unchanged
 // alongside these and are not superseded by them (D7).
 test.describe.configure({ timeout: 180_000 });
 

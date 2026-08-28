@@ -2,8 +2,8 @@
 // views/browse/state.ts's load() supersession guard (D39/F35) and views/keyvalue/state.ts's
 // cursor-strategy reload fallback (D40/F37) — and both are pinned today only by Docker-gated
 // Playwright steps that cannot deterministically force the race they exist to guard against. The
-// browse guard's own coverage (tests/ui/redis.spec.ts/s3.spec.ts's "descend then press Up
-// immediately" step) only exercises the guard if the slow load happens to still be in flight when
+// browse guard's own coverage (tests/e2e/s3.spec.ts's "descend then press Up immediately" step)
+// only exercises the guard if the slow load happens to still be in flight when
 // Up lands — on a fast container or a small level, the step passes whether or not the guard
 // exists. Both modules are plain TypeScript over bridge/data/bridge/control, both window.kira
 // wrappers a stub can satisfy — this file resolves the *older* of two in-flight loads *after* the

@@ -1,12 +1,12 @@
-import { expect, test } from '../../ui/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
+import { expect, test } from '../../e2e/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
 import { installControlMocks } from '../support/mockControl';
 import { installMockPort } from '../support/mockPort';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './sqs.fixture';
 
 // P50 §4.4 — sqs's frontend half. The connectionsCreate (uri mode) flow is left to
-// tests/ui/connections.spec.ts (kept, unchanged) — this spec starts from an already-listed
+// tests/e2e/connections.spec.ts (kept, unchanged) — this spec starts from an already-listed
 // connection.
 
 interface TreeNodeLike {

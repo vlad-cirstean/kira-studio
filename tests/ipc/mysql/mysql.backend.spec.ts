@@ -17,7 +17,7 @@ import { controlSnapshots as savedControl, portSnapshots as savedPort } from './
 // spec exists for (D17: Filter by this value must come back backtick-quoted) and the
 // "Routines" folder naming (D20 — not "Functions", mysql's own catalog grouping). The
 // engine-picker/Add-Connection-dialog flow in the original tests/ui/mysql.spec.ts is generic
-// connection-dialog UI already covered by tests/ui/connections.spec.ts (kept, unchanged) — this
+// connection-dialog UI already covered by tests/e2e/connections.spec.ts (kept, unchanged) — this
 // split's frontend half starts from an already-listed connection, like mariadb's and redis's own
 // frontend specs, to keep the split focused on this adapter's actual distinguishing behavior.
 

@@ -24,7 +24,7 @@ export const SMALL_FOR_COUNT_BODY = 'a small object, used only as the count() co
 export const OVERSIZED_OBJECT_KEY = 'sizes/oversized.bin';
 export const OVERSIZED_OBJECT_BYTES = OBJECT_BODY_PREVIEW_BYTES + 1024;
 // A real, tiny PNG (1x1, transparent) — under the preview limit so it renders, but its bytes are
-// not valid UTF-8 (tests/ui/s3.spec.ts's binary-object scenario), same fixture seed.sh embeds by
+// not valid UTF-8 (tests/e2e/s3.spec.ts's binary-object scenario), same fixture seed.sh embeds by
 // hand for the demo bucket.
 export const BINARY_OBJECT_KEY = 'sizes/logo.png';
 export const BINARY_OBJECT_BASE64 =
@@ -41,7 +41,7 @@ export const READONLY_TARGET_KEY = 'readonly-target.txt';
 export const READONLY_TARGET_BODY = 'must not change if a read-only connection tries to edit it';
 export const DELETE_TARGET_KEY = 'delete-target.txt';
 export const DELETE_TARGET_BODY = 'this object exists only to be deleted';
-// A second, independent delete target — tests/ui/s3.spec.ts's delete scenario removes one object
+// A second, independent delete target — tests/e2e/s3.spec.ts's delete scenario removes one object
 // from a tree row and a different one from an open tab in the same test, so each needs its own key.
 export const SECOND_DELETE_TARGET_KEY = 'second-delete-target.txt';
 export const SECOND_DELETE_TARGET_BODY =
