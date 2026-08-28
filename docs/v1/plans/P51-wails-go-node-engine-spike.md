@@ -287,12 +287,15 @@ status explicitly rather than defaulting to v2's stability. This closes former o
 
 New code on both sides, and there is no framework help for any of it.
 
-- **Choose the transport.** Most plausibly **stdio pipes** (closest to today's `stdio: 'pipe'` fork,
-  no filesystem artifact, lifetime tied to the child by construction) or a **Unix domain socket**
-  (independently addressable, easier to reconnect to, needs a path in the app's own data dir and its
-  own cleanup). Loopback TCP is a third option and probably the worst — a local listener is reachable
-  by any other process on the machine, which would need a per-launch token, where the other two do
-  not.
+- **Decided: stdio pipes.** This closes former open question 1 in §5. Rationale: closest to today's
+  `stdio: 'pipe'` fork, no filesystem artifact to create or clean up, and the channel's lifetime is
+  tied to the child process by construction — the same property `utilityProcess.fork` gives main today.
+  A Unix domain socket (independently addressable, easier to reconnect to without restarting the
+  child) remains the fallback if the spike finds a concrete reason stdio doesn't work — e.g. if
+  `engine-host.ts`'s stdout/stderr-to-`log.ts` pumping needs those streams left free for plain text
+  logging rather than shared with framed protocol traffic. Loopback TCP is dropped entirely: a local
+  listener is reachable by any other process on the machine and would need a per-launch token neither
+  of the other two options requires.
 - **Frame the existing protocol.** `PortRequest`/`PortResponse`/`PortEvent` (§2.1) carry over verbatim
   as payload shapes; what they need is a framing layer (length-prefix or newline-delimited) since a
   byte stream has no message boundaries where `postMessage` did. Whether the payloads stay JSON or
@@ -548,8 +551,8 @@ renderer branches on, and `src/main/storage/db.ts`'s 200-entry statement cache a
 
 ## 5. Open questions for the repo owner
 
-Most of what the deleted plan asked is answered by §1's premises. Two more were resolved in review
-after this document's first draft; one genuinely remains open.
+Most of what the deleted plan asked is answered by §1's premises. Three of the original four were
+resolved in review after this document's first draft; one genuinely remains open.
 
 **Resolved:**
 
@@ -557,18 +560,18 @@ after this document's first draft; one genuinely remains open.
    decided. This is the spike's literal step one (§3.8).**
 2. ~~Wails v2 (stable) or v3 (beta)?~~ **v3, beta status accepted (§3.2).** The `setTransport()` lead
    on avoiding a JSON round-trip for bulk data only exists on v3.
+3. ~~Which Go↔Node transport should the spike prototype first?~~ **stdio pipes (§3.3).** A Unix domain
+   socket remains the named fallback if stdio proves unworkable for a concrete reason (e.g. contention
+   with `engine-host.ts`'s stdout/stderr-based logging path) — not a coin flip to revisit casually.
 
 **Still open:**
 
-3. **Which Go↔Node transport should the spike prototype first (§3.3)** — stdio pipes, or a Unix domain
-   socket? Stdio is closest to today's `stdio: 'pipe'` fork and ties the channel's lifetime to the
-   child for free; a socket is easier to reconnect to and keeps stdout/stderr free for the logging path
-   `engine-host.ts` uses today. A default of "stdio first, socket only if something forces it" is the
-   plan's suggestion, but it is the repo owner's call.
 4. **Is there a macOS arm64 machine available for the spike at all?** `docs/PERF.md` §3's manual
    procedures remain unfilled for exactly this reason, and P20's §8 Q1 asked the same thing. A
    Linux-only investigation cannot answer §3.4, §3.5 or §3.7 — and this environment cannot even reach
-   Wails' own documentation, confirmed twice now (§3.2, §3.8).
+   Wails' own documentation: confirmed three times now (§3.2, §3.8), and per this session's own proxy
+   guidance a 403 is an organizational policy denial, not a transient failure, so a different network
+   environment is required, not another retry.
 
 ## 6. Decision gate
 
