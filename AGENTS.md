@@ -281,10 +281,21 @@ it here.
 
 ## Wails v3 / Go — building and testing in this environment (P51)
 
-See `docs/v1/plans/P51-wails-go-node-engine-spike.md` and its `P51-spike-report-part{1,2,3}.md` for
-the actual design findings. This section is only the reusable environment setup, so it doesn't have
-to be re-derived next time.
+See `docs/v1/plans/P51-wails-go-node-engine-spike.md` and its `P51-spike-report-part{1,2,3,4}.md`
+for the actual design findings. This section is only the reusable environment setup, so it doesn't
+have to be re-derived next time.
 
+- **On real macOS hardware, not just the Linux sandbox, `wails.io`/`v3.wails.io` are *also*
+  403-blocked** (part 4) — this is this environment's organizational proxy policy, not a
+  sandbox-specific artifact. `proxy.golang.org` and `nodejs.org` are both reachable from macOS too,
+  which is all that's needed to install the toolchain and vendor a real Node runtime.
+- **A native npm dependency's install script (`node-pre-gyp`, `node-gyp`, …) may silently not run**
+  on a newer npm: it now default-denies install scripts per-package (`npm warn install-scripts …
+  not yet covered by allowScripts`) until explicitly approved with
+  `npm install-scripts approve <pkg>`. Hit this vendoring `@confluentinc/kafka-javascript` against a
+  freshly-downloaded Node runtime in part 4 — the first `npm install` silently left
+  `build/Release/*.node` missing because the postinstall (`node-pre-gyp install
+  --fallback-to-build`) never ran. Approve, then re-run install (or `npm rebuild <pkg>`).
 - **`wails.io` and `v3.wails.io` are egress-blocked in this sandbox** (403 at the CONNECT-tunnel
   stage, confirmed repeatedly) — the official docs cannot be read from here. **`proxy.golang.org` is
   not blocked**, so `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` works fine and pulls

@@ -13,10 +13,13 @@
 > `/wails/runtime` and `/wails/stream/*` are reachable only through WebKitGTK's registered `wails://`
 > scheme from inside a real webview, not over plain HTTP even in dev mode — sharpening, not
 > reopening, §3.8's already-decided move to a faked bridge for tests.
-> **§3.4, §3.5, §3.7 and the native-shell half of §3.8 remain untouched** — they need the macOS arm64
-> machine §5 Q4 already named, which is still not available. Read all three report parts before
-> assuming any open question below is closed; this header is intentionally terse and the reports are
-> the source of truth for what has actually been verified.
+> Part 4 answers §5 Q4 itself — run from a real Apple Silicon Mac — and closes §3.4 with a real
+> signed `.app`, a vendored real Node runtime, and `@confluentinc/kafka-javascript`'s native addon
+> loaded and exercised through the Go↔Node stdio transport in a running, packaged build. **§3.5
+> (Keychain library) and §3.7 (RAM measurement) were explicitly deferred by the repo owner for that
+> round and remain open** — read all four report parts before assuming any open question below is
+> closed; this header is intentionally terse and the reports are the source of truth for what has
+> actually been verified.
 
 ## 0. What this phase is, and what it replaces
 
@@ -559,8 +562,8 @@ renderer branches on, and `src/main/storage/db.ts`'s 200-entry statement cache a
 
 ## 5. Open questions for the repo owner
 
-Most of what the deleted plan asked is answered by §1's premises. Three of the original four were
-resolved in review after this document's first draft; one genuinely remains open.
+Most of what the deleted plan asked is answered by §1's premises. All four of the original
+questions are now resolved; what remains open lives inside §3.5/§3.7 themselves, not here.
 
 **Resolved:**
 
@@ -571,15 +574,15 @@ resolved in review after this document's first draft; one genuinely remains open
 3. ~~Which Go↔Node transport should the spike prototype first?~~ **stdio pipes (§3.3).** A Unix domain
    socket remains the named fallback if stdio proves unworkable for a concrete reason (e.g. contention
    with `engine-host.ts`'s stdout/stderr-based logging path) — not a coin flip to revisit casually.
-
-**Still open:**
-
-4. **Is there a macOS arm64 machine available for the spike at all?** `docs/PERF.md` §3's manual
-   procedures remain unfilled for exactly this reason, and P20's §8 Q1 asked the same thing. A
-   Linux-only investigation cannot answer §3.4, §3.5 or §3.7 — and this environment cannot even reach
-   Wails' own documentation: confirmed three times now (§3.2, §3.8), and per this session's own proxy
-   guidance a 403 is an organizational policy denial, not a transient failure, so a different network
-   environment is required, not another retry.
+4. ~~Is there a macOS arm64 machine available for the spike at all?~~ **Yes — resolved in
+   `docs/v1/plans/P51-spike-report-part4.md`.** A real Apple Silicon Mac was used directly: Go and
+   the `wails3` CLI installed, a real `wails3 init` macOS project built, packaged and ad-hoc signed,
+   with a vendored real Node runtime and `@confluentinc/kafka-javascript`'s native addon spawned
+   from Go over the §3.3 stdio transport and exercised through the real, running, signed `.app`.
+   This closes §3.4 with a real build. **§3.5 (Keychain library) and §3.7 (RAM measurement) were
+   explicitly deferred by the repo owner for this round and remain open** — not because the machine
+   is unavailable (it now demonstrably is) but by scoping choice; a future round on the same
+   machine should close them.
 
 ## 6. Decision gate
 
