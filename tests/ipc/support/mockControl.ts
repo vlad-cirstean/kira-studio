@@ -44,18 +44,37 @@ export async function installControlMocks(
     }
     for (const [channel, list] of byChannel) {
       ipcMain.removeHandler(channel);
+      // Two or more snapshots can share one (channel, args) key on purpose — e.g. a browse
+      // listing captured once before a delete and once after (P50 §4.3 row 10, browseInvalidate's
+      // cross-tab refresh): the request is identical both times, only the server's answer
+      // changed. Grouped by key, in fixture order; the Nth call to that exact key returns the
+      // Nth snapshot, and every call past the last one keeps returning the last (a spec that
+      // calls a stateless channel like connectionsList more times than it has snapshots for gets
+      // its steady-state answer repeated, not an error).
+      const byKey = new Map<string, ControlSnapshot[]>();
+      for (const snap of list) {
+        const key = canonical(snap.args);
+        const group = byKey.get(key) ?? [];
+        group.push(snap);
+        byKey.set(key, group);
+      }
+      const cursors = new Map<string, number>();
       ipcMain.handle(channel, (_event, args) => {
         log.push({ channel, args });
         // A channel called with the same args every time (connectionsList, connectionsStates)
         // has exactly one snapshot; a channel whose response depends on its args (treeChildren
-        // for different paths) has one per distinct args value, matched here. A single-snapshot
-        // channel answers regardless of the exact args it was called with — e.g. opsCancel's
-        // opId is generated client-side per run and can never appear in a captured fixture.
+        // for different paths) has one per distinct args value. A single-snapshot channel
+        // answers regardless of the exact args it was called with — e.g. opsCancel's opId is
+        // generated client-side per run and can never appear in a captured fixture.
         if (list.length === 1) return list[0].response;
-        const match = list.find((s) => canonical(s.args) === canonical(args));
-        if (!match)
+        const key = canonical(args);
+        const group = byKey.get(key);
+        if (!group) {
           throw new Error(`no fixture snapshot for ${channel} args ${JSON.stringify(args)}`);
-        return match.response;
+        }
+        const at = cursors.get(key) ?? 0;
+        cursors.set(key, at + 1);
+        return group[Math.min(at, group.length - 1)].response;
       });
     }
   }, snapshots as ControlSnapshot[]);
