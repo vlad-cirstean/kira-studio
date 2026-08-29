@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,9 +15,17 @@ import (
 
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
+	"github.com/kirathecat/kira-studio/shell/internal/config"
+	"github.com/kirathecat/kira-studio/shell/internal/connections"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
+	"github.com/kirathecat/kira-studio/shell/internal/logging"
+	"github.com/kirathecat/kira-studio/shell/internal/metrics"
+	"github.com/kirathecat/kira-studio/shell/internal/oplog"
+	"github.com/kirathecat/kira-studio/shell/internal/preconnect"
+	"github.com/kirathecat/kira-studio/shell/internal/secrets"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/shell/internal/tree"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -33,18 +42,33 @@ var assets embed.FS
 //go:embed blank/index.html
 var blankAssets embed.FS
 
+// main's startup order mirrors src/main/index.ts (P52 §4.1), with the upgradeLegacySecrets step
+// deleted, not ported (P52 §6.4): config.EnsureLayout -> logging.Init/Sweep -> storage.Open
+// (migrates) -> secrets.New -> repos.New + repos.NewSecrets -> Settings.GetAll ->
+// enginehost.Start -> preconnect.New -> connections.New(...).Start -> tree.New ->
+// enginehost.PushCacheConfig -> oplog.New(...).Start -> metrics ticker Start -> appcore.Deps ->
+// application.New(Services) -> window (P55 §7).
 func main() {
+	if err := config.EnsureLayout(); err != nil {
+		log.Fatalf("kira-studio-shell: ensure layout: %v", err)
+	}
+	if err := logging.Init(); err != nil {
+		log.Fatalf("kira-studio-shell: logging: %v", err)
+	}
+	logging.Sweep()
+
 	db, err := storage.Open()
 	if err != nil {
 		log.Fatalf("kira-studio-shell: storage: %v", err)
 	}
-	defer db.Close()
+
+	cipher := secrets.New()
 
 	repositories, err := repos.New(db.DB)
 	if err != nil {
 		log.Fatalf("kira-studio-shell: storage repos: %v", err)
 	}
-	defer repositories.Close()
+	secretsRepo := repos.NewSecrets(db.DB, cipher)
 
 	deps := appcore.Deps{
 		DB:        db.DB,
@@ -70,10 +94,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("kira-studio-shell: start engine: %v", err)
 	}
-	defer host.Stop()
 	deps.EngineHost = host
 	deps.NodeVersion = nodeVersion(nodeBin)
+
+	preconnectSupervisor := preconnect.New()
+	connectionsSvc := connections.New(connections.Deps{
+		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
+		Cipher: cipher, Host: host, Preconnect: preconnectSupervisor,
+	})
+	connectionsSvc.Start()
+	deps.Connections = connectionsSvc
+
+	treeSvc := tree.New(repositories.Connections, repositories.Metadata, host, connectionsSvc)
+	deps.Tree = treeSvc
+
 	enginehost.PushCacheConfig(host, settings)
+
+	oplogWiring := oplog.New(host, repositories.Ops, settings.Advanced.OpLogRetentionDays)
+	oplogWiring.Start()
+
+	metricsTicker := metrics.NewTicker(
+		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
+		metrics.Interval,
+	)
+	metricsTicker.Start()
 
 	app := application.New(application.Options{
 		Name:        "Kira Studio Shell",
@@ -84,6 +128,7 @@ func main() {
 			application.NewService(&bridge.LayoutService{Deps: deps}),
 			application.NewService(&bridge.TabsService{Deps: deps}),
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
+			application.NewService(&bridge.TreeService{Deps: deps}),
 			application.NewService(&bridge.EngineService{Deps: deps}),
 			application.NewService(&bridge.OpsService{Deps: deps}),
 			application.NewService(&bridge.FiltersService{Deps: deps}),
@@ -95,7 +140,16 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 		OnShutdown: func() {
+			metricsTicker.Stop()
+			oplogWiring.Stop()
+			connectionsSvc.Shutdown()
 			host.Stop()
+			if err := repositories.Close(); err != nil {
+				slog.Warn("close repos", "scope", "shutdown", "err", err)
+			}
+			if err := db.Close(); err != nil {
+				slog.Warn("close db", "scope", "shutdown", "err", err)
+			}
 		},
 	})
 
@@ -119,7 +173,11 @@ func main() {
 // resolveEngine locates the vendored Node runtime and the M1 walking-skeleton engine script.
 // P52 §3.1 vendors the runtime to shell/runtime/node/ (git-ignored, fetched by
 // scripts/vendor-node.sh); this checks next to the running executable first (the packaged shape)
-// and falls back to the source tree (the `wails3 task dev` / `go run` shape).
+// and falls back to the source tree (the `wails3 task dev` / `go run` shape). Switching this to
+// the real bundled src/engine (shell/runtime/engine/engine.cjs, built by `bun run build:engine`
+// and already verified end-to-end in P54's stdio_main_integration_test.go) is out of this
+// phase's scope — P55 §0 lists no src/ or engine-wiring change, only the seven Go packages and
+// bridge completion above.
 func resolveEngine() (nodeBin, script string, err error) {
 	scriptCandidates := []string{
 		"testdata/engine-ping.mjs",

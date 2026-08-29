@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/go-cmp v0.7.0
+	github.com/keybase/go-keychain v0.0.1
 	github.com/mattn/go-sqlite3 v1.14.50
 	github.com/shirou/gopsutil/v4 v4.26.7
 	github.com/wailsapp/wails/v3 v3.0.0-beta.15

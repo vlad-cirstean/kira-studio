@@ -2,7 +2,7 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
-	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/shell/internal/connections"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -11,18 +11,66 @@ type ConnectionsService struct {
 }
 
 func (s *ConnectionsService) List() ([]model.ConnectionSummary, error) {
-	list, err := s.Deps.Repos.Connections.List()
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return s.Deps.Connections.List()
 }
 
-// States is in-memory, not DB-backed (mirrors src/main/connections.ts's own `states` Map) — the
-// full connect/disconnect state machine lands in P55. A fresh boot with nothing connected yet has
-// nothing to report, matching today's behaviour before any connect attempt.
+func (s *ConnectionsService) Create(input connections.Input) (model.ConnectionSummary, error) {
+	return s.Deps.Connections.Create(input)
+}
+
+type ConnectionsUpdateArgs struct {
+	ID    string            `json:"id"`
+	Input connections.Input `json:"input"`
+}
+
+func (s *ConnectionsService) Update(args ConnectionsUpdateArgs) (model.ConnectionSummary, error) {
+	return s.Deps.Connections.Update(args.ID, args.Input)
+}
+
+// ConnectionsIDArgs is shared by every method below that needs nothing but a connection id.
+type ConnectionsIDArgs struct {
+	ID string `json:"id"`
+}
+
+func (s *ConnectionsService) Duplicate(args ConnectionsIDArgs) (model.ConnectionSummary, error) {
+	return s.Deps.Connections.Duplicate(args.ID)
+}
+
+func (s *ConnectionsService) Remove(args ConnectionsIDArgs) error {
+	return s.Deps.Connections.Remove(args.ID)
+}
+
+type ConnectionsReorderArgs struct {
+	IDs []string `json:"ids"`
+}
+
+func (s *ConnectionsService) Reorder(args ConnectionsReorderArgs) ([]model.ConnectionSummary, error) {
+	return s.Deps.Connections.Reorder(args.IDs)
+}
+
+// Reveal never errors (P25 D9) — an undecryptable secret comes back as a RevealResult carrying
+// its own Error field, not a rejected call.
+func (s *ConnectionsService) Reveal(args ConnectionsIDArgs) connections.RevealResult {
+	return s.Deps.Connections.Reveal(args.ID)
+}
+
+// Test never errors, for the same reason: failure is reported inside TestResult.
+func (s *ConnectionsService) Test(input connections.Input) connections.TestResult {
+	return s.Deps.Connections.Test(input)
+}
+
+func (s *ConnectionsService) Connect(args ConnectionsIDArgs) (model.ConnectionState, error) {
+	return s.Deps.Connections.Connect(args.ID)
+}
+
+func (s *ConnectionsService) Disconnect(args ConnectionsIDArgs) (model.ConnectionState, error) {
+	return s.Deps.Connections.Disconnect(args.ID)
+}
+
+// States is in-memory, not DB-backed (mirrors src/main/connections.ts's own `states` Map),
+// sorted by connection id (P55 §2 D7).
 func (s *ConnectionsService) States() ([]model.ConnectionState, error) {
-	return []model.ConnectionState{}, nil
+	return s.Deps.Connections.States(), nil
 }
 
 // SecretStorageStatus mirrors src/shared/domain/secrets.ts's secretStorageStatusSchema.
@@ -33,17 +81,9 @@ type SecretStorageStatus struct {
 	Reason           *string `json:"reason"`
 }
 
-// SecretsStatus is a real answer, not a stub: the Keychain-backed cipher (P51 §3.5, resolved in
-// P52 §6) is P55 work, so until then this build honestly reports itself as unavailable rather
-// than claiming a backend it does not have — the same `{available:false, backend:'unavailable'}`
-// shape src/main/secret-cipher.ts already reports on a real probe failure (P25 D13), which the
-// connection dialog already renders correctly.
+// SecretsStatus reports the real Keychain-backed cipher's status (P55 M1). secrets.Status and
+// SecretStorageStatus are field-for-field identical (that struct moved to internal/secrets
+// unchanged, per P55 §1.3) so a plain conversion is exact, not a coincidental shortcut.
 func (s *ConnectionsService) SecretsStatus() (SecretStorageStatus, error) {
-	reason := "Secret storage is not implemented in this build yet (P52 walking skeleton; lands in P55)."
-	return SecretStorageStatus{
-		Available:        false,
-		Backend:          "unavailable",
-		InsecureFallback: false,
-		Reason:           &reason,
-	}, nil
+	return SecretStorageStatus(s.Deps.Connections.SecretsStatus()), nil
 }

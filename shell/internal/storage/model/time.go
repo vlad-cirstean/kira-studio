@@ -20,3 +20,13 @@ func NowISO() string {
 func FormatISO(t time.Time) string {
 	return t.UTC().Format(jsISOFormat)
 }
+
+// ParseISO parses a timestamp written by FormatISO/NowISO (or by the Node engine's own
+// toISOString()). It also accepts RFC3339Nano as a fallback, since not every producer of an
+// "ISO" timestamp trims to exactly three fractional digits.
+func ParseISO(s string) (time.Time, error) {
+	if t, err := time.Parse(jsISOFormat, s); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339Nano, s)
+}

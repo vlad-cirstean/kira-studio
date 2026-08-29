@@ -476,5 +476,53 @@ have to be re-derived next time.
   confirmation that `src/engine`'s only genuine Electron coupling was the two spots named above,
   not a load-bearing dependency on the Electron runtime itself.
 
+**P55 implementation findings, worth keeping for P56+:**
+
+- **Install `wails3` pinned to the exact `go.mod` version, not `@latest`.**
+  `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` resolved to `v3.0.0-beta.16` in this
+  session while `shell/go.mod` pins `v3.0.0-beta.15` — a silent version skew between the bindings
+  generator and the runtime library that could generate a call-ID scheme or wrapper shape the
+  vendored runtime doesn't actually match. Use `@v3.0.0-beta.15` (or whatever `go.mod` currently
+  pins) explicitly.
+- **`main.go`'s `resolveEngine()` still points at the P52 walking-skeleton's
+  `testdata/engine-ping.mjs`, not the real bundled `src/engine` (`shell/runtime/engine/engine.cjs`,
+  built by `bun run build:engine` and already proven correct end-to-end by P54's own
+  `stdio_main_integration_test.go`).** Switching the running app over to the real engine was never
+  in P55's scope (§0 lists no `src/`/engine-wiring change) and is still open — don't assume
+  `connections.Connect()` et al. talk to a real adapter in the packaged app yet; they talk to the
+  ping fixture until whichever later phase (cutover, most likely) flips `resolveEngine()` over.
+- **Comparing a struct containing an `any` field (or anything holding a `map`/slice) with `==`/`!=`
+  panics at runtime** ("comparing uncomparable type") rather than failing to compile — Go only
+  catches this statically when the field's *static* type is already uncomparable, not when it's
+  `any` holding a `map[string]interface{}` at runtime (e.g. `model.ConnectionState.Caps`, decoded
+  from JSON). Use `go-cmp` (already a dependency) or `reflect.DeepEqual` for any struct with a wire
+  `any`/`json.RawMessage`-derived field, never `==`.
+- **`internal/enginetest`'s shared fixture (`testdata/engine-fixture.mjs`) grew three test-only ops
+  beyond P55's own plan table**, each solving a real determinism problem rather than being
+  speculative: `fixture:release-slow` (answers every pending `slow-` `adapter:connect` on demand —
+  without it, testing the in-flight-connect dedupe would mean actually waiting out a real 20s
+  timeout); `fixture:request-count` (an op-name → call-count map, for asserting "exactly one engine
+  call" or "no engine call on a cache hit" without instrumenting the transport itself); and
+  `fixture:last-connect-config` (echoes the most recent `adapter:connect` payload's `config` back,
+  the only way a Go test can observe that `resolve()` actually re-injected a URI password — no
+  `adapter:connect` response otherwise carries it). Any future phase extending this fixture should
+  grep for `fixture:` ops before assuming the table in P55's plan doc is the complete list.
+- **A container's minimal init can leave a killed process group's members answering
+  `kill(pid, 0)` as "alive" for a second or two after they've actually received and acted on the
+  signal** — a reparented orphan becomes a zombie the moment it exits, and `kill(pid, 0)` succeeds
+  against a zombie (it still holds a PID table entry) until something actually calls `wait()` on
+  it. This sandbox's `process_api`-as-init does that reaping more slowly than a real system init
+  (launchd/systemd) does. `internal/preconnect`'s and `internal/connections`' process-group-kill
+  tests poll for `ESRCH` with a multi-second timeout rather than asserting it on the first check,
+  specifically because of this — a real macOS run should see it resolve near-instantly, but don't
+  tighten these timeouts based on that assumption without re-testing there.
+- **A bridge service's own argument validation (e.g. `bridge/tree.go`'s `Children` rejecting an
+  empty `connectionId` with `E_BAD_REQUEST`) is a separate guard from anything the service
+  underneath enforces** — `internal/tree.Service.Children("", ...)` does not itself reject an empty
+  id (it would just fail `requireConnected` less legibly), so this check exists only at the bridge
+  boundary, mirroring `bridge/filters.go`'s existing `FiltersService.List` pattern. Any new bridge
+  method taking a bare id string should get the same explicit guard rather than relying on the
+  service to produce a good-enough error by accident.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

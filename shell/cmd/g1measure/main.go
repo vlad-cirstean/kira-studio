@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/metrics"
@@ -24,9 +25,9 @@ func main() {
 	var anchorFlag, helperFlag string
 	var samples int
 	var intervalSec int
-	flag.StringVar(&anchorFlag, "anchor", "kira-studio-shell,runtime/node/bin/node",
+	flag.StringVar(&anchorFlag, "anchor", strings.Join(metrics.AnchorNeedles, ","),
 		"comma-separated executable-path substrings identifying this app's own executables (Go binary, vendored Node)")
-	flag.StringVar(&helperFlag, "helper", "com.apple.WebKit,webkitgtk,bwrap",
+	flag.StringVar(&helperFlag, "helper", strings.Join(metrics.HelperNeedles, ","),
 		"comma-separated executable-path substrings identifying native-webview helper processes — filtered to this app's own on darwin, see AppProcessSet")
 	flag.IntVar(&samples, "samples", 10, "number of samples")
 	flag.IntVar(&intervalSec, "interval", 1, "seconds between samples")
