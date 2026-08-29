@@ -618,7 +618,10 @@ Recorded so a successful walking skeleton is not mistaken for a green light.
 2. **Is there a Mac to run this on?** Everything in §0 is Linux/WebKitGTK. The shell is
    platform-agnostic by construction — `neu run --arch arm64` on a Mac with the same committed
    config should be the whole of it — but nobody has done it. `docs/PERF.md` §3's manual macOS
-   procedures have been unfilled since P12 for the same reason.
+   procedures have been unfilled since P12 for the same reason. **Partially answered by §9.1
+   (2026-08-29):** the shell ran on a real Apple Silicon Mac and rendered under WKWebView — a
+   memory reading only, not a rendering/console-error re-verification, and not a resolution of
+   D9's macOS 14 floor question below.
 3. **Given §4's bulk-data finding, is a Neutralino migration still interesting?** Three candidates
    have now been looked at and **all three** fail the same test: Electrobun (P20 §9 item 2, no
    port-transfer primitive), Wails (its own §3.2/§3.3 — bulk data necessarily transits the Go
@@ -695,3 +698,84 @@ workbench is fully visible with no engine, no data, and no console error, on a b
 the real Electron app provably untouched. §7's open questions (macOS, bulk-data transport, E2E,
 load, security posture) remain exactly as recorded — this phase answers only whether a window comes
 up, and it does.
+
+### 9.1 Real macOS memory measurement (2026-08-29 addendum)
+
+Answers §8 Q2 in part: **there is a Mac, and the shell was run on it.** Same real Apple Silicon Mac
+(arm64, macOS 26.5.2) `docs/PERF.md` §2.4's P52 gate G1 used, on this branch, this session. This is
+a memory reading, not a re-verification of §0.3/§9's render/console-error claims — those were not
+repeated here.
+
+**This is not a gate.** Unlike P52 §15, P51 defines no memory threshold and no go/no-go verdict for
+this phase. The number below is recorded for comparison against `docs/PERF.md`'s Electron and Wails
+figures, per D8's own logic in reverse: D8 kept the *Linux* figures out of `docs/PERF.md` because
+WebKitGTK is not the target platform's engine; a *macOS* WKWebView figure has no such disqualifier.
+It is not added to `docs/PERF.md` in this pass — only the plan record is updated, matching D10's
+posture that this file, not `docs/PERF.md`, is where P51's own numbers live.
+
+**Setup**, from a clean checkout of this branch: `bun run build` (renderer already present from
+verifying this pass), `cd neutralino && npm install`, `npx neu update` — ran with **no** `WARN …
+nightly` line, confirming the `6.9.0` pin still holds and, unlike §0.1's sandbox, `npx neu create`
+on this machine printed `Found the latest release tag v6.9.0` rather than the `403`-driven nightly
+fallback: `api.github.com` is reachable from here. `neutralino/bin/` and `neutralino/resources/`
+are both gitignored and regenerate from scratch (D4/D6), so a fresh `neu create` scaffold was used
+once to pull `resources/icons/{appIcon,trayIcon}.png` (§0.6 item 3 — `neu build` hard-errors
+without them; `neu update` alone does not fetch them), then discarded. `sh
+scripts/build-neutralino-shell.sh` built `neutralino/resources/` from `out/renderer/` as normal.
+
+**Instrument and method.** No Go/`gopsutil` tooling exists on this branch (that is
+`wails-native-shell-spike`'s `shell/cmd/g1measure`, a different app entirely) and `docs/PERF.md`
+§2.4's `responsibility_get_pid_responsible_for_pid` attribution does not apply here regardless:
+Neutralino's `neu build --macos-bundle` is a bare rename with no `Info.plist` (§0.6 item 2), so
+there is no signed `.app` to launch via Finder/LaunchServices, and both `neu run` and the packaged
+binary are reached by direct exec. Process attribution instead used **exact spawn-timestamp
+correlation** (`ps -o lstart`): on every launch, the app's own three WebKit XPC helpers
+(`.GPU`/`.Networking`/`.WebContent`) spawn within the same second as the app's own pid, distinct
+from unrelated WebKit helpers already running on the machine from other apps (idle since a prior
+day, per their own `lstart`). Confirmed directly by killing the app: only the four
+same-timestamp pids exited; the stale helpers from other apps stayed running. RSS was sampled with
+`ps -o rss=` for exactly those four pids, 10 samples 1 s apart, minimum taken, across three
+independent launches for reproducibility: `neu run --disable-auto-reload` (dev mode,
+`--load-dir-res`) once, and the packaged `neu build` output
+(`dist/kira-studio/kira-studio-mac_arm64`, run directly, no CLI wrapper) twice.
+
+**Result — converged within noise across all three independent launches:**
+
+| Process | RSS (min) |
+|---|---|
+| `kira-studio-mac_arm64` (native binary) | ≈103.8 MB |
+| `com.apple.WebKit.GPU` | ≈29.8 MB |
+| `com.apple.WebKit.Networking` | ≈23.9 MB |
+| `com.apple.WebKit.WebContent` | ≈77.8 MB |
+| **Total** | **≈234.8 MB** (240 464 KB min) |
+
+This is the real workbench (connections panel, empty state, status bar) rendering under the
+`window.kira` stub from §0.3 run 3 — no engine, no IPC, no data, unchanged from this phase's D1
+scope. A first, hastier sample (taken 4 s after launch, before the page had visibly finished
+settling) read a stray ≈168 MB and was discarded as a measurement artifact once the following two
+runs reproduced ≈235 MB from a full 10 s settle; it is not reported as a fourth data point.
+
+**Against `docs/PERF.md`'s real-machine figures** (§2.2 Electron, §2.4 Wails/Go, same machine):
+
+| Shell | Config | RSS |
+|---|---|---|
+| Electron (real app) | idle | 620–626 MB |
+| Wails/Go (real app, G1) | blank | 216.3 MB |
+| Wails/Go (real app, G1) | real renderer, 9 boot-path DB reads | 261.7 MB |
+| Neutralino (this phase's shell) | real renderer, no engine/IPC/data | ≈234.8 MB |
+
+Neutralino's reading sits between Wails' blank and real-renderer configs — closer to Wails' *blank*
+figure is the fairer comparison, since this shell has no engine or data attached either. Both sit
+far under Electron's baseline; neither result suggests Neutralino is a memory outlier against Wails
+on the one axis this phase can measure.
+
+**What this does not establish**, matching D8/§7's own discipline applied to a macOS number instead
+of a Linux one: this is not a formal gate reading (P51 defines none, unlike P52 §15); the launch is
+a direct exec, not the Finder/LaunchServices path a distributed app would use, so it carries the
+same caveat `docs/PERF.md` §2.4 recorded for an `exec`'d Wails blank config (undercounts helpers
+relative to a real launch) — except here every reading, including the packaged-binary ones, is
+already an `exec`, so there is no LaunchServices-launched figure to compare against, unlike Wails'
+G1 pass. It has not been through a review pass the way P52's G1 number was (§2.4 found and fixed
+three real bugs before trusting its own reading); no equivalent scrutiny has been applied here. It
+says nothing about §4's engine subprocess, bulk-data transport, or load behaviour, all still
+unbuilt.
