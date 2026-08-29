@@ -461,7 +461,7 @@ P51 §9.1 established there is a real Apple Silicon Mac available. Re-running §
 | D11 | **`src/main/security.ts` and `tests/unit/security.spec.ts` are deleted, not ported. What the app loses is written into `docs/ARCHITECTURE.md` in their place.** | Every entry in that module is a Chromium/Electron capability toggle — `webPreferences`, `session` permission handlers, `will-frame-navigate`, `webviewTag`, the spellchecker, WebGL, `electronFuses`. **None has a Neutralino equivalent**, and there is nothing to turn off because there is no Chromium. Leaving a dead module that configures a runtime the app no longer uses would be exactly the "stubbed" thing AGENTS.md forbids. The audit itself is valuable and survives as prose: Neutralino's posture is a different model (`nativeAllowList`, `tokenSecurity`, a localhost HTTP server plus WebSocket the page talks to) that needs auditing from scratch, and that audit is not this phase. |
 | D12 | **`createSecretCipher()` is reimplemented in the app process to report `{ available: false, backend: 'unavailable', insecureFallback: false, reason: … }` on every platform, and to throw `SecretStoreError` from `encrypt`.** No keychain, no obfuscation, no environment-variable fallback. | Credential storage is out of scope for this phase by the SPEC row's own words. The honest expression of "out of scope" is the failure mode P25 D13 already designed for this exact situation: a password-bearing save fails **visibly** at the dialog rather than silently writing plaintext. `connections.ts` already guards every cipher call with `password !== null`, so passwordless connections work fully. Inventing a Node `basic_text` analogue would be building the keychain phase badly, inside a phase that excluded it. |
 | D13 | **`src/main` keeps its directory name.** "Main process" is Electron vocabulary, and this is now the app process — but the rename is carried in the docs and the plan, not in 50 file paths. | A 50-file `git mv` buys one word, inflates the diff that reviews this phase's real risk (the relay), and makes every future `git log` traversal cross a rename boundary for no behavioural reason. `docs/ARCHITECTURE.md` gets one sentence establishing the vocabulary instead. |
-| D14 | **`tests/` is edited in exactly three places** — delete `tests/unit/security.spec.ts` (D11), rewrite `tests/unit/menu.spec.ts` against the Neutralino menu shape, add `tests/unit/relay-codec.spec.ts` — and `tests/e2e/` and the `tests/ipc/` frontend half are left in the tree, un-runnable, for a later decision. | Reality #12: those two specs import modules this phase deletes or rewrites; leaving them broken is not an option and rewriting them is a few lines. The two dead suites are a different matter: P51 §4 established there is no Playwright driver for Neutralino at all, so "port them" is not a small task hiding in this phase — it is a phase. Deleting them destroys the record of what the app is supposed to do; leaving them destroys `bun run test:e2e`. §9 Q3 asks the user. |
+| D14 | **`tests/` is edited in exactly three places** — delete `tests/unit/security.spec.ts` (D11), rewrite `tests/unit/menu.spec.ts` against the Neutralino menu shape, add `tests/unit/relay-codec.spec.ts` — and `tests/e2e/` and the `tests/ipc/` frontend half are left in the tree, un-runnable, for a later decision. | Reality #12: those two specs import modules this phase deletes or rewrites; leaving them broken is not an option and rewriting them is a few lines. The two dead suites are a different matter: P51 §4 established there is no Playwright driver for Neutralino at all, so "port them" is not a small task hiding in this phase — it is a phase. Deleting them destroys the record of what the app is supposed to do; leaving them destroys `bun run test:e2e`. §9 Q3 asks the user. **Amended 2026-08-29 (§9 Q3 resolved):** the "no Playwright driver for Neutralino" objection was about driving the native shell binary specifically. Playwright's `webkit` project drives its own patched WebKit build directly against a served page — no native shell, no CDP — so it can point at the real renderer + `kira-bridge.js` + a real running app process over the real WebSocket. `tests/e2e/` and the `tests/ipc/` frontend half are ported onto that instead of being deleted or left red; see Stage 6. |
 | D15 | **`docs/ARCHITECTURE.md`'s Process model and Renderer security surface sections are rewritten, and the invariant "Bulk data skips the main process" is deleted rather than softened.** | It is simply no longer true. Every result page now transits the app process — engine → `fork()` IPC → app process → base64 → 256 KB frames → WebSocket → native binary → page. `docs/PERF.md` §2.1's interaction budgets were measured under a design where the old invariant held, which is a fact about those budgets that the next perf phase needs to be told (§4). Softening the sentence would leave a document that quietly lies. |
 | D16 | **`electron.vite.config.ts` is replaced by `vite.config.ts` (renderer only) plus `scripts/build-app.sh` (esbuild for the app process, the engine and the bridge script).** `electron-builder.yml` and `scripts/verify-packaging.sh` are left untouched and dead. | `electron-vite` exists to build a main/preload/renderer triple, and two of those three are gone. esbuild is already this repo's Node-side bundler (`scripts/run-ipc-backend.sh`, `test:db:kafka`), so it is not a new tool. Packaging is out of scope by the SPEC row, so its config is not rewritten — and P51 §0.6 item 2 already established that Neutralino packaging is from scratch, not a port. |
 | D17 | **The `neutralino/` shell from P51 is kept and extended, not rebuilt**: `enableExtensions: true`, an `extensions` entry, a widened `nativeAllowList`, and `scripts/build-neutralino-shell.sh` gains the app-process/engine/bridge copy steps. The `6.9.0` version pin (P51 D6) stands. | It already works, it is already committed, and its five files are exactly the right five. Reproducibility depends on the pin surviving (P51 §0.5: unpinned, this sandbox's `api.github.com` 403 silently resolves the runtime to `nightly`). |
@@ -638,6 +638,31 @@ was actually hit, it is named.
 24. Append an **Outcome** section to this file and one implementation paragraph to SPEC §10's P52
     row, P48/P49/P50/P51 style.
 
+### Stage 6 — E2E on Playwright `webkit` (added 2026-08-29, §9 Q3)
+
+25. `playwright.config.ts`: add a `webkit` project. Its target is the served renderer
+    (`out/renderer/index.html` under a static server, e.g. `vite preview`) with `kira-bridge.js`
+    injected exactly as `build-neutralino-shell.sh` injects it (step 22) — Playwright drives its own
+    WebKit build against this page directly, never the native `.app` shell, so nothing here waits on
+    a Neutralino driver.
+26. A `tests/e2e/support/harness.ts` (or the nearest existing fixture file) starts a real app process
+    (`node out/app/index.js`, the same binary the shell launches) against a **stub transport**: since
+    the app process's wire is `extensions.dispatch`/`app.broadcast` over the Neutralino WebSocket
+    (D4) and there is no native binary in this harness to speak that protocol, the harness needs the
+    app process to also accept a **plain WebSocket** with the same six `kira:*` frame shapes when a
+    `KIRA_E2E_WS_PORT` env var is set — a thin dev-only listener in `src/main/neutralino/host.ts`
+    alongside the real stdin handshake, gated behind that env var so it never runs in the packaged
+    app. `kira-bridge.js` already only knows "the WebSocket at the URL Neutralino's `Neutralino.init()`
+    resolves"; point it at the same port in this mode.
+27. Port `tests/e2e/*.spec.ts` and the `tests/ipc/` frontend half onto the `webkit` project and this
+    harness, spec by spec. Each spec's assertions (grid contents, cancel behaviour, menu shortcuts,
+    window bounds) are unchanged — only the boot sequence (launch app process + harness page instead
+    of an Electron `_electron.launch()`) changes. `bun run test:e2e` targets the new project.
+28. Record in the Outcome section which specs ported cleanly and which needed a rewrite beyond the
+    boot sequence (a WebKit-vs-Chromium rendering or timing difference is a real finding, not a bug
+    to paper over — P29/P47's Chromium-tuned scroll behaviour, reality #4/§8 item 4, is the most
+    likely place this surfaces).
+
 ---
 
 ## 4. Explicitly out of scope — and what each would actually take
@@ -654,9 +679,13 @@ was actually hit, it is named.
   use `commandDarwin` to point at it. That is the same conclusion the parallel Wails spike reached
   independently, and it is also what makes `electron-builder.yml`'s `electronFuses` reasoning
   (S6/S7 — "not usable as a general-purpose Node runtime") apply *more* strongly, not less.
-- **An E2E harness.** P51 §4, unchanged: Playwright has an Electron driver and a browser driver and
-  no Neutralino driver; WebKitGTK/WKWebView do not speak CDP. This phase's concrete new consequence
-  is that `tests/e2e/` and the `tests/ipc/` frontend half stop running (D14, §9 Q3).
+- ~~**An E2E harness.**~~ **Back in scope, 2026-08-29 (§9 Q3 resolved) — see Stage 6.** P51 §4's
+  objection stands for driving the *native shell binary*: no Neutralino driver, and WebKitGTK/WKWebView
+  do not speak CDP. It does not apply to Playwright's own `webkit` project, which is Playwright's own
+  patched WebKit build driven by its own protocol, with no CDP and no native shell involved — it can
+  load the served renderer + real `kira-bridge.js` directly and talk to a real running app process over
+  the real WebSocket. `tests/e2e/` and the `tests/ipc/` frontend half are ported onto it rather than
+  left un-runnable.
 - **Progressive rendering of a chunked page.** The measurements make it possible — TTFB drops from
   ~1.7 s to ~27 ms at 22 MB (§0.4) — and the relay's chunk framing is exactly what a progressive
   grid would consume. It is not built: `bridge/port.ts` reassembles and resolves one promise,
@@ -861,21 +890,50 @@ fourth, but it is the same `stream` page kind as Kafka with none of Kafka's nati
    decision can be re-made deliberately rather than rediscovered later. If it were revisited, the
    security objection is the whole question: the relay keeps result bytes inside processes the app
    owns; the sideband does not.
+
+   **Resolved (2026-08-29, user):** keep chunking. D6/D7 stand unchanged.
+
 2. **§0.5 shows the residual control latency during a bulk transfer is the app process's own event
    loop, not Neutralino's relay — a second, control-only extension process would restore it to
    ~30–50 ms. Worth a second process?** It is a real cost either way: two Node processes instead of
    one, two handshakes, and control/data state split across them. This phase does not do it.
+
+   **Not raised in the 2026-08-29 answers.** Proceeding on D2's existing default — one app process,
+   no second control-only process, for this phase.
+
 3. **`tests/e2e/` (11 specs) and the `tests/ipc/` frontend half stop being runnable (D14). Delete
    them on this branch, or leave them in place, red, until an E2E phase?** Leaving them keeps the
    record of what the app is supposed to do and breaks `bun run test:e2e`. Deleting them loses the
    record. There is no third option that is not a fake.
+
+   **Resolved (2026-08-29, user):** a third option, not listed above — stand up an E2E driver on
+   Playwright's own `webkit` project (its patched WebKit build, not CDP; §4's "no Neutralino driver;
+   WebKitGTK/WKWebView do not speak CDP" objection was specifically about driving the *native shell*,
+   which Playwright webkit sidesteps by never doing that: it drives the served renderer + real
+   `kira-bridge.js` directly, against a real running app process over the real WebSocket, with no
+   Neutralino binary in the loop). This turns "An E2E harness" (§4) from out-of-scope back into part
+   of this phase's Stage 4/5 work. Measurements and the suite itself run in this sandbox (Linux) —
+   see Q4.
+
 4. **Should §0.4/§0.5 be re-run on the Mac before or after the implementation?** The wire protocol
    and the frame ceiling transfer by construction; the chunking numbers are WebKitGTK-under-Xvfb.
    Re-running the two probe scaffolds on the Mac is maybe an hour and would move the chunk-size
    decision (D6) from "measured on the wrong engine" to "measured".
+
+   **Resolved (2026-08-29, user):** measurements taken in this sandbox are fine; implementation does
+   not block on real-Mac re-verification. Every number this phase records stays labelled as a Linux
+   observation (P51 D8), unchanged.
+
 5. **After P52, is a keychain phase the next one?** §0.9/D12 make it the thing standing between this
    branch and an app anyone could use. The three routes are named in P51 §4 and none of them is
    small.
+
+   **Resolved (2026-08-29, user):** yes, keychain is the next phase, kept separate from this one per
+   the user's standing instruction. Design direction for that phase, recorded here so it is not lost:
+   store one master key in the OS keychain; envelope-encrypt the actual connection passwords under
+   that master key; keep the envelope-encryption step itself swappable (a `SecretCipher`-shaped seam
+   the keychain-backed key retrieval sits behind, distinct from the algorithm used to wrap/unwrap
+   individual secrets). Not designed further or implemented here — D12 stands for this phase.
 
 ---
 

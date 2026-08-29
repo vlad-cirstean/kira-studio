@@ -452,6 +452,16 @@ Named concretely, so the next phase starts from a list rather than a blank page.
   report `true`/`'keychain'`. A Linux dev fallback equivalent to `KIRA_INSECURE_SECRETS` (AGENTS.md,
   P25 D13) would have to be invented from nothing — Chromium's `basic_text` obfuscation has no
   Neutralino analogue.
+
+  **Design direction fixed 2026-08-29 (user, ahead of the phase itself):** whichever of the three
+  routes above is chosen to reach the OS keychain, store exactly **one master key** there, not a
+  per-credential entry — then envelope-encrypt the actual connection passwords under that master key
+  (fetch/derive the master key from the keychain once, use it to wrap/unwrap a DEK or the secrets
+  directly). The envelope-encryption step itself must be **modular and swappable** — a seam between
+  "how the master key is obtained" (the keychain-specific part, tied to whichever route is chosen)
+  and "how a secret is wrapped under it" (an algorithm choice, not a platform choice), so the wrapping
+  scheme can change without touching keychain access. This is not designed further here — it is
+  scope for the keychain phase itself, recorded so the direction isn't rediscovered from scratch.
 - **The engine subprocess and the DB adapters.** `src/engine` is 119 files / 14 743 lines and
   `src/main/engine-host.ts` forks it with `utilityProcess.fork(…, {execArgv:
   ['--max-old-space-size=' + maxOldSpaceMb]})` — a V8 flag with no meaning outside Node, and a
