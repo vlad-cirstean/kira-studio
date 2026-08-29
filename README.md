@@ -17,6 +17,10 @@ Vue 3 — one workbench across eleven database engines.
   Allow** answers it permanently for that build.
 - **Credentials are encrypted at rest** via the macOS Keychain (`safeStorage`) — see
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Storage section.
+- **In-progress NeutralinoJS migration spike** (`neutralino/`, `scripts/build-neutralino-*.sh`,
+  `scripts/fetch-neutralino-engine-runtime.sh`) — an exploration, not the shipped architecture yet.
+  Same platform scope as the rest of v1: macOS, Apple Silicon (`arm64`) only, no Intel build. See
+  [`docs/v1/plans/P51-neutralino-migration-spike.md`](docs/v1/plans/P51-neutralino-migration-spike.md).
 
 ## Supported engines
 
