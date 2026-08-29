@@ -171,3 +171,8 @@ scripts/demo-dbs/sqlite/*.sqlite
 neutralino/bin/
 neutralino/resources/
 neutralino/.tmp/
+
+# Vendored Node runtime + kafka-javascript native addon for a packaged Neutralino engine
+# process (scripts/fetch-neutralino-engine-runtime.sh) — build-time fetches, not repo content,
+# same treatment as neutralino/bin/. See P51 §9.3.
+neutralino/engine-runtime/

@@ -832,3 +832,75 @@ electron-builder does all of the above (bundle scaffold, `Info.plist`, `asar`, a
 fuses) automatically; Neutralino has none of it built in, so this project now owns a small,
 independent script for the structural half, and still needs a real Mac for the signing/launch half
 — same as today's Electron build already requires for its own final verification.
+
+### 9.3 macOS packaging with a real engine: vendored Node + kafka-javascript's native addon (2026-08-29 addendum)
+
+Follow-up to §9.2, user-directed: §9.2 only packaged the empty shell. The real risk is whether the
+*engine* — a plain Node process P52 will spawn via `child_process.fork()`, plus
+`@confluentinc/kafka-javascript`'s native addon (P32's hardest packaging problem for Electron,
+D6/D7) — can be packaged for macOS at all without a Mac to build on.
+
+**Neither piece needs a from-source compile.** Precedent: `wails-native-shell-spike`'s P51
+(`docs/v1/plans/P51-wails-go-node-engine-spike.md` §1.2, §3.7) already reached the same conclusion
+independently — "vendor an actual Node.js runtime binary, the ordinary kind anyone downloads from
+nodejs.org" — stated there as a decision from the repo owner. This addendum reproduces it
+concretely for Neutralino, with real downloaded artifacts, not just the architectural argument:
+
+- **Node runtime**: `https://nodejs.org/dist/v22.22.2/node-v22.22.2-darwin-arm64.tar.gz` (matching
+  this sandbox's own `node -v` — v22.22.2, ABI 127) downloads and extracts cleanly from Linux;
+  `bin/node` is `file(1)`-confirmed as a valid arm64 Mach-O executable, 113 MB uncompressed. No
+  macOS or cross-compiler involved — it's a prebuilt official release, same as anyone installing
+  Node normally.
+- **`@confluentinc/kafka-javascript`'s native addon**: publishes real prebuilds per Node ABI via
+  `node-pre-gyp` (`package.json`'s `binary` block) on GitHub Releases, independent of Electron
+  entirely — confirmed by downloading
+  `confluent-kafka-javascript-v1.10.0-node-v127-darwin-unknown-arm64.tar.gz` directly (the exact
+  asset list came from GitHub's `releases/expanded_assets/v1.10.0` fragment, since the repo API
+  itself is out of this session's GitHub scope). Extracted `.node` is `file(1)`-confirmed as a
+  valid arm64 Mach-O bundle, ABI 127 — the same ABI the vendored Node runtime above needs. This
+  sidesteps P32 D6 entirely: `native-electron-build.sh`'s whole reason to exist is rebuilding this
+  addon against Electron's *non-standard* embedded-Node ABI, which requires Electron's own headers
+  (`artifacts.electronjs.org`, proxy-blocked in this sandbox per that script's own header comment).
+  A plain-Node engine needs no such rebuild — Confluent already publishes the ABI Node itself uses.
+
+Both fetches are now `scripts/fetch-neutralino-engine-runtime.sh` (new), writing to
+`neutralino/engine-runtime/` (gitignored, same treatment as `neutralino/bin/` — these are
+build-time fetches, not repo content). Re-run confirmed idempotent (second run re-uses both
+artifacts, no re-download).
+
+**Full composition, verified for real.** Both artifacts were assembled into §9.2's actual `.app`
+bundle, alongside a real copy of `out/main/engine.js` + `out/main/chunks/` (the existing
+Electron-agnostic engine build, P51 reality #1/#7 — untouched) and the JS-side runtime
+dependencies `@confluentinc/kafka-javascript`'s native loader actually needs:
+`node_modules/@confluentinc/kafka-javascript` itself calls `require('bindings')('confluent-kafka-javascript')`
+(`librdkafka.js:11`) rather than requiring the `.node` file directly, so `node_modules/bindings`
+(and its own dependency `file-uri-to-path`) must ship too — both copied in. `zod`, the one other
+bare-specifier `require()` in `engine.js` itself, was included for the same reason. Resulting
+layout: `Contents/Resources/node/bin/node` (vendored runtime) and `Contents/Resources/engine/`
+(`engine.js`, `chunks/`, `node_modules/{@confluentinc/kafka-javascript,bindings,file-uri-to-path,zod}`),
+with the darwin-arm64 `.node` swapped into
+`engine/node_modules/@confluentinc/kafka-javascript/build/Release/` in place of the Linux one `bun
+install` left there for local dev.
+
+Verified three ways: `file(1)` on both native artifacts inside the assembled bundle confirms arm64
+Mach-O; the assembled bundle's directory nesting puts `engine/node_modules/` exactly where Node's
+own module resolution would find it from `engine/chunks/*.js` (parent-directory walk — the same
+layout electron-builder's `asarUnpack` already relies on for pure-JS `require()` today, minus the
+asar); and `bindings`' own resolution function (`bindings.js`, invoked for real against the
+assembled tree, not simulated) was called with `module_root` pointing at the bundled
+`@confluentinc/kafka-javascript` directory and returned exactly
+`.../build/Release/confluent-kafka-javascript.node` — the file placed there. Total assembled
+bundle: 145 MB (108 MB vendored Node, 32 MB engine + kafka addon, ~5 MB shell/resources).
+
+**What this does not establish**, same boundary as §9.2: the vendored binaries are foreign-arch
+Mach-O on this x86-64 Linux sandbox, so nothing here executes `node`, forks the engine, or actually
+`dlopen`s the kafka addon — only their presence, format, and resolution paths are checked. Whether
+`child_process.fork()` from the vendored `node` binary behaves identically to Electron's
+`utilityProcess.fork()` (structured clone, `MessagePort` transfer) is unverified and stays P52
+implementation work, not a packaging question. The 145 MB figure is this addendum's ad-hoc
+assembly, not a production layout decision (whether `npm`/`npx`/`corepack` should also be stripped
+from the vendored runtime, whether `node_modules` should be deduplicated against the app process's
+own, exact `Info.plist`/entitlements for a two-executable bundle — a real `node` binary alongside
+`kira-studio` — per the Wails plan's own note that this raises the *same* Node-runtime hardening
+question Electron's `runAsNode` fuse addresses, "more, not less") is P52's to make, not this
+addendum's.
