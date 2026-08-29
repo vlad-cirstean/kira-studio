@@ -73,6 +73,7 @@ func main() {
 	defer host.Stop()
 	deps.EngineHost = host
 	deps.NodeVersion = nodeVersion(nodeBin)
+	enginehost.PushCacheConfig(host, settings)
 
 	app := application.New(application.Options{
 		Name:        "Kira Studio Shell",

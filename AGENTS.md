@@ -431,5 +431,50 @@ have to be re-derived next time.
   while `repos.New` (P52 §5.4's five prepared statements: settings/layout/tabs select-all,
   op-log insert/update) is still the only production path.
 
+**P54 implementation findings, worth keeping for P55+:**
+
+- **Under the stdio transport, stdout is the frame channel, not a log sink — `console` must be
+  repointed before anything else runs.** `src/engine/control.ts`'s `AdapterDeps.log` and
+  `cache/lru.ts`'s cache-refusal warning both call `console.log`/`console.warn`/`console.error`
+  directly; under Electron's `parentPort` transport this was harmless (merely logged by
+  `engine-host.ts`), but under stdio a stray `console.log` writes raw text into the exact byte
+  stream `shell/internal/enginehost`'s length-prefixed reader is parsing, desynchronising it.
+  `src/engine/stdio-main.ts` fixes this with one line, `globalThis.console = new Console({stdout:
+  process.stderr, stderr: process.stderr})`, before reading a single byte of stdin — confirmed
+  against real `src/engine` module code, not just `index.ts`'s own `electron` import, which is
+  the only coupling P52 §4.4 had checked for.
+- **`application.StreamConn.Send` blocks; `TrySend` is the non-blocking, `ErrStreamFull`-returning
+  variant** — P52 §7.2 has this backwards (it credits `Send` with the `ErrStreamFull` behaviour).
+  Confirmed by reading `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.15/
+  pkg/application/stream.go` directly (`wails.io`/`v3.wails.io` are 403-blocked from this
+  environment, so the module cache is the only source). Also worth knowing from the same file:
+  per-connection bounds are 8 MiB **and** 256 frames, and any single frame over 64 MiB
+  (`streamMaxFrameBytes`) is rejected outright — a real, new ceiling this migration introduces
+  that Electron's structured clone never had (`internal/enginehost/stream.go`'s
+  `maxDataFrameBytes` enforces the same limit Go-side, dropping an oversized frame with a named
+  log line rather than corrupting the stream).
+- **The three real concurrency bugs found in P52 M1's `enginehost/host.go` walking skeleton**,
+  fixed in P54 and worth naming so nobody re-introduces them: (1) `writeFrame` held the same mutex
+  the read loop needs to deliver a response, across a blocking `stdin.Write` — a full pipe
+  deadlocked the whole host; fixed with a separate `writeMu` guarding stdin only. (2) `cmd.Wait()`
+  ran concurrently with the stdout reader, which `os/exec`'s own `StdoutPipe` doc calls incorrect
+  (`Wait` closes the pipe once it sees the process exit, racing an in-flight read); fixed with
+  `readDone`/`stderrDone` channels awaited before `Wait()`. (3) `Events()` returned a fresh
+  channel per call but every one of them ranged over the *same* underlying channel, so two
+  subscribers split events between them rather than both receiving every one; fixed with a real
+  per-subscriber channel registry (`Subscribe()`/`Event`/`EventEngineDown`).
+- **`ENGINE_OP.configureCache`'s wire string is `'cache:configure'`**, not a name like
+  `'engine:configure-cache'` guessed by an earlier plan draft before the actual protocol file was
+  read — always grep `src/shared/protocol/engine-ops.ts` for the literal rather than inferring an
+  op name from its TS identifier.
+- **A bundled `src/engine` via `bun run build:engine` (esbuild, `--format=cjs`,
+  `--alias:@shared=./src/shared`, the same `--external:` list `scripts/run-ipc-backend.sh` uses)
+  runs correctly under a bare `node` with no Electron at all** — confirmed end-to-end against the
+  real bundle (`shell/internal/enginehost/stdio_main_integration_test.go`, opt-in and skipped
+  when the bundle is absent): both the control and data channels dispatch correctly, unknown ops
+  on both channels return `E_UNSUPPORTED`, and no stray bytes reach stdout. This is real
+  confirmation that `src/engine`'s only genuine Electron coupling was the two spots named above,
+  not a load-bearing dependency on the Electron runtime itself.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

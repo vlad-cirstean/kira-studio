@@ -39,6 +39,7 @@
     "verify:packaging": "sh scripts/verify-packaging.sh",
     "build:wails": "vite build -c vite.wails.config.ts",
     "dev:wails": "bun run build:wails && cd shell && wails3 task dev",
+    "build:engine": "bunx esbuild src/engine/stdio-main.ts --bundle --platform=node --format=cjs --alias:@shared=./src/shared --external:electron --external:@confluentinc/kafka-javascript --external:ssh2 --external:cpu-features --outfile=shell/runtime/engine/engine.cjs",
     "test:go": "cd shell && go test ./...",
     "package:wails": "cd shell && wails3 task darwin:package && sh scripts/sign-bundle.sh"
   },
