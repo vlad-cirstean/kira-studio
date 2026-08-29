@@ -779,3 +779,56 @@ G1 pass. It has not been through a review pass the way P52's G1 number was (§2.
 three real bugs before trusting its own reading); no equivalent scrutiny has been applied here. It
 says nothing about §4's engine subprocess, bulk-data transport, or load behaviour, all still
 unbuilt.
+
+### 9.2 macOS packaging: real .app bundle feasibility (2026-08-29 addendum)
+
+User-directed check before P52 proceeds further: is a real, distributable macOS `.app` even
+buildable on top of Neutralino, or is packaging itself a blocker independent of the engine bridge?
+
+**`neu build --macos-bundle` does not produce a real app bundle.** Read directly from the installed
+CLI's own source
+(`neutralino/node_modules/@neutralinojs/neu/src/modules/bundler.js:211-217`): the entire
+`macosBundle` branch is `fs.renameSync(binary, binary + '.app')` — one rename, nothing else. Built
+and confirmed empirically (`npx neu build --release --macos-bundle` from `neutralino/`): the output
+`kira-studio-mac_universal.app` is `file(1)`-reported as a flat Mach-O universal binary, not a
+directory — no `Contents/`, no `Info.plist`, no bundle identifier, no icon. This is the same gap
+§0.6 item 2 already named in passing; this addendum is the first time it was checked for real. A
+plain renamed executable would not register with LaunchServices or pass Gatekeeper's bundle checks
+regardless of signing — this is not a signing problem, it is a missing-structure problem.
+
+**A real bundle is buildable from Linux, without a Mac, for the structural half of packaging.**
+Neutralino's own docs don't cover this gap; the community fills it with an unofficial script
+(`hschneider/neutralino-build-scripts`' `build-mac.sh` — confirmed via its README and script body:
+`jq`-driven config extraction, a scaffold `cp -r` into `Contents/`, `sed` templating for
+`Info.plist`, explicitly noting it "should also run on Linux or Windows/WSL"). Rather than vendor a
+third-party script sight-unseen, its approach was reproduced and verified directly against this
+repo's own build output: `scripts/build-neutralino-macos-bundle.sh` (new, this addendum) takes
+`neutralino/dist/kira-studio/kira-studio-mac_$arch` (the plain `neu build`, no `--macos-bundle`)
+and `build/icon.png` (the same 1024×1024 source `electron-builder.yml` already uses) and produces
+`neutralino/dist/kira-studio/mac_$arch/Kira Studio.app` with a real `Contents/MacOS/kira-studio`,
+`Contents/Resources/{resources.neu,appIcon.icns}`, and a generated `Contents/Info.plist`
+(`CFBundleIdentifier` and version read from `neutralino.config.json` via `jq`, not hand-copied).
+Icon conversion needed `png2icns` (Debian/Ubuntu package `icnsutils`, not preinstalled — installed
+for this check, no Mac-only tool involved). Run for real, arm64, output verified three ways:
+`Contents/MacOS/kira-studio` is `file(1)`-reported as a valid arm64 Mach-O executable (the same
+binary `neu build` fetched, untouched); `Contents/Info.plist` parses cleanly under Python's
+`plistlib` with the expected `CFBundleIdentifier: com.kirathecat.kira-studio`;
+`Contents/Resources/appIcon.icns` is `file(1)`-reported as a valid `ic10`-type Mac OS X icon. The
+directory layout matches Apple's documented bundle structure exactly.
+
+**What this does and does not settle.** Settled: macOS packaging is not a hard blocker on
+Neutralino's own account — a correctly-shaped, real `.app` bundle is producible cross-platform, in
+CI, from this repo's existing build output, with a script now committed
+(`scripts/build-neutralino-macos-bundle.sh`) rather than a one-off manual step. Not settled, because
+nothing in this sandbox can settle it: whether the packaged binary actually launches under
+LaunchServices, resolves `resources.neu` correctly from inside `Contents/Resources` at runtime, and
+clears Gatekeeper — `codesign` is an Apple-only binary with no Linux equivalent here, and there is
+no macOS kernel in this sandbox to exec the Mach-O regardless of signing. This is not a new
+limitation Neutralino introduces: `scripts/verify-packaging.sh`'s own A3/A5 checks already gate on
+`command -v codesign` / `command -v PlistBuddy` and skip with a note on a non-macOS runner, because
+the existing Electron pipeline has always had the same requirement — this sandbox could never
+verify electron-builder's signed output end-to-end either. What genuinely differs from Electron:
+electron-builder does all of the above (bundle scaffold, `Info.plist`, `asar`, ad-hoc signing,
+fuses) automatically; Neutralino has none of it built in, so this project now owns a small,
+independent script for the structural half, and still needs a real Mac for the signing/launch half
+— same as today's Electron build already requires for its own final verification.
