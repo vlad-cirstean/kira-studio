@@ -4,43 +4,37 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-// TabRecord's `State` stays raw JSON here — src/shared/domain/tabs.ts's per-kind discriminated
-// union (data/definition/console/document/keyvalue/stream/browse) is renderer-side validation
-// logic, not storage shape, and belongs with the rest of §7's typed bridge in P53/P56, not this
-// walking skeleton.
-type TabRecord struct {
-	ID           string          `json:"id"`
-	ConnectionID *string         `json:"connectionId"`
-	Path         string          `json:"path"`
-	Kind         string          `json:"kind"`
-	State        json.RawMessage `json:"state"`
-	Order        int             `json:"order"`
-	Active       bool            `json:"active"`
-}
-
-// renderableTabKinds mirrors tabs.ts's RENDERABLE_TAB_KINDS (D18) — a row of any other kind is
-// dropped on restore, logged, and not re-saved.
-var renderableTabKinds = map[string]bool{
-	"data": true, "definition": true, "console": true, "document": true,
-	"keyvalue": true, "stream": true, "browse": true,
-}
+const tabsSelectAllSQL = `SELECT id, connection_id, path, kind, state_json, "order", active FROM tabs ORDER BY "order" ASC`
 
 type TabsRepo struct {
 	DB *sql.DB
+
+	// selectAll is prepared once by repos.New (P52 §5.4); nil when constructed directly, which
+	// falls back to an ad-hoc query with identical SQL.
+	selectAll *sql.Stmt
 }
 
-func (r *TabsRepo) List() ([]TabRecord, error) {
-	rows, err := r.DB.Query(
-		`SELECT id, connection_id, path, kind, state_json, "order", active FROM tabs ORDER BY "order" ASC`,
+func (r *TabsRepo) List() ([]model.TabRecord, error) {
+	var (
+		rows *sql.Rows
+		err  error
 	)
+	if r.selectAll != nil {
+		rows, err = r.selectAll.Query()
+	} else {
+		rows, err = r.DB.Query(tabsSelectAllSQL)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("repos/tabs: query: %w", err)
 	}
 	defer rows.Close()
 
-	out := []TabRecord{}
+	out := []model.TabRecord{}
 	for rows.Next() {
 		var (
 			id, path, kind, stateJSON string
@@ -51,17 +45,18 @@ func (r *TabsRepo) List() ([]TabRecord, error) {
 		if err := rows.Scan(&id, &connectionID, &path, &kind, &stateJSON, &order, &active); err != nil {
 			return nil, fmt.Errorf("repos/tabs: scan: %w", err)
 		}
-		if !json.Valid([]byte(stateJSON)) {
-			continue // state_json is not valid JSON — dropped, mirroring tabs.ts.
-		}
-		// P19 legacy coercion: a tab persisted before the ddl->definition rename.
-		if kind == "ddl" {
-			kind = "definition"
-		}
-		if !renderableTabKinds[kind] {
+		if !isJSONObject([]byte(stateJSON)) {
+			slog.Warn("dropping tab row: state_json is not a JSON object", "scope", "storage/tabs", "id", id)
 			continue
 		}
-		rec := TabRecord{ID: id, Path: path, Kind: kind, State: json.RawMessage(stateJSON), Order: order, Active: active}
+		// No 'ddl'->'definition' coercion here (P53 §3.1: dropped alongside ops.go's, not
+		// ported): the renderer has not written 'ddl' since P19, and a fresh kira.db cannot
+		// contain one, so an unrecognised kind is simply dropped like any other.
+		if !model.IsRenderableTabKind(kind) {
+			slog.Warn("dropping tab row: unrecognised kind", "scope", "storage/tabs", "id", id, "kind", kind)
+			continue
+		}
+		rec := model.TabRecord{ID: id, Path: path, Kind: kind, State: json.RawMessage(stateJSON), Order: order, Active: active}
 		if connectionID.Valid {
 			v := connectionID.String
 			rec.ConnectionID = &v
@@ -76,7 +71,7 @@ func (r *TabsRepo) List() ([]TabRecord, error) {
 
 // Save replaces the whole tab set in one transaction, rewriting `order` as the array index so
 // the stored order is always dense (tabs.ts's replaceTabs).
-func (r *TabsRepo) Save(records []TabRecord) error {
+func (r *TabsRepo) Save(records []model.TabRecord) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("repos/tabs: begin: %w", err)
@@ -98,4 +93,15 @@ func (r *TabsRepo) Save(records []TabRecord) error {
 		return fmt.Errorf("repos/tabs: commit: %w", err)
 	}
 	return nil
+}
+
+// isJSONObject reports whether raw is valid JSON whose top-level value is an object — tabs.ts's
+// row.state must round-trip a Record<...>-shaped state, never a bare array or scalar.
+func isJSONObject(raw []byte) bool {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return false
+	}
+	_, ok := v.(map[string]any)
+	return ok
 }

@@ -40,21 +40,22 @@ func main() {
 	}
 	defer db.Close()
 
+	repositories, err := repos.New(db.DB)
+	if err != nil {
+		log.Fatalf("kira-studio-shell: storage repos: %v", err)
+	}
+	defer repositories.Close()
+
 	deps := appcore.Deps{
-		DB:          db.DB,
-		StartedAt:   time.Now().UnixMilli(),
-		Settings:    &repos.SettingsRepo{DB: db.DB},
-		Layout:      &repos.LayoutRepo{DB: db.DB},
-		Tabs:        &repos.TabsRepo{DB: db.DB},
-		Connections: &repos.ConnectionsRepo{DB: db.DB},
-		Ops:         &repos.OpsRepo{DB: db.DB},
-		Filters:     &repos.FiltersRepo{DB: db.DB},
+		DB:        db.DB,
+		StartedAt: time.Now().UnixMilli(),
+		Repos:     repositories,
 	}
 
-	// The engine memory cap mirrors today's advanced.engineMemoryCapMb setting (P51 §3.6); M1
+	// The engine memory cap mirrors today's advanced.engineMemoryCapMb setting (P51 §3.6); this
 	// reads it from the just-migrated (possibly still-default) settings row, same as production
 	// would before any user override exists.
-	settings, err := deps.Settings.GetAll()
+	settings, err := deps.Repos.Settings.GetAll()
 	if err != nil {
 		log.Fatalf("kira-studio-shell: read settings: %v", err)
 	}

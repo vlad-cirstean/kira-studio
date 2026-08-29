@@ -3,15 +3,15 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
 type ConnectionsService struct {
 	Deps appcore.Deps
 }
 
-func (s *ConnectionsService) List() ([]repos.ConnectionSummary, error) {
-	list, err := s.Deps.Connections.List()
+func (s *ConnectionsService) List() ([]model.ConnectionSummary, error) {
+	list, err := s.Deps.Repos.Connections.List()
 	if err != nil {
 		return nil, ipcerr.Internal(err.Error())
 	}
@@ -21,8 +21,8 @@ func (s *ConnectionsService) List() ([]repos.ConnectionSummary, error) {
 // States is in-memory, not DB-backed (mirrors src/main/connections.ts's own `states` Map) — the
 // full connect/disconnect state machine lands in P55. A fresh boot with nothing connected yet has
 // nothing to report, matching today's behaviour before any connect attempt.
-func (s *ConnectionsService) States() ([]repos.ConnectionState, error) {
-	return []repos.ConnectionState{}, nil
+func (s *ConnectionsService) States() ([]model.ConnectionState, error) {
+	return []model.ConnectionState{}, nil
 }
 
 // SecretStorageStatus mirrors src/shared/domain/secrets.ts's secretStorageStatusSchema.

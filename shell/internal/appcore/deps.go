@@ -10,18 +10,13 @@ import (
 )
 
 // Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
-// IpcDeps shape as closely as each phase's scope allows. M1 carries only what the nine boot-path
-// reads and the engine ping need; connections/secrets/tree land in P54-P55.
+// IpcDeps shape as closely as each phase's scope allows. connections/secrets/tree services land
+// in P55; this is P53's storage core plus P52's walking-skeleton scaffolding.
 type Deps struct {
 	DB          *sql.DB
 	EngineHost  *enginehost.Host
 	NodeVersion string
 	StartedAt   int64 // unix millis, for engineStatus/appInfo-style diagnostics later
 
-	Settings    *repos.SettingsRepo
-	Layout      *repos.LayoutRepo
-	Tabs        *repos.TabsRepo
-	Connections *repos.ConnectionsRepo
-	Ops         *repos.OpsRepo
-	Filters     *repos.FiltersRepo
+	Repos *repos.Repos
 }

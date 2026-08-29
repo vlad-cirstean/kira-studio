@@ -409,5 +409,27 @@ have to be re-derived next time.
   later foreach/foreground command in the same script sees it unset. Put `export` statements on
   their own line before the line that backgrounds the long-running command.
 
+**P53 implementation findings, worth keeping for P54+:**
+
+- **`go test ./internal/...` and `go build ./internal/...` need nothing but the Go toolchain** —
+  `mattn/go-sqlite3` is cgo but links only the SQLite amalgamation, no GTK/WebKit. A bare
+  `go build .`/`go test ./...` additionally compiles the root `main` package, which imports Wails
+  and does need `libgtk-4-dev`/`libwebkitgtk-6.0-dev`/`pkg-config` (already present in this
+  session's container, but not guaranteed in a fresh one — see the P52 finding above on
+  `apt-get install`). Prefer `./internal/...` for a fast storage-only test loop; it never needs
+  the GTK/WebKit dev headers at all.
+- **`wails3` and `wails3 generate bindings` are needed before `bun run build:wails` will build**,
+  not only before `go run .` — the generated `frontend/bindings/**/*.js` files are real Vite
+  import targets (`shell/frontend/shim/kira-bridge.ts` imports them directly), so a Vite build
+  fails with an unresolvable-import error, not a silently-stale-bindings one, if they're missing.
+  Regenerate with `wails3 generate bindings -b -i -ts` from `shell/` any time a bridge service's
+  method set changes, before the next `bun run build:wails`.
+- **Repo constructors take a bare `*sql.DB` and an optional prepared statement** (e.g.
+  `SettingsRepo{DB: db, selectAll: stmt}`), never a `*Repos`-only path — `selectAll`/`insert`/
+  `update` being `nil` falls back to an ad-hoc query with identical SQL. This is what lets tests
+  construct a repo directly (`&repos.SettingsRepo{DB: db}`) without going through `repos.New`,
+  while `repos.New` (P52 §5.4's five prepared statements: settings/layout/tabs select-all,
+  op-log insert/update) is still the only production path.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
