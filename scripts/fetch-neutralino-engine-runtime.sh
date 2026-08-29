@@ -12,6 +12,13 @@
 #
 # Output goes to neutralino/engine-runtime/ (gitignored — these are build-time fetches, not
 # repo content, same treatment as neutralino/bin/).
+#
+# Both binaries are stripped of debug symbols after download (P51 §9.4 — measured ~19% off the
+# Node binary, ~8% off the kafka addon, both still valid Mach-O; this must happen before signing,
+# never after, since stripping invalidates any existing signature). GNU binutils' `strip` cannot
+# read Mach-O at all ("file format not recognized") — this needs `llvm-strip` specifically on
+# Linux, or macOS's own Xcode-CLT `strip` when this script runs on a real Mac. Neither present:
+# skip stripping and say so, same pattern verify-packaging.sh uses for its own runner-gated checks.
 set -eu
 
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
@@ -24,6 +31,16 @@ kafka_version=$(node -p "require('$repo_root/node_modules/@confluentinc/kafka-ja
 
 mkdir -p "$out_dir"
 
+strip_macho() {
+  if command -v llvm-strip >/dev/null 2>&1; then
+    llvm-strip -S -x "$1"
+  elif [ "$(uname -s)" = "Darwin" ] && command -v strip >/dev/null 2>&1; then
+    strip -S -x "$1"
+  else
+    echo "fetch-neutralino-engine-runtime: note — no Mach-O-capable strip found (need llvm-strip, or macOS's own strip); leaving $1 unstripped"
+  fi
+}
+
 # --- Node.js runtime (darwin) ---------------------------------------------------------------
 node_dir="$out_dir/node-v$node_version-darwin-$arch"
 if [ ! -x "$node_dir/bin/node" ]; then
@@ -32,8 +49,9 @@ if [ ! -x "$node_dir/bin/node" ]; then
     "https://nodejs.org/dist/v$node_version/node-v$node_version-darwin-$arch.tar.gz"
   tar -xzf "$out_dir/node.tar.gz" -C "$out_dir"
   rm -f "$out_dir/node.tar.gz"
+  strip_macho "$node_dir/bin/node"
 fi
-echo "node runtime: $node_dir/bin/node"
+echo "node runtime: $node_dir/bin/node ($(du -h "$node_dir/bin/node" | cut -f1))"
 
 # --- @confluentinc/kafka-javascript native addon (darwin, matching this repo's Node ABI) ----
 kafka_dir="$out_dir/kafka-native-darwin-$arch"
@@ -46,5 +64,6 @@ if [ ! -f "$kafka_node" ]; then
     "https://github.com/confluentinc/confluent-kafka-javascript/releases/download/v$kafka_version/$asset"
   tar -xzf "$out_dir/kafka.tar.gz" -C "$kafka_dir" Release/confluent-kafka-javascript.node --strip-components=1
   rm -f "$out_dir/kafka.tar.gz"
+  strip_macho "$kafka_node"
 fi
-echo "kafka native addon: $kafka_node"
+echo "kafka native addon: $kafka_node ($(du -h "$kafka_node" | cut -f1))"

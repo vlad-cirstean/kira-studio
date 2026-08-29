@@ -904,3 +904,51 @@ own, exact `Info.plist`/entitlements for a two-executable bundle — a real `nod
 `kira-studio` — per the Wails plan's own note that this raises the *same* Node-runtime hardening
 question Electron's `runAsNode` fuse addresses, "more, not less") is P52's to make, not this
 addendum's.
+
+### 9.4 Shrinking the vendored Node binary (2026-08-29 addendum)
+
+User question, directly following §9.3: can the vendored `node` binary (108 MB there) be pruned?
+
+**Debug-symbol stripping — real, measured, now automatic.** Neither `bin/npm`, `bin/npx`,
+`bin/corepack`, `include/`, `share/doc/`, nor `lib/node_modules/npm` were ever vendored in the first
+place (§9.3 copies only `bin/node`), so there is no docs/tooling weight left to trim — the 108 MB
+figure was already the bare executable alone. What *is* prunable: debug symbols compiled into that
+executable. Measured directly, `llvm-strip -S -x` (the same flags a macOS release build would use)
+on the real downloaded binaries:
+
+| Artifact | Before | After | Saved |
+|---|---|---|---|
+| `node` (darwin-arm64) | 113 MB (112,989,184 B) | 87 MB | ~23% |
+| `confluent-kafka-javascript.node` (darwin-arm64) | 9.5 MB (9,534,736 B) | 8.4 MB | ~12% |
+
+Both re-verified as valid arm64 Mach-O after stripping (`file(1)`, unchanged output apart from the
+size). `scripts/fetch-neutralino-engine-runtime.sh` now strips both automatically after download,
+so every future fetch produces the smaller artifact — no separate step to remember. **Ordering
+matters**: stripping must happen before code signing, never after, since it rewrites the binary and
+would invalidate any signature already applied — the script only ever strips a freshly-downloaded,
+unsigned artifact, so this is a non-issue here, but is worth stating for whoever wires signing into
+the real release pipeline.
+
+**Why not GNU `strip`.** The `strip` already on a stock Linux box (GNU binutils, BFD-based) cannot
+read Mach-O at all — tried directly, it fails with `file format not recognized`. `llvm-strip` (LLVM
+project, `apt-get install llvm` on this sandbox) does; so does macOS's own Xcode-CLT `strip` when
+run on a real Mac. The fetch script tries `llvm-strip` first, falls back to a Darwin-native `strip`,
+and otherwise skips with a note — the same runner-gated pattern `verify-packaging.sh` already uses
+for `codesign`/`PlistBuddy`.
+
+**What was not pursued, and why.** A `--with-intl=small-icu` Node build would cut noticeably more
+(full ICU locale data is the single largest chunk of a stock Node binary after the engine itself),
+but nodejs.org does not publish that as a prebuilt tarball — getting one means building Node from
+source for macOS arm64, which needs a real macOS toolchain this sandbox does not have; not attempted
+here, and not worth attempting for a size question when P52's actual architecture work is still
+outstanding. `upx`-style executable compression was considered and rejected outright, not just
+deferred: macOS's own code-signing and Gatekeeper checks the *installed* binary's bytes on launch,
+and a self-decompressing wrapper is exactly the shape those checks exist to distrust — not a
+size/effort tradeoff worth carrying into a real distribution. Sharing one vendored `node` between
+the app process and the engine process needs no extra work: `child_process.fork()` already re-execs
+`process.execPath`, i.e. the same binary already vendored — nothing to prune there because nothing
+is duplicated in the first place.
+
+Net effect on §9.3's assembled bundle: 145 MB → ~119 MB, node/kafka accounting for nearly all of it
+either way. The shell itself (`resources.neu` + the Neutralino binary + icon) was already the
+smallest part of the total and was not revisited here.
