@@ -952,3 +952,17 @@ is duplicated in the first place.
 Net effect on §9.3's assembled bundle: 145 MB → ~119 MB, node/kafka accounting for nearly all of it
 either way. The shell itself (`resources.neu` + the Neutralino binary + icon) was already the
 smallest part of the total and was not revisited here.
+
+**No Intel slice to thin, for an arm64-only build.** User question: since v1 only targets Apple
+Silicon (`electron-builder.yml`'s own scope, D12), can the vendored `node` binary be thinned of its
+x86_64 slice? Checked with `llvm-lipo -info` (the authoritative tool for this, not `file`'s
+heuristic) on both vendored artifacts: `Non-fat file: ... is architecture: arm64` for each. Neither
+is a universal binary — `fetch-neutralino-engine-runtime.sh` already requests
+`node-v$version-darwin-$arch.tar.gz` and Confluent's own release assets are already split
+per-arch, so there was never an x86_64 slice bundled in to remove. Confirmed against nodejs.org's
+own dist listing for v22.22.2: only separate `darwin-arm64` and `darwin-x64` tarballs exist, no
+`darwin-universal`. The one universal (fat) binary anywhere in this investigation is Neutralino's
+own shell binary (`neutralino-mac_universal`, 5.9 MB, both slices) — and `build-neutralino-macos-bundle.sh`
+already avoids it by taking an `arch` argument and defaulting to the arm64-only shell binary
+(`kira-studio-mac_arm64`, 2.9 MB) instead. Nothing left to prune on the architecture axis for an
+arm64-only release.
