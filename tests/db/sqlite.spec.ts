@@ -295,6 +295,40 @@ describe('sqlite adapter (§9.1, P35)', () => {
     }
   });
 
+  // P57 e2e-revisit §7 item 1: sqlite_stat1 only exists once ANALYZE has run at least once
+  // (F20) — the shared `fixture` above already has it (scenario 6's own `ANALYZE big_rows`), so
+  // it cannot exercise the case every real user's database actually starts in. A genuinely fresh
+  // database, seeded but never ANALYZEd at all, reproduces the real failure this was found as:
+  // `{"code":"E_QUERY","message":"no such table: sqlite_stat1"}` (loadRowEstimates in catalog.ts
+  // queries sqlite_stat1 unconditionally, with no existence guard).
+  test('6b. tree enumeration survives a database that has never been ANALYZEd', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const neverAnalyzedPath = join(fixture.dir, 'never-analyzed.sqlite');
+    const db = new DatabaseSync(neverAnalyzedPath);
+    try {
+      db.exec('CREATE TABLE plain (id INTEGER PRIMARY KEY, note TEXT)');
+      db.exec("INSERT INTO plain (note) VALUES ('hello')");
+    } finally {
+      db.close();
+    }
+
+    const adapter = await createAdapter('sqlite', deps);
+    await adapter.connect({ ...fixture.config, database: neverAnalyzedPath }, makeCtx());
+    try {
+      const { nodes: dbChildren } = await adapter.children(
+        path([{ kind: 'database', name: 'main' }]),
+        makeCtx(),
+      );
+      // No ANALYZE ever ran, so every table's estimate is absent — same null as scenario 6's
+      // composite_pk, just for every table rather than one, and via a database where the whole
+      // sqlite_stat1 table is missing rather than merely empty for this name.
+      expect(dbChildren.map((n) => n.name)).toEqual(['plain']);
+      expect(dbChildren[0]?.detail).toBeUndefined();
+    } finally {
+      await adapter.disconnect();
+    }
+  });
+
   // D4: rewritten, not dropped — this is the whole of the cancellation contract for an engine
   // with no sqlite3_interrupt and a synchronous API (F10). The app's first honest `cancel: false`.
   test('7. cancel: caps says false, cancel() says false, an already-aborted op still rejects', async () => {
