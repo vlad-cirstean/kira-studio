@@ -13,6 +13,13 @@
 //   {"kind":"definition","path":"...","tabId":null}                    -> TreeDefinitionResult
 //   {"kind":"read","path":"...","pageSize":100,"filter":null,"sort":null,"projection":null,"cursor":{"mode":"offset","offset":0}} -> LogicalPage
 //   {"kind":"count","path":"...","filter":null}                        -> {value, exact}
+//   {"kind":"preview","path":"...","ops":[MutationRowOp, ...]}          -> {statements}
+//   {"kind":"mutate","path":"...","ops":[MutationRowOp, ...]}           -> {affectedRows} or {error}
+//     MutationRowOp: {"kind":"update","key":{...},"changes":{...}} | {"kind":"insert","values":{...}}
+//                  | {"kind":"delete","key":{...}}
+// `mutate` steps run in recipe order against the *same* container — a delete/update/insert
+// genuinely changes the data, so a recipe capturing a mutation sequence must list steps in the
+// same order the ported spec will replay them, exactly like a real session would issue them.
 // Each step's result is printed as one JSON object on its own line, prefixed by its index, so a
 // long recipe's output can be split apart without re-running the container.
 //
@@ -31,7 +38,7 @@ import { decodePage } from '../tests/ipc/support/decode';
 import { openHarness } from '../tests/ipc/support/harness';
 
 interface Step {
-  kind: 'children' | 'describe' | 'definition' | 'read' | 'count';
+  kind: 'children' | 'describe' | 'definition' | 'read' | 'count' | 'preview' | 'mutate';
   path: string;
   tabId?: string | null;
   pageSize?: number;
@@ -39,6 +46,8 @@ interface Step {
   sort?: unknown;
   projection?: unknown;
   cursor?: unknown;
+  ops?: unknown[];
+  refresh?: boolean;
 }
 
 async function main(): Promise<void> {
@@ -87,9 +96,32 @@ async function main(): Promise<void> {
             connectionId: pg.config.id,
             path: step.path,
             filter: step.filter ?? null,
-            refresh: false,
+            refresh: step.refresh ?? false,
           };
           result = { payload, ...(await harness.dataOp(DATA_OP.count, payload)) };
+          break;
+        }
+        case 'preview': {
+          const payload = { connectionId: pg.config.id, path: step.path, ops: step.ops ?? [] };
+          result = { payload, ...(await harness.dataOp(DATA_OP.preview, payload)) };
+          break;
+        }
+        case 'mutate': {
+          const payload = {
+            opId: `capture-mutate-${i}`,
+            tabId: step.tabId ?? null,
+            connectionId: pg.config.id,
+            path: step.path,
+            ops: step.ops ?? [],
+          };
+          try {
+            result = { payload, ok: await harness.dataOp(DATA_OP.mutate, payload) };
+          } catch (err) {
+            result = {
+              payload,
+              error: { message: (err as Error).message, code: (err as { code?: string }).code },
+            };
+          }
           break;
         }
       }

@@ -133,6 +133,7 @@
       };
     }
     if (response.kind === 'mutate') return { affectedRows: response.affectedRows };
+    if (response.kind === 'preview') return { statements: response.statements };
     if (response.kind === 'execute') return { pages: response.pages.map(buildPage) };
     return {};
   }
@@ -196,6 +197,10 @@
     cursors.set(key, at + 1);
     var snap = group[Math.min(at, group.length - 1)];
     function reply() {
+      if (snap.error) {
+        respond({ kind: 'res', id: req.id, ok: false, error: snap.error });
+        return;
+      }
       respond({ kind: 'res', id: req.id, ok: true, payload: buildResponsePayload(snap.response) });
     }
     // Frontend-only (types.ts's PortSnapshot.delayMs) — see mockPort.ts's own comment.
