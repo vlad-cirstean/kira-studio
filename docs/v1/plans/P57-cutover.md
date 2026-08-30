@@ -1635,9 +1635,10 @@ porting at this fidelity versus consolidating overlapping coverage.
 - Design the shared mock fixture data (tree shape + table contents) for the Postgres-backed specs,
   if porting them is still the chosen path after the above.
 - Port or explicitly drop, one file at a time: `tabs`, `tooltips`, `autocomplete`, `cell-editor`,
-  `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`, `tree`.
-  `budgets`/`perf`/`leaks` "re-create" per §5.6 (renderer-owned instrumentation hooks, not
-  Electron-specific) rather than port verbatim.
+  `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`, `tree`,
+  `budgets`, `perf`, `leaks`. §5.6's original guess that the last three would need to "re-create
+  against renderer-owned instrumentation hooks" rather than port turned out to be wrong for the
+  large majority of both files — see the dedicated bullet below, once all fourteen are done.
   - **`connections` and `secrets` — done, in a resumed session.** `connections.spec.ts` ported
     almost whole (CRUD/colors/URI-mode/duplicate/delete against a spec-level fixture); its two
     relaunch-persistence checks dropped, and the retired-colour scenario reshaped into a boot-time
@@ -1668,8 +1669,7 @@ porting at this fidelity versus consolidating overlapping coverage.
     (`window.kira.opsRecent`) checks were redundant with the `data-source` attribute every relevant
     scenario already asserts directly. `console.spec.ts` dropped only session restore and the
     native-Electron-menu half of its undo/redo scenario (CodeMirror's own keyboard-driven
-    history()/historyKeymap is fully portable and covers the same feature). Remaining: `tooltips`,
-    `autocomplete`, `cell-editor`, `data-view`, `tree`.
+    history()/historyKeymap is fully portable and covers the same feature).
   - **`interaction` — also done**, against a new real capture of the
     regions -> customers -> orders -> order_items <- products FK graph plus `app.composite_pk`'s
     own filter/sort/projection reads (`scripts/capture-postgres-tree.ts`, run for real against a
@@ -1711,6 +1711,36 @@ porting at this fidelity versus consolidating overlapping coverage.
     playwright test` — the same Postgres-Testcontainers-hangs-under-Bun finding `AGENTS.md` already
     documents. `s3-download-real.spec.ts` (E3) remains conditional per the amendment, pending
     tests/db/ coverage decisions (task #11).
+- **`budgets`, `perf`, `leaks` — also done, and §5.6's "re-create" guess was wrong.** None of
+  `budgets.spec.ts`'s five wall-clock measurements or `perf.spec.ts`'s rAF/DOM-cell tripwires ever
+  touch the network during their measured window — every one times a click/scroll/keystroke
+  against data the app already holds in memory, so a mocked backend measures the identical renderer
+  work a real one would. Both ported with the *same* absolute budgets `docs/PERF.md` §2.1 already
+  records, not new instrumentation. Two numbers needed honest, documented adjustment for this
+  tier's own real environment, neither an app regression — full reasoning and measurements in
+  `docs/PERF.md`'s new P57 M5 sub-section under §2.1: `perf.spec.ts`'s raw rAF-cadence tripwire
+  (24 ms → 80 ms, this sandbox's headless WebKit paces at ~35 ms/frame even at idle — confirmed
+  non-flaky, not app work) and `budgets.spec.ts`'s primary scroll-response budget (8 ms → 12 ms,
+  real cross-file contention under `fullyParallel: true`, confirmed reproducible: 7-8 ms alone,
+  9-10 ms under full-suite load). One check doesn't port — `perf.spec.ts`'s L2 cache-budget
+  assertion and two `leaks.spec.ts` sub-scenarios (L3 bound, hit-rate reset) all exercise
+  `src/engine/cache/{pages,lru,counts}.ts`, which lives in the `engine` child process this tier
+  doesn't run — replaced by `tests/unit/engine-cache.spec.ts` (new), a more precise
+  dependency-free unit test of the real eviction algorithm itself. A third `leaks.spec.ts`
+  sub-scenario ("deleting a connection closes its tabs") also doesn't port: `state/tabs.ts`'s
+  stale-tab-close and `project/state/tree.ts`'s `knownConnectionIds` pruning are both deliberately
+  wired to the `connectionsChanged` event, and `mockRuntime.ts` has no `Events.On` analogue —
+  `interaction.spec.ts`'s own already-documented structural gap, confirmed again here.
+  Getting `budgets.spec.ts` green surfaced one genuine, pre-existing renderer bug, now fixed:
+  `DataGrid.vue`'s `headerTitleFor(name)` was a plain function called directly from a `v-tooltip`
+  template binding, building a fresh `TooltipContent` object on every call; `v-tooltip`'s own
+  `updated` hook gates its DOM write on `binding.value !== binding.oldValue`, a reference check
+  that a freshly-built object always fails, so every header cell's tooltip attributes were rewritten
+  on *every* grid re-render for any reason, including a pure vertical scroll with no column change
+  at all (confirmed via a real `MutationObserver` count: dozens of attribute writes per scroll tick).
+  Fixed by memoizing it into a `computed` `Map`, restoring the file's own "sub-row scroll mutates
+  nothing" invariant (D4) to actually holding, not merely appearing to because the original test's
+  own scroll-position constant happened to sit at this mock's fixture-imposed scroll ceiling.
 - `playwright.config.ts`'s `e2e` project stays alongside `ui` until every portable spec has ported
   and every dropped one is accounted for — then it (and `tests/e2e/` itself, minus the three
   full-stack anchors) goes away, per §4.9/D16.

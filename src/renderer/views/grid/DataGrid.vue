@@ -122,10 +122,28 @@ function colorForColumn(name: string): string {
 // alone is what v-tooltip's own type checks against, the same way every plain-string call site
 // already satisfies that directive with no import of its own.
 // P48 F7: columns.ts's own columnHeaderTooltip — ConsoleResultGrid.vue builds the same shape.
-function headerTitleFor(name: string) {
-  const column = columnByName.value.get(name) ?? { name, typeClass: 'other' as const };
-  return columnHeaderTooltip(column, dataTypeFor(name), columnMetaByName.value.get(name)?.comment);
-}
+//
+// P57 M5 finding: memoized (not a plain function called from the template, as this used to be) —
+// `v-tooltip`'s directive `updated` hook (workbench/state/tooltip.ts) gates its DOM write on
+// `binding.value !== binding.oldValue`, a reference check. A plain function invoked directly in
+// the template builds a brand-new TooltipContent object on every call, so that check always saw
+// "changed" and rewrote every header cell's tooltip attributes on every re-render this component
+// did for *any* reason — including a pure vertical scroll, which has nothing to do with column
+// metadata. Confirmed via a real MutationObserver count during a sub-4px scroll (well under one
+// row): dozens of attribute writes on header cells alone. A `computed` Map returns the same object
+// reference across renders whenever the underlying column/metadata hasn't changed, so the
+// directive's reference check now actually skips the write in the common case.
+const headerTooltips = computed(() => {
+  const map = new Map<string, ReturnType<typeof columnHeaderTooltip>>();
+  for (const name of columnOrder.value) {
+    const column = columnByName.value.get(name) ?? { name, typeClass: 'other' as const };
+    map.set(
+      name,
+      columnHeaderTooltip(column, dataTypeFor(name), columnMetaByName.value.get(name)?.comment),
+    );
+  }
+  return map;
+});
 
 // P31 D11: a font change drops columns.ts's memoized measuring context (so the next measurement
 // re-reads the current --kira-font-family/--kira-font-size tokens instead of the ones baked into
@@ -1576,7 +1594,7 @@ defineExpose({ scrollCellIntoView });
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
           :data-sort="currentSortDirection(columnOrder[c]) ?? undefined"
-          v-tooltip="headerTitleFor(columnOrder[c])"
+          v-tooltip="headerTooltips.get(columnOrder[c])"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
             width: `${offsets[c + 1] - offsets[c]}px`,
