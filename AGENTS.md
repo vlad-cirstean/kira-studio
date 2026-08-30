@@ -33,6 +33,17 @@ team works, and how to run things in whichever box a session happens to be on.
   planning pass N should actually re-read the current source rather than trust pass N-1's own
   target-tree/summary prose, and should say plainly when a pass turns up nothing real rather than
   manufacturing a finding to fill it.
+- **A "review phase"** — run once a phase (or a batch of phases) is otherwise complete, on request —
+  means spawning **three Opus subagents in parallel**, each analyzing the current tree against one
+  dimension: (1) overall architecture and structure, maintainability, clean code, and security;
+  (2) functional correctness and business logic; (3) performance and resource efficiency. Each
+  agent only reports findings — it does not fix anything. The main Sonnet session then fixes every
+  finding directly, the same "Opus plans/reviews, Sonnet implements" split as everywhere else in
+  this file. Once every finding from that round is fixed, **repeat the whole three-agent cycle
+  again** — a fresh round against the now-changed tree, not a one-shot — for as many rounds as
+  asked for; this is the same "multiple passes" rule two bullets up, applied to review instead of
+  implementation. A round that turns up nothing real should say so plainly rather than manufacture
+  a finding to fill it.
 - No per-phase PRs. One feature branch for all of v1.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`,
   no skipped validation to make something demo. Scope left out of a phase is left out entirely,
@@ -626,6 +637,29 @@ have to be re-derived next time.
   addition to `electron.vite.config.ts` exists only to keep C1's "the Electron app is still whole
   and buildable" checkpoint (§0.3/§9 M4) a literal, checkable fact rather than a claim that quietly
   stopped being true the moment the shared bridge files changed.
+- **WebKit *is* installable in Claude Code's Linux web containers — an earlier session's "cannot
+  reach the download host" finding (`docs/v1/plans/P57-cutover.md` §5.6/M5-done notes) does not
+  hold in every session.** `bunx playwright install webkit` fetched WebKit 26.5 from
+  `cdn.playwright.dev` without issue in this session; the only real gap was the system shared
+  libraries it needs to actually launch (`libevent-2.1-7t64`, `libgstreamer-plugins-bad1.0-0`,
+  `libflite1`, `gstreamer1.0-libav` — exactly what Playwright's own post-install warning names),
+  fixed the same way as any other `apt-get install -y ...`. Once both are done,
+  `bunx playwright test --project=ui` runs for real against WebKit, no chromium override needed —
+  confirmed with `tests/ui/smoke.spec.ts`. Treat network reachability to `cdn.playwright.dev` as
+  worth retrying each session rather than a permanent wall, the same posture already established
+  for `artifacts.electronjs.org` in the Native Kafka driver section above.
+- **`window.kira` no longer exists once P57 M2/M3 have run — a `tests/e2e/`-era spec's own
+  `page.evaluate(() => window.kira.someChannel(...))` helper has no replacement, and cannot be
+  ported as-is.** `contextBridge`'s `window.kira` was Electron-only; the Wails renderer calls the
+  generated `@bindings/*` service methods directly (via `control.ts`), and nothing puts them on
+  `window` for a test to reach into from outside the bundle. Porting a `tests/e2e/` spec that used
+  this purely as a UI-driving shortcut (most call sites) means driving the same action through the
+  real UI instead (a button click, not a direct call). Porting one that used it as a raw
+  verification probe *of the mock's own canned response* (checking a shape the test's own fixture
+  already determines, e.g. "the list never carries a password") is checking something with no live
+  wire left to query in this tier — that invariant now belongs to whatever Go/repo-layer test
+  already covers the real backend's actual behavior, and the UI-tier port should say so and drop
+  the raw check rather than assert against its own fixture data as if it proved anything.
 - **A native tree/list Vue component's click and double-click handlers are genuinely separate**
   (`TreeRow.vue`'s `@click="onClick"` emits `select`; `@dblclick="onDblClick"` emits `open`) —
   driving it via `xdotool` needs two real, separately-dispatched `click 1` events close together

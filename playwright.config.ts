@@ -10,12 +10,12 @@ import { defineConfig } from '@playwright/test';
 // existed because concurrent Electron apps contend over wall-clock/RSS budgets and Docker
 // containers — the webkit tier has neither, the same reasoning that already made `ipc-frontend`
 // fully parallel. `browserName: 'webkit'` matches what a packaged build actually embeds
-// (WKWebView on macOS, WebKitGTK on Linux); this sandbox has no WebKit binary available to it
-// (only Chromium is preinstalled, and `playwright install` cannot reach the download host here —
-// AGENTS.md), so verifying `ui` in this sandbox needs `playwright test --project=ui
-// --browser=chromium`, an override this config does not need to encode. `ipc-frontend` keeps its
-// name, `testDir` and settings; only its mocking mechanism moves (D13/D14) once its seven specs
-// are re-pointed.
+// (WKWebView on macOS, WebKitGTK on Linux); a fresh Claude Code Linux container has no WebKit
+// binary preinstalled, but `bunx playwright install webkit` plus the system libs its own
+// post-install warning names (AGENTS.md) fetches and runs a real one, so `playwright test
+// --project=ui` verifies against the genuine target with no chromium override needed.
+// `ipc-frontend` keeps its name, `testDir` and settings; only its mocking mechanism moves
+// (D13/D14) once its seven specs are re-pointed.
 export default defineConfig({
   workers: '50%',
   retries: 0,
