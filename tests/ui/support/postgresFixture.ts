@@ -217,7 +217,9 @@ export const SERVER_VERSION =
 
 /** The connect + expand-to-`app`-schema boilerplate every fixture below shares. Exported (not
  *  just used internally) so a spec needing a custom connect/disconnect/reconnect sequence of its
- *  own — tree.spec.ts, for one — can still start from the same real connect/root/db/app snapshots
+ *  own, or whose own tables live outside this module (a table specific to one spec stays
+ *  file-local, per definition.spec.ts/cell-editor.spec.ts's own precedent) — tree.spec.ts and
+ *  cell-editor.spec.ts, for two — can still start from the same real connect/root/db/app snapshots
  *  instead of re-deriving them. */
 export function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
   return [

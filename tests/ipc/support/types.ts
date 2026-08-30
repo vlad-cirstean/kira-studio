@@ -67,6 +67,13 @@ export interface LogicalTabularPage extends LogicalPageBase {
   columns: ColumnDescriptor[];
   rows: (string | null)[][];
   truncatedCells: number;
+  /** tests/ui/-only (P57): per-column row indices whose value came back truncated — the logical
+   *  counterpart of page.ts's `TextColumnChunk.truncated` bitset (read via `isTruncated`), which
+   *  `decodePage()` does not surface (nothing needed it before cell-editor.spec.ts's port).
+   *  Optional and index-aligned with `columns`; absent (every page literal that predates this
+   *  field) means "nothing in this page is truncated," so an old fixture still decodes the same
+   *  as before. */
+  truncatedRows?: number[][];
 }
 
 export interface LogicalDocumentPage extends LogicalPageBase {

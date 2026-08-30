@@ -14,6 +14,13 @@ export interface KiraApp {
 export interface RelaunchOptions {
   control?: readonly ControlSnapshot[];
   stream?: readonly PortSnapshot[];
+  /** Playwright's own `BrowserContextOptions.timezoneId` (e.g. `'America/New_York'`) — this
+   *  sandbox's own system timezone is UTC (P57 M5 finding, porting cell-editor.spec.ts), which
+   *  silently makes any "local time differs from UTC" assertion vacuously true-or-false depending
+   *  on the host machine rather than the app's own behaviour, since `browser.newPage()` otherwise
+   *  inherits the host's real zone. A spec that genuinely needs Local and UTC to differ should
+   *  pass this rather than assume the host isn't UTC. */
+  timezoneId?: string;
 }
 
 export type Relaunch = (options?: RelaunchOptions) => Promise<KiraApp>;
@@ -58,7 +65,7 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
 
     const launch = async (options?: RelaunchOptions): Promise<KiraApp> => {
       if (current) await current.close();
-      const page = await browser.newPage();
+      const page = await browser.newPage({ timezoneId: options?.timezoneId });
       page.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(msg.text());
       });

@@ -59,7 +59,7 @@
     return socket;
   }
 
-  function encodeChunk(values) {
+  function encodeChunk(values, truncatedRows) {
     var i, j;
     var encoder = new TextEncoder();
     var encoded = values.map((v) => (v === null ? new Uint8Array(0) : encoder.encode(v)));
@@ -75,7 +75,14 @@
       offsets[j + 1] = cursor;
       if (values[j] === null) nulls[j >> 3] |= 1 << (j & 7);
     }
-    return { data: data, offsets: offsets, nulls: nulls, truncated: new Uint32Array(0) };
+    // page.ts's `isTruncated` binary-searches this array, so it must be sorted — every caller so
+    // far passes it already sorted (LogicalTabularPage.truncatedRows's own doc comment).
+    return {
+      data: data,
+      offsets: offsets,
+      nulls: nulls,
+      truncated: new Uint32Array(truncatedRows || []),
+    };
   }
 
   function buildPage(logical) {
@@ -86,7 +93,12 @@
         columns: logical.columns,
         rowCount: logical.rows.length,
         truncatedCells: logical.truncatedCells,
-        chunks: logical.columns.map((_col, c) => encodeChunk(logical.rows.map((r) => r[c]))),
+        chunks: logical.columns.map((_col, c) =>
+          encodeChunk(
+            logical.rows.map((r) => r[c]),
+            logical.truncatedRows?.[c],
+          ),
+        ),
       });
     }
     if (logical.kind === 'document') {
