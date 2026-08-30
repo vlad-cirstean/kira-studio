@@ -1741,11 +1741,24 @@ porting at this fidelity versus consolidating overlapping coverage.
   Fixed by memoizing it into a `computed` `Map`, restoring the file's own "sub-row scroll mutates
   nothing" invariant (D4) to actually holding, not merely appearing to because the original test's
   own scroll-position constant happened to sit at this mock's fixture-imposed scroll ceiling.
-- `playwright.config.ts`'s `e2e` project stays alongside `ui` until every portable spec has ported
-  and every dropped one is accounted for — then it (and `tests/e2e/` itself, minus the three
-  full-stack anchors) goes away, per §4.9/D16.
+- **M5 is now fully done.** With `budgets`/`perf`/`leaks` merged and every other spec already ported
+  (above), all 23 original `tests/e2e/` specs had a settled disposition, so `tests/e2e/` itself and
+  the `e2e` project entry in `playwright.config.ts` are deleted, per §4.9/D16. One real load-bearing
+  (non-test) dependency turned up first and was fixed rather than broken by the deletion:
+  `scripts/capture-postgres-tree.ts`'s `seedScrollGrid` step imported `seedScrollFixture` from
+  `tests/e2e/support/pg.ts` — moved verbatim to `tests/db/support/postgres.ts` (with a comment
+  explaining the relocation) and the script's import updated to match. Deleting `tests/e2e/` also
+  took its `global.d.ts` ambient `Window` augmentation with it; `tests/ui/leaks.spec.ts` and
+  `perf.spec.ts` read `window.__kiraGridRetainedBytes`/`__kiraRetainedBytes`/`__kiraTreeConnectionIds`
+  straight off `window` (not through a local cast, unlike `budgets.spec.ts`'s own `__kiraKeyProbe`),
+  so a new `tests/ui/global.d.ts` re-declares just those three hooks for `tsconfig.node.json`'s
+  program (a separate TS project from `src/renderer`'s own `tsconfig.web.json`, so the app's
+  identically-named `declare global` in `main.ts` doesn't cover `tests/ui/` at all). `bun run
+  typecheck`, `bunx biome check`, `go build`/`vet`/`test`, and the full `ui` project (36/36) are all
+  green after the deletion. `tsconfig.node.json` no longer includes `tests/e2e/**/*.ts`.
 - `tests/unit/security.spec.ts` is already deleted (done above); double-check no other §5.3 item was
   missed.
 - M6 (delete `src/main`, `src/preload`, `src/engine/index.ts`), M7 (Electron out of the build), M8
-  (documentation) are entirely unstarted, and M5 must finish first (§9's second hard rule: "M5
-  before M6 … a green suite means the new mocks work, not that the old tests are gone").
+  (documentation) are up next, now that M5 (all of it, including the `tests/e2e/` deletion itself)
+  is finished (§9's second hard rule: "M5 before M6 … a green suite means the new mocks work, not
+  that the old tests are gone" — now satisfied).

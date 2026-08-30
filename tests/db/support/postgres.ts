@@ -97,3 +97,40 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
     },
   };
 }
+
+const SCROLL_GRID_COLUMNS = 60;
+const SCROLL_GRID_ROWS = 5_000;
+
+// P29 D14: neither the standard seed's `big_rows` (many rows, few columns) nor `wide_table` (few
+// rows, many columns) can show the scroll-render gap — this creates the wide-AND-tall shape P29's
+// own F5/F8 need, against whichever container `startPostgres()` handed back (never
+// `tests/db/fixtures/0001_seed.sql`, which every other suite's row counts/ordering already depend
+// on staying unchanged). Moved here from `tests/e2e/support/pg.ts` (P57 M5: `tests/e2e/` retired)
+// — `scripts/capture-postgres-tree.ts`'s own `seedScrollGrid` step kind still needs it to
+// reproduce `tests/ui/budgets.spec.ts`/`perf.spec.ts`'s real `app.scroll_grid` captures.
+/** `app.scroll_grid`: 60 text columns x 5 000 rows, one integer primary key, no foreign keys. */
+export async function seedScrollFixture(uri: string): Promise<void> {
+  const client = new Client({ connectionString: uri });
+  await client.connect();
+  try {
+    const columns = Array.from({ length: SCROLL_GRID_COLUMNS }, (_, i) => `col${i + 1}`);
+    const createCols = columns.map((c) => `${c} text NOT NULL`).join(',\n        ');
+    await client.query(`
+      CREATE TABLE app.scroll_grid (
+        id integer PRIMARY KEY,
+        ${createCols}
+      );
+    `);
+    const selectCols = columns
+      .map((c, i) => `'row ' || i || ' col ${i + 1}' AS ${c}`)
+      .join(',\n        ');
+    await client.query(`
+      INSERT INTO app.scroll_grid
+      SELECT i AS id, ${selectCols}
+      FROM generate_series(1, ${SCROLL_GRID_ROWS}) i;
+    `);
+    await client.query('ANALYZE app.scroll_grid');
+  } finally {
+    await client.end();
+  }
+}

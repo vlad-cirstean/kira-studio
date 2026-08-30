@@ -468,9 +468,6 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
 }) => {
   test.setTimeout(120_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  page.on('console', (m) => {
-    if (m.text().startsWith('SUBROW_DEBUG')) console.log(m.text());
-  });
 
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
@@ -667,20 +664,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await page.waitForTimeout(500);
   const subRowMutations = await scrollGrid.evaluate(async (el) => {
     let count = 0;
-    const debug: string[] = [];
     const observer = new MutationObserver((records) => {
       count += records.length;
-      for (const r of records) {
-        debug.push(
-          `${r.type} ${(r.target as HTMLElement).getAttribute?.('data-testid') ?? (r.target as HTMLElement).tagName} attr=${r.attributeName} added=${r.addedNodes.length} removed=${r.removedNodes.length}`,
-        );
-      }
     });
     observer.observe(el, { childList: true, subtree: true, attributes: true });
     el.scrollTop += 4; // well under a 28px row
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     observer.disconnect();
-    console.log('SUBROW_DEBUG', JSON.stringify(debug.slice(0, 20)));
     return count;
   });
   expect(subRowMutations).toBe(0);

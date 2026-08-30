@@ -29,7 +29,7 @@
 //   {"kind":"execute","path":"...","statements":["SELECT ...", ...]}   -> {pages} or {error}
 //   {"kind":"seedScrollGrid"}                                          -> {seeded: true}
 //     Creates and populates `app.scroll_grid` (60 text columns x 5000 rows) via
-//     tests/e2e/support/pg.ts's own seedScrollFixture, against this run's container — the same
+//     tests/db/support/postgres.ts's own seedScrollFixture, against this run's container — the same
 //     synthetic, wide-AND-tall shape P29 D14 introduced (not part of tests/db/fixtures/0001_seed.sql,
 //     since every other suite's row counts/ordering already depend on that seed being unchanged).
 //     Must run before any `read`/`count`/`describe`/`children` step targeting `app.scroll_grid`.
@@ -50,8 +50,7 @@
 
 import { DATA_OP } from '../src/shared/protocol/data-ops';
 import { ENGINE_OP } from '../src/shared/protocol/engine-ops';
-import { startPostgres } from '../tests/db/support/postgres';
-import { seedScrollFixture } from '../tests/e2e/support/pg';
+import { seedScrollFixture, startPostgres } from '../tests/db/support/postgres';
 import { decodePage } from '../tests/ipc/support/decode';
 import { openHarness } from '../tests/ipc/support/harness';
 
