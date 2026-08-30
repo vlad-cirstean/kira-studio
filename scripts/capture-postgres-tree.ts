@@ -17,6 +17,7 @@
 //   {"kind":"mutate","path":"...","ops":[MutationRowOp, ...]}           -> {affectedRows} or {error}
 //     MutationRowOp: {"kind":"update","key":{...},"changes":{...}} | {"kind":"insert","values":{...}}
 //                  | {"kind":"delete","key":{...}}
+//   {"kind":"execute","path":"...","statements":["SELECT ...", ...]}   -> {pages} or {error}
 // `mutate` steps run in recipe order against the *same* container — a delete/update/insert
 // genuinely changes the data, so a recipe capturing a mutation sequence must list steps in the
 // same order the ported spec will replay them, exactly like a real session would issue them.
@@ -38,7 +39,15 @@ import { decodePage } from '../tests/ipc/support/decode';
 import { openHarness } from '../tests/ipc/support/harness';
 
 interface Step {
-  kind: 'children' | 'describe' | 'definition' | 'read' | 'count' | 'preview' | 'mutate';
+  kind:
+    | 'children'
+    | 'describe'
+    | 'definition'
+    | 'read'
+    | 'count'
+    | 'preview'
+    | 'mutate'
+    | 'execute';
   path: string;
   tabId?: string | null;
   pageSize?: number;
@@ -48,6 +57,7 @@ interface Step {
   cursor?: unknown;
   ops?: unknown[];
   refresh?: boolean;
+  statements?: string[];
 }
 
 async function main(): Promise<void> {
@@ -104,6 +114,28 @@ async function main(): Promise<void> {
         case 'preview': {
           const payload = { connectionId: pg.config.id, path: step.path, ops: step.ops ?? [] };
           result = { payload, ...(await harness.dataOp(DATA_OP.preview, payload)) };
+          break;
+        }
+        case 'execute': {
+          const payload = {
+            opId: `capture-execute-${i}`,
+            tabId: step.tabId ?? null,
+            connectionId: pg.config.id,
+            path: step.path,
+            statements: step.statements ?? [],
+          };
+          try {
+            const raw = await harness.dataOp<{ pages: unknown[] }>(DATA_OP.execute, payload);
+            result = {
+              payload,
+              pages: raw.pages.map((p) => decodePage(p as Parameters<typeof decodePage>[0])),
+            };
+          } catch (err) {
+            result = {
+              payload,
+              error: { message: (err as Error).message, code: (err as { code?: string }).code },
+            };
+          }
           break;
         }
         case 'mutate': {
