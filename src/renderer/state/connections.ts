@@ -129,6 +129,18 @@ export function closeDialog(): void {
   connectionsState.dialog.draft = null;
 }
 
+// P57 finding: `onConnectionsChanged`'s own full-replace (above) and this function's optimistic
+// append are independently scheduled — the Wails server-mode transport (tests/e2e-real/) delivers
+// the event on an independent WebSocket ahead of the bound call's own HTTP response often enough
+// to expose it, and nothing in the desktop transport actually guarantees the opposite order
+// either. Pushing a record the event's replace already added duplicates the row; upserting instead
+// of pushing makes either arrival order produce the same one-record result.
+function upsertRecord(record: ConnectionSummary): void {
+  const idx = connectionsState.records.findIndex((r) => r.id === record.id);
+  if (idx >= 0) connectionsState.records[idx] = record;
+  else connectionsState.records.push(record);
+}
+
 // D7: throws on a failed create/update rather than swallowing it into a returned null — the
 // dialog's own onSave() is the single place that decides what a failed save looks like, and it
 // only sees a rejection if this function never catches one.
@@ -139,12 +151,11 @@ export async function saveDialog(): Promise<ConnectionSummary | null> {
   let saved: ConnectionSummary;
   if (mode === 'create') {
     saved = await control.connectionsCreate(draft);
-    connectionsState.records.push(saved);
+    upsertRecord(saved);
   } else {
     if (!editingId) return null;
     saved = await control.connectionsUpdate(editingId, draft);
-    const idx = connectionsState.records.findIndex((r) => r.id === editingId);
-    if (idx >= 0) connectionsState.records[idx] = saved;
+    upsertRecord(saved);
   }
   closeDialog();
   return saved;
@@ -152,7 +163,7 @@ export async function saveDialog(): Promise<ConnectionSummary | null> {
 
 export async function duplicateConnection(id: string): Promise<ConnectionSummary> {
   const created = await control.connectionsDuplicate(id);
-  connectionsState.records.push(created);
+  upsertRecord(created);
   return created;
 }
 
