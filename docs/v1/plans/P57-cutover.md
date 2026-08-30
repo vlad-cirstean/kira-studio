@@ -1657,6 +1657,33 @@ porting at this fidelity versus consolidating overlapping coverage.
     handled bound-call error is a genuine HTTP 422 under Wails, which Chromium/WebKit's devtools log
     as console noise regardless of whether the app's own JS handles it — a `consoleErrors` assertion
     ported from `tests/e2e/` needs adjusting for that one expected line, not asserting zero.
+  - **`preconnect`, `tabs`, `mutations`, `definition`, `console` — also done**, each against real
+    Postgres captures shared via `tests/ui/support/postgresFixture.ts`
+    (`scripts/capture-postgres-tree.ts`, extended with `preview`/`mutate`/`execute` step kinds as
+    each port needed them). `preconnect.spec.ts` kept only its dialog-field/failure-before-connect
+    scenario (the sidecar-lifecycle half is process-management, not renderer UI).
+    `mutations.spec.ts` ported whole against `app.composite_pk`, including the real "duplicate key"
+    error text. `definition.spec.ts` kept 2 of its original scenarios (session restore dropped; the
+    MariaDB scenario was already explicitly skipped upstream) and confirmed the op-count
+    (`window.kira.opsRecent`) checks were redundant with the `data-source` attribute every relevant
+    scenario already asserts directly. `console.spec.ts` dropped only session restore and the
+    native-Electron-menu half of its undo/redo scenario (CodeMirror's own keyboard-driven
+    history()/historyKeymap is fully portable and covers the same feature). Remaining: `tooltips`,
+    `autocomplete`, `cell-editor`, `data-view`, `interaction`, `tree`.
+  - **The real-backend tier the D16 amendment above promised has landed.** `tests/e2e-real/`
+    (harness in `fixtures.ts`, selective interception in `support/passthrough.ts`) now has both
+    specs it named: `sqlite-real.spec.ts` (E1, Docker-free) and `postgres-real.spec.ts` (E2, a real
+    container) — both pass reliably against the real Go bridge, the real embedded engine and a real
+    adapter, over a `-tags server` binary with no native window. Both specs independently hit the
+    §5 non-idempotent optimistic-create finding live and work around it with a `page.reload()`
+    rather than fixing it in the app (already fixed separately, see `upsertRecord()` in
+    `src/renderer/state/connections.ts`, committed before the harness existed) — kept as the
+    doc-recommended workaround rather than re-plumbed once the fix landed, since both specs assert
+    real backend state after the reload, not the UI row count the race affects. E2 must run under
+    plain Node (`node node_modules/@playwright/test/cli.js test --project=e2e-real`), never `bunx
+    playwright test` — the same Postgres-Testcontainers-hangs-under-Bun finding `AGENTS.md` already
+    documents. `s3-download-real.spec.ts` (E3) remains conditional per the amendment, pending
+    tests/db/ coverage decisions (task #11).
 - `playwright.config.ts`'s `e2e` project stays alongside `ui` until every portable spec has ported
   and every dropped one is accounted for — then it (and `tests/e2e/` itself, minus the three
   full-stack anchors) goes away, per §4.9/D16.
