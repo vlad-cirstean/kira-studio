@@ -7,6 +7,7 @@ import {
   type TreeNode,
 } from '@shared/domain/tree';
 import { abbreviateCount } from '@shared/format';
+import { AdapterError } from '../errors';
 import type { SqliteParam } from './query';
 
 // Every function takes an `exec` rather than a handle directly, so every catalog query is routed
@@ -75,9 +76,26 @@ interface Stat1Row {
 // its first token is the table's row count too). Taking the max across every stat1 row for a table
 // is correct either way: a bare table row is exact, a full index's row is exact, and a partial
 // index's row can only ever be an undercount, never an overcount.
+//
+// A never-ANALYZEd database — every real user's database, until something runs ANALYZE — has no
+// sqlite_stat1 *table* at all, not merely an empty one, and this query (a fixed literal, no
+// params, so the only way it can fail) throws E_QUERY for it. That is a real, not hypothetical,
+// hole: it takes tree enumeration itself down (P57 e2e-revisit §7 item 1). Absent estimates is
+// exactly what the empty-map/null return already means for every table stat1 has no row for, so
+// the missing-table case is handled the same way, not treated as an error.
+function statsQueryFailed(err: unknown): boolean {
+  return err instanceof AdapterError && err.code === 'E_QUERY';
+}
+
 function loadRowEstimates(exec: QueryExecutor): Map<string, number> {
-  const rows = exec<Stat1Row>('SELECT tbl, stat FROM sqlite_stat1', []);
   const byTable = new Map<string, number>();
+  let rows: Stat1Row[];
+  try {
+    rows = exec<Stat1Row>('SELECT tbl, stat FROM sqlite_stat1', []);
+  } catch (err) {
+    if (statsQueryFailed(err)) return byTable;
+    throw err;
+  }
   for (const row of rows) {
     const n = Number.parseInt(row.stat.split(' ')[0] ?? '', 10);
     if (!Number.isFinite(n)) continue;
@@ -90,7 +108,13 @@ function loadRowEstimates(exec: QueryExecutor): Map<string, number> {
 // describe()'s single-table counterpart to loadRowEstimates' bulk fetch — same max-across-stat1-
 // rows logic (F20), scoped to one table rather than every table in the schema.
 export function getRowEstimateFor(exec: QueryExecutor, table: string): number | null {
-  const rows = exec<Stat1Row>('SELECT tbl, stat FROM sqlite_stat1 WHERE tbl = ?', [table]);
+  let rows: Stat1Row[];
+  try {
+    rows = exec<Stat1Row>('SELECT tbl, stat FROM sqlite_stat1 WHERE tbl = ?', [table]);
+  } catch (err) {
+    if (statsQueryFailed(err)) return null;
+    throw err;
+  }
   const counts = rows
     .map((r) => Number.parseInt(r.stat.split(' ')[0] ?? '', 10))
     .filter((n) => Number.isFinite(n));
