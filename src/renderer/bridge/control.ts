@@ -1,8 +1,22 @@
+import * as AppService from '@bindings/appservice.js';
+import * as ConnectionsService from '@bindings/connectionsservice.js';
+import * as EngineService from '@bindings/engineservice.js';
+import * as FilesService from '@bindings/filesservice.js';
+import * as FiltersService from '@bindings/filtersservice.js';
+import * as LayoutService from '@bindings/layoutservice.js';
+import * as LifecycleService from '@bindings/lifecycleservice.js';
+import type * as WailsModels from '@bindings/models.js';
+import * as OpsService from '@bindings/opsservice.js';
+import * as QueriesService from '@bindings/queriesservice.js';
+import * as SettingsService from '@bindings/settingsservice.js';
+import * as TabsService from '@bindings/tabsservice.js';
+import * as TreeService from '@bindings/treeservice.js';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
+import type { ObjectDefinition } from '@shared/domain/definition';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
@@ -17,150 +31,262 @@ import type {
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
+import type { ObjectMeta, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import type {
-  AppInfo,
-  AppMetricsSample,
-  ConnectionTestResult,
-  EngineStatus,
-  FilesChooseOpenArgs,
-  FilesChooseOpenResult,
-  FilesChooseSaveResult,
-  TreeChildrenResult,
-  TreeDefinitionResult,
-  TreeDescribeResult,
-} from '@shared/protocol/ipc';
+import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
+// See bridge/port.ts's identical import for why this needs the directive below rather than the
+// require-an-error kind (P57 M1/M2 finding: a tsconfig "paths" entry for this exact specifier
+// breaks Bun's mock.module interception).
+// biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
+// @ts-ignore
+import { Events } from '/wails/runtime.js';
 
-const kira = window.kira;
+// P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
+// ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object
+// (shell/internal/bridge's ipcerr package + Wails' bindings.go/transport_http.go). Unwrapped once,
+// here, so every consumer keeps reading `err.message` for display and `err.code` for branching.
+export function unwrap<T>(p: Promise<T>): Promise<T> {
+  return p.catch((err: unknown) => {
+    const e = err as { message?: string; cause?: unknown };
+    const cause = e.cause as { code?: unknown; message?: unknown } | undefined;
+    let code = 'E_INTERNAL';
+    let message = e.message ?? String(err);
+    if (cause && typeof cause === 'object' && typeof cause.code === 'string') {
+      code = cause.code;
+      message = typeof cause.message === 'string' ? cause.message : message;
+    } else {
+      // Belt and braces: a Wails change that stops populating `cause` still leaves the same JSON
+      // in `.message`, because ipcerr.Error.Error() is what CallError.Message is built from.
+      try {
+        const parsed = JSON.parse(message) as { code?: unknown; message?: unknown };
+        if (typeof parsed.code === 'string') {
+          code = parsed.code;
+          if (typeof parsed.message === 'string') message = parsed.message;
+        }
+      } catch {
+        // not our JSON — E_INTERNAL with the raw text is the right answer
+      }
+    }
+    const out: Error & { code?: string } = new Error(message);
+    out.code = code;
+    throw out;
+  });
+}
 
-// UI state is built from Vue `reactive()` objects, whose Proxy wrappers Electron's
-// contextBridge cannot structured-clone across the isolated world ("An object could not be
-// cloned"). Every payload built from renderer state is round-tripped through JSON here before
-// crossing into `window.kira` — the one place this is needed, rather than every call site.
-function plain<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+function on<T>(name: string, cb: (payload: T) => void): () => void {
+  return Events.On(name, (ev: { data: T }) => cb(ev.data));
+}
+
+// The generated bindings type array-returning methods as `T[] | null` (a Go nil slice marshals to
+// `null`), even though every backing repo/service in this codebase builds an explicit `[]T{}` or
+// `make([]T, 0, ...)` and never actually returns nil for these. Every `r ?? []` below keeps
+// control.ts's own return types exactly as they were pre-P57 (plain arrays, never null) rather
+// than pushing that generator conservatism onto every caller.
+//
+// The generated bindings also type every Go enum-like field (ConnectionSummary.kind,
+// ConnectionState.status, SecretStorageStatus.backend, TreeVisibility's hiddenKinds, SavedQuery's
+// kind/body, OpRecord.kind, TabRecord.kind, TreeNode.kind, ObjectMeta/ObjectDefinition.kind…) as
+// plain `string`, since Go's own enum-like types don't carry a literal-union guarantee across the
+// wire the way a Zod schema does. The Go value is always one of the valid members — the same
+// trust boundary window.kira's Electron IPC handlers implicitly had — so `trust` is a deliberate,
+// documented widen-then-narrow, not a silent bypass of a real check.
+function trust<T>(v: unknown): T {
+  return v as T;
 }
 
 export const control = {
-  appInfo: (): Promise<AppInfo> => kira.appInfo(),
-  settingsGetAll: (): Promise<Settings> => kira.settingsGetAll(),
-  settingsSet: (patch: SettingsPatch): Promise<Settings> => kira.settingsSet(plain(patch)),
-  onSettingsChanged: (cb: (settings: Settings) => void): (() => void) => kira.onSettingsChanged(cb),
-  layoutGetAll: (): Promise<Layout> => kira.layoutGetAll(),
-  layoutSet: (patch: LayoutPatch): Promise<Layout> => kira.layoutSet(plain(patch)),
-  engineStatus: (): Promise<EngineStatus> => kira.engineStatus(),
-  onEngineState: (cb: (status: EngineStatus) => void): (() => void) => kira.onEngineState(cb),
-  onOpenSettings: (cb: () => void): (() => void) => kira.onOpenSettings(cb),
-  onNewConnection: (cb: () => void): (() => void) => kira.onNewConnection(cb),
-  onToggleProjectPanel: (cb: () => void): (() => void) => kira.onToggleProjectPanel(cb),
-  onToggleOperationsPanel: (cb: () => void): (() => void) => kira.onToggleOperationsPanel(cb),
-  onCommandPalette: (cb: () => void): (() => void) => kira.onCommandPalette(cb),
-  onTabNext: (cb: () => void): (() => void) => kira.onTabNext(cb),
-  onTabPrev: (cb: () => void): (() => void) => kira.onTabPrev(cb),
-  onTabClose: (cb: () => void): (() => void) => kira.onTabClose(cb),
-  onViewFind: (cb: () => void): (() => void) => kira.onViewFind(cb),
-  onViewRefresh: (cb: () => void): (() => void) => kira.onViewRefresh(cb),
-  onViewRun: (cb: () => void): (() => void) => kira.onViewRun(cb),
-  onViewRunAll: (cb: () => void): (() => void) => kira.onViewRunAll(cb),
-  onFlushBeforeClose: (cb: () => void): (() => void) => kira.onFlushBeforeClose(cb),
-  appFlushed: (): void => kira.appFlushed(),
+  appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
+  settingsGetAll: (): Promise<Settings> =>
+    unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
+  settingsSet: (patch: SettingsPatch): Promise<Settings> =>
+    unwrap(SettingsService.Set({ patch })).then((r) => trust<Settings>(r)),
+  onSettingsChanged: (cb: (settings: Settings) => void): (() => void) =>
+    on(CHANNEL.settingsChanged, cb),
+  layoutGetAll: (): Promise<Layout> => unwrap(LayoutService.GetAll()).then((r) => trust<Layout>(r)),
+  layoutSet: (patch: LayoutPatch): Promise<Layout> =>
+    unwrap(LayoutService.Set({ patch })).then((r) => trust<Layout>(r)),
+  engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
+  onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
+  onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),
+  onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
+  onToggleOperationsPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleOperationsPanel, cb),
+  onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
+  onTabNext: (cb: () => void): (() => void) => on(CHANNEL.tabNext, cb),
+  onTabPrev: (cb: () => void): (() => void) => on(CHANNEL.tabPrev, cb),
+  onTabClose: (cb: () => void): (() => void) => on(CHANNEL.tabClose, cb),
+  onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
+  onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
+  onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),
+  onViewRunAll: (cb: () => void): (() => void) => on(CHANNEL.viewRunAll, cb),
+  // Quit handshake: main holds `before-quit` until every window acks this, so a debounced save
+  // still pending when the user quits is never silently lost.
+  onFlushBeforeClose: (cb: () => void): (() => void) => on(CHANNEL.appFlushBeforeClose, cb),
+  appFlushed: (): void => {
+    void LifecycleService.Flushed();
+  },
 
-  filesChooseSave: (defaultName: string): Promise<FilesChooseSaveResult> =>
-    kira.filesChooseSave({ defaultName }),
-  filesChooseOpen: (args?: FilesChooseOpenArgs): Promise<FilesChooseOpenResult> =>
-    kira.filesChooseOpen(args),
+  filesChooseSave: (defaultName: string): Promise<WailsModels.FilesChooseSaveResult> =>
+    unwrap(FilesService.ChooseSave({ defaultName })),
+  filesChooseOpen: (
+    args?: WailsModels.FilesChooseOpenArgs,
+  ): Promise<WailsModels.FilesChooseOpenResult> => unwrap(FilesService.ChooseOpen(args ?? {})),
 
-  connectionsList: (): Promise<ConnectionSummary[]> => kira.connectionsList(),
+  connectionsList: (): Promise<ConnectionSummary[]> =>
+    unwrap(ConnectionsService.List()).then((r) => trust<ConnectionSummary[]>(r ?? [])),
   connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>
-    kira.connectionsCreate(plain(input)),
+    unwrap(ConnectionsService.Create(input)).then((r) => trust<ConnectionSummary>(r)),
   connectionsUpdate: (id: string, input: ConnectionInput): Promise<ConnectionSummary> =>
-    kira.connectionsUpdate(plain({ id, input })),
+    unwrap(ConnectionsService.Update({ id, input })).then((r) => trust<ConnectionSummary>(r)),
   connectionsDuplicate: (id: string): Promise<ConnectionSummary> =>
-    kira.connectionsDuplicate({ id }),
-  connectionsDelete: (id: string): Promise<void> => kira.connectionsDelete({ id }),
+    unwrap(ConnectionsService.Duplicate({ id })).then((r) => trust<ConnectionSummary>(r)),
+  // Go-side name is Remove, not Delete (P57 §1.9) — read the .go file, do not assume lowerCamel.
+  connectionsDelete: (id: string): Promise<void> => unwrap(ConnectionsService.Remove({ id })),
   connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
-    kira.connectionsReorder(plain({ ids })),
+    unwrap(ConnectionsService.Reorder({ ids })).then((r) => trust<ConnectionSummary[]>(r ?? [])),
   connectionsReveal: (id: string): Promise<{ password: string | null; error: string | null }> =>
-    kira.connectionsReveal({ id }),
-  connectionsTest: (input: ConnectionInput): Promise<ConnectionTestResult> =>
-    kira.connectionsTest(plain({ input })),
-  connectionsConnect: (id: string): Promise<ConnectionState> => kira.connectionsConnect({ id }),
+    unwrap(ConnectionsService.Reveal({ id })),
+  // The generated TestResult's serverVersion/error are `string | null | undefined`; the pre-P57
+  // shape was `string | undefined` only (no null) — normalized here rather than pushed onto
+  // ConnectionDialog.vue, which assigns straight into its own `?: string` reactive state.
+  connectionsTest: (
+    input: ConnectionInput,
+  ): Promise<{
+    ok: boolean;
+    serverVersion?: string;
+    error?: string;
+  }> =>
+    unwrap<Awaited<ReturnType<typeof ConnectionsService.Test>>>(
+      ConnectionsService.Test(input),
+    ).then((r) => ({
+      ok: r.ok,
+      serverVersion: r.serverVersion ?? undefined,
+      error: r.error ?? undefined,
+    })),
+  connectionsConnect: (id: string): Promise<ConnectionState> =>
+    unwrap(ConnectionsService.Connect({ id })).then((r) => trust<ConnectionState>(r)),
   connectionsDisconnect: (id: string): Promise<ConnectionState> =>
-    kira.connectionsDisconnect({ id }),
-  connectionsStates: (): Promise<ConnectionState[]> => kira.connectionsStates(),
-  connectionsSecretsStatus: (): Promise<SecretStorageStatus> => kira.connectionsSecretsStatus(),
+    unwrap(ConnectionsService.Disconnect({ id })).then((r) => trust<ConnectionState>(r)),
+  connectionsStates: (): Promise<ConnectionState[]> =>
+    unwrap(ConnectionsService.States()).then((r) => trust<ConnectionState[]>(r ?? [])),
+  connectionsSecretsStatus: (): Promise<SecretStorageStatus> =>
+    unwrap(ConnectionsService.SecretsStatus()).then((r) => trust<SecretStorageStatus>(r)),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
-    kira.onConnectionState(cb),
+    on(CHANNEL.connectionState, cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>
-    kira.onConnectionMetadataInvalidated(cb),
+    on(CHANNEL.connectionMetadataInvalidated, cb),
   onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void): (() => void) =>
-    kira.onConnectionsChanged(cb),
+    on(CHANNEL.connectionsChanged, cb),
 
   treeChildren: (
     connectionId: string,
     path: string,
     refresh?: boolean,
-  ): Promise<TreeChildrenResult> => kira.treeChildren({ connectionId, path, refresh }),
+  ): Promise<{ nodes: TreeNode[]; source: 'cache' | 'server'; truncated: boolean }> =>
+    unwrap<Awaited<ReturnType<typeof TreeService.Children>>>(
+      TreeService.Children({ connectionId, path, refresh: refresh ?? false }),
+    ).then((r) =>
+      trust<{ nodes: TreeNode[]; source: 'cache' | 'server'; truncated: boolean }>({
+        ...r,
+        nodes: r.nodes ?? [],
+      }),
+    ),
   treeDescribe: (
     connectionId: string,
     path: string,
     refresh?: boolean,
     tabId?: string,
-  ): Promise<TreeDescribeResult> => kira.treeDescribe({ connectionId, path, refresh, tabId }),
+  ): Promise<{ meta: ObjectMeta; source: 'cache' | 'server' }> =>
+    unwrap(
+      TreeService.Describe({
+        connectionId,
+        path,
+        refresh: refresh ?? false,
+        tabId: tabId ?? null,
+      }),
+    ).then((r) => trust<{ meta: ObjectMeta; source: 'cache' | 'server' }>(r)),
   treeDefinition: (
     connectionId: string,
     path: string,
     refresh?: boolean,
     tabId?: string,
-  ): Promise<TreeDefinitionResult> => kira.treeDefinition({ connectionId, path, refresh, tabId }),
+  ): Promise<{ definition: ObjectDefinition; source: 'cache' | 'server' }> =>
+    unwrap(
+      TreeService.Definition({
+        connectionId,
+        path,
+        refresh: refresh ?? false,
+        tabId: tabId ?? null,
+      }),
+    ).then((r) => trust<{ definition: ObjectDefinition; source: 'cache' | 'server' }>(r)),
   treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
-    kira.treeInvalidate({ connectionId, path }),
+    unwrap(TreeService.Invalidate({ connectionId, path: path ?? null })),
 
   filtersList: (connectionId: string): Promise<TreeVisibility> =>
-    kira.filtersList({ connectionId }),
+    unwrap(FiltersService.List({ connectionId })).then((r) => trust<TreeVisibility>(r)),
   filtersReplace: (connectionId: string, visibility: TreeVisibility): Promise<TreeVisibility> =>
-    kira.filtersReplace(plain({ connectionId, visibility })),
+    unwrap(FiltersService.Replace({ connectionId, visibility })).then((r) =>
+      trust<TreeVisibility>(r),
+    ),
 
-  opsRecent: (limit: number): Promise<OpRecord[]> => kira.opsRecent({ limit }),
-  opsCancel: (opId: string): Promise<void> => kira.opsCancel({ opId }),
-  onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => kira.onOpUpdate(cb),
+  opsRecent: (limit: number): Promise<OpRecord[]> =>
+    unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),
+  opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
+  onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
 
-  onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) => kira.onAppMetrics(cb),
+  onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
+    on(CHANNEL.appMetrics, cb),
 
-  tabsList: (): Promise<TabRecord[]> => kira.tabsList(),
-  tabsSave: (tabs: TabRecord[]): Promise<void> => kira.tabsSave(plain({ tabs })),
+  tabsList: (): Promise<TabRecord[]> =>
+    unwrap(TabsService.List()).then((r) => trust<TabRecord[]>(r ?? [])),
+  tabsSave: (tabs: TabRecord[]): Promise<void> => unwrap(TabsService.Save({ tabs })),
 
+  // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
+  // `any` in the bindings) rather than the domain's real discriminated union — Go has no sum
+  // types, so the polymorphic body is opaque JSON on the wire and the discriminant is a plain
+  // string. `trust` narrows both at once, on the same "the server always writes a valid shape"
+  // assumption the Electron build made implicitly.
   queriesList: (connectionId: string, path: string): Promise<SavedFilterQuery[]> =>
-    kira.queriesList({ connectionId, path }),
+    unwrap(QueriesService.List({ connectionId, path })).then((r) =>
+      trust<SavedFilterQuery[]>(r ?? []),
+    ),
   queriesSave: (args: {
     connectionId: string;
     path: string;
     name: string;
     body: FilterBody;
     pinned: boolean;
-  }): Promise<SavedFilterQuery> => kira.queriesSave(plain(args)),
+  }): Promise<SavedFilterQuery> =>
+    unwrap(QueriesService.Save(args)).then((r) => trust<SavedFilterQuery>(r)),
   queriesListConsole: (connectionId: string, path: string): Promise<SavedConsoleQuery[]> =>
-    kira.queriesListConsole({ connectionId, path }),
+    unwrap(QueriesService.ListConsole({ connectionId, path })).then((r) =>
+      trust<SavedConsoleQuery[]>(r ?? []),
+    ),
   queriesSaveConsole: (args: {
     connectionId: string;
     path: string;
     name: string;
     body: ConsoleBody;
     pinned: boolean;
-  }): Promise<SavedConsoleQuery> => kira.queriesSaveConsole(plain(args)),
+  }): Promise<SavedConsoleQuery> =>
+    unwrap(QueriesService.SaveConsole(args)).then((r) => trust<SavedConsoleQuery>(r)),
   queriesUpdate: (id: string, patch: { name?: string; pinned?: boolean }): Promise<SavedQuery> =>
-    kira.queriesUpdate(plain({ id, ...patch })),
-  queriesDelete: (id: string): Promise<void> => kira.queriesDelete({ id }),
-  queriesTouch: (id: string): Promise<void> => kira.queriesTouch({ id }),
+    unwrap(
+      QueriesService.Update({ id, name: patch.name ?? null, pinned: patch.pinned ?? null }),
+    ).then((r) => trust<SavedQuery>(r)),
+  queriesDelete: (id: string): Promise<void> => unwrap(QueriesService.Delete({ id })),
+  queriesTouch: (id: string): Promise<void> => unwrap(QueriesService.Touch({ id })),
   queriesHistoryList: (
     connectionId: string,
     path: string,
     limit: number,
-  ): Promise<FilterHistoryEntry[]> => kira.queriesHistoryList({ connectionId, path, limit }),
+  ): Promise<FilterHistoryEntry[]> =>
+    unwrap(QueriesService.HistoryList({ connectionId, path, limit })).then((r) =>
+      trust<FilterHistoryEntry[]>(r ?? []),
+    ),
   queriesHistoryRecord: (
     connectionId: string,
     path: string,
     where: string | null,
     orderBy: SortSpec | null,
-  ): Promise<void> => kira.queriesHistoryRecord(plain({ connectionId, path, where, orderBy })),
+  ): Promise<void> => unwrap(QueriesService.HistoryRecord({ connectionId, path, where, orderBy })),
 };

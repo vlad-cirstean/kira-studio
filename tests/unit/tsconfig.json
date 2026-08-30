@@ -10,7 +10,13 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["bun-types"],
     "paths": {
-      "@shared/*": ["../../src/shared/*"]
+      "@shared/*": ["../../src/shared/*"],
+      "@bindings/*": [
+        "../../shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/*"
+      ],
+      "@bindings-internal/*": [
+        "../../shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/*"
+      ]
     }
   },
   "include": ["**/*.ts", "../../src/renderer/env.d.ts"]

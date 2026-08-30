@@ -22,15 +22,8 @@ import { onPortEvent, request } from './port';
 // escape hatch, never an abandoned-but-still-running server query.
 const NO_TIMEOUT = { timeoutMs: null as null };
 
-// Built from Vue `reactive()` tab state (projection, filter, sort, ...) — their Proxy wrappers
-// fail `MessagePort.postMessage`'s structured clone, so every request is round-tripped through
-// JSON here before crossing the port, mirroring control.ts's `plain()` for the contextBridge.
-function plain<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 async function readResponse(req: ReadRequestWire): Promise<ReadResponse> {
-  const response = (await request(DATA_OP.read, plain(req), NO_TIMEOUT)) as ReadResponse;
+  const response = (await request(DATA_OP.read, req, NO_TIMEOUT)) as ReadResponse;
   assertPageStructure(response.page);
   return response;
 }
@@ -38,7 +31,7 @@ async function readResponse(req: ReadRequestWire): Promise<ReadResponse> {
 export const data = {
   read: readResponse,
   count: (req: CountRequestWire): Promise<CountResponse> =>
-    request(DATA_OP.count, plain(req), NO_TIMEOUT) as Promise<CountResponse>,
+    request(DATA_OP.count, req, NO_TIMEOUT) as Promise<CountResponse>,
   invalidate: async (
     connectionId: string,
     path: string,
@@ -47,16 +40,16 @@ export const data = {
     await request(DATA_OP.invalidate, { connectionId, path, scope });
   },
   preview: (req: PreviewRequestWire): Promise<PreviewResponse> =>
-    request(DATA_OP.preview, plain(req), NO_TIMEOUT) as Promise<PreviewResponse>,
+    request(DATA_OP.preview, req, NO_TIMEOUT) as Promise<PreviewResponse>,
   mutate: (req: MutateRequestWire): Promise<MutateResponse> =>
-    request(DATA_OP.mutate, plain(req), NO_TIMEOUT) as Promise<MutateResponse>,
+    request(DATA_OP.mutate, req, NO_TIMEOUT) as Promise<MutateResponse>,
   execute: async (req: ExecuteRequestWire): Promise<ExecuteResponse> => {
-    const response = (await request(DATA_OP.execute, plain(req), NO_TIMEOUT)) as ExecuteResponse;
+    const response = (await request(DATA_OP.execute, req, NO_TIMEOUT)) as ExecuteResponse;
     for (const page of response.pages) assertPageStructure(page);
     return response;
   },
   objectDownload: (req: ObjectDownloadRequestWire): Promise<ObjectDownloadResponse> =>
-    request(DATA_OP.objectDownload, plain(req), NO_TIMEOUT) as Promise<ObjectDownloadResponse>,
+    request(DATA_OP.objectDownload, req, NO_TIMEOUT) as Promise<ObjectDownloadResponse>,
   clearCaches: async (): Promise<void> => {
     await request(DATA_OP.cacheClear);
   },

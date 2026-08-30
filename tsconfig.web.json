@@ -14,6 +14,9 @@
       "@bindings/*": [
         "./shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/*"
       ],
+      "@bindings-internal/*": [
+        "./shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/*"
+      ],
       "/wails/runtime.js": ["./node_modules/@wailsio/runtime/types/index.d.ts"]
     }
   },

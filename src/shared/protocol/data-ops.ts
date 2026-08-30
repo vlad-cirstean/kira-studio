@@ -4,9 +4,9 @@ import { localFilePathSchema } from '../domain/object-store';
 import { type SortSpec, sortSpecSchema } from '../domain/queries';
 import type { Page } from './page';
 
-// The bulk data channel group (D1): result pages travel renderer<->engine over the
-// MessagePort, never through main. Everything else P2 adds (tabs, saved filters, history,
-// settings) stays on ipcRenderer.invoke through main — see shared/protocol/ipc.ts.
+// The bulk data channel group (D1): result pages travel renderer<->engine over the dedicated
+// `engine` stream (bridge/port.ts), never through a bound call. Everything else P2 adds (tabs,
+// saved filters, history, settings) is a bound call instead — see bridge/control.ts.
 export const DATA_OP = {
   read: 'data:read',
   count: 'data:count',

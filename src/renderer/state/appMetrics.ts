@@ -1,4 +1,4 @@
-import type { AppMetricsSample } from '@shared/protocol/ipc';
+import type { AppMetricsSample } from '@shared/protocol/events';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 

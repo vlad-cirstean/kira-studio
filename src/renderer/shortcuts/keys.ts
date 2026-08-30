@@ -1,8 +1,8 @@
 import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/domain/shortcuts';
 
-// Menus build synchronously and AppInfo (shared/protocol/ipc.ts) is fetched async, so a UA sniff
-// beats plumbing a platform bridge through for one boolean that never changes for the process's
-// lifetime.
+// Menus build synchronously and AppInfo (bridge/control.ts's appInfo()) is fetched async, so a UA
+// sniff beats plumbing a platform bridge through for one boolean that never changes for the
+// process's lifetime.
 export const isMac = navigator.userAgent.includes('Mac');
 
 function resolveChord(id: ShortcutId): Chord {
