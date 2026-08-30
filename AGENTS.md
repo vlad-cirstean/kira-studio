@@ -136,54 +136,36 @@ team works, and how to run things in whichever box a session happens to be on.
   dynamic `import('../../../src/engine/control')`). Bundling also needs `tests/db/fixtures/`
   copied beside the bundle output the same way `run-ipc-backend.sh` already does for the backend
   tier (`tests/db/support/postgres.ts`'s seed-SQL read is `__dirname`-relative, which becomes the
-  bundle's own directory). `scripts/capture-postgres-tree.ts` is a new manual capture tool built on
-  this — real tree/data captures for porting the remaining `tests/e2e/*.spec.ts` files into
-  `tests/ui/` (P57 M5), following the same "capture, don't hand-write" discipline P50 D5 already
+  bundle's own directory). `scripts/capture-postgres-tree.ts` is a manual capture tool built on
+  this — real tree/data captures, originally for porting `tests/e2e/*.spec.ts` files into
+  `tests/ui/` (P57 M5, now complete — `tests/e2e/` is deleted), still used for any future
+  `tests/ui/` fixture that needs a real captured shape, following the same "capture, don't
+  hand-write" discipline P50 D5 already
   established for `tests/ipc/**/*.fixture.ts`.
 
-## Electron binary (for `tests/e2e/`)
-
-- **Claude Code's Linux web containers**: `bun install` does not fetch the Electron binary —
-  `node_modules/electron/install.js` downloads it via `@electron/get`, which fails in this
-  environment with `AssertionError: assert(!this.paused)` deep inside undici's HTTP/1 parser (a
-  proxy/streaming quirk with that specific downloader, not a blocked host — plain `curl -L` against
-  the same `github.com/electron/electron/releases/download/vX.Y.Z/electron-vX.Y.Z-linux-x64.zip`
-  URL succeeds). Fix by downloading with `curl` and installing manually:
-  ```
-  curl -sSL -o /tmp/electron.zip https://github.com/electron/electron/releases/download/v<version>/electron-v<version>-linux-x64.zip
-  mkdir -p node_modules/electron/dist && cd node_modules/electron/dist && unzip -q /tmp/electron.zip && cd -
-  chmod +x node_modules/electron/dist/electron node_modules/electron/dist/chrome-sandbox node_modules/electron/dist/chrome_crashpad_handler
-  printf 'electron' > node_modules/electron/path.txt   # no trailing newline — install.js compares it verbatim
-  ```
-  `<version>` is `node_modules/electron/package.json`'s own `"version"` field. Verify with
-  `node -e "console.log(require('electron'))"` — it should print the binary path with no
-  "Downloading Electron binary..." message. This unlocks real `xvfb-run -a bunx playwright test`
-  runs for every spec that doesn't need a `tests/db/`-style container (confirmed:
-  `smoke.spec.ts`, `startup.spec.ts`, `workbench.spec.ts`, `connections.spec.ts`,
-  `secrets.spec.ts` all pass) — most other specs still `test.skip()` cleanly via
-  `isDockerAvailable()` rather than fail, per the Docker note above.
-
-## `tests/ipc/` — building and testing in this environment (P50)
+## `tests/ipc/` — building and testing in this environment (P50, updated P57)
 
 See `docs/ARCHITECTURE.md`'s Testing section for what this tier is and why the fixture is
 generated rather than hand-written. This section is only about running it here.
 
-- **The backend half needs the Electron binary from the section above, but no `xvfb`** — it never
-  opens a window. `scripts/run-ipc-backend.sh` bundles each `tests/ipc/**/*.backend.spec.ts` (plus
-  the harness's own Docker-free self-test) with esbuild — `--bundle --platform=node --format=cjs
-  --loader:.sql=text --external:electron --external:@confluentinc/kafka-javascript --external:ssh2
-  --external:cpu-features` — then runs the bundle under `ELECTRON_RUN_AS_NODE=1 electron`, one
-  process per spec file, sequentially (each file's container helper is a module-scope memo assuming
-  one file per process). `node_modules/.bin` needs to be on `PATH` for the bare `electron` the
-  script invokes to resolve. `tests/db/support/*.ts`'s `.sql`-reading helpers resolve their seed
-  file relative to `__dirname`, which is `out/tests/ipc/` once bundled, not `tests/db/fixtures/` —
-  the script copies the fixtures directory beside the bundle output to fix this, rather than editing
-  `tests/db/` itself.
-- **The frontend half needs `xvfb`** (`bun run test:ipc:fe`, i.e. `electron-vite build && playwright
-  test --project=ipc-frontend`) for the same reason every other `tests/e2e/`-style Playwright run
-  does on a display-less Linux container: `xvfb-run -a bunx playwright test --project=ipc-frontend`.
-  It needs no Docker, no container and no native driver — confirmed here for mariadb, mysql, redis,
-  rabbitmq and sqs.
+- **Neither half needs `xvfb` any more** (P57 removed Electron outright — there is no
+  `_electron.launch()`-style native window anywhere left in the repo). The backend half
+  (`scripts/run-ipc-backend.sh`) never opened a window even under Electron; the frontend half
+  (`bun run test:ipc:fe`, i.e. `bun run build && playwright test --project=ipc-frontend`) drives
+  Playwright's own headless Chromium against a static file server, the same way `tests/ui/` does —
+  confirmed by running both tiers directly in this sandbox with no display server at all.
+- **The backend half needs the vendored Node runtime** (`scripts/vendor-node.sh` →
+  `shell/runtime/node/bin/node`), not Electron. `scripts/run-ipc-backend.sh` bundles each
+  `tests/ipc/**/*.backend.spec.ts` (plus the harness's own Docker-free self-test) with esbuild —
+  `--bundle --platform=node --format=cjs --loader:.sql=text
+  --external:@confluentinc/kafka-javascript --external:ssh2 --external:cpu-features` — then runs
+  the bundle under that vendored `node` directly, one process per spec file, sequentially (each
+  file's container helper is a module-scope memo assuming one file per process). This is required
+  rather than incidental: Bun cannot load some of the adapters this tier drives (sqlite needs
+  `node:sqlite`, kafka needs the native-ABI driver — Native Kafka driver section below).
+  `tests/db/support/*.ts`'s `.sql`-reading helpers resolve their seed file relative to `__dirname`,
+  which is `out/tests/ipc/` once bundled, not `tests/db/fixtures/` — the script copies the fixtures
+  directory beside the bundle output to fix this, rather than editing `tests/db/` itself.
 - **Regenerating a fixture** (`KIRA_IPC_FIXTURES=write sh scripts/run-ipc-backend.sh`) writes each
   backend spec's own `<adapter>.fixture.ts` via raw `JSON.stringify` (quoted keys, `capture.ts`'s
   `writeFixtureModule`) — run `bunx biome check --write tests/ipc/<adapter>/<adapter>.fixture.ts`
@@ -206,68 +188,54 @@ generated rather than hand-written. This section is only about running it here.
   coordinator host:port (a fresh Docker-assigned hostname and host-mapped port every run) is
   frozen the same way ClickHouse's `.inner_id.<uuid>` is.
 
-## Secrets / `KIRA_INSECURE_SECRETS` (for password-bearing `tests/e2e/` specs, P25)
+## Secrets / `KIRA_INSECURE_SECRETS` (P25, moved to Go in P52/P57)
 
-- Credentials are encrypted via Electron's `safeStorage`, which is Keychain-backed on macOS and
-  has **no real backing store on Linux** — a bare Linux dev/CI container has no `gnome-keyring` or
-  `kwallet` daemon (no systemd, see the Docker note above), so `safeStorage.isEncryptionAvailable()`
-  is `false` there by default.
+- Credentials are encrypted by `shell/internal/secrets` (`cipher.go`/`status.go`) directly against
+  the OS Keychain on macOS — no more Electron `safeStorage` in between. There is **no Linux
+  Keychain backend at all** (no `gnome-keyring`/`kwallet` probing), so a bare Linux dev/CI
+  container is unavailable by default, the same shape as before, just for a more direct reason.
 - **On Claude Code's Linux web containers and any other Linux dev machine**: set
-  `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev` or the Playwright harness) to
-  opt into a Linux-only development fallback (Chromium's `basic_text` obfuscation — a hardcoded
-  key, not real encryption). `tests/e2e/fixtures.ts` already sets this for every test by default,
-  so the normal `xvfb-run -a bun run test:e2e` loop needs no extra step; it only matters for a
-  manual `bun run dev` session or a one-off `electron out/main/index.js` launch outside the test
-  harness.
-- **On macOS**, this variable is ignored outright — `safeStorage` uses the real Keychain and
+  `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev`, the Wails/Go binary directly,
+  or `t.Setenv("KIRA_INSECURE_SECRETS", "1")` in a Go test) to opt into a Linux-only development
+  fallback — a hardcoded compile-time key (`insecureKeyMaterial`, `cipher.go`), the same honesty as
+  Chromium's old `basic_text` obfuscation: obfuscation, not real encryption, deliberately not a
+  file-backed keyring that would look more secure than it is (P52 §6.5). `tests/e2e-real/`'s own
+  fixture sets this for every real-backend test by default.
+- **On macOS**, this variable is ignored outright — the real Keychain is used and
   `KIRA_INSECURE_SECRETS` can never weaken it, even if accidentally left set in an environment.
-  `tests/e2e/secrets.spec.ts`'s scenario 1 is the guard that this stays true: it fails loudly
-  (never skips) if `available`/`backend` on `darwin` don't read `true`/`'keychain'`.
+  `tests/ui/secrets.spec.ts`'s "keychain available" scenario is the guard that this stays true.
 - Without the variable, Linux resolves to secret storage being **unavailable** — a password-bearing
-  save fails visibly (the dialog's `connection-save-error`) rather than silently falling back to
-  plaintext. This is deliberate (see `docs/v1/plans/P25-credential-keychain-encryption.md` D13),
-  not a bug to work around.
+  save fails visibly rather than silently falling back to plaintext. This is deliberate (originally
+  `docs/v1/plans/P25-credential-keychain-encryption.md` D13, unchanged by the Go port), not a bug
+  to work around.
+- **The envelope prefix changed to `kira:v2:`** (P52 §6.4) — the cipher itself genuinely changed
+  (AES-256-GCM under the app's own key, not Chromium `safeStorage`'s AES-128-CBC), so a `kira:v1:`
+  value from an old Electron-era install cannot and should not decrypt under the new code; there is
+  no migration path, by design (P52 §5.1's fresh-database rule for this cutover). The Keychain
+  *service name* itself, `"Kira Studio Safe Storage"`, deliberately did **not** change (P57 D12) —
+  changing it would orphan every existing user's stored key, since the OS looks the item up by
+  service name, not by app bundle identifier.
 
-## Native Kafka driver — building and testing in this environment (P32)
+## Native Kafka driver — building and testing in this environment (P32, resolved P57)
 
 See `docs/ARCHITECTURE.md`'s Kafka section for *why* (ABI-specific native addon, Bun can't load
 it at all, no consumer-group join on browse). This section is only about running it here.
 
-- **Electron's ABI is the only one that matters for this app.** `scripts/native-electron-build.sh`
-  rebuilds the driver for Electron's own ABI (read from `node_modules/electron/abi_version`) before
-  anything that loads it runs — wired as `predev`, `pretest:e2e`, `pretest:db:kafka` and
-  `prepackage:mac`. It caches a successful build under `.cache/native/confluent-kafka-javascript/<abi>.node`
-  and writes a marker beside the built module, so a matching ABI skips the rebuild entirely on
-  every run after the first.
-- **Claude Code's Linux web containers**: `electron-rebuild` (what `native-electron-build.sh` calls
-  to do the real work) needs to download Electron's C++ headers from `artifacts.electronjs.org` —
-  this specific proxy 403 has been observed to come and go across sessions in this environment (it
-  was gone by P50), so treat it as worth retrying rather than a permanent wall. The header fetch
-  succeeding still isn't the whole story here: `@confluentinc/kafka-javascript`'s own build
-  (`util/configure.js`) passes librdkafka's `mklove` configure script `--install-deps
-  --source-deps-only --enable-static`, which always tries to build zlib/libcurl/libcrypto/zstd
-  from source rather than looking at system packages first — and two of those source tarballs
-  (`zlib.net`, `curl.se`) are hosts this environment's proxy hard-blocks (403 on the CONNECT
-  itself, confirmed via the proxy's own `__agentproxy/status` recent-failures log), regardless of
-  what dev packages are installed. **The fix**: `util/configure.js` reads `CKJS_LINKING` — set to
-  `dynamic`, it passes `./configure` no flags at all, which links dynamically against the system's
-  own `libssl-dev`/`zlib1g-dev`/`libcurl4-openssl-dev` (already present, or `apt-get install`-able)
-  instead of vendoring anything, so it never touches the two blocked hosts:
-  `CKJS_LINKING=dynamic bunx electron-rebuild --only @confluentinc/kafka-javascript`. Confirmed:
-  `ldd` on the resulting `.node` resolves every shared library, it loads under
-  `ELECTRON_RUN_AS_NODE=1 electron`, and `bun run test:db:kafka` (all 21 cases) and this phase's
-  own `tests/ipc/kafka/kafka.backend.spec.ts` both pass against a real broker. Cache the result the
-  same way `native-electron-build.sh` does (`cp` the built `.node` to
-  `.cache/native/confluent-kafka-javascript/<abi>.node`, write the ABI to the `.native-abi` marker)
-  so later runs in the same session skip the rebuild.
-  `native-electron-build.sh` backs up the existing `.node` file before attempting a rebuild and
-  restores it on failure, specifically because `node-gyp`/`electron-rebuild` deletes
-  `build/Release` *before* attempting the build — without the backup, a failed rebuild attempt in
-  an unsupported environment would destroy the Node-ABI bootstrap binary `bun install` provided,
-  corrupting `node_modules` rather than just failing cleanly. `native-electron-build.sh` itself
-  doesn't yet set `CKJS_LINKING=dynamic`, so a plain `predev`/`pretest:e2e`/`pretest:db:kafka` run
-  still hits the from-source path here; export the variable before invoking it (or the underlying
-  `electron-rebuild` command directly, as above) until the script itself is updated.
+- **No ABI rebuild step exists or is needed any more.** Under Electron, this whole section used to
+  be about rebuilding `@confluentinc/kafka-javascript`'s native addon against Electron's own ABI
+  (`scripts/native-electron-build.sh`, deleted in P57) — real work, since Electron's Node-API ABI
+  never matches whatever Node built the addon during `bun install`. Now that the engine (the only
+  process that ever loads this addon) runs under a real, plain Node runtime
+  (`shell/runtime/node/bin/node`, vendored by `scripts/vendor-node.sh`), the addon `bun install`
+  built loads there **exactly as it landed on disk, with no rebuild step of any kind** — confirmed
+  in P51 part 4 and reconfirmed by every Kafka-touching test in this repo (`tests/db/kafka.spec.ts`,
+  `tests/ipc/kafka/kafka.backend.spec.ts`). If a future Node major version bump ever produces an
+  ABI mismatch, the fix is an ordinary `bun rebuild`/`npm rebuild @confluentinc/kafka-javascript`
+  against the vendored Node's own version — no `electron-rebuild`, no `CKJS_LINKING` dance, no
+  Electron headers to fetch. The historical detail of *why* this used to be hard (the
+  `artifacts.electronjs.org` header fetch, `zlib.net`/`curl.se` being proxy-blocked,
+  `CKJS_LINKING=dynamic` as the workaround) is preserved in this file's P57 findings log below in
+  case a genuinely new native-module build problem ever needs the same debugging playbook.
 
 ## SQLite adapter — testing in this environment (P35)
 
@@ -279,18 +247,19 @@ See `docs/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies o
   start, no image to pull, no daemon to reach. Its only environment dependency is `node:sqlite`
   itself, gated by `sqliteAvailable()` the same way every other DB spec here gates on
   `isDockerAvailable()`.
-- **`tests/e2e/sqlite.spec.ts` runs unconditionally** (no Docker gate at all) — the one DB-backed e2e
-  spec that actually executes in Claude Code's own Linux web container, where every other engine's
-  e2e spec self-skips for lack of Docker. This sandbox's system Node (`/opt/node22`, 22.22+) has
-  `node:sqlite`, which is what `playwright test` actually runs under (Playwright's own test runner
-  is a Node program, not a Bun one) — confirmed empirically, not assumed.
+- **`tests/e2e-real/sqlite-real.spec.ts` runs unconditionally** (no Docker gate at all, Docker-free
+  by design) — a real `-tags server` Go binary, a real embedded engine and a real temp-file SQLite
+  database, driven by a plain Playwright browser tab (P57 §6/§8, replacing the old
+  `tests/e2e/sqlite.spec.ts`, which is deleted). It needs the vendored Node runtime
+  (`shell/runtime/node/bin/node`) and the built engine bundle (`bun run build:engine`) to exist
+  first — the same two prerequisites `wails-dev-setup.sh` checks for.
 - This sandbox's own Bun (1.3.x) lacks `node:sqlite`, so `bun test tests/db/sqlite.spec.ts` here
   reports the legible `SQLITE_UNAVAILABLE_MESSAGE` failure rather than actually running the
   suite — the same class of environment gap `tests/db:kafka` hits for a different reason above.
-  The adapter itself was verified here by bundling the real source with `esbuild` and running it
-  under `ELECTRON_RUN_AS_NODE=1 electron` against a real temp-file database — the same technique
-  P32's Kafka smoke-testing established for "the target runtime differs from the one `bun test`
-  would use."
+  The adapter itself is verified for real here regardless, via the vendored Node
+  (`shell/runtime/node/bin/node`, not the system Node and not Electron) against a real temp-file
+  database — both through `tests/e2e-real/sqlite-real.spec.ts` above and through
+  `scripts/run-ipc-backend.sh`'s bundled backend specs.
 
 ## ClickHouse adapter — testing in this environment (P36)
 
@@ -781,6 +750,88 @@ have to be re-derived next time.
   whose platform-dependence is a real OS-level input-translation quirk rather than app code reading
   the UA string (e.g. Control+click becoming a contextmenu event on real macOS hardware) — that
   stays keyed off the actual host, which this sandbox's Linux is, honestly.
+- **This mock tier's own fixture, not just the app, can hide a real byte-accounting bug.**
+  `tests/ui/support/mockStreamBrowser.js`'s constructed pages hardcoded `byteSize: 0` for every
+  page kind, which made every retained-bytes assertion in `leaks.spec.ts`/`perf.spec.ts` pass
+  vacuously (`0 > 0` never true, so the assertion direction happened to still read as "no leak"
+  rather than fail loudly) — found only by tracing *why* a real leak-detection assertion kept
+  passing even after deliberately breaking the code it was meant to catch. Fixed by computing real
+  byte sizes with the exact same formula `src/shared/protocol/page.ts` uses
+  (`chunk.data.byteLength + offsets.byteLength + nulls.byteLength + truncated.byteLength`, plus a
+  fixed per-column envelope for tabular pages) — the general lesson: a mock that hardcodes a
+  "doesn't matter for this test" value in one field can silently invalidate a *different* test's
+  entire premise once that field is reused for something the original mock author didn't expect.
+- **A plain function called directly inside a Vue template binding (`v-tooltip="fn(x)"`, not a
+  `computed`) defeats any directive that gates its own work on reference equality.** `DataGrid.vue`'s
+  `headerTitleFor(name)` built a fresh object on every call, and `v-tooltip`'s own `updated` hook
+  compares `binding.value !== binding.oldValue` — a fresh object always fails that check, so every
+  header cell's tooltip attributes were rewritten on *every* re-render, including a pure vertical
+  scroll with no column change at all (confirmed via a real `MutationObserver`: dozens of spurious
+  attribute writes per scroll tick, a genuine pre-existing performance bug this migration's own
+  scroll-response test surfaced rather than introduced). Fixed by memoizing into a `computed` `Map`.
+  Any future `v-directive="expression"` binding built from a plain function call, not a `computed`
+  or a stored ref, is worth this same scrutiny.
+- **A ported test's own scroll-position constants can silently stop testing what they claim to**
+  once the mock fixture backing them is smaller than the real table the constants were tuned
+  against. `budgets.spec.ts`'s `scroll_grid` mock only ever captures one `pageSize=100` page
+  (~100 rows), not the real table's 5000 — a hardcoded `scrollTop` baseline chosen without checking
+  the fixture's own `maxScrollTop` silently clamped to the ceiling with no failure, giving a "0
+  mutations" result that looked like proof of the invariant rather than proof the scroll never
+  actually moved. Fixed by deriving every scroll-position constant from the fixture's own
+  already-computed `maxScrollTop`/`clientHeight` at test time, never from a literal tuned against a
+  different (larger) dataset.
+- **`CONNECTION_COLOR_CHOICES` (the offered color-picker subset) is a strict subset of
+  `connectionColorSchema` (the storable superset) — clicking a retired swatch's `data-testid` (e.g.
+  `color-teal`, `color-violet`) hangs a test until its action timeout, silently, since that DOM
+  element simply never exists.** Found independently twice while porting different specs in the
+  same session (once for `violet`, once for `teal`) — worth checking any new spec's chosen
+  connection color against `CONNECTION_COLOR_CHOICES` (`src/shared/domain/connection.ts`) before
+  writing the click, not after it hangs.
+- **`tests/ui/`'s mocked control plane has no `Events.On` (push-event) analogue at all — a
+  structural gap, not a per-scenario mocking gap.** `mockRuntime.ts` intercepts only the request/
+  response `Call` RPC; anything the renderer learns exclusively through a live push subscription
+  (a real `@wailsio/runtime` `Events.On`, e.g. `control.onConnectionsChanged`) can never fire in
+  this tier no matter how the test drives the UI. Confirmed impossible to port, not merely
+  difficult: `state/tabs.ts`'s stale-tab-close-on-delete and `project/state/tree.ts`'s
+  `knownConnectionIds` pruning (both wired to `connectionsChanged`), and the L2/L3 engine-cache
+  budget/hit-rate checks (they live in the `engine` Node child process, which this tier never
+  runs). The cache-budget coverage moved to `tests/unit/engine-cache.spec.ts`, a direct
+  dependency-free unit test of `src/engine/cache/{lru,pages,counts}.ts` — the honest replacement
+  when the real subject is structurally unreachable from a given test tier, rather than leaving the
+  claim untested or asserting against the mock's own fixture as if it proved anything.
+- **`AppProcessSet` (metrics/sampler.go) matching by executable-path substring means the app's own
+  CPU/RSS instrumentation is coupled to `shell/Taskfile.yml`'s `APP_NAME` string, not just its own
+  code.** Renaming the shipping binary (P57 D11, `"kira-studio-shell"` → `"Kira Studio"`) without
+  updating `metrics/ticker.go`'s `AnchorNeedles` to match would have silently broken the app's own
+  status-bar RSS/CPU figure and G1's own measurement — not caught by any test, since nothing in
+  this repo asserts against a real packaged process today. Any future rename of `APP_NAME` needs
+  the same check.
+- **`Info.plist`'s `CFBundleExecutable` must equal `shell/Taskfile.yml`'s `APP_NAME` exactly, byte
+  for byte — `create:app:bundle` copies `bin/{{.APP_NAME}}` into `Contents/MacOS/{{.APP_NAME}}`
+  verbatim**, so the on-disk executable's filename literally *is* `APP_NAME` (with a space, for
+  `"Kira Studio"`). This isn't optional cosmetic parity with `CFBundleName`/`CFBundleIdentifier` —
+  a mismatch here means macOS can't find the executable to launch it at all, and codesign can't
+  validate it. Same applies to `Info.dev.plist` for the `.dev.app` bundle `wails3 task dev` builds.
+- **`shell/build/config.yml`'s `info.productName`/`productIdentifier`/`description` feed
+  `wails3 update build-assets`, which the file's own header warns will overwrite hand-maintained
+  build assets (`Info.plist` included) if ever run.** That command was not run this phase — the
+  Info.plist files were hand-edited directly, consistent with how they already drifted from
+  `config.yml`'s other fields (copyright, comments) before this session — but `config.yml` was
+  still updated to match, so a *future* run of that command doesn't silently revert the D11 rename.
+- **No build step in this repository vendors `@confluentinc/kafka-javascript`'s native module (or
+  any `node_modules/`) into `shell/runtime/engine/`.** `build:engine`'s esbuild bundle marks it
+  `--external`, same as always, but nothing copies the actual dependency tree alongside `engine.cjs`
+  the way `scripts/vendor-node.sh` does for the Node runtime — a real packaged build today would
+  have Kafka connections fail at `require()` time. Flagged as a `note` (non-fatal) in both
+  `scripts/sign-bundle.sh` and `scripts/verify-packaging.sh` rather than assumed solved; plausibly
+  moot once a future phase removes the Node engine sidecar entirely.
+- **This session's GitHub push access lacked the `workflow` OAuth scope**, so a commit touching
+  `.github/workflows/*.yml` was rejected outright by GitHub itself, not by anything in this repo.
+  The intended CI changes were committed instead under
+  `docs/v1/plans/p57-pending-ci-workflows/{ci,release}.yml` with a `README.md` giving the
+  copy-and-apply steps for a session with the right scope — worth checking whether that directory
+  still exists (meaning the CI update is still pending) before assuming `.github/workflows/` is
+  current.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
