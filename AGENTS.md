@@ -371,6 +371,14 @@ have to be re-derived next time.
   actual `wails://`-registered webview can. (Not yet checked whether macOS's WKWebView transport
   works the same way — the scheme-registration code is platform-specific, so this is Linux-confirmed
   only, not assumed to generalize.)
+  **Correction (P57, `docs/v1/plans/P57-e2e-revisit.md`): that is true of a *desktop* build (dev or
+  packaged) — it does not generalize to Wails itself.** `pkg/application/application_server.go`'s
+  `//go:build server` platform (`go build -tags server`, zero source changes needed) serves the
+  entire bound-call surface and the data-plane stream over a real TCP listener with no webview and
+  no scheme registration at all — `linux_cgo.go`'s interception is compiled out under that tag.
+  Verified: a plain Playwright chromium tab against a `-tags server` binary drove a real SQLite file
+  and a real Postgres container through the real Go bridge. This is the mechanism
+  `tests/e2e-real/` is built on.
 
 **P52 implementation findings, worth keeping for P53+:**
 

@@ -617,6 +617,20 @@ anchors `sqlite`/`mongo`/`s3`. `s3.spec.ts` is the costliest single loss and is 
 it is the only spec exercising the real save/open dialogs and `DATA_OP.objectDownload`'s "the engine
 writes the file itself" contract, which no mock can honestly stand in for.
 
+> **Amended, not reversed (`docs/v1/plans/P57-e2e-revisit.md`, written after M5 was already in
+> progress).** `tests/e2e/` is still deleted and 20 of its 23 specs are still written off exactly as
+> below. But a real-backend tier turned out to be possible after all, through a mechanism nobody in
+> P51-P57 had looked at: Wails v3 beta.15's `-tags server` build mode serves the whole bound-call
+> surface and the data-plane stream over a real TCP listener, with zero source changes and no native
+> window — so a plain Playwright browser tab can drive the real Go backend, the real embedded
+> engine, and a real database adapter. Verified empirically (real SQLite and real Postgres
+> round-trips, 2-7s, no Xvfb). Two new specs recover the *wiring* value of the three retired anchors
+> at roughly 150 lines total: `tests/e2e-real/sqlite-real.spec.ts` (Docker-free) and
+> `tests/e2e-real/postgres-real.spec.ts` (a real container). A third, `s3-download-real.spec.ts`, is
+> conditional on whether a `tests/db/s3.spec.ts` case for the same file-write contract (see below)
+> makes it redundant. None of this claims back native window chrome, menus, real save/open dialogs,
+> or lifecycle — see `P57-e2e-revisit.md` §4 for the unchanged list of what stays lost.
+
 **D17 — `tests/electron-db/kafka.spec.ts` moves to `tests/db/kafka.spec.ts` and runs under the
 vendored Node.** P52 §12.2, unchanged, and P51 part 4 already proved the addon loads under a stock
 Node. The `tests/electron-db/` directory and its tsconfig go away, and `typecheck:db` loses its
@@ -1300,7 +1314,7 @@ each result **including "not available in this session"** rather than leaving it
 | **Cold start** (P52 §11) | Never measured for a Wails build | A number in §3, read from the `WindowRuntimeReady` log line (P56 §1.5) |
 | **`sign-bundle.sh`'s nested paths** (§4.13) | The resource layout is whatever `create:app:bundle` produces on darwin | All four `codesign` lines succeed and `--verify --deep --strict` exits 0 |
 | **`verify-packaging.sh`'s A3–A6 + N1/N2 against a real bundle** | Every one reads `dist/`/the `.app` | The script exits 0 on a freshly packaged bundle |
-| **The save/open dialogs** (the coverage `s3.spec.ts` took with it, D16) | Wails' dialogs are AppKit and need a user | An S3 object downloads to a chosen path; a SQLite file opens through the picker, including the "All files" row P56 D8 translates to *no* filter |
+| **The save/open dialogs** (the coverage `s3.spec.ts` took with it, D16 — the AppKit panel itself, not the download; `P57-e2e-revisit.md` §3.6 automates the rest by faking just `FilesService.ChooseSave`, exactly as the old Electron test already stubbed it) | Wails' dialogs are AppKit and need a user | An S3 object downloads to a chosen path; a SQLite file opens through the picker, including the "All files" row P56 D8 translates to *no* filter |
 | **`navigator.clipboard` under WKWebView** (P52 §9, P56 §6) | `Permissions` has no darwin implementation at all (P56 §1.6) | Grid copy and paste both work in the packaged build |
 | P56 §6's remaining four (Cmd+Q, Dock reopen, bounds persistence, DevTools absent in a packaged build) | Carried forward if P56's session could not run them | As P56 §6 states |
 
@@ -1315,9 +1329,13 @@ than a "zero"): `src/renderer/bridge/{control,port,data}.ts`, `src/renderer/env.
 **What gets worse.** P52 §11 enumerated this for the migration; the items that actually come due
 here, with what this plan changes about them:
 
-1. **The full-stack tier is gone.** Three anchors retire (D16). `s3.spec.ts`'s dialog and
-   `objectDownload` coverage becomes a manual check (§6) — a real downgrade from an automated
-   assertion to a human remembering.
+1. **The full-stack tier is reduced, not gone.** Three anchors retire (D16), but two of their
+   *wiring* value is recovered by `tests/e2e-real/` (D16's amendment, `P57-e2e-revisit.md`) — 23
+   specs down to 2-3, with native-shell coverage (menus, dialogs, lifecycle, WKWebView rendering)
+   genuinely gone and wire-level coverage (real bridge, real engine, real adapter) genuinely kept.
+   `s3.spec.ts`'s AppKit save/open panel itself stays a manual check (§6) — a real downgrade from an
+   automated assertion to a human remembering — but its `objectDownload` file-write contract either
+   gets a `tests/db/s3.spec.ts` case or an `e2e-real` spec of its own (`P57-e2e-revisit.md` §7/§6).
 2. **`hardening.spec.ts` loses its subject entirely**, and P56 §1.6 established that more of the
    posture is inert than P52 §9 assumed (`Permissions` has no darwin implementation; there is no
    navigation-policy delegate at all). What replaces it is `security_test.go`, which asserts what
