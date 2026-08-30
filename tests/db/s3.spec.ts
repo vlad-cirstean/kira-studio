@@ -707,4 +707,30 @@ describe('s3 adapter (§9.1, P17/P33)', () => {
       await rm(tmpDir, { recursive: true, force: true });
     }
   });
+
+  // P57 e2e-revisit §7 item 2: the "engine, not the renderer, performs the write" contract, for
+  // the one object shape that actually needs it — over OBJECT_BODY_PREVIEW_BYTES, the read path
+  // (scenario 25's own NESTED_OBJECT_KEY is well under it) never fetches a Body at all
+  // (KeyValueView.vue's own "use Download to save it locally" — this is the *only* way to read its
+  // content). Byte-`Buffer`-exact, not a decoded-utf8-string compare, and independent of the read
+  // path's own truncation logic in s3/read.ts.
+  test('28. downloadObject reads the full body of an object too large to preview', async () => {
+    const adapter = await createAdapter('s3', deps);
+    await adapter.connect(fixture.config, makeCtx());
+    const tmpDir = await mkdtemp(join(tmpdir(), 'kira-s3-download-oversized-'));
+    const destPath = join(tmpDir, 'oversized.bin');
+    try {
+      const result = await adapter.downloadObject(
+        { path: objectPath(MAIN_BUCKET, OVERSIZED_OBJECT_KEY), destPath },
+        makeCtx(),
+      );
+      expect(result.bytes).toBe(OVERSIZED_OBJECT_BYTES);
+      const written = await readFile(destPath);
+      expect(written.byteLength).toBe(OVERSIZED_OBJECT_BYTES);
+      expect(written.equals(Buffer.from('x'.repeat(OVERSIZED_OBJECT_BYTES)))).toBe(true);
+    } finally {
+      await adapter.disconnect();
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
