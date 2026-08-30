@@ -197,6 +197,39 @@ export const POSTGRES_CAPS = {
 const SERVER_VERSION =
   'PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit';
 
+/** The connect + expand-to-`app`-schema boilerplate every fixture below shares. */
+function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
+  return [
+    {
+      channel: IPC.connectionsConnect,
+      args: { id: connectionId },
+      response: {
+        connectionId,
+        status: 'connected',
+        serverVersion: SERVER_VERSION,
+        error: null,
+        since: 1735689600000,
+        caps: POSTGRES_CAPS,
+      },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId, path: '', refresh: false },
+      response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId, path: DB_PATH, refresh: false },
+      response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId, path: APP_PATH, refresh: false },
+      response: { nodes: APP_CHILDREN, source: 'server', truncated: false },
+    },
+  ];
+}
+
 /** A connectable postgres ConnectionSummary, plus the control/data snapshots to connect it, expand
  *  its tree down to `app.order_items`, and open that table at both stock page sizes. Every spec
  *  using this can add its own `connectionsCreate` snapshot (name/color differ per spec) and reuse
@@ -207,33 +240,7 @@ export function orderItemsFixture(connectionId: string): {
 } {
   return {
     control: [
-      {
-        channel: IPC.connectionsConnect,
-        args: { id: connectionId },
-        response: {
-          connectionId,
-          status: 'connected',
-          serverVersion: SERVER_VERSION,
-          error: null,
-          since: 1735689600000,
-          caps: POSTGRES_CAPS,
-        },
-      },
-      {
-        channel: IPC.treeChildren,
-        args: { connectionId, path: '', refresh: false },
-        response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
-      },
-      {
-        channel: IPC.treeChildren,
-        args: { connectionId, path: DB_PATH, refresh: false },
-        response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
-      },
-      {
-        channel: IPC.treeChildren,
-        args: { connectionId, path: APP_PATH, refresh: false },
-        response: { nodes: APP_CHILDREN, source: 'server', truncated: false },
-      },
+      ...connectAndExpandControl(connectionId),
       {
         channel: IPC.treeDescribe,
         args: { connectionId, path: ORDER_ITEMS_PATH, refresh: false, tabId: null },
@@ -266,6 +273,143 @@ export function orderItemsFixture(connectionId: string): {
           cursor: { mode: 'offset', offset: 0 },
         },
         response: { kind: 'read', page: orderItemsPage(1000), source: 'server' },
+      },
+    ],
+  };
+}
+
+export const COMPOSITE_PK_PATH = `${APP_PATH}/table:composite_pk`;
+
+export const COMPOSITE_PK_COLUMNS: ColumnDescriptor[] = [
+  {
+    name: 'tenant_id',
+    dataType: 'integer',
+    typeClass: 'number',
+    nullable: false,
+    isPrimaryKey: true,
+    generated: false,
+  },
+  {
+    name: 'entity_id',
+    dataType: 'integer',
+    typeClass: 'number',
+    nullable: false,
+    isPrimaryKey: true,
+    generated: false,
+  },
+  {
+    name: 'name',
+    dataType: 'text',
+    typeClass: 'text',
+    nullable: true,
+    isPrimaryKey: false,
+    generated: false,
+  },
+];
+
+export const COMPOSITE_PK_META = {
+  path: COMPOSITE_PK_PATH,
+  kind: 'table' as const,
+  name: 'composite_pk',
+  qualifiedName: 'app.composite_pk',
+  columns: [
+    {
+      name: 'tenant_id',
+      position: 1,
+      dataType: 'integer',
+      nullable: false,
+      defaultExpr: null,
+      isPrimaryKey: true,
+      comment: null,
+    },
+    {
+      name: 'entity_id',
+      position: 2,
+      dataType: 'integer',
+      nullable: false,
+      defaultExpr: null,
+      isPrimaryKey: true,
+      comment: null,
+    },
+    {
+      name: 'name',
+      position: 3,
+      dataType: 'text',
+      nullable: true,
+      defaultExpr: null,
+      isPrimaryKey: false,
+      comment: null,
+    },
+  ],
+  primaryKey: ['tenant_id', 'entity_id'],
+  foreignKeys: [],
+  referencedBy: [],
+  indexes: [
+    {
+      name: 'composite_pk_pkey',
+      columns: ['tenant_id', 'entity_id'],
+      unique: true,
+      primary: true,
+      method: 'btree',
+    },
+  ],
+  rowEstimate: null,
+  comment: null,
+};
+
+/** Real captures of `app.composite_pk`'s starting 3-row state — (1,1)/(1,2)/(2,1), a genuine
+ *  2-column PK and no inbound FK (tests/db's own reason for choosing this table too, per
+ *  tests/db/postgres.spec.ts). Callers add their own connect/tree/read/count/mutate snapshots on
+ *  top for whatever sequence their own scenario needs — unlike order_items, mutations.spec.ts and
+ *  interaction.spec.ts each drive a different, stateful mutation sequence against it, so there is
+ *  no one fixed "the" fixture the way orderItemsFixture() is. */
+export function compositePkConnectAndOpen(connectionId: string): {
+  control: ControlSnapshot[];
+  port: PortSnapshot[];
+} {
+  return {
+    control: [
+      ...connectAndExpandControl(connectionId),
+      {
+        channel: IPC.treeDescribe,
+        args: { connectionId, path: COMPOSITE_PK_PATH, refresh: false, tabId: null },
+        response: { meta: COMPOSITE_PK_META, source: 'server' },
+      },
+    ],
+    port: [
+      {
+        op: DATA_OP.read,
+        payload: {
+          connectionId,
+          path: COMPOSITE_PK_PATH,
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: 100,
+          cursor: { mode: 'offset', offset: 0 },
+        },
+        response: {
+          kind: 'read',
+          page: {
+            kind: 'tabular',
+            columns: COMPOSITE_PK_COLUMNS,
+            rows: [
+              ['1', '1', 'tenant 1 / entity 1'],
+              ['1', '2', 'tenant 1 / entity 2'],
+              ['2', '1', 'tenant 2 / entity 1'],
+            ],
+            position: {
+              offset: 0,
+              pageSize: 100,
+              hasMore: false,
+              nextToken: null,
+              prevToken: null,
+              strategy: 'keyset',
+            },
+            truncatedCells: 0,
+          },
+          source: 'server',
+        },
       },
     ],
   };
