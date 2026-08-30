@@ -74,7 +74,25 @@ const ORDER_ITEMS_ROWS = [
 
 export const DB_PATH = 'database:kira_test';
 export const APP_PATH = `${DB_PATH}/schema:app`;
+export const ANALYTICS_PATH = `${DB_PATH}/schema:analytics`;
 export const ORDER_ITEMS_PATH = `${APP_PATH}/table:order_items`;
+export const WIDE_TABLE_PATH = `${APP_PATH}/table:wide_table`;
+export const ORDERS_PATH = `${APP_PATH}/table:orders`;
+
+// Real capture (scripts/capture-postgres-tree.ts) of database:kira_test/schema:analytics's own
+// children — surfaced a node no hand-written guess would have included: `events_id_seq`, the
+// serial PK's own backing sequence, alongside the `events` table itself (0001_seed.sql's only
+// analytics-schema object) — exactly the class of miss P50 D5's "capture, don't hand-write"
+// discipline exists to catch.
+export const ANALYTICS_CHILDREN = [
+  { kind: 'table', name: 'events', path: `${ANALYTICS_PATH}/table:events`, hasChildren: false },
+  {
+    kind: 'sequence',
+    name: 'events_id_seq',
+    path: `${ANALYTICS_PATH}/sequence:events_id_seq`,
+    hasChildren: false,
+  },
+];
 
 function orderItemsPage(pageSize: 100 | 1000) {
   return {
@@ -194,11 +212,14 @@ export const POSTGRES_CAPS = {
   fileTransfer: false,
 };
 
-const SERVER_VERSION =
+export const SERVER_VERSION =
   'PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit';
 
-/** The connect + expand-to-`app`-schema boilerplate every fixture below shares. */
-function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
+/** The connect + expand-to-`app`-schema boilerplate every fixture below shares. Exported (not
+ *  just used internally) so a spec needing a custom connect/disconnect/reconnect sequence of its
+ *  own — tree.spec.ts, for one — can still start from the same real connect/root/db/app snapshots
+ *  instead of re-deriving them. */
+export function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
   return [
     {
       channel: IPC.connectionsConnect,
@@ -228,6 +249,25 @@ function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
       response: { nodes: APP_CHILDREN, source: 'server', truncated: false },
     },
   ];
+}
+
+/** A `connectionsDisconnect` snapshot for a connection `connectAndExpandControl` already
+ *  connected — the ConnectionState shape `state/connections.ts`'s `disconnectConnection` stores
+ *  verbatim, same fields as the connected state above with `status`/`serverVersion`/`caps` swapped
+ *  to their disconnected values. */
+export function connectionsDisconnectSnapshot(connectionId: string): ControlSnapshot {
+  return {
+    channel: IPC.connectionsDisconnect,
+    args: { id: connectionId },
+    response: {
+      connectionId,
+      status: 'disconnected',
+      serverVersion: null,
+      error: null,
+      since: 1735689600000,
+      caps: null,
+    },
+  };
 }
 
 /** A connectable postgres ConnectionSummary, plus the control/data snapshots to connect it, expand
