@@ -265,11 +265,21 @@ P32's other unverified-in-this-sandbox items).
 |---|---|---|---|
 | L-B renderer page retention | Tab RSS(10 tabs) − Tab RSS(0 tabs) > 120 MB and `__kiraGridRetainedBytes()` accounts for < half | delta ≈ 18–43 MB (152.9−134.8 to 177.7−134.9) — already well under the 120 MB trigger on its own, so the AND condition fails regardless of the retained-bytes share | no |
 | L-C L2 budget default | steady state sits at the 64 MB budget and total RSS > 350 MB | L2 usage observed at 0.3 MB / 64 MB (hit rate 44%, 7/16) — far below the budget; total RSS is over budget but not because L2 is full | no |
-| L-D bundle weight | packaged `.app` > 300 MB on disk | 252 MB (`--dir` build, arm64, `electronLanguages: ['en']`) | no |
+| L-D bundle weight | packaged `.app` > 300 MB on disk | **not re-measured for the Wails bundle** — see the note below this table | unknown |
 | L-E engine old-space cap | peak engine RSS > 400 MB in any §3 scenario | peak observed 155.6 MB | no |
 | L-F cached tree expand | p95 > 50 ms | 2.8 ms | no |
 | L-G cell editor populate | p95 > 50 ms | 4.9 ms | no |
 | L-H scroll response | p95 > 8 ms | p95 = 14.2 ms, which reads as "fired" by the letter of the trigger — but per the methodology note in §2.1, this p95 elevation is a frame-scheduling artifact confirmed by the double-rAF test, not app work exceeding budget; the metric the lever is meant to gate (p50, the work-bound figure) is 5.6 ms, comfortably under budget. Pulling the pre-approved remedy (reducing `OVERSCAN_ROWS`) would not address an artifact of frame scheduling, so this is recorded as not fired | no (see caveat) |
+
+**L-D after the Wails/Go migration (P57 M8).** The 252 MB this row used to carry was an
+electron-builder `--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer
+exists, so the figure was retired rather than carried forward against a different bundle. The
+measurement is now `du -sh "shell/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS
+hardware in this environment. The closest real evidence is P51 part 4's spike bundle, measured at
+251 MB on actual Apple Silicon *before* `scripts/vendor-node.sh`'s 81 MB trim (`include/` +
+`lib/node_modules/npm`) was moved into vendor time, which projects to ≈ 170 MB — a projection from a
+differently-laid-out spike bundle, not a measurement of the shipping one, and not a basis for
+declaring the > 300 MB trigger unfired. Record the real number here on the next macOS run.
 
 Per D21: every pre-approved lever has been evaluated against real measurements; only L-A fired and
 has been applied; the 350 MB budget still fails, dominated by non-app-controllable Chromium/Electron
@@ -446,14 +456,30 @@ headroom exists. The user's lever for this is the cache budget input in Settings
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
-and record the results here.
+and record the results here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
+re-pointed procedure, not a re-measurement — nothing in this section has been executed on real
+hardware since the migration, and no number in this file changed as a result of the rewrite.
+
+**The bundle these procedures run against.** `bun run package` (`cd shell && wails3 task
+darwin:package`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces
+**`shell/bin/Kira Studio.app`**. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
+`out/main/` entry points no longer exist. The measurement-relevant paths inside the bundle:
+`Contents/MacOS/Kira Studio` (the Go binary), `Contents/MacOS/runtime/node/bin/node` (the vendored
+Node runtime) and `Contents/MacOS/runtime/engine/engine.cjs` (the engine child's bundle).
 
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
-1. `bun run package:mac` (see `docs/PACKAGING.md`).
-2. Launch `dist/mac-arm64/Kira Studio.app` 3 times, discarding the first (Gatekeeper's quarantine
-   scan of an unsigned bundle on first launch is not the app's cost).
-3. Read the `startup` log line's `process.uptime()` value from `~/.kira-studio/logs/` for each of
-   the 3 launches; take the median.
+1. `bun run package`.
+2. Launch `shell/bin/Kira Studio.app` 3 times via Finder or `open`, discarding the first
+   (Gatekeeper's quarantine scan of an ad-hoc-signed bundle on first launch is not the app's cost).
+   Launch it the way a user would rather than `exec`ing the binary — §2.4's own methodology note
+   records that a directly-`exec`'d run is a structurally different process set on macOS.
+3. Read the cold-start line from `~/.kira-studio/logs/kira-<YYYY-MM-DD>.log` for each of the 3
+   launches and take the median. That line is emitted by `shell/internal/shell/window.go`'s
+   `events.Common.WindowRuntimeReady` handler (P56 — Wails' analogue of `did-finish-load`, and the
+   measurement point that replaces Electron's `process.uptime()`, which no longer exists): it reads
+   `msg="did-finish-load at uptime <N>ms" scope=startup`, where `<N>` is milliseconds from
+   `shell/main.go`'s `startedAt` (captured at process entry) to the frontend runtime being ready.
+   A packaged run writes to the file only — the stderr copy is dev-only (`config.IsDev()`).
 4. Record: `<median> ms — <date>, <machine>`.
 
 **Packaged RSS** (target: < 350 MB total, 5 connections / 10 tabs — §2.2's own automated version of
@@ -461,24 +487,46 @@ this scenario was removed as a permanently-failing, non-app-controllable finding
 packaged check is what's left):
 1. With the packaged app running, build the scenario by hand: 2× Postgres + MariaDB + MongoDB +
    Redis connections; 4 Postgres tabs + 2 MariaDB tabs + 2 MongoDB tabs + 2 Redis tabs, all loaded.
-2. Sum `ps -o rss= -p <pid>` (or Activity Monitor's memory column) across every `Kira Studio` /
-   `Kira Studio Helper` process.
-3. Record: `<total> MB — <date>, <machine>`.
+2. Read the memory figure from the app's own status bar (bottom right, `data-testid=app-metrics-mem`).
+   That readout *is* the replacement for `app.getAppMetrics()`: `internal/metrics`' `Sampler` +
+   `Ticker` sum RSS and CPU across the app's own process set every 5 s (`metrics.Interval`) and emit
+   it as `kira:app:metrics`. There is no separate manual command to run for the headline number, and
+   no per-process breakdown — it is one app-wide figure by construction (§2.2's per-process table has
+   no equivalent here).
+3. Optional second opinion, using the same instrument §2.3/§2.4 measured gate G1 with:
+   `cd shell && go run ./cmd/g1measure` (its `-anchor`/`-helper` defaults are
+   `metrics.AnchorNeedles`/`HelperNeedles`; min of 10 samples 1 s apart), or a `ps -o rss=` sum over
+   the same set — the `Kira Studio` binary, `runtime/node/bin/node`, and the `com.apple.WebKit.*`
+   helpers. Do not grep `com.apple.WebKit` by hand unfiltered: it also matches every *other* running
+   app's idle WebKit helpers, the over-count §2.4's third bug records (≈ 87 MB of other apps on that
+   machine) and the reason `metrics.AppProcessSet` exists.
+4. Record: `<total> MB — <date>, <machine>`.
 
-**Window-bounds debounce timer on close (F8, D8)** — `main/window.ts`'s resize/move-debounce
-`setTimeout` is now cleared on the window's `closed` event; there is no automated way to assert a
-timer handle was cleared rather than merely expired. Verify by resizing/moving the packaged app's
-window, quitting within the debounce window (< 250 ms of the last move), and confirming the process
-exits promptly rather than lingering on an unref'd-but-still-pending timer.
+**Window-bounds debounce timer on close (F8, D8)** — now `shell/internal/shell/window.go`: the
+resize/move debouncer (300 ms, `boundsDebounce`) is cancelled on `events.Common.WindowClosing`, and
+again by `Attach`'s detach at quit. **The Electron-era symptom this check watched for does not carry
+over.** It looked for the process lingering on an unref'd-but-still-pending `setTimeout`; a pending
+Go `time.AfterFunc` never holds process exit, so "exits promptly" cannot fail here and is not worth
+a manual run. What is still worth verifying by hand is D8's deliberate *non-flush*: move the
+packaged app's window and let it settle (> 300 ms, so that rectangle is persisted), move it again
+and quit within 300 ms of that second move, then relaunch and confirm the window comes back at the
+**first** rectangle — the in-flight bounds write is dropped on purpose, not flushed. Re-aimed from
+the old check, not re-measured.
 
-**Op-log reconciliation on an engine crash (F10, D10)** — `wireOplog` now marks in-flight ops
-`status: 'error'` when the engine process exits unexpectedly. Verify by force-killing the engine
-utility process (e.g. via Activity Monitor) while a long-running op is in flight, then confirming
-the Operations panel shows that op as failed rather than stuck `running` forever.
+**Op-log reconciliation on an engine crash (F10, D10)** — now `internal/oplog`'s
+`handleEngineDown`: every op still `running` when the engine child goes away is finished with
+`status: 'error'` and the message `engine process exited`. Verify by force-killing the engine child
+— the vendored Node process, `Contents/MacOS/runtime/node/bin/node`, which Activity Monitor lists as
+`node` — while a long-running op is in flight, then confirming the Operations panel shows that op as
+failed rather than stuck `running` forever.
 
-**Log file retention (F12, D12)** — `main/log.ts` deletes `kira-*.log` files older than 30 days at
-startup. Verify by backdating a log file's mtime past 30 days in `~/.kira-studio/logs/`, relaunching
-the packaged app, and confirming that file is gone while newer ones remain.
+**Log file retention (F12, D12)** — now `internal/logging`'s `Sweep`, which deletes `kira-*.log`
+files older than `LogRetentionDays` (30) by mtime at startup. Verify by backdating a log file's mtime
+past 30 days in `~/.kira-studio/logs/`, relaunching the packaged app, and confirming that file is
+gone while newer ones remain.
+
+**App size (lever L-D)** — `du -sh "shell/bin/Kira Studio.app"`, against the > 300 MB trigger. See
+§2.2's lever table for what that row currently does and does not claim.
 
 ## 4. P13's nonfunctional sweep — the three items P12 handed forward
 
