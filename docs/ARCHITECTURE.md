@@ -22,27 +22,32 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 
 | Concern | Choice | Note |
 |---|---|---|
-| Shell | Electron (latest stable) | native title bar, macOS 13+, `arm64` only |
-| Language | TypeScript 7 (native compiler) for `.ts` | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
-| Package manager / scripts / test runner | Bun | Electron runs on its embedded Node — Bun is tooling only |
-| Build | electron-vite | Vite HMR for renderer, esbuild for main/engine |
+| Shell | **Wails v3** (`v3.0.0-beta.15`), Go | native title bar, macOS 13+, `arm64` only |
+| Language | TypeScript 7 (native compiler) for `.ts`; **Go** for the shell | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
+| Package manager / scripts / test runner | Bun | the engine runs on a vendored real Node, not on Bun — Bun is tooling only |
+| Renderer build | Vite (`vite build`, `vite.config.ts` at the repo root) | builds `src/renderer` straight into `shell/frontend/dist`, which `shell/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
+| Engine build | esbuild (`bun run build:engine`) | bundles `src/engine/stdio-main.ts` into `shell/runtime/engine/engine.cjs` |
+| Engine runtime | a **vendored Node** at `shell/runtime/node/` | fetched from nodejs.org by `scripts/vendor-node.sh`, git-ignored; deliberately not the system Node and not an embedded-in-the-shell runtime |
 | UI | Vue 3 (`<script setup>`, Composition API) | |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
-| Validation | Zod | runtime validation at every trust boundary: IPC control-channel payloads, stored settings/layout/connection rows read back from SQLite, connection-dialog input |
+| Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod still guards every trust boundary that is still TypeScript: the engine wire protocol's control and data payloads (`src/engine/{control,rpc,data,stdio-main}.ts`) and connection-dialog input. Rows read back out of SQLite are now validated in Go instead (`shell/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
-| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed through **Drizzle ORM** | `drizzle-orm/sqlite-proxy` over `node:sqlite` (`better-sqlite3` as the driver fallback) — implementation detail behind the storage module |
-| Packaging | electron-builder | unsigned local builds; signing/notarization after v1 |
+| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `mattn/go-sqlite3` (the same unmodified upstream SQLite amalgamation `node:sqlite` embeds, so the migrations and queries behave identically); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
+| Packaging | `wails3 task darwin:package` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`); ships as a zipped `.app`, no DMG, no auto-update, no notarization |
 | DB tests | Testcontainers (Node) | real containers, real data; Colima |
-| UI tests | Playwright `_electron.launch` | every change validated |
-| Logging | `electron-log` | main process only (`electron-log/main`), scoped loggers (`log.scope(name)`); the engine `utilityProcess` keeps writing to stdout/stderr, which main pipes into the same sink — single log file, single source of truth |
+| UI tests | Playwright against the built bundle, real WebKit | every change validated |
+| Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold; the engine child keeps writing to stdout/stderr, which the shell pipes into the same sink — single log file, single source of truth |
 
 Driver libraries — the best-maintained option per engine: `pg`, `mariadb`, `mongodb`, `ioredis`,
 `@confluentinc/kafka-javascript` (native, heavier, but actively maintained where `kafkajs` has
 stalled), `@aws-sdk/client-sqs`, `@aws-sdk/client-s3`.
 
-App identity: organisation **kirathecat**, bundle ID `com.kirathecat.kira-studio`. No auto-update.
+App identity: organisation **kirathecat**, app name **Kira Studio**, bundle ID
+`com.kirathecat.kira-studio` (the `-shell` suffix carried during the P52–P56 coexistence window is
+gone). The bundle's executable is literally `Contents/MacOS/Kira Studio`, space included. No
+auto-update.
 
 ## Invariants
 
@@ -58,8 +63,16 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 - Every operation that can exceed ~150 ms shows progress and a working stop button.
 - Every DB read goes through the cache layer (see Caching, below) — a cache miss is the only thing
   that produces a query.
+- **Bulk data passes through the Go process without being parsed, copied or re-encoded.** Result
+  pages travel renderer↔engine over one named stream that the Go shell forwards verbatim in both
+  directions (see Process model, below). Go never unmarshals a data-plane frame. This replaces the
+  older "bulk data skips the main process" rule, which described Electron's `MessagePort`
+  arrangement: under Wails the bytes genuinely do traverse the shell process, and what is
+  guaranteed is that it does not look at them.
 - The renderer loads no remote content, opens no window, and navigates nowhere but its own base
-  URL (see Renderer security surface, below).
+  URL. Under Electron this was enforced by the shell as well as true of the code; under Wails only
+  the second half still holds — the renderer contains no such call, but there is no navigation
+  policy left to stop one (see Renderer security surface, below).
 
 ## Adapter contract
 
@@ -169,7 +182,7 @@ mysql-family/`) — `mariadb/` and `mysql/` each hold only their own profile (se
 ### SQLite (`node:sqlite`, P35)
 
 Uses `node:sqlite`, a Node builtin — no new dependency, no native module, no build step. Requires
-Bun 1.4+ or Electron/Node 22.5+ (not present in Bun 1.3). `caps.cancel` is permanently `false`:
+Bun 1.4+ or Node 22.5+ (not present in Bun 1.3). `caps.cancel` is permanently `false`:
 `node:sqlite` has no `sqlite3_interrupt` and the whole API is synchronous, so a running statement
 blocks the event loop and an abort can never be delivered while one runs — this is a fact about the
 driver, not a gap. Keyset pagination falls back through primary key → unique index → the table's
@@ -196,13 +209,14 @@ keeps executing a query after the original socket closes.
 ### Kafka (`@confluentinc/kafka-javascript`, P32)
 
 The Kafka adapter's driver wraps a native NAN addon (built against V8's C++ API, not N-API) — it is
-**ABI-specific per JS runtime**, not portable the way a pure-JS dependency is, and it must be
-rebuilt for Electron's own ABI before use (`scripts/native-electron-build.sh`, wired as `predev`/
-`pretest:e2e`/`pretest:db:kafka`/`prepackage:mac`). **Bun cannot load this addon at any ABI** —
-confirmed empirically, not just from the docs (a matching-ABI build still crashes with `undefined
-symbol: v8::FunctionTemplate::SetClassName` when required from Bun) — which is why the Kafka
-adapter suite runs under `ELECTRON_RUN_AS_NODE=1 electron` (`tests/electron-db/kafka.spec.ts`, on
-`node:test`) instead of `bun test tests/db` like every other engine.
+**ABI-specific per JS runtime**, not portable the way a pure-JS dependency is. Under the Electron
+shell that meant an ABI rebuild step before every run and before packaging; against the vendored
+Node runtime there is **no rebuild step at all** — the addon loads under a stock Node exactly as it
+landed on disk from `bun install`. **Bun still cannot load this addon at any ABI** — confirmed
+empirically, not just from the docs (a matching-ABI build still crashes with `undefined symbol:
+v8::FunctionTemplate::SetClassName` when required from Bun) — which is why `tests/db/kafka.spec.ts`
+runs esbuild-bundled under the vendored Node (`node:test`, via `scripts/run-db-tests.sh`'s
+`--path-ignore-patterns`) while every other engine's spec in that directory runs under Bun.
 
 The adapter never joins a consumer group for a read-only browse — it assigns partitions directly
 (`assign()`, explicit start offsets, a bounded poll loop) rather than `subscribe()`, so `group.id`
@@ -284,17 +298,41 @@ result is shown moved.
 
 `~/.kira-studio/` (dir `0700`), containing `kira.sqlite` (`0600`) and `logs/`.
 
-Credentials in the `connections` table's `password` column are **encrypted at rest** (P25) via
-Electron's `safeStorage` (Keychain-derived on macOS) as a `kira:v1:<base64>` envelope — plaintext
-never touches disk for a connection created or edited since, and a row left plaintext by an older
-build is upgraded in place on the next launch. The connection dialog's credential note reflects
-the platform's actual backend rather than a fixed warning. Linux — development/CI only, v1 targets
-macOS only — has no real keychain support: behind an explicit `KIRA_INSECURE_SECRETS=1` env var it
-falls back to Chromium's `basic_text` obfuscation (a hardcoded key, not a real keychain); without
-it, secret storage is unavailable and a write carrying a password is refused rather than silently
-stored in the clear. The column is still accessed only through a `SecretStore` indirection (now
-paired with a `SecretCipher`, `main/secret-cipher.ts` — the only file that imports `safeStorage`),
-so a future re-key or a real cross-platform secret store stays a contained change.
+Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
+Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
+because it is the right one: one **single symmetric key** lives in the OS keychain and every value
+is encrypted with it, with the ciphertext in the app's own database — one keychain item means one
+authorization decision rather than a prompt per connection, item-count and item-size limits become
+irrelevant, and `SecretStore.copy()` stays a raw column copy that never needs the OS key at all.
+
+The key is 32 random bytes held as one generic-password item via `github.com/keybase/go-keychain`
+(service `Kira Studio Safe Storage`, account `Kira Studio`), and values are sealed with
+**AES-256-GCM** under a `kira:v2:<base64>` envelope. Two item attributes are load-bearing:
+`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, so the key is never restorable from a backup onto
+another machine, and non-synchronizable, so it never reaches iCloud Keychain. `secrets/keyring_darwin.go`
+is the only file in the repo that touches the keychain library; `secrets/cipher.go` is the only
+file that encrypts or decrypts, so a future re-key or a real cross-platform secret store stays a
+contained change.
+
+Two things changed with the cipher, and both are deliberate. The envelope bumped **`kira:v1:` →
+`kira:v2:`** because the cipher genuinely changed (AES-256-GCM under our own key, against Chromium's
+AES-128-CBC under `safeStorage`'s) — reusing the v1 prefix would hand a v1 value to a v2 decrypt and
+fail confusingly. And the **pre-P25 plaintext passthrough is dropped**: `Decrypt` of a non-enveloped
+value now returns an `E_SECRET_STORE` error naming the problem instead of returning it verbatim.
+`upgradeLegacySecrets` was deleted rather than ported for the same reason — it only ever upgraded
+rows written before P25. AES-GCM's authentication tag is a real gain over the old design: a tampered
+or truncated ciphertext fails to authenticate rather than decrypting to garbage, and the existing
+user-facing decrypt-failure message ("may have been written on a different machine or after a
+keychain reset — re-enter it to fix this connection") is already correct for that case and is kept
+verbatim.
+
+The connection dialog's credential note reflects the platform's actual backend rather than a fixed
+warning; the probed `{available, backend, insecureFallback, reason}` status is resolved once at
+startup and never changes for the life of the process. Linux — development/CI only, v1 targets macOS
+only — has no real keychain support: behind an explicit `KIRA_INSECURE_SECRETS=1` env var it falls
+back to obfuscation under a hardcoded compile-time key (the same threat model and the same honesty
+as Chromium's `basic_text`, whose backend name is kept); without it, secret storage is unavailable
+and a write carrying a password is refused rather than silently stored in the clear.
 
 ```
 schema_version(version)
@@ -313,10 +351,12 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 tabs(id, connection_id, path, kind, state_json, order, active)  -- session restore
 ```
 
-Migrations are forward-only numbered SQL files applied on startup. Table access goes through
-**Drizzle ORM** schema definitions that mirror the migration files. Every row read back out of
-`settings`, `ui_layout` and `connections` is parsed through a **Zod** schema before use, so a
-hand-edited or stale-shape row fails loudly instead of propagating `undefined`s into the UI.
+Migrations are forward-only numbered SQL files (`shell/internal/storage/migrations/`) applied on
+startup. Table access is hand-written `database/sql` in `shell/internal/storage/repos/` — there is
+no ORM; the Drizzle dependency went out with the Electron shell. Every row read back out of
+`settings`, `ui_layout` and `connections` is decoded through the model types in
+`shell/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
+instead of propagating zero values into the UI.
 
 S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
 repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
@@ -437,137 +477,194 @@ two numbers the two had drifted into.
 
 ## Process model
 
+Three processes: the **webview** running the Vue renderer, the **Go shell** that owns the window
+and all app state, and the **engine**, a Node child process holding every database driver.
+
 ```
-┌─────────────┐   MessagePort (bulk data)   ┌──────────────┐
-│  renderer   │◄───────────────────────────►│    engine    │  utilityProcess
-│  (Vue, UI)  │                             │  (drivers)   │
-└──────┬──────┘                             └──────┬───────┘
-       │ ipcRenderer (control, storage, dialogs)   │ lifecycle, config
-       └────────────────────┬──────────────────────┘
-                     ┌──────┴──────┐
-                     │    main     │  windows, menus, SQLite, settings, op log
-                     └─────────────┘
+┌──────────────────────┐                          ┌────────────────────────┐
+│  webview             │                          │  engine (drivers)      │
+│  (Vue renderer)      │                          │  vendored Node child   │
+└──────────┬───────────┘                          └───────────┬────────────┘
+           │                                                  │
+           │  control: generated Wails bindings               │  stdio, JSON-line
+           │           (HTTP to /wails/runtime)               │  wire protocol
+           │  data:    one "engine" WebSocket stream          │  (control + data)
+           │                                                  │
+           └─────────────────────┬────────────────────────────┘
+                      ┌──────────┴───────────┐
+                      │  Go shell (Wails v3) │  window, menus, SQLite, settings, op log,
+                      │  shell/main.go       │  keychain, pre-connect, engine supervision
+                      └──────────────────────┘
 ```
 
 **Why a separate engine process.** Driver work (socket reads, protocol parsing, row decoding) is
-CPU-bursty. In the main process it would stall window/menu handling; in the renderer it would drop
-frames. In its own process it is fully parallel and its memory is separately capped and reclaimable.
+CPU-bursty. In the shell process it would stall window/menu handling; in the webview it would drop
+frames. In its own process it is fully parallel and its memory is separately capped and reclaimable
+(`--max-old-space-size`, from the `advanced.engineMemoryCapMb` setting).
 
 **One engine for all connections**, not one per connection: a V8 isolate costs ~35 MB, so
 per-connection processes would blow the RAM budget at 5 connections. The adapter host is written so
 a connection *can* be moved to its own process later (config flag) if a driver proves unstable.
 
-**Bulk data skips the main process.** At window creation, main creates a `MessageChannel` and hands
-one port to the renderer and one to the engine. Result pages travel renderer↔engine directly, as
-transferable `ArrayBuffer`s where the column type allows. Control messages (connect, cancel,
-settings) go through main so it stays the single source of truth for state and logging.
+**The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
+TypeScript bindings under `shell/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
+`wails3 generate bindings -b -i -ts -names`), which `src/renderer/bridge/control.ts` calls as plain
+typed async functions — `AppService.Info()`, `ConnectionsService.List()` — resolving under the hood
+to HTTP calls against the local `/wails/runtime` endpoint driven by `/wails/runtime.js`
+(`@wailsio/runtime`). Every call is wrapped in one `unwrap()` that normalizes a Go-side error into
+the `{message, code}` shape the renderer already branched on. The **data plane** is a single named
+stream, `"engine"`, opened once per page load by `src/renderer/bridge/port.ts` via
+`JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
+
+**Bulk data passes through Go, unread.** `shell/internal/bridge/stream.go`'s `ServeEngineStream`
+attaches the renderer's stream connection directly as the engine host's sink and forwards every
+inbound frame to the engine's stdin verbatim — neither direction is unmarshalled, and there is no
+intermediate copy or re-encode. Backpressure is the transport's own: Wails' `Send` blocks, so the
+engine host's bounded queue fills, its read loop stops draining the engine's stdout, and the OS pipe
+pushes back on the engine.
+
+**The Go side is `shell/`.** `shell/main.go` builds the `application.New` options and registers
+twelve bound services under `shell/internal/bridge/` — `AppService`, `SettingsService`,
+`LayoutService`, `TabsService`, `ConnectionsService`, `TreeService`, `EngineService`, `OpsService`,
+`FiltersService`, `FilesService`, `QueriesService`, `LifecycleService`. Behind them:
+`internal/storage/` (repos plus forward-only SQL migrations), `internal/tree/service.go` (the
+children/describe/definition cache-aside), `internal/preconnect/` (the pre-connect script
+supervisor, a real process-supervisor state machine), `internal/secrets/` (the keychain, see
+Storage), `internal/enginehost/` (the engine child's supervisor and protocol speaker), and
+`internal/metrics/`.
+
+**App-wide CPU/RSS metrics** (`internal/metrics/`, the Go analogue of Electron's
+`app.getAppMetrics()`) find this app's process set by **executable-path substring match, not a
+pid-tree walk** — a native webview's helpers (WKWebView's `com.apple.WebKit.*`, WebKitGTK's
+WebProcess/NetworkProcess) are not children of the shell in the ppid sense, so a tree walk would
+silently under-count. `AnchorNeedles` is `["Kira Studio", "runtime/node/bin/node"]`,
+`HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide scan per
+5 s tick.
+
+**Known regression: the engine stdio hop JSON-encodes bulk data.** `stdio-main.ts`'s `writeFrame`
+does `JSON.stringify` on every frame, control and data alike. Electron's `MessagePortMain` carried
+`TextColumnChunk`'s four exactly-sized typed arrays across by real structured clone; JSON does not
+— a `TypedArray` serializes as an object keyed `"0","1",…`, which is why `bridge/port.ts` has to
+carry `reviveChunks` to rebuild real `Uint8Array`/`Uint32Array` instances on the renderer side. The
+correctness hole is closed, but the cost is not: a binary blob inflates to roughly 5–6 bytes per
+original byte on the wire before `reviveChunks` even runs, plus the transient heap both the
+`stringify` and the `parse` need. This is a genuine memory and CPU regression against the Electron
+architecture and it is **not fixed** — the named direction is a future phase (P58) migrating the
+adapters to native Go, which removes the Node sidecar and this hop with it.
 
 ## Renderer security surface
 
-`src/main/security.ts` is the one module that owns every default-on Electron/Chromium capability
-this app has turned off, plus the reason each was turned off — an audit against what the renderer
-actually does, not a blanket hardening pass (P46). `rendererWebPreferences()` builds the
-`webPreferences` object `window.ts` passes to `BrowserWindow`; `hardenSession()` runs once on
-`session.defaultSession` after `app.whenReady()`; `hardenWindow()` runs per window before its
-`loadURL`/`loadFile` call.
+**This section is much shorter than it was, and that is the finding, not an omission.** Most of what
+P46 hardened were default-on Electron/Chromium capabilities. Under Wails the webview is a native
+WKWebView, not a bundled Chromium, so the majority of those switches have **no subject at all** —
+there is nothing to turn off, because the thing was never on. A smaller number have **no analogue**:
+Wails exposes no equivalent, and the guarantee is genuinely weaker than it was. Those are listed as
+losses below rather than papered over.
 
-| Turned off | Because |
+`shell/internal/shell/security.go` is the one module that owns what remains. `Harden()` returns the
+posture, and `window.go`'s `Options` is its single caller. It does four things: deny every
+permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` false, leave
+`EnableFileDrop` false, and leave `OpenInspectorOnStartup` false.
+
+| P46 control | Status under Wails |
 |---|---|
-| DevTools in a packaged build (`devTools: !app.isPackaged`) | No caller exists in a packaged renderer (no node integration, not on the `contextBridge` surface) — this closes the last path, `openDevTools()`, after the dev-menu's own keyboard gating already closed the shortcut one. |
-| Every Chromium permission, except the clipboard | Nothing else is used: no notification is ever raised, no geolocation/media/device API is called. `navigator.clipboard` is the one real user — both halves route through the permission *request* handler, under the names `clipboard-read` and `clipboard-sanitized-write`. |
-| `window.open` | Zero `window.open`, zero `target="_blank"`, zero `<a href>` anywhere in `src/renderer`/`src/shared`. File pickers are native `dialog` modals over IPC, not popups. |
-| Navigating the window away from its own base URL | The `<meta>` CSP has no say over top-level navigation — a renderer bug or a compromised dependency could otherwise send the whole window to a remote origin. Guarded on `will-frame-navigate` (fires before `will-navigate`, covers sub-frames too), allowing only URLs starting with `process.env.ELECTRON_RENDERER_URL ?? 'file://'` — `wc.reload()` and a dev-server full reload both still work through it. |
-| Attaching a `<webview>` | Makes `webviewTag: false` unbypassable. |
-| The spellchecker (`spellcheck: false` *and* `session.setSpellCheckerEnabled(false)` — neither implies the other) | The connection dialog's password field becomes plain `type="text"` once the eye toggle reveals it; a spellchecked field hands its contents to the platform spell checker. |
-| WebGL | The only `getContext()` calls in the tree are two `'2d'` contexts, both for text measurement. |
-| Autofill on every `TextField.vue`-backed input (`autocomplete="off"`) | Zero `<form>` elements means Chromium has no form owner to attach autofill heuristics to; the attribute is the actual per-input opt-out. |
-| Being a Node runtime once packaged (`electronFuses`: `runAsNode`/`enableNodeOptionsEnvironmentVariable`/`enableNodeCliInspectArguments`, all `false`) | Closes the one remaining "debuggable outside development" path after DevTools: a Node inspector on main is strictly more powerful than DevTools on the renderer. Measured against the real `out/main/index.js` running under a fuse-flipped copy of the Electron binary — it boots identically, including the engine's own `utilityProcess`. |
+| `contextIsolation` / `sandbox` / `nodeIntegration: false` | **No subject, strictly better.** There is no Node in the webview to isolate it from, and no `contextBridge`/`window.kira` surface at all — the renderer reaches Go only through generated bindings and the `engine` stream. |
+| DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `shell/build/darwin/Taskfile.yml`. |
+| Every Chromium permission except the clipboard | **Set, but inert on macOS.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed), but Wails v3.0.0-beta.15 implements `resolvePermission` only for Linux and Windows — there are zero darwin references. The option is kept because it is genuinely correct on Linux, where `wails3 task dev` runs; on macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
+| `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `src/renderer`/`src/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
+| Navigation lock to the base URL | **No analogue — a real loss, already known.** There is no navigation-policy delegate on darwin at all (`webview_window_darwin.m` has no `decidePolicy`). This is weaker than the Electron `will-frame-navigate` guard plus fuses it replaces, and is recorded as a loss rather than mitigated. |
+| `webviewTag: false` | **No subject.** |
+| The spellchecker | **No analogue in the shell** — Wails exposes no spellcheck control. The mitigation moved into the renderer instead: `spellcheck="false"` on the field itself. The reason is unchanged: the connection dialog's password field becomes plain `type="text"` once the eye toggle reveals it. |
+| WebGL off | **No subject.** |
+| The seven `disable-*` Chromium switches | **No subject.** |
+| `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `shell/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
+| The three Electron fuses (`runAsNode` and friends) | **No subject.** There is no Electron binary to re-run as Node. |
+
+**Autofill** is unchanged and still a renderer-side control: `autocomplete="off"` on every
+`TextField.vue`-backed input, because zero `<form>` elements means the engine has no form owner to
+attach autofill heuristics to and the attribute is the actual per-input opt-out.
 
 **The clipboard allowlist is an allowlist, not a deny-all, because a deny-all breaks the app.**
-`navigator.clipboard.readText()`/`writeText()` are permissions like any other, and denying them
-throws `NotAllowedError` at `clipboard.ts`'s `copyText` (38 call sites) and the grid's own paste
-path — with no failure visible in this repo's Docker-free test subset, since the assertions that
-would catch it are Docker-gated. One shared `Set`, consulted by both the permission request and
-check handlers, so the two can never drift apart.
-
-**`grantFileProtocolExtraPrivileges` stays on. This is a rule, not a footnote: turning it off
-bricks the packaged app.** The built renderer is `<script type="module" crossorigin>`, loaded over
-`file://`, and this fuse is precisely what lets a `file://` page fetch a sibling `file://` module —
-without it, the module load is CORS-refused and the window never finishes booting. Electron's own
-packaging docs read as an invitation to disable it ("if you aren't serving pages from `file://` you
-should disable this fuse"); this app **is** serving from `file://`, which is exactly what makes the
-suggestion a trap here. `scripts/verify-packaging.sh`'s S7 fails the build if it is ever set to
-`false`.
+Denying clipboard reads throws at `clipboard.ts`'s `copyText` (38 call sites) and the grid's own
+paste path. This reasoning still governs the `Permissions` map even though that map is inert on
+macOS — it is the correct value, and it is the value that actually applies on Linux.
 
 **Deliberately left alone, each a decision rather than an oversight:**
-- **Background throttling** stays on (the default). The quit-flush handshake is IPC-driven end to
-  end, and the app's one `setInterval` (the run-state ticker) only runs while an operation is in
-  flight — nothing on either path depends on a hidden window's timers *not* being throttled.
 - **Hardware acceleration** stays on. The grid's scroll budget (see Invariants, above, and
-  `docs/PERF.md` §1) depends on GPU compositing; disabling it would cost the one non-functional
-  requirement this whole phase exists in service of.
-- **`disableDialogs`/`safeDialogs`** stay off the table. `window.confirm()` gates six destructive
-  actions (deleting a key, an S3 object, a message, a document, a connection); replacing them with
-  the app's own confirmation UI is a UI change for a future phase, not a security setting to flip
-  here.
+  `docs/PERF.md` §1) depends on GPU compositing.
+- **`window.confirm()`** still gates six destructive actions (deleting a key, an S3 object, a
+  message, a document, a connection). Replacing them with the app's own confirmation UI is a UI
+  change for a future phase.
 
-**What actually holds this**, so a revert is never silent: `tests/e2e/hardening.spec.ts` (Docker-free
-— pinned `webPreferences`, every permission scenario, the window-open/navigation/webview guards,
-the spellchecker, the autofill attribute, WebGL) and `tests/unit/security.spec.ts`/
-`tests/unit/menu.spec.ts` (the option object and the packaged-vs-dev menu template, neither needing
-Docker or even a real Electron — `security.ts`'s only `electron` import is `import type`). The three
-Electron fuses and the WebGL disable have real coverage only on a packaged macOS build; both are
-recorded as owed verification in `docs/v1/plans/P46-…md` §8, not silently assumed passing.
+**What actually holds this**, so a revert is never silent: `shell/internal/shell/security_test.go`
+and `menutemplate_test.go` (the posture value and the packaged-vs-dev menu template — the successors
+to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose subjects moved to Go). There is
+no Wails analogue of the old `tests/e2e/hardening.spec.ts`, and none was written: with the table
+above reduced to "no subject" for most rows, there is nothing left for such a spec to assert that
+the Go test does not already cover. The macOS-only behaviours — WebKit's clipboard gesture
+heuristics, and the absent navigation delegate — have no automated coverage on any platform this
+repo's CI runs.
 
 ## Testing
 
-Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`. `ipc/` is the odd one
-out — it is two suites in one directory, a `node:test` backend half and a Playwright frontend half
-per adapter, sharing one fixture module by design (P50, below).
+Five suites, under `tests/`: `unit/`, `db/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite in
+`shell/` (`bun run test:go`). `ipc/` is the odd one out — it is two suites in one directory, a
+`node:test` backend half and a Playwright frontend half per adapter, sharing one fixture module by
+design (P50, below).
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
 `~/.kira-studio` or a database a running `bun run dev` session is connected to. Running the tests
 must not disconnect, lock out, or otherwise disturb a `bun run dev` instance already running on the
-same machine. One exception is deliberate (P25 F10): on a real macOS dev machine, the Keychain item
-`safeStorage` uses is named after the app and shared with the developer's own login keychain, so a
-UI test that saves a connection password touches the same OS-level encryption key a `bun run dev`
-session would. This is safe — each test's *secrets* stay isolated in its own temp `KIRA_HOME`'s
-`kira.sqlite`, only the underlying key is shared, the same as any two processes signed as this app
-would share it, and no test ever rotates or clears that key.
+same machine. One exception is deliberate (P25 F10): on a real macOS dev machine the app's Keychain
+item is shared with the developer's own login keychain, so a test that saves a connection password
+touches the same OS-level encryption key a `bun run dev` session would. This is safe — each test's
+*secrets* stay isolated in its own temp `KIRA_HOME`'s `kira.sqlite`, only the underlying key is
+shared, and no test ever rotates or clears that key.
 
 **`tests/unit/` needs nothing external and finishes in about a second** (`bun test tests/unit`) —
-plain TypeScript modules exercised with fakes (a `bun:sqlite`-backed Drizzle instance restating a
-table's DDL by hand, a fake `requestAnimationFrame` queue, a hand-written fake client implementing
-one method) rather than a real container or a real Electron process. A shared `window` stub
-(`tests/unit/support/window.ts`) is imported by every spec that needs one, rather than each spec
-declaring its own — Bun's module registry is shared across every spec file in one test run, so
-whichever spec's stub loads first wins for the whole run.
+plain TypeScript modules exercised with fakes rather than a real container or a real app process. It
+was pruned hard during the migration to a much stricter bar: a unit test now exists only for
+genuinely complex or deeply-nested logic — parsers, cursor/pagination boundary arithmetic, cache
+eviction, crypto, concurrency state machines. Most CRUD-, wrapper- and constructor-shaped tests were
+deleted as low-value rather than ported. The **Go suite was pruned against the same bar** in the
+same pass. Two specs were deleted because their subject moved rather than disappeared:
+`security.spec.ts` and `menu.spec.ts` are now `shell/internal/shell/security_test.go` and
+`menutemplate_test.go`. A shared runtime stub (`tests/unit/support/wailsRuntime.ts`) registers a fake
+`/wails/runtime.js` and is imported for its side effect by every spec that needs one, rather than
+each spec declaring its own — Bun's module registry is shared across every spec file in one test
+run, so whichever spec's stub loads first wins for the whole run.
 
-**`tests/db/` and `tests/electron-db/` need a real external resource** — a Testcontainers-managed
-Docker container per engine (`bun test tests/db`, requires Colima on macOS or a Docker daemon on
-Linux) — and one file in `electron-db/` needs a real Electron process on top of that, because the
-native Kafka driver is built against Electron's own Node ABI and cannot load under Bun at all (see
-the Kafka section above). One container per engine, one fixture module per engine that seeds a
-realistic dataset: wide tables, `NULL`s, unicode, large text/blob, nested JSON, composite PKs,
-self-referencing and multi-hop FKs, ≥ 1 M rows in one table to exercise paging and counts.
-Scenarios per engine: connect/disconnect, tree enumeration, describe, definition, first page, deep
-page, count, projection, sort, filter, cancel-mid-query (asserted **server-side** — the query must
-actually be gone from `pg_stat_activity` / `SHOW PROCESSLIST` / `currentOp`), cache hit/miss
-behaviour, add/delete row, command preview correctness. Local-only for now — no CI wiring in v1.
+**`tests/db/` needs a real external resource** — a Testcontainers-managed Docker container per
+engine (`bun run test:db`, requires Colima on macOS or a Docker daemon on Linux). It is **entirely
+untouched by the shell migration**: the adapters did not move, and Bun + Testcontainers is
+unaffected by what the shell is written in. It also absorbed the former `tests/electron-db/`: the
+Kafka spec now lives beside every other engine's as `tests/db/kafka.spec.ts`, and
+`scripts/run-db-tests.sh` runs it esbuild-bundled under the vendored Node while the rest of the
+directory runs under Bun. Bun still cannot load the Kafka driver's native addon at any ABI, but a
+stock Node loads it with no ABI dance at all — the Electron-ABI rebuild step is gone.
 
-**`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real IPC
-boundary — the control channel (`window.kira.*` → `ipcMain.handle` in `src/main/ipc/*`) and the
-bulk-data port (a `MessagePort` between `renderer/bridge/port.ts` and `engine/rpc.ts`, bypassing
-main entirely). Per adapter, one folder holds three files: `<adapter>.backend.spec.ts` drives the
-real `handleFrame`/`dispatch`/`TreeService` stack against a real container with no renderer at all
-(`bun run test:ipc:be`, one `ELECTRON_RUN_AS_NODE=1 electron` process per spec file, because
-`src/main/ipc/*`/`engine/{control,rpc}.ts` import `electron` and some adapters — sqlite, kafka —
-cannot load under Bun at any ABI); `<adapter>.frontend.spec.ts` drives the real Vue UI with both IPC
-halves mocked (`ipcMain` handlers swapped in the main process for the control channel — `window.kira`
-itself is frozen and non-configurable, so renderer-side mocking is impossible — and a fresh
-`MessageChannel` port for the bulk-data side), via `bun run test:ipc:fe`, which needs no Docker, no
-container and no native driver; and `<adapter>.fixture.ts` is the one file both halves import. That
+One container per engine, one fixture module per engine that seeds a realistic dataset: wide tables,
+`NULL`s, unicode, large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs,
+≥ 1 M rows in one table to exercise paging and counts. Scenarios per engine: connect/disconnect,
+tree enumeration, describe, definition, first page, deep page, count, projection, sort, filter,
+cancel-mid-query (asserted **server-side** — the query must actually be gone from `pg_stat_activity`
+/ `SHOW PROCESSLIST` / `currentOp`), cache hit/miss behaviour, add/delete row, command preview
+correctness. Local-only for now — no CI wiring in v1.
+
+**`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real wire
+boundary — the control plane and the bulk-data plane (see Process model, above). Per adapter, one
+folder holds three files: `<adapter>.backend.spec.ts` drives the real `handleFrame`/`dispatch` stack
+against a real container with no renderer at all (`bun run test:ipc:be`, one vendored-Node process
+per spec file — no Electron is involved any more, since the harness's own `src/main` imports are
+gone and neither `engine/{control,rpc}.ts` nor any adapter ever imported `electron`; the separate
+process per file is still needed because some adapters, sqlite and kafka, cannot load under Bun at
+any ABI). The one thing that harness lost with `src/main` is the real tree cache-aside, which used
+to come from `src/main/tree-service.ts`; it is now a Map-backed stand-in for
+`shell/internal/tree.Service`'s cache-aside, since the real one is Go and this tier is TypeScript.
+`<adapter>.frontend.spec.ts` drives the real Vue UI with both planes mocked, via `bun run
+test:ipc:fe`, which needs no Docker, no container and no native driver; and `<adapter>.fixture.ts`
+is the one file both halves import. That
 fixture is **generated, never hand-written**: `KIRA_IPC_FIXTURES=write bun run test:ipc:be` captures
 real responses from a real container and writes the module, and every subsequent run of the backend
 spec asserts its own real responses against that same committed file. This is the tier's anti-drift
@@ -577,27 +674,44 @@ first.** Wall-clock and other non-reproducible fields (timestamps, ephemeral por
 generated ids, approximate row-count estimates) are frozen to fixed placeholders in the fixture
 after being validated structurally against the real value, never invented.
 
-**`tests/e2e/`** (renamed from `tests/ui/`, P50 — `bun run test:e2e`) runs Playwright's
-`_electron.launch()` against the built app, driving the real UI against the real containers. Every
-change is validated with it before it is called done. After P50 it holds two things: three
-full-stack anchors that stay whole rather than split at the IPC boundary — `sqlite.spec.ts`
-(Docker-free, the only DB-backed spec that runs in every environment this repo runs in),
-`mongo.spec.ts` (Docker-backed, the document page kind, a real write path end to end) and
-`s3.spec.ts` (the only spec exercising `src/main/ipc/files.ts`'s real save/open dialogs and
-`DATA_OP.objectDownload`, whose contract — the engine writes the file itself, bytes never transit
-main or the renderer — no mock can honestly stand in for) — and the remaining non-adapter specs,
-unchanged: panel toggles, settings persistence, connection CRUD, tree expansion and caching (assert
-query counts via the op log), opening the same table twice with independent state, all pagination
-controls, projection, search toolbar modes, stop button, cell editor autodetect + beautify, document
-expand/collapse, PK/FK navigation, every context menu opening with the right items, copy/paste, the
-sticky ancestor band's exact geometry and handoff across a scroll, and the checkbox tree filter's
-kind/tri-state/name-filter/persistence behavior. Plus a perf smoke test asserting no dropped frames
-while scrolling 10k rows (the RSS budget's own `memory.spec.ts` was removed — permanently over
-budget on Chromium/Electron process overhead no app-level change can address; see `docs/PERF.md`
-§2.2).
+**`tests/e2e/` is gone** — the whole `_electron.launch()` tier, 23 spec files, was retired with the
+Electron shell rather than ported wholesale. Every pure-UI spec has a verified `tests/ui/` port;
+every full-stack-only spec has a named disposition, recorded here because two of them are losses:
+`sqlite.spec.ts`'s and the postgres wiring value was recovered by the new `tests/e2e-real/` tier;
+`s3.spec.ts`'s file-write contract (the engine writes the file itself, bytes never transit the shell
+or the renderer) was recovered by a `tests/db/` case; **`mongo.spec.ts`'s full-stack anchor value was
+not recovered**, and that is an accepted, documented loss. `hardening.spec.ts` and `startup.spec.ts`
+were deleted outright with no analogue: there is no `webPreferences`, fuse or Chromium-permission
+concept left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
+(`docs/PERF.md` §3).
 
-**Parallelism.** `playwright.config.ts` runs two projects on purpose, not by oversight: `e2e` (the
-`tests/e2e/` specs above) stays `workers: 1, fullyParallel: false` because its `budgets`/`perf`/
-`startup`/`leaks` specs assert wall-clock numbers that CPU contention would move; `ipc-frontend`
-(`tests/ipc/**/*.frontend.spec.ts`) runs `fullyParallel` because it contends over nothing — each
-test gets its own `KIRA_HOME`, its own Chromium profile, and no shared socket or container at all.
+**`tests/ui/`** (`bun run test:ui`) is its replacement for everything that ported: 36 tests across 18
+spec files driving the **real built `shell/frontend/dist` bundle** — real Vue, real
+`bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, which is what a
+packaged build actually embeds (WKWebView on macOS, WebKitGTK on Linux). There is no native app
+process and no container: **both wire planes are mocked**, the control plane by
+`page.route('**/wails/runtime')` answering from fixtures keyed by a hand-maintained `CHANNEL_TO_FQN`
+table, the data plane by a fake `window._wails.streamFactory` socket. It covers what the old tier
+covered minus the full-stack anchors: panel toggles, settings persistence, connection CRUD, tree
+expansion and caching, opening the same table twice with independent state, pagination, projection,
+search toolbar modes, stop button, cell editor, document expand/collapse, PK/FK navigation, context
+menus, copy/paste, the sticky ancestor band's geometry, the checkbox tree filter, plus the
+budgets/perf/leaks specs.
+
+**`tests/e2e-real/`** is the new full-stack *wiring* tier, and it is deliberately small — two specs
+(sqlite, postgres). It builds the Go shell with `-tags server` (Wails v3's server build mode), which
+serves both planes over plain HTTP and WebSocket to a plain Chromium tab with **no native window at
+all**: a real Go backend, a real embedded engine child, a real adapter, a real container. That
+recovers the wiring confidence `tests/e2e/` used to provide for these two engines at a small
+fraction of the cost. It is not a UI-fidelity tier — that is `tests/ui/`'s job, which is why this one
+uses Chromium rather than WebKit. Server mode has no file dialogs (`FilesService.ChooseSave`/
+`ChooseOpen` answer a real HTTP 422), so a spec needing one stubs exactly that method through a
+passthrough route that reuses `CHANNEL_TO_FQN` rather than re-deriving it.
+
+**Parallelism.** `playwright.config.ts` runs three projects, all `fullyParallel`. `ui` being fully
+parallel is a real change from the old `e2e` project's `workers: 1`, and it is earned rather than
+inherited: that serialisation existed because concurrent Electron apps contend over wall-clock/RSS
+budgets and Docker containers, and this tier has neither — the same reasoning that already made
+`ipc-frontend` fully parallel. `e2e-real` runs `workers: 2`, safe because a per-test `KIRA_HOME` plus
+`WAILS_SERVER_PORT` gives each instance its own SQLite app storage, its own secrets and its own
+engine child.
