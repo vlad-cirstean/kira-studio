@@ -1,3 +1,5 @@
+import './wailsRuntime';
+
 // A shared globalThis.window stub for every tests/unit spec that needs one, imported for its
 // side effect (`import './support/window'`) rather than declared inline per spec.
 //
@@ -21,3 +23,9 @@
   ),
   addEventListener: () => {},
 };
+
+// bridge/port.ts (P57) calls JSONStream('engine') at its own module scope, and data.ts and
+// workbench/state/engine.ts both import port.ts — so any spec whose chain reaches either now
+// needs '/wails/runtime.js' to resolve under Bun. The './wailsRuntime' import above registers the
+// one shared mock.module for that specifier; see its own comment for why it has to be the only
+// registration in the whole run.
