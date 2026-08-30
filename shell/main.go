@@ -14,10 +14,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
 	"github.com/kirathecat/kira-studio/shell/internal/config"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
+	"github.com/kirathecat/kira-studio/shell/internal/enginebackend"
+	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/logging"
 	"github.com/kirathecat/kira-studio/shell/internal/metrics"
@@ -103,20 +107,37 @@ func main() {
 	deps.EngineHost = host
 	deps.NodeVersion = nodeVersion(nodeBin)
 
+	adapterDeps := adapters.Deps{Log: func(level, message string) {
+		switch level {
+		case "error":
+			slog.Error(message, "scope", "adapter")
+		case "warn":
+			slog.Warn(message, "scope", "adapter")
+		default:
+			slog.Info(message, "scope", "adapter")
+		}
+	}}
+	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)
+	router := adapterhost.NewRouter(adapterDeps, goCache, host, repositories.Connections)
+	deps.Router = router
+
 	preconnectSupervisor := preconnect.New()
 	connectionsSvc := connections.New(connections.Deps{
 		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
-		Cipher: cipher, Host: host, Preconnect: preconnectSupervisor,
+		Cipher: cipher, Host: host, Backend: router, Preconnect: preconnectSupervisor,
 	})
 	connectionsSvc.Start()
 	deps.Connections = connectionsSvc
 
-	treeSvc := tree.New(repositories.Connections, repositories.Metadata, host, connectionsSvc)
+	treeSvc := tree.New(repositories.Connections, repositories.Metadata, router, connectionsSvc)
 	deps.Tree = treeSvc
 
-	enginehost.PushCacheConfig(host, settings)
+	// Configure pushes the budget to both caches (§4.9).
+	router.PushCacheConfig(settings)
 
-	oplogWiring := oplog.New(host, repositories.Ops, settings.Advanced.OpLogRetentionDays)
+	// A14: internal/oplog stays byte-unchanged, consuming one merged EventSource fanning the Node
+	// engine's own op:start/op:end events together with the router's in-process scheduler's.
+	oplogWiring := oplog.New(enginebackend.Merge(host, router.Host()), repositories.Ops, settings.Advanced.OpLogRetentionDays)
 	oplogWiring.Start()
 
 	metricsTicker := metrics.NewTicker(
@@ -164,7 +185,7 @@ func main() {
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
 			application.NewService(&bridge.TreeService{Deps: deps}),
 			application.NewService(&bridge.EngineService{Deps: deps}),
-			application.NewService(&bridge.OpsService{Deps: deps}),
+			application.NewService(&bridge.OpsService{Deps: deps, Canceller: router}),
 			application.NewService(&bridge.FiltersService{Deps: deps}),
 			application.NewService(&bridge.FilesService{Dialogs: dialogs}),
 			application.NewService(&bridge.QueriesService{Deps: deps}),

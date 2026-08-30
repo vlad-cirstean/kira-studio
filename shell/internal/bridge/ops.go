@@ -1,14 +1,28 @@
 package bridge
 
 import (
+	"context"
+
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
+// Canceller is the one thing OpsService.Cancel needs (A11's per-consumer-interface discipline —
+// the same shape as connections.Backend and tree.Backend). *adapterhost.Router satisfies this
+// structurally: it asks its own in-process scheduler first (op ownership, not connection kind,
+// A13 — Cancel's payload is only {opId}, so there is no kind to route on) and forwards to the
+// engine child only for an op it never started.
+type Canceller interface {
+	Cancel(ctx context.Context, opID string) (bool, error)
+}
+
+// OpsService keeps Canceller as its own field rather than routing it through the shared
+// appcore.Deps (the same shape bridge.FilesService's own Dialogs field already uses): appcore
+// cannot import bridge (bridge already imports appcore), so a Canceller-typed field belongs here.
 type OpsService struct {
-	Deps appcore.Deps
+	Deps      appcore.Deps
+	Canceller Canceller
 }
 
 type OpsRecentArgs struct {
@@ -30,12 +44,12 @@ type OpsCancelArgs struct {
 	OpID string `json:"opId"`
 }
 
-// Cancel is a bare passthrough to the engine (src/main/ipc/ops.ts:16-19) — there is nothing in
+// Cancel is a bare passthrough to the Canceller (src/main/ipc/ops.ts:16-19) — there is nothing in
 // internal/oplog to build on, which is why P55 §7 left it here.
 func (s *OpsService) Cancel(args OpsCancelArgs) error {
 	if args.OpID == "" {
 		return ipcerr.BadRequest("opId is required")
 	}
-	_, err := s.Deps.EngineHost.Call(enginehost.OpCancel, map[string]any{"opId": args.OpID})
+	_, err := s.Canceller.Cancel(context.Background(), args.OpID)
 	return err
 }

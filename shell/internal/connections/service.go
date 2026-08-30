@@ -4,7 +4,7 @@
 package connections
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -22,8 +22,41 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 )
 
-// TestResult mirrors connections.ts's ConnectionTestResult and the engine's own adapter:test
-// result shape, so it can be json.Unmarshal'd directly.
+// Backend is the slice of adapter lifecycle operations this service calls through instead of
+// straight into *enginehost.Host (A11's per-consumer-interface discipline — the same shape as
+// tree.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally; a thin
+// enginehost-only stub can too, which is what keeps this package's own tests two-line stubs.
+// Four methods, matching A11's own count: Test and Connect each need their own method (they
+// resolve config differently and return different shapes), Disconnect covers all three
+// fire-and-forget call sites (onPreconnectExit, Remove, Disconnect), and IsNativeKind is not one
+// of the nine call sites at all — it is MarkAllErrored's own need (A15), not a Host.Call
+// replacement.
+type Backend interface {
+	// Connect resolves cfg.Kind to a live adapter (native) or forwards to the engine child
+	// (Node-served), and returns what the caller needs to build the connected state.
+	Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (ConnectResult, error)
+	// Test probes cfg without ever registering a live adapter — control.ts's handleTest:
+	// connect, read the server version, unconditionally disconnect. A real Go error, not a
+	// never-throws contract; Test (below) is what wraps it into TestResult.
+	Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (serverVersion string, err error)
+	// Disconnect is fire-and-forget at every call site today, so it stays that shape here.
+	Disconnect(ctx context.Context, connectionID string) error
+	// IsNativeKind reports whether kind is currently served by a Go adapter in this process
+	// (adapterhost's own nativeKinds, A12). MarkAllErrored uses this to skip a Go-native
+	// connection when the Node engine child exits — it is unaffected, because it is (A15).
+	IsNativeKind(kind string) bool
+}
+
+// ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
+// actually reads (serverVersion, caps) — Caps stays untyped because both a native adapter's
+// adapters.Caps and a Node-forwarded connection's raw decoded JSON land here.
+type ConnectResult struct {
+	ServerVersion string
+	Caps          any
+}
+
+// TestResult mirrors connections.ts's ConnectionTestResult — the shape Service.Test builds from
+// Backend.Test's (serverVersion, error) return, matching the JSON the renderer already expects.
 type TestResult struct {
 	OK            bool    `json:"ok"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
@@ -36,13 +69,16 @@ type RevealResult struct {
 	Error    *string `json:"error"`
 }
 
-// Deps is everything the service needs from the rest of the app.
+// Deps is everything the service needs from the rest of the app. Host stays alongside Backend: it
+// is still used directly for watch()'s engine:down subscription (MarkAllErrored's own trigger),
+// which is not one of the nine Backend-routed call sites.
 type Deps struct {
 	Conns      *repos.ConnectionsRepo
 	Secrets    *repos.SecretsRepo
 	Metadata   *repos.MetadataCacheRepo
 	Cipher     *secrets.Cipher
 	Host       *enginehost.Host
+	Backend    Backend
 	Preconnect *preconnect.Supervisor
 }
 
@@ -95,7 +131,7 @@ func (s *Service) onPreconnectExit(exit preconnect.Exit) {
 	// goroutine, exactly as connections.ts:155's `void … .catch(() => {})` does — this handler
 	// must not block the shared preconnect exit-emitter goroutine for that long.
 	go func() {
-		_, _ = s.deps.Host.Call(enginehost.OpDisconnect, map[string]any{"connectionId": exit.ConnectionID})
+		_ = s.deps.Backend.Disconnect(context.Background(), exit.ConnectionID)
 	}()
 
 	detail := "(exit unknown)"
@@ -293,7 +329,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 func (s *Service) Remove(id string) error {
 	current := s.StateOf(id)
 	if current.Status == "connected" || current.Status == "connecting" {
-		_, _ = s.deps.Host.Call(enginehost.OpDisconnect, map[string]any{"connectionId": id})
+		_ = s.deps.Backend.Disconnect(context.Background(), id)
 	}
 	s.deps.Preconnect.Stop(id)
 	if err := s.deps.Conns.Delete(id); err != nil { // cascades filters, metadata cache, saved queries
@@ -343,17 +379,12 @@ func (s *Service) Test(in Input) TestResult {
 			return TestResult{OK: false, Error: &msg}
 		}
 	}
-	payload, err := s.deps.Host.CallTimeout(enginehost.OpTest, map[string]any{"config": r.config}, enginehost.ConnectTimeout)
+	serverVersion, err := s.deps.Backend.Test(context.Background(), r.config)
 	if err != nil {
 		msg := errorMessage(err)
 		return TestResult{OK: false, Error: &msg}
 	}
-	var result TestResult
-	if err := json.Unmarshal(payload, &result); err != nil {
-		msg := err.Error()
-		return TestResult{OK: false, Error: &msg}
-	}
-	return result
+	return TestResult{OK: true, ServerVersion: &serverVersion}
 }
 
 // Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an
@@ -423,19 +454,8 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 		started = true
 	}
 
-	payload, err := s.deps.Host.CallTimeout(enginehost.OpConnect, map[string]any{"config": r.config}, enginehost.ConnectTimeout)
+	result, err := s.deps.Backend.Connect(context.Background(), r.config)
 	if err != nil {
-		if started {
-			s.deps.Preconnect.Stop(id)
-		}
-		return model.ConnectionState{}, err
-	}
-
-	var result struct {
-		ServerVersion string `json:"serverVersion"`
-		Caps          any    `json:"caps"`
-	}
-	if err := json.Unmarshal(payload, &result); err != nil {
 		if started {
 			s.deps.Preconnect.Stop(id)
 		}
@@ -465,7 +485,7 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 
 func (s *Service) Disconnect(id string) (model.ConnectionState, error) {
 	s.deps.Preconnect.Stop(id)
-	_, _ = s.deps.Host.Call(enginehost.OpDisconnect, map[string]any{"connectionId": id})
+	_ = s.deps.Backend.Disconnect(context.Background(), id)
 	// Cached metadata stays — "metadata stays, it is on disk".
 	state := model.ConnectionState{ConnectionID: id, Status: "disconnected", Since: nowMillis()}
 	s.emitState(state)
@@ -502,6 +522,10 @@ func (s *Service) SecretsStatus() secrets.Status { return s.deps.Cipher.Status()
 // synchronously on the caller's goroutine (watch's, in production) — that goroutine has nothing
 // else to do once the engine is gone, and a deterministic shutdown is worth more there than
 // concurrency, unlike onPreconnectExit's own best-effort disconnect above.
+//
+// A15: narrowed to Node-served connections. A Go-native connection is unaffected by the Node
+// child exiting, because it is — without this, killing the Node child would drop a live
+// Go-native connection (and stop its pre-connect script) for no reason at all.
 func (s *Service) MarkAllErrored(reason string) {
 	s.mu.Lock()
 	snapshot := make([]model.ConnectionState, 0, len(s.states))
@@ -511,11 +535,15 @@ func (s *Service) MarkAllErrored(reason string) {
 	s.mu.Unlock()
 
 	for _, st := range snapshot {
-		if st.Status == "connected" || st.Status == "connecting" {
-			s.deps.Preconnect.Stop(st.ConnectionID)
-			errCopy := reason
-			s.emitState(model.ConnectionState{ConnectionID: st.ConnectionID, Status: "error", Error: &errCopy, Since: nowMillis()})
+		if st.Status != "connected" && st.Status != "connecting" {
+			continue
 		}
+		if summary, err := s.deps.Conns.Get(st.ConnectionID); err == nil && summary != nil && s.deps.Backend.IsNativeKind(summary.Kind) {
+			continue
+		}
+		s.deps.Preconnect.Stop(st.ConnectionID)
+		errCopy := reason
+		s.emitState(model.ConnectionState{ConnectionID: st.ConnectionID, Status: "error", Error: &errCopy, Since: nowMillis()})
 	}
 }
 

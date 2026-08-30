@@ -5,6 +5,7 @@ package appcore
 import (
 	"database/sql"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
@@ -32,5 +33,6 @@ type Deps struct {
 	Repos       *repos.Repos
 	Connections *connections.Service
 	Tree        *tree.Service
+	Router      *adapterhost.Router // PushCacheConfig's Go-side half (bridge/settings.go); A17
 	Events      Emitter
 }

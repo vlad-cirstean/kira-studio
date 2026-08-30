@@ -3,7 +3,6 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -34,7 +33,7 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 		return model.Settings{}, ipcerr.Internal(err.Error())
 	}
 	if args.Patch.Cache != nil && args.Patch.Cache.L2BudgetMb != nil {
-		enginehost.PushCacheConfig(s.Deps.EngineHost, merged)
+		s.Deps.Router.PushCacheConfig(merged)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 	return merged, nil

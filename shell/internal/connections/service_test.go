@@ -9,8 +9,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
+	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/enginetest"
 	"github.com/kirathecat/kira-studio/shell/internal/preconnect"
@@ -57,10 +60,13 @@ func newHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
+	// nativeKinds is empty through the whole of P58a's M4, so this router always forwards to the
+	// engine fixture — the same behaviour these tests exercised before the Backend refactor.
+	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Host: host, Preconnect: pre,
+		Cipher: cipher, Host: host, Backend: router, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
@@ -105,10 +111,13 @@ func newUnavailableCipherHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
+	// nativeKinds is empty through the whole of P58a's M4, so this router always forwards to the
+	// engine fixture — the same behaviour these tests exercised before the Backend refactor.
+	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Host: host, Preconnect: pre,
+		Cipher: cipher, Host: host, Backend: router, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)

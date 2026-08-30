@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
+	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/enginetest"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
@@ -45,7 +48,10 @@ func newHarness(t *testing.T) *harness {
 
 	host := enginetest.Host(t)
 	fake := &fakeStates{status: map[string]string{}}
-	svc := tree.New(r.Connections, r.Metadata, host, fake)
+	// nativeKinds is empty through the whole of P58a's M4, so this router always forwards to the
+	// engine fixture — the same behaviour these tests exercised before the Backend refactor.
+	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	svc := tree.New(r.Connections, r.Metadata, router, fake)
 	return &harness{svc: svc, repos: r, host: host, fake: fake}
 }
 

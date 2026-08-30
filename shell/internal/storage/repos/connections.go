@@ -114,6 +114,19 @@ func (r *ConnectionsRepo) List() ([]model.ConnectionSummary, error) {
 	return out, nil
 }
 
+// KindOf satisfies adapterhost.KindLookup — the router's per-connection native/Node-served
+// routing decision. A plain DB read for now, not the connections service's own in-memory state
+// map: main.go constructs the router before connections.Service exists (the router is one of
+// that service's own Deps), so there is no earlier in-memory source to prefer yet. Worth
+// revisiting once nativeKinds is non-empty and this is on every data op's hot path (M5).
+func (r *ConnectionsRepo) KindOf(connID string) (string, bool) {
+	summary, err := r.Get(connID)
+	if err != nil || summary == nil {
+		return "", false
+	}
+	return summary.Kind, true
+}
+
 // Get returns (nil, nil) when no row with this id exists (or the row failed validation).
 func (r *ConnectionsRepo) Get(connID string) (*model.ConnectionSummary, error) {
 	row := r.DB.QueryRow(`SELECT `+connectionSelectColumns+` FROM connections WHERE id = ?`, connID)

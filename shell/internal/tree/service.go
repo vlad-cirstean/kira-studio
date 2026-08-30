@@ -6,10 +6,11 @@
 package tree
 
 import (
+	"context"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 )
@@ -19,6 +20,18 @@ import (
 // driving a real connect, while a real *connections.Service satisfies it too.
 type Connected interface {
 	StateOf(connectionID string) model.ConnectionState
+}
+
+// Backend is the slice of adapter tree operations this service calls through instead of straight
+// into *enginehost.Host (A11's per-consumer-interface discipline — the same shape as
+// connections.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally.
+// Return types reuse adapters.TreeChildren/model.ObjectMeta/model.ObjectDefinition rather than
+// tree-local wrapper types: Source ("cache" | "server") is this service's own concern, set after
+// any real Backend call, never something the backend itself decides.
+type Backend interface {
+	Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error)
+	Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error)
+	Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error)
 }
 
 type ChildrenResult struct {
@@ -38,14 +51,14 @@ type DefinitionResult struct {
 }
 
 type Service struct {
-	conns  *repos.ConnectionsRepo
-	meta   *repos.MetadataCacheRepo
-	host   *enginehost.Host
-	states Connected
+	conns   *repos.ConnectionsRepo
+	meta    *repos.MetadataCacheRepo
+	backend Backend
+	states  Connected
 }
 
-func New(conns *repos.ConnectionsRepo, meta *repos.MetadataCacheRepo, host *enginehost.Host, states Connected) *Service {
-	return &Service{conns: conns, meta: meta, host: host, states: states}
+func New(conns *repos.ConnectionsRepo, meta *repos.MetadataCacheRepo, backend Backend, states Connected) *Service {
+	return &Service{conns: conns, meta: meta, backend: backend, states: states}
 }
 
 // wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error.
@@ -100,23 +113,17 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 	if err != nil {
 		return ChildrenResult{}, ipcerr.Internal(err.Error())
 	}
-	payload, err := s.host.Call(enginehost.OpChildren, map[string]any{"connectionId": connectionID, "path": nodePath})
+	result, err := s.backend.Children(context.Background(), connectionID, nodePath)
 	if err != nil {
 		return ChildrenResult{}, err
 	}
-	var result struct {
-		Nodes     []model.TreeNode `json:"nodes"`
-		Truncated bool             `json:"truncated"`
-	}
-	if err := json.Unmarshal(payload, &result); err != nil {
-		return ChildrenResult{}, ipcerr.Internal(err.Error())
-	}
-	if result.Truncated {
+	truncated := result.Truncated != nil && *result.Truncated
+	if truncated {
 		_ = s.meta.Drop(connectionID, path)
 	} else if encoded, err := json.Marshal(result.Nodes); err == nil {
 		_ = s.meta.Put(connectionID, path, "children", encoded)
 	}
-	return ChildrenResult{Nodes: result.Nodes, Source: "server", Truncated: result.Truncated}, nil
+	return ChildrenResult{Nodes: result.Nodes, Source: "server", Truncated: truncated}, nil
 }
 
 // Describe ports tree-service.ts:110-128. `tabId` tags the resulting op-log row so the requesting
@@ -139,22 +146,14 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 	if err != nil {
 		return DescribeResult{}, ipcerr.Internal(err.Error())
 	}
-	payload, err := s.host.Call(enginehost.OpDescribe, map[string]any{
-		"connectionId": connectionID, "path": nodePath, "tabId": tabID,
-	})
+	meta, err := s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
 		return DescribeResult{}, err
 	}
-	var result struct {
-		Meta model.ObjectMeta `json:"meta"`
-	}
-	if err := json.Unmarshal(payload, &result); err != nil {
-		return DescribeResult{}, ipcerr.Internal(err.Error())
-	}
-	if encoded, err := json.Marshal(result.Meta); err == nil {
+	if encoded, err := json.Marshal(meta); err == nil {
 		_ = s.meta.Put(connectionID, path, "describe", encoded)
 	}
-	return DescribeResult{Meta: result.Meta, Source: "server"}, nil
+	return DescribeResult{Meta: meta, Source: "server"}, nil
 }
 
 // Definition ports tree-service.ts:130-148.
@@ -175,22 +174,14 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 	if err != nil {
 		return DefinitionResult{}, ipcerr.Internal(err.Error())
 	}
-	payload, err := s.host.Call(enginehost.OpDefinition, map[string]any{
-		"connectionId": connectionID, "path": nodePath, "tabId": tabID,
-	})
+	definition, err := s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
 		return DefinitionResult{}, err
 	}
-	var result struct {
-		Definition model.ObjectDefinition `json:"definition"`
-	}
-	if err := json.Unmarshal(payload, &result); err != nil {
-		return DefinitionResult{}, ipcerr.Internal(err.Error())
-	}
-	if encoded, err := json.Marshal(result.Definition); err == nil {
+	if encoded, err := json.Marshal(definition); err == nil {
 		_ = s.meta.Put(connectionID, path, "definition", encoded)
 	}
-	return DefinitionResult{Definition: result.Definition, Source: "server"}, nil
+	return DefinitionResult{Definition: definition, Source: "server"}, nil
 }
 
 // Invalidate drops L1 for one node (path non-nil) or the whole connection (path nil). No push of
