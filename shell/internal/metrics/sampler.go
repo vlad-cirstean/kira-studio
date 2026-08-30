@@ -79,7 +79,8 @@ func (s *Sampler) Sample() (Sample, error) {
 // MatchingPIDs finds every running process whose executable path contains needle — the "match on
 // the bundle, not the pid tree" rule P52 §3.3/§8.4 both call for — plus any explicitly known
 // extra pids (e.g. the engine child, which is a direct child but costs nothing to include
-// explicitly too).
+// explicitly too). Exported for a single-needle caller; AppProcessSet below does its own combined
+// scan rather than calling this once per needle (see its own comment for why).
 func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
 	procs, err := process.Processes()
 	if err != nil {
@@ -116,36 +117,52 @@ func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
 // WKWebView's XPC helpers) that are actually this app's own helpers — not simply every process on
 // the machine whose executable happens to match the substring.
 //
-// Why this exists: a native webview's helper processes are not children of this app in the ppid
-// sense (WKWebView's are reparented to launchd, ppid=1), so MatchingPIDs alone over-matches —
-// confirmed on a real machine measuring P52 gate G1: "com.apple.WebKit" matched Messages' and
-// Notes' own idle WebContent/GPU/Networking helpers too, inflating a 215 MB reading to 300 MB.
-// On darwin, macOS itself tracks which process is "responsible" for launching each XPC service
-// (the same mechanism Activity Monitor uses to group them visually) via
+// Why the helper/anchor split exists: a native webview's helper processes are not children of
+// this app in the ppid sense (WKWebView's are reparented to launchd, ppid=1), so a plain substring
+// match over-matches — confirmed on a real machine measuring P52 gate G1: "com.apple.WebKit"
+// matched Messages' and Notes' own idle WebContent/GPU/Networking helpers too, inflating a 215 MB
+// reading to 300 MB. On darwin, macOS itself tracks which process is "responsible" for launching
+// each XPC service (the same mechanism Activity Monitor uses to group them visually) via
 // responsibility_get_pid_responsible_for_pid, so helper pids are kept only when that resolves to
 // one of the anchor pids. On every other platform responsiblePID returns -1 (unknown), so helper
 // pids are kept unfiltered — correct there specifically because P52 §2.3 already confirmed
 // WebKitGTK's own helpers really are ppid children on Linux, so this over-match risk doesn't arise.
+//
+// Scans the system's process table exactly once, regardless of how many needles are given (P57
+// finding: an earlier version called MatchingPIDs — a full process.Processes() enumeration plus
+// an Exe() syscall on every process on the machine — once per needle, i.e. once per *element* of
+// AnchorNeedles/HelperNeedles combined. With this app's own needle lists that's 5 full system-wide
+// scans every 5s tick for the life of the process, almost all of it re-deriving the exact same
+// process-to-executable-path facts five times over. One scan, checked against every needle per
+// process, produces the identical result for a small, fixed syscall cost instead of one that scales
+// with the needle count).
 func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
-	anchors, err := unionMatchingPIDs(anchorNeedles)
+	procs, err := process.Processes()
 	if err != nil {
 		return nil, err
 	}
+
+	var anchors, helpers []int32
+	for _, p := range procs {
+		exe, err := p.Exe()
+		if err != nil || exe == "" {
+			continue
+		}
+		switch {
+		case containsAny(exe, anchorNeedles):
+			anchors = append(anchors, p.Pid)
+		case containsAny(exe, helperNeedles):
+			helpers = append(helpers, p.Pid)
+		}
+	}
+
 	anchorSet := make(map[int32]bool, len(anchors))
 	for _, pid := range anchors {
 		anchorSet[pid] = true
 	}
 
-	helpers, err := unionMatchingPIDs(helperNeedles)
-	if err != nil {
-		return nil, err
-	}
-
 	out := append([]int32{}, anchors...)
 	for _, pid := range helpers {
-		if anchorSet[pid] {
-			continue // already counted as an anchor
-		}
 		if resp := responsiblePID(pid); resp == -1 || anchorSet[resp] {
 			out = append(out, pid)
 		}
@@ -153,20 +170,11 @@ func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
 	return out, nil
 }
 
-func unionMatchingPIDs(needles []string) ([]int32, error) {
-	seen := map[int32]bool{}
-	var out []int32
+func containsAny(s string, needles []string) bool {
 	for _, n := range needles {
-		pids, err := MatchingPIDs(n)
-		if err != nil {
-			return nil, err
-		}
-		for _, pid := range pids {
-			if !seen[pid] {
-				seen[pid] = true
-				out = append(out, pid)
-			}
+		if strings.Contains(s, n) {
+			return true
 		}
 	}
-	return out, nil
+	return false
 }
