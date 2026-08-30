@@ -1468,3 +1468,127 @@ tests are gone".
   page is the expected symptom of a module-scope throw. Do not skip it at C1.
 - **The Electron app must stay buildable through M4.** `bun run build` is the check; it is cheap and
   it is the difference between a recoverable and an expensive failure at C1.
+
+## 11. Implementation status (as of this session)
+
+M0–M4 are done, committed, and pushed to `wails-native-shell-spike` — C1's six-item boot proof
+passed and is recorded (P57 M4 commit). M5 is in progress; this section is the honest state of it,
+to resume from rather than re-derive.
+
+### M5 — done
+
+- **D13/D14 — `tests/ui/support/{mockRuntime,mockStream}.ts`.** The mock-backed UI tier's whole
+  mechanism, replacing `tests/ipc/support/{mockControl,mockPort}.ts`'s Electron-side approach.
+  `mockRuntime.ts` intercepts `/wails/` at the network layer (`page.route`): the real Wails runtime
+  bundle itself (read from the pinned Go module's
+  `internal/assetserver/bundledassets/runtime.js` — **not** the unbundled `@wailsio/runtime` npm
+  package, which collides on the `/wails/runtime.js` URL between the app's own aggregate import and
+  `calls.js`'s internal relative import of the same name — a real dead end this session hit and
+  documented in the file's own comment) and the one `Call` RPC endpoint, answered from
+  `ControlSnapshot` fixtures via a `CHANNEL_TO_FQN` table built off the generated bindings' own
+  `$Call.ByName(...)` literals. `mockStream.ts` installs `window._wails.streamFactory` (D14),
+  injected as a raw string rather than a typed function — every esbuild-based TS loader this repo's
+  tooling runs under (tsx, Playwright's own transform) emits `keepNames()` helper calls that don't
+  survive `Function.prototype.toString()`, so the browser-side logic lives in a plain, uncompiled
+  `mockStreamBrowser.js` instead, read as text. Both needed a `WILDCARD_DEFAULTS` table for calls
+  the pre-P57 mock let fall through to a real (temporary, empty) backend rather than intercepting:
+  `filtersList`, `tabsSave`, `layoutSet`/`settingsSet`, `opsCancel`/`queriesHistoryRecord`,
+  `treeDescribe`, `queriesList`/`queriesListConsole`/`queriesHistoryList`. `canonical()` also
+  normalizes a missing `refresh` key the same as `refresh: false`, and tree channels fall back from
+  an uncaptured `refresh:true` snapshot to the matching `refresh:false` one. Proven against real
+  Chromium across 27 repeated runs with zero flakes (this sandbox has no WebKit binary and cannot
+  reach the download host — `playwright.config.ts`'s own `ui` project still specifies
+  `browserName: 'webkit'`, correct for a real target; verification here used
+  `--browser=chromium`/an explicit `executablePath` override).
+- **`tests/ui/fixtures.ts`, `support/{server,bootSnapshots,tree,dialogs}.ts`.** The tier's harness:
+  `relaunch()` opens a fresh page against `server.ts`'s static build server and installs both mocks
+  before the one navigation, merging each spec's own control snapshots over
+  `EMPTY_BOOT_SNAPSHOTS` (the five-call boot sequence every fresh app fires). `tree.ts`/`dialogs.ts`
+  ported byte-identically from `tests/e2e/support/` (nothing in them was Electron-specific).
+- **All seven `tests/ipc/**/*.frontend.spec.ts` re-pointed** onto the new mocks — unchanged
+  assertions, passing reliably. `redis.frontend.spec.ts`'s row-count read became
+  `expect.poll`-based (a real timing gap: `data-level` and the row list update off two separate
+  reactive triggers, a gap real Electron IPC latency always outlasted but this tier's faster HTTP
+  mock sometimes doesn't).
+- **D17 — `tests/electron-db/kafka.spec.ts` → `tests/db/kafka.spec.ts`**, running under the vendored
+  Node with no Electron-ABI rebuild step (verified: the `bun install`-built native addon loads
+  as-is). Folded into new `scripts/run-db-tests.sh`.
+- **§5.3 — `tests/unit`'s stub swap.** `window.ts`'s dead `window.kira` Proxy removed (`control.ts`
+  no longer reads it at all post-M2); `menu.spec.ts`/`security.spec.ts` deleted (Go coverage already
+  landed in P56).
+- **D15 re-verified**: all seven `tests/ipc/**/*.fixture.ts` confirmed byte-identical after a real
+  `KIRA_IPC_FIXTURES=write` run against Docker, for all seven adapters — once run through
+  `bun run format` (a pre-existing gap in that checklist item this run surfaced but did not
+  introduce: `capture.ts`'s raw `JSON.stringify` output was never biome-formatted by the write
+  path).
+- **`tests/ui/smoke.spec.ts`** (full port) and **`tests/ui/workbench.spec.ts`** (2 of 7 scenarios;
+  see the finding below) — the first two `tests/e2e/` ports, proving the mechanism end to end.
+
+Commits: `a6b6e89` (D15/harness), `026cf68` (the mocks + 7 re-pointed specs + D17 + §5.3),
+`8c32bcb` (workbench.spec.ts). All pushed to `wails-native-shell-spike`.
+
+### A finding that changes the remaining M5 estimate
+
+§9's M5 bullet and §5.6 list `workbench`, `tabs`, `tooltips`, `cell-editor`, `autocomplete`, `tree`,
+`interaction`, `data-view`, `connections`, `console`, `definition`, `mutations`, `preconnect`,
+`secrets` as pure-UI specs that "port into this tier against the same mocks" (§5.6's own words).
+Reading them individually (not just their names) shows most of that is optimistic:
+
+- **`workbench.spec.ts`**: 5 of 7 scenarios assert real persistence across a `relaunch()` (panel
+  visibility, two settings-dialog sections, word wrap, a narrowed-patch write) — a real write
+  surviving a real process restart via `src/main`'s own storage. `tests/ui/`'s `relaunch()` has no
+  backing store at all (fresh mocks every call, by design), so these have no equivalent here, and
+  are not covered by `tests/e2e/sqlite.spec.ts` either (D16 keeps that file's assertions
+  unchanged). **Only 2 of 7 scenarios ported**; the other 5 are a real, acknowledged coverage loss,
+  flagged in `tests/ui/workbench.spec.ts`'s own header comment.
+- **`tabs.spec.ts`, `tooltips.spec.ts`** (read in full) and, by grep, **`autocomplete`,
+  `cell-editor`, `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`,
+  `tree`, `budgets`, `leaks`, `perf`** all call `startPostgres()`/`isDockerAvailable()` and drive a
+  **real Postgres container** through the pre-P57 `window.kira` global (which no longer exists —
+  `src/preload` is still present today, since M6 hasn't run, but `control.ts` stopped reading it in
+  M2). Porting these is not a mechanical re-point the way the ipc frontend specs were: it means
+  designing realistic `ControlSnapshot`/`PortSnapshot` fixture data (tree shape, table contents)
+  standing in for whatever each spec's real Postgres schema currently provides, replacing every
+  `window.kira.connectionsCreate(...)`-against-a-real-container call, and — same as
+  `workbench.spec.ts` — dropping or separately flagging any scenario that specifically asserts
+  persistence-across-relaunch (`tabs.spec.ts`'s session-restore scenario is one such case, found
+  while reading it). A shared fixture module (one realistic "postgres-like" tree +
+  table data set, reused across specs) is very likely the efficient way to do this rather than
+  inventing fixture data per file — not yet started.
+- **`connections.spec.ts`, `secrets.spec.ts`**: also use `window.kira` directly (`connectionsList`,
+  `connectionsReveal`, `connectionsSecretsStatus`, `connectionsCreate`), but grep did not show
+  `startPostgres`/`isDockerAvailable` for either — worth checking whether they need a real adapter
+  at all or can be mocked more directly (e.g. `secrets.spec.ts`'s scope may be almost entirely
+  about `connectionsSecretsStatus`'s reported backend, which `WILDCARD_DEFAULTS` or a spec-level
+  fixture could answer without any adapter). Not yet read in full — this was the very next thing in
+  progress when the session paused.
+- **`sqlite.spec.ts`, `mongo.spec.ts`, `s3.spec.ts`** are explicitly kept as the three full-stack
+  anchors per D16/D10 and are **not** meant to port — no work needed there beyond the header-comment
+  addition D16 already calls for.
+- **`hardening.spec.ts`, `startup.spec.ts`** have no analogue and are dropped outright per §7 — no
+  work needed.
+
+None of this blocks M5's own stated ending condition ("every suite green while `src/main` still
+exists") from being reachable — it changes the estimate and the *shape* of the remaining work, from
+"re-point N files" to "design shared fixtures, then port or explicitly drop each remaining file's
+scenarios one at a time," and it is worth a second look at whether every one of these specs is worth
+porting at this fidelity versus consolidating overlapping coverage.
+
+### M5 — not started
+
+- Read `connections.spec.ts` and `secrets.spec.ts` in full to confirm whether they need the
+  shared-postgres-fixture treatment or something lighter.
+- Design the shared mock fixture data (tree shape + table contents) for the Postgres-backed specs,
+  if porting them is still the chosen path after the above.
+- Port or explicitly drop, one file at a time: `tabs`, `tooltips`, `autocomplete`, `cell-editor`,
+  `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`, `tree`,
+  `connections`, `secrets`. `budgets`/`perf`/`leaks` "re-create" per §5.6 (renderer-owned
+  instrumentation hooks, not Electron-specific) rather than port verbatim.
+- `playwright.config.ts`'s `e2e` project stays alongside `ui` until every portable spec has ported
+  and every dropped one is accounted for — then it (and `tests/e2e/` itself, minus the three
+  full-stack anchors) goes away, per §4.9/D16.
+- `tests/unit/security.spec.ts` is already deleted (done above); double-check no other §5.3 item was
+  missed.
+- M6 (delete `src/main`, `src/preload`, `src/engine/index.ts`), M7 (Electron out of the build), M8
+  (documentation) are entirely unstarted, and M5 must finish first (§9's second hard rule: "M5
+  before M6 … a green suite means the new mocks work, not that the old tests are gone").
