@@ -194,24 +194,3 @@ func TestWailsFilterTranslation(t *testing.T) {
 		})
 	}
 }
-
-func TestChooseOpenPassesTitle(t *testing.T) {
-	d := &recordingDialogs{openRes: ""}
-	svc := &bridge.FilesService{Dialogs: d}
-
-	if _, err := svc.ChooseOpen(bridge.FilesChooseOpenArgs{Title: "Pick a file"}); err != nil {
-		t.Fatalf("ChooseOpen: %v", err)
-	}
-	if d.openReq.Title != "Pick a file" {
-		t.Errorf("Title = %q, want %q", d.openReq.Title, "Pick a file")
-	}
-
-	d2 := &recordingDialogs{openRes: ""}
-	svc2 := &bridge.FilesService{Dialogs: d2}
-	if _, err := svc2.ChooseOpen(bridge.FilesChooseOpenArgs{}); err != nil {
-		t.Fatalf("ChooseOpen (no title): %v", err)
-	}
-	if d2.openReq.Title != "" {
-		t.Errorf("Title = %q, want empty when omitted", d2.openReq.Title)
-	}
-}

@@ -51,6 +51,13 @@ team works, and how to run things in whichever box a session happens to be on.
 - **Comments: very concise, and only where truly necessary.** Add one only when the code cannot
   say it for itself — a non-obvious *why*, a constraint, a workaround. Never restate what the code
   already shows.
+- **A unit test earns its keep only when there's real logic behind it to protect** — branching,
+  error handling, edge cases, parsing/validation, non-trivial state transitions. A test that only
+  restates something the compiler already guarantees (a getter, a struct-literal round-trip, a
+  one-line wrapper with no branching of its own) gives no protection against regressions; it's
+  just more code someone has to update for no benefit the next time the trivial thing it wraps
+  changes shape. This applies going forward to new code, not only as a one-time cleanup of what's
+  already there.
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc., with a `!` or `BREAKING CHANGE:`
   footer for breaking changes.
