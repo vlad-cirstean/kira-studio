@@ -1562,3 +1562,59 @@ that spans all six sub-phases.
 - **Comparing a struct containing an `any` field with `==` panics at runtime** rather than failing to
   compile (P55's finding). `model.ConnectionState.Caps` is such a field and P58a now puts a real
   `adapters.Caps` value in it — use `go-cmp` (already a dependency), never `==`.
+
+## 12. M0 results (run for real in this sandbox)
+
+All five probes pass, run against `postgres:17-alpine` and `confluentinc/cp-kafka:8.0.7` (both
+pulled via `mirror.gcr.io` and retagged, per `AGENTS.md`'s Docker section — the daemon was already
+running in this session with no `dockerd` bootstrap needed). Two results are genuine findings that
+change or sharpen an §1/§6 claim rather than merely confirming one; both are folded back into the
+relevant design section, not just recorded here.
+
+- **JS-1 — PASS, as designed.** `[]byte` → base64; a bare `[]uint32` → a plain JSON number array (not
+  base64) — confirming D5's own premise that `offsets`/`truncated` need the explicit `MarshalJSON`
+  wrapper, not just a type alias; the wrapper's LE-byte encoding round-trips correctly
+  (`[0,5,10]` → `AAAAAAUAAAAKAAAA`, verified by hand-decoding).
+- **TC-1 — PASS.** `testcontainers-go` starts a real Postgres container in ~2.1s in this sandbox, no
+  Bun-style hang, confirming §4.10/A19's premise that the Go test tier has no analogue of P57's
+  `bun run` Testcontainers hang.
+- **PG-1 — PASS, with one probe-design correction worth keeping.** `pg_cancel_backend` on a side
+  connection reliably produces SQLSTATE `57014` on the cancelled query. The first run's
+  `pg_stat_activity` check read a stale `query LIKE '%pg_sleep%'` count of 1 immediately after
+  cancellation — not evidence the query was still running, but `pg_stat_activity.query` showing the
+  backend's *last-run* statement text while it briefly sits `idle`/`idle in transaction (aborted)`.
+  Filtering on `state != 'idle'` (not just query text) reads 0 immediately, no added delay needed.
+  **This is the real check `postgres/client.go`'s own cancellation verification should use** —
+  `state`, not a text match against `query`.
+- **PG-2 — genuinely failed on the first attempt, and the fix is better than §6's own guessed
+  fallback.** pgx v5's default extended-query protocol returns `bytea` (and other binary-capable
+  types) in **binary** wire format, which cannot scan into `*string` at all
+  (`cannot scan bytea (OID 17) in binary format into **string`). §6's own "if it fails" column
+  guessed this would force a second, dedicated text-mode connection per database, doubling
+  `ConnSet`'s backend count. **That guess is wrong, and the real fix is smaller**: passing
+  `pgx.QueryExecModeSimpleProtocol` as a per-query option forces the simple query protocol for that
+  one call, which returns every value in text format — on the *same* connection, mixed freely with
+  ordinary (extended-protocol, typed) queries on other calls. Confirmed: `bytea` arrives `\x`-prefixed
+  exactly as the current TypeScript adapter's `NormalizeCellText` expects, `numeric`/`timestamptz`/
+  `json` all decode as their expected text forms, and `NULL` scans to a nil `*string`. **Design
+  consequence for M5**: `client.go`'s data-reading queries (`read`/`preview`/console `execute`) pass
+  `pgx.QueryExecModeSimpleProtocol`; catalog/typed queries (tree, describe, definition) do not need
+  it and keep the default extended protocol. No second connection, no `ConnSet` shape change.
+- **KF-1 — PASS in full, including both capabilities P32 D13/D14 recorded as lost.** franz-go's
+  `kgo.ConsumePartitions` at explicit start offsets consumed all 10 produced records across both
+  partitions with `kadm.ListGroups` reporting **zero** groups afterward (no `kira-studio-browse`
+  ever created) — the no-group claim §1.7 makes is not just true of the current adapter's design,
+  it is what franz-go's own client does by construction when you never call `Subscribe`. Each
+  partition's `FetchTopicPartition.HighWatermark` matched `kadm.ListEndOffsets`'s own value exactly.
+  `kadm.DescribeTopicConfigs` and `kadm.Metadata` (giving the cluster id) both succeeded — the two
+  capabilities P32 D13/D14 recorded as permanently lost under the native NAN-addon client are real
+  and available under franz-go/kadm, confirming D7's own recovery claim rather than merely its driver
+  choice. **D7 needs no fallback; the primary recommendation is fully validated.**
+
+None of these results changes P58a's own decisions — §3's `query.go` row already named this exact
+fork and left it for "probe PG-2's answer" to decide (*"QueryExecModeSimpleProtocol + RawValues, or
+a per-query result-format override"*); PG-2 settles it as the former, with no second connection.
+No `go.mod` change, no target-tree change, no milestone re-sequencing.
+`docs/v1/plans/P58-go-native-adapters.md` does not need updating for these: D7 stands as written,
+and PG-1/PG-2's findings are implementation detail inside M5's own Postgres adapter, not a
+substrate-level decision the parent plan makes.
