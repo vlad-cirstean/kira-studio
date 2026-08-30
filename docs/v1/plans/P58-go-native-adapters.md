@@ -246,6 +246,15 @@ to **eight call sites plus one interface**, not a rewrite of either service. The
 consumers are `Subscribe` (`connections.watch`, `oplog.Start`), `PushCacheConfig` and `Alive`/`PID`
 (`bridge/engine.go`) — four more, each a one-line swap.
 
+*Corrected (P58a's OQ-2): there is a ninth call site, and it does not fit the "route by
+`ConnectionKind`" model the other eight do.* `internal/bridge/ops.go:39`'s stop-button handler calls
+`Host.Call(ENGINE_OP.cancel, {opId})` — a bare op id, with no connection id and therefore no kind to
+route on. A kind-keyed router cannot answer "cancel op X" without first knowing which backend owns
+op X. P58a resolves this (its own decision A13) by routing cancellation on **op ownership** — each
+backend registers the op ids it started, and cancel is dispatched to whichever backend currently
+owns the id — rather than by kind. Any later sub-phase's router work must preserve this: cancel is
+the one operation that is never a kind lookup.
+
 Worth recording because it is not obvious from the file names: `enginehost.Host` is *already*
 effectively an interface at every call site (`Call`, `CallTimeout`, `Subscribe`, `Alive`, `PID`,
 `AttachStream`, `SendData`, `Stop`). D4's router slots in behind that same shape.
@@ -481,6 +490,15 @@ names appearing together — keeps its recognition logic and swaps its `toTypedA
 `cellText`, `isNull`, `isTruncated`, `chunkByteSize`) sees real `Uint8Array`/`Uint32Array` exactly as
 it does today.
 
+*Amended (P58a's OQ-3): this is a narrowing, not a same-day swap.* D4's coexistence property means
+the ten still-Node-served kinds keep emitting the old index-keyed JSON form (`{"0":1,"1":2,…}`)
+throughout P58a-P58e, while the newly-native kinds emit base64 as each one lands. `reviveChunks`
+therefore carries **both** decode branches for the whole coexistence window — detecting which form
+it received (a base64 string is not a JS object with numeric-string keys) rather than assuming one —
+and only P58f, once every kind is native, deletes the index-keyed branch as dead code. Any sub-phase
+plan that reads this decision as "the decoder becomes base64-only at M2" has read it wrong; M2 makes
+base64 the format *newly-native* adapters use, nothing more.
+
 *Named alternative, deliberately deferred:* a binary envelope on a raw `Stream('engine')` — a JSON
 header frame plus the chunk bytes appended verbatim — which would take the wire cost from ~1.33× to
 1.0×. Rejected **for this phase** on three grounds: it reopens P57 D2 (whose reasoning — malformed
@@ -676,6 +694,14 @@ whole app down with the user's unsaved tab state. `runOp`'s Go successor recover
 with its stack under `scope=adapter`, and converts it to an `E_INTERNAL` `AdapterError` for that one
 op. This does not restore the old isolation — §7 says so plainly — but it converts "the app
 disappears" into "one operation failed", which is the difference that matters to a user.
+
+*Resolved (P58a's OQ-1): `E_INTERNAL` is not one of `errors.ts`'s eight closed `AdapterErrorCode`
+values, and it stays that way.* The wire keeps carrying the literal string `"E_INTERNAL"` on a
+recovered panic without widening the TypeScript type — `viewOp.ts`'s `classify` already treats any
+unrecognised code as `kind: 'error'`, which is the correct renderer behaviour for a fault the closed
+set was never meant to name. Adding a ninth code to a set every sub-phase's adapter is written
+against would be a wider, riskier change for a case that should never fire in a correctly-ported
+adapter.
 
 **D17 — validation at the adapter boundary is hand-written Go decoders, matching
 `internal/storage/model/`'s established precedent, not a zod-equivalent library.** `docs/ARCHITECTURE.md`'s

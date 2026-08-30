@@ -1277,8 +1277,16 @@ this document and, for anything surprising, an `AGENTS.md` entry.
 Ordering: JS-1 and TC-1 first (they need nothing and everything else needs Docker), then PG-1 and
 PG-2 against the container TC-1 proves.
 
-**Not run in P58a:** the franz-go, `mattn/go-sqlite3`, `clickhouse-go`, `go-redis`, `mongo-driver`,
-`aws-sdk-go-v2` and RabbitMQ probes from the parent's M0 list. See §10 OQ-5.
+**OQ-5, resolved: run the Kafka probe here too**, alongside the four above, as a fifth M0 probe
+(**KF-1**) — franz-go's `kgo.ConsumePartitions` at explicit offsets against a real `confluentinc/
+cp-kafka` container, asserting no `JoinGroup`/`SyncGroup` traffic (`kadm.DescribeGroups` sees no
+group named `kira-studio-browse` afterward) and `FetchPartition.HighWatermark` matching the topic's
+actual high-water mark. It is the one M0 probe with a `go.mod`/packaging decision attached (P58 D7's
+own fallback, `confluent-kafka-go`, is cgo) — discovering that in P58e rather than now would mean
+the "no native modules" claim moves late, exactly the failure mode P58 §9's R4 exists to prevent.
+The other seven probes (`mattn/go-sqlite3`, `clickhouse-go`, `go-redis`, `mongo-driver`,
+`aws-sdk-go-v2`, RabbitMQ) stay out of P58a's scope — none of them carries a decision that would
+change if deferred to its own sub-phase, unlike Kafka's.
 
 ## 7. C1 — the checklist
 
@@ -1512,17 +1520,9 @@ by `adapterhost` as ordinary `op:end` events", which is complete for the coexist
 P58f keeps the event shape or converts oplog to typed direct calls is a P58f design decision that
 should be recorded as such rather than assumed either way.
 
-**OQ-5 — should M0's other-engine probes run inside P58a?** The parent's §9 M0 is a *shared*
-milestone listing eight probes across all eleven drivers, and its R4 says *"M0 before M5, and
-specifically M0's Kafka probe before P58e is planned."* P58a's own scope needs only the Postgres and
-container probes (§6), and running nine more here would put a day of throwaway work in the critical
-path of the pathfinder. **But one of them has a decision attached:** if franz-go's assign-at-offset
-browse fails, P58 D7's fallback is `confluent-kafka-go`, which is cgo — a `go.mod` and packaging
-consequence the parent explicitly wants written down *"at the moment it is taken, not discovered
-later."* Discovering that in P58e means the whole phase's "no native modules" claim moves late.
-Recommendation, for the parent's author to accept or reject: run **only** the Kafka probe here
-alongside P58a's four, and leave the other seven to their own sub-phases. P58a does not act on this
-either way without an answer.
+**OQ-5 — resolved.** Accepted as recommended: the Kafka probe (KF-1) runs inside P58a's own M0,
+alongside the four Postgres/container probes — see §6. The other seven engines' probes stay deferred
+to their own sub-phases, none of them carrying a decision that would change if deferred.
 
 **OQ-6 — `docs/ARCHITECTURE.md`'s Adapter contract section describes one adapter layer; there will
 be two for five sub-phases.** The parent's §3 lists `docs/ARCHITECTURE.md` as edited in M11, at the
