@@ -1947,3 +1947,87 @@ real, scoped cleanup task, not a two-line fix, and pruning just the three stale 
 the rest of an already-dead interface in place — cosmetic, not a real fix. Left for M8's
 documentation pass, which already owns exactly this kind of "grep for stale Electron-era surface
 area" sweep.
+
+### M8 — done
+
+§4.15's own scope is documentation, not code — so this milestone did **not** touch
+`src/shared/protocol/ipc.ts`'s `KiraApi`/`AppInfo` (the finding directly above); that stays a real,
+open follow-up for whoever next touches that file, correctly out of scope for a docs-only
+milestone rather than silently absorbed into it.
+
+Three of the four documents §4.15 names were rewritten by three Opus subagents launched in
+parallel (isolated worktrees, each briefed with this session's own verified ground truth — the
+actual bundle layout, the actual `AnchorNeedles` mechanics, the actual Keychain design — rather
+than left to rediscover it independently and risk drifting from what M5-M7 actually built), then
+reviewed and merged by hand exactly like every other subagent contribution this session; the
+fourth (`AGENTS.md`) and the `docs/v1/SPEC.md` row were written directly.
+
+- **`docs/ARCHITECTURE.md`** — the Stack table, Invariants (D18's bulk-data rewrite), Process model
+  (redrawn diagram: webview / Go shell / Node engine child, the two wire planes, the twelve bound
+  services, `AnchorNeedles`/`HelperNeedles`, and the JSON-over-stdio regression named as a known,
+  unfixed limitation with P58 as its likely resolution), Storage (the Go keychain design, `kira:v2:`,
+  why the old plaintext-passthrough behavior was dropped rather than ported), Renderer security
+  surface (fully restructured as a per-P46-control table of "no subject" / "no analogue, a real
+  loss" / "ports differently" — the honest finding here is that the section is *shorter*, not that
+  it was hardened further), and Testing (the tier list this document's own §5 already established,
+  now the authoritative record). One correction the reviewing agent's own briefing got wrong and
+  the writing agent caught by reading the actual code rather than trusting the brief: the Keychain
+  service name's "distinct from Electron" comment (`keyring_darwin.go`) describes it being distinct
+  from *Electron's own* separately-named Chromium `safeStorage` item, not evidence against this
+  session's (correct, and matching D12) claim that the Go-side name has stayed `Kira Studio Safe
+  Storage` unchanged since P52 — worth recording since it is exactly the kind of misreading a
+  differently-phrased briefing could produce, and the agent flagged rather than silently resolved
+  it either way.
+- **`docs/PACKAGING.md`** — fully rewritten (per §4.15's own instruction, not a section-scoped
+  patch): the real `create:app:bundle` layout, `shell/build/config.yml`/the two Taskfiles in place
+  of `electron-builder.yml`, `scripts/sign-bundle.sh`'s four codesign lines and why the two nested
+  Mach-Os are signed individually, a verification-checklist table honestly split into what this
+  Linux sandbox could and couldn't check, the Kafka-vendoring gap given its own prominent §6 entry,
+  and a §7 whose own status line says plainly that `.github/workflows/` still holds the pre-M7
+  Electron files (the M7 OAuth-scope gap) — so §7 describes the *intended* CI, not what runs today,
+  and says so rather than presenting one as the other.
+- **`docs/PERF.md`** — narrower, as planned: only §3's manual procedures and the L-D app-size row
+  touched (§2.1-2.4 were already correctly re-measured against the new architecture during M5).
+  Packaged cold start re-pointed at the `WindowRuntimeReady` log line (independently confirmed by
+  reading `shell/internal/shell/window.go`/`shell/main.go`/`shell/internal/logging`, not asserted
+  from the brief alone); packaged RSS re-pointed at the app's own status-bar readout (backed by
+  `internal/metrics`) rather than inventing a new manual `app.getAppMetrics()` replacement; the
+  window-bounds-debounce manual check honestly re-aimed (its old Electron symptom, a process
+  lingering on a pending `setTimeout`, cannot occur under Go's `time.AfterFunc`, so it now verifies
+  the actual non-flush behavior instead) rather than left checking something that can no longer
+  fail; L-D's stale 252 MB electron-builder figure replaced with "not re-measured" and a real
+  command, rather than a guessed number. Flagged, not fixed (genuinely out of this document's own
+  narrow scope for this pass): §1's budget table still asserts against `tests/e2e/startup.spec.ts`,
+  which no longer exists, across several rows that would need one coherent pass together, not a
+  spot fix that would leave the table internally inconsistent.
+- **`AGENTS.md`** — the "Electron binary (for `tests/e2e/`)" section deleted outright (both its
+  subject and `tests/e2e/` itself are gone); the `tests/ipc/`, Secrets/`KIRA_INSECURE_SECRETS`,
+  Native Kafka driver and SQLite-adapter sections rewritten for the Go/vendored-Node mechanisms
+  that actually run today (no more `ELECTRON_RUN_AS_NODE`, no more ABI rebuilds, no more `xvfb`
+  anywhere in this repo); the existing chronological "P5x implementation findings" log left alone
+  where it correctly describes what was true *at that phase* rather than rewritten into present
+  tense (the log's own value is as a historical record); a new batch of P57 findings appended
+  covering M5-M7's own real discoveries (the mock byteSize gap, the `DataGrid.vue` tooltip
+  memoization bug, the two D11 consistency requirements the plan's own table didn't enumerate —
+  `CFBundleExecutable` and `AnchorNeedles` — the Kafka vendoring gap, and the workflow-OAuth-scope
+  limitation).
+- **`docs/v1/SPEC.md`** — the row §14 owed for P52 and never got, covering all six implementation
+  phases (P52-P57) together per D-adjacent reasoning already used elsewhere in this plan (one
+  combined row rather than six near-empty ones, since P58/P59's own rows already exist and this
+  gap was specifically about P52-P57 having *no* row at all); P51's own row updated from "plan
+  only" to point at the new row rather than continuing to describe itself as not yet implemented.
+
+**Verified**: `bun run typecheck` (all four projects) and `bunx biome check .` stayed clean through
+every commit in this milestone (docs-only changes, so this mostly confirms nothing else regressed
+underneath); every agent's own `grep -n -i electron <file>` pass was reviewed by hand before merge,
+and every remaining hit in all four files is either a deliberate historical/comparative reference or
+a named, still-open gap — never an assertion that a Electron mechanism is still live. No build or
+test command was re-run purely for this milestone beyond that, since nothing here changes runtime
+behavior.
+
+**What is honestly still open exiting P57 entirely**, collected in one place rather than scattered
+across four documents' own gap sections: the Kafka native-module packaging gap (§M7, `docs/
+PACKAGING.md` §6); `src/shared/protocol/ipc.ts`'s dead `KiraApi`/`AppInfo` interfaces (above);
+`docs/PERF.md` §1's stale `tests/e2e/`-referencing budget-table rows (above); and the CI workflow
+files themselves, staged under `docs/v1/plans/p57-pending-ci-workflows/` pending a push from a
+session with the `workflow` OAuth scope this one lacked. None of these block P58/P59 from starting.
