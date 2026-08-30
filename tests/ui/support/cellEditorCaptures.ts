@@ -5,8 +5,10 @@
 // by the read pipeline itself before it ever reaches this fixture — the 65536-character strings
 // below are the adapter's own real truncation, not a value this file chose.
 //
-// File-local to tests/ui/cell-editor.spec.ts (not postgresFixture.ts): none of these four tables
-// (formats, wide_table, nulls_and_unicode, nested_json) is used by any other ported spec.
+// File-local to tests/ui/cell-editor.spec.ts (not postgresFixture.ts): three of these four tables
+// (formats, nulls_and_unicode, nested_json) are used by no other ported spec. `WIDE_TABLE_COLUMNS`/
+// `WIDE_TABLE_ROWS` are the exception — tests/ui/budgets.spec.ts's "cached tab switch" scenario
+// (P57 M5) reuses this exact real capture rather than re-capturing the same two-row table.
 
 import type { ColumnDescriptor } from '@shared/protocol/page';
 

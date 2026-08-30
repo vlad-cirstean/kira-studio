@@ -85,50 +85,96 @@
     };
   }
 
+  // Mirrors src/shared/protocol/page.ts's chunkByteSize/pageByteSize exactly (P57 M5 leaks/perf
+  // port finding): the real engine computes `byteSize` once, embeds it in the page it sends, and
+  // the browser trusts that number verbatim — nothing on the receiving end recomputes it. This
+  // mock used to hardcode `byteSize: 0` regardless of how much data a page actually carried, which
+  // made every retained-bytes assertion (tests/ui/leaks.spec.ts, perf.spec.ts) vacuously pass no
+  // matter what the app actually retained — a gap only surfaced once a spec finally exercised it.
+  var COLUMN_ENVELOPE_BYTES = 64;
+
+  function chunkByteSize(chunk) {
+    return (
+      chunk.data.byteLength +
+      chunk.offsets.byteLength +
+      chunk.nulls.byteLength +
+      chunk.truncated.byteLength
+    );
+  }
+
+  function sumChunkBytes(chunks) {
+    var total = 0;
+    var i;
+    for (i = 0; i < chunks.length; i++) total += chunkByteSize(chunks[i]);
+    return total;
+  }
+
   function buildPage(logical) {
     var base = { position: logical.position, byteSize: 0, fetchedAt: Date.now() };
+    var chunks, tabularByteSize, ti, col, ids, bodies, fields, values;
+    var keys, headers, attrs, timestamps, streamBodies;
     if (logical.kind === 'tabular') {
+      chunks = logical.columns.map((_col, c) =>
+        encodeChunk(
+          logical.rows.map((r) => r[c]),
+          logical.truncatedRows?.[c],
+        ),
+      );
+      tabularByteSize = 0;
+      for (ti = 0; ti < chunks.length; ti++) {
+        col = logical.columns[ti];
+        tabularByteSize += chunkByteSize(chunks[ti]) + (col.name.length + col.dataType.length) * 2;
+        tabularByteSize += COLUMN_ENVELOPE_BYTES;
+      }
       return Object.assign({}, base, {
         kind: 'tabular',
         columns: logical.columns,
         rowCount: logical.rows.length,
         truncatedCells: logical.truncatedCells,
-        chunks: logical.columns.map((_col, c) =>
-          encodeChunk(
-            logical.rows.map((r) => r[c]),
-            logical.truncatedRows?.[c],
-          ),
-        ),
+        chunks: chunks,
+        byteSize: tabularByteSize,
       });
     }
     if (logical.kind === 'document') {
+      ids = encodeChunk(logical.ids);
+      bodies = encodeChunk(logical.bodies);
       return Object.assign({}, base, {
         kind: 'document',
         rowCount: logical.ids.length,
-        ids: encodeChunk(logical.ids),
-        bodies: encodeChunk(logical.bodies),
+        ids: ids,
+        bodies: bodies,
+        byteSize: sumChunkBytes([ids, bodies]),
       });
     }
     if (logical.kind === 'keyvalue') {
+      fields = encodeChunk(logical.fields);
+      values = encodeChunk(logical.values);
       return Object.assign({}, base, {
         kind: 'keyvalue',
         redisType: logical.redisType,
         ttlMs: logical.ttlMs,
         memoryBytes: logical.memoryBytes,
         rowCount: logical.fields.length,
-        fields: encodeChunk(logical.fields),
-        values: encodeChunk(logical.values),
+        fields: fields,
+        values: values,
+        byteSize: sumChunkBytes([fields, values]),
       });
     }
+    keys = encodeChunk(logical.keys);
+    headers = encodeChunk(logical.headers);
+    attrs = encodeChunk(logical.attrs);
+    timestamps = encodeChunk(logical.timestamps);
+    streamBodies = encodeChunk(logical.bodies);
     return Object.assign({}, base, {
       kind: 'stream',
       rowCount: logical.keys.length,
       visibilityTimeoutSeconds: logical.visibilityTimeoutSeconds,
-      keys: encodeChunk(logical.keys),
-      headers: encodeChunk(logical.headers),
-      attrs: encodeChunk(logical.attrs),
-      timestamps: encodeChunk(logical.timestamps),
-      bodies: encodeChunk(logical.bodies),
+      keys: keys,
+      headers: headers,
+      attrs: attrs,
+      timestamps: timestamps,
+      bodies: streamBodies,
+      byteSize: sumChunkBytes([keys, headers, attrs, timestamps, streamBodies]),
     });
   }
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import { IPC } from '@shared/protocol/ipc';
@@ -1018,5 +1019,56 @@ export function nullsAndUnicodeFixture(connectionId: string): {
         response: { kind: 'read', page: NULLS_AND_UNICODE_PAGE, source: 'server' },
       },
     ],
+  };
+}
+
+// `app.big_rows`' content is fully deterministic (`id`, `hash=md5(id::text)` —
+// tests/db/support/postgres.ts's own seed) — generated here rather than inlined as a 10 000-row
+// literal array, the same reasoning tests/ui/data-view.spec.ts's own `bigRowsRows` helper already
+// documents (verified byte-for-byte against a real capture's first/last rows there). Exported
+// (unlike that file-local copy) because tests/ui/budgets.spec.ts and tests/ui/perf.spec.ts both
+// need the identical pageSize=10000 page.
+export function bigRowsRow(id: number): [string, string] {
+  return [String(id), createHash('md5').update(String(id)).digest('hex')];
+}
+export function bigRowsRows(count: number, startId: number): [string, string][] {
+  return Array.from({ length: count }, (_, i) => bigRowsRow(startId + i));
+}
+
+/** `app.big_rows` at pageSize=10000, offset=0 — the page `budgets.spec.ts`/`perf.spec.ts` both
+ *  scroll. `nextToken` is a real capture (scripts/capture-postgres-tree.ts, P57 M5 leaks/perf/
+ *  budgets port) — independently re-verified this session as byte-identical to data-view.spec.ts's
+ *  own PAGE_E, confirming the token is a pure function of the page's own content (keyset value +
+ *  filter hash), not something that could drift between captures. */
+export function bigRowsHugePage(connectionId: string): PortSnapshot {
+  return {
+    op: DATA_OP.read,
+    payload: {
+      connectionId,
+      path: BIG_ROWS_PATH,
+      projection: null,
+      filter: null,
+      sort: null,
+      pageSize: 10000,
+      cursor: { mode: 'offset', offset: 0 },
+    },
+    response: {
+      kind: 'read',
+      page: {
+        kind: 'tabular',
+        columns: BIG_ROWS_COLUMNS,
+        rows: bigRowsRows(10000, 1),
+        position: {
+          offset: 0,
+          pageSize: 10000,
+          hasMore: true,
+          nextToken: 'eyJ2IjoxLCJrIjpbIjEwMDAwIl0sImYiOiI1YWIwNzAyNWZmMWNkZmE1In0',
+          prevToken: null,
+          strategy: 'keyset',
+        },
+        truncatedCells: 0,
+      },
+      source: 'server',
+    },
   };
 }

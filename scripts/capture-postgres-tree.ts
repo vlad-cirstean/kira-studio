@@ -27,6 +27,12 @@
 //     MutationRowOp: {"kind":"update","key":{...},"changes":{...}} | {"kind":"insert","values":{...}}
 //                  | {"kind":"delete","key":{...}}
 //   {"kind":"execute","path":"...","statements":["SELECT ...", ...]}   -> {pages} or {error}
+//   {"kind":"seedScrollGrid"}                                          -> {seeded: true}
+//     Creates and populates `app.scroll_grid` (60 text columns x 5000 rows) via
+//     tests/e2e/support/pg.ts's own seedScrollFixture, against this run's container — the same
+//     synthetic, wide-AND-tall shape P29 D14 introduced (not part of tests/db/fixtures/0001_seed.sql,
+//     since every other suite's row counts/ordering already depend on that seed being unchanged).
+//     Must run before any `read`/`count`/`describe`/`children` step targeting `app.scroll_grid`.
 // `mutate` steps run in recipe order against the *same* container — a delete/update/insert
 // genuinely changes the data, so a recipe capturing a mutation sequence must list steps in the
 // same order the ported spec will replay them, exactly like a real session would issue them.
@@ -45,6 +51,7 @@
 import { DATA_OP } from '../src/shared/protocol/data-ops';
 import { ENGINE_OP } from '../src/shared/protocol/engine-ops';
 import { startPostgres } from '../tests/db/support/postgres';
+import { seedScrollFixture } from '../tests/e2e/support/pg';
 import { decodePage } from '../tests/ipc/support/decode';
 import { openHarness } from '../tests/ipc/support/harness';
 
@@ -57,8 +64,10 @@ interface Step {
     | 'count'
     | 'preview'
     | 'mutate'
-    | 'execute';
-  path: string;
+    | 'execute'
+    | 'seedScrollGrid';
+  // Every kind but seedScrollGrid needs a real path; seedScrollGrid takes no arguments at all.
+  path?: string;
   tabId?: string | null;
   pageSize?: number;
   filter?: string | null;
@@ -99,6 +108,10 @@ async function main(): Promise<void> {
     for (const [i, step] of recipe.entries()) {
       let result: unknown;
       switch (step.kind) {
+        case 'seedScrollGrid':
+          await seedScrollFixture(pg.uri);
+          result = { seeded: true };
+          break;
         case 'children':
           result = await harness.children(pg.config.id, step.path);
           break;
