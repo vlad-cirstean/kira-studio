@@ -72,6 +72,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
     "@vscode/codicons": "0.0.46-24",
+    "@wailsio/runtime": "3.0.0-beta.15",
     "bun-types": "1.4.0",
     "electron": "44.0.0",
     "electron-builder": "26.15.3",

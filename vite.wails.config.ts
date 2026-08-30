@@ -60,6 +60,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),
+      // Generated bindings (P57 D8) — kept short because the real path is repeated once per
+      // service import in control.ts and would otherwise break if either tree moves.
+      '@bindings': resolve(
+        __dirname,
+        'shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/bridge',
+      ),
     },
   },
   build: {
