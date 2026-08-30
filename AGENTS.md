@@ -516,6 +516,50 @@ have to be re-derived next time.
   tests poll for `ESRCH` with a multi-second timeout rather than asserting it on the first check,
   specifically because of this — a real macOS run should see it resolve near-instantly, but don't
   tighten these timeouts based on that assumption without re-testing there.
+
+**P56 implementation findings, worth keeping for P57+:**
+
+- **Two ordering knots, same shape, same fix.** `application.Options.ShouldQuit` must be an
+  already-allocated `*shell.Quitter`'s method value, and `appcore.Deps.Events` (read by
+  `SettingsService.Set`, embedded into a `Services` entry) must be a real `appcore.Emitter` — but
+  both the `Quitter`'s `*bridge.Events` and `Deps.Events` need the `*application.App` that only
+  `application.New` produces, and `New` needs the `Services` slice (and `ShouldQuit`) as
+  *arguments*. `FilesService{Dialogs: ...}` has the identical problem one level down (a `Dialogs`
+  needs the app and the current main window). The fix used throughout `internal/shell/app.go`:
+  build a small struct with a nil `*application.App` field, hand out its interface value
+  immediately, and give the caller an `attach(app)` closure to fill the field in right after `New`
+  returns — `NewDeferredEmitter`/`NewDeferredDialogs`. Nothing can actually call through either
+  adapter before `Run()` starts the renderer, so the brief nil window is safe. Any future service
+  needing the live `*App` at construction time will hit this same wall.
+- **`app.Quit()` is a safe no-op before `Run()` has ever executed.** `(*App).Quit` guards on
+  `a.impl != nil`, and `a.impl` is only assigned inside `Run()` (`application.go:659`) — so
+  `quit_test.go` can drive `Quitter.ShouldQuit`/`Flushed`/`Shutdown` end-to-end against the real
+  `*application.App` from `TestMain` without ever calling `Run()`, and the final `app.Quit()` at
+  the end of `flushThenQuit` just does nothing in that harness instead of panicking or blocking.
+- **`events.Mac.*` application-event constants compile on every platform**, even though the code
+  that actually wires them up (`events_common_darwin.go`'s `ApplicationShouldHandleReopen`
+  handler) is behind a `//go:build darwin` tag. The constant table itself
+  (`pkg/events/events.go`) carries no build tag, so `shell.AttachReopen`'s
+  `events.Mac.ApplicationShouldHandleReopen` reference builds cleanly on this Linux sandbox; only
+  an actual macOS run will ever deliver the event.
+- **After this phase, the boot-smoke screenshot shows the status bar stuck on "engine
+  connecting" forever, and that is correct, not a regression.** `resolveEngine()` now starts the
+  real bundled `engine.cjs` (P56 D12), and the Go-side stream plumbing
+  (`bridge/stream.go`/`app.HandleStream("engine", ...)`) is real and tested — but
+  `src/renderer/workbench/state/engine.ts`'s `initEngineState()` still drives its status off
+  `src/renderer/bridge/port.ts`'s `ready` promise and a data-plane `ping`, and that file still
+  expects Electron's old `MessagePort` handoff, which nothing on the Wails side produces (P56 §7
+  explicitly excludes any `src/renderer/bridge/` change). The status pill cannot leave
+  `'connecting'` until P57 rewires `bridge/port.ts` onto the new named Stream — don't read the
+  stuck pill as a sign the engine or the stream handler is broken.
+- **`modifierMap` (`keys.go`) has no `"Control"` entry — only `"Ctrl"`.** `chordToAccelerator`'s
+  literal `"Control"` output (`shortcuts.ts`) is an Electron-ism; a verbatim port makes
+  `SetAccelerator` silently log-and-drop (`GetAccelerator()` stays `""`). `internal/shell/accel.go`
+  maps `Chord.Ctrl` to the string `"Ctrl"`, and `menu_wails_test.go` exists specifically to catch a
+  regression here by checking real accelerators parsed, not just the Go-side template shape.
+- **`application.UnHide` is a dead role on macOS** — `application.ShowAll` is the one that reaches
+  `unhideAllApplications:`, and is the actual analogue of Electron's `role: 'unhide'`.
+  `TestShowAllNotUnhide` pins this so a future edit can't silently swap them back.
 - **A bridge service's own argument validation (e.g. `bridge/tree.go`'s `Children` rejecting an
   empty `connectionId` with `E_BAD_REQUEST`) is a separate guard from anything the service
   underneath enforces** — `internal/tree.Service.Children("", ...)` does not itself reject an empty

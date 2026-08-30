@@ -16,6 +16,7 @@ import * as ConnectionsService from '../bindings/github.com/kirathecat/kira-stud
 import * as EngineService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/engineservice.js';
 import * as FiltersService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/filtersservice.js';
 import * as LayoutService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/layoutservice.js';
+import * as LifecycleService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/lifecycleservice.js';
 import * as OpsService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/opsservice.js';
 import * as SettingsService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/settingsservice.js';
 import * as TabsService from '../bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/tabsservice.js';
@@ -71,10 +72,9 @@ window.kira = {
   onViewRun: (cb) => on(CHANNEL.viewRun, cb),
   onViewRunAll: (cb) => on(CHANNEL.viewRunAll, cb),
   onFlushBeforeClose: (cb) => on(CHANNEL.appFlushBeforeClose, cb),
-  // Lifecycle.Flushed() lands in P56 alongside the rest of the quit-flush handshake (§8.3); a
-  // fresh M1 build has nothing listening on the Go side yet, so this is deliberately a no-op
-  // rather than a call into a service that doesn't exist.
-  appFlushed: () => {},
+  // P56 D11: the quit-flush handshake's ack (§1.3) — tabs.ts awaits its own tabsSave before
+  // calling this, and Quitter.Flushed() is the goroutine waiting on it.
+  appFlushed: () => LifecycleService.Flushed(),
 
   connectionsList: () => ConnectionsService.List(),
   connectionsStates: () => ConnectionsService.States(),

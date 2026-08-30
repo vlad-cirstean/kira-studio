@@ -17,3 +17,15 @@ func (s *LayoutService) GetAll() (model.Layout, error) {
 	}
 	return layout, nil
 }
+
+type LayoutSetArgs struct {
+	Patch model.LayoutPatch `json:"patch"`
+}
+
+func (s *LayoutService) Set(args LayoutSetArgs) (model.Layout, error) {
+	merged, err := s.Deps.Repos.Layout.Set(args.Patch)
+	if err != nil {
+		return model.Layout{}, ipcerr.Internal(err.Error())
+	}
+	return merged, nil
+}

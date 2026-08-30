@@ -25,6 +25,10 @@
 //                                   what resolve() actually sent (e.g. the re-injected URI
 //                                   password), which no adapter:connect response otherwise echoes
 //   fixture:crash             -> process.exit(3) without answering
+//   (data channel, tag 1)     -> fixture:echo-data (P56 D13): any frame arriving on the data tag
+//                                is echoed back on the data tag verbatim, no JSON involved — lets
+//                                a Go test prove frame passthrough integrity and tag-based demux
+//                                for internal/bridge's engine Stream
 
 let buf = Buffer.alloc(0);
 const pendingSlow = [];
@@ -76,6 +80,13 @@ function writeFrame(tag, obj) {
   process.stdout.write(Buffer.concat([header, body]));
 }
 
+function writeRaw(tag, body) {
+  const header = Buffer.alloc(5);
+  header.writeUInt32BE(body.length, 0);
+  header.writeUInt8(tag, 4);
+  process.stdout.write(Buffer.concat([header, body]));
+}
+
 function ok(tag, id, payload) {
   writeFrame(tag, { kind: 'res', id, ok: true, payload });
 }
@@ -93,6 +104,14 @@ function lastSegment(segments) {
 }
 
 function handleFrame(tag, frame) {
+  // fixture:echo-data (D13): a data-tagged frame carries no JSON envelope at all — it is
+  // whatever bytes the renderer's stream sent, exactly as SendData writes them
+  // (enginehost/stream.go). Echo it back verbatim on the same tag, never through JSON.
+  if (tag === 1) {
+    writeRaw(1, frame);
+    return;
+  }
+
   let req;
   try {
     req = JSON.parse(frame.toString('utf8'));

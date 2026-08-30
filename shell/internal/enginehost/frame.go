@@ -8,9 +8,8 @@ import (
 
 // Wire format (P54 §3): | length uint32 BE | tag uint8 | body (length bytes) |. length is the
 // body's byte length and excludes the tag byte. tag 0 = control (parsed by Go), tag 1 = data
-// (opaque to Go, handed to a Sink verbatim). The Node counterpart is
-// src/engine/stdio-main.ts's writeFrame/the stdin 'data' handler, and shell/testdata/
-// engine-ping.mjs for the dev/G1 engine child.
+// (opaque to Go, handed to a Sink verbatim). The Node counterpart is src/engine/stdio-main.ts's
+// writeFrame/the stdin 'data' handler.
 const (
 	frameTagControl byte = 0
 	frameTagData    byte = 1

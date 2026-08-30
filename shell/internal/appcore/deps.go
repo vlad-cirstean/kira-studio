@@ -11,13 +11,18 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/tree"
 )
 
+// Emitter is the Go→renderer push seam (P56 D1/D4). internal/shell implements it over
+// *application.App's Event.Emit; bridge/events.go is its one real consumer package, so no bridge
+// file has to import Wails. Deps carries the bare interface, not a *bridge.Events, since bridge
+// already imports appcore — a *bridge.Events field here would be an import cycle.
+type Emitter interface{ Emit(name string, data any) }
+
 // Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
-// IpcDeps shape as closely as each phase's scope allows. P52's deps.ts row also lists Secrets,
-// Log and Events; none is added here (P55 §7): the cipher reaches the bridge through
-// Connections.SecretsStatus() exactly as ipc/connections.ts:44 does today, logging is
-// slog.Default() (P53's seam, backed by internal/logging since P55 M0), and Events is P56's
-// bridge/events.go. internal/oplog and the metrics ticker have no bridge service yet (P55 §6.1,
-// §7) so they are wired directly in main.go, not carried here.
+// IpcDeps shape as closely as each phase's scope allows. P52's deps.ts row also lists Secrets and
+// Log; neither is added here: the cipher reaches the bridge through Connections.SecretsStatus()
+// exactly as ipc/connections.ts:44 does today, and logging is slog.Default() (P53's seam, backed
+// by internal/logging since P55 M0). internal/oplog and the metrics ticker have no bridge service
+// yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
 type Deps struct {
 	DB          *sql.DB
 	EngineHost  *enginehost.Host
@@ -27,4 +32,5 @@ type Deps struct {
 	Repos       *repos.Repos
 	Connections *connections.Service
 	Tree        *tree.Service
+	Events      Emitter
 }

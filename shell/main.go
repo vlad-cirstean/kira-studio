@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
@@ -23,6 +24,7 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 	"github.com/kirathecat/kira-studio/shell/internal/preconnect"
 	"github.com/kirathecat/kira-studio/shell/internal/secrets"
+	"github.com/kirathecat/kira-studio/shell/internal/shell"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/shell/internal/tree"
@@ -45,10 +47,14 @@ var blankAssets embed.FS
 // main's startup order mirrors src/main/index.ts (P52 §4.1), with the upgradeLegacySecrets step
 // deleted, not ported (P52 §6.4): config.EnsureLayout -> logging.Init/Sweep -> storage.Open
 // (migrates) -> secrets.New -> repos.New + repos.NewSecrets -> Settings.GetAll ->
-// enginehost.Start -> preconnect.New -> connections.New(...).Start -> tree.New ->
-// enginehost.PushCacheConfig -> oplog.New(...).Start -> metrics ticker Start -> appcore.Deps ->
-// application.New(Services) -> window (P55 §7).
+// resolveEngine (P56 D12: the real bundled engine) -> enginehost.Start -> preconnect.New ->
+// connections.New(...).Start -> tree.New -> enginehost.PushCacheConfig -> oplog.New(...).Start ->
+// metrics ticker Start -> shell.NewQuitter -> application.New(Services, ShouldQuit, OnShutdown)
+// -> attach the deferred emitter and the Quitter to the now-real App -> menu -> engine stream ->
+// reopen handler -> the main window -> app.Run() (P56 §4.11).
 func main() {
+	startedAt := time.Now()
+
 	if err := config.EnsureLayout(); err != nil {
 		log.Fatalf("kira-studio-shell: ensure layout: %v", err)
 	}
@@ -72,7 +78,7 @@ func main() {
 
 	deps := appcore.Deps{
 		DB:        db.DB,
-		StartedAt: time.Now().UnixMilli(),
+		StartedAt: startedAt.UnixMilli(),
 		Repos:     repositories,
 	}
 
@@ -119,6 +125,34 @@ func main() {
 	)
 	metricsTicker.Start()
 
+	// The two adapters below are needed inside the Services list, which is itself an argument to
+	// application.New — but both need the *App that New alone produces (P56 §4.11's ordering
+	// knot). Each is built "deferred": usable now, wired to the real App by attach() once New has
+	// returned, well before Run() lets the renderer or any signal path actually call through it.
+	emitter, attachEmitter := shell.NewDeferredEmitter()
+	deps.Events = emitter
+	dialogs, attachDialogs := shell.NewDeferredDialogs()
+
+	events := bridge.NewEvents(emitter)
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker})
+
+	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
+	// before the flush wait rather than after it — P56 D3/index.ts:156).
+	beforeFlush := sync.OnceFunc(func() { metricsTicker.Stop() })
+	teardown := sync.OnceFunc(func() {
+		eventsDetach()
+		oplogWiring.Stop()
+		connectionsSvc.Shutdown()
+		host.Stop()
+		if err := repositories.Close(); err != nil {
+			slog.Warn("close repos", "scope", "shutdown", "err", err)
+		}
+		if err := db.Close(); err != nil {
+			slog.Warn("close db", "scope", "shutdown", "err", err)
+		}
+	})
+	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second)
+
 	app := application.New(application.Options{
 		Name:        "Kira Studio Shell",
 		Description: "A visual database client for macOS (Wails/Go spike shell)",
@@ -132,55 +166,60 @@ func main() {
 			application.NewService(&bridge.EngineService{Deps: deps}),
 			application.NewService(&bridge.OpsService{Deps: deps}),
 			application.NewService(&bridge.FiltersService{Deps: deps}),
+			application.NewService(&bridge.FilesService{Dialogs: dialogs}),
+			application.NewService(&bridge.QueriesService{Deps: deps}),
+			application.NewService(&bridge.LifecycleService{Flusher: quitter}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(),
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			// P56 D10: closing the last window leaves the app running, matching Electron's
+			// default — AttachReopen below is what brings a window back.
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		OnShutdown: func() {
-			metricsTicker.Stop()
-			oplogWiring.Stop()
-			connectionsSvc.Shutdown()
-			host.Stop()
-			if err := repositories.Close(); err != nil {
-				slog.Warn("close repos", "scope", "shutdown", "err", err)
-			}
-			if err := db.Close(); err != nil {
-				slog.Warn("close db", "scope", "shutdown", "err", err)
-			}
-		},
+		ShouldQuit: quitter.ShouldQuit,
+		OnShutdown: quitter.Shutdown,
 	})
 
-	// P52 M1 window: minimal options only (P52 §3.2). Bounds-from-layout, the menu and the
-	// quit-flush handshake are P56 work (§8.1-§8.3).
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Kira Studio",
-		Width:            1280,
-		Height:           800,
-		MinWidth:         900,
-		MinHeight:        600,
-		BackgroundColour: application.NewRGB(0x1F, 0x1F, 0x1F),
-		URL:              "/",
-	})
+	attachEmitter(app)
+	quitter.Attach(app)
+
+	var mainWindow *application.WebviewWindow
+	attachDialogs(app, func() application.Window { return mainWindow })
+
+	isDev := app.Env.Info().Debug
+	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
+		AppName: "Kira Studio", IsDev: isDev, Events: events, Quit: quitter.RequestQuit,
+	}))
+
+	shell.RegisterEngineStream(app, host)
+
+	windowDeps := shell.WindowDeps{Layout: repositories.Layout, StartedAt: startedAt}
+	newWindow := func() {
+		win := app.Window.NewWithOptions(shell.Options(windowDeps, shell.Harden(), "/"))
+		mainWindow = win
+		shell.Attach(win, windowDeps)
+	}
+	shell.AttachReopen(app, newWindow)
+
+	newWindow()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-// resolveEngine locates the vendored Node runtime and the M1 walking-skeleton engine script.
-// P52 §3.1 vendors the runtime to shell/runtime/node/ (git-ignored, fetched by
-// scripts/vendor-node.sh); this checks next to the running executable first (the packaged shape)
-// and falls back to the source tree (the `wails3 task dev` / `go run` shape). Switching this to
-// the real bundled src/engine (shell/runtime/engine/engine.cjs, built by `bun run build:engine`
-// and already verified end-to-end in P54's stdio_main_integration_test.go) is out of this
-// phase's scope — P55 §0 lists no src/ or engine-wiring change, only the seven Go packages and
-// bridge completion above.
+// resolveEngine locates the vendored Node runtime and the real bundled engine (P56 D12: the
+// switch from M1's engine-ping.mjs walking-skeleton fixture to shell/runtime/engine/engine.cjs,
+// built by `bun run build:engine` and already verified end-to-end by P54's
+// stdio_main_integration_test.go). P52 §3.1 vendors the Node runtime to shell/runtime/node/
+// (git-ignored, fetched by scripts/vendor-node.sh); this checks next to the running executable
+// first (the packaged shape) and falls back to the source tree (the `wails3 task dev` / `go run`
+// shape).
 func resolveEngine() (nodeBin, script string, err error) {
 	scriptCandidates := []string{
-		"testdata/engine-ping.mjs",
+		"runtime/engine/engine.cjs",
 	}
 	nodeCandidates := []string{
 		"runtime/node/bin/node",
@@ -188,7 +227,7 @@ func resolveEngine() (nodeBin, script string, err error) {
 	if exe, exeErr := os.Executable(); exeErr == nil {
 		exeDir := filepath.Dir(exe)
 		nodeCandidates = append([]string{filepath.Join(exeDir, "runtime", "node", "bin", "node")}, nodeCandidates...)
-		scriptCandidates = append([]string{filepath.Join(exeDir, "testdata", "engine-ping.mjs")}, scriptCandidates...)
+		scriptCandidates = append([]string{filepath.Join(exeDir, "runtime", "engine", "engine.cjs")}, scriptCandidates...)
 	}
 
 	nodeBin, err = firstExisting(nodeCandidates)
@@ -199,7 +238,7 @@ func resolveEngine() (nodeBin, script string, err error) {
 	}
 	script, err = firstExisting(scriptCandidates)
 	if err != nil {
-		return "", "", fmt.Errorf("engine-ping.mjs not found (looked in %v)", scriptCandidates)
+		return "", "", fmt.Errorf(`engine.cjs not found (looked in %v) — run "bun run build:engine" first`, scriptCandidates)
 	}
 	return nodeBin, script, nil
 }
