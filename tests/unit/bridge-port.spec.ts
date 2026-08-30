@@ -10,7 +10,9 @@ import { setSocketFactory } from './support/wailsRuntime';
 const socket: FakeSocket = createFakeSocket();
 setSocketFactory(() => socket);
 
-const { ready, request, onPortEvent } = await import('../../src/renderer/bridge/port');
+const { ready, request, onPortEvent, reviveChunks } = await import(
+  '../../src/renderer/bridge/port'
+);
 
 // request() gates its send on `ready` via a .then() registered synchronously but resolved on a
 // later microtask; awaiting `ready` itself is not enough to guarantee that .then has *also* run,
@@ -99,8 +101,59 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     offB();
   });
 
+  test('6. a JSON-round-tripped TextColumnChunk is revived into real typed arrays', async () => {
+    // JSON.stringify on a Uint8Array/Uint32Array serialises it as a plain object keyed "0","1",...
+    // (TypedArrays are not Array.isArray) — exactly what JSON.parse hands back to onmessage, since
+    // JSONStream's own decode is a plain JSON.parse. Found live: a real data:read response failed
+    // downstream with "chunk.data is not a Uint8Array" (protocol/page.ts's assertChunkStructure)
+    // until reviveChunks (P57 finding, discovered by the C1 boot proof) fixed it.
+    const jsonRoundTripped = {
+      page: {
+        kind: 'tabular',
+        columns: [{ name: 'id' }],
+        chunks: [
+          {
+            data: { 0: 97, 1: 98 },
+            offsets: { 0: 0, 1: 1, 2: 2 },
+            nulls: { 0: 0 },
+            truncated: {},
+          },
+        ],
+      },
+      source: 'server',
+    };
+    const p = request('read');
+    await flush();
+    const sent = socket.sent.at(-1) as SentRequest;
+    socket.__message({ kind: 'res', id: sent.id, ok: true, payload: jsonRoundTripped });
+    const result = (await p) as typeof jsonRoundTripped;
+    const chunk = result.page.chunks[0] as unknown as {
+      data: Uint8Array;
+      offsets: Uint32Array;
+      nulls: Uint8Array;
+      truncated: Uint32Array;
+    };
+    expect(chunk.data).toBeInstanceOf(Uint8Array);
+    expect(Array.from(chunk.data)).toEqual([97, 98]);
+    expect(chunk.offsets).toBeInstanceOf(Uint32Array);
+    expect(Array.from(chunk.offsets)).toEqual([0, 1, 2]);
+    expect(chunk.nulls).toBeInstanceOf(Uint8Array);
+    expect(chunk.truncated).toBeInstanceOf(Uint32Array);
+    expect(chunk.truncated.length).toBe(0);
+  });
+
+  test('6b. reviveChunks leaves non-chunk-shaped values alone', () => {
+    expect(reviveChunks(null)).toBe(null);
+    expect(reviveChunks('text')).toBe('text');
+    expect(reviveChunks([1, 2, { a: 1 }])).toEqual([1, 2, { a: 1 }]);
+    expect(reviveChunks({ id: 'c1', nested: { name: 'x' } })).toEqual({
+      id: 'c1',
+      nested: { name: 'x' },
+    });
+  });
+
   // Terminal: closing the stream is not reversible in this module, so this runs last.
-  test('6. close rejects every pending request, and later requests reject immediately', async () => {
+  test('7. close rejects every pending request, and later requests reject immediately', async () => {
     const pending = request('during-close');
     await flush();
     socket.__close();

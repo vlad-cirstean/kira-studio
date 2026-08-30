@@ -568,5 +568,69 @@ have to be re-derived next time.
   method taking a bare id string should get the same explicit guard rather than relying on the
   service to produce a good-enough error by accident.
 
+**P57 implementation findings, worth keeping for the rest of this phase and beyond:**
+
+- **`JSONStream`'s JSON round-trip does not preserve `TextColumnChunk`'s `TypedArray`s, and this
+  was already latent in `src/engine/stdio-main.ts` since P54 — P57 M4's boot proof is the first
+  thing that ever actually exercised it.** `protocol/page.ts`'s `TextColumnChunk` is four
+  exactly-sized buffers (`data`/`nulls`: `Uint8Array`, `offsets`/`truncated`: `Uint32Array`), a
+  shape the old `MessagePort`'s structured clone carried across verbatim. `stdio-main.ts`'s
+  `writeFrame` does `JSON.stringify(message)` for *both* control and data frames (P54, untouched
+  by P57 §0.2's "no engine change"), and `JSON.stringify` on a TypedArray — not `Array.isArray`,
+  so it serializes as a plain object keyed `"0","1",...` rather than an array — loses its identity
+  entirely: `JSON.parse` on the other end hands back `{0:1,1:2,...}`, and every real data-view read
+  failed downstream with `"chunk.data is not a Uint8Array"` (`protocol/page.ts`'s own
+  `assertChunkStructure`) the first time C1's boot test actually opened a table. Fixed in
+  `bridge/port.ts`'s `reviveChunks` — a JSON-tree walk that recognises the four field names
+  together (every page kind reuses the same `TextColumnChunk` shape under different key names:
+  `data`, `ids`/`bodies`, `fields`/`values`, `keys`/`headers`/`attrs`/`timestamps`/`bodies`) and
+  reconstructs real `Uint8Array`/`Uint32Array` instances — kept inside `bridge/port.ts` rather than
+  `src/engine/` specifically to stay inside P57's own declared scope. This does not fix the
+  underlying inefficiency (a binary blob JSON-inflates to ~5-6 bytes per original byte before
+  `reviveChunks` even runs) — that's a real, pre-existing-since-P54 performance concern worth its
+  own follow-up, not something this phase's own scope covers.
+- **A tsconfig "paths" entry for a literal, absolute-path-shaped specifier (like
+  `/wails/runtime.js`) breaks Bun's own `mock.module` interception for every file that
+  transitively imports it — not only the file whose tsconfig declares the mapping.** Confirmed by
+  direct experiment: pointing `tests/unit/tsconfig.json`'s "paths" at a real, otherwise-loadable
+  stub file for this exact specifier still produced `Cannot find module '/wails/runtime.js'` from
+  `bridge/port.ts`, regardless of whether the target was a real file or a `.d.ts`. `tsgo`'s own
+  typecheck, by contrast, *does* apply a "paths" mapping declared anywhere in the `-p`'d project to
+  every file it reaches, including ones outside that project's own directory — so the fix has to
+  be asymmetric: no "paths" entry for this specifier anywhere (Bun's own module registry via
+  `mock.module` handles it at runtime), and a `@ts-ignore` — not `@ts-expect-error`, which fails as
+  "unused" under `tsconfig.web.json`, where the same import resolves cleanly via a real npm-package
+  mapping — on the one import site each in `port.ts` and `control.ts`. Biome's own
+  `noTsIgnore` rule auto-fixes `@ts-ignore` → `@ts-expect-error` on `bun run format`, including
+  inside *prose comments* that merely mention the string "@ts-ignore" — so a `biome-ignore` comment
+  belongs directly above the one real directive line, and nearby prose has to describe the
+  directive without spelling it out literally, or `format` silently reintroduces the exact bug the
+  directive exists to avoid.
+- **A file that P57 D7 intends to fully retire from the renderer can still need to keep existing
+  on disk for several more milestones**, if any Electron-only file not yet deleted still imports
+  it. `ipc.ts` is a clean example: `control.ts`/`port.ts`/`env.d.ts` moved off it entirely in M2,
+  but `src/main/index.ts` and eight `src/main/ipc/*.ts` files still import it, and deleting the
+  file broke `bun run build` (the Electron bundle) — which M4's own C1 checkpoint requires staying
+  buildable. The fix was mechanical (restore the file, since nothing in the renderer's own import
+  graph reaches it any more; delete it for real at M6 alongside `src/main/`) but the general
+  lesson is to check *every* remaining consumer of a file a decision names for deletion, not just
+  the ones the milestone in question is actively rewriting.
+- **`src/renderer/bridge/{control,port}.ts` are genuinely shared between the Wails and Electron
+  builds** (one `src/renderer` tree, `vite.wails.config.ts` and `electron.vite.config.ts` each
+  build it separately) — so once P57 M1/M2 point them at Wails-only mechanisms (`/wails/runtime.js`,
+  the generated `@bindings/*`), the Electron build needs the *same* `resolve.alias` entries and the
+  same `/wails/` `external` marking `vite.wails.config.ts` already carries, purely so
+  `bun run build` still compiles. The resulting Electron bundle cannot actually run correctly
+  (there is no real Wails asset server inside a Chromium renderer to serve `/wails/runtime.js`
+  from) — that's fine and expected, since Electron is being removed outright in M7; the alias
+  addition to `electron.vite.config.ts` exists only to keep C1's "the Electron app is still whole
+  and buildable" checkpoint (§0.3/§9 M4) a literal, checkable fact rather than a claim that quietly
+  stopped being true the moment the shared bridge files changed.
+- **A native tree/list Vue component's click and double-click handlers are genuinely separate**
+  (`TreeRow.vue`'s `@click="onClick"` emits `select`; `@dblclick="onDblClick"` emits `open`) —
+  driving it via `xdotool` needs two real, separately-dispatched `click 1` events close together
+  (`xdotool click 1; sleep 0.05; xdotool click 1`), not `xdotool click --repeat 2`, which did not
+  register as a double-click in WebKitGTK during this phase's C1 boot test.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

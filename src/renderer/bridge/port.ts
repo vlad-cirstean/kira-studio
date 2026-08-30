@@ -50,9 +50,56 @@ export const ready = new Promise<void>((resolve, reject) => {
 // error `initEngineState`'s own catch is about to report.
 void ready.catch(() => {});
 
+// P57 finding, discovered by C1's own boot proof (§5.7): `TextColumnChunk` (protocol/page.ts) is
+// four exactly-sized TypedArrays, a shape the old `MessagePort`'s structured clone carried across
+// verbatim. JSONStream's transport does not — `src/engine/stdio-main.ts` (untouched by P57, §0.2)
+// JSON.stringifies every frame, including data ones, and `JSON.stringify` on a Uint8Array/
+// Uint32Array serializes it as a plain object keyed "0","1","2",... (TypedArrays are not
+// `Array.isArray`), so `JSON.parse` hands back `{0:1,1:2,...}`, not a real typed array — every
+// data-view read failed downstream with "chunk.data is not a Uint8Array" (protocol/page.ts's own
+// assertChunkStructure) until this revived it. Recognised by the four field names together, since
+// every page kind (tabular/document/key-value/object-store) reuses the exact same chunk shape
+// under different key names (`data`, `ids`/`bodies`, `fields`/`values`, `keys`/`headers`/...).
+function isChunkLike(
+  v: unknown,
+): v is { data: unknown; offsets: unknown; nulls: unknown; truncated: unknown } {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    !Array.isArray(v) &&
+    'data' in v &&
+    'offsets' in v &&
+    'nulls' in v &&
+    'truncated' in v
+  );
+}
+
+function toTypedArray<T>(v: unknown, ctor: { from(v: number[]): T }): T {
+  return ctor.from(Object.values(v as Record<string, number>));
+}
+
+export function reviveChunks(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(reviveChunks);
+  if (value && typeof value === 'object') {
+    if (isChunkLike(value)) {
+      return {
+        data: toTypedArray(value.data, Uint8Array),
+        offsets: toTypedArray(value.offsets, Uint32Array),
+        nulls: toTypedArray(value.nulls, Uint8Array),
+        truncated: toTypedArray(value.truncated, Uint32Array),
+      };
+    }
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = reviveChunks(v);
+    return out;
+  }
+  return value;
+}
+
 function handleMessage(message: PortResponse | PortEvent): void {
   if (message.kind === 'evt') {
-    for (const cb of eventListeners.get(message.topic) ?? []) cb(message.payload);
+    const payload = reviveChunks(message.payload);
+    for (const cb of eventListeners.get(message.topic) ?? []) cb(payload);
     return;
   }
   const req = pending.get(message.id);
@@ -60,7 +107,7 @@ function handleMessage(message: PortResponse | PortEvent): void {
   pending.delete(message.id);
   if (req.timer) clearTimeout(req.timer);
   if (message.ok) {
-    req.resolve(message.payload);
+    req.resolve(reviveChunks(message.payload));
   } else {
     const err: Error & { code?: string } = new Error(message.error.message);
     err.code = message.error.code;
