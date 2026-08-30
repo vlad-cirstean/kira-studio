@@ -17,6 +17,13 @@ export interface ControlSnapshot<T = unknown> {
   /** Optional for the same reason `args` is — a channel that resolves `void` (e.g. `opsCancel`)
    *  captures `response: undefined`, which JSON.stringify drops from the committed fixture. */
   response?: T;
+  /** tests/ui/-only (P57): when set, `mockRuntime.ts` answers this snapshot as a failed bound
+   *  call instead of a 200 — `control.ts`'s `unwrap` reads `.cause.code`/`.cause.message` off the
+   *  thrown error, so this is the shape a real business-rule rejection (not a schema-validation
+   *  one, which never reaches the wire) takes. Mutually exclusive with `response` — a snapshot
+   *  answers as one or the other, never both. No `tests/ipc/**` fixture sets this; the backend
+   *  capture/replay half has no concept of it. */
+  error?: { code: string; message: string };
 }
 
 /** One bulk-data snapshot. `payload` matches a PortRequest's own payload; `response` is logical,

@@ -353,6 +353,14 @@ export async function installControlMocks(
       });
       return;
     }
+    if (snap.error) {
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: runtimeErrorBody(snap.error.code, snap.error.message),
+      });
+      return;
+    }
     // `response: undefined` (a void-returning channel, e.g. opsCancel) round-trips through
     // JSON.stringify as a dropped key — `JSON.stringify(undefined)` is itself `undefined`, not the
     // string `"undefined"`, so it is special-cased to the JSON literal `null`, exactly what a Go

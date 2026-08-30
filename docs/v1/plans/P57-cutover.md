@@ -1617,9 +1617,28 @@ porting at this fidelity versus consolidating overlapping coverage.
 - Design the shared mock fixture data (tree shape + table contents) for the Postgres-backed specs,
   if porting them is still the chosen path after the above.
 - Port or explicitly drop, one file at a time: `tabs`, `tooltips`, `autocomplete`, `cell-editor`,
-  `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`, `tree`,
-  `connections`, `secrets`. `budgets`/`perf`/`leaks` "re-create" per §5.6 (renderer-owned
-  instrumentation hooks, not Electron-specific) rather than port verbatim.
+  `console`, `data-view`, `definition`, `interaction`, `mutations`, `preconnect`, `tree`.
+  `budgets`/`perf`/`leaks` "re-create" per §5.6 (renderer-owned instrumentation hooks, not
+  Electron-specific) rather than port verbatim.
+  - **`connections` and `secrets` — done, in a resumed session.** `connections.spec.ts` ported
+    almost whole (CRUD/colors/URI-mode/duplicate/delete against a spec-level fixture); its two
+    relaunch-persistence checks dropped, and the retired-colour scenario reshaped into a boot-time
+    seed rather than a raw `window.kira` injection (see below — `window.kira` no longer exists).
+    `secrets.spec.ts` ported only its pure-UI slice (the three `connectionsSecretsStatus` shapes'
+    credential-note rendering, plus the failed/succeeded-save behavior when unavailable) — its
+    other 7 checks were genuinely storage-layer, not UI, and are covered instead by
+    `shell/internal/storage/repos/secrets_test.go` and `connections/service_test.go`. Two real
+    environment findings surfaced getting these green, both now in `AGENTS.md`: **WebKit is
+    actually installable here** (`bunx playwright install webkit` + a few `apt-get` packages)
+    correcting this document's own §5.6/M5-done claim that it isn't — every remaining `tests/ui/`
+    spec should be verified against real WebKit, not a Chromium override; and **`window.kira` is
+    gone** once M2/M3 have run, so any remaining `tests/e2e/` spec's raw `window.kira.*` calls need
+    driving through real UI instead, or dropping if they only re-verify the mock's own fixture.
+    `mockRuntime.ts`/`ControlSnapshot` also gained an optional `error` field for simulating a
+    genuine backend rejection (distinct from `E_FIXTURE_MISS`), and a real, permanent finding: every
+    handled bound-call error is a genuine HTTP 422 under Wails, which Chromium/WebKit's devtools log
+    as console noise regardless of whether the app's own JS handles it — a `consoleErrors` assertion
+    ported from `tests/e2e/` needs adjusting for that one expected line, not asserting zero.
 - `playwright.config.ts`'s `e2e` project stays alongside `ui` until every portable spec has ported
   and every dropped one is accounted for — then it (and `tests/e2e/` itself, minus the three
   full-stack anchors) goes away, per §4.9/D16.

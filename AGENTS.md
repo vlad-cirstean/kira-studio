@@ -678,6 +678,27 @@ have to be re-derived next time.
   matches; and when in doubt, run the test once — the mock's own `E_FIXTURE_MISS` error message
   echoes `JSON.stringify(callArgs)` verbatim, which is faster and more reliable than deriving the
   exact shape by reading the renderer's call sites.
+- **Every handled bound-call error is a real HTTP 422 under Wails, and that is genuinely new
+  console noise Electron never produced.** `pkg/application/transport_http.go` (the pinned
+  `wailsapp/wails/v3` module, read directly — not assumed) writes `http.StatusUnprocessableEntity`
+  for any bound-call error, handled or not; Chromium/WebKit's own devtools then log "Failed to load
+  resource: … 422" for that fetch regardless of whether the page's JS catches the rejection
+  (confirmed empirically porting `tests/e2e/secrets.spec.ts`'s scenario 5, whose original
+  `expect(consoleErrors).toEqual([])` assumed the old Electron `ipcRenderer.invoke` rejection path,
+  which never touches the browser's network-resource-loading machinery at all). A test asserting
+  "no console noise from a handled error" now has to assert "no console noise *other than* the one
+  expected 422 line" instead — mirrors `tests/ui/support/mockRuntime.ts`'s own precedent for a
+  benign 404 on `/wails/custom.js`, just for a real error response instead of a missing asset.
+- **`ControlSnapshot` gained an optional `error?: {code, message}` field (tests/ui/-only,
+  `tests/ipc/support/types.ts`/`mockRuntime.ts`) for a fixture that needs to simulate a genuine
+  business-rule rejection**, not a schema-validation failure (those never reach the wire —
+  `ConnectionDialog.vue`'s `onSave()` calls `connectionInputSchema.safeParse` first) and not an
+  `E_FIXTURE_MISS` (that means the fixture is incomplete, not that the real backend would reject
+  the call). `control.ts`'s `unwrap` reads `.cause.code`/`.cause.message` off the thrown error, so
+  the mock answers an `error`-bearing snapshot with the same `runtimeErrorBody` shape
+  `E_FIXTURE_MISS` already used, at a real non-2xx status. No `tests/ipc/**` fixture sets it (the
+  backend capture/replay half has no concept of it); first used by `secrets.spec.ts`'s "save fails
+  when secrets are unavailable" scenario.
 - **A native tree/list Vue component's click and double-click handlers are genuinely separate**
   (`TreeRow.vue`'s `@click="onClick"` emits `select`; `@dblclick="onDblClick"` emits `open`) —
   driving it via `xdotool` needs two real, separately-dispatched `click 1` events close together
