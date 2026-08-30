@@ -101,50 +101,6 @@
       }
     },
     {
-      "includes": ["src/main/**", "!src/main/storage/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["drizzle-orm", "drizzle-orm/**"],
-                    "message": "SPEC §11: the Drizzle instance is only ever touched by main/storage/db.ts and its repos/ — a caller reaches storage through repos/, not the ORM directly."
-                  },
-                  {
-                    "group": ["node:sqlite"],
-                    "message": "SPEC §11: main/storage/db.ts is the only file that opens the SQLite database directly."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/main/storage/**", "!src/main/storage/db.ts"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["node:sqlite"],
-                    "message": "SPEC §11: db.ts is the only file that opens the SQLite database directly — repos/ takes the Drizzle instance db.ts hands them."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
       "includes": ["src/engine/adapters/**"],
       "linter": {
         "rules": {

@@ -1762,3 +1762,30 @@ porting at this fidelity versus consolidating overlapping coverage.
   (documentation) are up next, now that M5 (all of it, including the `tests/e2e/` deletion itself)
   is finished (§9's second hard rule: "M5 before M6 … a green suite means the new mocks work, not
   that the old tests are gone" — now satisfied).
+
+### M6 — done
+
+§4.6's own precondition grep (`grep -rn "src/main\|src/preload" src/ tests/ scripts/ *.ts *.json`)
+turned up two files the plan's own wording didn't anticipate: `tests/unit/metadata-cache.spec.ts`
+(real, non-type imports of `getCached`/`putCached` from `main/storage/repos/metadata-cache.ts` and
+`createTreeService` from `main/tree-service.ts`) and `tests/db/preconnect.spec.ts`
+(`createPreconnectSupervisor` from `main/preconnect.ts`) — both testing genuinely dead code, not
+`tests/ipc/support/harness.ts`'s already-fixed (D15) reference. Neither file's *subject* had a real
+caller left anywhere in `src/renderer/`, `src/engine/` or `shell/` — a repo-wide grep for real
+(non-comment) imports of any `main/*` module found only these two spec files — confirming the Go
+rewrite (`shell/internal/preconnect`, `shell/internal/storage/repos/metadata_cache_test.go`,
+`shell/internal/tree/service_test.go`, all already green) had already superseded them; only the
+stale Node-side tests exercising the old implementation were left behind. Deleted both alongside
+`src/main/`, `src/preload/` and `src/engine/index.ts`, rather than porting them to test code with no
+production caller. Also removed, as a direct consequence of the deletion rather than new scope:
+`tsconfig.node.json`'s now-empty `src/main/**/*.ts`/`src/preload/**/*.ts` include globs, and
+`biome.json`'s two `src/main/**`-scoped `noRestrictedImports` overrides (the Drizzle/`node:sqlite`
+boundary rules they enforced have no subject left to guard). `electron.vite.config.ts` still
+references `src/main/index.ts`/`src/preload/index.ts` by string path (`resolve(__dirname, ...)`,
+not an import) and `tsconfig.node.json` still lists `"electron"` in `types` — both left alone here,
+since removing the electron-vite build config and its type is M7's job (§4.7), not this milestone's.
+Verified: `bun run typecheck` (all four projects), `bunx biome check .` (no new findings — the one
+pre-existing warning and one pre-existing info are both unrelated to this change), `go build`/`go
+vet`/`go test ./...`, the full `ui` project (36/36, one `tree.spec.ts` timeout on the first run
+reproduced the same transient full-suite-contention flake §11's M5 entry already documented — a
+clean re-run passed 36/36), and `ipc-frontend` (8/8) are all green post-deletion.
