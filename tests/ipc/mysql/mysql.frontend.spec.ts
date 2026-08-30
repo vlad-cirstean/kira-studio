@@ -1,7 +1,5 @@
-import { expect, test } from '../../e2e/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
-import { installControlMocks } from '../support/mockControl';
-import { installMockPort } from '../support/mockPort';
+import { expect, test } from '../../ui/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './mysql.fixture';
 
@@ -29,15 +27,13 @@ const DB_PATH = nodePathByName('kira_test');
 const ORDER_ITEMS_PATH = nodePathByName('order_items');
 
 test('mysql (frontend, mocked IPC) — connect, tree, filter-by-value quoting, console', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { app, window: page } = kira;
-
-  await installControlMocks(app, controlSnapshots);
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-  const port = await installMockPort(page, portSnapshots);
+  const { window: page, stream } = await relaunch({
+    control: controlSnapshots,
+    stream: portSnapshots,
+  });
 
   const connRow = connectionRow(page);
   await expect(connRow).toBeVisible();
@@ -75,7 +71,7 @@ test('mysql (frontend, mocked IPC) — connect, tree, filter-by-value quoting, c
   await expect(whereInput).toHaveValue(`\`id\` = '${idValue}'`);
 
   // D7: the read request the filter actually produced, not only what it rendered.
-  const ops = await port.ops();
+  const ops = await stream.ops();
   const filteredRead = ops.find(
     (o) =>
       o.op === 'data:read' && (o.payload as { filter?: string }).filter === `\`id\` = '${idValue}'`,

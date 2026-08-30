@@ -1,14 +1,14 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from '../../e2e/fixtures';
-import { acceptConfirm } from '../../e2e/support/dialogs';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
-import { installControlMocks } from '../support/mockControl';
-import { installMockPort } from '../support/mockPort';
+import { expect, type Relaunch, test } from '../../ui/fixtures';
+import { acceptConfirm } from '../../ui/support/dialogs';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './redis.fixture';
 
-// P50 §4.3 — the redis split's frontend half. Real Electron/Vue, both IPC halves mocked from the
-// exact fixture redis.backend.spec.ts asserts against. No container, no Docker.
+// P50 §4.3 / P57 D13-D16 — the redis split's frontend half. Real Vue and real bridge/{control,port
+// }.ts, both wire protocols mocked from the exact fixture redis.backend.spec.ts asserts against —
+// no container, no Docker, and (since P57) no Electron process either: a page against the static
+// build, both mocks installed at the network layer before the one navigation `relaunch()` does.
 
 interface TreeNodeLike {
   name: string;
@@ -40,27 +40,24 @@ const LIST_KEY_PATH = nodePathByName('queue:jobs');
 const SESSION_NS_PATH = nodePathByName('session');
 const DB1_OTHER_NS_PATH = nodePathByName('other-db');
 
-async function setup(kira: { app: import('@playwright/test').ElectronApplication; window: Page }) {
-  await installControlMocks(kira.app, controlSnapshots);
-  await kira.window.reload();
-  await kira.window.waitForSelector('[data-testid="status-bar"]');
-  await installMockPort(kira.window, portSnapshots);
+async function setup(relaunch: Relaunch): Promise<Page> {
+  const { window } = await relaunch({ control: controlSnapshots, stream: portSnapshots });
 
-  const connRow = connectionRow(kira.window);
+  const connRow = connectionRow(window);
   await expect(connRow).toBeVisible();
-  await openRowMenu(kira.window, '');
-  await kira.window.click('[data-testid="menu-item-connect"]');
+  await openRowMenu(window, '');
+  await window.click('[data-testid="menu-item-connect"]');
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
+  return window;
 }
 
 test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { window: page } = kira;
-  await setup(kira);
+  const page = await setup(relaunch);
 
   // --- 1: two logical dbs, both leaves (no key-browsing twisty) ---------------------------
   await expandRow(page, '');
@@ -211,11 +208,10 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
 // assertion here is over an already-loaded level, which the fixture's already-captured user/1
 // listing (four rows) already provides.
 test('redis (frontend, mocked IPC) — browse tab: filter and Up', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { window: page } = kira;
-  await setup(kira);
+  const page = await setup(relaunch);
 
   await expandRow(page, '');
   const db0Row = await findRow(page, DB0_PATH);
@@ -231,8 +227,14 @@ test('redis (frontend, mocked IPC) — browse tab: filter and Up', async ({
   await user1Row.dblclick();
   await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
 
+  // P57 finding: `data-level` and the row list itself update off two separate reactive triggers
+  // (project/state/tree.ts's own level ref vs. its children fetch resolving) — a gap real
+  // Electron IPC's own round-trip latency happened to always outlast, but this tier's HTTP mock
+  // sometimes doesn't. `expect.poll` waits for the count to actually settle before this test reads
+  // it as a plain number to reuse below, rather than reading `data-level` matching as a proxy for
+  // "the rows are here too".
+  await expect.poll(() => browseView.locator('[data-testid="browse-row"]').count()).toBe(4);
   const totalRows = await browseView.locator('[data-testid="browse-row"]').count();
-  expect(totalRows).toBe(4);
   await browseView.locator('[data-testid="browse-filter"]').fill('profile');
   await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(1);
   await expect(browseView.locator('[data-testid="browse-count"]')).toContainText(

@@ -1,13 +1,12 @@
-import { expect, test } from '../../e2e/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
-import { installControlMocks } from '../support/mockControl';
-import { installMockPort } from '../support/mockPort';
+import { expect, test } from '../../ui/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './clickhouse.fixture';
 
-// P50 §4.4 — clickhouse's frontend half, same shape as mysql's (§4.4). The engine-picker/Add
-// Connection dialog flow is left to tests/e2e/connections.spec.ts (kept, unchanged, generic
-// connection-dialog UI) — this spec starts from an already-listed connection.
+// P50 §4.4 / P57 D13-D16 — clickhouse's frontend half, same shape as mysql's (§4.4). The
+// engine-picker/Add Connection dialog flow is left to tests/e2e/connections.spec.ts (kept,
+// unchanged, generic connection-dialog UI, full-stack) — this spec starts from an already-listed
+// connection, both wire protocols mocked from the exact fixture the backend half asserts against.
 
 interface TreeNodeLike {
   name: string;
@@ -29,15 +28,13 @@ const DB_PATH = nodePathByName('kira_test', 'database');
 const ORDER_ITEMS_PATH = nodePathByName('order_items', 'table');
 
 test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delete gating, definition, console', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { app, window: page } = kira;
-
-  await installControlMocks(app, controlSnapshots);
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-  const port = await installMockPort(page, portSnapshots);
+  const { window: page, stream } = await relaunch({
+    control: controlSnapshots,
+    stream: portSnapshots,
+  });
 
   const connRow = connectionRow(page);
   await expect(connRow).toBeVisible();
@@ -82,7 +79,7 @@ test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delet
   await expect(whereInput).toHaveValue(`\`id\` = '${idValue}'`);
 
   // D7: the read request the filter actually produced, not only what it rendered.
-  const ops = await port.ops();
+  const ops = await stream.ops();
   const filteredRead = ops.find(
     (o) =>
       o.op === 'data:read' && (o.payload as { filter?: string }).filter === `\`id\` = '${idValue}'`,

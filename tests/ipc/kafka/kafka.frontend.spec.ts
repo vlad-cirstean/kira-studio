@@ -1,7 +1,5 @@
-import { expect, test } from '../../e2e/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
-import { installControlMocks } from '../support/mockControl';
-import { installMockPort } from '../support/mockPort';
+import { expect, test } from '../../ui/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './kafka.fixture';
 
@@ -30,15 +28,10 @@ const EMPTY_TOPIC_PATH = nodePathByName('empty-topic', 'topic');
 const CONSUMER_GROUP_PATH = nodePathByName('kira-test-group', 'consumerGroup');
 
 test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offsetWindow), definitions', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { app, window: page } = kira;
-
-  await installControlMocks(app, controlSnapshots);
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-  await installMockPort(page, portSnapshots);
+  const { window: page } = await relaunch({ control: controlSnapshots, stream: portSnapshots });
 
   const connRow = connectionRow(page);
   await expect(connRow).toBeVisible();

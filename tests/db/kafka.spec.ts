@@ -15,17 +15,22 @@ import {
   ORDERS_MESSAGE_COUNT,
   ORDERS_PARTITION_COUNT,
   ORDERS_TOPIC,
-} from '../db/fixtures/0005_kafka_seed';
-import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from '../db/support/docker';
-import { type KafkaFixture, startKafka } from '../db/support/kafka';
-import { readStream } from '../db/support/page';
+} from './fixtures/0005_kafka_seed';
+import { DOCKER_UNAVAILABLE_MESSAGE, isDockerAvailable } from './support/docker';
+import { type KafkaFixture, startKafka } from './support/kafka';
+import { readStream } from './support/page';
 
-// P32 D27/D28: this suite left Bun for `ELECTRON_RUN_AS_NODE=1 electron` (test:db:kafka) because
-// Bun cannot load the native driver at any ABI (F21). node:test/node:assert/strict replace
-// bun:test/expect mechanically — every assertion here is the same check, not a new one. The
-// fixture/support files stay under tests/db/ and stay client-free (0005_kafka_seed.ts, support/
-// kafka.ts, support/docker.ts, support/page.ts) since tests/ipc/kafka/kafka.backend.spec.ts also
-// imports them, from a third runtime again.
+// P32 D27/D28: this suite left Bun for a real Node process because Bun cannot load the native
+// driver at any ABI (F21) — node:test/node:assert/strict replace bun:test/expect mechanically,
+// every assertion here is the same check, not a new one. P57 D17: that real Node used to mean
+// `ELECTRON_RUN_AS_NODE=1 electron` plus an Electron-ABI rebuild of the addon
+// (scripts/native-electron-build.sh); it now means the vendored stock Node
+// (shell/runtime/node/bin/node) running the `bun install`-built addon exactly as it landed on
+// disk — no rebuild, since P51 part 4 already proved the addon loads under a stock Node with no
+// ABI dance at all. This file lives beside its own fixtures now (fixtures/0005_kafka_seed.ts,
+// support/{docker,kafka,page}.ts) rather than one directory up: `tests/electron-db/` only ever
+// existed because this suite could not share a directory with `bun test`'s own file discovery,
+// and excluding it by name (package.json's `test:db` script) does that just as well.
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 

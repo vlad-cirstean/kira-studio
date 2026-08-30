@@ -1,14 +1,12 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from '../../e2e/fixtures';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../../e2e/support/tree';
-import { installControlMocks, readControlLog } from '../support/mockControl';
-import { installMockPort } from '../support/mockPort';
+import { expect, test } from '../../ui/fixtures';
+import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import { controlSnapshots, portSnapshots } from './mariadb.fixture';
 
-// P50 §4.2 — the pilot adapter's frontend half. Real Electron, real Vue, real preload/contextBridge
-// boundary; both IPC halves mocked from the exact same fixture mariadb.backend.spec.ts asserts
-// against (the vital rule). No container, no adapter, no network — this file needs no Docker at
-// all and is expected to run in this sandbox.
+// P50 §4.2 / P57 D13-D16 — the pilot adapter's frontend half. Real Vue and real bridge/{control,
+// port}.ts; both wire protocols mocked from the exact same fixture mariadb.backend.spec.ts asserts
+// against (the vital rule). No container, no adapter, no network, and (since P57) no Electron
+// process either — this file needs no Docker at all and is expected to run in this sandbox.
 
 const DB_PATH = 'database:kira_test';
 const ORDER_ITEMS_PATH = `${DB_PATH}/table:order_items`;
@@ -24,18 +22,13 @@ async function firstGutterNumber(page: Page): Promise<string> {
 }
 
 test('mariadb (frontend, mocked IPC) — connect, tree, data tab, count, filter, stop button', async ({
-  kira,
+  relaunch,
   consoleErrors,
 }) => {
-  const { app, window: page } = kira;
-
-  await installControlMocks(app, controlSnapshots);
-  // F6's ordering fact: main re-attaches a real port on every did-finish-load, so the renderer
-  // must reload against the mocked control handlers first, and the mock port is installed only
-  // after that reload settles — never before it, and never followed by another one.
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-  await installMockPort(page, portSnapshots);
+  const { window: page, control } = await relaunch({
+    control: controlSnapshots,
+    stream: portSnapshots,
+  });
 
   const connRow = connectionRow(page);
   await expect(connRow).toBeVisible();
@@ -80,7 +73,7 @@ test('mariadb (frontend, mocked IPC) — connect, tree, data tab, count, filter,
   await page.click('[data-testid="toolbar-stop"]');
   await expect(page.locator('[data-testid="toolbar-stop"]')).toBeDisabled({ timeout: 2_000 });
 
-  const controlLog = await readControlLog(app);
+  const controlLog = control.log();
   const cancelCall = controlLog.find((entry) => entry.channel === 'kira:ops:cancel');
   expect(cancelCall).toBeTruthy();
   expect(typeof (cancelCall?.args as { opId?: unknown } | undefined)?.opId).toBe('string');
