@@ -1,11 +1,8 @@
 package enginehost_test
 
 import (
-	"bytes"
-	"log/slog"
 	"os"
 	"os/exec"
-	"sync"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
@@ -41,34 +38,4 @@ func newHost(t *testing.T, script string, args ...string) *enginehost.Host {
 	}
 	t.Cleanup(h.Stop)
 	return h
-}
-
-// captureLogs redirects slog.Default() to an in-memory text handler for the duration of the
-// test, restoring the previous default on cleanup.
-func captureLogs(t *testing.T) *syncBuffer {
-	t.Helper()
-	buf := &syncBuffer{}
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	return buf
-}
-
-// syncBuffer is a bytes.Buffer usable from the slog handler's goroutine and read back from the
-// test goroutine without a race.
-type syncBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (b *syncBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *syncBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
 }

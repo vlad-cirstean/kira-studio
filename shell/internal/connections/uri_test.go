@@ -4,6 +4,10 @@ import "testing"
 
 func strPtr(s string) *string { return &s }
 
+// TestStripURIPassword covers the userinfo surgery's interacting rules: find the authority (which
+// ends at the first /, ? or #), split at the LAST '@' and the FIRST ':' inside it, percent-decode
+// what is left, and drop the '@' entirely when the username is empty — all without touching a
+// byte outside the authority.
 func TestStripURIPassword(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -36,28 +40,6 @@ func derefOrNil(s *string) any {
 		return nil
 	}
 	return *s
-}
-
-func TestInjectURIPassword(t *testing.T) {
-	tests := []struct {
-		name string
-		uri  string
-		pass *string
-		want string
-	}{
-		{"nil password is the identity", "postgresql://u@h/db", nil, "postgresql://u@h/db"},
-		{"empty password is the identity", "postgresql://u@h/db", strPtr(""), "postgresql://u@h/db"},
-		{"injects and encodes", "postgresql://u@h/db", strPtr("p"), "postgresql://u:p@h/db"},
-		{"query and fragment untouched", "postgresql://u@h/db?a=b#f", strPtr("p"), "postgresql://u:p@h/db?a=b#f"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := injectURIPassword(tt.uri, tt.pass)
-			if got != tt.want {
-				t.Errorf("injectURIPassword() = %q, want %q", got, tt.want)
-			}
-		})
-	}
 }
 
 func TestURIPasswordRoundTripSurvivesSpecialCharacters(t *testing.T) {

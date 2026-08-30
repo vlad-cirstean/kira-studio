@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
-	"github.com/kirathecat/kira-studio/shell/internal/enginetest"
 	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
@@ -80,20 +79,6 @@ func seedRawOp(t *testing.T, ops *repos.OpsRepo, id, startedAt string) {
 	}
 }
 
-// seedConnection inserts a bare connections row so an op_log row can reference it — op_log.
-// connection_id has a real foreign key to connections(id).
-func seedConnection(t *testing.T, ops *repos.OpsRepo, id string) {
-	t.Helper()
-	now := model.NowISO()
-	if _, err := ops.DB.Exec(
-		`INSERT INTO connections (id, name, kind, color, mode, read_only, created_at, updated_at, sort_order)
-		 VALUES (?, ?, 'postgres', 'blue', 'fields', 0, ?, ?, 0)`,
-		id, id, now, now,
-	); err != nil {
-		t.Fatalf("seed connection %s: %v", id, err)
-	}
-}
-
 func rowExists(t *testing.T, ops *repos.OpsRepo, id string) bool {
 	t.Helper()
 	var exists int
@@ -154,112 +139,9 @@ func (c *updateCollector) count() int {
 	return len(c.recs)
 }
 
-func (c *updateCollector) at(i int) model.OpRecord {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.recs[i]
-}
-
-func strp(s string) *string { return &s }
-
-func TestStartEndRowLifecycle(t *testing.T) {
-	h := newHarness(t, 30)
-	seedConnection(t, h.ops, "c1")
-	var updates updateCollector
-	h.wiring.OnUpdate(updates.handle)
-	h.wiring.Start()
-	t.Cleanup(h.wiring.Stop)
-
-	startedAt := model.NowISO()
-	h.src.ch <- enginehost.Event{
-		Topic:   enginehost.EventOpStart,
-		Payload: opStartPayload("op1", strp("c1"), strp("t1"), "read", startedAt),
-	}
-	waitUntil(t, time.Second, func() bool { return updates.count() >= 1 })
-	running := updates.at(0)
-	if running.Status != "running" || running.ConnectionID == nil || *running.ConnectionID != "c1" {
-		t.Fatalf("first update = %+v, want a running record for c1", running)
-	}
-	row := fetchOp(t, h.ops, "op1")
-	if row.Status != "running" {
-		t.Errorf("DB row status = %q, want running", row.Status)
-	}
-
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload("op1", "ok")}
-	waitUntil(t, time.Second, func() bool { return updates.count() >= 2 })
-	final := updates.at(1)
-	if final.Status != "ok" {
-		t.Errorf("final Status = %q, want ok", final.Status)
-	}
-	if final.ConnectionID == nil || *final.ConnectionID != "c1" {
-		t.Errorf("final ConnectionID = %v, want c1 (carried from the matching op:start)", final.ConnectionID)
-	}
-	if final.TabID == nil || *final.TabID != "t1" {
-		t.Errorf("final TabID = %v, want t1", final.TabID)
-	}
-	if final.Kind != "read" {
-		t.Errorf("final Kind = %q, want read", final.Kind)
-	}
-	row = fetchOp(t, h.ops, "op1")
-	if row.Status != "ok" {
-		t.Errorf("DB row status = %q, want ok", row.Status)
-	}
-}
-
-func TestUnknownOpEndUsesFallbacks(t *testing.T) {
-	h := newHarness(t, 30)
-	var updates updateCollector
-	h.wiring.OnUpdate(updates.handle)
-	h.wiring.Start()
-	t.Cleanup(h.wiring.Stop)
-
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload("op-unknown", "ok")}
-	waitUntil(t, time.Second, func() bool { return updates.count() >= 1 })
-	rec := updates.at(0)
-	if rec.ConnectionID != nil {
-		t.Errorf("ConnectionID = %v, want nil", rec.ConnectionID)
-	}
-	if rec.TabID != nil {
-		t.Errorf("TabID = %v, want nil", rec.TabID)
-	}
-	if rec.Kind != "test" {
-		t.Errorf("Kind = %q, want test", rec.Kind)
-	}
-}
-
-func TestMalformedEventsAreDropped(t *testing.T) {
-	h := newHarness(t, 30)
-	var updates updateCollector
-	h.wiring.OnUpdate(updates.handle)
-	h.wiring.Start()
-	t.Cleanup(h.wiring.Stop)
-
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpStart, Payload: json.RawMessage(`not json`)}
-	h.src.ch <- enginehost.Event{
-		Topic:   enginehost.EventOpStart,
-		Payload: opStartPayload("op-bad-kind", nil, nil, "bogus-kind", model.NowISO()),
-	}
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload("op-bad-status", "bogus-status")}
-
-	// Prove the queue actually drained (rather than merely not having emitted yet) with one real
-	// event, then assert nothing from the three malformed ones landed either as a DB row or an
-	// update.
-	h.src.ch <- enginehost.Event{
-		Topic:   enginehost.EventOpStart,
-		Payload: opStartPayload("op-good", nil, nil, "read", model.NowISO()),
-	}
-	waitUntil(t, time.Second, func() bool { return updates.count() >= 1 })
-
-	if updates.count() != 1 {
-		t.Fatalf("got %d updates, want exactly 1 (the malformed events must emit nothing)", updates.count())
-	}
-	for _, id := range []string{"op-bad-kind", "op-bad-status"} {
-		if rowExists(t, h.ops, id) {
-			t.Errorf("a malformed event wrote a row for %s", id)
-		}
-	}
-}
-
+// TestPruneRunsAtStartAndEvery500 pins the prune cadence's counter arithmetic: once at Start, then
+// on exactly the 500th completed op and not again until the 1000th. An off-by-one here either
+// prunes on every op (a full table scan per query) or never prunes at all after startup.
 func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 	h := newHarness(t, 1)
 	staleAt := model.FormatISO(time.Now().Add(-48 * time.Hour))
@@ -288,6 +170,9 @@ func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 	}
 }
 
+// TestEngineDownReconcilesInFlight covers this package's actual subject: everything still tracked
+// as running when the engine exits must be finished with the exit error and dropped from the
+// in-flight map, while an op that already reached a terminal state is left alone.
 func TestEngineDownReconcilesInFlight(t *testing.T) {
 	h := newHarness(t, 30)
 	var updates updateCollector
@@ -321,53 +206,4 @@ func TestEngineDownReconcilesInFlight(t *testing.T) {
 	// The goroutine's `for evt := range events` returns once the channel closes — Stop (via
 	// fakeSource's unsubscribe) closing it here must not panic or hang.
 	h.wiring.Stop()
-}
-
-func TestUnparseableStartedAtGivesZeroDuration(t *testing.T) {
-	h := newHarness(t, 30)
-	h.wiring.Start()
-	t.Cleanup(h.wiring.Stop)
-
-	h.src.ch <- enginehost.Event{
-		Topic:   enginehost.EventOpStart,
-		Payload: opStartPayload("op-bad-date", nil, nil, "read", "not a date"),
-	}
-	waitUntil(t, time.Second, func() bool { return rowExists(t, h.ops, "op-bad-date") })
-
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventEngineDown}
-	waitUntil(t, time.Second, func() bool { return fetchOp(t, h.ops, "op-bad-date").Status == "error" })
-	row := fetchOp(t, h.ops, "op-bad-date")
-	if row.DurationMs == nil || *row.DurationMs != 0 {
-		t.Errorf("DurationMs = %v, want 0", row.DurationMs)
-	}
-}
-
-func TestRealHostEngineDown(t *testing.T) {
-	t.Setenv("KIRA_HOME", t.TempDir())
-	db, err := storage.Open()
-	if err != nil {
-		t.Fatalf("storage.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	r, err := repos.New(db.DB)
-	if err != nil {
-		t.Fatalf("repos.New: %v", err)
-	}
-	t.Cleanup(func() { _ = r.Close() })
-
-	host := enginetest.Host(t)
-	w := oplog.New(host, r.Ops, 30)
-	w.Start()
-	t.Cleanup(w.Stop)
-
-	if _, err := host.Call("fixture:emit-op-start", map[string]any{
-		"opId": "real-op1", "connectionId": nil, "tabId": nil, "kind": "read", "startedAt": model.NowISO(),
-	}); err != nil {
-		t.Fatalf("fixture:emit-op-start: %v", err)
-	}
-	waitUntil(t, time.Second, func() bool { return rowExists(t, r.Ops, "real-op1") })
-
-	_, _ = host.Call("fixture:crash", nil) // never answers; the engine process exits instead
-
-	waitUntil(t, 2*time.Second, func() bool { return fetchOp(t, r.Ops, "real-op1").Status == "error" })
 }

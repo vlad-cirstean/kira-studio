@@ -74,29 +74,9 @@ func sendDataRequest(t *testing.T, h *enginehost.Host, id int, op string, payloa
 	}
 }
 
-func TestDataFrameReachesSinkByteIdentical(t *testing.T) {
-	h := newHost(t, fixture)
-	sink := &fakeSink{}
-	detach := h.AttachStream(sink)
-	defer detach()
-
-	big := bytes.Repeat([]byte("x"), 1<<20+37) // > 1 MiB, an odd size on purpose
-	sendDataRequest(t, h, 1, "echo", map[string]any{"blob": string(big)})
-
-	waitFor(t, 5*time.Second, func() bool { return len(sink.received()) == 1 })
-	var resp struct {
-		Payload struct {
-			Blob string `json:"blob"`
-		} `json:"payload"`
-	}
-	if err := json.Unmarshal(sink.received()[0], &resp); err != nil {
-		t.Fatalf("unmarshal sink frame: %v", err)
-	}
-	if resp.Payload.Blob != string(big) {
-		t.Errorf("echoed blob length %d != sent length %d, or content mismatch", len(resp.Payload.Blob), len(big))
-	}
-}
-
+// TestDataFrameIsNotUnmarshalled pins the data channel's opaque-bytes contract: Go must hand a
+// tag-1 frame to the Sink byte for byte, never parsing or re-encoding it — proven with a payload
+// that is not valid JSON or UTF-8 at all.
 func TestDataFrameIsNotUnmarshalled(t *testing.T) {
 	h := newHost(t, fixture)
 	sink := &fakeSink{}
@@ -112,38 +92,9 @@ func TestDataFrameIsNotUnmarshalled(t *testing.T) {
 	}
 }
 
-func TestControlAndDataDemux(t *testing.T) {
-	h := newHost(t, fixture)
-	sink := &fakeSink{}
-	detach := h.AttachStream(sink)
-	defer detach()
-
-	sendDataRequest(t, h, 1, "echo", map[string]any{"marker": "data-channel"})
-	raw, err := h.Call("ping", nil)
-	if err != nil {
-		t.Fatalf("Call(ping): %v", err)
-	}
-	var pong struct{ Pong bool }
-	if err := json.Unmarshal(raw, &pong); err != nil || !pong.Pong {
-		t.Fatalf("Call(ping) response = %s", raw)
-	}
-
-	waitFor(t, 5*time.Second, func() bool { return len(sink.received()) == 1 })
-	if !bytes.Contains(sink.received()[0], []byte("data-channel")) {
-		t.Errorf("sink frame = %s, want it to contain the data-channel request's marker", sink.received()[0])
-	}
-}
-
-func TestNoSinkDropsDataFrames(t *testing.T) {
-	h := newHost(t, fixture)
-	for i := 0; i < 200; i++ {
-		sendDataRequest(t, h, i, "echo", map[string]any{"i": i})
-	}
-	if _, err := h.Call("ping", nil); err != nil {
-		t.Errorf("Call(ping) after 200 unattached data frames: %v", err)
-	}
-}
-
+// TestBackpressureStallsThenRecovers covers the whole backpressure chain: a blocked sink fills
+// the bounded queue, the read loop stops draining stdout and the OS pipe pushes back on the
+// engine — and once released, all 500 frames arrive intact and in order.
 func TestBackpressureStallsThenRecovers(t *testing.T) {
 	h := newHost(t, fixture)
 	block := make(chan struct{})
@@ -182,25 +133,9 @@ func TestBackpressureStallsThenRecovers(t *testing.T) {
 	}
 }
 
-func TestSendRetriesOnStreamFull(t *testing.T) {
-	h := newHost(t, fixture)
-	sink := &fakeSink{full: 5}
-	detach := h.AttachStream(sink)
-	defer detach()
-
-	start := time.Now()
-	sendDataRequest(t, h, 1, "echo", map[string]any{"ok": true})
-	waitFor(t, 5*time.Second, func() bool { return len(sink.received()) == 1 })
-	elapsed := time.Since(start)
-
-	if elapsed < 2*time.Millisecond {
-		t.Errorf("delivery took %s, want at least the backoff floor (5 retries)", elapsed)
-	}
-	if got := sink.received(); len(got) != 1 {
-		t.Fatalf("sink received %d frames, want exactly 1 (no duplicate delivery)", len(got))
-	}
-}
-
+// TestNonFullSinkErrorDetaches pins deliver's two-way error discrimination: ErrStreamFull means
+// retry, anything else means the session is gone and the sink must be detached. Getting this
+// backwards makes the writer goroutine spin forever against a dead session.
 func TestNonFullSinkErrorDetaches(t *testing.T) {
 	h := newHost(t, fixture)
 	sink := &fakeSink{err: errors.New("session gone")}
@@ -228,6 +163,9 @@ func TestNonFullSinkErrorDetaches(t *testing.T) {
 	}
 }
 
+// TestSupersededSinkAbandonsRetry covers the sink generation counter: a frame mid-retry against a
+// sink that has since been replaced belongs to a dead session and must be abandoned, never
+// delivered late to the sink that replaced it.
 func TestSupersededSinkAbandonsRetry(t *testing.T) {
 	h := newHost(t, fixture)
 	sinkA := &fakeSink{full: 1 << 30} // effectively always ErrStreamFull

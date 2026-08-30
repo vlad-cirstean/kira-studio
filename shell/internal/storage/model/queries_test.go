@@ -6,9 +6,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
+// TestSortSpecRoundTrip is the accept half of SortSpec's hand-written codec — note the
+// "structured empty term list" case, which must round-trip as valid; see
+// TestSortSpecUnmarshalRejectsInvalid for why telling it apart from an absent terms key is the
+// whole reason the decoder probes into json.RawMessage.
 func TestSortSpecRoundTrip(t *testing.T) {
 	tests := []struct {
 		name string
@@ -38,24 +43,10 @@ func TestSortSpecRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSortSpecMarshalOmitsOtherArmKey(t *testing.T) {
-	structured, err := json.Marshal(model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "a", Direction: "asc"}}})
-	if err != nil {
-		t.Fatalf("Marshal structured: %v", err)
-	}
-	if strings.Contains(string(structured), `"text"`) {
-		t.Errorf("structured SortSpec JSON contains text key: %s", structured)
-	}
-
-	text, err := json.Marshal(model.SortSpec{Kind: "text", Text: "x"})
-	if err != nil {
-		t.Fatalf("Marshal text: %v", err)
-	}
-	if strings.Contains(string(text), `"terms"`) {
-		t.Errorf("text SortSpec JSON contains terms key: %s", text)
-	}
-}
-
+// TestSortSpecUnmarshalRejectsInvalid is the reject half, and the reason the decoder cannot just
+// unmarshal into the struct: a missing `terms`/`text` key and an empty one both land as a nil Go
+// slice, so only probing the raw JSON can tell "structured with no terms key" (invalid) from
+// "structured with an empty term list" (valid). A bare null must be rejected too.
 func TestSortSpecUnmarshalRejectsInvalid(t *testing.T) {
 	tests := []struct {
 		name string
@@ -75,39 +66,6 @@ func TestSortSpecUnmarshalRejectsInvalid(t *testing.T) {
 			// discriminated union, which also rejects a bare null.
 			if err := json.Unmarshal([]byte(tt.json), &got); err == nil {
 				t.Fatalf("Unmarshal(%s) = nil error, want an error", tt.json)
-			}
-		})
-	}
-}
-
-func TestValidSavedQueryKind(t *testing.T) {
-	for _, v := range []string{"filter", "console"} {
-		if !model.ValidSavedQueryKind(v) {
-			t.Errorf("ValidSavedQueryKind(%q) = false, want true", v)
-		}
-	}
-	if model.ValidSavedQueryKind("banana") {
-		t.Error("ValidSavedQueryKind(banana) = true, want false")
-	}
-}
-
-func TestValidSavedQueryName(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"ok", "My Query", false},
-		{"empty", "", true},
-		{"whitespace only", "   ", true},
-		{"exactly 120", strings.Repeat("a", 120), false},
-		{"121 chars", strings.Repeat("a", 121), true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := model.ValidSavedQueryName(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidSavedQueryName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			}
 		})
 	}

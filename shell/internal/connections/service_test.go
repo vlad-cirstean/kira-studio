@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -158,72 +156,9 @@ func asIpcErr(t *testing.T, err error) *ipcerr.Error {
 	return ie
 }
 
-func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatalf("condition not met within %s", timeout)
-	}
-}
-
-func TestCreateUpdateDuplicateDelete(t *testing.T) {
-	h := newHarness(t)
-	created := mustCreate(t, h.svc, func() connections.Input {
-		in := fieldsInput("round-trip")
-		in.Password = strPtr("hunter2")
-		return in
-	}())
-
-	// List never returns a password: ConnectionSummary has no such field, and its JSON encoding
-	// must not carry one either.
-	list, err := h.svc.List()
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	encoded, _ := json.Marshal(list)
-	if strings.Contains(string(encoded), "hunter2") || strings.Contains(string(encoded), `"password"`) {
-		t.Errorf("List() JSON leaked a password field: %s", encoded)
-	}
-
-	updated, err := h.svc.Update(created.ID, func() connections.Input {
-		in := fieldsInput("renamed")
-		return in
-	}())
-	if err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-	if updated.Name != "renamed" {
-		t.Errorf("Name = %q, want renamed", updated.Name)
-	}
-
-	dup, err := h.svc.Duplicate(created.ID)
-	if err != nil {
-		t.Fatalf("Duplicate: %v", err)
-	}
-	if dup.Name != "renamed copy" {
-		t.Errorf("duplicate Name = %q, want %q", dup.Name, "renamed copy")
-	}
-
-	if err := h.repos.Metadata.Put(created.ID, "database:x", "children", json.RawMessage(`{"nodes":[]}`)); err != nil {
-		t.Fatalf("seed metadata: %v", err)
-	}
-	if err := h.svc.Remove(created.ID); err != nil {
-		t.Fatalf("Remove: %v", err)
-	}
-	if got, _ := h.repos.Metadata.Get(created.ID, "database:x", "children"); got != nil {
-		t.Errorf("metadata cache row survived Remove: %s", got)
-	}
-	if row, _ := h.repos.Connections.Get(created.ID); row != nil {
-		t.Errorf("connection row survived Remove: %+v", row)
-	}
-}
-
+// TestPasswordThreeStateConvention pins Update's three-state password contract — nil leaves the
+// stored secret alone, "" clears it, non-empty replaces it — which a naive `if password != nil`
+// collapses into two states and silently wipes credentials on every unrelated edit.
 func TestPasswordThreeStateConvention(t *testing.T) {
 	h := newHarness(t)
 	in := fieldsInput("pw-conn")
@@ -271,6 +206,9 @@ func TestPasswordThreeStateConvention(t *testing.T) {
 	}
 }
 
+// TestUriPasswordStripAndInject is the end-to-end statement of the URI secret rule: the password
+// is stripped out of the URI before the row is written (so it is never persisted in cleartext)
+// and re-injected only into the config handed to the engine.
 func TestUriPasswordStripAndInject(t *testing.T) {
 	h := newHarness(t)
 	in := connections.Input{
@@ -312,6 +250,9 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	}
 }
 
+// TestCreateValidatesSecretBeforeWriting covers half of the deliberately asymmetric write
+// ordering: Create must prove the secret can be encrypted BEFORE inserting, so an unavailable
+// cipher leaves no half-written row behind.
 func TestCreateValidatesSecretBeforeWriting(t *testing.T) {
 	h := newUnavailableCipherHarness(t)
 
@@ -343,6 +284,9 @@ func TestCreateValidatesSecretBeforeWriting(t *testing.T) {
 	}
 }
 
+// TestUpdateWritesSecretBeforeRow is the other half: the row already exists, so Update writes the
+// secret first and a cipher failure must abort before any other field is touched — a half-applied
+// edit is the failure mode this ordering exists to prevent.
 func TestUpdateWritesSecretBeforeRow(t *testing.T) {
 	h := newHarness(t)
 	created := mustCreate(t, h.svc, fieldsInput("original-name"))
@@ -367,89 +311,9 @@ func TestUpdateWritesSecretBeforeRow(t *testing.T) {
 	}
 }
 
-func TestConnectSuccessPath(t *testing.T) {
-	h := newHarness(t)
-	created := mustCreate(t, h.svc, fieldsInput("ok-conn"))
-	if err := h.repos.Metadata.Put(created.ID, "database:x", "children", json.RawMessage(`{"nodes":[]}`)); err != nil {
-		t.Fatalf("seed metadata: %v", err)
-	}
-
-	var mu sync.Mutex
-	var seen []model.ConnectionState
-	h.svc.OnStateChange(func(st model.ConnectionState) {
-		mu.Lock()
-		seen = append(seen, st)
-		mu.Unlock()
-	})
-	var invalidated []string
-	h.svc.OnMetadataInvalidated(func(id string) {
-		mu.Lock()
-		invalidated = append(invalidated, id)
-		mu.Unlock()
-	})
-
-	state, err := h.svc.Connect(created.ID)
-	if err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	if state.Status != "connected" {
-		t.Fatalf("Status = %q, want connected (error=%v)", state.Status, state.Error)
-	}
-	if state.ServerVersion == nil || *state.ServerVersion != "fixture 1.0" {
-		t.Errorf("ServerVersion = %v, want fixture 1.0", state.ServerVersion)
-	}
-	if state.Caps == nil {
-		t.Errorf("Caps is nil, want the fixture's caps object")
-	}
-
-	mu.Lock()
-	statuses := make([]string, len(seen))
-	for i, s := range seen {
-		statuses[i] = s.Status
-	}
-	mu.Unlock()
-	if len(statuses) < 2 || statuses[0] != "connecting" || statuses[len(statuses)-1] != "connected" {
-		t.Errorf("OnStateChange sequence = %v, want to start with connecting and end with connected", statuses)
-	}
-
-	mu.Lock()
-	gotInvalidated := append([]string(nil), invalidated...)
-	mu.Unlock()
-	if len(gotInvalidated) != 1 || gotInvalidated[0] != created.ID {
-		t.Errorf("OnMetadataInvalidated fired with %v, want exactly [%s]", gotInvalidated, created.ID)
-	}
-	if got, _ := h.repos.Metadata.Get(created.ID, "database:x", "children"); got != nil {
-		t.Errorf("metadata cache row survived Connect: %s", got)
-	}
-}
-
-func TestConnectFailurePathStopsPreconnect(t *testing.T) {
-	h := newHarness(t)
-	in := fieldsInput("fail-conn")
-	in.Preconnect = strPtr("sleep 30")
-	created := mustCreate(t, h.svc, in)
-
-	start := time.Now()
-	state, err := h.svc.Connect(created.ID)
-	elapsed := time.Since(start)
-	if err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	if state.Status != "error" {
-		t.Fatalf("Status = %q, want error", state.Status)
-	}
-	if state.Error == nil || !strings.Contains(*state.Error, "synthetic connect failure") {
-		t.Errorf("Error = %v, want it to name the fixture's synthetic failure", state.Error)
-	}
-	// Connect only returns once attemptConnect's Stop(id) call has finished, and Stop blocks
-	// until the process has actually exited (preconnect's own, separately tested guarantee) — so
-	// by the time we're here the sidecar this connection started is already dead. The >= 2s
-	// elapsed time confirms the sidecar did settle before the engine's failure response arrived.
-	if elapsed < time.Second {
-		t.Errorf("Connect returned after %s, want it to have waited out the sidecar settle window first", elapsed)
-	}
-}
-
+// TestInFlightConnectDedupe covers the in-flight attempt map: eight concurrent Connect calls for
+// one id must share a single attempt — identical results for every caller, and exactly one
+// adapter:connect on the wire.
 func TestInFlightConnectDedupe(t *testing.T) {
 	h := newHarness(t)
 	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
@@ -497,203 +361,5 @@ func TestInFlightConnectDedupe(t *testing.T) {
 	}
 	if count.Count != 1 {
 		t.Errorf("adapter:connect was called %d times, want exactly 1", count.Count)
-	}
-}
-
-func TestSidecarCheckboxArms(t *testing.T) {
-	h := newHarness(t)
-	in := fieldsInput("ok-arms")
-	in.Preconnect = strPtr("sleep 2.05")
-	in.PreconnectSidecar = true
-	created := mustCreate(t, h.svc, in)
-
-	if _, err := h.svc.Connect(created.ID); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	// The script may die either just before or just after Arm() (a real race the settle window
-	// itself creates — §4.4 D7) — either way it ends up 'error', synchronously in the first case
-	// or via onPreconnectExit shortly after in the second, so poll rather than asserting on
-	// Connect's own immediate return value.
-	waitUntil(t, 3*time.Second, func() bool { return h.svc.StateOf(created.ID).Status == "error" })
-}
-
-func TestMarkAllErrored(t *testing.T) {
-	h := newHarness(t)
-	connected1 := mustCreate(t, h.svc, fieldsInput("connected-1"))
-	connected2 := mustCreate(t, h.svc, fieldsInput("connected-2"))
-	untouched := mustCreate(t, h.svc, fieldsInput("never-connected"))
-
-	if _, err := h.svc.Connect(connected1.ID); err != nil {
-		t.Fatalf("Connect(1): %v", err)
-	}
-	if _, err := h.svc.Connect(connected2.ID); err != nil {
-		t.Fatalf("Connect(2): %v", err)
-	}
-
-	h.svc.MarkAllErrored("custom reason")
-
-	for _, id := range []string{connected1.ID, connected2.ID} {
-		st := h.svc.StateOf(id)
-		if st.Status != "error" || st.Error == nil || *st.Error != "custom reason" {
-			t.Errorf("StateOf(%s) = %+v, want error/custom reason", id, st)
-		}
-	}
-	if st := h.svc.StateOf(untouched.ID); st.Status != "disconnected" {
-		t.Errorf("StateOf(untouched) = %+v, want untouched (disconnected)", st)
-	}
-}
-
-func TestEngineDownMarksAllErrored(t *testing.T) {
-	h := newHarness(t)
-	c1 := mustCreate(t, h.svc, fieldsInput("engine-down-1"))
-	c2 := mustCreate(t, h.svc, fieldsInput("engine-down-2"))
-	if _, err := h.svc.Connect(c1.ID); err != nil {
-		t.Fatalf("Connect(1): %v", err)
-	}
-	if _, err := h.svc.Connect(c2.ID); err != nil {
-		t.Fatalf("Connect(2): %v", err)
-	}
-
-	_, _ = h.host.Call("fixture:crash", nil) // never answers; the engine process exits instead
-
-	waitUntil(t, 2*time.Second, func() bool {
-		return h.svc.StateOf(c1.ID).Status == "error" && h.svc.StateOf(c2.ID).Status == "error"
-	})
-	for _, id := range []string{c1.ID, c2.ID} {
-		st := h.svc.StateOf(id)
-		if st.Error == nil || *st.Error != "engine process exited" {
-			t.Errorf("StateOf(%s).Error = %v, want \"engine process exited\"", id, st.Error)
-		}
-	}
-}
-
-func TestStatesAreSorted(t *testing.T) {
-	h := newHarness(t)
-	ids := make([]string, 3)
-	for i := range ids {
-		created := mustCreate(t, h.svc, fieldsInput("sort-me"))
-		ids[i] = created.ID
-	}
-	// Connect in reverse-of-creation order — an arbitrary scramble relative to sorted(ids).
-	for i := len(ids) - 1; i >= 0; i-- {
-		if _, err := h.svc.Connect(ids[i]); err != nil {
-			t.Fatalf("Connect: %v", err)
-		}
-	}
-
-	wantOrder := append([]string(nil), ids...)
-	sort.Strings(wantOrder)
-
-	for attempt := 0; attempt < 2; attempt++ {
-		states := h.svc.States()
-		if len(states) != len(ids) {
-			t.Fatalf("States() returned %d entries, want %d", len(states), len(ids))
-		}
-		gotOrder := make([]string, len(states))
-		for i, st := range states {
-			gotOrder[i] = st.ConnectionID
-		}
-		if !sort.StringsAreSorted(gotOrder) {
-			t.Errorf("States() = %v, not sorted", gotOrder)
-		}
-	}
-}
-
-func TestRevealNeverThrows(t *testing.T) {
-	h := newHarness(t)
-	created := mustCreate(t, h.svc, fieldsInput("garbage-secret"))
-	if _, err := h.repos.Connections.DB.Exec(`UPDATE connections SET password = ? WHERE id = ?`, "garbage", created.ID); err != nil {
-		t.Fatalf("seed garbage password: %v", err)
-	}
-
-	result := h.svc.Reveal(created.ID)
-	if result.Password != nil {
-		t.Errorf("Password = %v, want nil", *result.Password)
-	}
-	// "garbage" carries no kira:v2: prefix at all, so Decrypt refuses it as a format error rather
-	// than an authentication failure — either way, Reveal must fold it into Error, never a panic
-	// or an unhandled failure (P25 D9).
-	if result.Error == nil || !strings.Contains(*result.Error, "cannot be decrypted") {
-		t.Errorf("Error = %v, want the envelope-format error", result.Error)
-	}
-}
-
-func TestTestAlwaysStopsPreconnect(t *testing.T) {
-	h := newHarness(t)
-
-	okResult := h.svc.Test(func() connections.Input {
-		in := fieldsInput("ok-test")
-		in.Preconnect = strPtr("true")
-		return in
-	}())
-	if !okResult.OK {
-		t.Errorf("ok Test() = %+v, want OK", okResult)
-	}
-
-	failResult := h.svc.Test(func() connections.Input {
-		in := fieldsInput("fail-test")
-		in.Preconnect = strPtr("true")
-		return in
-	}())
-	if failResult.OK {
-		t.Errorf("fail Test() = %+v, want !OK", failResult)
-	}
-
-	// Test's deferred Stop(r.config.ID) (service.go) always runs, on both the ok and the fail
-	// path, however Test ends — a subsequent Test() reusing the same "test" key must not hang or
-	// error because of a leftover process, since preconnect.Start() itself also supersedes
-	// anything already tracked. This shutdown completing at all (StopAll has nothing left to
-	// escalate against) is the observable half of that guarantee from outside the package; the
-	// blocking-until-exited half is preconnect's own, separately tested contract.
-	h.svc.Shutdown()
-}
-
-func TestListChangedBroadcast(t *testing.T) {
-	h := newHarness(t)
-	var mu sync.Mutex
-	count := 0
-	h.svc.OnListChanged(func([]model.ConnectionSummary) {
-		mu.Lock()
-		count++
-		mu.Unlock()
-	})
-	get := func() int {
-		mu.Lock()
-		defer mu.Unlock()
-		return count
-	}
-
-	created := mustCreate(t, h.svc, fieldsInput("list-changed"))
-	if got := get(); got != 1 {
-		t.Errorf("after Create, count = %d, want 1", got)
-	}
-
-	if _, err := h.svc.Update(created.ID, fieldsInput("list-changed-2")); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-	if got := get(); got != 2 {
-		t.Errorf("after Update, count = %d, want 2", got)
-	}
-
-	dup, err := h.svc.Duplicate(created.ID)
-	if err != nil {
-		t.Fatalf("Duplicate: %v", err)
-	}
-	if got := get(); got != 3 {
-		t.Errorf("after Duplicate, count = %d, want 3", got)
-	}
-
-	if _, err := h.svc.Reorder([]string{dup.ID, created.ID}); err != nil {
-		t.Fatalf("Reorder: %v", err)
-	}
-	if got := get(); got != 4 {
-		t.Errorf("after Reorder, count = %d, want 4", got)
-	}
-
-	if err := h.svc.Remove(created.ID); err != nil {
-		t.Fatalf("Remove: %v", err)
-	}
-	if got := get(); got != 5 {
-		t.Errorf("after Remove, count = %d, want 5", got)
 	}
 }

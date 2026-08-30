@@ -51,12 +51,23 @@ team works, and how to run things in whichever box a session happens to be on.
 - **Comments: very concise, and only where truly necessary.** Add one only when the code cannot
   say it for itself — a non-obvious *why*, a constraint, a workaround. Never restate what the code
   already shows.
-- **A unit test earns its keep only when there's real logic behind it to protect** — branching,
-  error handling, edge cases, parsing/validation, non-trivial state transitions. A test that only
-  restates something the compiler already guarantees (a getter, a struct-literal round-trip, a
-  one-line wrapper with no branching of its own) gives no protection against regressions; it's
-  just more code someone has to update for no benefit the next time the trivial thing it wraps
-  changes shape. This applies going forward to new code, not only as a one-time cleanup of what's
+- **Unit tests exist only for advanced, complex or deeply nested logic — and this app has very
+  little of that.** The default answer for a new piece of code is *no dedicated unit test at all*.
+  A test earns its keep only when it guards something genuinely hard to get right: a parser or
+  splitter with several interacting lexical rules, cursor/pagination arithmetic with real boundary
+  cases, cache eviction/invalidation with rules that interact, crypto beyond
+  encrypt-then-decrypt (tampering, corruption, key handling), concurrency — ordering, backpressure,
+  cancellation, races — or a decision structure large enough that no one can hold it in their head.
+  Keep a test outside those categories only when it is the one thing standing between "ships
+  broken" and "caught before merge" for a subtle rule, and say which rule in a comment above it.
+  Everything else gets nothing: CRUD round-trips (a database round-trip is plumbing, not logic,
+  even when it's integration-shaped), one- or two-condition validation, required-field and enum
+  guards, thin wrappers that forward a call unchanged, constructors and struct-literal builders,
+  serialize-then-deserialize round-trips with no format-specific edge case, single bad-input →
+  single-error paths, and anything that mostly restates what a short function body already says.
+  A branch is not complexity — a single `if` guarding one obvious case is exactly the kind of
+  thing a type system and a guard clause already make hard to get wrong. When torn between two
+  similar tests, delete. This applies going forward to new code, not only as a cleanup of what's
   already there.
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc., with a `!` or `BREAKING CHANGE:`

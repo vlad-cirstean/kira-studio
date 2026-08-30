@@ -23,34 +23,6 @@ func newRepos(t *testing.T) *storage.DB {
 	return db
 }
 
-func newSettingsRepo(t *testing.T) *repos.SettingsRepo {
-	return &repos.SettingsRepo{DB: newRepos(t).DB}
-}
-
-func newLayoutRepo(t *testing.T) *repos.LayoutRepo {
-	return &repos.LayoutRepo{DB: newRepos(t).DB}
-}
-
-func newTabsRepo(t *testing.T) *repos.TabsRepo {
-	return &repos.TabsRepo{DB: newRepos(t).DB}
-}
-
-func newConnectionsRepo(t *testing.T) *repos.ConnectionsRepo {
-	return &repos.ConnectionsRepo{DB: newRepos(t).DB}
-}
-
-func newOpsRepo(t *testing.T) *repos.OpsRepo {
-	return &repos.OpsRepo{DB: newRepos(t).DB}
-}
-
-func newFiltersRepo(t *testing.T) *repos.FiltersRepo {
-	return &repos.FiltersRepo{DB: newRepos(t).DB}
-}
-
-func newSavedQueriesRepo(t *testing.T) *repos.SavedQueriesRepo {
-	return &repos.SavedQueriesRepo{DB: newRepos(t).DB}
-}
-
 func newFilterHistoryRepo(t *testing.T) *repos.FilterHistoryRepo {
 	return &repos.FilterHistoryRepo{DB: newRepos(t).DB}
 }

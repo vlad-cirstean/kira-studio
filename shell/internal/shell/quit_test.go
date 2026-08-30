@@ -83,21 +83,9 @@ func waitFor(t *testing.T, ch <-chan struct{}, within time.Duration, what string
 	}
 }
 
-func TestShouldQuitReturnsFalseImmediately(t *testing.T) {
-	q, _, _, _ := newTestQuitter(time.Second)
-
-	start := time.Now()
-	got := q.ShouldQuit()
-	elapsed := time.Since(start)
-
-	if got {
-		t.Error("ShouldQuit() = true on the first call, want false")
-	}
-	if elapsed > time.Millisecond {
-		t.Errorf("ShouldQuit() took %s, want well under 1ms — it must never block (D2)", elapsed)
-	}
-}
-
+// TestFlushAckCompletesTeardown covers the winning arm of flushThenQuit's ack-vs-timeout select:
+// the renderer's ack must short-circuit the timeout, and the two teardown halves must still run
+// in order.
 func TestFlushAckCompletesTeardown(t *testing.T) {
 	q, emitter, ord, done := newTestQuitter(200 * time.Millisecond)
 
@@ -125,6 +113,8 @@ func TestFlushAckCompletesTeardown(t *testing.T) {
 	}
 }
 
+// TestFlushTimeoutStillTearsDown covers the other arm: a renderer that never acks must not be
+// able to keep the app alive — the timeout fires and teardown runs anyway.
 func TestFlushTimeoutStillTearsDown(t *testing.T) {
 	var logs bytes.Buffer
 	prev := slog.Default()
@@ -149,21 +139,9 @@ func TestFlushTimeoutStillTearsDown(t *testing.T) {
 	}
 }
 
-func TestLateAckIsHarmless(t *testing.T) {
-	q, _, ord, done := newTestQuitter(20 * time.Millisecond)
-
-	q.ShouldQuit()
-	waitFor(t, done, time.Second, "teardown")
-	before := ord.snapshot()
-
-	q.Flushed() // after the timeout already tore down — must not panic or re-run anything
-
-	after := ord.snapshot()
-	if len(after) != len(before) {
-		t.Errorf("order changed after a late ack: before=%v after=%v", before, after)
-	}
-}
-
+// TestSecondShouldQuitReturnsTrue covers the started/done CAS handshake: concurrent ShouldQuit
+// calls must all decline and start exactly one flush, and only the post-teardown pass may return
+// true. None of them may block — ShouldQuit runs on the same thread the ack arrives on (D2).
 func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 	q, _, _, done := newTestQuitter(time.Second)
 
@@ -191,56 +169,4 @@ func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 	if !q.ShouldQuit() {
 		t.Error("ShouldQuit() after teardown = false, want true")
 	}
-}
-
-func TestShutdownWithoutShouldQuit(t *testing.T) {
-	q, _, ord, done := newTestQuitter(time.Second)
-
-	q.Shutdown()
-	waitFor(t, done, time.Second, "teardown")
-
-	if got := ord.snapshot(); len(got) != 2 || got[0] != "beforeFlush" || got[1] != "teardown" {
-		t.Errorf("order = %v, want [beforeFlush teardown]", got)
-	}
-}
-
-func TestTeardownRunsOnceAcrossBothPaths(t *testing.T) {
-	q, _, ord, done := newTestQuitter(time.Second)
-
-	q.ShouldQuit()
-	deadline := time.Now().Add(time.Second)
-	for len(ord.snapshot()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
-
-	q.Flushed()
-	waitFor(t, done, time.Second, "teardown")
-
-	// The signal path's own call, arriving after ShouldQuit's ack-driven teardown already ran —
-	// both OnceFuncs must make this a no-op (D3).
-	q.Shutdown()
-
-	got := ord.snapshot()
-	if len(got) != 2 || got[0] != "beforeFlush" || got[1] != "teardown" {
-		t.Errorf("order = %v, want exactly [beforeFlush teardown] — each half must run once across both paths", got)
-	}
-}
-
-func TestFlushBeforeCloseIsEmitted(t *testing.T) {
-	q, emitter, _, done := newTestQuitter(time.Second)
-
-	q.ShouldQuit()
-	deadline := time.Now().Add(time.Second)
-	for len(emitter.names()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
-
-	names := emitter.names()
-	if len(names) != 1 || names[0] != bridge.ChannelFlushBeforeClose {
-		t.Fatalf("emitted channels = %v, want exactly [%s], and before the ack was even possible",
-			names, bridge.ChannelFlushBeforeClose)
-	}
-
-	q.Flushed()
-	waitFor(t, done, time.Second, "teardown")
 }

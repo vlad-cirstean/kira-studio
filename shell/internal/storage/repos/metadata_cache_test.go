@@ -6,22 +6,10 @@ import (
 	"testing"
 )
 
-func TestMetadataCachePutGet(t *testing.T) {
-	r := newMetadataCacheRepo(t)
-	seedConnection(t, r.DB, "c1")
-
-	if err := r.Put("c1", "db:t", "children", json.RawMessage(`["a","b"]`)); err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-	got, err := r.Get("c1", "db:t", "children")
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if string(got) != `["a","b"]` {
-		t.Errorf("Get() = %s, want [\"a\",\"b\"]", got)
-	}
-}
-
+// TestMetadataCacheDifferentKindsShareOneRow pins Put's merge semantics: the unique index is
+// (connection_id, path) and `kind` is a key INSIDE the stored payload object, so caching a
+// 'describe' for a path must merge into that path's existing row rather than overwrite the
+// 'children' already there. A plain upsert silently destroys the other kind.
 func TestMetadataCacheDifferentKindsShareOneRow(t *testing.T) {
 	r := newMetadataCacheRepo(t)
 	seedConnection(t, r.DB, "c1")
@@ -54,94 +42,9 @@ func TestMetadataCacheDifferentKindsShareOneRow(t *testing.T) {
 	}
 }
 
-func TestMetadataCacheGetMissReturnsNil(t *testing.T) {
-	r := newMetadataCacheRepo(t)
-	seedConnection(t, r.DB, "c1")
-	got, err := r.Get("c1", "db:missing", "children")
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if got != nil {
-		t.Errorf("Get(miss) = %s, want nil", got)
-	}
-}
-
-func TestMetadataCacheOversizedPayloadRefused(t *testing.T) {
-	r := newMetadataCacheRepo(t)
-	seedConnection(t, r.DB, "c1")
-
-	if err := r.Put("c1", "db:t", "children", json.RawMessage(`["existing"]`)); err != nil {
-		t.Fatalf("Put initial: %v", err)
-	}
-
-	huge := make([]byte, 5*1024*1024)
-	for i := range huge {
-		huge[i] = 'a'
-	}
-	hugeJSON, err := json.Marshal(string(huge))
-	if err != nil {
-		t.Fatalf("marshal huge: %v", err)
-	}
-	if err := r.Put("c1", "db:t", "describe", hugeJSON); err != nil {
-		t.Fatalf("Put oversized: %v", err)
-	}
-
-	// The existing row must be untouched — describe was refused, children survives.
-	children, err := r.Get("c1", "db:t", "children")
-	if err != nil {
-		t.Fatalf("Get children: %v", err)
-	}
-	if string(children) != `["existing"]` {
-		t.Errorf("Get(children) after refused oversized Put = %s, want unchanged", children)
-	}
-	describe, err := r.Get("c1", "db:t", "describe")
-	if err != nil {
-		t.Fatalf("Get describe: %v", err)
-	}
-	if describe != nil {
-		t.Errorf("Get(describe) after refused oversized Put = %s, want nil (never written)", describe)
-	}
-}
-
-func TestMetadataCacheDrop(t *testing.T) {
-	r := newMetadataCacheRepo(t)
-	seedConnection(t, r.DB, "c1")
-	if err := r.Put("c1", "db:t", "children", json.RawMessage(`[]`)); err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-	if err := r.Drop("c1", "db:t"); err != nil {
-		t.Fatalf("Drop: %v", err)
-	}
-	got, err := r.Get("c1", "db:t", "children")
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if got != nil {
-		t.Errorf("Get() after Drop = %s, want nil", got)
-	}
-}
-
-func TestMetadataCacheDropConnection(t *testing.T) {
-	r := newMetadataCacheRepo(t)
-	seedConnection(t, r.DB, "c1")
-	if err := r.Put("c1", "db:a", "children", json.RawMessage(`[]`)); err != nil {
-		t.Fatalf("Put a: %v", err)
-	}
-	if err := r.Put("c1", "db:b", "children", json.RawMessage(`[]`)); err != nil {
-		t.Fatalf("Put b: %v", err)
-	}
-	if err := r.DropConnection("c1"); err != nil {
-		t.Fatalf("DropConnection: %v", err)
-	}
-	var count int
-	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM metadata_cache WHERE connection_id = 'c1'`).Scan(&count); err != nil {
-		t.Fatalf("count: %v", err)
-	}
-	if count != 0 {
-		t.Errorf("row count after DropConnection = %d, want 0", count)
-	}
-}
-
+// TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections covers the per-connection eviction
+// pass: the 200-row cap is partitioned BY connection (one busy connection must not evict
+// another's rows) and the rows kept are the newest by (fetched_at, rowid).
 func TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections(t *testing.T) {
 	r := newMetadataCacheRepo(t)
 	seedConnection(t, r.DB, "c1")
