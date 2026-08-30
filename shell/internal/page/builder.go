@@ -58,8 +58,12 @@ const (
 )
 
 // Page is any of TabularPage, DocumentPage, KeyValuePage, StreamPage — page.ts's Page union.
+// Size, not ByteSize, because a field named ByteSize already exists on every concrete type and Go
+// does not allow a method and a field to share a name; internal/enginecache is the one caller that
+// needs the byte cost through the interface rather than through the concrete struct.
 type Page interface {
 	PageKind() PageKind
+	Size() int
 }
 
 func nowEpochMs() int64 {
@@ -78,6 +82,7 @@ type TabularPage struct {
 }
 
 func (TabularPage) PageKind() PageKind { return PageKindTabular }
+func (p TabularPage) Size() int        { return p.ByteSize }
 
 func (p TabularPage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -175,6 +180,7 @@ type DocumentPage struct {
 }
 
 func (DocumentPage) PageKind() PageKind { return PageKindDocument }
+func (p DocumentPage) Size() int        { return p.ByteSize }
 
 func (p DocumentPage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -236,6 +242,7 @@ type KeyValuePage struct {
 }
 
 func (KeyValuePage) PageKind() PageKind { return PageKindKeyValue }
+func (p KeyValuePage) Size() int        { return p.ByteSize }
 
 func (p KeyValuePage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -307,6 +314,7 @@ type StreamPage struct {
 }
 
 func (StreamPage) PageKind() PageKind { return PageKindStream }
+func (p StreamPage) Size() int        { return p.ByteSize }
 
 func (p StreamPage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {

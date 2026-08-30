@@ -1,0 +1,200 @@
+package enginecache
+
+import (
+	"sync"
+	"time"
+
+	"github.com/kirathecat/kira-studio/shell/internal/page"
+)
+
+// CacheStats is data-ops.ts's CacheStats, six ints. A16 governs how the router merges this with
+// the Node engine's own stats during coexistence — that merge lives in the router, not here.
+type CacheStats struct {
+	L2Bytes       int
+	L2BudgetBytes int
+	L2Entries     int
+	L2Hits        int
+	L2Misses      int
+	L3Entries     int
+}
+
+func (a CacheStats) equal(b CacheStats) bool { return a == b }
+
+// Cache is the Go analogue of cache/index.ts: L2 (pages) + L3 (counts) plus the throttled
+// stats-changed notification. Unlike the TypeScript module-level singleton, this is a value
+// constructed by main.go and held by the router (§4.7's Go-specific note #1) — one mutex guards
+// pages, counts and the listener/throttle state together, since ByteLru itself has none.
+type Cache struct {
+	log func(level, message string)
+
+	mu     sync.Mutex
+	pages  *pageStore
+	counts *countStore
+
+	listeners      map[int]func(CacheStats)
+	nextListenerID int
+	lastEmitted    *CacheStats
+	throttled      bool
+}
+
+// NewCache constructs a Cache with an initial L2 budget. log receives "warn" for the half-budget
+// refusal (lru.ts:56-63); pass nil to discard it.
+func NewCache(l2BudgetBytes int, log func(level, message string)) *Cache {
+	if log == nil {
+		log = func(string, string) {}
+	}
+	c := &Cache{log: log, listeners: make(map[int]func(CacheStats))}
+	warn := func(msg string) { c.log("warn", msg) }
+	c.pages = newPageStore(warn)
+	c.counts = newCountStore(warn)
+	if l2BudgetBytes > 0 {
+		c.pages.configureBudget(l2BudgetBytes)
+	}
+	return c
+}
+
+func (c *Cache) currentStatsLocked() CacheStats {
+	ps := c.pages.stats()
+	return CacheStats{
+		L2Bytes: ps.bytes, L2BudgetBytes: ps.budgetBytes, L2Entries: ps.entries,
+		L2Hits: ps.hits, L2Misses: ps.misses, L3Entries: c.counts.entryCount(),
+	}
+}
+
+// scheduleEmitLocked mirrors index.ts's scheduleEmit: throttled to at most 1 Hz (D16), via
+// time.AfterFunc rather than a ticker — a ticker fires while idle, and "an idle app posts nothing"
+// is a property the status bar depends on. Must be called with c.mu held.
+func (c *Cache) scheduleEmitLocked() {
+	if c.throttled {
+		return
+	}
+	c.throttled = true
+	time.AfterFunc(time.Second, func() {
+		c.mu.Lock()
+		c.throttled = false
+		stats := c.currentStatsLocked()
+		changed := c.lastEmitted == nil || !stats.equal(*c.lastEmitted)
+		var toNotify []func(CacheStats)
+		if changed {
+			c.lastEmitted = &stats
+			for _, cb := range c.listeners {
+				toNotify = append(toNotify, cb)
+			}
+		}
+		c.mu.Unlock()
+		for _, cb := range toNotify {
+			cb(stats)
+		}
+	})
+}
+
+// Configure mirrors cache.configure.
+func (c *Cache) Configure(l2BudgetBytes int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.configureBudget(l2BudgetBytes)
+	c.scheduleEmitLocked()
+}
+
+// ReadPage mirrors cache.readPage. The caller computes key via PageCacheKey(req) once and reuses
+// it for the paired StorePage call on a miss — the same split data.ts's handleRead makes, so a
+// cache hit costs one map lookup, not one hash plus a lookup.
+func (c *Cache) ReadPage(key string) (page.Page, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	p, ok := c.pages.get(key)
+	c.scheduleEmitLocked()
+	return p, ok
+}
+
+// StorePage mirrors cache.storePage.
+func (c *Cache) StorePage(key, label string, req ReadRequest, p page.Page) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.put(key, req, label, p)
+	c.scheduleEmitLocked()
+}
+
+// Count mirrors cache.count.
+func (c *Cache) Count(connectionID, path string, filter *string) (CountEntry, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.counts.get(connectionID, path, filter)
+}
+
+// StoreCount mirrors cache.storeCount.
+func (c *Cache) StoreCount(connectionID, path string, filter *string, value int64, exact bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.counts.put(connectionID, path, filter, value, exact)
+	c.scheduleEmitLocked()
+}
+
+// DropTarget mirrors cache.dropTarget: an explicit Refresh (DATA_OP.invalidate, scope 'all') drops
+// both its pages and its counts hard.
+func (c *Cache) DropTarget(connectionID, path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.dropTarget(connectionID, path)
+	c.counts.dropTarget(connectionID, path)
+	c.scheduleEmitLocked()
+}
+
+// InvalidateAfterMutation mirrors cache.invalidateAfterMutation (§7, P43 F12/D17): a local mutation
+// drops the target's pages (they may now be wrong) but only marks its counts stale — the pager
+// keeps the last known total, greyed, until the user asks to refresh.
+func (c *Cache) InvalidateAfterMutation(connectionID, path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.dropTarget(connectionID, path)
+	c.counts.markTargetStale(connectionID, path)
+	c.scheduleEmitLocked()
+}
+
+// DropPagesOnly mirrors cache.dropPagesOnly (DATA_OP.invalidate scope 'pages' — the post-mutation
+// reload; leaves the stale count intact).
+func (c *Cache) DropPagesOnly(connectionID, path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.dropTarget(connectionID, path)
+	c.scheduleEmitLocked()
+}
+
+// DropConnection mirrors cache.dropConnection (§2.2: disconnecting releases all its cached pages).
+func (c *Cache) DropConnection(connectionID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.dropConnection(connectionID)
+	c.counts.dropConnection(connectionID)
+	c.scheduleEmitLocked()
+}
+
+// Clear mirrors cache.clear.
+func (c *Cache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pages.clear()
+	c.counts.clear()
+	c.scheduleEmitLocked()
+}
+
+// Stats mirrors cache.stats.
+func (c *Cache) Stats() CacheStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.currentStatsLocked()
+}
+
+// OnStatsChanged mirrors cache.onStatsChanged: registers cb and returns an unsubscribe func.
+func (c *Cache) OnStatsChanged(cb func(CacheStats)) func() {
+	c.mu.Lock()
+	id := c.nextListenerID
+	c.nextListenerID++
+	c.listeners[id] = cb
+	c.mu.Unlock()
+	return func() {
+		c.mu.Lock()
+		delete(c.listeners, id)
+		c.mu.Unlock()
+	}
+}
