@@ -6,12 +6,12 @@ version: '3'
 # This information is used to generate the build assets.
 info:
   companyName: "Kira the Cat" # The name of the company
-  productName: "Kira Studio Shell" # The name of the application
-  # Not the shipping id (com.kirathecat.kira-studio) — deliberately distinct so the Wails build
-  # and the Electron build are distinguishable in Activity Monitor and in the Keychain during the
-  # P52-P56 coexistence window (P51/P52 §3.1). P57 changes this to the shipping identifier.
-  productIdentifier: "com.kirathecat.kira-studio-shell"
-  description: "A visual database client for macOS (Wails/Go spike shell)" # The application description
+  productName: "Kira Studio" # The name of the application
+  # The shipping identifier (P57 D11) — the Wails build is the only build now that Electron is
+  # gone, so there is no longer a coexisting identity to keep distinct (P51/P52 §3.1's
+  # "-shell"-suffixed id no longer applies).
+  productIdentifier: "com.kirathecat.kira-studio"
+  description: "A visual database client for macOS" # The application description
   copyright: "(c) 2026, Kira the Cat" # Copyright text
   comments: "Kira Studio native shell (P52 walking skeleton)" # Comments
   version: "0.0.0" # The application version

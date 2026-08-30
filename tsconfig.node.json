@@ -7,7 +7,7 @@
     "noEmit": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["node", "electron"],
+    "types": ["node"],
     "paths": {
       "@shared/*": ["./src/shared/*"]
     }
@@ -15,7 +15,6 @@
   "include": [
     "src/engine/**/*.ts",
     "src/shared/**/*.ts",
-    "electron.vite.config.ts",
     "playwright.config.ts",
     "tests/e2e-real/**/*.ts",
     "tests/ui/**/*.ts",

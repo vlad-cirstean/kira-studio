@@ -13,11 +13,13 @@ import (
 // string literals (P52 §15: a bad needle match was one of the three real bugs found getting G1
 // measured).
 var (
-	AnchorNeedles = []string{"kira-studio-shell", "runtime/node/bin/node"}
+	// "Kira Studio" is the shipping executable name (P57 D11: shell/Taskfile.yml's APP_NAME,
+	// matched here since AppProcessSet finds this app's own process by executable path substring,
+	// not by pid tree — see sampler.go's header comment).
+	AnchorNeedles = []string{"Kira Studio", "runtime/node/bin/node"}
 	HelperNeedles = []string{"com.apple.WebKit", "webkitgtk", "bwrap"}
 )
 
-// Interval mirrors src/main/index.ts's APP_METRICS_INTERVAL_MS.
 const Interval = 5 * time.Second
 
 // Ticker samples on a fixed cadence and fans each Sample out to every OnSample subscriber. P52

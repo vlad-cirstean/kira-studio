@@ -22,6 +22,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: shell/go.mod
       - run: bun install --frozen-lockfile
 
       - name: Set package.json version from the release tag
@@ -36,15 +39,28 @@ jobs:
           " "$TAG"
           echo "package.json version set to $TAG (from tag $GITHUB_REF_NAME)"
 
+      - name: Generate Wails bindings (P57 D8/D13)
+        run: |
+          set -eu
+          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          (cd shell && wails3 generate bindings -b -i -ts -names)
+
       - run: bun run lint
       - run: bun run typecheck
 
-      - run: bun run package:mac
+      - name: Vendor the Node runtime and build the engine bundle
+        run: |
+          sh scripts/vendor-node.sh
+          bun run build:engine
 
-      - name: Drop differential-update payload (no auto-update in v1 — SPEC.md §1/§3, docs/PACKAGING.md §7)
-        run: rm -f dist/*.blockmap
+      - run: bun run package
 
-      - name: Verify packaging (strict — no update feed or blockmap may reach a release)
+      - name: Zip the signed app bundle for distribution
+        run: ditto -c -k --keepParent "shell/bin/Kira Studio.app" "kira-studio-macos-arm64.zip"
+
+      - name: Verify packaging (strict — no leftover update-feed artifact may reach a release)
         env:
           KIRA_STRICT_UPDATE_CHECK: '1'
         run: bun run verify:packaging
@@ -60,7 +76,7 @@ jobs:
 
               xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
 
-          This release has no auto-update. The artifacts below carry no update metadata or feed
+          This release has no auto-update. The artifact below carries no update metadata or feed
           — see docs/PACKAGING.md §7 for why, and what would need to change first.
           EOF
 
@@ -70,12 +86,10 @@ jobs:
             --draft \
             --title "Kira Studio $GITHUB_REF_NAME" \
             --notes-file release-notes.md \
-            dist/*.dmg dist/*.zip
+            kira-studio-macos-arm64.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: kira-studio-macos-arm64
-          path: |
-            dist/*.dmg
-            dist/*.zip
+          path: kira-studio-macos-arm64.zip
           retention-days: 14

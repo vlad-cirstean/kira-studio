@@ -1789,3 +1789,147 @@ pre-existing warning and one pre-existing info are both unrelated to this change
 vet`/`go test ./...`, the full `ui` project (36/36, one `tree.spec.ts` timeout on the first run
 reproduced the same transient full-suite-contention flake §11's M5 entry already documented — a
 clean re-run passed 36/36), and `ipc-frontend` (8/8) are all green post-deletion.
+
+### M7 — done
+
+`package.json` (§4.7): `predev`/`dev`/`build`/`start` (electron-vite) and `build:wails`/`dev:wails`
+collapsed into `predev`/`dev`/`build` exactly per the table; `test:e2e`/`pretest:e2e` replaced by
+`test:ui`; `test:ipc:fe` drops its `electron-vite build` prefix for `bun run build`;
+`package:mac`/`package:mac:dir`/`prepackage:mac` collapsed into one `package` script running
+`wails3 task darwin:package && sh scripts/sign-bundle.sh`; `"main": "out/main/index.js"` deleted
+(no Node entry point). Removed: `electron`, `electron-builder`, `electron-vite`,
+`@electron/rebuild` (devDependencies), `electron-log` (dependencies), `"electron"` from
+`trustedDependencies`. Also removed, found dead as a direct consequence of M6's deletion rather
+than named in §4.7: **`drizzle-orm`** — its only two consumers, `src/main/storage/*` and
+`tests/unit/metadata-cache.spec.ts`, are both already gone. `bun install` afterward dropped 6
+packages total and rewrote `bun.lock`, as §4.7 anticipated.
+
+`electron.vite.config.ts` and `electron-builder.yml` deleted; `vite.wails.config.ts` renamed to
+`vite.config.ts` (D10) with no other edit needed — its own header comment already documented "no
+injected shim" from an earlier phase. `scripts/native-electron-build.sh` deleted.
+`scripts/wails-dev-setup.sh`'s header comment updated for the `predev`/`dev` renames (still wired
+identically, just re-pointed at the new script names). `tsconfig.node.json`: `"electron"` dropped
+from `types`, `"electron.vite.config.ts"` dropped from `include` (already lost its
+`"src/main/**/*.ts"`/`"src/preload/**/*.ts"` entries in M6).
+
+**D11, all four named places plus one the plan's own table didn't enumerate.** `shell/main.go:157-158`
+(`Name`/`Description`), `shell/Taskfile.yml:4` (`APP_NAME`), `shell/build/darwin/Info.plist`
+(`CFBundleName`/`CFBundleIdentifier`) — exactly as tabled. Three additions, each found by tracing
+the actual mechanics rather than the table's shorthand:
+1. **`CFBundleExecutable`** — not named in §4.8's table, but `create:app:bundle` copies
+   `bin/{{.APP_NAME}}` into `Contents/MacOS/{{.APP_NAME}}` verbatim, so the executable's on-disk
+   filename *is* `APP_NAME` — `CFBundleExecutable` must equal it or the bundle fails to launch and
+   codesign fails to validate, which is the exact failure mode D11's own rationale names
+   ("splitting these across milestones would produce a bundle whose plist and Taskfile disagree").
+   Updated alongside `CFBundleName`/`CFBundleIdentifier`.
+2. **`shell/build/darwin/Info.dev.plist`** — the `.dev.app` bundle `wails3 task dev` launches
+   carries the same three keys, copied by the same mechanism (`create:app:bundle:dev`); not in any
+   table but mechanically identical to the prod plist, so edited the same way.
+3. **`shell/internal/metrics/ticker.go`'s `AnchorNeedles`** — `AppProcessSet` (sampler.go) finds
+   this app's own process set by **executable path substring**, not pid tree (its own header
+   comment). The needle was the literal string `"kira-studio-shell"`; left unchanged, the app's own
+   CPU/RSS metrics (the status bar figure, and G1's own measurement) would silently stop finding
+   the process the moment the shipping binary is renamed to `"Kira Studio"` — a real functional
+   regression the plan's diff-table shorthand didn't surface, since it only lists file-level edits,
+   not `AppProcessSet`'s runtime string-matching dependency on one of them. Updated to `"Kira
+   Studio"` with a comment explaining why it has to track `APP_NAME`.
+   `shell/build/config.yml`'s `info.productName`/`productIdentifier`/`description` also updated
+   (feeds `wails3 update build-assets`, which is *not* run here — `Info.plist` is hand-maintained
+   directly, consistent with its pre-existing drift from `config.yml`'s other fields like
+   `copyright`/`comments`) so a future run of that command would not silently revert D11.
+   D12 (Keychain service name unchanged) reconfirmed via grep — `Kira Studio Safe Storage` intact.
+
+**`scripts/sign-bundle.sh` (new) and `scripts/verify-packaging.sh` (rewritten), §4.13.** Both use
+`shell/bin/Kira Studio.app`'s **actual** `create:app:bundle` layout
+(`Contents/MacOS/runtime/{node,engine}/...`), read from `shell/build/darwin/Taskfile.yml` directly
+rather than copied from P52 §10.1's paths — exactly the verification the plan's own text demanded
+("must be verified against a real packaged bundle, not copied from P52... the resources layout is
+whatever `create:app:bundle` produces"), since P52's paths (`Contents/Resources/engine/...`) don't
+match this Taskfile's `Contents/MacOS/runtime/...` at all. `verify-packaging.sh`'s S3/S4
+(`electron-builder.yml`-reading checks) and S6/S7 (Electron fuses) are deleted outright — no
+replacement needed, since their *subject* doesn't exist under Wails, not because the property they
+protected became unimportant. A1/A2 (electron-builder update-feed artifacts) deleted the same way.
+N1 (vendored-node trim) and N2 (`codesign --verify --deep --strict`) added per the table; N1 is
+fully checkable on Linux and passes against this repo's actual `shell/runtime/node` today
+(`include/` and `lib/node_modules/npm` both confirmed absent).
+
+**One honest, deliberately-left-open gap, in both new scripts and flagged rather than
+guessed shut**: no build step in this repository vendors `@confluentinc/kafka-javascript`'s native
+`.node` module (or any `node_modules/`) into `shell/runtime/engine/` — `build:engine`'s esbuild
+bundle marks it `--external` (unchanged from before), and nothing copies the dependency alongside
+`engine.cjs` the way `scripts/vendor-node.sh` does for the Node runtime. This means a real packaged
+build today would have a working app whose Kafka connections fail at `require()` time. This is not
+a regression from M7 (the old Electron path had a comparable but different mechanism —
+`electron-rebuild`/asar-unpack — that is gone along with Electron) and is arguably moot: P58 is
+expected to remove the Node engine sidecar entirely, which would remove the question along with it.
+Both scripts treat the missing path as a `note` (non-fatal), not a `fail`, and name the gap in a
+comment rather than asserting success against a path nothing produces. Left for P58 to either close
+or obsolete, not invented here without the macOS tooling to verify it.
+
+**CI (§4.14).** `ci.yml`: `checks` (macos-15) gains an `actions/setup-go` step, a "generate Wails
+bindings" step (`go install` the version pinned in `shell/go.mod`, then
+`wails3 generate bindings -b -i -ts -names` — needed because `bun run build`/`bun run typecheck`
+now resolve real `@bindings`/`@bindings-internal` imports that didn't exist when `build` meant
+`electron-vite build`), `bun run build:engine` before `bun run build`, and `bun run test:go`.
+`e2e-smoke` renamed `ui` and moved to `ubuntu-latest` (D5/§4.14 — webkit needs no macOS); the
+keychain-prep step is deleted (`safeStorage` is gone); gains the same bindings-generation step
+(`test:ui` also calls `bun run build`) plus `bunx playwright install webkit` and the system
+libraries AGENTS.md names (`libevent-2.1-7t64`, `libgstreamer-plugins-bad1.0-0`, `libflite1`,
+`gstreamer1.0-libav`) and the Linux-only GTK4/WebKitGTK headers the `wails3` CLI itself needs to
+`go install` (AGENTS.md — needed even though the *app* targets macOS only, because building the
+CLI does not). `db-unit-tests` unchanged. `package-smoke`: `bun run package:mac:dir` → `bun run
+package`, gains Go setup, `scripts/vendor-node.sh` and `bun run build:engine` (main.go refuses to
+start without both, though packaging itself doesn't launch the app — kept for parity with a real
+release build and because `verify-packaging.sh`'s A2 needs them present), and the asserted paths
+rewritten for the Wails bundle layout (`shell/bin/Kira Studio.app/Contents/MacOS/runtime/...`
+instead of `dist/mac-arm64/.../app.asar.unpacked/out/main/engine.js`).
+
+`release.yml` gains the same Go/bindings/vendor-node/build-engine steps and switches
+`bun run package:mac` → `bun run package`. **One judgment call, not literally specified by the
+plan**: the old release artifact was electron-builder's `.dmg`/`.zip` pair with a
+differential-update blockmap dropped by hand; `wails3 task darwin:package:dmg` exists but isn't
+wired into any `package.json` script (§4.7's table names only one new `package` script, matching
+`darwin:package`, not `darwin:package:dmg`), and building a DMG-based release pipeline was not
+something this milestone's own scope ("remove Electron from the build") asked for. Rather than
+invent unverified new release machinery on a Linux sandbox with no macOS to test it against, the
+release job now zips the ad-hoc-signed `.app` directly (`ditto -c -k --keepParent`) for
+distribution — no DMG, no blockmap (Wails never produces one, so the old "drop it" step is deleted
+outright rather than kept as a no-op). A DMG-based release, if wanted, is left to a follow-up that
+can actually test `wails3 tool package --format dmg` on real macOS.
+
+**Verified** (this sandbox, Linux, no code-signing tools): `bun run build` (renamed script, same
+`vite.config.ts`) succeeds; `bun run typecheck` (all four projects) clean; `bunx biome check .`
+shows only the same two pre-existing, unrelated findings M5/M6 already noted; `go build`/`go
+vet`/`go test -count=1 ./...` all green; `bun run build:engine` still produces `engine.cjs` with
+`--external:electron` simply dropped (no other change); `bun test tests/unit` (98 pass); the full
+`ui` project (36/36) and `ipc-frontend` (8/8) both green after a fresh `bun install`; `sh
+scripts/verify-packaging.sh` exits 0, correctly reporting every artifact check "skipped" since no
+bundle exists in this sandbox. **Not verified, and cannot be from Linux**: `wails3 task
+darwin:package` itself, `scripts/sign-bundle.sh`'s actual `codesign` invocations, the CI workflow
+YAML (no runner available to execute it against), and therefore the exact nested paths inside a
+*real* packaged bundle — matching the plan's own framing of packaging as a macOS check, "on macOS,
+or recorded as unavailable" here.
+
+**One pre-existing, unrelated flake noticed while running the wider suite**:
+`tests/ipc/clickhouse/clickhouse.backend.spec.ts` fails on a hardcoded expected
+`serverVersion: 'ClickHouse 26.3.24.4'` against a `clickhouse:latest`-family container that has
+since moved to `26.3.26.3` — a container-image version drift with no connection to Electron removal
+(the file was not touched this session). Not fixed here; noted so it isn't mistaken for a
+regression from this milestone.
+
+**One acceptance-criterion gap knowingly left open, for M8**: §8 criterion 5's grep
+(`grep -rn electron src/ tests/ scripts/ package.json *.ts *.yml`) still finds one real,
+non-comment hit — `src/shared/protocol/ipc.ts`'s `AppInfo` interface still declares
+`electron`/`chrome`/`node` fields, inside a `KiraApi` interface that is itself entirely dead (zero
+importers anywhere in `src/` or `tests/`, confirmed by grep) — the old `window.kira` contextBridge
+surface, superseded by the Wails-generated bindings' own `AppInfo`
+(`shell/internal/bridge/app.go`'s comment already says as much: "Nothing in the current renderer
+reads AppInfo's fields"). `KiraApi` is ~110 lines covering the entire pre-Wails IPC contract and
+references a dozen sibling interfaces in the same file (`TreeChildrenResult`,
+`ConnectionTestResult`, `FilesChooseOpenResult`, etc.) that need their own usage audit before
+deletion — some of `ipc.ts`'s exports are still genuinely live (its `IPC` channel-name constants
+back `tests/ui/support/bootSnapshots.ts`'s fixture keys). Deleting `KiraApi`/`AppInfo` safely is a
+real, scoped cleanup task, not a two-line fix, and pruning just the three stale fields would leave
+the rest of an already-dead interface in place — cosmetic, not a real fix. Left for M8's
+documentation pass, which already owns exactly this kind of "grep for stale Electron-era surface
+area" sweep.

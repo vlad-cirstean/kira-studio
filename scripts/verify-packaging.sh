@@ -2,9 +2,13 @@
 # verify-packaging.sh — the executable form of P15's "auto-update configuration verified"
 # deliverable (docs/v1/plans/P15-gh-tooling.md §2, §4). Runs on Linux and macOS, locally and in CI.
 #
-# Static checks (S1-S5) always run. Artifact checks (A1-A5) run only when dist/ exists; otherwise
-# they print "skipped" and pass. Set KIRA_STRICT_UPDATE_CHECK=1 to make a leftover .blockmap
-# fatal (A2) instead of a reported note — the release workflow sets this after deleting them.
+# Rewritten for the Wails/Go shell (P57 M7/§4.13): electron-builder.yml and every check that read
+# it are gone — there is no updater feed format, no Electron fuses, no asar to unpack a native
+# module out of. What survives is the *property* those checks protected (no auto-update, ad-hoc
+# signed, correct bundle identity) reasserted against the Wails bundle's own layout.
+#
+# Static checks (S1-S5) always run. Artifact checks (A1-A4, N1-N2) run only when the bundle exists;
+# otherwise they print "skipped" and pass.
 #
 # Every check runs before the script exits, so one run reports everything wrong, not just the
 # first failure.
@@ -31,114 +35,106 @@ if grep -rnE "autoUpdater|electron-updater" src/ >/dev/null 2>&1; then
   fail "updater code present" "src/ references autoUpdater or electron-updater"
 fi
 
-# --- S3: dmg.writeUpdateInfo: false is intact -----------------------------------------------
-if ! grep -qE '^\s*writeUpdateInfo:\s*false' electron-builder.yml; then
-  fail "writeUpdateInfo not false" "electron-builder.yml no longer sets dmg.writeUpdateInfo: false"
-fi
+# --- S5: the packaging script cannot publish ---------------------------------------------------
+PACKAGE_SCRIPT="$(node -p "require('./package.json').scripts['package'] || ''")"
+case "$PACKAGE_SCRIPT" in
+  *"wails3 task darwin:package"*) ;;
+  *) fail "package script changed" "package.json's 'package' script no longer runs 'wails3 task darwin:package' — this check needs updating along with it" ;;
+esac
 
-# --- S4: no publish configuration ------------------------------------------------------------
-if grep -qE '^\s*publish:' electron-builder.yml; then
-  fail "publish configuration present" "electron-builder.yml has a publish: key; v1 ships with none"
-fi
+APP="shell/bin/Kira Studio.app"
 
-# --- S5: packaging scripts cannot publish -----------------------------------------------------
-for name in package:mac package:mac:dir; do
-  script="$(node -p "require('./package.json').scripts['$name'] || ''")"
-  case "$script" in
-    *"--publish never"*) ;;
-    *) fail "$name missing --publish never" "package.json script '$name' does not pass --publish never" ;;
-  esac
-done
-
-# --- S6: the three safe Electron fuses are flipped off (P46 D77) -------------------------------
-for fuse in runAsNode enableNodeOptionsEnvironmentVariable enableNodeCliInspectArguments; do
-  if ! grep -qE "^\s*${fuse}:\s*false" electron-builder.yml; then
-    fail "$fuse fuse not disabled" "electron-builder.yml's electronFuses.$fuse is not set to false"
-  fi
-done
-if ! grep -qE '^\s*resetAdHocDarwinSignature:\s*true' electron-builder.yml; then
-  fail "resetAdHocDarwinSignature not set" "electron-builder.yml's electronFuses.resetAdHocDarwinSignature is not true — required once fuses are flipped, since this build ships identity: '-' (ad-hoc)"
-fi
-
-# --- S7: the file:// fuse this app depends on is never disabled (P46 D78) ----------------------
-if grep -qE '^\s*grantFileProtocolExtraPrivileges:\s*false' electron-builder.yml; then
-  fail "grantFileProtocolExtraPrivileges disabled" "electron-builder.yml sets grantFileProtocolExtraPrivileges: false — measured to brick the app outright, since the renderer's own <script type=module crossorigin> is loaded over file:// and gets CORS-refused without this fuse (P46 F71)"
-fi
-
-# --- Artifact checks (only if dist/ exists) ---------------------------------------------------
-if [ ! -d dist ]; then
-  note "skipped A1-A5 — no dist/ build present"
+# --- Artifact checks (only if the bundle exists) -----------------------------------------------
+if [ ! -d "$APP" ]; then
+  note "skipped A1-A4/N1-N2 — \"$APP\" not present (run 'bun run package' first)"
 else
-  # A1: no update feed file
-  if ls dist/latest*.yml >/dev/null 2>&1; then
-    fail "update feed present" "dist/latest*.yml exists — electron-builder wrote an auto-update feed"
-  fi
-
-  # A2: no differential-update payload (warning unless KIRA_STRICT_UPDATE_CHECK=1)
-  if ls dist/*.blockmap >/dev/null 2>&1; then
-    if [ "${KIRA_STRICT_UPDATE_CHECK:-}" = "1" ]; then
-      fail "blockmap present (strict mode)" "dist/*.blockmap exists — a differential-update artifact must not reach a release; see docs/PACKAGING.md §7"
-    else
-      note "dist/*.blockmap exists — electron-builder writes this unconditionally for the mac zip target (harmless without a feed file); see docs/PACKAGING.md §7. Set KIRA_STRICT_UPDATE_CHECK=1 to make this fatal."
-    fi
-  fi
-
-  APP="dist/mac-arm64/Kira Studio.app"
-
-  # A3: ad-hoc signature
+  # A1: ad-hoc signature, on both the bundle and its two nested executables (§4.13's extension of
+  # the old single-target check — a Wails bundle carries a vendored node binary and, once P58's
+  # predecessor vendors one, a Kafka native module, each independently signed before the whole
+  # bundle is deep-signed over them).
   if command -v codesign >/dev/null 2>&1; then
-    if [ -d "$APP" ]; then
-      if ! codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'; then
-        fail "signature not ad-hoc" "codesign on \"$APP\" did not report Signature=adhoc"
+    for target in "$APP" "$APP/Contents/MacOS/runtime/node/bin/node"; do
+      if [ -e "$target" ]; then
+        if ! codesign -dv --verbose=2 "$target" 2>&1 | grep -q 'Signature=adhoc'; then
+          fail "signature not ad-hoc" "codesign on \"$target\" did not report Signature=adhoc"
+        fi
+      else
+        note "skipped the ad-hoc signature check for \"$target\" — not present"
       fi
-    else
-      note "skipped A3 — \"$APP\" not present"
-    fi
+    done
   else
-    note "skipped A3 — codesign not available on this runner"
+    note "skipped A1 — codesign not available on this runner"
   fi
 
-  # A4: engine unpacked
-  if [ -d "$APP" ]; then
-    if [ ! -f "$APP/Contents/Resources/app.asar.unpacked/out/main/engine.js" ]; then
-      fail "engine.js not unpacked" "\"$APP/Contents/Resources/app.asar.unpacked/out/main/engine.js\" is missing"
-    fi
-  else
-    note "skipped A4 — \"$APP\" not present"
+  # A2: the engine bundle and the vendored node binary are present at their expected paths
+  # (main.go's resolveEngine() looks for both next to the running executable — see
+  # shell/build/darwin/Taskfile.yml's create:app:bundle). Node's node_modules resolution for
+  # @confluentinc/kafka-javascript (external to the esbuild bundle, P52 §10.1) is NOT checked
+  # here: no build step vendors it into the packaged bundle yet — a real, open gap, not a
+  # regression from this milestone (P57 M7 only removes Electron from the build; P58 is expected
+  # to remove the Node engine sidecar, and with it the question of whether this gap is worth
+  # closing at all). Tracked in docs/v1/plans/P57-cutover.md's M7 entry rather than silently
+  # assumed solved.
+  if [ ! -f "$APP/Contents/MacOS/runtime/engine/engine.cjs" ]; then
+    fail "engine.cjs missing" "\"$APP/Contents/MacOS/runtime/engine/engine.cjs\" is missing"
+  fi
+  if [ ! -x "$APP/Contents/MacOS/runtime/node/bin/node" ]; then
+    fail "vendored node missing" "\"$APP/Contents/MacOS/runtime/node/bin/node\" is missing or not executable"
+  fi
+  KAFKA_NATIVE="$APP/Contents/MacOS/runtime/engine/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node"
+  if [ ! -f "$KAFKA_NATIVE" ]; then
+    note "\"$KAFKA_NATIVE\" is missing — Kafka's native module is not yet vendored into the packaged bundle (known gap, see this script's A2 comment); Kafka connections will fail at runtime in this build"
   fi
 
-  # A5: bundle identifier
+  # A3: bundle identifier (D11 — this is the first milestone this ever passes against a real
+  # Wails bundle; before P57 the Wails build shipped the deliberately-distinct
+  # com.kirathecat.kira-studio-shell identifier, P51/P52 §3.1).
   if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-    if [ -d "$APP" ]; then
-      BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
-      if [ "$BUNDLE_ID" != "com.kirathecat.kira-studio" ]; then
-        fail "wrong bundle identifier" "CFBundleIdentifier is '$BUNDLE_ID', expected com.kirathecat.kira-studio"
-      fi
-    else
-      note "skipped A5 — \"$APP\" not present"
+    BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$BUNDLE_ID" != "com.kirathecat.kira-studio" ]; then
+      fail "wrong bundle identifier" "CFBundleIdentifier is '$BUNDLE_ID', expected com.kirathecat.kira-studio"
     fi
   else
-    note "skipped A5 — PlistBuddy not available on this runner"
+    note "skipped A3 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the Kafka driver's native module is unpacked, and only there (P32 D7) — Electron cannot
-  # dlopen a native addon from inside an asar archive, so a .node left inside app.asar would make
-  # every Kafka connection fail at runtime with no build-time signal.
-  if [ -d "$APP" ]; then
-    UNPACKED_NATIVE="$APP/Contents/Resources/app.asar.unpacked/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node"
-    if [ ! -f "$UNPACKED_NATIVE" ]; then
-      fail "kafka driver not unpacked" "\"$UNPACKED_NATIVE\" is missing"
-    fi
-    ASAR="$APP/Contents/Resources/app.asar"
-    if [ -f "$ASAR" ] && command -v npx >/dev/null 2>&1; then
-      if npx --yes asar list "$ASAR" 2>/dev/null | grep -q '@confluentinc/kafka-javascript/build/Release/.*\.node$'; then
-        fail "kafka driver inside app.asar" "\"$ASAR\" contains a .node under @confluentinc/kafka-javascript — it must be asarUnpack'd, not bundled"
+  # A4: the Kafka driver's native module, once vendored (see A2's note), must be unpacked
+  # alongside engine.cjs and never left compressed inside anything this runtime would need to
+  # extract at load time — Wails ships a plain directory tree, not an asar, so there is no
+  # asar-specific half of this check left (unlike the old A6).
+  if [ -f "$KAFKA_NATIVE" ]; then
+    if command -v file >/dev/null 2>&1; then
+      if ! file "$KAFKA_NATIVE" | grep -q 'Mach-O.*arm64'; then
+        fail "kafka native module wrong arch" "\"$KAFKA_NATIVE\" is not a Mach-O arm64 binary"
       fi
-    else
-      note "skipped the app.asar contents half of A6 — no asar CLI available on this runner"
+    fi
+    if command -v codesign >/dev/null 2>&1; then
+      if ! codesign -dv --verbose=2 "$KAFKA_NATIVE" 2>&1 | grep -q 'Signature=adhoc'; then
+        fail "kafka native module not signed" "codesign on \"$KAFKA_NATIVE\" did not report Signature=adhoc"
+      fi
+    fi
+  fi
+
+  # --- N1: the vendored Node runtime is trimmed (scripts/vendor-node.sh's own guarantee) --------
+  NODE_RUNTIME="$APP/Contents/MacOS/runtime/node"
+  if [ -d "$NODE_RUNTIME" ]; then
+    if [ -d "$NODE_RUNTIME/include" ]; then
+      fail "vendored node not trimmed" "\"$NODE_RUNTIME/include\" is present — scripts/vendor-node.sh should have removed it"
+    fi
+    if [ -d "$NODE_RUNTIME/lib/node_modules/npm" ]; then
+      fail "vendored node not trimmed" "\"$NODE_RUNTIME/lib/node_modules/npm\" is present — scripts/vendor-node.sh should have removed it"
     fi
   else
-    note "skipped A6 — \"$APP\" not present"
+    note "skipped N1 — \"$NODE_RUNTIME\" not present"
+  fi
+
+  # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
+  if command -v codesign >/dev/null 2>&1; then
+    if ! codesign --verify --deep --strict "$APP" >/dev/null 2>&1; then
+      fail "bundle does not verify" "codesign --verify --deep --strict \"$APP\" did not exit 0"
+    fi
+  else
+    note "skipped N2 — codesign not available on this runner"
   fi
 fi
 

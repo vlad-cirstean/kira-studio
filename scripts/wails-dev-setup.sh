@@ -1,10 +1,11 @@
 #!/bin/sh
-# wails-dev-setup.sh — wired as `predev:wails`. `bun run dev:wails` (`bun run build:wails && cd
-# shell && wails3 task dev`) is not self-contained: the `wails3` CLI is a Go binary bun/npm can't
-# fetch, the generated bindings `bun run build:wails` needs are gitignored and don't exist in a
-# fresh clone, and shell/main.go's own `resolveEngine()` refuses to *start* the app without the
-# vendored Node runtime and the bundled engine (also gitignored). This script checks each of those
-# and does only the ones actually missing, so a fresh clone's first `bun run dev:wails` just works
+# wails-dev-setup.sh — wired as `predev` (P57 M7: this is the only build now, so the `:wails`
+# suffix retired with the Electron one it used to disambiguate from). `bun run dev` (`bun run
+# build && cd shell && wails3 task dev`) is not self-contained: the `wails3` CLI is a Go binary
+# bun/npm can't fetch, the generated bindings `bun run build` needs are gitignored and don't exist
+# in a fresh clone, and shell/main.go's own `resolveEngine()` refuses to *start* the app without
+# the vendored Node runtime and the bundled engine (also gitignored). This script checks each of
+# those and does only the ones actually missing, so a fresh clone's first `bun run dev` just works
 # and a warm one stays fast.
 set -eu
 

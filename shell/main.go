@@ -154,8 +154,8 @@ func main() {
 	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second)
 
 	app := application.New(application.Options{
-		Name:        "Kira Studio Shell",
-		Description: "A visual database client for macOS (Wails/Go spike shell)",
+		Name:        "Kira Studio",
+		Description: "A visual database client for macOS",
 		Services: []application.Service{
 			application.NewService(&bridge.AppService{Deps: deps}),
 			application.NewService(&bridge.SettingsService{Deps: deps}),
