@@ -38,5 +38,19 @@ export default defineConfig({
       fullyParallel: true,
       workers: '50%',
     },
+    // P57-e2e-revisit.md §6/§8: a real Go backend (`go build -tags server`), a real embedded
+    // engine and a real database adapter, reached over plain HTTP/WebSocket by a plain Chromium
+    // tab — no mock, no native window. A *wiring* tier, not a UI-fidelity one (D5): `chromium`,
+    // not `webkit`, is the right default here, since the point is proving the backend is wired,
+    // not proxying the packaged app's own webview (`ui`'s job). `fullyParallel`/`workers: 2` is
+    // proven safe (§3.5): per-test KIRA_HOME + WAILS_SERVER_PORT gives each instance its own
+    // SQLite app-storage, secrets file and engine child.
+    {
+      name: 'e2e-real',
+      testDir: './tests/e2e-real',
+      use: { browserName: 'chromium' },
+      fullyParallel: true,
+      workers: 2,
+    },
   ],
 });
