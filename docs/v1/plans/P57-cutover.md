@@ -1555,13 +1555,49 @@ Reading them individually (not just their names) shows most of that is optimisti
   while reading it). A shared fixture module (one realistic "postgres-like" tree +
   table data set, reused across specs) is very likely the efficient way to do this rather than
   inventing fixture data per file — not yet started.
-- **`connections.spec.ts`, `secrets.spec.ts`**: also use `window.kira` directly (`connectionsList`,
-  `connectionsReveal`, `connectionsSecretsStatus`, `connectionsCreate`), but grep did not show
-  `startPostgres`/`isDockerAvailable` for either — worth checking whether they need a real adapter
-  at all or can be mocked more directly (e.g. `secrets.spec.ts`'s scope may be almost entirely
-  about `connectionsSecretsStatus`'s reported backend, which `WILDCARD_DEFAULTS` or a spec-level
-  fixture could answer without any adapter). Not yet read in full — this was the very next thing in
-  progress when the session paused.
+- **`connections.spec.ts` — read in full (resuming session).** No real adapter needed, confirmed:
+  every call is `connectionsCreate`/`Update`/`Duplicate`/`Delete`/`List`/`Reveal` against the local
+  store, never `connectionsTest`/`Connect`. The dialog/CRUD/color/duplicate/delete narrative is a
+  spec-level fixture, not a shared one — `mockRuntime.ts`'s per-(channel, canonical-args) cursor
+  replay already supports the sequence (each `connectionsCreate` call has distinct args, so it
+  keys naturally; repeated `connectionsList()` calls need an ordered snapshot sequence reflecting
+  each mutation, which is exactly what the cursor was built for). **Two scenarios do not port**:
+  the "create, wait, `relaunch()`, still there" and "recolor, wait, `relaunch()`, still cyan"
+  checks (lines ~75–77 and ~148–153 of the original) assert real cross-process persistence, which
+  `tests/ui/fixtures.ts`'s own header comment already rules out ("there is nothing to persist to")
+  — same category as `workbench.spec.ts`'s 5 dropped scenarios. Everything else ports.
+- **`secrets.spec.ts` — read in full.** Unlike `connections.spec.ts`, this is not a "pure UI" spec
+  once read past its own file-header comment: scenarios 2–4 (7 of the file's 9 substantive checks)
+  read the raw on-disk SQLite file directly (`storedPassword`/`noFileContains`, the app's own
+  `kira.sqlite`) and assert real encrypt-at-rest, plaintext-upgrade-on-relaunch, and
+  idempotent-re-encryption behavior across 2–3 real `relaunch()`s each. None of that has a mock-tier
+  equivalent for the same reason `connections.spec.ts`'s two dropped scenarios don't — there is no
+  disk and no second process. That guarantee is now covered natively and more directly at the
+  layer that actually implements it: `shell/internal/storage/repos/secrets_test.go` exercises a
+  real AES-256-GCM round trip against the repo (`TestSecretsSetGetRoundTrip`,
+  `TestSecretsGetPropagatesDecryptError`, `TestSecretsCopyIsByteForByteAndTouchesNoCipher`), and
+  `shell/internal/connections/service_test.go`'s `TestPasswordThreeStateConvention` covers the
+  create/update/reveal three-state convention scenario 2's UI half also exercises. **Also found in
+  passing**: the real envelope prefix is `kira:v2:` (`shell/internal/secrets/cipher.go`), not the
+  `kira:v1:` scenario 2–4 assert on — a deliberate, already-decided P52 §6.4 break from Chromium
+  `safeStorage`'s v1 envelope, not a bug this phase introduces or should paper over by rewriting the
+  E2E assertion to match. Scenario 4's "pre-P25 plaintext row upgraded on next launch" premise is
+  the sharpest casualty: a `kira:v1:`-prefixed row from a real pre-migration user database now hits
+  `cipher.go`'s "not in this app's kira:v2: envelope format" error path instead of being silently
+  upgraded — genuinely lost behavior, not a test-porting artifact, and worth a line in P57's own
+  §7/M8 documentation rather than being silently absorbed here.
+  **What does port**: `connectionsSecretsStatus()`'s three backend shapes
+  (`keychain`/`basic_text`/`unavailable`) and `ConnectionDialog.vue`'s `connection-credential-note`
+  rendering for each are pure UI, and porting them via canned mock responses is *less* platform-gated
+  than the original — the original branches on `process.platform` and only ever exercises the one
+  status shape the host OS actually produces (P52 D16), so this sandbox has only ever run the Linux
+  branch; a mock-backed version exercises all three unconditionally, in one spec, on any OS. Scenario
+  5's failed-save-with-password / succeeded-save-without-password UI behavior (dialog stays open,
+  `connection-save-error` shown, no record created vs. record created) also ports on canned
+  `connectionsCreate` responses — minus its own two `storedPassword`/`noFileContains` disk
+  assertions, which stay a Go-side guarantee. **Net**: a new `tests/ui/secrets.spec.ts` covering only
+  the status-shape/credential-note/failed-save UI surface; the on-disk encryption narrative is
+  dropped from the E2E tier and is not re-created — it is already covered, more precisely, in Go.
 - **`sqlite.spec.ts`, `mongo.spec.ts`, `s3.spec.ts`** are explicitly kept as the three full-stack
   anchors per D16/D10 and are **not** meant to port — no work needed there beyond the header-comment
   addition D16 already calls for.
