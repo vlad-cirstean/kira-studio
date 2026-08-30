@@ -647,7 +647,11 @@ have to be re-derived next time.
   `bunx playwright test --project=ui` runs for real against WebKit, no chromium override needed —
   confirmed with `tests/ui/smoke.spec.ts`. Treat network reachability to `cdn.playwright.dev` as
   worth retrying each session rather than a permanent wall, the same posture already established
-  for `artifacts.electronjs.org` in the Native Kafka driver section above.
+  for `artifacts.electronjs.org` in the Native Kafka driver section above. `ipc-frontend`'s default
+  Chromium project needs the same treatment for a different reason: a fresh container's
+  preinstalled Chromium is missing its `chrome-headless-shell` binary specifically (`bunx
+  playwright install chromium` fetches it, ~185 MB + ~115 MB) — Playwright's own default launch
+  mode for a project with no explicit `headless` option wants that binary, not the full browser one.
 - **`window.kira` no longer exists once P57 M2/M3 have run — a `tests/e2e/`-era spec's own
   `page.evaluate(() => window.kira.someChannel(...))` helper has no replacement, and cannot be
   ported as-is.** `contextBridge`'s `window.kira` was Electron-only; the Wails renderer calls the
@@ -660,6 +664,20 @@ have to be re-derived next time.
   wire left to query in this tier — that invariant now belongs to whatever Go/repo-layer test
   already covers the real backend's actual behavior, and the UI-tier port should say so and drop
   the raw check rather than assert against its own fixture data as if it proved anything.
+- **`mockRuntime.ts`'s `canonical()` only sorts *top-level* keys — a nested object's key order must
+  byte-match the real call's, or a fixture with semantically identical args still 422s as
+  `E_FIXTURE_MISS`.** Hit porting `connections.spec.ts`: a `connectionsUpdate({id, input})` call's
+  `input` object is built by spreading an existing `ConnectionSummary` and stripping a few keys
+  (`state/connections.ts`'s `openEditDialog`/`patchConnectionFields`), so its key order is whatever
+  order *that record's own JSON response* used, not `connectionInputSchema`'s declared field order
+  — and a spread-then-reassign of an existing key (`{...fields, color: 'red'}` when `fields` already
+  has `color`) does not move that key, while a genuinely new key added by the same spread
+  (`password`, which `ConnectionSummary` never carries) lands at the very end. Two fixes, both
+  applied: build a canned response's own fields in the same order `defaultDraft()`
+  (`state/connections.ts`) or the prior response used, so a later request built by spreading it
+  matches; and when in doubt, run the test once — the mock's own `E_FIXTURE_MISS` error message
+  echoes `JSON.stringify(callArgs)` verbatim, which is faster and more reliable than deriving the
+  exact shape by reading the renderer's call sites.
 - **A native tree/list Vue component's click and double-click handlers are genuinely separate**
   (`TreeRow.vue`'s `@click="onClick"` emits `select`; `@dblclick="onDblClick"` emits `open`) —
   driving it via `xdotool` needs two real, separately-dispatched `click 1` events close together
