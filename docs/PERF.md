@@ -444,6 +444,55 @@ regardless of target — never wired to anything this macOS-only app needs. Remo
 `build:server`/`build:docker`/`run:docker`/`setup:docker` tasks and their `.gitignore` entries.
 Unrelated to G1 itself, but found and cleaned up in the same session.
 
+### 2.5 P58a M2 — chunk wire-encoding: Go base64 vs the Node engine's index-keyed JSON
+
+**Status: measured, re-taking the P52-P57 row's ~11x/48x figures against a controlled fixture, as
+P58 §1.4 and P58a §4.6 required of M2.** Both producers still exist in this phase — the Go codec
+(`shell/internal/page.Chunk`, P58 D5) and the Node engine's plain `JSON.stringify` of a
+`TextColumnChunk`'s typed arrays (`stdio-main.ts`'s `writeFrame`) — so this is the one window in
+the whole P58 migration where a like-for-like measurement is cheap, per the plan's own note.
+
+**Fixture, identical on both sides:** a 2000-row `TextColumnChunk` built the same way in Go and
+Node — a fixed 49-byte ASCII value per non-NULL row, 1 row in 97 NULL, 1 row in 53 marked
+truncated. Underlying (unencoded) size: **103,394 bytes** (`data` + `offsets`×4 + `nulls` +
+`truncated`×4) — close enough to "100 KB" to match the figure it replaces, and reproducible from
+the throwaway measurement programs this row was taken from (not committed to the repo, per this
+phase's own "no product code lands in M0/M2 measurement work" convention — the `Chunk`/`Uint32LE`
+encoding logic exercised is a verbatim copy of the real `shell/internal/page` code).
+
+**Wire bytes** (`len(json.Marshal(chunk))` in Go; `Buffer.byteLength(JSON.stringify(chunk), 'utf8')`
+in Node, `node --expose-gc`, v22.22.2):
+
+| Encoding | Wire bytes | Ratio to raw |
+|---|---|---|
+| Go, base64 of exact LE bytes (D5) | 137,914 | **1.334x** |
+| Node engine, index-keyed JSON object | 1,124,081 | **10.872x** |
+
+Both numbers land almost exactly on the figures they replace (P58 §1.4 predicted ~1.33x and ~11x)
+— this is a confirmation against a controlled fixture, not a new finding.
+
+**Transient heap for the one encode call.** The two runtimes don't expose the same instrument, so
+this is the closest matched pair available, stated with what each one actually measures: Go's
+`runtime.MemStats.TotalAlloc` delta across the single `json.Marshal` call (bytes the allocator
+handed out during that call, most of it reclaimed by the next GC); Node's `process.memoryUsage()
+.heapUsed` delta across the single `JSON.stringify` call, taken immediately after a forced
+`global.gc()` baseline (bytes still resident on the JS heap right after the call, before the next
+collection).
+
+| Encoding | Transient heap bytes | Ratio to raw |
+|---|---|---|
+| Go, base64 | 709,312 | 6.86x |
+| Node engine, index-keyed JSON | 4,232,600 | **40.9x** |
+
+The wire-side comparison (1.33x vs 10.87x) is the one D5 was decided on and reproduces cleanly.
+The heap side confirms the same direction and a similar order of magnitude to the ~48x figure it
+replaces, but the two numbers are not the same instrument measuring the same call shape as
+whatever produced the original 48x, so treat 40.9x as this fixture's own honest number rather than
+a reproduction of that exact figure. Go's own 6.86x is not "6.86x worse than raw" in a way that
+matters at runtime — `json.Marshal`'s base64 encoder allocates one intermediate string plus the
+final byte slice, both short-lived, against a Node engine that additionally builds and then walks
+a ~2000-entry-per-buffer JS object graph.
+
 ### L2 cache note (D19)
 
 L2's 64 MB default budget and its `> budget / 2` no-cache refusal rule (a single page whose byte

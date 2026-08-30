@@ -3,37 +3,14 @@ package connections
 import (
 	"fmt"
 
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 )
-
-// ResolvedConfig is engine-ops.ts's ResolvedConnectionConfig. It is declared here rather than in
-// internal/storage/model for the same reason the TS declares it in the protocol file rather than
-// in domain/connection.ts: it is the one shape that carries a secret, and only the engine channel
-// ever sees it. `preconnect`/`preconnectSidecar` are absent by construction (P11 D13) — the
-// engine has no use for a shell string or main's own arm()/monitor decision.
-type ResolvedConfig struct {
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Kind      string         `json:"kind"`
-	Color     string         `json:"color"`
-	Mode      string         `json:"mode"`
-	ReadOnly  bool           `json:"readOnly"`
-	Host      *string        `json:"host"`
-	Port      *int           `json:"port"`
-	Database  *string        `json:"database"`
-	Username  *string        `json:"username"`
-	URI       *string        `json:"uri"`
-	Options   map[string]any `json:"options"`
-	SortOrder int            `json:"sortOrder"`
-	CreatedAt string         `json:"createdAt"`
-	UpdatedAt string         `json:"updatedAt"`
-	Password  *string        `json:"password"`
-}
 
 // resolved is resolve's and resolveFromInput's shared return shape: the engine-bound config plus
 // the two preconnect fields stripped from it, which only doConnect needs.
 type resolved struct {
-	config            ResolvedConfig
+	config            model.ResolvedConnectionConfig
 	preconnect        *string
 	preconnectSidecar bool
 }
@@ -60,7 +37,7 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 	}
 
 	return resolved{
-		config: ResolvedConfig{
+		config: model.ResolvedConnectionConfig{
 			ID: summary.ID, Name: summary.Name, Kind: summary.Kind, Color: summary.Color,
 			Mode: summary.Mode, ReadOnly: summary.ReadOnly, Host: summary.Host, Port: summary.Port,
 			Database: summary.Database, Username: summary.Username, URI: uri, Options: summary.Options,
@@ -83,7 +60,7 @@ func resolveFromInput(in Input) resolved {
 		uri = &injected
 	}
 	return resolved{
-		config: ResolvedConfig{
+		config: model.ResolvedConnectionConfig{
 			ID: "test", Name: in.Name, Kind: in.Kind, Color: in.Color, Mode: in.Mode,
 			ReadOnly: in.ReadOnly, Host: in.Host, Port: in.Port, Database: in.Database,
 			Username: in.Username, URI: uri, Options: in.Options,
