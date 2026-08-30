@@ -103,6 +103,25 @@ team works, and how to run things in whichever box a session happens to be on.
   `testcontainers` integration has also been observed to hang indefinitely in this specific sandbox
   on images that pull and run fine under plain Node with the identical image — a sandbox quirk of
   the Bun runtime here, not a real bug (confirmed fine on a real machine).
+  **Postgres, confirmed as a specific instance of that same Bun/testcontainers hang (P57)**:
+  `@testcontainers/postgresql`'s default wait strategy is `Wait.forAll([forHealthCheck(),
+  forListeningPorts()])`; under `bun run`, the container starts and its own healthcheck passes
+  (confirmed via `docker logs`/`docker exec pg_isready`) but `.start()` never resolves — debug
+  logging (`DEBUG=testcontainers*`) shows the very last line is ever `"Health check wait strategy
+  complete"`, `forListeningPorts()`'s own completion log never appears, for minutes. The identical
+  container/wait-strategy/image resolves in ~2s under plain `node
+  --experimental-strip-types --experimental-transform-types` (a quick syntax check) or, matching
+  how this repo already runs `tests/ipc/**/*.backend.spec.ts` (`scripts/run-ipc-backend.sh`), an
+  esbuild `--bundle --platform=node --format=cjs` bundle run under the vendored
+  `shell/runtime/node/bin/node` (needed anyway once a script imports anything with an extensionless
+  relative import a bare Node ESM loader can't resolve, e.g. `tests/ipc/support/harness.ts`'s own
+  dynamic `import('../../../src/engine/control')`). Bundling also needs `tests/db/fixtures/`
+  copied beside the bundle output the same way `run-ipc-backend.sh` already does for the backend
+  tier (`tests/db/support/postgres.ts`'s seed-SQL read is `__dirname`-relative, which becomes the
+  bundle's own directory). `scripts/capture-postgres-tree.ts` is a new manual capture tool built on
+  this — real tree/data captures for porting the remaining `tests/e2e/*.spec.ts` files into
+  `tests/ui/` (P57 M5), following the same "capture, don't hand-write" discipline P50 D5 already
+  established for `tests/ipc/**/*.fixture.ts`.
 
 ## Electron binary (for `tests/e2e/`)
 
