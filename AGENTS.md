@@ -33,7 +33,7 @@ team works, and how to run things in whichever box a session happens to be on.
   planning pass N should actually re-read the current source rather than trust pass N-1's own
   target-tree/summary prose, and should say plainly when a pass turns up nothing real rather than
   manufacturing a finding to fill it.
-- **A "review phase"** — run once a phase (or a batch of phases) is otherwise complete, on request —
+- **A "code review"** — run once a phase (or a batch of phases) is otherwise complete, on request —
   means spawning **three Opus subagents in parallel**, each analyzing the current tree against one
   dimension: (1) overall architecture and structure, maintainability, clean code, and security;
   (2) functional correctness and business logic; (3) performance and resource efficiency. Each
