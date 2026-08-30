@@ -1,0 +1,189 @@
+package adapterhost
+
+import (
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
+	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
+	"github.com/kirathecat/kira-studio/shell/internal/page"
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
+)
+
+// fakeConn is a StreamSession that records every frame handed to Send.
+type fakeConn struct {
+	sent chan []byte
+}
+
+func newFakeConn() *fakeConn { return &fakeConn{sent: make(chan []byte, 16)} }
+
+func (c *fakeConn) Send(frame []byte) error {
+	c.sent <- frame
+	return nil
+}
+func (c *fakeConn) Receive() ([]byte, error) { select {} } // never used directly in these tests
+
+func newTestRouter() (*Router, fakeKindLookup) {
+	conns := fakeKindLookup{}
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, conns)
+	return r, conns
+}
+
+func mustFrame(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal frame: %v", err)
+	}
+	return b
+}
+
+func readSent(t *testing.T, conn *fakeConn) map[string]any {
+	t.Helper()
+	select {
+	case frame := <-conn.sent:
+		var out map[string]any
+		if err := json.Unmarshal(frame, &out); err != nil {
+			t.Fatalf("unmarshal sent frame: %v", err)
+		}
+		return out
+	case <-time.After(time.Second):
+		t.Fatal("no frame was sent to the session within 1s")
+		return nil
+	}
+}
+
+func assertNothingSent(t *testing.T, conn *fakeConn) {
+	t.Helper()
+	select {
+	case frame := <-conn.sent:
+		t.Fatalf("expected no frame, got %s", frame)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+// A native connection's data:read is answered locally, never forwarded — the response frame is a
+// real {kind:"res", ok:true, payload:{...}} built by the dispatcher.
+func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
+	r, conns := newTestRouter()
+	nativeKinds["fakekind"] = true
+	defer delete(nativeKinds, "fakekind")
+	conns["conn-1"] = "fakekind"
+
+	fake := &dataFakeAdapter{readFn: func() (page.Page, error) {
+		return page.TabularPage{RowCount: 1, ByteSize: 5}, nil
+	}}
+	adapters.SetLiveAdapter("conn-1", fake)
+	defer adapters.DeleteLiveAdapter("conn-1")
+
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	frame := mustFrame(t, map[string]any{
+		"kind": "req", "id": 1, "op": "data:read",
+		"payload": map[string]any{
+			"opId": "op-1", "tabId": nil, "connectionId": "conn-1", "path": "database:app/table:t",
+			"projection": nil, "filter": nil, "sort": nil, "pageSize": 10,
+			"cursor": map[string]any{"mode": "offset", "offset": 0},
+		},
+	})
+	r.HandleDataFrame(session, frame)
+
+	resp := readSent(t, conn)
+	if resp["kind"] != "res" || resp["id"] != float64(1) || resp["ok"] != true {
+		t.Fatalf("resp = %+v, want a res/1/ok:true frame", resp)
+	}
+	if fake.readCalls != 1 {
+		t.Errorf("adapter.Read calls = %d, want 1", fake.readCalls)
+	}
+}
+
+// An unknown (or non-native) connection's data op is forwarded, never answered locally — with no
+// child attached, that means no frame is ever sent to the session at all.
+func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
+	r, conns := newTestRouter()
+	conns["conn-2"] = "mariadb" // never in nativeKinds
+
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	frame := mustFrame(t, map[string]any{
+		"kind": "req", "id": 2, "op": "data:read",
+		"payload": map[string]any{"connectionId": "conn-2", "pageSize": 10, "cursor": map[string]any{"mode": "offset", "offset": 0}},
+	})
+	r.HandleDataFrame(session, frame)
+	assertNothingSent(t, conn)
+}
+
+// ping always forwards, regardless of nativeKinds (A17) — it is never answered locally.
+func TestHandleDataFrame_Ping_NeverAnsweredLocally(t *testing.T) {
+	r, _ := newTestRouter()
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	r.HandleDataFrame(session, mustFrame(t, map[string]any{"kind": "req", "id": 3, "op": "ping"}))
+	assertNothingSent(t, conn)
+}
+
+// cache:clear clears the Go-native cache synchronously, regardless of whether a child is attached
+// to receive the forwarded copy.
+func TestHandleDataFrame_CacheClear_ClearsGoCache(t *testing.T) {
+	r, _ := newTestRouter()
+	cacheReq := enginecache.ReadRequest{ConnectionID: "c", Path: "p", PageSize: 10, Cursor: model.PageCursor{Mode: "offset"}}
+	key, label := enginecache.PageCacheKey(cacheReq)
+	r.cache.StorePage(key, label, cacheReq, page.TabularPage{ByteSize: 5})
+	if r.cache.Stats().L2Entries != 1 {
+		t.Fatal("setup: expected the seeded page to be cached")
+	}
+
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+	r.HandleDataFrame(session, mustFrame(t, map[string]any{"kind": "req", "id": 4, "op": "cache:clear"}))
+
+	if r.cache.Stats().L2Entries != 0 {
+		t.Error("cache:clear must clear the Go-native cache")
+	}
+}
+
+func TestObserveChildEvent_UpdatesLastChildStats(t *testing.T) {
+	r, _ := newTestRouter()
+	frame := mustFrame(t, map[string]any{
+		"kind": "evt", "topic": "cache:stats",
+		"payload": map[string]any{"l2Bytes": 100, "l2BudgetBytes": 1000, "l2Entries": 2, "l2Hits": 3, "l2Misses": 4, "l3Entries": 5},
+	})
+	r.observeChildEvent(frame)
+
+	r.statsMu.Lock()
+	got, have := r.lastChildStats, r.haveChildStats
+	r.statsMu.Unlock()
+	if !have {
+		t.Fatal("expected haveChildStats to be true after a cache:stats event")
+	}
+	want := enginecache.CacheStats{L2Bytes: 100, L2BudgetBytes: 1000, L2Entries: 2, L2Hits: 3, L2Misses: 4, L3Entries: 5}
+	if got != want {
+		t.Errorf("lastChildStats = %+v, want %+v", got, want)
+	}
+}
+
+// A16: counters sum; the budget reports once, not doubled.
+func TestMergedCacheStats_SumsCountersReportsBudgetOnce(t *testing.T) {
+	r, _ := newTestRouter()
+	r.statsMu.Lock()
+	r.lastChildStats = enginecache.CacheStats{L2Bytes: 1000, L2BudgetBytes: 64 << 20, L2Entries: 10, L2Hits: 20, L2Misses: 5, L3Entries: 7}
+	r.haveChildStats = true
+	r.statsMu.Unlock()
+
+	got := r.mergedCacheStats()
+	goStats := r.cache.Stats() // all zero: nothing native has run in this test
+	if got.L2BudgetBytes != goStats.L2BudgetBytes {
+		t.Errorf("L2BudgetBytes = %d, want the Go side's own configured budget (%d), not summed", got.L2BudgetBytes, goStats.L2BudgetBytes)
+	}
+	if got.L2Bytes != 1000 || got.L2Entries != 10 || got.L2Hits != 20 || got.L2Misses != 5 || got.L3Entries != 7 {
+		t.Errorf("got = %+v, want the child's counters summed with Go's own (zero here)", got)
+	}
+}

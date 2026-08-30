@@ -3,6 +3,7 @@ package adapterhost
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
@@ -35,6 +36,10 @@ type Router struct {
 	child      *enginehost.Host // nil once P58f deletes the Node sidecar
 	conns      KindLookup
 
+	// statsMu guards the router's own passively-observed snapshot of the child's last cache:stats
+	// push (A16, dataframe.go's observeChildEvent/mergedCacheStats) — a separate mutex from
+	// enginecache.Cache's own, since these two fields have nothing to do with Go's cache.
+	statsMu        sync.Mutex
 	lastChildStats enginecache.CacheStats
 	haveChildStats bool
 }

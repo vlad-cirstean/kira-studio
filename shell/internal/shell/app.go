@@ -1,9 +1,9 @@
 package shell
 
 import (
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -85,10 +85,12 @@ func NewDeferredDialogs() (d bridge.Dialogs, attach func(app *application.App, w
 }
 
 // RegisterEngineStream registers the one named stream. The handler blocks for the life of the
-// connection, which is what keeps it open (stream.go:162-166's StreamHandler contract).
-func RegisterEngineStream(app *application.App, host *enginehost.Host) {
+// connection, which is what keeps it open (stream.go:162-166's StreamHandler contract). Takes the
+// router, not the engine host, since M4: the data plane is a server now, not a byte forwarder
+// (P58 D3).
+func RegisterEngineStream(app *application.App, router *adapterhost.Router) {
 	app.HandleStream(bridge.StreamName, func(c *application.StreamConn) {
-		bridge.ServeEngineStream(host, c)
+		bridge.ServeEngineStream(router, c)
 	})
 }
 

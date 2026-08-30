@@ -1,14 +1,15 @@
 package bridge
 
 import (
-	"log/slog"
-
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
+	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 )
 
 // StreamSession is the whole of what the engine stream handler needs from a renderer connection.
 // *application.StreamConn satisfies it structurally — Send([]byte) error (stream.go:234) and
-// Receive() ([]byte, error) (stream.go:274) — so this package still imports no Wails (P56 D1).
+// Receive() ([]byte, error) (stream.go:274) — so this package still imports no Wails (P56 D1). The
+// same method set as adapterhost.StreamSession (A11's per-consumer-interface discipline); passing
+// a bridge.StreamSession value where adapterhost.StreamSession is expected works because Go
+// matches interfaces structurally even across two independently-declared types.
 type StreamSession interface {
 	Send(frame []byte) error
 	Receive() ([]byte, error)
@@ -21,26 +22,21 @@ type StreamSession interface {
 const StreamName = "engine"
 
 // ServeEngineStream runs for the life of one connection and returns when the renderer's side
-// closes (page reload, window close, app shutdown). Outbound: conn is attached as the host's Sink
-// directly — Wails' Send blocks rather than returning ErrStreamFull (stream.go:234-240; TrySend is
-// the non-blocking one), which is exactly P52 §7.2's backpressure policy: enginehost's bounded
-// queue fills, its read loop stops draining the engine's stdout, and the OS pipe pushes back on
-// the engine (P56 D15). Inbound: every frame goes to the engine's stdin verbatim. Go never
-// unmarshals a data-plane frame in either direction.
-func ServeEngineStream(host *enginehost.Host, conn StreamSession) {
-	detach := host.AttachStream(conn)
+// closes (page reload, window close, app shutdown). After P58a M4 this is a data-plane server, not
+// a byte forwarder (P58 D3): router.AttachStream gives this session its own single writer (A18),
+// and every inbound frame is handed to router.HandleDataFrame, which decides — per connection kind
+// — whether to answer it in-process or forward it to the Node engine child unchanged.
+// HandleDataFrame runs on its own goroutine per frame so a slow read never serialises behind it;
+// responses are correlated by id, so out-of-order completion is already the renderer's own
+// contract (port.ts's pending map).
+func ServeEngineStream(router *adapterhost.Router, conn StreamSession) {
+	session, detach := router.AttachStream(conn)
 	defer detach()
 	for {
 		frame, err := conn.Receive()
 		if err != nil {
 			return
 		}
-		if err := host.SendData(frame); err != nil {
-			// The engine is gone. The session stays open: enginehost has already failed every
-			// pending call with E_ENGINE_DOWN (P54), and the renderer's own pending map is what
-			// surfaces that — closing the stream here would additionally reject frames the
-			// renderer has not sent yet, which is not today's behaviour.
-			slog.Warn("engine stream send failed", "scope", "stream", "err", err)
-		}
+		go router.HandleDataFrame(session, frame)
 	}
 }

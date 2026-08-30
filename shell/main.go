@@ -214,7 +214,7 @@ func main() {
 		AppName: "Kira Studio", IsDev: isDev, Events: events, Quit: quitter.RequestQuit,
 	}))
 
-	shell.RegisterEngineStream(app, host)
+	shell.RegisterEngineStream(app, router)
 
 	windowDeps := shell.WindowDeps{Layout: repositories.Layout, StartedAt: startedAt}
 	newWindow := func() {

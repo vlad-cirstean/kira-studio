@@ -516,12 +516,28 @@ the `{message, code}` shape the renderer already branched on. The **data plane**
 stream, `"engine"`, opened once per page load by `src/renderer/bridge/port.ts` via
 `JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
 
-**Bulk data passes through Go, unread.** `shell/internal/bridge/stream.go`'s `ServeEngineStream`
-attaches the renderer's stream connection directly as the engine host's sink and forwards every
-inbound frame to the engine's stdin verbatim — neither direction is unmarshalled, and there is no
-intermediate copy or re-encode. Backpressure is the transport's own: Wails' `Send` blocks, so the
-engine host's bounded queue fills, its read loop stops draining the engine's stdout, and the OS pipe
-pushes back on the engine.
+**The data plane is a server now, not a byte forwarder (P58 D3, since P58a M4).** Bulk data is
+produced and encoded exactly once, in the process that owns the window — the old invariant ("Go
+never reads a data-plane frame") could not survive Go adapters existing at all, since the router
+has to decide, per connection, which process answers. `shell/internal/adapterhost/dataframe.go`'s
+`HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
+op, that connection's `connectionId` — to route it: a **Go-native** connection (`nativeKinds`, A12;
+empty until P58a M5's Postgres lands) is answered in-process by `adapterhost.Dispatcher`, its
+response `json.Marshal`ed directly (base64 chunk encoding, P58 D5) with no engine involved at all;
+a **Node-served** connection's frame is forwarded to the engine's stdin unread, exactly as before.
+`ping` always reaches the Node engine regardless (A17 — the status pill still reports its pid while
+it does most of the work); `cache:stats`/`cache:clear` are answered locally, merging both caches'
+counters while reporting the configured budget once, not doubled (A16).
+
+**One writer, both producers (A18).** `adapterhost.Session` owns a single bounded queue (64 frames
+/ 32 MiB, matching the engine host's own bounds) and the one goroutine draining it into the
+renderer's `Send` — both the Node engine's own data frames (`Session` satisfies `enginehost.Sink`)
+and the router's own locally-produced responses enqueue into it, so exactly one goroutine ever
+calls the renderer connection's blocking `Send`. Backpressure toward the Node engine is unchanged:
+a full queue reports `enginehost.ErrStreamFull`, which the engine host's own retry-with-backoff
+already handles by pausing its stdout read loop, which is what pushes back on the OS pipe. A
+locally-produced response has no pipe to push back through, so a full queue just drops it — the
+renderer's own pending request then times out exactly as if the process had died.
 
 **The Go side is `shell/`.** `shell/main.go` builds the `application.New` options and registers
 twelve bound services under `shell/internal/bridge/` — `AppService`, `SettingsService`,

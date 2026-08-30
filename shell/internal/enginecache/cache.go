@@ -9,13 +9,18 @@ import (
 
 // CacheStats is data-ops.ts's CacheStats, six ints. A16 governs how the router merges this with
 // the Node engine's own stats during coexistence — that merge lives in the router, not here.
+// JSON tags matter here, not just style: this struct crosses the wire directly as a data-plane
+// response/event payload, and the renderer's cacheStatsSchema expects these exact lowercase-first
+// key names — without the tags, encoding/json would emit "L2Bytes" and the renderer's zod parse
+// would fail (its own decode is more forgiving, matching case-insensitively, which is exactly the
+// kind of one-way compatibility that hides this bug until the marshal side is exercised).
 type CacheStats struct {
-	L2Bytes       int
-	L2BudgetBytes int
-	L2Entries     int
-	L2Hits        int
-	L2Misses      int
-	L3Entries     int
+	L2Bytes       int `json:"l2Bytes"`
+	L2BudgetBytes int `json:"l2BudgetBytes"`
+	L2Entries     int `json:"l2Entries"`
+	L2Hits        int `json:"l2Hits"`
+	L2Misses      int `json:"l2Misses"`
+	L3Entries     int `json:"l3Entries"`
 }
 
 func (a CacheStats) equal(b CacheStats) bool { return a == b }
