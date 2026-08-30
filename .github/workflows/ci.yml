@@ -23,51 +23,32 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: shell/go.mod
       - run: bun install --frozen-lockfile
-      - name: Generate Wails bindings (P57 D8/D13 — src/renderer/bridge/*.ts import them directly)
-        run: |
-          set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd shell && wails3 generate bindings -b -i -ts -names)
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run build:engine
       - run: bun run build
-      - run: bun run test:go
       - run: bun run verify:packaging
 
-  ui:
+  e2e-smoke:
     needs: checks
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: shell/go.mod
-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — AGENTS.md)
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
       - run: bun install --frozen-lockfile
-      - name: Generate Wails bindings
+      - name: Prepare an unlocked keychain for safeStorage (P25 D15)
         run: |
           set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd shell && wails3 generate bindings -b -i -ts -names)
-      - name: Install WebKit and its system libraries (AGENTS.md)
-        run: |
-          bunx playwright install webkit
-          sudo apt-get install -y libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav
-      - run: bun run test:ui
+          P="$(openssl rand -base64 24)"
+          security create-keychain -p "$P" kira-ci.keychain-db
+          security set-keychain-settings -lut 21600 kira-ci.keychain-db
+          security unlock-keychain -p "$P" kira-ci.keychain-db
+          security default-keychain -s kira-ci.keychain-db
+          security list-keychains -d user -s kira-ci.keychain-db login.keychain-db
+      - run: bun run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -98,22 +79,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: shell/go.mod
       - run: bun install --frozen-lockfile
-      - name: Vendor the Node runtime and build the engine bundle (main.go refuses to start without both)
-        run: |
-          sh scripts/vendor-node.sh
-          bun run build:engine
-      - run: bun run package
-      - name: Assert packaged bundle (docs/PACKAGING.md §4)
+      - run: bun run package:mac:dir
+      - name: Assert packaged bundle (docs/PACKAGING.md §4 items 1-3, 9)
         run: |
           set -eu
-          APP="shell/bin/Kira Studio.app"
+          APP="dist/mac-arm64/Kira Studio.app"
           test -d "$APP"
-          test -f "$APP/Contents/MacOS/runtime/engine/engine.cjs"
-          test -x "$APP/Contents/MacOS/runtime/node/bin/node"
+          test -f "$APP/Contents/Resources/app.asar.unpacked/out/main/engine.js"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
             = 'com.kirathecat.kira-studio'
           codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'

@@ -1910,6 +1910,20 @@ YAML (no runner available to execute it against), and therefore the exact nested
 *real* packaged bundle — matching the plan's own framing of packaging as a macOS check, "on macOS,
 or recorded as unavailable" here.
 
+**A real, environment-level blocker, not a design gap**: this session's GitHub push access lacks
+the `workflow` OAuth scope, so a commit touching `.github/workflows/*.yml` is rejected outright by
+GitHub itself ("refusing to allow an OAuth App to create or update workflow `ci.yml` without
+`workflow` scope") — no amount of retrying or re-attaching the repo changes this. Rather than drop
+the CI updates (§4.14) to get a green push, everything else in this milestone (package.json, the
+config/script/Go changes, the plan doc itself) was committed and pushed as normal, and the
+*intended* `ci.yml`/`release.yml` content was committed instead to
+`docs/v1/plans/p57-pending-ci-workflows/{ci,release}.yml`, with a `README.md` there giving the
+three-line copy-and-commit sequence for whoever next pushes with `workflow` scope. The actual
+`.github/workflows/ci.yml`/`release.yml` in this branch are therefore still the **pre-M7**
+versions (`e2e-smoke`/`package:mac:dir`/etc.) until that follow-up lands — a real, temporary gap
+in this milestone's own "CI updated" claim, called out here rather than silently left for someone
+to discover the hard way.
+
 **One pre-existing, unrelated flake noticed while running the wider suite**:
 `tests/ipc/clickhouse/clickhouse.backend.spec.ts` fails on a hardcoded expected
 `serverVersion: 'ClickHouse 26.3.24.4'` against a `clickhouse:latest`-family container that has
