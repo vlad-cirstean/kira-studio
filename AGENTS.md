@@ -738,6 +738,38 @@ have to be re-derived next time.
   driving it via `xdotool` needs two real, separately-dispatched `click 1` events close together
   (`xdotool click 1; sleep 0.05; xdotool click 1`), not `xdotool click --repeat 2`, which did not
   register as a double-click in WebKitGTK during this phase's C1 boot test.
+- **`tests/ui/support/mockRuntime.ts` has no `Events.On` (push-event) mechanism at all — confirmed
+  as a hard, structural gap while porting `interaction.spec.ts`, not just the narrower
+  `connectionsChanged` case `connections.spec.ts`'s own header comment already named.** It
+  intercepts only the one `Call` RPC endpoint; anything the renderer learns exclusively through a
+  live `control.onXxx` subscription (a real `@wailsio/runtime` `Events.On`) can never update in
+  this tier, no matter how the test drives the UI. Two concrete casualties, both permanent for this
+  tier, not fixture-design gaps: (1) `state/ops.ts`'s Operations panel — `hydrateOps()` fetches
+  `opsRecent()` once at boot and thereafter relies solely on `onOpUpdate` push for every later
+  status change, so an op run *during* a test never appears in the DOM; (2) every `global: true`
+  keyboard shortcut (`shared/domain/shortcuts.ts`) — Command Palette, Window ▸ Next/Previous/Close
+  Tab, View ▸ Find/Refresh/Run Statement/Run All — whose accelerator is dispatched exclusively via
+  the native menu emitting a Wails event, with no renderer-owned keydown fallback the way undo/redo
+  has (`console.spec.ts`'s own precedent); the Command Palette itself has no button either, so even
+  the commands it would otherwise reach are unreachable. Any future port touching a live
+  `control.onXxx` push or a `global: true` binding will hit this same wall — there is nothing to
+  fix in the test, only a scenario to drop with this same reasoning.
+- **Playwright's bundled WebKit reports `navigator.userAgent` as `Macintosh` unconditionally,
+  regardless of the real host OS** — confirmed by direct experiment on this Linux sandbox:
+  `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 …`. `renderer/shortcuts/
+  keys.ts`'s own `isMac` is `navigator.userAgent.includes('Mac')`, evaluated *inside the page* —
+  so it disagrees with the Node test-runner's own `process.platform` (`'linux'` here) every time.
+  A `tests/e2e/`-era spec's `process.platform === 'darwin' ? macChord : otherChord` pattern (correct
+  under real Electron, where the renderer's UA honestly reflects the host) silently picks the
+  *wrong* chord once ported to `tests/ui/`: hit porting `interaction.spec.ts`'s `grid.deleteRows`
+  case, whose mac-only override (`Cmd+Backspace`) is not the plain `Delete` every other platform
+  uses — a `Delete` keypress matched no shortcut at all, with no error, just nothing happening.
+  Fixed by reading `navigator.userAgent` from the page itself (`page.evaluate(() =>
+  navigator.userAgent.includes('Mac'))`) after `relaunch()`, never from `process.platform`, for any
+  chord whose choice depends on platform as the *app* perceives it. This does not apply to a chord
+  whose platform-dependence is a real OS-level input-translation quirk rather than app code reading
+  the UA string (e.g. Control+click becoming a contextmenu event on real macOS hardware) — that
+  stays keyed off the actual host, which this sandbox's Linux is, honestly.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

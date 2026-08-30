@@ -1669,7 +1669,34 @@ porting at this fidelity versus consolidating overlapping coverage.
     scenario already asserts directly. `console.spec.ts` dropped only session restore and the
     native-Electron-menu half of its undo/redo scenario (CodeMirror's own keyboard-driven
     history()/historyKeymap is fully portable and covers the same feature). Remaining: `tooltips`,
-    `autocomplete`, `cell-editor`, `data-view`, `interaction`, `tree`.
+    `autocomplete`, `cell-editor`, `data-view`, `tree`.
+  - **`interaction` — also done**, against a new real capture of the
+    regions -> customers -> orders -> order_items <- products FK graph plus `app.composite_pk`'s
+    own filter/sort/projection reads (`scripts/capture-postgres-tree.ts`, run for real against a
+    fresh Postgres container this session — `docker`/`shell/runtime/node`/`wails3`
+    bindings/`bun run build:wails` all had to be (re-)provisioned first, none of it persisted from
+    an earlier session). Almost the whole file ports: the full right-click matrix (grid cell/row/
+    header, PK/FK cell nav), row/column selection accumulation, and every keyboard-driven copy/
+    paste/duplicate/delete chord. Two whole scenarios are dropped, both traced to the same root
+    cause — **this tier's `mockRuntime.ts` has no `Events.On` (push-event) mechanism at all**,
+    confirmed as a hard structural gap, not merely the narrower `connectionsChanged` case
+    `connections.spec.ts`'s own comment already named: (1) the Operations panel — `state/ops.ts`'s
+    `hydrateOps()` fetches `opsRecent()` once at boot and relies solely on a live `onOpUpdate` push
+    for every later status change, so an op run *during* a test can never appear in the DOM here;
+    (2) every native-menu keyboard shortcut (Command Palette, Window ▸ Next/Previous/Close Tab,
+    View ▸ Find/Refresh/Run Statement/Run All) — unlike undo/redo, these are all `global: true`
+    bindings with no renderer-owned keydown fallback (`shared/domain/shortcuts.ts`'s own comment:
+    a `global` binding's accelerator is "never a local keydown handler"), and the Command Palette
+    itself has no button either, so even the palette-routed commands are unreachable. A third,
+    genuinely new environment finding surfaced getting the keyboard-chord scenarios green, now in
+    `AGENTS.md`: **Playwright's bundled WebKit reports `navigator.userAgent` as `Macintosh`
+    unconditionally, regardless of the real host OS** — `renderer/shortcuts/keys.ts`'s `isMac` read
+    inside the page therefore disagrees with the test runner's own `process.platform` (`'linux'`
+    here), so the original file's `process.platform === 'darwin'` ternary for
+    `DUPLICATE_KEY`/`COPY_KEY`/`DELETE_KEY` silently picks the wrong chord in this tier (most
+    visibly: a plain `Delete` keypress never matches `grid.deleteRows`, whose mac-only override is
+    `Cmd+Backspace`) — fixed by reading `navigator.userAgent` from the page itself after
+    `relaunch()`, not from `process.platform`.
   - **The real-backend tier the D16 amendment above promised has landed.** `tests/e2e-real/`
     (harness in `fixtures.ts`, selective interception in `support/passthrough.ts`) now has both
     specs it named: `sqlite-real.spec.ts` (E1, Docker-free) and `postgres-real.spec.ts` (E2, a real
