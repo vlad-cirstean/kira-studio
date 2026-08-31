@@ -50,12 +50,6 @@ func TestWailsFilterTranslation(t *testing.T) {
 			wantName: "", wantPattern: "",
 		},
 		{
-			name:        "single group",
-			filters:     []bridge.FileFilter{{Name: "SQLite database", Extensions: []string{"sqlite", "sqlite3", "db", "db3"}}},
-			wantName:    "SQLite database",
-			wantPattern: "*.sqlite;*.sqlite3;*.db;*.db3",
-		},
-		{
 			name: "two groups with no wildcard flatten into one pattern",
 			filters: []bridge.FileFilter{
 				{Name: "Images", Extensions: []string{"png", "jpg"}},

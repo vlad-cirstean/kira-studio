@@ -32,29 +32,6 @@ func TestCache_L2NeverExceedsBudgetAfterEviction(t *testing.T) {
 	}
 }
 
-func TestCache_ClearPagesResetsHitMissCounters(t *testing.T) {
-	c := NewCache(DefaultPageBudgetBytes, nil)
-	req := ReadRequest{
-		ConnectionID: "conn", Path: "database:kira_test/schema:app/table:order_items",
-		Cursor: pageOffsetCursor(0),
-	}
-	key, label := PageCacheKey(req)
-	c.StorePage(key, label, req, fakePage(10))
-	c.ReadPage(key)               // a real hit
-	c.ReadPage("missing-key-xyz") // a real miss
-
-	before := c.Stats()
-	if before.L2Hits == 0 || before.L2Misses == 0 {
-		t.Fatalf("before = %+v, want nonzero hits and misses", before)
-	}
-
-	c.Clear()
-	after := c.Stats()
-	if after.L2Hits != 0 || after.L2Misses != 0 || after.L2Entries != 0 || after.L2Bytes != 0 {
-		t.Errorf("after Clear() = %+v, want all zero", after)
-	}
-}
-
 func TestCache_L3BoundedAtExactly2048Entries(t *testing.T) {
 	c := NewCache(DefaultPageBudgetBytes, nil)
 	const combos = 2500

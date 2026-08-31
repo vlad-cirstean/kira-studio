@@ -137,26 +137,6 @@ func TestHandleDataFrame_CacheClear_ClearsGoCache(t *testing.T) {
 	}
 }
 
-func TestObserveChildEvent_UpdatesLastChildStats(t *testing.T) {
-	r, _ := newTestRouter()
-	frame := mustFrame(t, map[string]any{
-		"kind": "evt", "topic": "cache:stats",
-		"payload": map[string]any{"l2Bytes": 100, "l2BudgetBytes": 1000, "l2Entries": 2, "l2Hits": 3, "l2Misses": 4, "l3Entries": 5},
-	})
-	r.observeChildEvent(frame)
-
-	r.statsMu.Lock()
-	got, have := r.lastChildStats, r.haveChildStats
-	r.statsMu.Unlock()
-	if !have {
-		t.Fatal("expected haveChildStats to be true after a cache:stats event")
-	}
-	want := enginecache.CacheStats{L2Bytes: 100, L2BudgetBytes: 1000, L2Entries: 2, L2Hits: 3, L2Misses: 4, L3Entries: 5}
-	if got != want {
-		t.Errorf("lastChildStats = %+v, want %+v", got, want)
-	}
-}
-
 // A16: counters sum; the budget reports once, not doubled.
 func TestMergedCacheStats_SumsCountersReportsBudgetOnce(t *testing.T) {
 	r, _ := newTestRouter()

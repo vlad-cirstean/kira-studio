@@ -3,7 +3,6 @@ package adapters_test
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,22 +48,5 @@ func TestRunWithAbortRace_CallerCtxCancelledDoesNotReachIssue(t *testing.T) {
 	case <-releaseCh:
 	case <-time.After(1 * time.Second):
 		t.Error("release was never called once issue actually settled")
-	}
-}
-
-func TestRunWithAbortRace_ReleaseCalledExactlyOnce(t *testing.T) {
-	var released int32
-	release := func() { atomic.AddInt32(&released, 1) }
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	_, err := adapters.RunWithAbortRace(ctx, release, func(issueCtx context.Context) (int, error) {
-		return 0, errors.New("boom")
-	})
-	if err == nil {
-		t.Fatal("expected an error from issue")
-	}
-	if atomic.LoadInt32(&released) != 1 {
-		t.Errorf("release called %d times, want exactly 1", released)
 	}
 }

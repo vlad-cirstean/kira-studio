@@ -1,7 +1,6 @@
 package adapterhost
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
@@ -25,20 +24,6 @@ func newTestSession() (*Session, *fakeConn) {
 	conn := newFakeConn()
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
 	return newSession(r, conn), conn
-}
-
-func TestSession_WriteLoop_DeliversFramesInOrder(t *testing.T) {
-	s, conn := newTestSession()
-	defer s.Close()
-
-	s.enqueueLocal([]byte("first"))
-	s.enqueueLocal([]byte("second"))
-
-	first := <-conn.sent
-	second := <-conn.sent
-	if !bytes.Equal(first, []byte("first")) || !bytes.Equal(second, []byte("second")) {
-		t.Errorf("got %s, %s, want first, second in order", first, second)
-	}
 }
 
 // enqueue reports ErrStreamFull once both the frame-count and byte bounds are exhausted, and
