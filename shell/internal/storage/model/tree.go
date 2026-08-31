@@ -135,6 +135,9 @@ func ValidateObjectMeta(meta *ObjectMeta) bool {
 	if meta.Columns == nil {
 		meta.Columns = []ColumnMeta{}
 	}
+	if meta.PrimaryKey == nil {
+		meta.PrimaryKey = []string{}
+	}
 	if meta.ForeignKeys == nil {
 		meta.ForeignKeys = []ForeignKeyMeta{}
 	}

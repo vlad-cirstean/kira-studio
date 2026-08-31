@@ -18,6 +18,7 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mariadb"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mysql"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/clickhouse"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/postgres"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqlite"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"

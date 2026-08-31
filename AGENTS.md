@@ -984,7 +984,7 @@ implementation and real-container testing found that the plan itself could not h
     adapter exists and both connections can be genuinely native/non-native side by side in one
     running app, which is closer to what steps 17-21 are actually trying to prove.
 
-## P58b — MySQL/MariaDB, SQLite, ClickHouse (M6), findings worth keeping for M6.4+
+## P58b — MySQL/MariaDB, SQLite, ClickHouse (M6), findings worth keeping for P58c+
 
 `docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` covers the design and carries its own §12/§13
 results sections in full detail; this is the condensed, cross-milestone version worth a reader not
@@ -1052,6 +1052,69 @@ re-deriving from the plan doc.
   genuine no-primary-key `no_pk_rowid` table (needed anyway for D22's own rowid-keyset scenario),
   so the sqlite suite's "mutate: no primary key" test uses it directly with no side-connection probe
   table required.
+- **M6.4 (ClickHouse) confirmed the M6.3 lesson above was worth stating in general terms, not just
+  for SQLite.** Rolling a raw `net/http` client instead of vendoring `@clickhouse/client` (B11)
+  meant losing that library's own hidden defaults, not just its dependency weight: plain
+  `FORMAT JSON` on `clickhouse-server:26.3` emits a UInt64/Int64 column as a bare JSON number
+  unless `output_format_json_quote_64bit_integers=1` is requested explicitly, which
+  `@clickhouse/client`'s own `.json()` method evidently sets on every request without `client.ts`
+  ever having to say so. `catalog.ts`'s own `total_rows: string | null` typing (and, transitively,
+  every Go struct field ported from it) is only correct once a hand-rolled client asks for that
+  setting itself — found on the *first* real run against the container, not before, fixed by adding
+  the setting to `client.go`'s own `fixedSettings` map (sent on every request, matching B11's whole
+  design) and typing `system.columns.position` — a second, independently-discovered UInt64 column —
+  as `string` too, parsed on the Go side like `total_rows`/`count()` already were.
+- **A self-referential false positive in a server-side liveness check, not a cancellation bug.**
+  The acceptance suite's own "cancel, asserted server-side" test polled
+  `system.processes WHERE query LIKE '%sleep(3)%'` and never observed the target query as gone —
+  not because `KILL QUERY` failed, but because the *checking* query's own SQL text contains the
+  literal substring `sleep(3)` inside its own `LIKE` pattern, so once ClickHouse makes that query
+  itself visible in `system.processes` while it runs (confirmed empirically), it permanently
+  matches its own predicate. The general lesson, worth carrying into P58c/P58d/P58e's own
+  cancellation tests: a server-side liveness poll must check a value the checking statement's own
+  text cannot itself satisfy (here, the tracked `query_id`, not a text scan) — the same shape of
+  mistake as reusing a fixed literal as a placeholder value elsewhere in this phase's own findings
+  (B16's `nativeKinds` entries above), just at the query level instead of the Go-test level.
+- **C1b (docs/v1/plans/P58b-mysql-sqlite-clickhouse.md §7) ran for real in this session** —
+  `tests/e2e-real/mariadb-real.spec.ts`, MariaDB as the native side and MongoDB (still Node-served)
+  as the other, filling the exact gap P58a's own §13 recorded as unfillable before a second adapter
+  went native. Both halves passed: the native half end to end (real dialog, real tree, real cell
+  text over the base64 chunk path, real keyset paging over `big_rows`), and — the load-bearing
+  half — MariaDB staying `connected` and still serving a real read through a fresh `page.reload()`
+  after the Node engine child was actually `SIGKILL`ed (confirmed via the server's own
+  `enginehost: engine process exited` log line), while MongoDB's own connection flipped to `error`.
+  This is the first time P58 D4's coexistence property has been proven in a running app, not only
+  in `adapterhost`'s own router unit tests. `tests/e2e-real/fixtures.ts` gained one small, narrowly-
+  scoped addition to make it possible: `KiraApp.serverPid`, so a test can find the Node engine
+  child as a real process child (`pgrep -P <serverPid>`) instead of guessing at the vendored
+  runtime's own binary name.
+- **A real frontend regression, live in `main` since M6.3, was only caught here because M6.4's own
+  validation happened to re-run `tests/e2e-real/sqlite-real.spec.ts` as a sanity check** — it was
+  never re-run at M6.3's own closeout, whose validation sweep covered `go test`, `lint`,
+  `typecheck`, and the mocked `test:ui`/`test:ipc:fe` tiers only. The failure:
+  `expect(consoleErrors).toEqual([])` caught a real
+  `TypeError: Cannot read properties of null (reading 'length')` thrown from a Vue computed
+  (`DataGrid.vue`'s `if (meta.primaryKey && meta.referencedBy.length > 0)`). Root cause: Go's
+  `encoding/json` marshals a nil slice as `null`, not `[]`, and every native adapter's catalog code
+  builds its list fields the idiomatic Go way (`var result []model.ForeignKeyMeta`, appended to
+  only when there's something to add) — so a table with no reverse foreign keys (the common case)
+  sent `referencedBy: null` over the wire, where the TS engine's own arrays were never anything but
+  `[]`. `model.ValidateObjectMeta`/`ValidateObjectDefinition` already existed with exactly this
+  nil-to-`[]` normalization, but were only ever wired into `tree/service.go`'s cache-load path
+  (`json.Unmarshal` from a *child-served* payload) — `adapterhost.Router`'s `describeNative`/
+  `definitionNative` call the adapter directly and returns its struct as-is, so a native result
+  never passed through the normalizer. Fixed by calling `model.ValidateObjectMeta(&meta)` /
+  `model.ValidateObjectDefinition(&def)` at the end of `describeNative`/`definitionNative` in
+  `shell/internal/adapterhost/router.go`, and by adding the same missing `PrimaryKey` nil-guard to
+  `ValidateObjectMeta` itself (only `Columns`/`ForeignKeys`/`ReferencedBy`/`Indexes` were guarded
+  before). This is the same class of bug as P58a's own `toTypedArray` finding — a real wire-path
+  regression invisible to every mocked tier — and confirms the general lesson from that finding
+  needs restating even more sharply: **`tests/e2e-real/*.spec.ts` must be re-run in full after
+  every `nativeKinds` flip, not just for the kind that just went native**, since a shared code path
+  (here, `adapterhost.Router`, common to all native adapters) can silently break every *other*
+  already-native kind's own wire format at the same time. Re-verified clean after the fix: all of
+  `go test ./... -count=1`, `sqlite-real.spec.ts`, `postgres-real.spec.ts` (2/2),
+  `mariadb-real.spec.ts` C1b (2/2), and `test:ui`/`test:ipc:fe`.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

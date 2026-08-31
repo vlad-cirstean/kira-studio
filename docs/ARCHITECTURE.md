@@ -235,23 +235,35 @@ the coercion; that one path reformats the value to SQLite's own canonical
 `strftime('%Y-%m-%d %H:%M:%f')` text rather than passing the original bytes through unmodified — a
 narrow, documented capability trade, not a silent gap.
 
-### ClickHouse (`@clickhouse/client`, P36)
+### ClickHouse (P36; Go-native as of P58b M6.4)
 
-`@clickhouse/client` (npm) — the app's first added dependency since the Kafka client migration
-(P32), and unlike that one it needs no native build step at all (a plain JS HTTP client). The
-client's HTTP interface has **no per-request `database` override**: `database` is set once at
-client construction and embedded in every request's URL query string automatically. Every
-statement the adapter issues relies on that one construction-time default plus fully-qualified
-`` `db`.`table` `` identifiers — there is no per-call `database` option to reach for; the client's
-own types don't have one.
+**ClickHouse is Go-native as of P58b M6.4** (`shell/internal/adapters/clickhouse/`, plain
+`net/http`) — `nativeKinds["clickhouse"]` is `true`, the last of the five SQL-family kinds P58b set
+out to migrate. Unlike every other adapter in this phase, the Go port carries **no driver
+dependency at all**: no `@clickhouse/client` equivalent, no vendored client library — a hand-rolled
+HTTP client that POSTs the statement text and reads ClickHouse's own
+`JSONCompactStringsEachRowWithNamesAndTypes` wire format line by line (names row, types row, then
+one JSON array of strings — or the `ᴺᵁᴸᴸ` sentinel — per data row). This works because ClickHouse's
+own text-rendering already covers every exotic type (`Decimal128`, `UUID`, `Array`/`Tuple`/`Map`,
+`Enum8`, big `UInt64`/`Int64` values) exactly the way the cell editor needs it, so there is nothing
+a Go-side type system would add. The one cost of skipping a client library: its hidden defaults
+have to be re-discovered and re-set explicitly. `output_format_json_quote_64bit_integers=1` is one
+such setting — `@clickhouse/client`'s own `.json()` method sets it invisibly on every request;
+without it, a plain `FORMAT JSON` catalog query (`total_rows`, `count()`, `system.columns.position`)
+renders a UInt64/Int64 column as a bare JSON number rather than a quoted string, which is both a
+precision loss past 2^53 and a decode failure for a Go struct field typed `string`. Every such
+setting travels as a URL query parameter on every request (there is no persistent client-level
+session over stateless HTTP), including `database=<db>` (no per-request database override exists
+in ClickHouse's HTTP interface either way, so every statement is fully qualified with
+`` `db`.`table` `` regardless of driver).
 
-`canUpdate`/`canDelete` are permanently `false` (`caps.ts`) — a MergeTree `PRIMARY KEY` is a sparse
+`canUpdate`/`canDelete` are permanently `false` (`caps.go`) — a MergeTree `PRIMARY KEY` is a sparse
 index over parts, not a unique row key, so there is no addressable row to target for `UPDATE`/
 `DELETE`. This is a structural fact about the engine, not "not yet implemented." The grid's `− row`
 button and inline cell editing are both disabled for this connection kind for the same reason, with
 a tooltip naming it. Cancellation goes through `KILL QUERY WHERE query_id = '<id>' SYNC` on a
-second HTTP request (the client's own connection pool already has a free one), since the server
-keeps executing a query after the original socket closes.
+second HTTP request (`net/http`'s own connection pool, sized to always have one free), since the
+server keeps executing a query after the original socket closes.
 
 ### Kafka (`@confluentinc/kafka-javascript`, P32)
 

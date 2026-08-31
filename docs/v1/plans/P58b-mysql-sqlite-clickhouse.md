@@ -1969,3 +1969,123 @@ flips from the TypeScript adapter's honest `false` to an equally honest `true` (
 designed, and every other design fact in §4.2 (keyset-by-rowid, `BEGIN IMMEDIATE`, the `mode=ro`/
 `mode=rw` DSN defence alongside `assertFileExists`, `PRAGMA table_xinfo` over `table_info`) was
 confirmed rather than assumed by the acceptance suite.
+
+**M6.4 — ClickHouse native adapter (`shell/internal/adapters/clickhouse/`, plain `net/http`, B11)
+and checkpoint C1b.** Built per §4.3's design and B11-B13, tested with 20 subtests plus 2 unit
+tests against a real `clickhouse/clickhouse-server:26.3` fixture (three users, matching §4.5's own
+D35 split), 3× under `go test ./... -race` with no races. `nativeKinds["clickhouse"]` is now
+`true` — every SQL-family kind P58b set out to migrate (`postgres`, `mariadb`, `mysql`, `sqlite`,
+`clickhouse`) is now Go-native. `git diff --stat -- src/` stayed empty through the whole milestone.
+
+B11's own bet paid off exactly as argued: no ClickHouse driver, no vendored client, `net/http` plus
+a hand-rolled `JSONCompactStringsEachRowWithNamesAndTypes` line reader. Two real bugs surfaced on
+the *first* real run against the container, both specific to rolling a raw HTTP client rather than
+reusing `@clickhouse/client`'s own hidden defaults — precisely the class of finding B11 accepted as
+the trade for not vendoring a client library:
+
+- **The root-cause bug**: every catalog struct typed `string`/`*string` for a UInt64/Int64 column
+  (`total_rows`, `count() AS n`, and — a second, distinct instance of the identical class —
+  `system.columns.position`) failed to unmarshal with `json: cannot unmarshal number into Go
+  struct field ... of type string`. `catalog.ts`'s own `interface SystemTableRow { total_rows:
+  string | null }` assumes ClickHouse's plain `FORMAT JSON` quotes 64-bit integers — true only
+  because `@clickhouse/client`'s own `.json()` method sets `output_format_json_quote_64bit_integers`
+  itself, invisibly, on every request it makes. Verified directly against a live
+  `clickhouse-server:26.3` container (a throwaway `curl` probe, the same M6.0-style discipline) in
+  both directions: the setting is off by default on this server version (`FORMAT JSON` emits a bare
+  JSON number for a UInt64, losing precision past 2^53), and turning it on quotes *every* 64-bit
+  column uniformly, `position` included. Fixed by adding
+  `output_format_json_quote_64bit_integers=1` to `client.go`'s own `fixedSettings` — sent as a URL
+  query parameter on every request, per B11's whole design — and typing `systemColumnRow.Position`
+  as `string`, parsed in `toColumnMeta`, matching the pattern the already-string `total_rows`/`n`
+  fields used. `JSONCompactStringsEachRowWithNamesAndTypes` (the read/console/streamed path) was
+  never affected either way — every one of its own cells is already a JSON string by format name.
+  This is the authoritative correction to client.ts's own FIXED_SETTINGS list for any future
+  hand-rolled HTTP client against this API: the four settings §4.3 named are not the complete list
+  a stateless client needs to match `@clickhouse/client`'s own behaviour.
+- **A test-authoring bug masquerading as a cancellation failure**: the acceptance suite's own
+  "cancel, asserted server-side" test initially polled `SELECT count() FROM system.processes WHERE
+  query LIKE '%sleep(3)%'` and never terminated, reporting the killed query as still present
+  indefinitely. The real cause was not the adapter: the checking query's own SQL text contains the
+  literal substring `sleep(3)` inside its own `LIKE` pattern, so once that query itself becomes
+  visible in `system.processes` (confirmed empirically — ClickHouse does show a query to a
+  same-connection read of `system.processes` while it is still executing), it permanently matches
+  its own predicate, masking whether the real target query was ever actually gone. `KILL QUERY`
+  itself worked correctly throughout, confirmed by checking `system.processes` for the tracked
+  `query_id` (`kira-<opID>-<seq>`, deterministic and never self-matching) instead of a `LIKE` scan
+  over statement text — the fix, and the general lesson: a server-side liveness check must never
+  filter on a text pattern that the checking statement's own source could itself satisfy.
+- **A second, narrower test-only bug in the same area**: the acceptance suite's `connectedAdapter`
+  helper reused the literal `"connect"` as every subtest's own `op.OpID`, which `adapter.go`'s
+  `nextQueryID` turns into the fixed query_id `"kira-connect-0"` for literally every `Connect()`
+  call in the file. Running the whole `shell` module's test suite (rather than the `clickhouse`
+  package alone) surfaced `DB::Exception: Query with id = kira-connect-0 is already running`
+  (`QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING`) when two subtests' connect probes landed close enough
+  in wall-clock time for the server to not yet have cleared the previous one's query_id from its
+  own registry. Not a production concern — a real op's `OpID` is always genuinely unique per
+  operation — but a real trap for any test file reusing a literal opID across many `Connect()`
+  calls against a query_id-keyed server. Fixed with a package-level atomic counter appended to
+  every `connectedAdapter` call's own opID.
+
+**C1b** (§7's own checklist) ran against `tests/e2e-real/mariadb-real.spec.ts` (new — §5.6's one
+exception to "adding one spec per newly-native engine is tempting and mostly wrong": there is no
+other way to run C1b), with the roles P58a's own §13 could not fill now filled: MariaDB is the
+**native** side, MongoDB (still Node-served, P58c) is the other. Recorded per P55 §10 / P56 §6 /
+P57 §6 / P58a §13's own standard — naming what ran and what could not, not leaving it implied.
+
+- **Steps 1-10 (native half) — all passed for real**, in `mariadb-real.spec.ts`'s first test: the
+  app builds and boots, a real MariaDB connection is created through the dialog, tested and
+  connected with a `MariaDB 11.` version tooltip, the tree expands straight to relations (no
+  schema level, unlike Postgres), `kira_test.order_items` opens and renders real cell text over the
+  base64 chunk path, and `big_rows` pages forward then back with `[data-testid="pager"]` carrying
+  `data-pagination="keyset"` throughout. `[data-testid="engine-status"]` stays `ok` (the Node child
+  is alive and answering ping, P58a A17) even in a wholly-native session.
+- **Steps 11-12 (coexistence half) — passed for real**, in the second test, `fixtures.ts` gaining
+  one small, deliberate addition to make it possible: `KiraApp.serverPid`, the real server
+  process's own pid, so the test can find its Node engine child as a direct process child
+  (`pgrep -P <serverPid>`) rather than guessing at the vendored runtime's binary name. A MariaDB
+  connection and a MongoDB connection are both connected in the same session; MongoDB's own tree
+  expands and a `widgets` document renders through the Node child's index-keyed encoding (still
+  the live proof `toTypedArray`'s second branch is needed, P58a A10); the Node child is then
+  `SIGKILL`ed for real (confirmed server-side by the log line
+  `enginehost: engine process exited err="signal: killed"`); MongoDB's status dot flips to `error`
+  while MariaDB's stays `connected`, and a fresh `page.reload()` plus a real `regions` table read
+  through the still-native MariaDB adapter proves it never depended on the child that just died.
+  **This is the first time P58 D4's coexistence property has been proven in a running app rather
+  than only in `adapterhost`'s own router unit tests.**
+- **Three iterations of test-only locator flakiness, not adapter bugs, before the coexistence test
+  was reliable.** All three are worth naming because none of them were about the adapter: (1) the
+  Mongo document view's own testid is `document-tree` (one per row, not a single container) rather
+  than the guessed `document-grid`; (2) MariaDB and MongoDB share the identical seeded database
+  name (`kira_test`), so once both connections are expanded in the same session,
+  `[data-path="database:kira_test"]` matches one row per connection — resolved not by guessing at
+  tree order but by reloading the page before the post-kill read, which collapses every row back to
+  the two bare connection roots so expanding only MariaDB's own leaves exactly one such row on the
+  whole page; (3) MariaDB itself seeds two databases (`kira_test` and `kira_analytics`, M6.2's own
+  `kira_analytics` addition), which is why disambiguating by database name rather than by
+  connection-scoped DOM nesting mattered in the first place.
+
+**A real frontend regression, live since M6.3, surfaced only because M6.4's own closeout re-ran
+`sqlite-real.spec.ts` as a sanity check** rather than trusting that a change scoped to
+`adapters/clickhouse/` couldn't affect it. `expect(consoleErrors).toEqual([])` caught a real
+`TypeError: Cannot read properties of null (reading 'length')`, thrown from `DataGrid.vue`'s
+`if (meta.primaryKey && meta.referencedBy.length > 0)`. Root cause: Go's `encoding/json` marshals a
+nil slice as `null`, and every native adapter builds its catalog list fields the idiomatic Go way
+(`var result []model.ForeignKeyMeta`, appended to only when there's something to add) — so a table
+with no reverse foreign keys (`order_items`, in the sqlite fixture) sent `referencedBy: null` over
+the wire, where the TS engine's own arrays were never anything but `[]`. `model.ValidateObjectMeta`/
+`ValidateObjectDefinition` (`shell/internal/storage/model/tree.go`/`definition.go`) already existed
+with exactly this nil-to-`[]` normalization, but were wired only into `tree/service.go`'s
+cache-load path (`json.Unmarshal` of a *child-served* payload) — `adapterhost.Router`'s
+`describeNative`/`definitionNative` return the adapter's struct directly, so a native result never
+passed through the normalizer. Fixed by calling `model.ValidateObjectMeta(&meta)` /
+`model.ValidateObjectDefinition(&def)` at the end of both functions in
+`shell/internal/adapterhost/router.go`, plus adding the same missing `PrimaryKey` nil-guard to
+`ValidateObjectMeta` itself (only `Columns`/`ForeignKeys`/`ReferencedBy`/`Indexes` were guarded
+before). This is the same class of bug as P58a's own `toTypedArray` finding — a real wire-path
+regression no mocked tier can see — and sharpens that finding's general lesson: **a
+`tests/e2e-real/*.spec.ts` regression sweep must be re-run in full after every `nativeKinds` flip,
+not only for the kind that just went native**, because a shared code path (here,
+`adapterhost.Router`, common to every native adapter) can silently break an *already-native* kind's
+own wire format at the same time. Re-verified clean after the fix: `go test ./... -count=1`,
+`sqlite-real.spec.ts`, `postgres-real.spec.ts` (2/2), `mariadb-real.spec.ts` C1b (2/2), and
+`test:ui`/`test:ipc:fe`.

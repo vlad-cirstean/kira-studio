@@ -16,7 +16,7 @@ import (
 // kind is added here in the same commit as its adapter's tests going green, and never earlier
 // (A12). Postgres is native as of M5 (checkpoint C1) — every other kind still routes to the Node
 // engine child until its own milestone lands.
-var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true, "sqlite": true}
+var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true, "sqlite": true, "clickhouse": true}
 
 // TestKindNodeServed is a connection kind guaranteed to still route to the Node engine child —
 // exported so other packages' tests can use one definitely-not-yet-native kind as a placeholder
@@ -297,6 +297,12 @@ func (r *Router) describeNative(ctx context.Context, connectionID string, path m
 			if err != nil {
 				return nil, err
 			}
+			// Native adapters build their list fields (e.g. ReferencedBy) as `var x []T` and leave
+			// them nil when empty, which json.Marshal renders as `null` — the TS engine's own
+			// arrays were never nil over the wire. describeViaChild's json.Unmarshal path gets this
+			// normalization for free from tree/service.go's cache load; a native Describe result
+			// never passes through there, so it needs the same nil->[] normalization here.
+			model.ValidateObjectMeta(&meta)
 			op.SetRows(len(meta.Columns))
 			return meta, nil
 		})
@@ -341,6 +347,9 @@ func (r *Router) definitionNative(ctx context.Context, connectionID string, path
 			if err != nil {
 				return nil, err
 			}
+			// Same nil-slice-over-the-wire hazard as describeNative above, for Notes/Constraints/
+			// Sections.
+			model.ValidateObjectDefinition(&def)
 			op.SetRows(len(def.Statements))
 			return def, nil
 		})
