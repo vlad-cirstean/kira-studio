@@ -225,6 +225,13 @@ export const controlSnapshots: ControlSnapshot[] = [
         },
         {
           kind: 'table',
+          name: 'trail\\',
+          path: 'database:kira_test/table:trail%5C',
+          hasChildren: false,
+          detail: '~1 rows',
+        },
+        {
+          kind: 'table',
           name: 'weird`name',
           path: 'database:kira_test/table:weird%60name',
           hasChildren: false,

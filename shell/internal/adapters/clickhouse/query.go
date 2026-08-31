@@ -61,9 +61,21 @@ func buildURL(h *Handle, queryID string, extraParams map[string]string, readOnly
 		q.Set("readonly", "2")
 	}
 	for k, v := range extraParams {
-		q.Set("param_"+k, v)
+		q.Set("param_"+k, escapeParamValue(v))
 	}
 	return h.URL + "/?" + q.Encode()
+}
+
+// escapeParamValue doubles a raw backslash before it goes into a `param_<name>` value. The
+// server-side value of one of these query parameters (D19) is run through ClickHouse's own
+// string-literal escape-sequence parser, not taken verbatim — url.Values.Set already handles the
+// HTTP transport encoding, but that happens after this: an un-escaped backslash server-side either
+// combines with the next character into an unintended escape (e.g. "a\bc" silently becomes
+// "a<backspace>c", since \b is a real recognized escape) or, dangling at the end of the value,
+// fails outright with CANNOT_PARSE_ESCAPE_SEQUENCE — both observed against a real table named
+// with a trailing backslash (P2 R1).
+func escapeParamValue(v string) string {
+	return strings.ReplaceAll(v, `\`, `\\`)
 }
 
 func doRequest(ctx context.Context, h *Handle, sql, queryID string, extraParams map[string]string, readOnly bool) (*http.Response, error) {

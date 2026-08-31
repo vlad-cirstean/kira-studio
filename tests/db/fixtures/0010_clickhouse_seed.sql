@@ -355,3 +355,13 @@ CREATE TABLE `Order Items` (
   note String
 ) ENGINE = MergeTree ORDER BY id;
 INSERT INTO `Order Items` (id, note) VALUES (1, 'space in identifier');
+
+-- P2 R1: a trailing backslash — unlike a backtick, ClickHouse's identifier lexer reads a raw
+-- backslash as an escape introducer (the same rules as a string literal), so quoteIdent must
+-- double it too; `\\` written here is the correctly-escaped form of the one-character name
+-- `trail\`.
+CREATE TABLE `trail\\` (
+  id    UInt32,
+  value String
+) ENGINE = MergeTree ORDER BY id;
+INSERT INTO `trail\\` (id, value) VALUES (1, 'backslash quoting works');

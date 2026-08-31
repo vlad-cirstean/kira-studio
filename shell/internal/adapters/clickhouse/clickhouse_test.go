@@ -223,6 +223,24 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
+	// P2 R1: unlike MySQL/MariaDB, ClickHouse's identifier lexer processes backslash escapes the
+	// same as a string literal — quoteIdent must double a raw backslash, not just a backtick, or
+	// the generated query never actually reaches this table (a trailing "\`" is read as an escaped
+	// literal backtick, not the identifier's closing quote).
+	t.Run("quoting: a table name containing a raw backslash", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", `trail\`)),
+			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-8c"))
+		if err != nil {
+			t.Fatalf(`Read(trail\): %v`, err)
+		}
+		if tp := p.(page.TabularPage); tp.RowCount != 1 {
+			t.Errorf(`trail\ RowCount = %d, want 1`, tp.RowCount)
+		}
+	})
+
 	t.Run("read: first page", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		p, err := a.Read(context.Background(), adapters.ReadRequest{

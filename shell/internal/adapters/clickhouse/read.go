@@ -12,11 +12,19 @@ import (
 
 // quoteIdent is read.ts's own — F28/D29: ClickHouse quotes identifiers with backticks, the same
 // character its own create_table_query output uses.
+//
+// P2 R1: ClickHouse's lexer reads a backtick-quoted identifier with the same backslash-escape
+// rules as a string literal, not just SQL-style doubled-quote escaping — a raw backslash must be
+// doubled too, or a name ending in one (or containing "\`") lets the following character,
+// including the identifier's own closing backtick, be consumed as an escape sequence instead of
+// terminating the identifier, corrupting the query or letting subsequent text run as SQL.
 func quoteIdent(name string) string {
 	if strings.ContainsRune(name, '\x00') {
 		panic(adapters.New(adapters.CodeQuery, "identifier contains a NUL byte", nil))
 	}
-	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	escaped := strings.ReplaceAll(name, "\\", "\\\\")
+	escaped = strings.ReplaceAll(escaped, "`", "``")
+	return "`" + escaped + "`"
 }
 
 var (
