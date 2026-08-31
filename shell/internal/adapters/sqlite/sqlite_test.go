@@ -508,6 +508,50 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P2 R1: a BLOB column's edited value arrives from the grid still spelled in the app's own
+	// "0x<hex>" display convention (read.go's cellText above) — Mutate must decode it back into
+	// raw bytes before binding it as a parameter, not hand the driver that 6-character ASCII
+	// string as if it were the new column content.
+	t.Run("mutate: BLOB column edit round-trips as bytes, not its own hex text", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		probe, err := sql.Open("sqlite", "file:"+fixture.Path)
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probe.Close()
+		if _, err := probe.Exec("CREATE TABLE IF NOT EXISTS blob_rw (id INTEGER PRIMARY KEY, data BLOB)"); err != nil {
+			t.Fatalf("create probe table: %v", err)
+		}
+		defer probe.Exec("DROP TABLE IF EXISTS blob_rw")
+		if _, err := probe.Exec("INSERT INTO blob_rw (id, data) VALUES (1, ?)", []byte{0x01, 0x02, 0x03}); err != nil {
+			t.Fatalf("seed probe table: %v", err)
+		}
+
+		plan := model.MutationPlan{
+			Path: nodePath(cfg.ID, seg("database", "main"), seg("table", "blob_rw")),
+			Ops: []model.MutationRowOp{{
+				Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}},
+				Changes: model.RowValues{{Name: "data", Value: strp("0x0405")}},
+			}},
+		}
+		result, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-blob-rw"))
+		if err != nil {
+			t.Fatalf("Mutate: %v", err)
+		}
+		if result.AffectedRows != 1 {
+			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+		}
+
+		var stored []byte
+		if err := probe.QueryRow("SELECT data FROM blob_rw WHERE id = 1").Scan(&stored); err != nil {
+			t.Fatalf("probe read back: %v", err)
+		}
+		want := []byte{0x04, 0x05}
+		if string(stored) != string(want) {
+			t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
+		}
+	})
+
 	// The real, previously-undocumented modernc.org/sqlite finding this session made: unlike
 	// node:sqlite, this driver silently re-parses a TEXT value into a Go time.Time whenever the
 	// column's declared type is DATE/DATETIME/TIMESTAMP and the text happens to look like a date —

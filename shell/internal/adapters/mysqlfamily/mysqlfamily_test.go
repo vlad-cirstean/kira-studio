@@ -388,6 +388,52 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P2 R1: a VARBINARY column's edited value arrives from the grid still spelled in the app's
+	// own "0x<hex>" display convention (read.go's own cellText) — Mutate must decode it back into
+	// raw bytes before binding it as a parameter, not hand the driver that ASCII text as if it
+	// were the new column content.
+	t.Run("mutate: VARBINARY column edit round-trips as bytes, not its own hex text", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		ctx := context.Background()
+
+		probeDB, err := sql.Open("mysql", sideDSN(cfg))
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probeDB.Close()
+		if _, err := probeDB.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS blob_rw (id INT PRIMARY KEY, data VARBINARY(255))"); err != nil {
+			t.Fatalf("create probe table: %v", err)
+		}
+		defer probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS blob_rw")
+		if _, err := probeDB.ExecContext(ctx, "INSERT INTO blob_rw (id, data) VALUES (1, ?)", []byte{0x01, 0x02, 0x03}); err != nil {
+			t.Fatalf("seed probe table: %v", err)
+		}
+
+		plan := model.MutationPlan{
+			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "blob_rw")),
+			Ops: []model.MutationRowOp{{
+				Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}},
+				Changes: model.RowValues{{Name: "data", Value: strp("0x0405")}},
+			}},
+		}
+		result, err := a.Mutate(ctx, plan, adapters.NewOpCtx("op-blob-rw"))
+		if err != nil {
+			t.Fatalf("Mutate: %v", err)
+		}
+		if result.AffectedRows != 1 {
+			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+		}
+
+		var stored []byte
+		if err := probeDB.QueryRowContext(ctx, "SELECT data FROM blob_rw WHERE id = 1").Scan(&stored); err != nil {
+			t.Fatalf("probe read back: %v", err)
+		}
+		want := []byte{0x04, 0x05}
+		if string(stored) != string(want) {
+			t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
+		}
+	})
+
 	t.Run("read-only connection cannot write", func(t *testing.T) {
 		ro := cfg
 		ro.ReadOnly = true

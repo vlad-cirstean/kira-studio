@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"encoding/hex"
 	"sort"
 	"strings"
 
@@ -95,61 +96,106 @@ func AssertKeyIsPrimaryKey(primaryKey []string, key model.RowValues, qualifiedNa
 
 // ValueRenderer is the Go analogue of sql-mutate.ts's ValueRenderer<P> — the one thing the three
 // SQL dialects disagree on is the placeholder each renderer emits ($n vs ?), which BuildKeysetPredicate
-// already takes as a parameter for the same reason.
-type ValueRenderer func(value *string, params *[]any) string
+// already takes as a parameter for the same reason. It also takes the column name (NewParamRenderer's
+// own binary-decoding gate below needs it) and can fail: a malformed edited value must be reported,
+// not silently mis-encoded.
+type ValueRenderer func(name string, value *string, params *[]any) (string, error)
 
 // LiteralRenderer is preview()'s renderer (never executes): an escaped SQL literal, no params
-// touched.
-func LiteralRenderer(value *string) string {
+// touched, no decoding — preview text is cosmetic only and never reaches a driver.
+func LiteralRenderer(_ string, value *string) (string, error) {
 	if value == nil {
-		return "NULL"
+		return "NULL", nil
 	}
-	return "'" + strings.ReplaceAll(*value, "'", "''") + "'"
+	return "'" + strings.ReplaceAll(*value, "'", "''") + "'", nil
+}
+
+// DecodeBinaryCellText decodes the app-wide "0x<hex>" binary-cell display convention (each SQL
+// adapter's own read.go cellText/normalizeCellText) back into raw bytes.
+func DecodeBinaryCellText(text string) ([]byte, error) {
+	trimmed := strings.TrimPrefix(strings.TrimPrefix(text, "0x"), "0X")
+	decoded, err := hex.DecodeString(trimmed)
+	if err != nil {
+		return nil, New(CodeQuery, "not a valid 0x<hex> binary value", err)
+	}
+	return decoded, nil
 }
 
 // NewParamRenderer is mutate()'s renderer — pushes onto params and returns the dialect's
-// placeholder for the position it landed at.
-func NewParamRenderer(placeholder func(int) string) ValueRenderer {
-	return func(value *string, params *[]any) string {
+// placeholder for the position it landed at. isBinary reports whether name is a binary-typed
+// column: such a column's value arrives here still spelled in the "0x<hex>" display convention
+// (read unchanged, or hand-edited) and must be decoded into raw bytes before being bound — handing
+// the driver that display string as-is silently corrupts the column's real bytes on every edit
+// (P2 R1 finding), since it is the ASCII text "0x4142" that gets stored, not the two bytes it
+// denotes.
+func NewParamRenderer(placeholder func(int) string, isBinary func(name string) bool) ValueRenderer {
+	return func(name string, value *string, params *[]any) (string, error) {
+		if value != nil && isBinary(name) {
+			decoded, err := DecodeBinaryCellText(*value)
+			if err != nil {
+				return "", New(CodeQuery, "column "+name+": "+err.Error(), nil)
+			}
+			*params = append(*params, decoded)
+			return placeholder(len(*params)), nil
+		}
 		*params = append(*params, value)
-		return placeholder(len(*params))
+		return placeholder(len(*params)), nil
 	}
 }
 
-func whereFromKey(key model.RowValues, render ValueRenderer, params *[]any, quote func(string) string) string {
+func whereFromKey(key model.RowValues, render ValueRenderer, params *[]any, quote func(string) string) (string, error) {
 	parts := make([]string, len(key))
 	for i, kv := range key {
 		if kv.Value == nil {
 			parts[i] = quote(kv.Name) + " IS NULL"
 		} else {
-			parts[i] = quote(kv.Name) + " = " + render(kv.Value, params)
+			rendered, err := render(kv.Name, kv.Value, params)
+			if err != nil {
+				return "", err
+			}
+			parts[i] = quote(kv.Name) + " = " + rendered
 		}
 	}
-	return strings.Join(parts, " AND ")
+	return strings.Join(parts, " AND "), nil
 }
 
 // RenderRowOp ports sql-mutate.ts's renderRowOp: UPDATE/DELETE/INSERT text for one row op, with
 // the WHERE built from the row key. quote is the caller's own quoteIdent.
-func RenderRowOp(relationSQL string, op model.MutationRowOp, render ValueRenderer, params *[]any, quote func(string) string) string {
+func RenderRowOp(relationSQL string, op model.MutationRowOp, render ValueRenderer, params *[]any, quote func(string) string) (string, error) {
 	switch op.Kind {
 	case "update":
 		setParts := make([]string, len(op.Changes))
 		for i, kv := range op.Changes {
-			setParts[i] = quote(kv.Name) + " = " + render(kv.Value, params)
+			rendered, err := render(kv.Name, kv.Value, params)
+			if err != nil {
+				return "", err
+			}
+			setParts[i] = quote(kv.Name) + " = " + rendered
 		}
-		return "UPDATE " + relationSQL + " SET " + strings.Join(setParts, ", ") +
-			" WHERE " + whereFromKey(op.Key, render, params, quote)
+		where, err := whereFromKey(op.Key, render, params, quote)
+		if err != nil {
+			return "", err
+		}
+		return "UPDATE " + relationSQL + " SET " + strings.Join(setParts, ", ") + " WHERE " + where, nil
 	case "delete":
-		return "DELETE FROM " + relationSQL + " WHERE " + whereFromKey(op.Key, render, params, quote)
+		where, err := whereFromKey(op.Key, render, params, quote)
+		if err != nil {
+			return "", err
+		}
+		return "DELETE FROM " + relationSQL + " WHERE " + where, nil
 	default: // "insert"
 		columns := make([]string, len(op.Values))
 		values := make([]string, len(op.Values))
 		for i, kv := range op.Values {
 			columns[i] = quote(kv.Name)
-			values[i] = render(kv.Value, params)
+			rendered, err := render(kv.Name, kv.Value, params)
+			if err != nil {
+				return "", err
+			}
+			values[i] = rendered
 		}
 		return "INSERT INTO " + relationSQL + " (" + strings.Join(columns, ", ") + ") VALUES (" +
-			strings.Join(values, ", ") + ")"
+			strings.Join(values, ", ") + ")", nil
 	}
 }
 

@@ -613,6 +613,53 @@ func TestPostgres_MutateNoPrimaryKey(t *testing.T) {
 	}
 }
 
+// P2 R1: a bytea column's edited value arrives from the grid still spelled in the app's own
+// "0x<hex>" display convention (read.go's own normalizeCellText) — Mutate must decode it back
+// into raw bytes before binding it as a parameter, not hand pgx that ASCII text as if it were the
+// new column content (byteain would then store it verbatim in Postgres's own escape format).
+func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+
+	probe, err := pgx.Connect(ctx, fixture.URI)
+	if err != nil {
+		t.Fatalf("probe connect: %v", err)
+	}
+	defer probe.Close(context.Background())
+	if _, err := probe.Exec(ctx, "CREATE TABLE IF NOT EXISTS app.blob_rw (id int PRIMARY KEY, data bytea)"); err != nil {
+		t.Fatalf("create probe table: %v", err)
+	}
+	defer probe.Exec(context.Background(), "DROP TABLE IF EXISTS app.blob_rw")
+	if _, err := probe.Exec(ctx, "INSERT INTO app.blob_rw (id, data) VALUES (1, $1)", []byte{0x01, 0x02, 0x03}); err != nil {
+		t.Fatalf("seed probe table: %v", err)
+	}
+
+	plan := model.MutationPlan{
+		Path: nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "blob_rw")),
+		Ops: []model.MutationRowOp{{
+			Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}},
+			Changes: model.RowValues{{Name: "data", Value: strp("0x0405")}},
+		}},
+	}
+	result, err := a.Mutate(ctx, plan, adapters.NewOpCtx("op-blob-rw"))
+	if err != nil {
+		t.Fatalf("Mutate: %v", err)
+	}
+	if result.AffectedRows != 1 {
+		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+
+	var stored []byte
+	if err := probe.QueryRow(ctx, "SELECT data FROM app.blob_rw WHERE id = 1").Scan(&stored); err != nil {
+		t.Fatalf("probe read back: %v", err)
+	}
+	want := []byte{0x04, 0x05}
+	if string(stored) != string(want) {
+		t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
+	}
+}
+
 // 28. execute: one page per statement, including a non-row-returning one.
 func TestPostgres_ExecuteOnePagePerStatement(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

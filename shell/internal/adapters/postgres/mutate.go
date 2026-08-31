@@ -6,15 +6,29 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
+	"github.com/kirathecat/kira-studio/shell/internal/page"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-var paramRenderer = adapters.NewParamRenderer(dollarPlaceholder)
+// literalRenderer adapts sql-mutate.go's LiteralRenderer to the adapters.ValueRenderer shape
+// RenderRowOp expects — preview() never touches params, but the signature still takes one, so
+// this closure just ignores it.
+func literalRenderer(name string, value *string, _ *[]any) (string, error) {
+	return adapters.LiteralRenderer(name, value)
+}
 
-// literalRenderer adapts sql-mutate.go's LiteralRenderer (a plain func(*string) string) to the
-// adapters.ValueRenderer shape RenderRowOp expects — preview() never touches params, but the
-// signature still takes one, so this closure just ignores it.
-func literalRenderer(value *string, _ *[]any) string { return adapters.LiteralRenderer(value) }
+// binaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
+// resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
+// convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
+func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
+	binary := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		if typeClassFor(c.DataType) == page.TypeClassBinary {
+			binary[c.Name] = true
+		}
+	}
+	return func(name string) bool { return binary[name] }
+}
 
 // resolveTablePath is mutate.ts's own resolveTablePath — postgres's three-segment
 // database/schema/table form, distinct from sql-mutate.go's ResolveDatabaseTablePath (the
@@ -40,7 +54,11 @@ func preview(plan model.MutationPlan) ([]string, error) {
 	statements := make([]string, len(ordered))
 	for i, op := range ordered {
 		var params []any
-		statements[i] = adapters.RenderRowOp(relationSQL, op, literalRenderer, &params, quoteIdent)
+		stmt, err := adapters.RenderRowOp(relationSQL, op, literalRenderer, &params, quoteIdent)
+		if err != nil {
+			return nil, err
+		}
+		statements[i] = stmt
 	}
 	return statements, nil
 }
@@ -90,6 +108,8 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 		}
 	}
 
+	paramRenderer := adapters.NewParamRenderer(dollarPlaceholder, binaryColumnsOf(target.Columns))
+
 	ordered := adapters.OrderedOps(plan.Ops)
 	type compiledOp struct {
 		sql    string
@@ -100,10 +120,17 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	previewParts := make([]string, len(ordered))
 	for i, rowOp := range ordered {
 		var params []any
-		sql := adapters.RenderRowOp(relationSQL, rowOp, paramRenderer, &params, quoteIdent)
+		sql, err := adapters.RenderRowOp(relationSQL, rowOp, paramRenderer, &params, quoteIdent)
+		if err != nil {
+			return model.MutationResult{}, err
+		}
 		compiled[i] = compiledOp{sql: sql, params: params, kind: rowOp.Kind}
 		var literalParams []any
-		previewParts[i] = adapters.RenderRowOp(relationSQL, rowOp, literalRenderer, &literalParams, quoteIdent)
+		previewPart, err := adapters.RenderRowOp(relationSQL, rowOp, literalRenderer, &literalParams, quoteIdent)
+		if err != nil {
+			return model.MutationResult{}, err
+		}
+		previewParts[i] = previewPart
 	}
 	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
 	op.SetCommand(joinSemicolons(previewParts))
