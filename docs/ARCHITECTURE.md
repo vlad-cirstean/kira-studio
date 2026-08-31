@@ -371,7 +371,9 @@ The key is 32 random bytes held as one generic-password item via `github.com/key
 another machine, and non-synchronizable, so it never reaches iCloud Keychain. `secrets/keyring_darwin.go`
 is the only file in the repo that touches the keychain library; `secrets/cipher.go` is the only
 file that encrypts or decrypts, so a future re-key or a real cross-platform secret store stays a
-contained change.
+contained change. The **service name itself must never change** (P57 D12, which deliberately kept
+`Kira Studio Safe Storage` through the rename): the OS looks the item up by service name, not by
+bundle identifier, so changing it orphans every existing user's stored key.
 
 Two things changed with the cipher, and both are deliberate. The envelope bumped **`kira:v1:` →
 `kira:v2:`** because the cipher genuinely changed (AES-256-GCM under our own key, against Chromium's
@@ -600,7 +602,13 @@ calls the renderer connection's blocking `Send`. Backpressure toward the Node en
 a full queue reports `enginehost.ErrStreamFull`, which the engine host's own retry-with-backoff
 already handles by pausing its stdout read loop, which is what pushes back on the OS pipe. A
 locally-produced response has no pipe to push back through, so a full queue just drops it — the
-renderer's own pending request then times out exactly as if the process had died.
+renderer's own pending request then times out exactly as if the process had died. Wails' own
+`application.StreamConn` bounds sit underneath all of this: `Send` blocks and `TrySend` is the
+non-blocking `ErrStreamFull`-returning variant, per-connection limits are 8 MiB **and** 256 frames,
+and any single frame over 64 MiB (`streamMaxFrameBytes`) is rejected outright — a real ceiling this
+transport introduces that Electron's structured clone never had, enforced Go-side too by
+`internal/enginehost/stream.go`'s `maxDataFrameBytes`, which drops an oversized frame with a named
+log line rather than corrupting the stream.
 
 **The Go side is `shell/`.** `shell/main.go` builds the `application.New` options and registers
 twelve bound services under `shell/internal/bridge/` — `AppService`, `SettingsService`,
@@ -619,6 +627,13 @@ WebProcess/NetworkProcess) are not children of the shell in the ppid sense, so a
 silently under-count. `AnchorNeedles` is `["Kira Studio", "runtime/node/bin/node"]`,
 `HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide scan per
 5 s tick.
+
+**Under the stdio transport, stdout is the frame channel, not a log sink.** `src/engine`'s own
+modules call `console.log`/`warn`/`error` directly (`control.ts`'s `AdapterDeps.log`, `cache/lru.ts`'s
+refusal warning); harmless under Electron's `parentPort`, but a stray write here lands raw text in
+the exact byte stream `internal/enginehost`'s length-prefixed reader is parsing. `stdio-main.ts`
+repoints it — `globalThis.console = new Console({stdout: process.stderr, stderr: process.stderr})` —
+before reading a single byte of stdin, and any new engine-side logging must stay on that path.
 
 **Known regression: the engine stdio hop JSON-encodes bulk data.** `stdio-main.ts`'s `writeFrame`
 does `JSON.stringify` on every frame, control and data alike. Electron's `MessagePortMain` carried
