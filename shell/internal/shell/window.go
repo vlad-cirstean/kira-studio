@@ -33,7 +33,7 @@ func Options(d WindowDeps, sec SecurityOptions, url string) application.WebviewW
 		BackgroundColour: application.NewRGB(24, 24, 27),
 		URL:              url,
 		Permissions:      sec.Permissions,
-		EnableFileDrop:   true,
+		EnableFileDrop:   false,
 		Mac:              application.MacWindow{WebviewPreferences: sec.Webview},
 	}
 
