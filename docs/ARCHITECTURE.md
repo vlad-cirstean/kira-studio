@@ -24,30 +24,31 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 |---|---|---|
 | Shell | **Wails v3** (`v3.0.0-beta.15`), Go | native title bar, macOS 13+, `arm64` only |
 | Language | TypeScript 7 (native compiler) for `.ts`; **Go** for the shell | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
-| Package manager / scripts / test runner | Bun | the engine runs on a vendored real Node, not on Bun — Bun is tooling only |
+| Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
 | Renderer build | Vite (`vite build`, `vite.config.ts` at the repo root) | builds `src/renderer` straight into `shell/frontend/dist`, which `shell/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
-| Engine build | esbuild (`bun run build:engine`) | bundles `src/engine/stdio-main.ts` into `shell/runtime/engine/engine.cjs` |
-| Engine runtime | a **vendored Node** at `shell/runtime/node/` | fetched from nodejs.org by `scripts/vendor-node.sh`, git-ignored; deliberately not the system Node and not an embedded-in-the-shell runtime |
 | UI | Vue 3 (`<script setup>`, Composition API) | |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
-| Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod still guards every trust boundary that is still TypeScript: the engine wire protocol's control and data payloads (`src/engine/{control,rpc,data,stdio-main}.ts`) and connection-dialog input. Rows read back out of SQLite are now validated in Go instead (`shell/internal/storage/model/`) |
+| Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`shell/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
 | Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
-| Packaging | `wails3 task darwin:package` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`); ships as a zipped `.app`, no DMG, no auto-update, no notarization |
-| DB tests | Testcontainers (Node) | real containers, real data; Colima |
+| Packaging | `wails3 task darwin:package` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`); ships as a zipped `.app`, no DMG, no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f) |
+| DB tests | Testcontainers, driven from Bun | `tests/db/` no longer holds per-engine specs (P58f D1) — it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `tests/e2e-real/` both seed from; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
-| Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold; the engine child keeps writing to stdout/stderr, which the shell pipes into the same sink — single log file, single source of truth |
+| Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
-`mysqlfamily` core), `mattn/go-sqlite3` (sqlite), a hand-rolled `net/http` client (clickhouse, no
-driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb), `redis/go-redis/v9` (redis),
-`aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg` config-and-error-mapping
-package), `github.com/twmb/franz-go` + `franz-go/pkg/kadm` (kafka). The Node engine child still
-spawns and still runs — P58f's own M10 deletes it — but as of P58e M9.3 it answers no connection
-traffic for any kind at all (checkpoint C2, `docs/v1/plans/P58e-kafka.md` §7).
+`mysqlfamily` core), `modernc.org/sqlite` (sqlite — pure Go, no cgo), a hand-rolled `net/http` client
+(clickhouse, no driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb),
+`redis/go-redis/v9` (redis), `aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg`
+config-and-error-mapping package), `github.com/twmb/franz-go` + `franz-go/pkg/kadm` (kafka). **The
+whole product binary is cgo-free for its own code** — only Wails' own macOS bindings still need
+`CGO_ENABLED=1` — a materially better outcome than the parent plan's own D8 predicted, and one
+nothing had claimed until now. **The Node engine child is gone as of P58f M10**: checkpoint C2
+(P58e M9.3) had already brought it to answering no connection traffic for any kind; P58f deleted the
+process itself, its build/vendoring machinery, and everything that supervised it.
 
 App identity: organisation **kirathecat**, app name **Kira Studio**, bundle ID
 `com.kirathecat.kira-studio` (the `-shell` suffix carried during the P52–P56 coexistence window is
@@ -68,12 +69,15 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 - Every operation that can exceed ~150 ms shows progress and a working stop button.
 - Every DB read goes through the cache layer (see Caching, below) — a cache miss is the only thing
   that produces a query.
-- **Bulk data passes through the Go process without being parsed, copied or re-encoded.** Result
-  pages travel renderer↔engine over one named stream that the Go shell forwards verbatim in both
-  directions (see Process model, below). Go never unmarshals a data-plane frame. This replaces the
-  older "bulk data skips the main process" rule, which described Electron's `MessagePort`
-  arrangement: under Wails the bytes genuinely do traverse the shell process, and what is
-  guaranteed is that it does not look at them.
+- **Bulk data is produced and encoded exactly once, in the process that owns the window (P58 D3).**
+  A result page is built in Go by the adapter that read it, held in the Go-side L2 cache as native
+  structures, and serialized a single time when a renderer asks for it (see Process model, below).
+  There is no second process, no intermediate encoding, and no re-decode — Go now parses every
+  data-plane request envelope too, since it is the thing answering them. This replaces both the
+  original Electron-era rule ("bulk data skips the main process", describing `MessagePort`) and the
+  P58a–P58e interim ("the Go process forwards without looking"), which held only while a
+  Node-served kind could still exist beside a Go-native one — P58f M10 deleted that seam along with
+  the Node engine child.
 - The renderer loads no remote content, opens no window, and navigates nowhere but its own base
   URL. Under Electron this was enforced by the shell as well as true of the code; under Wails only
   the second half still holds — the renderer contains no such call, but there is no navigation
@@ -81,15 +85,20 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 
 ## Adapter contract
 
-Every engine is one directory under `src/engine/adapters/`, implementing the `Adapter` interface
-(`src/engine/adapters/adapter.ts`). A `Caps` object (`src/shared/caps.ts`) declares what that
-engine can do — `defaultPageKind`, `pagination` strategy, `canInsert`/`canUpdate`/`canDelete`,
-`cancel`, `sql`, `definition`, `describe`, `fileTransfer`, `keyBrowser` (P41 — true only for
+Every engine is one package under `shell/internal/adapters/` (`postgres/`, `mysqlfamily/` shared by
+mariadb/mysql, `sqlite/`, `clickhouse/`, `mongo/`, `redis/`, `sqs/`, `s3/`, `kafka/`), implementing
+the `Adapter` interface (`shell/internal/adapters/adapter.go`). A `Caps` struct
+(`shell/internal/adapters/caps.go`, field order kept identical to the TypeScript `Caps` type still
+declared in `src/shared/caps.ts` for the renderer, so the two diff against each other) declares what
+that engine can do — `DefaultPageKind`, `Pagination` strategy, `CanInsert`/`CanUpdate`/`CanDelete`,
+`Cancel`, `SQL`, `Definition`, `Describe`, `FileTransfer`, `KeyBrowser` (P41 — true only for
 redis/s3: the top-level container's own key/object space is unbounded and arbitrarily nested, so
 the project tree treats that container as a leaf and the UI reaches it through a dedicated Browse
 tab instead, SPEC.md §8.18) — and the UI reads *only* `Caps`, never a `connection.kind` check, to
-decide what to show. `registry.ts` lazily `import()`s each adapter directory so an unused engine's
-driver is never loaded into the engine process's baseline memory.
+decide what to show. `registry.go`'s `loaders` map is `registry.ts`'s successor: a plain constructor
+table, each adapter package registering its own constructor from its own `init()`, not a
+lazy-`import()` map — Go links every adapter into the binary regardless of whether a connection kind
+is ever used, so there is no per-engine baseline-memory story left to preserve (P58a OQ-6).
 
 ### Per-database mapping
 
@@ -114,56 +123,26 @@ SQS's authentication is by **named AWS profile** (static keys accepted only in U
 Cancellation is never "stop showing the result" — it is always forwarded to the server. If a driver
 cannot cancel, the capability is absent and the stop button says so rather than lying.
 
-Every adapter maps its own driver's thrown errors from its own `errors.ts`, exported as one
-`mapError(err): AdapterError` (P39) — the closed `AdapterErrorCode` set, with the driver's message
-preserved verbatim (Adapter rule 4). `src/engine/adapters/errors.ts` (the shared root, not any one engine's own)
-also holds `unsupported(kind, what)` and `noQueryConsole(kind)` — the two sentence shapes behind
-every `E_UNSUPPORTED` capability stub (describe/definition/file-transfer read `"<what> is not
-supported for <kind>"`; a missing query console reads `"<kind> has no query console"`). It also
-holds `assertWritable(readOnly)` (P39 iter2) — the `"connection is read-only"` refusal every
-write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contract in
-`adapter.ts`: enforced on the engine side, not only greyed out in the UI). It also holds
-`assertNotCancelled(ctx)` (P39 iter3) — Adapter rule 2's pre-flight cancellation check (`throw`s
-`E_CANCELLED` if `ctx.signal` is already aborted), replacing nine copies of the same guard across
-postgres/mysql-family/clickhouse/sqlite. It also holds (P48) `throwIfCancelled(ctx)` —
-`assertNotCancelled`'s mid-flight sibling, the check an adapter re-runs after an `await` rather than
-before a call starts, with a message that says so ("operation was cancelled", no "before it
-started") — replacing twenty-six identical copies across eight adapters, and `requireConnected(handle)`,
-replacing ten identical "did `connect()` ever run" guards each adapter's private handle accessors
-opened with. `postgres/query.ts` and `mysql-family/query.ts`'s own callback-style abort/settle race
-(cancel arriving after the driver's callback already resolved, or vice versa) is unified behind a
-new `engine/adapters/abort.ts`'s `withAbortRace(ctx, run, opts)`, replacing six near-identical copies
-across their `query.ts`/`console.ts` modules.
-
-`src/engine/adapters/sql-text.ts` holds the genuinely shared, driver-agnostic SQL text/planning
-glue the SQL adapters' `read.ts` modules call — `resolveProjection`/`safeInt` (P39),
-`stripOneTrailingSemicolon`/`singleStatusPage` (P39 iter2), and `computeEffectiveOrder` (P39 iter3)
-— the keyset-eligibility rule (which sort terms admit a keyset predicate, and the tiebreaker that
-makes one) that postgres/mysql-family/sqlite's `read.ts` each wrote out identically; each call site
-still passes its own tiebreaker expression (sqlite's keeps its rowid fallback, since only sqlite's
-`ReadTarget` has a `rowidColumn` field to fall back to). P48 added the rest of the SQL read path's
-keyset planning here too: `assertKeysetSupported`/`resolveFetchColumns`/`buildScanOrderBy`, then
-`buildKeysetPosition` — collapsing three 28-line `strategy`/`hasMore`/`nextToken`/`prevToken`/
-`position` blocks (postgres, mysql-family, sqlite) and their three `keysetValuesOf` closures into
-one, each caller passing only its own `cellAt` reader — plus `whereClause`/`parseCountValue` (the
-filter clause and numeric count-result parse `read.ts`'s `readPage`/`countRows` share across all
-four SQL adapters including ClickHouse) and `primaryKeyFromIndexes`/`resolveKeyShape`, moved out of
-postgres's and mysql-family's own `catalog.ts` where each had its own copy.
-
-`src/engine/adapters/sql-mutate.ts` (P39 iter2) holds the SQL adapters' shared mutation guards —
-`orderedOps` (delete, then update, then insert, regardless of the plan's own array order),
-`assertColumnsKnown`, `assertAffectedExactlyOne` and `assertKeyIsPrimaryKey` — called by postgres/
-mysql-family/sqlite (and clickhouse for `assertColumnsKnown` alone, since it has no addressable row
-to update or delete). `assertKeyIsPrimaryKey` takes the caller's own already-built qualified-name
-string rather than a shared format, since the three dialects spell it three different ways
-(`schema.relation` / `database.table` / `schema.table`). It also holds (P39 iter3) a generic
-row-op-to-SQL-text renderer — `ValueRenderer<P>`, `literalRenderer`/`createParamRenderer` and
-`renderRowOp` — that postgres/mysql-family/sqlite's `mutate.ts` each wrote out character-for-
-character identically apart from the dialect's own parameter placeholder (`$n` vs `?`) and params
-element type (`unknown[]` vs sqlite's `SqliteParam[]`), plus `resolveDatabaseTablePath` for the
-two-segment database/table path check clickhouse/mysql-family/sqlite's `mutate.ts` shared (postgres
-keeps its own three-segment `resolveTablePath`, a genuinely different path shape with its own
-message).
+Every adapter maps its own driver's returned errors to the closed `ErrorCode` set via
+`shell/internal/adapters/errors.go`'s `New`/`CodeOf`, the driver's message preserved verbatim
+(Adapter rule 4, carried over unchanged from the TypeScript design this replaced). `errors.go` also
+holds the shared guard functions every adapter package calls rather than re-implementing: `Unsupported`/
+`NoQueryConsole` (the two sentence shapes behind every `E_UNSUPPORTED` capability stub),
+`AssertWritable` (the read-only refusal every write-capable adapter's `Mutate` opens with),
+`CheckNotStarted`/`CheckCancelled` (pre-flight and mid-flight cancellation checks against the op's
+own `context.Context`), and `RequireConnected[T]` (the generic "did `Connect` ever run" guard every
+adapter's handle accessor opens with). `sqltext.go` holds the shared, driver-agnostic SQL text/
+planning glue the SQL adapters' `read.go` modules call — projection resolution, the keyset-
+eligibility rule and its per-dialect tiebreaker, page-token encode/decode, `WhereClause`/
+`ParseCountValue`, and the full keyset-position pipeline (`AssertKeysetSupported` →
+`ResolveFetchColumns` → `BuildScanOrderBy` → `BuildKeysetPosition`) that postgres/mysqlfamily/sqlite
+each call with only their own tiebreaker and cell reader. `sqlmutate.go` holds the shared mutation
+guards (`OrderedOps`, `AssertColumnsKnown`, `AssertAffectedExactlyOne`, `AssertKeyIsPrimaryKey`) and
+a generic row-op-to-SQL-text renderer (`ValueRenderer`, `LiteralRenderer`/`NewParamRenderer`,
+`RenderRowOp`) that postgres/mysqlfamily/sqlite share apart from each dialect's own parameter
+placeholder and qualified-name format. `abort.go`'s `RunWithAbortRace[T]` is the one abort/settle
+race every adapter with a callback-style or detached-context driver needs (postgres, mysqlfamily —
+see their own sections below for which side of the race each takes and why).
 
 ## Per-engine adapter facts
 
@@ -206,8 +185,9 @@ when `caching_sha2_password` needs one and TLS is off, with no option to refuse 
 
 ### SQLite (P35; Go-native as of P58b M6.3)
 
-**SQLite is Go-native as of P58b M6.3** (`shell/internal/adapters/sqlite/`, `modernc.org/sqlite`)
-— `nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
+**SQLite is Go-native as of P58b M6.3** (`shell/internal/adapters/sqlite/`, `modernc.org/sqlite`,
+pure Go and cgo-free — the same driver that also backs the app's own storage, see Storage below) —
+`nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
 an equally honest `true`: `node:sqlite` (a Node builtin, no native module, no build step, requiring
 Bun 1.4+/Node 22.5+) had no `sqlite3_interrupt` and its whole API was synchronous, so a running
 statement blocked the event loop and an abort could never be delivered while one ran; the Go port's
@@ -290,7 +270,12 @@ lost: the group definition's CLASSIC-vs-KIP-848 `type` row has no `kadm` source 
 `partitionAssignor` merges into a `protocol` row that already carries the same value. Idempotent
 producing is franz-go's default and is explicitly disabled (`kgo.DisableIdempotentWrite()`) to match
 the old driver's own default and avoid an `InitProducerId` hang on a single-broker cluster whose
-transaction-log replication factor is Kafka's default of 3.
+transaction-log replication factor is Kafka's default of 3. The produce command-preview text was
+re-rendered in P58f M10 (D6): it used to show the old `node-rdkafka` binding's
+`producer.produce('<topic>', null, Buffer.from(...), '<key>')` call signature, which after M10 would
+have been the last reference in the repo to an API that no longer exists in a user-visible string;
+it now reads `ProduceSync <topic> key=<key>` (`key=<none>` when the key is null), matching the real
+`kgo.ProduceSync` call the adapter makes (`produce.go`'s `previewProduce`).
 
 Cancellation has no server-side kill at all — Kafka's protocol has none, the same shape as SQS and
 S3 — so the op's own `context.Context` on every `kadm`/`kgo` call is the entire mechanism, with one
@@ -471,6 +456,13 @@ no ORM; the Drizzle dependency went out with the Electron shell. Every row read 
 `shell/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
 instead of propagating zero values into the UI.
 
+**A known, deliberate orphan.** `settings` stores leaves by key, and an existing installation may
+carry an `advanced.engineMemoryCapMb` row from before P58f M10 removed the setting end to end
+(D18, with it the `--max-old-space-size` flag it fed) — there is no migration to delete it, since a
+schema-version bump for one inert leaf row was judged not worth the migration-ordering risk. Nothing
+reads that key any more; the row is harmless and is recorded here so nobody rediscovers it later
+wondering what still consumes it.
+
 S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
 repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
 **named profile** goes in `username`, and static keys (accepted only in URI mode, per the SQS
@@ -588,34 +580,41 @@ two numbers the two had drifted into.
 
 ## Process model
 
-Three processes: the **webview** running the Vue renderer, the **Go shell** that owns the window
-and all app state, and the **engine**, a Node child process holding every database driver.
+Two processes: the **webview** running the Vue renderer, and the **Go shell** that owns the window,
+all app state, and now every database driver too.
 
 ```
-┌──────────────────────┐                          ┌────────────────────────┐
-│  webview             │                          │  engine (drivers)      │
-│  (Vue renderer)      │                          │  vendored Node child   │
-└──────────┬───────────┘                          └───────────┬────────────┘
-           │                                                  │
-           │  control: generated Wails bindings               │  stdio, JSON-line
-           │           (HTTP to /wails/runtime)               │  wire protocol
-           │  data:    one "engine" WebSocket stream          │  (control + data)
-           │                                                  │
-           └─────────────────────┬────────────────────────────┘
-                      ┌──────────┴───────────┐
-                      │  Go shell (Wails v3) │  window, menus, SQLite, settings, op log,
-                      │  shell/main.go       │  keychain, pre-connect, engine supervision
-                      └──────────────────────┘
+┌──────────────────────┐
+│  webview             │
+│  (Vue renderer)      │
+└──────────┬───────────┘
+           │
+           │  control: generated Wails bindings
+           │           (HTTP to /wails/runtime)
+           │  data:    one "engine" WebSocket stream
+           │
+┌──────────┴───────────┐
+│  Go shell (Wails v3) │  window, menus, SQLite, settings, op log, keychain,
+│  shell/main.go       │  pre-connect, every adapter, cache, metrics
+└──────────────────────┘
 ```
 
-**Why a separate engine process.** Driver work (socket reads, protocol parsing, row decoding) is
-CPU-bursty. In the shell process it would stall window/menu handling; in the webview it would drop
-frames. In its own process it is fully parallel and its memory is separately capped and reclaimable
-(`--max-old-space-size`, from the `advanced.engineMemoryCapMb` setting).
+**Why there used to be a separate engine process, and what P58f gave up to remove it.** Driver work
+(socket reads, protocol parsing, row decoding) is CPU-bursty; a Node child process kept it off the
+shell's window/menu handling and off the webview's frame budget, at the cost of the JSON-inflation
+hop below and the packaging/vendoring machinery P58f deleted. P58 (`docs/v1/plans/P58-go-native-adapters.md`
+D16) traded that process isolation for one fewer process, in-process encoding (below), and no
+native-module packaging story — the real loss, not papered over: **an adapter panic used to kill
+only the engine child** (`E_ENGINE_DOWN`, every connection errors, the window/tabs/settings/op log
+all survive); now every adapter call runs behind a `recover()` at the op boundary
+(`adapterhost.Host.safeRun`), which converts a panic into a failed op (`E_INTERNAL`) for that one
+call instead of taking the whole app down — but a panic *outside* that boundary (a goroutine an
+adapter spawns and never joins, for instance) still can. This does not restore the old isolation;
+it converts "the app disappears" into "one operation failed" for the panics it actually catches.
 
-**One engine for all connections**, not one per connection: a V8 isolate costs ~35 MB, so
-per-connection processes would blow the RAM budget at 5 connections. The adapter host is written so
-a connection *can* be moved to its own process later (config flag) if a driver proves unstable.
+**One process for all connections**, same as before: there was never one V8 isolate per connection,
+and there is no per-connection Go process either — the adapter host multiplexes every open
+connection through its own registry and cache regardless of how many are open at once.
 
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
 TypeScript bindings under `shell/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
@@ -627,74 +626,66 @@ the `{message, code}` shape the renderer already branched on. The **data plane**
 stream, `"engine"`, opened once per page load by `src/renderer/bridge/port.ts` via
 `JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
 
-**The data plane is a server now, not a byte forwarder (P58 D3, since P58a M4).** Bulk data is
-produced and encoded exactly once, in the process that owns the window — the old invariant ("Go
-never reads a data-plane frame") could not survive Go adapters existing at all, since the router
-has to decide, per connection, which process answers. `shell/internal/adapterhost/dataframe.go`'s
+**The data plane is a server, not a byte forwarder (P58 D3).** Bulk data is produced and encoded
+exactly once, in the process that owns the window — the old Electron-era invariant ("Go never reads
+a data-plane frame") could not survive Go adapters existing at all. `shell/internal/adapterhost/dataframe.go`'s
 `HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
-op, that connection's `connectionId` — to route it: a **Go-native** connection (`nativeKinds`, A12;
-`{"postgres": true}` as of P58a M5, every other kind still Node-served) is answered in-process by
-`adapterhost.Dispatcher`, its response `json.Marshal`ed directly (base64 chunk encoding, P58 D5)
-with no engine involved at all; a **Node-served** connection's frame is forwarded to the engine's
-stdin unread, exactly as before. `src/renderer/bridge/port.ts`'s `reviveChunks`/`toTypedArray`
-decode either wire shape transparently: a base64 string (a Go-native chunk) or `JSON.stringify`'s
-index-keyed object (a Node-served one, P57's own finding) — `isChunkLike`'s own check only looks at
-the outer object's four key names, not which shape each one carries.
-`ping` always reaches the Node engine regardless (A17 — the status pill still reports its pid while
-it does most of the work); `cache:stats`/`cache:clear` are answered locally, merging both caches'
-counters while reporting the configured budget once, not doubled (A16).
+op, that connection's `connectionId` — to route it, then answers every op in-process by
+`adapterhost.Dispatcher`, its response `json.Marshal`ed directly with every chunk's four buffers
+base64-of-exact-LE-bytes (P58 D5). There is no other wire shape any more: `src/renderer/bridge/port.ts`'s
+`reviveChunks`/`toTypedArray` decode only that one form (P58f D8 deleted the `JSON.stringify`
+index-keyed branch a Node-served connection used to produce, once every kind was native and nothing
+emitted it any more). `ping` is answered locally too — the engine *is* this process now (P58f D11),
+so the status pill's pid is this process's own `os.Getpid()`, not a child's; `cache:stats`/`cache:clear`
+are answered locally as before, merging both caches' counters while reporting the configured budget
+once, not doubled (A16).
 
-**One writer, both producers (A18).** `adapterhost.Session` owns a single bounded queue (64 frames
-/ 32 MiB, matching the engine host's own bounds) and the one goroutine draining it into the
-renderer's `Send` — both the Node engine's own data frames (`Session` satisfies `enginehost.Sink`)
-and the router's own locally-produced responses enqueue into it, so exactly one goroutine ever
-calls the renderer connection's blocking `Send`. Backpressure toward the Node engine is unchanged:
-a full queue reports `enginehost.ErrStreamFull`, which the engine host's own retry-with-backoff
-already handles by pausing its stdout read loop, which is what pushes back on the OS pipe. A
-locally-produced response has no pipe to push back through, so a full queue just drops it — the
-renderer's own pending request then times out exactly as if the process had died. Wails' own
-`application.StreamConn` bounds sit underneath all of this: `Send` blocks and `TrySend` is the
+**One writer, one producer.** `adapterhost.Session` owns a single bounded queue (64 frames / 32 MiB)
+and the one goroutine draining it into the renderer's `Send`, so exactly one goroutine ever calls
+the renderer connection's blocking `Send`. There is only one producer now — the router's own
+locally-produced responses — where P58a–P58e had two (the deleted Node engine's own data frames were
+the other, fanned together by the now-deleted `internal/enginebackend`, P58f D9). A full queue just
+drops the frame — the renderer's own pending request then times out exactly as if the process had
+died, which `port.ts` already handles — there is no OS pipe left to push back through, so the old
+retry-with-backoff that paused the engine's stdout read loop has no successor and needs none. Wails'
+own `application.StreamConn` bounds sit underneath all of this: `Send` blocks and `TrySend` is the
 non-blocking `ErrStreamFull`-returning variant, per-connection limits are 8 MiB **and** 256 frames,
-and any single frame over 64 MiB (`streamMaxFrameBytes`) is rejected outright — a real ceiling this
-transport introduces that Electron's structured clone never had, enforced Go-side too by
-`internal/enginehost/stream.go`'s `maxDataFrameBytes`, which drops an oversized frame with a named
-log line rather than corrupting the stream.
+and any single frame over 64 MiB (`streamMaxFrameBytes`) is rejected outright, enforced Go-side too
+by `adapterhost.Session`'s own `maxDataFrameBytes`, which drops an oversized frame with a named log
+line rather than corrupting the stream.
 
 **The Go side is `shell/`.** `shell/main.go` builds the `application.New` options and registers
 twelve bound services under `shell/internal/bridge/` — `AppService`, `SettingsService`,
 `LayoutService`, `TabsService`, `ConnectionsService`, `TreeService`, `EngineService`, `OpsService`,
-`FiltersService`, `FilesService`, `QueriesService`, `LifecycleService`. Behind them:
-`internal/storage/` (repos plus forward-only SQL migrations), `internal/tree/service.go` (the
-children/describe/definition cache-aside), `internal/preconnect/` (the pre-connect script
+`FiltersService`, `FilesService`, `QueriesService`, `LifecycleService`. `EngineService.Status()` has
+zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
+rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
+no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
+services: `internal/storage/` (repos plus forward-only SQL migrations), `internal/tree/service.go`
+(the children/describe/definition cache-aside), `internal/preconnect/` (the pre-connect script
 supervisor, a real process-supervisor state machine), `internal/secrets/` (the keychain, see
-Storage), `internal/enginehost/` (the engine child's supervisor and protocol speaker), and
-`internal/metrics/`.
+Storage), `internal/adapterhost/` (the router, session and data-plane server described above),
+`internal/adapters/` (every engine's own package, see Adapter contract), `internal/oplog/` (the
+op-log event type and its two topics, relocated here from the deleted `internal/enginehost` — P58f
+D9), and `internal/metrics/`.
 
 **App-wide CPU/RSS metrics** (`internal/metrics/`, the Go analogue of Electron's
 `app.getAppMetrics()`) find this app's process set by **executable-path substring match, not a
 pid-tree walk** — a native webview's helpers (WKWebView's `com.apple.WebKit.*`, WebKitGTK's
 WebProcess/NetworkProcess) are not children of the shell in the ppid sense, so a tree walk would
-silently under-count. `AnchorNeedles` is `["Kira Studio", "runtime/node/bin/node"]`,
-`HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide scan per
-5 s tick.
+silently under-count. `AnchorNeedles` is `["Kira Studio"]` (P58f: no vendored Node child needle any
+more), `HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide
+scan per 5 s tick.
 
-**Under the stdio transport, stdout is the frame channel, not a log sink.** `src/engine`'s own
-modules call `console.log`/`warn`/`error` directly (`control.ts`'s `AdapterDeps.log`, `cache/lru.ts`'s
-refusal warning); harmless under Electron's `parentPort`, but a stray write here lands raw text in
-the exact byte stream `internal/enginehost`'s length-prefixed reader is parsing. `stdio-main.ts`
-repoints it — `globalThis.console = new Console({stdout: process.stderr, stderr: process.stderr})` —
-before reading a single byte of stdin, and any new engine-side logging must stay on that path.
-
-**Known regression: the engine stdio hop JSON-encodes bulk data.** `stdio-main.ts`'s `writeFrame`
-does `JSON.stringify` on every frame, control and data alike. Electron's `MessagePortMain` carried
-`TextColumnChunk`'s four exactly-sized typed arrays across by real structured clone; JSON does not
-— a `TypedArray` serializes as an object keyed `"0","1",…`, which is why `bridge/port.ts` has to
-carry `reviveChunks` to rebuild real `Uint8Array`/`Uint32Array` instances on the renderer side. The
-correctness hole is closed, but the cost is not: a binary blob inflates to roughly 5–6 bytes per
-original byte on the wire before `reviveChunks` even runs, plus the transient heap both the
-`stringify` and the `parse` need. This is a genuine memory and CPU regression against the Electron
-architecture and it is **not fixed** — the named direction is a future phase (P58) migrating the
-adapters to native Go, which removes the Node sidecar and this hop with it.
+**The JSON-inflation regression named in earlier phases is fixed and measured, not merely claimed.**
+The old Node-engine-over-stdio hop `JSON.stringify`d every frame, control and data alike — a
+`TypedArray` has no native JSON form, so it serialized as an object keyed `"0","1",…`, which is why
+`reviveChunks` above exists at all. That correctness fix was never the problem; the wire and heap
+cost of getting there was. P58a M2 measured both paths on the same fixture
+(`docs/PERF.md` §2.5): the Node engine's index-keyed JSON inflated a chunk **10.872x** on the wire
+and **40.9x** in transient heap; Go's own base64 encoding (P58 D5) inflates it **1.334x** and
+**6.86x** respectively — a real cost (base64 is never free) but an order of magnitude smaller, and
+it is what every kind uses today, not an aspiration.
 
 ## Renderer security surface
 
@@ -779,44 +770,51 @@ same pass. Two specs were deleted because their subject moved rather than disapp
 each spec declaring its own — Bun's module registry is shared across every spec file in one test
 run, so whichever spec's stub loads first wins for the whole run.
 
-**`tests/db/` needs a real external resource** — a Testcontainers-managed Docker container per
-engine (`bun run test:db`, requires Colima on macOS or a Docker daemon on Linux). It is **entirely
-untouched by the shell migration**: the adapters did not move, and Bun + Testcontainers is
-unaffected by what the shell is written in. `tests/db/kafka.spec.ts`, the one file in this
-directory that could not run under Bun at all (the old TypeScript driver's compiled binding loaded
-under no Bun ABI), was deleted in P58e M9 — its subject is now
-`shell/internal/adapters/kafka/kafka_test.go`, and `scripts/run-db-tests.sh` is a plain `bun test
-tests/db` with no Node half left to run.
+**`tests/db/` is a shared fixture corpus now, not a spec suite (P58f D1).** Every per-engine
+`tests/db/*.spec.ts` is gone — the last four (clickhouse, mariadb, mysql, sqlite) retired in P58f
+M10 alongside `src/engine/`, the same day the argument for keeping them (*"a still-passing
+TypeScript spec is a live oracle to diff a Go port against"*) expired, since that oracle read
+`src/engine/adapters/` directly. What survives, because Go and `tests/e2e-real/` both still read it:
+`fixtures/*.sql` (read by `shell/internal/adapters/testsupport/{postgres,mariadb,mysql,sqlite,clickhouse}.go`
+by absolute path) and five `support/*.ts` modules (`docker`, `postgres`, `mariadb`, `sqlite`,
+`kafka`) that `tests/e2e-real/support/*.ts` re-exports for container seeding. `tests/db/kafka.spec.ts`,
+the one file in this directory that could never run under Bun at all (the old TypeScript driver's
+compiled binding loaded under no Bun ABI), had already moved to `shell/internal/adapters/kafka/kafka_test.go`
+in P58e M9, ahead of the rest.
 
-One container per engine, one fixture module per engine that seeds a realistic dataset: wide tables,
-`NULL`s, unicode, large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs,
-≥ 1 M rows in one table to exercise paging and counts. Scenarios per engine: connect/disconnect,
-tree enumeration, describe, definition, first page, deep page, count, projection, sort, filter,
-cancel-mid-query (asserted **server-side** — the query must actually be gone from `pg_stat_activity`
-/ `SHOW PROCESSLIST` / `currentOp`), cache hit/miss behaviour, add/delete row, command preview
-correctness. Local-only for now — no CI wiring in v1.
+The fixture data itself is unchanged from what it always seeded: wide tables, `NULL`s, unicode,
+large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs, ≥ 1 M rows in one
+table to exercise paging and counts. Per-engine scenario coverage — connect/disconnect, tree
+enumeration, describe, definition, first page, deep page, count, projection, sort, filter,
+cancel-mid-query (asserted **server-side**), cache hit/miss behaviour, add/delete row, command
+preview correctness — now lives in `shell/internal/adapters/*/*_test.go`, one Go test file per
+engine, run by `bun run test:go`. Local-only for now — no CI wiring in v1.
 
 **`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real wire
-boundary — the control plane and the bulk-data plane (see Process model, above). Per adapter, one
-folder holds three files: `<adapter>.backend.spec.ts` drives the real `handleFrame`/`dispatch` stack
-against a real container with no renderer at all (`bun run test:ipc:be`, one vendored-Node process
-per spec file — no Electron is involved any more, since the harness's own `src/main` imports are
-gone and neither `engine/{control,rpc}.ts` nor any adapter ever imported `electron`; the separate
-process per file is still needed because some adapters, sqlite and kafka, cannot load under Bun at
-any ABI). The one thing that harness lost with `src/main` is the real tree cache-aside, which used
-to come from `src/main/tree-service.ts`; it is now a Map-backed stand-in for
-`shell/internal/tree.Service`'s cache-aside, since the real one is Go and this tier is TypeScript.
-`<adapter>.frontend.spec.ts` drives the real Vue UI with both planes mocked, via `bun run
-test:ipc:fe`, which needs no Docker, no container and no native driver; and `<adapter>.fixture.ts`
-is the one file both halves import. That
-fixture is **generated, never hand-written**: `KIRA_IPC_FIXTURES=write bun run test:ipc:be` captures
-real responses from a real container and writes the module, and every subsequent run of the backend
-spec asserts its own real responses against that same committed file. This is the tier's anti-drift
-guarantee, stated once because it is easy to state wrong: **a frontend spec cannot mock a shape the
-backend has stopped producing without that same fixture module's own backend assertion failing
-first.** Wall-clock and other non-reproducible fields (timestamps, ephemeral ports, randomly
-generated ids, approximate row-count estimates) are frozen to fixed placeholders in the fixture
-after being validated structurally against the real value, never invented.
+boundary — the control plane and the bulk-data plane (see Process model, above) — and **its backend
+half moved to Go in P58f M10 (D13)**, since the wire boundary it exercises is now Go-to-Go, not
+Go-to-Node. Per adapter, `tests/ipc/<adapter>/` holds two files now: `<adapter>.frontend.spec.ts`
+drives the real Vue UI with both planes mocked, via `bun run test:ipc:fe`, which needs no Docker, no
+container and no native driver; and `<adapter>.fixture.ts` is the file it imports, generated —
+**never hand-written** — by `shell/internal/ipcfixture`'s per-adapter Go test
+(`clickhouse_test.go`, `kafka_test.go`, `mariadb_test.go`, `mysql_test.go`, `redis_test.go`,
+`sqs_test.go`; postgres and sqlite are covered elsewhere and generate no fixture of their own).
+`KIRA_IPC_FIXTURES=write go test ./internal/ipcfixture/...` drives the real `adapterhost`/`adapters`
+stack against a real container, captures its real responses, and writes the `.ts` module
+(`write.go`'s `mustMarshalNoEscape` — Go's `encoding/json` escapes HTML and sorts map keys by
+default, so the generator uses `SetEscapeHTML(false)` and typed structs, never maps); every
+subsequent plain `go test` run of the same package asserts its own real responses against that
+committed file. This is the tier's anti-drift guarantee, kept **word for word** across the port
+because it is easy to state wrong: **a frontend spec cannot mock a shape the backend has stopped
+producing without that same fixture module's own backend assertion failing first.** The guarantee
+holds only while *something* regenerates: `kafka.frontend.spec.ts`'s Configuration-section assertion
+went stale for three weeks after the Kafka adapter went native (P58e M9.3) and kept asserting an
+empty section against a fixture nobody had re-captured, until this port's own regeneration surfaced
+and fixed it. Wall-clock and other non-reproducible fields (timestamps, ephemeral ports, randomly generated
+ids, approximate row-count estimates) are frozen to fixed placeholders (`frozen.go`) after being
+validated structurally against the real value, never invented. `tests/ipc/support/types.ts` is the
+one TypeScript file the tier keeps outright — the frontend specs' own shared types, with real
+consumers on that side and no Go equivalent needed.
 
 **`tests/e2e/` is gone** — the whole `_electron.launch()` tier, 23 spec files, was retired with the
 Electron shell rather than ported wholesale. Every pure-UI spec has a verified `tests/ui/` port;
@@ -842,20 +840,25 @@ search toolbar modes, stop button, cell editor, document expand/collapse, PK/FK 
 menus, copy/paste, the sticky ancestor band's geometry, the checkbox tree filter, plus the
 budgets/perf/leaks specs.
 
-**`tests/e2e-real/`** is the new full-stack *wiring* tier, and it is deliberately small — two specs
-(sqlite, postgres). It builds the Go shell with `-tags server` (Wails v3's server build mode), which
-serves both planes over plain HTTP and WebSocket to a plain Chromium tab with **no native window at
-all**: a real Go backend, a real embedded engine child, a real adapter, a real container. That
-recovers the wiring confidence `tests/e2e/` used to provide for these two engines at a small
-fraction of the cost. It is not a UI-fidelity tier — that is `tests/ui/`'s job, which is why this one
-uses Chromium rather than WebKit. Server mode has no file dialogs (`FilesService.ChooseSave`/
-`ChooseOpen` answer a real HTTP 422), so a spec needing one stubs exactly that method through a
-passthrough route that reuses `CHANNEL_TO_FQN` rather than re-deriving it.
+**`tests/e2e-real/`** is the full-stack *wiring* tier, and it is deliberately small — three specs
+(sqlite, postgres, mariadb), five tests. It builds the Go shell with `-tags server` (Wails v3's
+server build mode), which serves both planes over plain HTTP and WebSocket to a plain Chromium tab
+with **no native window at all**: a real Go backend, a real adapter, a real container — there is no
+embedded engine child to speak of any more (P58f M10). That recovers the wiring confidence
+`tests/e2e/` used to provide for these engines at a small fraction of the cost. It is not a
+UI-fidelity tier — that is `tests/ui/`'s job, which is why this one uses Chromium rather than
+WebKit. Server mode has no file dialogs (`FilesService.ChooseSave`/`ChooseOpen` answer a real HTTP
+422), so a spec needing one stubs exactly that method through a passthrough route that reuses
+`CHANNEL_TO_FQN` rather than re-deriving it. `mariadb-real.spec.ts`'s second test is the coexistence
+proof that used to kill the Node engine child mid-session and assert every connection survived
+(`C2`, retired with the child it needed) — rewritten in P58f M10 to prove **two native kinds in one
+session** instead: a MariaDB and a Kafka connection are both opened, the page is reloaded, and both
+serve a real read afterward, since there is no child left to kill and the property worth proving now
+is that native adapters coexist cleanly within one process across a reload.
 
 **Parallelism.** `playwright.config.ts` runs three projects, all `fullyParallel`. `ui` being fully
 parallel is a real change from the old `e2e` project's `workers: 1`, and it is earned rather than
 inherited: that serialisation existed because concurrent Electron apps contend over wall-clock/RSS
 budgets and Docker containers, and this tier has neither — the same reasoning that already made
 `ipc-frontend` fully parallel. `e2e-real` runs `workers: 2`, safe because a per-test `KIRA_HOME` plus
-`WAILS_SERVER_PORT` gives each instance its own SQLite app storage, its own secrets and its own
-engine child.
+`WAILS_SERVER_PORT` gives each instance its own SQLite app storage and its own secrets.
