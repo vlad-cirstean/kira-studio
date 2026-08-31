@@ -1711,3 +1711,103 @@ property goes unproven in a running app until the sub-phase that deletes coexist
 - **`go test ./... -race` is the bar**, not `go test ./...`. Three of P58b's four adapters run their
   driver call on a goroutine (`RunWithAbortRace`) and register/release from another; the race
   detector is the only thing that will find a missing mutex in `runningByOp`.
+
+## 12. M6.0 results (run for real in this sandbox)
+
+All four probes pass, run against `mariadb:11.4`, `mysql:8.4` and `clickhouse/clickhouse-server:26.3`
+(all already pulled and retagged via `mirror.gcr.io` from earlier sessions — no fresh pull needed).
+Throwaway code, in a scratch Go module outside the repo, never committed — the four programs
+themselves, per §6's own instruction. Findings that change or sharpen a decision are folded back
+into §2 rather than only recorded here; this section is the empirical trail.
+
+- **TC-2 — PASS, all three.** `mariadb:11.4` and `mysql:8.4` each start and answer `SELECT 1` with
+  no wait-strategy surprises (both resolve on their own log-message wait). `clickhouse-server:26.3`
+  starts and answers an authenticated HTTP `SELECT 1` with **no `ulimit` workaround at all** —
+  confirming §1.12's source read against a running daemon, not just against the module's own code.
+  One correction to the probe as originally sketched: the ClickHouse module's `WithPassword("")`
+  does not mean "no password" — its own doc comment says the password *"must not be empty or
+  undefined"* — and an unauthenticated GET against the HTTP interface is a 401, not a free pass;
+  the real credentials (`WithPassword("probe")`, `user=default&password=probe`) are what the
+  adapter's own client must send too, matching client.go's design already.
+- **MY-1 — PASS, both engines, with one genuine per-engine divergence worth designing around.**
+  (a) confirmed: `DatabaseTypeName()` distinguishes `VARBINARY`/`BLOB` from `TEXT`/`JSON` on both
+  engines, and `DECIMAL(10,3)` arrives as the exact server text `"123.456"`, never a float — B2/B3
+  stand as written. A secondary, unplanned-for confirmation: MariaDB's `JSON` column reports
+  `DatabaseTypeName() == "TEXT"` (MariaDB's `JSON` is a `LONGTEXT` alias with a `CHECK` constraint,
+  not a real type), while MySQL's reports `"JSON"` — both still classify correctly as `text`/`json`
+  typeClass either way, so no code change, but worth naming in `docs/ARCHITECTURE.md`'s per-engine
+  section so a future reader does not "fix" the apparent inconsistency.
+  (c) confirmed exactly as §1.4 predicted: cancelling a query's `context.Context` returns
+  `context canceled` to the caller **and leaves the `*sql.Conn` unusable** (`driver: bad
+  connection` on the very next statement) — this is decisive evidence for B6/B14: mysql-family
+  must never pass the op's own context into `QueryContext`/`ExecContext`.
+  (d) confirmed: `UPDATE … ` via `QueryContext` yields zero columns, no rows.
+  (b) **confirmed for MariaDB, genuinely different for MySQL — a real per-engine divergence, not a
+  probe bug.** `KILL QUERY <id>` against a plain `SELECT SLEEP(30)` on MariaDB raises
+  `Error 1317 (70100): Query execution was interrupted` after ~500 ms, exactly as designed. The
+  identical test against MySQL 8.4 returns **no error at all** — `SELECT SLEEP(30)` resolves with
+  its own documented return value (`1`, meaning "was interrupted") rather than raising anything,
+  because MySQL's `SLEEP()` is explicitly documented to swallow `KILL QUERY` and report it via its
+  return value instead of an error, precisely so scripts can test cancellation without handling an
+  exception. This is a fact about `SLEEP()` specifically, not about `KILL QUERY` against a real
+  data-scanning statement (which does raise an error on both engines — not independently
+  re-verified here, since `mapError`'s job is to map whatever the driver returns, not to assume a
+  particular statement shape), but it means **`mysqlfamily`'s own acceptance test for real MySQL
+  cancellation must not use `SLEEP()` as its long-running statement** — a recursive/generated-rows
+  query (the same shape `sqlite/query.ts`'s own long-statement tests already use) is the honest
+  substitute, and `mysqlfamily`'s Go suite uses one instead of copying `postgres_test.go`'s own
+  `pg_sleep(30)` pattern verbatim.
+- **SQ-1 — PASS, confirms B7 exactly, plus one B9-relevant surprise.** `mattn/go-sqlite3` returns
+  `bool(true)` for the `BOOLEAN` column and the **zero `time.Time`** for `'not a date'` in the
+  `DATETIME` column — silently, no error, exactly as §1.5 read from its source.
+  `modernc.org/sqlite` returns `int64(1)` and the raw string `"not a date"` for the same two
+  columns — storage-class-faithful, no coercion. All four of modernc's own feature checks pass:
+  the `_busy_timeout`/`_foreign_keys`/`_txlock`/`_query_only` DSN options are accepted;
+  `mode=rw` against a missing file fails with `unable to open database file (14)` and creates
+  nothing; a context cancelled 300 ms into a long recursive-CTE statement returns `context
+  canceled` and **the same `*sql.Conn` is immediately reusable afterward** (`SELECT 1` succeeds) —
+  a materially better result than mysql-family's own MY-1(c): modernc's own `interruptOnDone`
+  really does call `sqlite3_interrupt` and leaves the connection healthy, which is exactly the
+  mechanism B8 needs and confirms `sqliteCaps.cancel: true` is a mechanism actually available, not
+  aspirational; `SQLITE_BUSY` and `SQLITE_NOTADB` both arrive as `*sqlite.Error` with the expected
+  codes (5, 26) and readable messages. **The one surprise**: a two-statement string
+  (`CREATE TABLE …; INSERT …`) passed to a single `Exec` call **executes both statements** — modernc
+  does not raise an error and does not silently drop the second one the way `node:sqlite`'s
+  `prepare()` does. This does not withdraw B9 (the console's one-page-per-statement *contract*
+  still needs enforcing), but it changes the mechanism: the adapter must split and count statements
+  itself *before* executing (e.g. reject a payload that already contains more than one statement,
+  the same shape `console.go`'s own multi-statement `execute()` loop already assumes at the caller
+  level) rather than relying on the driver to reject or truncate a smuggled second statement — a
+  cheaper, more correct guard than SQ-1 was written expecting to need.
+- **CH-1 — PASS on all four, with one probe correction that matters for the adapter's own request
+  shape.** (a) the exact format confirmed: names row, types row
+  (`"Decimal(18, 4)"`, `"Enum8('a' = 1, 'b' = 2)"`, …), and the data row's every documented cell
+  verified byte for byte — `"ᴺᵁᴸᴸ"` for the `Nullable(String)` NULL, `"nan"` for the `Float64` NaN,
+  `"[1,2,3]"`/`"{'x':1,'y':2}"` for `Array`/`Map`. (b) `KILL QUERY WHERE query_id = '…' SYNC`
+  against a running `sleep(3) FROM numbers(20)` works from a second HTTP request: the killed
+  request itself comes back `status=500`, header `X-ClickHouse-Exception-Code: 394`, body
+  `"Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)…"` — B12's first two
+  extraction sites confirmed against a real response, not just against `errors.ts`'s table.
+  (c) **the mid-stream `__exception__` trailer does not appear with a default-sized result** — a
+  10,000-row `numbers()` query buffers entirely before ClickHouse flushes anything, so the whole
+  response arrives as one ordinary `status=500` error with no rows at all. It **does** reproduce,
+  byte for byte, once the request forces early flushing (`buffer_size=0&wait_end_of_query=0` plus a
+  small `max_block_size`) against a 2,000,000-row query that fails partway through: `status=200`,
+  the normal names/types/data rows stream first, then the literal trailer
+  `__exception__\n<token>\nCode: 395. DB::Exception: …\n<byte-count> <token>\n__exception__\n`.
+  **The probe correction**: a plain GET with `query=<sql>` in the URL is rejected outright by this
+  server version — *"Cannot execute query in readonly mode. For queries over HTTP, method GET
+  implies readonly. You should use method POST for modifying queries."* — for **every** statement,
+  not only DDL/DML; `clickhouse/client.go` must always POST the statement as the request body
+  (matching §6's own probe description, which already said POST — the correction is that this is
+  not optional even for a `SELECT`, contrary to what a first read of ClickHouse's docs might
+  suggest). (d) `X-ClickHouse-Summary`'s `written_rows` is readable on an `INSERT` response, as
+  designed.
+
+None of these results changes P58b's own decisions beyond what §2 already records — B7 and B11 both
+stand exactly as argued, now with a real container behind each rather than only a source read; B8's
+mechanism is now proven live, not merely plausible; B9's contract is unchanged but its enforcement
+point moves to the adapter, a smaller change than SQ-1 was written expecting to find. The MySQL
+`SLEEP()`/`KILL QUERY` divergence is new and is folded into §5.3's testing plan (the acceptance
+suite's own long-running statement) rather than into §2, since it changes a test fixture's shape,
+not a design decision.
