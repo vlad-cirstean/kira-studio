@@ -2,13 +2,11 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -29,7 +27,6 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/config"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/logging"
 	"github.com/kirathecat/kira-studio/shell/internal/metrics"
 	"github.com/kirathecat/kira-studio/shell/internal/oplog"
@@ -49,8 +46,8 @@ import (
 var assets embed.FS
 
 // blank is gate G1's configuration (1) (P52 §3.2): a static page making the one AppService.Info()
-// call, measuring the floor cost of Wails + the webview + Go + the vendored Node child with no
-// app in it. Selected via KIRA_G1_BLANK=1, never in normal operation.
+// call, measuring the floor cost of Wails + the webview + Go with no app in it. Selected via
+// KIRA_G1_BLANK=1, never in normal operation.
 //
 //go:embed blank/index.html
 var blankAssets embed.FS
@@ -58,11 +55,11 @@ var blankAssets embed.FS
 // main's startup order mirrors src/main/index.ts (P52 §4.1), with the upgradeLegacySecrets step
 // deleted, not ported (P52 §6.4): config.EnsureLayout -> logging.Init/Sweep -> storage.Open
 // (migrates) -> secrets.New -> repos.New + repos.NewSecrets -> Settings.GetAll ->
-// resolveEngine (P56 D12: the real bundled engine) -> enginehost.Start -> preconnect.New ->
-// connections.New(...).Start -> tree.New -> enginehost.PushCacheConfig -> oplog.New(...).Start ->
-// metrics ticker Start -> shell.NewQuitter -> application.New(Services, ShouldQuit, OnShutdown)
-// -> attach the deferred emitter and the Quitter to the now-real App -> menu -> engine stream ->
-// reopen handler -> the main window -> app.Run() (P56 §4.11).
+// adapterhost.NewRouter -> preconnect.New -> connections.New(...).Start -> tree.New ->
+// router.PushCacheConfig -> oplog.New(...).Start -> metrics ticker Start -> shell.NewQuitter ->
+// application.New(Services, ShouldQuit, OnShutdown) -> attach the deferred emitter and the
+// Quitter to the now-real App -> menu -> engine stream -> reopen handler -> the main window ->
+// app.Run() (P56 §4.11). There is no Node engine child to start any more (P58f M10 Phase 4).
 func main() {
 	startedAt := time.Now()
 
@@ -100,14 +97,6 @@ func main() {
 		log.Fatalf("kira-studio-shell: read settings: %v", err)
 	}
 
-	nodeBin, engineScript, err := resolveEngine()
-	if err != nil {
-		log.Fatalf("kira-studio-shell: resolve engine: %v", err)
-	}
-	host, err := enginehost.Start(nodeBin, engineScript)
-	if err != nil {
-		log.Fatalf("kira-studio-shell: start engine: %v", err)
-	}
 	adapterDeps := adapters.Deps{Log: func(level, message string) {
 		switch level {
 		case "error":
@@ -166,7 +155,6 @@ func main() {
 		eventsDetach()
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
-		host.Stop()
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
@@ -233,39 +221,6 @@ func main() {
 	}
 }
 
-// resolveEngine locates the vendored Node runtime and the real bundled engine (P56 D12: the
-// switch from M1's engine-ping.mjs walking-skeleton fixture to shell/runtime/engine/engine.cjs,
-// built by `bun run build:engine` and already verified end-to-end by P54's
-// stdio_main_integration_test.go). P52 §3.1 vendors the Node runtime to shell/runtime/node/
-// (git-ignored, fetched by scripts/vendor-node.sh); this checks next to the running executable
-// first (the packaged shape) and falls back to the source tree (the `wails3 task dev` / `go run`
-// shape).
-func resolveEngine() (nodeBin, script string, err error) {
-	scriptCandidates := []string{
-		"runtime/engine/engine.cjs",
-	}
-	nodeCandidates := []string{
-		"runtime/node/bin/node",
-	}
-	if exe, exeErr := os.Executable(); exeErr == nil {
-		exeDir := filepath.Dir(exe)
-		nodeCandidates = append([]string{filepath.Join(exeDir, "runtime", "node", "bin", "node")}, nodeCandidates...)
-		scriptCandidates = append([]string{filepath.Join(exeDir, "runtime", "engine", "engine.cjs")}, scriptCandidates...)
-	}
-
-	nodeBin, err = firstExisting(nodeCandidates)
-	if err != nil {
-		return "", "", fmt.Errorf(
-			"vendored node runtime not found (looked in %v) — run scripts/vendor-node.sh first", nodeCandidates,
-		)
-	}
-	script, err = firstExisting(scriptCandidates)
-	if err != nil {
-		return "", "", fmt.Errorf(`engine.cjs not found (looked in %v) — run "bun run build:engine" first`, scriptCandidates)
-	}
-	return nodeBin, script, nil
-}
-
 func assetHandler() http.Handler {
 	if os.Getenv("KIRA_G1_BLANK") == "1" {
 		sub, err := fs.Sub(blankAssets, "blank")
@@ -275,13 +230,4 @@ func assetHandler() http.Handler {
 		return application.AssetFileServerFS(sub)
 	}
 	return application.AssetFileServerFS(assets)
-}
-
-func firstExisting(candidates []string) (string, error) {
-	for _, c := range candidates {
-		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
-			return c, nil
-		}
-	}
-	return "", os.ErrNotExist
 }
