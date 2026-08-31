@@ -33,7 +33,7 @@ import {
 } from '../shared/document/rows';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
-import Pager from '../shared/page/Pager.vue';
+import PagerControls from '../shared/page/PagerControls.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
@@ -513,7 +513,7 @@ onUnmounted(() => {
              next/last, then page-size, then a count/columns-equivalent group, then the
              add/search group. Mongo supports an arbitrary skip()/limit() offset, so — unlike
              Redis/Kafka/SQS's cursor-only pagination — a real page-N jump box applies here too. -->
-        <Pager
+        <PagerControls
           :page-index="tab.state.pageIndex"
           :page-size="tab.state.pageSize"
           :count="rt?.count?.value ?? null"

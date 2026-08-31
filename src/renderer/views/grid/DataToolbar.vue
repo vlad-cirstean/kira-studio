@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import Pager from '../shared/page/Pager.vue';
+import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { getPage } from './page';
@@ -154,7 +154,7 @@ function onDeleteRow(): void {
 
   <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
        has no notion of "row 1–200" to display without the count query having already run). -->
-  <Pager
+  <PagerControls
     :page-index="tab.state.pageIndex"
     :page-size="tab.state.pageSize"
     :count="rt?.count?.value ?? null"
@@ -234,7 +234,7 @@ function onDeleteRow(): void {
 <style scoped>
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
    p-seg, p-input, p-chip, p-count) — the pager's own layout/page-jump-input styling lives in
-   Pager.vue now; only the columns anchor's positioning is left here. */
+   PagerControls.vue now; only the columns anchor's positioning is left here. */
 
 .columns-anchor {
   position: relative;
