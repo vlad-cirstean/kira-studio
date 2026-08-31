@@ -570,10 +570,10 @@
           "position": {
             "offset": null,
             "pageSize": 100,
-            "strategy": "cursor",
+            "hasMore": true,
             "nextToken": "synthetic-bighash-cursor-1",
             "prevToken": null,
-            "hasMore": true
+            "strategy": "cursor"
           }
         },
         "source": "server"
@@ -809,10 +809,10 @@
           "position": {
             "offset": null,
             "pageSize": 100,
-            "strategy": "cursor",
+            "hasMore": false,
             "nextToken": null,
             "prevToken": null,
-            "hasMore": false
+            "strategy": "cursor"
           }
         },
         "source": "server"

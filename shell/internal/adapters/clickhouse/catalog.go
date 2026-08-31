@@ -128,7 +128,11 @@ func lessTable(a, b systemTableRow) bool {
 	if ra != rb {
 		return ra < rb
 	}
-	return a.Name < b.Name
+	// catalog.ts's own listing sorted with String.prototype.localeCompare, which (for this driver's
+	// plain-ASCII table names) is case-insensitive — plain byte comparison would instead sort every
+	// uppercase-leading name before every lowercase one (a P58f-port-time finding, caught by fixture
+	// regeneration reordering "Order Items" ahead of "big_rows" instead of next to "order_items").
+	return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 }
 
 type systemColumnRow struct {

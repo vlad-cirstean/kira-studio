@@ -124,7 +124,9 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
     '[data-testid="definition-properties"][data-title="Configuration"]',
   );
   await expect(configSection).toBeVisible();
-  await expect(configSection.locator('.def-row')).toHaveCount(0);
+  // P58e E11 / P58f cutover: the Go adapter's DescribeTopicConfigs call actually works, unlike the
+  // deleted engine's kafkajs binding — the fixture now carries the topic's real config rows.
+  await expect(configSection.locator('.def-row')).toHaveCount(33);
 
   // --- a consumer group's definition shows Group/Members/Committed offsets --------------------
   await openRowMenu(page, CONSUMER_GROUP_PATH);

@@ -3,6 +3,7 @@ package ipcfixture
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -68,4 +69,36 @@ func assertMatchesCommittedJSONFixture(t *testing.T, rec *Recorder, jsonFixtureP
 	if diff := cmp.Diff(wantPort, gotPort); diff != "" {
 		t.Errorf("port snapshots diff from committed fixture %s (-want +got):\n%s", jsonFixturePath, diff)
 	}
+}
+
+// repoRootForWrite resolves the repository root from this package's own path
+// (shell/internal/ipcfixture), the same way every other repo-relative path this package needs
+// (write.go's FixturePathFor) is anchored — os.Getwd() during `go test` is always the package
+// directory, never the module root.
+func repoRootForWrite(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("ipcfixture: getwd: %v", err)
+	}
+	return filepath.Clean(filepath.Join(wd, "..", "..", ".."))
+}
+
+// maybeWriteFixture is P58f §4.5 step 3/D15's write-mode branch, the Go analogue of every
+// backend.spec.ts's own `if (isFixtureWriteMode()) { writeFixtureModule(...); return; }` — when
+// KIRA_IPC_FIXTURES=write, this writes rec's own captured (and already adapter-frozen, per
+// frozen.go) snapshots straight to the real tests/ipc/<adapterName>/<adapterName>.fixture.ts,
+// exactly as the TypeScript generator this package replaces did, and reports true so the caller
+// skips the read-mode assertion. Read mode (the default, and every CI run) always returns false.
+func maybeWriteFixture(t *testing.T, rec *Recorder, adapterName string) bool {
+	t.Helper()
+	if !IsWriteMode() {
+		return false
+	}
+	path := FixturePathFor(repoRootForWrite(t), adapterName)
+	if err := WriteFixtureModule(path, adapterName, rec.Control, rec.Port); err != nil {
+		t.Fatalf("ipcfixture: write fixture %s: %v", adapterName, err)
+	}
+	t.Logf("ipcfixture: wrote %s (KIRA_IPC_FIXTURES=write)", path)
+	return true
 }

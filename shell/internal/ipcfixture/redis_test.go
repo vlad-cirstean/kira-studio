@@ -373,5 +373,8 @@ func TestFixture_Redis(t *testing.T) {
 		t.Fatalf("execute pages = %d, want 1", len(executeResp.Pages))
 	}
 
+	if maybeWriteFixture(t, rec, "redis") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/redis.fixture.json")
 }

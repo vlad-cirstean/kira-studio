@@ -36,7 +36,7 @@
       "response": {
         "connectionId": "test-clickhouse",
         "status": "connected",
-        "serverVersion": "ClickHouse 26.3.24.4",
+        "serverVersion": "ClickHouse 26.3.26.3",
         "error": null,
         "since": 0,
         "caps": {
@@ -260,6 +260,7 @@
       "args": {
         "connectionId": "test-clickhouse",
         "path": "database:kira_test/table:order_items",
+        "refresh": false,
         "tabId": null
       },
       "response": {
@@ -267,10 +268,10 @@
           "path": "database:kira_test/table:order_items",
           "kind": "table",
           "qualifiedName": "kira_test.order_items",
+          "language": "sql",
           "statements": [
             "CREATE TABLE kira_test.order_items (`id` UInt32, `order_id` UInt32, `product_id` UInt32, `quantity` UInt32 DEFAULT 1, CONSTRAINT order_items_quantity_positive CHECK quantity > 0) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 8192"
           ],
-          "language": "sql",
           "origin": "server",
           "notes": [
             "A MergeTree PRIMARY KEY is a sparse index, not a uniqueness constraint — see Table properties.",

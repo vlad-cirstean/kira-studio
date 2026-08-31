@@ -58,6 +58,54 @@ func FreezeNodeDetail(nodes []model.TreeNode, name, detail string) []model.TreeN
 	return out
 }
 
+// FrozenCoordinatorHost/FrozenCoordinatorPort are what FreezeCoordinator substitutes for a kafka
+// consumer group's own coordinator broker address.
+const (
+	FrozenCoordinatorHost = "fixture-broker-host"
+	FrozenCoordinatorPort = 0
+)
+
+// FreezeCoordinator is kafka.backend.spec.ts's own freezeCoordinator, ported: a fresh Testcontainers
+// Docker-assigned hostname and host-mapped port every run, embedded both as a structured row (a
+// single "host:port" string) and as two separate fields inside the definition's own JSON statements
+// text (kafka/definition.go's own doc.Coordinator.Host/.Port) — each needs its own substitution.
+// Frozen at record time (not just at comparison time, unlike a run-to-run-*stable* value like
+// serverVersion) because a write-mode regeneration must capture a fixture that stays stable across
+// every future run, not just this one.
+func FreezeCoordinator(d model.ObjectDefinition) model.ObjectDefinition {
+	sections := make([]model.DefinitionSection, len(d.Sections))
+	for i, sec := range d.Sections {
+		rows := make([]model.DefinitionSectionRow, len(sec.Rows))
+		for j, row := range sec.Rows {
+			if row.Name == "coordinator" {
+				row.Value = coordinatorPlaceholder
+			}
+			rows[j] = row
+		}
+		sections[i] = model.DefinitionSection{Title: sec.Title, Rows: rows}
+	}
+	statements := make([]string, len(d.Statements))
+	for i, s := range d.Statements {
+		var doc map[string]any
+		if err := json.Unmarshal([]byte(s), &doc); err != nil {
+			statements[i] = s
+			continue
+		}
+		if _, hasCoordinator := doc["coordinator"]; hasCoordinator {
+			doc["coordinator"] = map[string]any{"host": FrozenCoordinatorHost, "port": FrozenCoordinatorPort}
+		}
+		b, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			statements[i] = s
+			continue
+		}
+		statements[i] = string(b)
+	}
+	d.Sections = sections
+	d.Statements = statements
+	return d
+}
+
 // FrozenQueueEpoch is what FreezeQueueTimestamps substitutes for every 10-digit run inside an sqs
 // queue definition's statements text, and for its own CreatedTimestamp/LastModifiedTimestamp rows.
 const FrozenQueueEpoch = "1700000000"
@@ -132,13 +180,29 @@ type FrozenConnectionSummary struct {
 	PreconnectSidecar bool           `json:"preconnectSidecar"`
 }
 
-// FreezeConnectionSummary applies the frozen fields above to a real model.ConnectionSummary.
+// FrozenEndpoint is what FreezeConnectionSummary substitutes for an sqs (uri-mode) connection's own
+// options.endpoint — matching sqs.backend.spec.ts's own connectionSummaryOf literally
+// ('http://fixture-host:0'), since a uri-mode connection has no top-level Host/Port for the freeze
+// above to apply to; LocalStack hands out a fresh host-mapped port every run.
+const FrozenEndpoint = "http://fixture-host:0"
+
+// FreezeConnectionSummary applies the frozen fields above to a real model.ConnectionSummary. Frozen
+// at record time (not just at comparison time) so a write-mode regeneration captures a fixture that
+// stays stable across future runs, the same way host/port/createdAt/updatedAt already do.
 func FreezeConnectionSummary(s model.ConnectionSummary) FrozenConnectionSummary {
 	host := FrozenHost
 	port := FrozenPort
 	options := s.Options
 	if options == nil {
 		options = map[string]any{}
+	}
+	if _, hasEndpoint := options["endpoint"]; hasEndpoint {
+		frozenOptions := make(map[string]any, len(options))
+		for k, v := range options {
+			frozenOptions[k] = v
+		}
+		frozenOptions["endpoint"] = FrozenEndpoint
+		options = frozenOptions
 	}
 	return FrozenConnectionSummary{
 		ID: s.ID, SortOrder: s.SortOrder, CreatedAt: FrozenCreatedAt, UpdatedAt: FrozenUpdatedAt,

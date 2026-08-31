@@ -125,5 +125,8 @@ func TestFixture_MySQL(t *testing.T) {
 		t.Fatalf("execute pages = %d, want 1", len(executeResp.Pages))
 	}
 
+	if maybeWriteFixture(t, rec, "mysql") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/mysql.fixture.json")
 }

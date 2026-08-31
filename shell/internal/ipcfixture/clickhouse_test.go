@@ -122,5 +122,8 @@ func TestFixture_ClickHouse(t *testing.T) {
 		t.Fatalf("execute pages = %d, want 1", len(executeResp.Pages))
 	}
 
+	if maybeWriteFixture(t, rec, "clickhouse") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/clickhouse.fixture.json")
 }

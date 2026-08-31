@@ -129,6 +129,7 @@
       "args": {
         "connectionId": "test-kafka",
         "path": "topic:orders",
+        "refresh": false,
         "tabId": null
       },
       "response": {
@@ -138,12 +139,10 @@
           "qualifiedName": "orders",
           "language": "json",
           "statements": [
-            "{\n  \"partitions\": [\n    {\n      \"id\": 0,\n      \"leader\": 1,\n      \"replicas\": [\n        1\n      ],\n      \"isr\": [\n        1\n      ]\n    },\n    {\n      \"id\": 1,\n      \"leader\": 1,\n      \"replicas\": [\n        1\n      ],\n      \"isr\": [\n        1\n      ]\n    }\n  ],\n  \"config\": []\n}"
+            "{\n  \"partitions\": [\n    {\n      \"id\": 0,\n      \"leader\": 1,\n      \"replicas\": [\n        1\n      ],\n      \"isr\": [\n        1\n      ]\n    },\n    {\n      \"id\": 1,\n      \"leader\": 1,\n      \"replicas\": [\n        1\n      ],\n      \"isr\": [\n        1\n      ]\n    }\n  ],\n  \"config\": [\n    {\n      \"name\": \"cleanup.policy\",\n      \"value\": \"delete\",\n      \"default\": true\n    },\n    {\n      \"name\": \"compression.gzip.level\",\n      \"value\": \"-1\",\n      \"default\": true\n    },\n    {\n      \"name\": \"compression.lz4.level\",\n      \"value\": \"9\",\n      \"default\": true\n    },\n    {\n      \"name\": \"compression.type\",\n      \"value\": \"producer\",\n      \"default\": true\n    },\n    {\n      \"name\": \"compression.zstd.level\",\n      \"value\": \"3\",\n      \"default\": true\n    },\n    {\n      \"name\": \"delete.retention.ms\",\n      \"value\": \"86400000\",\n      \"default\": true\n    },\n    {\n      \"name\": \"file.delete.delay.ms\",\n      \"value\": \"60000\",\n      \"default\": true\n    },\n    {\n      \"name\": \"flush.messages\",\n      \"value\": \"9223372036854775807\",\n      \"default\": false\n    },\n    {\n      \"name\": \"flush.ms\",\n      \"value\": \"9223372036854775807\",\n      \"default\": true\n    },\n    {\n      \"name\": \"follower.replication.throttled.replicas\",\n      \"value\": \"\",\n      \"default\": true\n    },\n    {\n      \"name\": \"index.interval.bytes\",\n      \"value\": \"4096\",\n      \"default\": true\n    },\n    {\n      \"name\": \"leader.replication.throttled.replicas\",\n      \"value\": \"\",\n      \"default\": true\n    },\n    {\n      \"name\": \"local.retention.bytes\",\n      \"value\": \"-2\",\n      \"default\": true\n    },\n    {\n      \"name\": \"local.retention.ms\",\n      \"value\": \"-2\",\n      \"default\": true\n    },\n    {\n      \"name\": \"max.compaction.lag.ms\",\n      \"value\": \"9223372036854775807\",\n      \"default\": true\n    },\n    {\n      \"name\": \"max.message.bytes\",\n      \"value\": \"1048588\",\n      \"default\": true\n    },\n    {\n      \"name\": \"message.timestamp.after.max.ms\",\n      \"value\": \"3600000\",\n      \"default\": true\n    },\n    {\n      \"name\": \"message.timestamp.before.max.ms\",\n      \"value\": \"9223372036854775807\",\n      \"default\": true\n    },\n    {\n      \"name\": \"message.timestamp.type\",\n      \"value\": \"CreateTime\",\n      \"default\": true\n    },\n    {\n      \"name\": \"min.cleanable.dirty.ratio\",\n      \"value\": \"0.5\",\n      \"default\": true\n    },\n    {\n      \"name\": \"min.compaction.lag.ms\",\n      \"value\": \"0\",\n      \"default\": true\n    },\n    {\n      \"name\": \"min.insync.replicas\",\n      \"value\": \"1\",\n      \"default\": true\n    },\n    {\n      \"name\": \"preallocate\",\n      \"value\": \"false\",\n      \"default\": true\n    },\n    {\n      \"name\": \"remote.log.copy.disable\",\n      \"value\": \"false\",\n      \"default\": true\n    },\n    {\n      \"name\": \"remote.log.delete.on.disable\",\n      \"value\": \"false\",\n      \"default\": true\n    },\n    {\n      \"name\": \"remote.storage.enable\",\n      \"value\": \"false\",\n      \"default\": true\n    },\n    {\n      \"name\": \"retention.bytes\",\n      \"value\": \"-1\",\n      \"default\": true\n    },\n    {\n      \"name\": \"retention.ms\",\n      \"value\": \"604800000\",\n      \"default\": true\n    },\n    {\n      \"name\": \"segment.bytes\",\n      \"value\": \"1073741824\",\n      \"default\": true\n    },\n    {\n      \"name\": \"segment.index.bytes\",\n      \"value\": \"10485760\",\n      \"default\": true\n    },\n    {\n      \"name\": \"segment.jitter.ms\",\n      \"value\": \"0\",\n      \"default\": true\n    },\n    {\n      \"name\": \"segment.ms\",\n      \"value\": \"604800000\",\n      \"default\": true\n    },\n    {\n      \"name\": \"unclean.leader.election.enable\",\n      \"value\": \"false\",\n      \"default\": true\n    }\n  ]\n}"
           ],
           "origin": "server",
-          "notes": [
-            "Topic configuration is not available: this Kafka client has no DescribeConfigs call."
-          ],
+          "notes": [],
           "constraints": [],
           "documentSchema": null,
           "sections": [
@@ -164,7 +163,173 @@
             },
             {
               "title": "Configuration",
-              "rows": []
+              "rows": [
+                {
+                  "name": "cleanup.policy",
+                  "value": "delete",
+                  "detail": "default"
+                },
+                {
+                  "name": "compression.gzip.level",
+                  "value": "-1",
+                  "detail": "default"
+                },
+                {
+                  "name": "compression.lz4.level",
+                  "value": "9",
+                  "detail": "default"
+                },
+                {
+                  "name": "compression.type",
+                  "value": "producer",
+                  "detail": "default"
+                },
+                {
+                  "name": "compression.zstd.level",
+                  "value": "3",
+                  "detail": "default"
+                },
+                {
+                  "name": "delete.retention.ms",
+                  "value": "86400000",
+                  "detail": "default"
+                },
+                {
+                  "name": "file.delete.delay.ms",
+                  "value": "60000",
+                  "detail": "default"
+                },
+                {
+                  "name": "flush.messages",
+                  "value": "9223372036854775807",
+                  "detail": "STATIC_BROKER_CONFIG"
+                },
+                {
+                  "name": "flush.ms",
+                  "value": "9223372036854775807",
+                  "detail": "default"
+                },
+                {
+                  "name": "follower.replication.throttled.replicas",
+                  "value": "",
+                  "detail": "default"
+                },
+                {
+                  "name": "index.interval.bytes",
+                  "value": "4096",
+                  "detail": "default"
+                },
+                {
+                  "name": "leader.replication.throttled.replicas",
+                  "value": "",
+                  "detail": "default"
+                },
+                {
+                  "name": "local.retention.bytes",
+                  "value": "-2",
+                  "detail": "default"
+                },
+                {
+                  "name": "local.retention.ms",
+                  "value": "-2",
+                  "detail": "default"
+                },
+                {
+                  "name": "max.compaction.lag.ms",
+                  "value": "9223372036854775807",
+                  "detail": "default"
+                },
+                {
+                  "name": "max.message.bytes",
+                  "value": "1048588",
+                  "detail": "default"
+                },
+                {
+                  "name": "message.timestamp.after.max.ms",
+                  "value": "3600000",
+                  "detail": "default"
+                },
+                {
+                  "name": "message.timestamp.before.max.ms",
+                  "value": "9223372036854775807",
+                  "detail": "default"
+                },
+                {
+                  "name": "message.timestamp.type",
+                  "value": "CreateTime",
+                  "detail": "default"
+                },
+                {
+                  "name": "min.cleanable.dirty.ratio",
+                  "value": "0.5",
+                  "detail": "default"
+                },
+                {
+                  "name": "min.compaction.lag.ms",
+                  "value": "0",
+                  "detail": "default"
+                },
+                {
+                  "name": "min.insync.replicas",
+                  "value": "1",
+                  "detail": "default"
+                },
+                {
+                  "name": "preallocate",
+                  "value": "false",
+                  "detail": "default"
+                },
+                {
+                  "name": "remote.log.copy.disable",
+                  "value": "false",
+                  "detail": "default"
+                },
+                {
+                  "name": "remote.log.delete.on.disable",
+                  "value": "false",
+                  "detail": "default"
+                },
+                {
+                  "name": "remote.storage.enable",
+                  "value": "false",
+                  "detail": "default"
+                },
+                {
+                  "name": "retention.bytes",
+                  "value": "-1",
+                  "detail": "default"
+                },
+                {
+                  "name": "retention.ms",
+                  "value": "604800000",
+                  "detail": "default"
+                },
+                {
+                  "name": "segment.bytes",
+                  "value": "1073741824",
+                  "detail": "default"
+                },
+                {
+                  "name": "segment.index.bytes",
+                  "value": "10485760",
+                  "detail": "default"
+                },
+                {
+                  "name": "segment.jitter.ms",
+                  "value": "0",
+                  "detail": "default"
+                },
+                {
+                  "name": "segment.ms",
+                  "value": "604800000",
+                  "detail": "default"
+                },
+                {
+                  "name": "unclean.leader.election.enable",
+                  "value": "false",
+                  "detail": "default"
+                }
+              ]
             }
           ],
           "generatedAt": "2024-01-01T00:00:00.000Z"
@@ -177,6 +342,7 @@
       "args": {
         "connectionId": "test-kafka",
         "path": "consumerGroup:kira-test-group",
+        "refresh": false,
         "tabId": null
       },
       "response": {
@@ -186,7 +352,7 @@
           "qualifiedName": "kira-test-group",
           "language": "json",
           "statements": [
-            "{\n  \"state\": \"EMPTY\",\n  \"type\": \"CLASSIC\",\n  \"protocolType\": \"simple\",\n  \"protocol\": \"\",\n  \"partitionAssignor\": \"\",\n  \"coordinator\": {\n    \"host\": \"fixture-broker-host\",\n    \"port\": 0\n  },\n  \"members\": [],\n  \"offsets\": [\n    {\n      \"name\": \"orders[0]\",\n      \"value\": \"0\",\n      \"detail\": null\n    },\n    {\n      \"name\": \"orders[1]\",\n      \"value\": \"0\",\n      \"detail\": null\n    }\n  ]\n}"
+            "{\n  \"coordinator\": {\n    \"host\": \"fixture-broker-host\",\n    \"port\": 0\n  },\n  \"members\": [],\n  \"offsets\": [\n    {\n      \"name\": \"orders[0]\",\n      \"value\": \"0\"\n    },\n    {\n      \"name\": \"orders[1]\",\n      \"value\": \"0\"\n    }\n  ],\n  \"protocol\": \"\",\n  \"protocolType\": \"\",\n  \"state\": \"Empty\"\n}"
           ],
           "origin": "server",
           "notes": [],
@@ -198,26 +364,16 @@
               "rows": [
                 {
                   "name": "state",
-                  "value": "EMPTY",
-                  "detail": null
-                },
-                {
-                  "name": "type",
-                  "value": "CLASSIC",
+                  "value": "Empty",
                   "detail": null
                 },
                 {
                   "name": "protocolType",
-                  "value": "simple",
-                  "detail": null
-                },
-                {
-                  "name": "protocol",
                   "value": "—",
                   "detail": null
                 },
                 {
-                  "name": "partitionAssignor",
+                  "name": "protocol",
                   "value": "—",
                   "detail": null
                 },
@@ -290,12 +446,12 @@
             "{\"source\":\"seed\"}"
           ],
           "attrs": [
-            "{\"partition\":1,\"offset\":\"0\"}",
-            "{\"partition\":0,\"offset\":\"0\"}",
-            "{\"partition\":0,\"offset\":\"1\"}",
-            "{\"partition\":1,\"offset\":\"1\"}",
-            "{\"partition\":1,\"offset\":\"2\"}",
-            "{\"partition\":0,\"offset\":\"2\"}"
+            "{\"offset\":\"0\",\"partition\":1}",
+            "{\"offset\":\"0\",\"partition\":0}",
+            "{\"offset\":\"1\",\"partition\":0}",
+            "{\"offset\":\"1\",\"partition\":1}",
+            "{\"offset\":\"2\",\"partition\":1}",
+            "{\"offset\":\"2\",\"partition\":0}"
           ],
           "timestamps": [
             "2024-01-01T00:00:00.000Z",

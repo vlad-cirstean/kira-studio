@@ -184,7 +184,10 @@ func TestFixture_Kafka(t *testing.T) {
 		t.Fatalf("expected a coordinator row in %+v", groupSection.Rows)
 	}
 	rec.recordControl(channelTreeDefinition, bridge.TreeDescribeArgs{ConnectionID: cfg.ID, Path: groupNode.Path, Refresh: false, TabID: nil},
-		tree.DefinitionResult{Definition: FreezeDefinition(groupDefinitionResult.Definition), Source: groupDefinitionResult.Source})
+		tree.DefinitionResult{Definition: FreezeCoordinator(FreezeDefinition(groupDefinitionResult.Definition)), Source: groupDefinitionResult.Source})
 
+	if maybeWriteFixture(t, rec, "kafka") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/kafka.fixture.json")
 }

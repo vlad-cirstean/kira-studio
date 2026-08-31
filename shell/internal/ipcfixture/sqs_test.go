@@ -135,5 +135,8 @@ func TestFixture_SQS(t *testing.T) {
 	rec.recordControl(channelTreeDefinition, bridge.TreeDescribeArgs{ConnectionID: cfg.ID, Path: ordersQueueNode.Path, Refresh: false, TabID: nil}, frozenResult)
 	rec.recordControl(channelTreeDefinition, bridge.TreeDescribeArgs{ConnectionID: cfg.ID, Path: ordersQueueNode.Path, Refresh: true, TabID: nil}, frozenResult)
 
+	if maybeWriteFixture(t, rec, "sqs") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/sqs.fixture.json")
 }

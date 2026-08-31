@@ -213,13 +213,18 @@
   }
 
   // opId/tabId are renderer-generated per request and must not gate the match — mirrors
-  // mockPort.ts's own matchKey exactly.
+  // mockPort.ts's own matchKey exactly. `refresh` gets the same false/absent normalisation
+  // mockRuntime.ts's own `canonical()` applies to the control channel (P58f-port finding): a live
+  // stream.ts/state.ts call (e.g. runCount) never sets the key at all, but a fixture captured
+  // straight from Go's own CountRequestWire always carries an explicit `refresh:false` — the wire
+  // struct has no `omitempty` for it, unlike the TypeScript optional field it replaces.
   function matchKey(op, payload) {
     var rest;
     if (payload && typeof payload === 'object') {
       rest = Object.assign({}, payload);
       delete rest.opId;
       delete rest.tabId;
+      if (rest.refresh === false) delete rest.refresh;
       return `${op}:${JSON.stringify(rest)}`;
     }
     return `${op}:${JSON.stringify(payload)}`;

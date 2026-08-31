@@ -175,5 +175,8 @@ func TestFixture_MariaDB(t *testing.T) {
 		t.Fatal("in-flight read never returned after cancel")
 	}
 
+	if maybeWriteFixture(t, rec, "mariadb") {
+		return
+	}
 	assertMatchesCommittedJSONFixture(t, rec, "testdata/mariadb.fixture.json")
 }

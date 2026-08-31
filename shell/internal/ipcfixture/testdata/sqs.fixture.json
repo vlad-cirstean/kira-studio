@@ -107,6 +107,7 @@
       "args": {
         "connectionId": "test-sqs",
         "path": "queue:orders-queue",
+        "refresh": false,
         "tabId": null
       },
       "response": {
@@ -116,7 +117,7 @@
           "qualifiedName": "orders-queue",
           "language": "json",
           "statements": [
-            "{\n  \"ApproximateNumberOfMessages\": \"0\",\n  \"ApproximateNumberOfMessagesNotVisible\": \"5\",\n  \"ApproximateNumberOfMessagesDelayed\": \"0\",\n  \"CreatedTimestamp\": \"1700000000\",\n  \"DelaySeconds\": \"0\",\n  \"LastModifiedTimestamp\": \"1700000000\",\n  \"MaximumMessageSize\": \"262144\",\n  \"MessageRetentionPeriod\": \"345600\",\n  \"QueueArn\": \"arn:aws:sqs:us-east-1:170000000000:orders-queue\",\n  \"ReceiveMessageWaitTimeSeconds\": \"0\",\n  \"VisibilityTimeout\": \"30\",\n  \"SqsManagedSseEnabled\": \"true\"\n}"
+            "{\n  \"ApproximateNumberOfMessages\": \"0\",\n  \"ApproximateNumberOfMessagesDelayed\": \"0\",\n  \"ApproximateNumberOfMessagesNotVisible\": \"5\",\n  \"CreatedTimestamp\": \"1700000000\",\n  \"DelaySeconds\": \"0\",\n  \"LastModifiedTimestamp\": \"1700000000\",\n  \"MaximumMessageSize\": \"262144\",\n  \"MessageRetentionPeriod\": \"345600\",\n  \"QueueArn\": \"arn:aws:sqs:us-east-1:170000000000:orders-queue\",\n  \"ReceiveMessageWaitTimeSeconds\": \"0\",\n  \"SqsManagedSseEnabled\": \"true\",\n  \"VisibilityTimeout\": \"30\"\n}"
           ],
           "origin": "server",
           "notes": [],
@@ -209,7 +210,7 @@
           "qualifiedName": "orders-queue",
           "language": "json",
           "statements": [
-            "{\n  \"ApproximateNumberOfMessages\": \"0\",\n  \"ApproximateNumberOfMessagesNotVisible\": \"5\",\n  \"ApproximateNumberOfMessagesDelayed\": \"0\",\n  \"CreatedTimestamp\": \"1700000000\",\n  \"DelaySeconds\": \"0\",\n  \"LastModifiedTimestamp\": \"1700000000\",\n  \"MaximumMessageSize\": \"262144\",\n  \"MessageRetentionPeriod\": \"345600\",\n  \"QueueArn\": \"arn:aws:sqs:us-east-1:170000000000:orders-queue\",\n  \"ReceiveMessageWaitTimeSeconds\": \"0\",\n  \"VisibilityTimeout\": \"30\",\n  \"SqsManagedSseEnabled\": \"true\"\n}"
+            "{\n  \"ApproximateNumberOfMessages\": \"0\",\n  \"ApproximateNumberOfMessagesDelayed\": \"0\",\n  \"ApproximateNumberOfMessagesNotVisible\": \"5\",\n  \"CreatedTimestamp\": \"1700000000\",\n  \"DelaySeconds\": \"0\",\n  \"LastModifiedTimestamp\": \"1700000000\",\n  \"MaximumMessageSize\": \"262144\",\n  \"MessageRetentionPeriod\": \"345600\",\n  \"QueueArn\": \"arn:aws:sqs:us-east-1:170000000000:orders-queue\",\n  \"ReceiveMessageWaitTimeSeconds\": \"0\",\n  \"SqsManagedSseEnabled\": \"true\",\n  \"VisibilityTimeout\": \"30\"\n}"
           ],
           "origin": "server",
           "notes": [],
@@ -318,11 +319,11 @@
             "{\"source\":{\"DataType\":\"String\",\"StringValue\":\"seed\"}}"
           ],
           "attrs": [
-            "{\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"ApproximateFirstReceiveTimestamp\":\"1700000000000\"}",
-            "{\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"ApproximateFirstReceiveTimestamp\":\"1700000000000\"}",
-            "{\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"ApproximateFirstReceiveTimestamp\":\"1700000000000\"}",
-            "{\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"ApproximateFirstReceiveTimestamp\":\"1700000000000\"}",
-            "{\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"ApproximateFirstReceiveTimestamp\":\"1700000000000\"}"
+            "{\"ApproximateFirstReceiveTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\"}",
+            "{\"ApproximateFirstReceiveTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\"}",
+            "{\"ApproximateFirstReceiveTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\"}",
+            "{\"ApproximateFirstReceiveTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\"}",
+            "{\"ApproximateFirstReceiveTimestamp\":\"1700000000000\",\"ApproximateReceiveCount\":\"1\",\"SenderId\":\"000000000000\",\"SentTimestamp\":\"1700000000000\"}"
           ],
           "timestamps": [
             "2024-01-01T00:00:00.000Z",
@@ -362,7 +363,8 @@
         "tabId": null,
         "connectionId": "test-sqs",
         "path": "queue:empty-queue",
-        "filter": null
+        "filter": null,
+        "refresh": false
       },
       "response": {
         "kind": "count",
