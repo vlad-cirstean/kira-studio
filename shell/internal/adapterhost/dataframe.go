@@ -26,21 +26,43 @@ type wireResponse struct {
 	Error   *wireError `json:"error,omitempty"`
 }
 
+type wireEvent struct {
+	Kind    string `json:"kind"`
+	Topic   string `json:"topic"`
+	Payload any    `json:"payload"`
+}
+
 // AttachStream makes conn the current renderer connection: a Session (A18's single writer) that
 // also becomes the engine child's Sink, so both producers share one queue and one conn.Send
-// caller. detach supersedes this session — call it when the renderer's side closes.
+// caller, and subscribes it to the Go cache's own stats-changed notifications (D12) — the status
+// bar's cache readout has had no producer since the Node child's cache stopped serving pages, and
+// this is what fixes it. detach supersedes this session — call it when the renderer's side closes.
 func (r *Router) AttachStream(conn StreamSession) (session *Session, detach func()) {
 	session = newSession(r, conn)
 	var detachChild func()
 	if r.child != nil {
 		detachChild = r.child.AttachStream(session)
 	}
+	unsubscribeStats := r.cache.OnStatsChanged(func(stats enginecache.CacheStats) {
+		r.pushCacheStats(session, stats)
+	})
 	return session, func() {
+		unsubscribeStats()
 		if detachChild != nil {
 			detachChild()
 		}
 		session.Close()
 	}
+}
+
+// pushCacheStats emits an unsolicited cache:stats event frame — the exact shape port.ts's
+// handleMessage dispatches on and data.onCacheStats consumes.
+func (r *Router) pushCacheStats(session *Session, stats enginecache.CacheStats) {
+	body, err := json.Marshal(wireEvent{Kind: "evt", Topic: "cache:stats", Payload: stats})
+	if err != nil {
+		return
+	}
+	session.enqueueLocal(body)
 }
 
 // HandleDataFrame is rpc.ts's dispatch, reimagined as a router: ping always forwards to the child

@@ -28,6 +28,11 @@ func mustFrame(t *testing.T, v any) []byte {
 
 func readSent(t *testing.T, conn *fakeConn) map[string]any {
 	t.Helper()
+	return readSentWithin(t, conn, time.Second)
+}
+
+func readSentWithin(t *testing.T, conn *fakeConn, timeout time.Duration) map[string]any {
+	t.Helper()
 	select {
 	case frame := <-conn.sent:
 		var out map[string]any
@@ -35,8 +40,8 @@ func readSent(t *testing.T, conn *fakeConn) map[string]any {
 			t.Fatalf("unmarshal sent frame: %v", err)
 		}
 		return out
-	case <-time.After(time.Second):
-		t.Fatal("no frame was sent to the session within 1s")
+	case <-time.After(timeout):
+		t.Fatalf("no frame was sent to the session within %s", timeout)
 		return nil
 	}
 }
@@ -138,6 +143,36 @@ func TestHandleDataFrame_CacheClear_ClearsGoCache(t *testing.T) {
 	if r.cache.Stats().L2Entries != 0 {
 		t.Error("cache:clear must clear the Go-native cache")
 	}
+}
+
+// D12: a session subscribes to the Go cache's stats-changed notifications on attach and gets an
+// unsolicited cache:stats event frame when they fire; detach unsubscribes.
+func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
+	r, _ := newTestRouter()
+	conn := newFakeConn()
+	_, detach := r.AttachStream(conn)
+
+	cacheReq := enginecache.ReadRequest{ConnectionID: "c", Path: "p", PageSize: 10, Cursor: model.PageCursor{Mode: "offset"}}
+	key, label := enginecache.PageCacheKey(cacheReq)
+	r.cache.StorePage(key, label, cacheReq, page.TabularPage{ByteSize: 5})
+
+	// The cache's own emit is throttled to at most 1 Hz (scheduleEmitLocked); give it real margin
+	// past that so this isn't a race against the cache's own timer.
+	evt := readSentWithin(t, conn, 3*time.Second)
+	if evt["kind"] != "evt" || evt["topic"] != "cache:stats" {
+		t.Fatalf("evt = %+v, want a cache:stats event frame", evt)
+	}
+	payload, ok := evt["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("evt payload = %+v, want a CacheStats object", evt["payload"])
+	}
+	if payload["l2Entries"] != float64(1) {
+		t.Errorf("l2Entries = %v, want 1", payload["l2Entries"])
+	}
+
+	detach()
+	r.cache.Clear()
+	assertNothingSent(t, conn)
 }
 
 // A16: counters sum; the budget reports once, not doubled.
