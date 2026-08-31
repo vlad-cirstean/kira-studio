@@ -8,11 +8,11 @@ team works, and how to run things in whichever box a session happens to be on.
 
 - The **main session runs on Sonnet**. It implements directly — it does not delegate
   implementation to subagents.
-- Each phase (see `docs/v1/SPEC.md` §10 phasing table) gets an Opus-authored plan
-  committed under `docs/v1/plans/` before any implementation starts. Produce this by spawning an
+- Each phase (see `docs/v1.1/SPEC.md`'s phasing table) gets an Opus-authored plan
+  committed under `docs/v1.1/plans/` before any implementation starts. Produce this by spawning an
   **Opus subagent** (`Agent` tool, `model: "opus"`) whose job is only to write that plan; the
   main Sonnet session then implements it.
-- If a phase's plan is missing from `docs/v1/plans/`, do not implement from the spec directly —
+- If a phase's plan is missing from `docs/v1.1/plans/`, do not implement from the spec directly —
   get the Opus plan written and committed first.
 - Do not spawn implementation subagents (Sonnet or otherwise) for the core sequential work.
   Phases build on each other, so the main session needs continuity of what was decided and why;
@@ -27,7 +27,7 @@ team works, and how to run things in whichever box a session happens to be on.
   Opus-research-then-Sonnet-fix cycle, in order, each one written and implemented against the
   *current* state of the tree (i.e. on top of everything the previous pass already landed) —
   never against the pre-phase state, and never batched into one plan up front. Give each pass's
-  plan its own file under `docs/v1/plans/` (e.g. a phase's plan plus `-iter2`/`-iter3` suffixes) so
+  plan its own file under `docs/v1.1/plans/` (e.g. a phase's plan plus `-iter2`/`-iter3` suffixes) so
   the history of what each round found and fixed stays legible on its own. The point of more than
   one pass is that later rounds find what earlier rounds missed or newly created — an Opus session
   planning pass N should actually re-read the current source rather than trust pass N-1's own
@@ -790,5 +790,7 @@ Nothing in this run needed softening or a "not available in this session" carve-
   hardware here, same constraint every earlier phase's packaged-build numbers hit; recorded as such in
   `docs/PERF.md` §3 and its L-D lever note rather than guessed at.
 
-Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
-phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
+Current-state architecture reference: `docs/ARCHITECTURE.md`. The live phasing record, phase by
+phase: `docs/v1.1/SPEC.md` (see `docs/v1.1/README.md` for what that folder is and isn't). v1 shipped
+and is kept as history in `docs/v1/SPEC.md`/`docs/v1/README.md`; it is not the process pointer
+anymore.
