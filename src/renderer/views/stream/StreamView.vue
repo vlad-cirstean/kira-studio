@@ -81,15 +81,11 @@ const isBatch = computed(() => caps.value?.pagination === 'batch');
 // Delete but no filter row at all (queue-based, no topic/partition/offset concept to filter by).
 const isKafka = computed(() => connRecord.value?.kind === 'kafka');
 const isSqs = computed(() => connRecord.value?.kind === 'sqs');
-// P37 D32: rabbitmq is the stream view's third kind — batch pagination like SQS (isBatch below),
-// but its own compose shape and its own poll-warning wording (a poll requeues, it does not
-// consume — SQS's own sentence would be a false statement about this engine).
-const isRabbit = computed(() => connRecord.value?.kind === 'rabbitmq');
 const canInsert = computed(() => caps.value?.canInsert ?? false);
 const canDelete = computed(() => caps.value?.canDelete ?? false);
 
-// D10/D12: a batch tab (SQS/RabbitMQ) never auto-loads on reconnect — only an explicit Poll does,
-// since every poll consumes/requeues from the queue rather than merely browsing it.
+// D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
+// since every poll consumes from the queue rather than merely browsing it.
 const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => {
@@ -212,8 +208,8 @@ const statusLine = computed(() => {
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap. P43 iter3 D46: a
 // computed over caps.maxPageSize rather than the plain module-level constant every other view's
-// own pageSizeOptions() call still is — the ceiling is per-connection (only rabbitmq sets one),
-// so it can only be known once caps has actually arrived for this tab's connection.
+// own pageSizeOptions() call still is — the ceiling is per-connection, so it can only be known
+// once caps has actually arrived for this tab's connection.
 const PAGE_SIZE_OPTIONS = computed(() => pageSizeOptions('stream-', caps.value?.maxPageSize));
 function onPageSize(size: PageSize): void {
   void setPageSize(props.tab.id, size);
@@ -561,14 +557,13 @@ onUnmounted(() => {
               v-if="canInsert"
               icon="add"
               data-testid="stream-add-message"
-              v-tooltip="isKafka ? 'Produce a message' : isRabbit ? 'Publish a message' : 'Send a message'"
+              v-tooltip="isKafka ? 'Produce a message' : 'Send a message'"
               @click="composeOpen = !composeOpen"
             />
             <StreamComposeMessage
-              v-if="composeOpen && (isKafka || isSqs || isRabbit)"
+              v-if="composeOpen && (isKafka || isSqs)"
               :tab-id="tab.id"
-              :kind="isKafka ? 'kafka' : isRabbit ? 'rabbitmq' : 'sqs'"
-              :queue-name="isRabbit ? targetTail?.name : undefined"
+              :kind="isKafka ? 'kafka' : 'sqs'"
               @close="composeOpen = false"
             />
           </div>
@@ -706,20 +701,10 @@ onUnmounted(() => {
 
       <!-- The one destructive truth of this view, stated once at the top. -->
       <template #strips>
-      <MessageStrip v-if="isBatch && !isRabbit" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
+      <MessageStrip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
         <span
           >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
           above) — it does not browse a stable position.</span
-        >
-      </MessageStrip>
-
-      <!-- P37 D32: a true statement about SQS is a false one about rabbitmq — a poll here goes
-           through the management API's own basic.get, which requeues rather than removes (F12). -->
-      <MessageStrip v-if="isBatch && isRabbit" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
-        <span
-          >Each poll fetches up to 500 messages through the management API and immediately
-          <b>requeues</b> them — nothing is removed, but they are marked redelivered and their
-          position in the queue can change.</span
         >
       </MessageStrip>
 

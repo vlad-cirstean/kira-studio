@@ -20,9 +20,6 @@ export const nodeKindSchema = z.enum([
   'bucket', // P17: an s3 bucket — the root container, redis's 'database' equivalent
   'prefix', // P17: an intermediate '/'-delimited level in an s3 bucket, redis's 'namespace' equivalent
   'object', // P17: a leaf s3 object, opened as a key/value tab (redis's 'key' equivalent)
-  'exchange', // P37: a rabbitmq exchange — a definition-only leaf, foldered under its vhost. A
-  // rabbitmq vhost is NOT a new kind: it reuses 'database' (P37 D15), the same reuse redis's db
-  // index and sqlite's single 'main' node already make.
 ]);
 export type NodeKind = z.infer<typeof nodeKindSchema>;
 

@@ -3,7 +3,7 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across eleven database engines.
+Vue 3 — one workbench across ten database engines.
 
 ## Status
 
@@ -31,7 +31,6 @@ Vue 3 — one workbench across eleven database engines.
 | Redis | Key/value | yes (Redis commands) | no | no | no | yes (per key) | `SCAN` cursor | yes (string keys only) |
 | Kafka | Stream | no | yes | no | no | yes (offset delta) | offset window | insert only (produce) |
 | SQS | Stream | no | yes | no | no | approximate | receive batches | insert + delete |
-| RabbitMQ⁵ | Stream | no | yes | no | no | no (live snapshot) | `basic.get` batches | insert only (publish) |
 | S3 | Key/value | no | no | no | no | per-object only | continuation token | yes (+ upload/download) |
 
 ¹ The console takes each engine's native command form, not SQL — that's why the column isn't
@@ -54,13 +53,6 @@ there is no addressable row to update or delete, so `canUpdate`/`canDelete` stay
 is offset-only for the same reason: no unique key exists to build a keyset cursor on. Uses
 `@clickhouse/client` (npm), the app's first added dependency since the Kafka client migration —
 pure JS, no native build step.
-
-⁵ RabbitMQ's adapter speaks only the broker's HTTP management API — AMQP itself has no way to list
-queues, exchanges, or bindings at all, so the wire protocol can't be the enumeration path even in
-principle. A message has no broker-assigned identity, so `canUpdate`/`canDelete` stay permanently
-`false` for a third, distinct reason from ClickHouse's and Kafka's own. A poll requeues rather than
-removes what it reads (`caps.pagination = 'batch'`, mirroring SQS). Adds no dependency at all — a
-plain `fetch` call, since both runtimes this app tests under already have it.
 
 A couple of things worth knowing up front:
 
@@ -198,9 +190,9 @@ Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`.
 - **`bun run test:e2e`** — Playwright driving the built Electron app via `_electron.launch()`. It
   builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:e2e`.
 - **Local fixture databases for manual testing** — see
-  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): ten of the eleven engines (SQLite
+  [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): nine of the ten engines (SQLite
   needs no container), a ~20k-row e-commerce dataset for the relational/document/key-value stores
-  plus a small backlog for Kafka/SQS/RabbitMQ/S3, via Colima + Docker Compose.
+  plus a small backlog for Kafka/SQS/S3, via Colima + Docker Compose.
 
 ## Architecture
 

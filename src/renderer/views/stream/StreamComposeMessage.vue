@@ -6,33 +6,26 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
-import { produceKafkaMessage, publishRabbitMessage, sendSqsMessage } from './mutations';
+import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
 // sentinel fields); SQS gets body/headers but no key (SendMessage has no key concept on this
 // app's model — see sqs/mutate.ts's own scoping note; task #61 added SQS's MessageAttributes
-// support, so headers is now shared by both kinds). P37 D32: rabbitmq gets body/headers plus a
-// routing key (prefilled with the queue's own name, F15), an exchange (prefilled to read
-// "(default)") and a Persistent checkbox — the compose panel's third shape. One popover, one
-// shape switch, rather than three near-identical components.
+// support, so headers is now shared by both kinds). One popover, one shape switch, rather than
+// two near-identical components.
 const props = defineProps<{
   tabId: string;
-  kind: 'kafka' | 'sqs' | 'rabbitmq';
-  queueName?: string;
+  kind: 'kafka' | 'sqs';
 }>();
 const emit = defineEmits<{ close: [] }>();
 
 const key = ref('');
 const body = ref('');
 const headers = ref('');
-const routingKey = ref('');
-const exchange = ref('');
-const persistent = ref(false);
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
 const isKafka = computed(() => props.kind === 'kafka');
-const isRabbit = computed(() => props.kind === 'rabbitmq');
 const canSubmit = computed(() => body.value.trim() !== '' && !submitting.value);
 
 async function submit(): Promise<void> {
@@ -45,14 +38,6 @@ async function submit(): Promise<void> {
         key: key.value.trim() === '' ? null : key.value,
         body: body.value,
         headers: headers.value.trim() === '' ? null : headers.value,
-      });
-    } else if (isRabbit.value) {
-      await publishRabbitMessage(props.tabId, {
-        body: body.value,
-        headers: headers.value.trim() === '' ? null : headers.value,
-        routingKey: routingKey.value.trim() === '' ? null : routingKey.value,
-        exchange: exchange.value.trim() === '' ? null : exchange.value,
-        persistent: persistent.value,
       });
     } else {
       await sendSqsMessage(
@@ -81,7 +66,7 @@ async function submit(): Promise<void> {
     <div class="compose-inner">
       <div class="compose-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
-        <span>{{ isKafka ? 'Produce a message' : isRabbit ? 'Publish a message' : 'Send a message' }}</span>
+        <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
         <IconButton icon="close" class="p-push" v-tooltip="'Close'" @click="emit('close')" />
       </div>
 
@@ -115,38 +100,6 @@ async function submit(): Promise<void> {
           />
         </label>
 
-        <!-- P37 D25/D32: routing key defaults to the queue's own name (F15) — placeholder shows
-             the default rather than the field starting non-empty, so an untouched field still
-             sends `null` and the adapter's own default applies. Exchange defaults to '' (the
-             default exchange), shown as "(default)" the same way the management UI itself spells
-             it (F15). -->
-        <label v-if="isRabbit" class="field">
-          <span class="p-sm muted">Routing key</span>
-          <TextField
-            v-model="routingKey"
-            :placeholder="queueName ? `${queueName} (this queue's name)` : '(none)'"
-            data-testid="stream-add-message-routing-key"
-          />
-        </label>
-
-        <label v-if="isRabbit" class="field">
-          <span class="p-sm muted">Exchange</span>
-          <TextField
-            v-model="exchange"
-            placeholder="(default)"
-            data-testid="stream-add-message-exchange"
-          />
-        </label>
-
-        <label v-if="isRabbit" class="field field-inline">
-          <input
-            type="checkbox"
-            v-model="persistent"
-            data-testid="stream-add-message-persistent"
-          />
-          <span class="p-sm">Persistent (survives a broker restart)</span>
-        </label>
-
         <span v-if="error" class="p-sm error-text" data-testid="stream-add-message-error">{{
           error
         }}</span>
@@ -161,7 +114,7 @@ async function submit(): Promise<void> {
           data-testid="stream-add-message-submit"
           @click="submit"
         >
-          {{ isKafka ? 'Produce' : isRabbit ? 'Publish' : 'Send' }}
+          {{ isKafka ? 'Produce' : 'Send' }}
         </AppButton>
       </div>
     </div>

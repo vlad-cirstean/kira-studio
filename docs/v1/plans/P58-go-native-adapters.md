@@ -18,6 +18,14 @@
 > M0** (a named probe against a real container/broker before any product code depends on it). This
 > repo's own standard from P55 §1.1 / P56 §1 / P57's preamble: a claim without a source is a guess,
 > and this phase is far too large to be built on guesses.
+>
+> **Amendment, mid-phase, before M8 was planned or implemented:** RabbitMQ was dropped from v1's
+> scope entirely — the connection kind, its TypeScript adapter, and every test/doc surface naming
+> it were removed from the tree rather than ported to Go. It is never coming back as a Go-native
+> adapter under this plan. Every count, table row and sequencing reference below that named
+> RabbitMQ as one of the eleven kinds is now stale by exactly one kind; **ten kinds remain**, and
+> M8 (§9) is SQS and S3 only. The SPEC.md quote above stays verbatim (docs/v1/ is never retro-edited)
+> — it is a historical record of what v1 originally specified, not a current scope statement.
 
 ## 0. What this phase is, and what it is not
 
@@ -99,9 +107,9 @@ The sub-phases:
 | **P58a** | The Go substrate + Postgres, the pathfinder | Nothing can move before the substrate. Postgres is the reference adapter (`caps.ts`'s own table is written postgres-first) and the only one that exercises *every* `Adapter` method including keyset pagination, side-connection cancellation, a query console and staged transactional mutations — so it proves the substrate rather than a subset of it |
 | **P58b** | MySQL/MariaDB, SQLite, ClickHouse | The rest of the SQL family. They share `sql-text.ts`'s keyset planner and `sql-mutate.ts`'s guards with Postgres, so this sub-phase exercises the substrate three more times with **no new page shape and no new pagination strategy** — only new dialects. Grouped because dialect-porting is one skill applied three times, not three unrelated problems |
 | **P58c** | MongoDB, Redis | The two adapters that produce a page shape the SQL family never does (`DocumentPage`, `KeyValuePage`) and that each carry their own hand-written expression language (`mongo/literal.ts`, 338 lines; `redis/console.ts`). Grouped because "a new page builder plus an original parser" is the same problem twice |
-| **P58d** | SQS, S3, RabbitMQ | The three *service-protocol* adapters with no new hard unknown: two share one SDK (`aws-sdk-go-v2`), and RabbitMQ has no driver at all — Go's own `net/http` is the whole dependency, making it the single easiest adapter in the set, not the hardest. Grouped because none of them needs a driver decision this plan has not already settled |
+| **P58d** | SQS, S3 | The two *service-protocol* SQL-adjacent adapters sharing one SDK (`aws-sdk-go-v2`), with no new driver decision this plan has not already settled. (RabbitMQ was dropped from scope — see the amendment note above — so this sub-phase is smaller than originally planned) |
 | **P58e** | Kafka | Alone, deliberately. It is the only adapter whose driver choice is a genuine decision (D7), the only one with a non-trivial consumer model, and the one carrying the still-open native-module packaging gap. Isolating it late means it can take a second pass without blocking the four sub-phases that do not depend on it — and it must land before P58f, because the cutover cannot happen while any kind is still Node-served |
-| **P58f** | Cutover | `src/engine/`, `internal/enginehost/`, the vendored Node, the build and packaging steps, the test tiers and the docs. Everything whose removal is only safe once all eleven kinds are native |
+| **P58f** | Cutover | `src/engine/`, `internal/enginehost/`, the vendored Node, the build and packaging steps, the test tiers and the docs. Everything whose removal is only safe once all ten kinds are native |
 
 **Each sub-phase gets its own Opus plan under `docs/v1/plans/` before implementation**, per
 `AGENTS.md`. That is not double-planning: it is this repo's own established shape for adapter work —
@@ -736,10 +744,10 @@ one connection in its UI.
 ## 3. Target tree
 
 ```
-shell/internal/adapters/                  NEW   the substrate + eleven engines
+shell/internal/adapters/                  NEW   the substrate + ten engines
   adapter.go              NEW  the Adapter interface, OpCtx, ConnectInfo, ReadRequest, CountRequest,
                                TreeChildren, and Adapter rules 1-8 carried over as doc comments
-  caps.go                 NEW  Caps + the eleven cap literals (one per engine package)
+  caps.go                 NEW  Caps + the ten cap literals (one per engine package)
   errors.go               NEW  AdapterError, the closed code set, mapError contract, unsupported(),
                                noQueryConsole(), assertWritable(), assertNotCancelled(),
                                throwIfCancelled(), requireConnected()
@@ -748,7 +756,7 @@ shell/internal/adapters/                  NEW   the substrate + eleven engines
   sqltext.go              NEW  sql-text.ts (378 lines): keyset planning, whereClause, order rules
   sqlmutate.go            NEW  sql-mutate.ts (138 lines): op ordering, guards, dialect rendering
   postgres/     …/mysqlfamily/ …/mariadb/ …/mysql/ …/sqlite/ …/clickhouse/
-  mongo/        …/redis/  …/kafka/  …/sqs/  …/s3/  …/rabbitmq/
+  mongo/        …/redis/  …/kafka/  …/sqs/  …/s3/
 shell/internal/page/                      NEW   the columnar codec (page.ts's builder half)
   chunk.go                NEW  TextColumnChunk + base64 marshalling (D5)
   builder.go              NEW  the four page builders, ColumnScratch, UTF-8 boundary truncation
@@ -1325,15 +1333,14 @@ adapters; M10–M11 are the cutover.** Hard rules, in priority order:
 
 **P58d — the service-protocol tier**
 
-- **M8 — SQS, S3, RabbitMQ.** S3 carries `caps.fileTransfer` and the temp-file-then-rename download.
-  RabbitMQ is expected to be the fastest adapter in the whole phase (§1.8) and is a good one to land
-  first inside the milestone for morale and for a clean early proof that a driverless adapter ports
-  cleanly.
+- **M8 — SQS, S3.** S3 carries `caps.fileTransfer` and the temp-file-then-rename download. (RabbitMQ
+  was dropped from scope before this milestone was planned or implemented — see the amendment note
+  at the top of this document.)
 
 **P58e — Kafka**
 
 - **M9 — Kafka, on franz-go** (D7), against M0's already-proven probe. Ends with `nativeKinds`
-  complete — all eleven — and `tests/db/kafka.spec.ts` deleted, along with
+  complete — all ten — and `tests/db/kafka.spec.ts` deleted, along with
   `scripts/run-db-tests.sh`'s whole reason for existing.
 
 **P58f — cutover**

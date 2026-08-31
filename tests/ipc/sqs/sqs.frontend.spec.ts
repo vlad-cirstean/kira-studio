@@ -64,8 +64,8 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   await expect(view.locator('.no-rows')).toContainText('Click Poll to fetch messages');
   await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
 
-  // sqs has no caps.maxPageSize — all four sizes stay present (the guard rabbitmq's own split
-  // exposes a real cap rather than inventing one, P50 §4.4).
+  // sqs has no caps.maxPageSize — all four sizes stay present (the guard that would otherwise
+  // filter them down applies only to an adapter that actually exposes a real cap, P50 §4.4).
   await expect(view.locator('[data-testid="stream-page-size-10"]')).toBeVisible();
   await expect(view.locator('[data-testid="stream-page-size-100"]')).toBeVisible();
   await expect(view.locator('[data-testid="stream-page-size-1000"]')).toBeVisible();

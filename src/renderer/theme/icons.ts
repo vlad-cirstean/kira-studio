@@ -21,7 +21,6 @@ const KIND_ICON: Record<NodeKind, string> = {
   bucket: 'archive', // P17: an s3 bucket
   prefix: 'folder', // P17: an intermediate '/'-delimited s3 key level
   object: 'file', // P17: a leaf s3 object, opened as a key/value tab (redis's own 'key' precedent)
-  exchange: 'git-merge', // P37: a rabbitmq exchange — routes one input to many bound destinations
 };
 
 // P19: 'group' isn't a real NodeKind (it's a renderer-only synthetic tree row, project/grouping.ts)

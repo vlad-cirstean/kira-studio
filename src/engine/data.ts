@@ -144,7 +144,7 @@ export async function handleMutate(payload: unknown): Promise<MutateResponse> {
     // Same-process, not a round trip back through main (P5 D12). §7/P13 D18: a mutation drops
     // the target's pages but only marks its counts stale — DATA_OP.invalidate's hard drop is
     // reserved for the renderer's explicit ↻ Refresh.
-    // P43 F12/D17: in a `finally`, not just the success path — redis/s3/sqs/rabbitmq/mongo/
+    // P43 F12/D17: in a `finally`, not just the success path — redis/s3/sqs/mongo/
     // clickhouse's own `mutate()` is a plain sequential loop with no transaction (unlike
     // postgres/mysql-family/sqlite's own BEGIN/COMMIT/ROLLBACK), so a plan that fails part-way
     // through still mutates the server. Leaving the success-only call meant that partial write

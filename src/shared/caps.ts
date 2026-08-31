@@ -71,10 +71,10 @@ export interface Caps {
   fileTransfer: boolean;
 
   /** P43 iter3 D46: the largest page this engine can actually serve in one read, when that is
-   *  below the picker's own ceiling. Absent means "every size the picker offers works" — ten of
-   *  the eleven adapters. Only rabbitmq sets it (a basic.get batch is one request, capped at
-   *  read.ts's MAX_POLL_MESSAGES, and every message in it is held unacked until the batch
-   *  finishes), so the stream toolbar can stop offering two sizes a poll can never serve. */
+   *  below the picker's own ceiling. Absent means "every size the picker offers works". No
+   *  current adapter sets it (rabbitmq did, before it was dropped — see P58 findings), but the
+   *  mechanism stays: the stream toolbar's page-size picker (sizes.ts's pageSizeOptions) already
+   *  filters against it generically for whichever future engine needs a real ceiling. */
   maxPageSize?: number;
 }
 
@@ -122,5 +122,4 @@ export const capsSchema = z.object({
  * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no         | no          |
  * | sqs      | region → queues                                                           | stream          | batch         | no (approx)    | SDK AbortSignal                          | no  | no         | no          |
  * | s3       | account → bucket → prefix/object (lazy, '/'-delimited)                   | keyvalue        | token         | no             | SDK AbortController                      | no  | no         | no          |
- * | rabbitmq | vhost (database) → queues (ungrouped), exchanges (folder); bindings live in the definition view | stream | batch | no (messages is a snapshot) | AbortSignal on the HTTP request | no | yes | no (no FK concept) |
  */

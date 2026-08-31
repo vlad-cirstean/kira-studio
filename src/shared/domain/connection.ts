@@ -12,8 +12,7 @@ export const connectionKindSchema = z.enum([
   'kafka',
   'sqs',
   's3',
-  'rabbitmq',
-]); // all v1 kinds; every one has an adapter as of P36 except rabbitmq, in progress for P37
+]); // all v1 kinds; every one has an adapter as of P36 (rabbitmq dropped, see P58 findings)
 export type ConnectionKind = z.infer<typeof connectionKindSchema>;
 
 // The connection dialog's default port per kind (D27's "kind-driven default port", not a
@@ -28,9 +27,6 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   mongodb: 27017,
   redis: 6379,
   kafka: 9092,
-  // P37 D10: the management HTTP API's port, not AMQP's 5672 — the only port this adapter can
-  // ever speak to (it has no AMQP client at all).
-  rabbitmq: 15672,
 };
 
 export const connectionColorSchema = z.enum([

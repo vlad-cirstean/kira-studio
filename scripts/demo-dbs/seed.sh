@@ -45,10 +45,6 @@ echo "==> S3 (LocalStack — same container as SQS)"
 docker exec -i kira-sqs bash < "${SCRIPT_DIR}/s3/seed.sh"
 
 echo
-echo "==> RabbitMQ (host-side — no useful CLI inside the image, talks to localhost:15672 directly)"
-bash "${SCRIPT_DIR}/rabbitmq/seed.sh"
-
-echo
 echo "==> SQLite (no container — a file on disk, built directly)"
 bun "${SCRIPT_DIR}/sqlite/seed.ts"
 

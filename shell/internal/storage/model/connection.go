@@ -46,7 +46,7 @@ type ConnectionState struct {
 // connectionKinds mirrors connection.ts's connectionKindSchema — all v1 kinds.
 var connectionKinds = map[string]bool{
 	"postgres": true, "mariadb": true, "mysql": true, "sqlite": true, "clickhouse": true,
-	"mongodb": true, "redis": true, "kafka": true, "sqs": true, "s3": true, "rabbitmq": true,
+	"mongodb": true, "redis": true, "kafka": true, "sqs": true, "s3": true,
 }
 
 // connectionColors mirrors connection.ts's connectionColorSchema — the whole storable set, not

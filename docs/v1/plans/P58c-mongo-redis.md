@@ -12,7 +12,9 @@
 >
 > **Predecessors:** `docs/v1/plans/P58a-substrate-postgres.md` (M0–M5, complete; §12/§13 record real
 > results) and `docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` (M6.0–M6.4, complete; §12/§13 the
-> same). Five of eleven kinds are Go-native at `223cf02`: `postgres`, `mariadb`, `mysql`, `sqlite`,
+> same). Five of ten kinds are Go-native at `223cf02` (RabbitMQ was dropped from v1's scope before
+> this plan was written, per the parent plan's amendment note — ten kinds remain, not eleven):
+> `postgres`, `mariadb`, `mysql`, `sqlite`,
 > `clickhouse`. **P58c writes no substrate**, and — unlike P58b — it barely uses the SQL half of the
 > one that exists (§1.3). What it does need is four small lifts, two of which exist *only* because
 > P58a and P58b deliberately parked their own placeholders on the two kinds this sub-phase makes
@@ -69,7 +71,7 @@
 4. **M7.3 — MongoDB.** One `mongo` package, `go.mongodb.org/mongo-driver/v2`. `nativeKinds` gains
    `mongodb`.
 5. **M7.4 — Redis, and checkpoint C1c.** One `redis` package, `github.com/redis/go-redis/v9`.
-   `nativeKinds` gains `redis`, reaching **seven of eleven**. Then **checkpoint C1c** (§7): P58b's
+   `nativeKinds` gains `redis`, reaching **seven of ten**. Then **checkpoint C1c** (§7): P58b's
    own checkpoint C1b re-run against a coexistence pairing that still exists after this sub-phase —
    because the one C1b used does not (§1.9).
 
@@ -139,7 +141,7 @@ about because it removes work rather than adding it.
   index's key namespace into a **Browse tab** (§8.18) rather than the project tree. Redis is the
   first native adapter to drive `src/renderer/views/browse/`, and the browse tier is also the only
   consumer in the app of `TreeChildren.Truncated` — for which `redis/catalog.ts`'s
-  `MAX_SCAN_ROUNDS` cap is the **only producer anywhere in the eleven adapters**
+  `MAX_SCAN_ROUNDS` cap is the **only producer anywhere in the ten adapters**
   (`project/state/tree.ts:104-107`'s own comment says so). Both need real coverage; neither needs
   new substrate.
 
@@ -430,7 +432,7 @@ already immune: its `IsNativeKind` mutation test uses `const fakeKind = "kira-te
 concepts back into one.
 
 **C14 moves `TestKindNodeServed` to `"kafka"`**, not to `"redis"` (which this very sub-phase makes
-native) and not to a P58d kind (`sqs`/`s3`/`rabbitmq`, all native one sub-phase later). Kafka is
+native) and not to a P58d kind (`sqs`/`s3`, both native one sub-phase later). Kafka is
 P58e's, the last kind to go native, so this is the last time the constant has to move before P58f
 deletes the concept — and its doc comment is rewritten to name **P58e** as the next mover.
 
@@ -475,11 +477,12 @@ having cost an iteration:
   the one Bash invocation §7 runs in.
 - **The `-tags server` binary loads the Kafka native addon through the vendored Node, not Bun.**
   `AGENTS.md`'s Native Kafka driver section: the addon loads under the vendored real Node with no
-  rebuild step, which is exactly the runtime the engine child uses. This is the one point where
-  Kafka is a riskier choice than RabbitMQ; **RabbitMQ is the named fallback** (no driver at all, an
-  HTTP management API, a `rabbitmq:4.3.5-management-alpine` container that `tests/ipc/rabbitmq/`
-  already starts here for real), at the cost of having to move again at P58d. OQ-3 raises the choice
-  to the parent's author.
+  rebuild step, which is exactly the runtime the engine child uses. **Kafka has no fallback pairing
+  left to fall back to**: RabbitMQ, this section's original named alternative, was dropped from v1's
+  scope entirely (see the parent plan's amendment note) before this sub-phase implemented. If the
+  Kafka native addon proves troublesome inside the `-tags server` binary, the only remaining
+  Node-served kind after M7.4 is SQS or S3 (both still one sub-phase away, P58d) — OQ-3 raises this
+  to the parent's author rather than silently assuming Kafka will just work.
 
 ### 1.10 Two claims from P58b's own closeout do not hold in the tree, and P58c inherits both
 
@@ -808,7 +811,7 @@ of `errors.ts:14-16`'s three Node errnos, exactly as `postgres/errors.go` and
 Go subject — delete them, do not port them, and let the `net` error branch cover the real case.
 
 **C14 — `adapterhost.TestKindNodeServed` moves from `"mongodb"` to `"kafka"` in M7.1, before either
-flip, and its doc comment names P58e as the next mover.** §1.8. `kafka` is the last of the eleven to
+flip, and its doc comment names P58e as the next mover.** §1.8. `kafka` is the last of the ten to
 go native (P58 §9's M9), so this is the final move before P58f retires the constant. Five consuming
 files need no edit — which is the whole dividend of P58b B16, and worth saying out loud so nobody
 "improves" the constant back into literals.
@@ -820,8 +823,9 @@ untouched. Its second test — **checkpoint C1b** — keeps its exact shape: con
 Node-served connection, render a page from it through the *index-keyed* chunk encoding (which is
 also the live proof that `toTypedArray`'s second branch is still needed, P58a A9/A10), `SIGKILL` the
 Node engine child, and assert that one flips to `error` while MariaDB stays `connected` and still
-serves a read after a `page.reload()`. RabbitMQ is the named fallback if the Kafka native addon
-proves troublesome inside the `-tags server` binary; OQ-3.
+serves a read after a `page.reload()`. There is no fallback pairing left if the Kafka native addon
+proves troublesome inside the `-tags server` binary (RabbitMQ, the original named fallback, was
+dropped from v1's scope); OQ-3.
 
 **C16 — `Router.childrenNative` normalizes a nil `TreeChildren.Nodes` to an empty slice, and both
 new adapters additionally return `[]model.TreeNode{}` explicitly at every leaf.** Belt and braces,
@@ -1119,7 +1123,7 @@ than trusting "the router handles it":
   native path — §5.6's full-suite sweep is not optional here.
 - **Cancel** — routes on op ownership, not kind (P58a A13). A flip changes nothing.
 - **`connections.MarkAllErrored`** — P58a A15 narrowed it to Node-served kinds. After M7.4, seven of
-  eleven kinds are excluded. Checkpoint C1c step 12 is the check that this is still right.
+  ten kinds are excluded. Checkpoint C1c step 12 is the check that this is still right.
 - **`cache:stats`** — P58a A16's merge is unchanged.
 - **The Browse tab** — new to the native path with redis (§1.1). `views/browse/state.ts` is the only
   consumer of `TreeChildren.Truncated`, and `redis/catalog.go` is its only producer.
@@ -1291,8 +1295,8 @@ the **same** Bash invocation as the app run (`AGENTS.md`, P51; budget 150 s).
    (already namespaced — **no** `library/` prefix).
 3. `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config`;
    `go install …/wails3@v3.0.0-beta.15` (**pinned**); `scripts/vendor-node.sh` and
-   `bun run build:engine` — **the Node child is still required**, it serves four of eleven kinds
-   after M7.4; `wails3 generate bindings -b -i -ts -names`; `bun run build`.
+   `bun run build:engine` — **the Node child is still required**, it serves three of ten kinds
+   after M7.4 (kafka, sqs, s3); `wails3 generate bindings -b -i -ts -names`; `bun run build`.
 4. `bunx playwright test --project=e2e-real`, which builds `go build -tags server` itself through
    `tests/e2e-real/fixtures.ts`.
 
@@ -1365,7 +1369,7 @@ leaving it implied. Steps 12, 13 and 14 are the load-bearing ones.
   `bun run test:unit`, `bun run test:go`, `bun run test:ui`, `bun run test:ipc:fe`) green; **the full
   `tests/e2e-real/` suite green** (§5.6); `git diff --stat src/` empty.
 - **M7.4** — `go test ./internal/adapters/redis/` green against a real container; `nativeKinds`
-  contains `redis`, reaching **seven of eleven**; `shell/main.go` has the second blank import;
+  contains `redis`, reaching **seven of ten**; `shell/main.go` has the second blank import;
   §5.4's seven called-out cases all present and passing; **checkpoint C1c recorded** (§7);
   `tests/db/redis.spec.ts` deleted last, `tests/db/support/redis.ts` **kept** after a re-grep;
   **the full `tests/e2e-real/` suite green**; `git diff --stat src/` empty.
@@ -1476,7 +1480,7 @@ first; its **R1** is P58f's and does not bind here.
     package (§1.2).
 22. `feat(redis): mutations and the CLI console` — `mutate.go`, `console.go`.
 23. `feat(adapterhost): serve redis in-process` — `nativeKinds += redis`, `main.go` += one blank
-    import. Seven of eleven. **Full `tests/e2e-real/` sweep runs here.**
+    import. Seven of ten. **Full `tests/e2e-real/` sweep runs here.**
 24. `test: delete tests/db/redis.spec.ts, its subject now in Go` (C20) — **re-grep first**.
 25. `docs: P58c findings — a document codec, a key/value adapter and two placeholders that had to
     move` — `AGENTS.md`, `docs/ARCHITECTURE.md`, and this document's §12/§13. **Checkpoint C1c runs
@@ -1528,13 +1532,14 @@ nobody has decided where it stops.** §1.9. P58b paired MariaDB (native) with Mo
 P58c must re-pair it because MongoDB goes native here. C15 picks **Kafka**, on the grounds that it is
 the last kind to go native (P58e) and so is the last move required — but that means **P58e must
 delete or rewrite the coexistence half entirely**, because after M9 there is no Node-served kind left
-to pair with, and P58f's checkpoint C2 (*"a full manual pass across all eleven kinds leaves the
-engine child's request counter at zero"*) is a different proof of a different property. Three things
-for the parent's author to settle: whether Kafka or RabbitMQ is the right pairing here (Kafka lives
-longer; RabbitMQ is lighter and has no native addon); whether P58e is expected to delete the second
-test or convert it into checkpoint C2's own vehicle; and whether `mariadb-real.spec.ts` should be
-renamed to something that does not name one of its two connections, since it has now been re-pointed
-once and will be again.
+to pair with, and P58f's checkpoint C2 (*"a full manual pass across all ten kinds leaves the
+engine child's request counter at zero"*) is a different proof of a different property. With
+RabbitMQ dropped from scope (the original named fallback if Kafka's native addon proved
+troublesome — see §1.9), Kafka is now the only candidate for this pairing; there is no fallback
+left to weigh it against. Two things remain for the parent's author to settle: whether P58e is
+expected to delete the second test or convert it into checkpoint C2's own vehicle; and whether
+`mariadb-real.spec.ts` should be renamed to something that does not name one of its two
+connections, since it has now been re-pointed once and will be again.
 
 **OQ-4 — C2's rendering-fidelity change is a user-visible behaviour change and P58 §7's lists do not
 have a slot for it.** §1.4. Go renders a stored BSON double `3.0` as `{"$numberDouble":"3.0"}` where
@@ -1582,8 +1587,8 @@ have to rediscover it.
   changes no bound method signature, so one regeneration per fresh container is enough.
 - **`shell/runtime/` is git-ignored too**, and P58c still needs both halves: `scripts/vendor-node.sh`
   for `runtime/node/bin/node` and `bun run build:engine` for `runtime/engine/engine.cjs`. The app
-  refuses to start without the engine bundle (P56 D12), and after P58c the child still serves **four
-  of eleven** kinds (`kafka`, `sqs`, `s3`, `rabbitmq`).
+  refuses to start without the engine bundle (P56 D12), and after P58c the child still serves **three
+  of ten** kinds (`kafka`, `sqs`, `s3`).
 - **Docker**: `nohup dockerd > /tmp/dockerd.log 2>&1 & disown` here; `colima start` on macOS. Pull
   every image through `mirror.gcr.io` and retag to the plain name. P58c's images: **`mongo:7`** and
   **`redis:7`** (both official → `mirror.gcr.io/library/…`), plus — for checkpoint C1c only —

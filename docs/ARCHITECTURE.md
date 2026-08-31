@@ -100,27 +100,18 @@ driver is never loaded into the engine process's baseline memory.
 | Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | close the assigned consumer, `AbortSignal` |
 | SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | `AbortSignal` on the SDK call |
 | S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
-| RabbitMQ | one `database` node per virtual host (reuses the `database` kind, labelled "Virtual host") → queues (ungrouped), exchanges (grouped into an "Exchanges" folder); bindings live in the definition view, never the tree, since a binding has no name or ID of its own | stream | `basic.get` batches of up to 500 messages through the management HTTP API, no addressable position | no — `messages` is a live snapshot of a moving queue, never a transactional count | `AbortSignal` on the HTTP request (no server-side kill — there is no long-running query left executing after the socket closes) |
 
-**SQS/RabbitMQ read policy.** Reads are **never automatic**. The stream view has an explicit
-**Poll** button with a visible warning. For SQS, `ReceiveMessage` makes messages invisible to real
-consumers for the visibility timeout; for RabbitMQ, `basic.get` (via the management API) requeues
-every message it returns rather than removing it — nothing is lost, but each poll can reorder a
-queue's messages and marks them redelivered on the next poll. Nothing is fetched on tab open, on
-refresh, or on a timer for either engine. SQS's authentication is by **named AWS profile** (static
-keys accepted only in URI mode); RabbitMQ's is HTTP basic auth against the management API, on port
-**15672**, not AMQP's own 5672 — the adapter has no AMQP client at all, so an `amqp://` URI is
-refused at connect rather than silently tried.
+**SQS read policy.** Reads are **never automatic**. The stream view has an explicit
+**Poll** button with a visible warning: `ReceiveMessage` makes messages invisible to real
+consumers for the visibility timeout. Nothing is fetched on tab open, on refresh, or on a timer.
+SQS's authentication is by **named AWS profile** (static keys accepted only in URI mode).
 
 Cancellation is never "stop showing the result" — it is always forwarded to the server. If a driver
 cannot cancel, the capability is absent and the stop button says so rather than lying.
 
 Every adapter maps its own driver's thrown errors from its own `errors.ts`, exported as one
 `mapError(err): AdapterError` (P39) — the closed `AdapterErrorCode` set, with the driver's message
-preserved verbatim (Adapter rule 4). RabbitMQ is the one exception: it exports `mapHttpError` and
-`mapNetworkError` instead, since it maps two genuinely different inputs (an HTTP status plus a
-management-API body, and a `fetch` rejection) and collapsing them would lose the `notFoundHint`
-distinction P37 built. `src/engine/adapters/errors.ts` (the shared root, not any one engine's own)
+preserved verbatim (Adapter rule 4). `src/engine/adapters/errors.ts` (the shared root, not any one engine's own)
 also holds `unsupported(kind, what)` and `noQueryConsole(kind)` — the two sentence shapes behind
 every `E_UNSUPPORTED` capability stub (describe/definition/file-transfer read `"<what> is not
 supported for <kind>"`; a missing query console reads `"<kind> has no query console"`). It also
@@ -129,7 +120,7 @@ write-capable adapter's `mutate()` opens with (`mutate()`'s own documented contr
 `adapter.ts`: enforced on the engine side, not only greyed out in the UI). It also holds
 `assertNotCancelled(ctx)` (P39 iter3) — Adapter rule 2's pre-flight cancellation check (`throw`s
 `E_CANCELLED` if `ctx.signal` is already aborted), replacing nine copies of the same guard across
-postgres/mysql-family/rabbitmq/clickhouse/sqlite. It also holds (P48) `throwIfCancelled(ctx)` —
+postgres/mysql-family/clickhouse/sqlite. It also holds (P48) `throwIfCancelled(ctx)` —
 `assertNotCancelled`'s mid-flight sibling, the check an adapter re-runs after an `await` rather than
 before a call starts, with a message that says so ("operation was cancelled", no "before it
 started") — replacing twenty-six identical copies across eight adapters, and `requireConnected(handle)`,
@@ -307,39 +298,10 @@ bucket, and `/`-delimited prefix/object navigation happens in a Browse tab inste
 — `bucket:b/prefix:reports/object:reports%2Fnote.txt`, not a bare local filename), the same
 convention the tree used before this phase and unrelated to it.
 
-### RabbitMQ (HTTP management API, P37)
-
-**No dependency at all** — the adapter speaks only the `rabbitmq_management` plugin's HTTP API over
-the platform's own `fetch`. AMQP 0-9-1 itself has no way to enumerate anything (no list-queues, no
-list-exchanges, no list-bindings in the protocol at all), so the wire protocol was never a
-candidate for the adapter's read path; adding an AMQP client on top of the HTTP one would be a
-second protocol for zero enumeration benefit, not a shortcut. `engine/adapters/rabbitmq/` has no
-`console.ts` — `caps.sql` is `false`, since the management API has no ad-hoc command language worth
-a console.
-
-The default vhost is literally **named `/`**, and must reach the wire as `%2F` (the management
-API's own path convention, e.g. `GET /api/queues/%2F/<name>`) — every path segment the adapter
-builds goes through one `encodeSegment()` function in `query.ts` so this can't be forgotten at a
-second call site. The image must carry `-management` in its tag: the plain `rabbitmq:4` image has
-no management plugin at all, so the adapter cannot reach a broker started from it.
-
-`canUpdate`/`canDelete` are permanently `false` — a RabbitMQ message has no broker-assigned
-identity at all (`message_id` is an optional, publisher-set AMQP property, never one the broker
-itself assigns), and AMQP has no per-message update or delete at any protocol version. This is a
-third distinct structural reason for the same pair of flags, after ClickHouse's sparse-index one
-and Kafka's immutable-log one. `mutate()` accepts only `insert` (a publish through an exchange,
-defaulting to the default exchange with the queue's own name as routing key); a publish the broker
-accepts but routes nowhere (`{"routed":false}`) is reported as an error, not a silent success.
-
-A poll **requeues, it does not consume** — `read()` always uses `ackmode: reject_requeue_true`, so
-nothing this adapter does removes a message from a queue; messages come back marked `redelivered`
-on the next poll. This is the same "poll-on-demand, never automatic" policy SQS uses, with its own
-warning-strip wording (SQS's messages are consumed; RabbitMQ's are requeued — reusing one engine's
-sentence for the other would be a false statement about it). The tree reuses the existing
-`database` NodeKind for a RabbitMQ virtual host (labelled "Virtual host" via a per-connection-kind
-override) rather than adding a new one; `exchange` is the one new `NodeKind` this phase added — a
-definition-only leaf, foldered under "Exchanges," with the nameless default exchange filtered out
-of every listing (its blank name cannot survive the app's own path/tab-title plumbing honestly).
+**RabbitMQ was dropped from v1's scope** (P58 findings) before it was ever ported to Go — it was
+Node-served-only via an HTTP-management-API adapter with no AMQP client, and rather than carry it
+through the native-adapter migration it was cut. `connectionKindSchema`/`nodeKindSchema` no longer
+carry `rabbitmq`/`exchange`; there is no successor section here.
 
 ### MongoDB / Redis
 
@@ -489,9 +451,7 @@ set — nothing reaches the database until *Commit*, and *Preview command* rende
 statements first. ClickHouse tables get add-row only, staged the same way (no addressable row to
 update/delete — a MergeTree `PRIMARY KEY` is a sparse index). MongoDB/Redis/Kafka/SQS/S3 write
 **immediately**, gated per adapter's `canInsert`/`canUpdate`/`canDelete` capability, with no
-staging or preview — there is no pending-change set to opt into for these engines at all. RabbitMQ
-gets add-row (publish) only, immediate, for the same reason ClickHouse's is add-only: no
-broker-assigned message identity to update or delete against.
+staging or preview — there is no pending-change set to opt into for these engines at all.
 
 **The cell editor is a panel mounted by whichever view owns the tab**, not a global singleton —
 grid, documents, key/value, stream and console each mount their own instance, appearing only while

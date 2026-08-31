@@ -102,7 +102,7 @@ team works, and how to run things in whichever box a session happens to be on.
   docker tag mirror.gcr.io/confluentinc/cp-kafka:8.0.7 confluentinc/cp-kafka:8.0.7
   ```
   The rule: a Docker Hub *official* image (no namespace in its plain name — `mariadb`, `mysql`,
-  `postgres`, `redis`, `rabbitmq`, `mongo`) lives under `library/` on the real registry, so the
+  `postgres`, `redis`, `mongo`) lives under `library/` on the real registry, so the
   mirror path needs that prefix; an image that already carries its own namespace
   (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`, `localstack/localstack`) mirrors at the
   same path with no `library/` inserted. Confirmed for every image this repo uses. ClickHouse needs

@@ -170,28 +170,6 @@ services:
       timeout: 5s
       retries: 30
 
-  # rabbitmq://kira:kira@localhost:15672/kira — host port 15672 collides with nothing else in this
-  # stack, so it keeps the container's own port (P37 D40, mirrors postgres/mongo/redis's own
-  # unchanged-port convention). The AMQP port (5672) is deliberately NOT published: the app cannot
-  # speak it at all (P37 D1 — the adapter is HTTP-management-API-only), and publishing it would
-  # suggest otherwise. The `-management` tag is not optional — the plain image has no management
-  # plugin, and this adapter has no other way to reach the broker.
-  rabbitmq:
-    image: rabbitmq:4.3.5-management-alpine
-    container_name: kira-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: kira
-      RABBITMQ_DEFAULT_PASS: kira
-    ports:
-      - "15672:15672"
-    volumes:
-      - kira-rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-
 volumes:
   kira-pg-data:
   kira-mariadb-data:
@@ -201,4 +179,3 @@ volumes:
   kira-redis-data:
   kira-kafka-data:
   kira-sqs-data:
-  kira-rabbitmq-data:

@@ -5,7 +5,7 @@ This file lists third-party icon assets bundled with Kira Studio's UI.
 ## simple-icons
 
 Kira Studio imports database/service engine marks (Postgres, MariaDB, MySQL, SQLite, MongoDB,
-Redis, Apache Kafka, ClickHouse, RabbitMQ) from the [Simple Icons](https://simpleicons.org/) icon
+Redis, Apache Kafka, ClickHouse) from the [Simple Icons](https://simpleicons.org/) icon
 set (`simple-icons` on npm), via `import { siX } from 'simple-icons'` and each icon's `path` and
 `hex` fields.
 
@@ -25,7 +25,7 @@ One icon carries an additional, more specific license: Apache Kafka's mark is no
 Icons as licensed under Apache-2.0 (<https://spdx.org/licenses/Apache-2.0>).
 
 The individual marks reproduced through Simple Icons (Postgres, MariaDB, MySQL, SQLite, MongoDB,
-Redis, Apache Kafka, ClickHouse, RabbitMQ) remain trademarks of their respective owners. They are
+Redis, Apache Kafka, ClickHouse) remain trademarks of their respective owners. They are
 used here solely to identify the corresponding database/service engine in the connection UI, not
 to imply endorsement by, or affiliation with, those trademark holders.
 

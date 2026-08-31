@@ -7,7 +7,6 @@ import {
   siMongodb,
   siMysql,
   siPostgresql,
-  siRabbitmq,
   siRedis,
   siSqlite,
 } from 'simple-icons';
@@ -27,8 +26,8 @@ import { computed } from 'vue';
 // (tried first, in rounded-square and various tint forms) covered too much of the small glyph and
 // read as a blocky sticker rather than the mark itself. #ececec was kept as the halo color (over
 // plain #fff, which read too bright/harsh) from that earlier iteration.
-// Unlike Devicon, the 9 simple-icons imports are genuine ES imports (simple-icons
-// ships real named exports and "sideEffects": false), so only the 9 referenced consts should end
+// Unlike Devicon, the 8 simple-icons imports are genuine ES imports (simple-icons
+// ships real named exports and "sideEffects": false), so only the 8 referenced consts should end
 // up in the bundle.
 // 1:1 with parts/_icons.html's i-* engine symbols.
 const props = defineProps<{ kind: ConnectionKind; size?: number }>();
@@ -161,18 +160,6 @@ const iconSize = computed(() => props.size ?? 16);
         :d="siClickhouse.path"
       />
       <path transform="translate(2,2) scale(0.5)" :fill="`#${siClickhouse.hex}`" :d="siClickhouse.path" />
-    </template>
-
-    <template v-if="kind === 'rabbitmq'">
-      <path
-        transform="translate(2,2) scale(0.5)"
-        fill="#ececec"
-        stroke="#ececec"
-        stroke-width="1.4"
-        stroke-linejoin="round"
-        :d="siRabbitmq.path"
-      />
-      <path transform="translate(2,2) scale(0.5)" :fill="`#${siRabbitmq.hex}`" :d="siRabbitmq.path" />
     </template>
 
     <template v-if="kind === 's3'">

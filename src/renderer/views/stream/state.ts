@@ -67,8 +67,8 @@ registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
 
-/** P43 F6/D7: written by StreamView.vue's own catch around onDeleteMessage (SQS only — Kafka/
- *  RabbitMQ have no addressable delete). */
+/** P43 F6/D7: written by StreamView.vue's own catch around onDeleteMessage (SQS only — Kafka
+ *  has no addressable delete). */
 export { setActionError };
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
