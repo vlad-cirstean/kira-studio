@@ -7,13 +7,15 @@ import (
 )
 
 // cpuDeltaPercent is the pure delta math cpuState/Sample pull apart to test the P2 R1 pid-reuse
-// guard without a real OS process: a pid contributes to the delta only when its createTime is
-// unchanged between the two snapshots.
+// guard and core-count normalization without a real OS process: a pid contributes to the delta
+// only when its createTime is unchanged between the two snapshots, and the raw per-core-sum delta
+// is divided by logicalCPUs before it comes back. logicalCPUs: 1 below is a no-op divisor, isolating
+// each of those tests to the pid-reuse behavior alone; normalization itself gets its own tests.
 
 func TestCpuDeltaPercent_SamePidSameProcess_ContributesDelta(t *testing.T) {
 	prev := map[int32]cpuState{100: {time: 1.0, createTime: 5000}}
 	cur := map[int32]cpuState{100: {time: 1.5, createTime: 5000}}
-	got := cpuDeltaPercent(prev, cur, 1.0)
+	got := cpuDeltaPercent(prev, cur, 1.0, 1)
 	if got != 50 {
 		t.Errorf("cpuDeltaPercent = %v, want 50 (0.5s of CPU time over 1s elapsed)", got)
 	}
@@ -25,7 +27,7 @@ func TestCpuDeltaPercent_ReusedPidDifferentCreateTime_ContributesNothing(t *test
 	// the old process's cumulative time would produce a large, spurious negative contribution.
 	prev := map[int32]cpuState{100: {time: 100.0, createTime: 5000}}
 	cur := map[int32]cpuState{100: {time: 0.1, createTime: 9999}}
-	got := cpuDeltaPercent(prev, cur, 1.0)
+	got := cpuDeltaPercent(prev, cur, 1.0, 1)
 	if got != 0 {
 		t.Errorf("cpuDeltaPercent = %v, want 0 (reused pid must not mix the old process's cumulative time into the delta)", got)
 	}
@@ -34,7 +36,7 @@ func TestCpuDeltaPercent_ReusedPidDifferentCreateTime_ContributesNothing(t *test
 func TestCpuDeltaPercent_NewPid_ContributesNothingThisTick(t *testing.T) {
 	prev := map[int32]cpuState{}
 	cur := map[int32]cpuState{200: {time: 0.3, createTime: 1234}}
-	got := cpuDeltaPercent(prev, cur, 1.0)
+	got := cpuDeltaPercent(prev, cur, 1.0, 1)
 	if got != 0 {
 		t.Errorf("cpuDeltaPercent = %v, want 0 (a pid with no prior sample has no delta to report yet)", got)
 	}
@@ -43,8 +45,31 @@ func TestCpuDeltaPercent_NewPid_ContributesNothingThisTick(t *testing.T) {
 func TestCpuDeltaPercent_ZeroElapsed_ReturnsZero(t *testing.T) {
 	prev := map[int32]cpuState{100: {time: 1.0, createTime: 5000}}
 	cur := map[int32]cpuState{100: {time: 2.0, createTime: 5000}}
-	if got := cpuDeltaPercent(prev, cur, 0); got != 0 {
+	if got := cpuDeltaPercent(prev, cur, 0, 1); got != 0 {
 		t.Errorf("cpuDeltaPercent = %v, want 0 for zero elapsed seconds (avoid a divide-by-zero blowup)", got)
+	}
+}
+
+// P2 R1 regression: StatusBar.vue renders CPUPercent as a plain "N%" with no clamping and a
+// 4-character reserved width ("100%") — the raw per-core-sum a multi-process, multi-core-busy app
+// produces (e.g. 350 on a quad-core machine fully loaded) must be normalized to the machine's own
+// 0-100 range before it ever reaches that layer.
+func TestCpuDeltaPercent_NormalizesByLogicalCPUCount(t *testing.T) {
+	// Two full cores' worth of CPU time accumulated across the process set over 1 elapsed second
+	// — a raw per-core-sum of 200 — on a 4-logical-core machine should read 50%, not 200%.
+	prev := map[int32]cpuState{100: {time: 0, createTime: 1}, 200: {time: 0, createTime: 2}}
+	cur := map[int32]cpuState{100: {time: 1.0, createTime: 1}, 200: {time: 1.0, createTime: 2}}
+	got := cpuDeltaPercent(prev, cur, 1.0, 4)
+	if got != 50 {
+		t.Errorf("cpuDeltaPercent = %v, want 50 (200%% raw per-core-sum / 4 logical cores)", got)
+	}
+}
+
+func TestCpuDeltaPercent_ZeroLogicalCPUs_ReturnsZero(t *testing.T) {
+	prev := map[int32]cpuState{100: {time: 1.0, createTime: 5000}}
+	cur := map[int32]cpuState{100: {time: 2.0, createTime: 5000}}
+	if got := cpuDeltaPercent(prev, cur, 1.0, 0); got != 0 {
+		t.Errorf("cpuDeltaPercent = %v, want 0 for a zero core count (avoid a divide-by-zero blowup)", got)
 	}
 }
 

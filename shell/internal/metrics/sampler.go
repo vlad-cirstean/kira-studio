@@ -9,13 +9,19 @@
 package metrics
 
 import (
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// Sample mirrors src/shared/protocol/ipc.ts's AppMetricsSample shape.
+// Sample mirrors src/shared/protocol/ipc.ts's AppMetricsSample shape. CPUPercent is normalized to
+// the machine's whole capacity (0-100, occasionally a hair over from measurement jitter), not the
+// per-core-sum a tool like `top` reports per process (which can read e.g. 350% on a busy
+// quad-core machine) — StatusBar.vue renders it as a plain "N%" with no further context or
+// clamping (and reserves only 4 characters of layout width for it, "100%"), so a raw per-core-sum
+// would both mean the wrong thing to a reader and overflow that reserved width (P2 R1).
 type Sample struct {
 	CPUPercent  float64 `json:"cpuPercent"`
 	MemoryBytes uint64  `json:"memoryBytes"`
@@ -33,17 +39,19 @@ type cpuState struct {
 
 // Sampler keeps the previous CPU-time sample so CPUPercent reports a live delta (matching
 // today's cpu.percentCPUUsage semantics) rather than gopsutil's own cumulative-since-start
-// figure.
+// figure, normalized by the machine's own logical core count so it lands in the same 0-100 range
+// regardless of how many cores the process set is spread across (P2 R1).
 type Sampler struct {
-	pids    func() ([]int32, error)
-	prevCPU map[int32]cpuState
-	prevAt  time.Time
+	pids        func() ([]int32, error)
+	prevCPU     map[int32]cpuState
+	prevAt      time.Time
+	logicalCPUs int
 }
 
 // NewSampler takes a pid-discovery function so the caller decides how the process set is found —
 // see Sum below for the bundle-matching implementation this app actually uses.
 func NewSampler(pids func() ([]int32, error)) *Sampler {
-	return &Sampler{pids: pids, prevCPU: map[int32]cpuState{}}
+	return &Sampler{pids: pids, prevCPU: map[int32]cpuState{}, logicalCPUs: runtime.NumCPU()}
 }
 
 func (s *Sampler) Sample() (Sample, error) {
@@ -72,7 +80,7 @@ func (s *Sampler) Sample() (Sample, error) {
 	now := time.Now()
 	var cpuPercent float64
 	if !s.prevAt.IsZero() {
-		cpuPercent = cpuDeltaPercent(s.prevCPU, cpuNow, now.Sub(s.prevAt).Seconds())
+		cpuPercent = cpuDeltaPercent(s.prevCPU, cpuNow, now.Sub(s.prevAt).Seconds(), s.logicalCPUs)
 	}
 	s.prevCPU = cpuNow
 	s.prevAt = now
@@ -81,13 +89,15 @@ func (s *Sampler) Sample() (Sample, error) {
 }
 
 // cpuDeltaPercent is Sample's own delta math, pulled out as a pure function so the pid-reuse
-// guard is unit-testable without a real OS process: a pid only contributes if it named the same
-// process (matching createTime) in both snapshots — a pid missing from prev (a genuinely new
-// process) or whose createTime changed (an exited process's pid reused by an unrelated new one)
-// contributes nothing for this tick, rather than a delta computed against a stranger's cumulative
-// CPU time.
-func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64) float64 {
-	if elapsedSeconds <= 0 {
+// guard and the core-count normalization are both unit-testable without a real OS process: a pid
+// only contributes if it named the same process (matching createTime) in both snapshots — a pid
+// missing from prev (a genuinely new process) or whose createTime changed (an exited process's
+// pid reused by an unrelated new one) contributes nothing for this tick, rather than a delta
+// computed against a stranger's cumulative CPU time. The raw per-core-sum (which alone can exceed
+// 100 on a machine with more than one logical core fully busy) is then divided by logicalCPUs so
+// the result lands in the same 0-100 range StatusBar.vue's plain "N%" reading assumes (P2 R1).
+func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logicalCPUs int) float64 {
+	if elapsedSeconds <= 0 || logicalCPUs <= 0 {
 		return 0
 	}
 	var deltaSum float64
@@ -96,7 +106,7 @@ func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64) float
 			deltaSum += (c.time - p.time) / elapsedSeconds
 		}
 	}
-	return deltaSum * 100
+	return deltaSum * 100 / float64(logicalCPUs)
 }
 
 // MatchingPIDs finds every running process whose executable path contains needle — the "match on
