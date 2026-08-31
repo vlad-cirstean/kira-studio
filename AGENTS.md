@@ -379,12 +379,15 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   to Go code: `AppProcessSet` matches by executable-path substring, so renaming the shipping binary
   without updating `metrics/ticker.go`'s `AnchorNeedles` silently breaks the status bar's RSS/CPU
   figure, and nothing in this repo would catch it.
-- **`.github/workflows/` is still Electron-era and its update is still pending** (re-verified this
-  pass: the live workflows still reference `safeStorage` and have no Go/bindings steps). A session
-  whose GitHub push access lacks the `workflow` OAuth scope has any commit touching
-  `.github/workflows/*.yml` rejected by GitHub itself; the intended files sit in
-  `docs/v1/plans/p57-pending-ci-workflows/` with a `README.md` of copy-and-apply steps. That
-  directory still existing is the signal that the update hasn't landed.
+- **`.github/workflows/` is still Electron-era and its update is still pending — now two generations
+  behind** (re-verified this pass: the live workflows still reference `safeStorage`, `test:e2e` and
+  `test:db`, neither of which is even a valid `package.json` script any more, and have no Go/bindings
+  steps at all). A session whose GitHub push access lacks the `workflow` OAuth scope has any commit
+  touching `.github/workflows/*.yml` rejected by GitHub itself — confirmed again this pass, same
+  rejection message as P57 M7. The intended files sit in `docs/v1/plans/p58-pending-ci-workflows/`
+  (renamed from `p57-pending-ci-workflows/`, since the staged content itself now carries both that
+  generation's Wails/Go update *and* P58f M10's own follow-up) with a `README.md` of copy-and-apply
+  steps. That directory still existing is the signal that neither update has landed.
 
 **P58a findings worth keeping** (`docs/v1/plans/P58a-substrate-postgres.md` covers the design and
 records the C1 walkthrough in §7):
