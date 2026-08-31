@@ -2069,10 +2069,138 @@ this sub-phase.
 
 ## 12. M9.0 results
 
-*(To be filled in by the implementing session, per §6. Each of KF-2, KF-3 and KF-4 gets a PASS/FAIL
-with the printed evidence, and any correction to §1 or §2 is folded back into the relevant section
-rather than only recorded here. KF-2(a) and KF-3(b)/(c) are the two whose answers can change a
-design; both must be resolved in writing before M9.2 begins.)*
+All four probes ran against a real `confluentinc/cp-kafka:8.0.7` broker via
+`testcontainers-go/modules/kafka@v0.44.0`, in a throwaway scratch module never committed to this
+repo (per the M9.0 rule). Ordering followed §6: KF-4(a) first, then KF-2, then KF-3, then the rest
+of KF-4.
+
+**KF-4(a) — container startup: PASS, with one gap not anticipated by §1.15/§4.2/E19.**
+`kafka.Run(ctx, "confluentinc/cp-kafka:8.0.7")` **fails outright** with `CLUSTER_ID is required.
+Command [/usr/local/bin/dub ensure CLUSTER_ID] FAILED!` unless `kafka.WithClusterID(...)` is passed
+explicitly — the module has no default. Confirmed by reading `modules/kafka@v0.44.0`'s own source
+(`WithClusterID` at `kafka.go:152-156` is a plain `testcontainers.WithEnv` wrapper) and its own test
+files, which all pass it. With `kafka.WithClusterID("kira-test-cluster")` added, the container
+started in **7.475s** and `Brokers()` returned a live, single-broker address; no ulimit or
+wait-strategy problem was encountered. **Action for M9.1: `testsupport/kafka.go` must call
+`kafka.WithClusterID(...)`; this is not optional the way it reads in §1.15.**
+
+**KF-2 — cancellation semantics: PASS, all five sub-probes, confirming P58e E3's premise exactly.**
+The first version of this probe was a false pass: it produced 50 records and cancelled at 300ms,
+but `PollRecords` drained all 50 in ~49ms — before the cancel fired — so it never exercised a real
+blocking wait. Fixed by draining the client first so the probed poll genuinely has nothing left and
+must block on `FetchMaxWait`. With that fix:
+- **(a)** a cancelled `context.Context` aborts an in-flight, genuinely-blocking `PollRecords`
+  promptly — returned after 300.71ms against a 300ms cancel (not the 20s `FetchMaxWait`), with
+  `errors.Is(fetches.Err(), context.Canceled) == true`.
+- **(b)** a pre-cancelled context short-circuits `PollRecords` immediately (1.9µs).
+- **(c)** a pre-cancelled context short-circuits `kadm.ListEndOffsets` immediately (141µs), the
+  error wrapped as `*fmt.wrapError` containing "operation was canceled" (not a bare
+  `context.Canceled`, so the mapper must use `errors.Is`, never a type assertion).
+- **(d)** `Close()` racing a live, genuinely-blocking `PollRecords` unblocks it promptly (300.75ms)
+  with `errors.Is(fetches.Err(), kgo.ErrClientClosed) == true`.
+- **(e)** repeated 10x with no flake; max latency 100.58ms, matching the cancel delay each round.
+
+No correction to **P58e E3** is needed: the op's own `context.Context` passed directly to every
+kadm/kgo call, with an explicit `Fetches.Err()` check via `errors.Is`, is confirmed sufficient.
+
+**KF-3 — end-of-log / transaction-commit-marker gap: the E9 fork resolves to "signal available,"
+plus one refinement not anticipated by §6's framing.** A `gap-topic` (1 partition) with one record
+produced inside a franz-go transaction (`BeginTransaction`/`ProduceSync`/`EndTransaction`) confirmed
+via `kadm.ListStartOffsets`/`ListEndOffsets`: start=0, end=2 (1 record + 1 invisible commit marker),
+exactly as predicted. Browsing from offset 0:
+- **Round 0 (the fetch that delivers the record) carries exactly the signal P58e E9's clamp needs**:
+  `HighWatermark=2`, `LastStableOffset=2`, `LogStartOffset=0` alongside the one delivered record at
+  offset 0. Consuming to `next = 1` and comparing against `HighWatermark = 2` is not yet "caught
+  up" by raw offset arithmetic, but the record at the only other valid offset (1) is the commit
+  marker itself and will never be delivered — so the clamp must treat "next has reached the last
+  *deliverable* offset for this high watermark" as done, exactly the shape **P58e E9** already
+  designs for. **This is confirmed on the plain (non-transactional) `ordinary-topic` too**
+  (`HighWatermark=1` after consuming its one record, no gap) — the fork is real and the signal
+  survives it.
+- **Refinement**: every subsequent poll — on *both* the gap-topic and the plain contrast topic —
+  did **not** return a quick, empty-but-successful result near `FetchMaxWait`. Raising the
+  per-round context timeout from 2s to 10s to rule out a too-tight probe budget showed all 8 rounds
+  block for the **full** 10s context deadline, every time, with **no partition metadata at all** on
+  return (`Partition=-1` sentinel, only a top-level `context deadline exceeded`; `FetchMaxWait` is
+  a per-broker-round-trip budget, not a caller-visible return latency — `PollRecords` keeps
+  retrying internally and only returns when there is data or the caller's context ends). This is
+  identical on the transactional and non-transactional topics, so it is general franz-go behavior,
+  not specific to the commit-marker gap. **Consequence for the adapter design: the clamp must be
+  derived once, from the watermark on the fetch that actually delivered the last record — never
+  from a follow-up "peek" poll**, since a peek poll cannot return a fresh watermark without either
+  genuinely blocking on new data or burning the caller's entire remaining timeout with no usable
+  metadata. `MAX_EMPTY_POLLS` (already kept as the second terminator per E9) is unaffected by this,
+  since it counts empty *delivered* batches within the loop's own bounded polls, not a peek
+  mechanism. No fork of E9 is required; this narrows how the delivering-fetch watermark must be
+  captured and used, and is worth a one-line comment at the clamp site in M9.2.
+
+**KF-4(b) — full inventory: recorded, no surprises.** Seeding `orders` (2 partitions, 6 messages,
+one `source:seed` header, keys `key-0`..`key-5`, JSON bodies) and registering `kira-test-group`
+with committed offsets and no members (mirroring `0005_kafka_seed.ts`) via `kadm.CommitOffsets`
+against `ListStartOffsets`' own results:
+- `adm.Metadata` returns a real cluster ID, one broker (`Rack=nil`), and per-topic `IsInternal`
+  (`__consumer_offsets` correctly flagged internal).
+- `adm.ListGroups`/`DescribeGroups` show the group in `State="Empty"`, `ProtocolType=""`,
+  `Members=0`, `Err=nil` — exactly the shape scenario 6 needs.
+- `adm.DescribeTopicConfigs("orders")` returns 32 real config rows, all `Source=DEFAULT_CONFIG`
+  except `flush.messages` (`STATIC_BROKER_CONFIG`). **`cleanup.policy=delete` and
+  `retention.ms=604800000` are both present and stable** — either is a safe pick for scenario 6's
+  inverted assertion (**P58e E11**).
+- `adm.FetchOffsets("kira-test-group")` returns both partitions at offset 0, `Err=nil`.
+
+**KF-4(c) — `ListOffsetsAfterMilli`: confirms the documented divergence (row 422), no new
+decision.** Before any record: returns offset 0 with the first record's own timestamp echoed back.
+After all records: returns the **current end offset** (3, matching the high watermark) with
+`Timestamp=-1` — not librdkafka's `-1`/`OFFSET_END` sentinel *offset*. Scenario 19's re-baseline
+should assert the end-offset value, not a `-1` offset.
+
+**KF-4(d) — nonexistent-topic detection: PASS for the error shape, but surfaces a real fixture
+hazard not anticipated by P58e E12's own framing.** `ListStartOffsets`/`ListEndOffsets` on
+`does-not-exist-topic` return a top-level `nil` error with the per-partition entry carrying
+`Partition=-1`, `Err=*kerr.Error` (`UNKNOWN_TOPIC_OR_PARTITION`) — confirming **P58e E12**'s
+map-inspection path (never error-catching) is correct, in 3.96ms. **However: the topic is then
+auto-created on the broker** (`adm.Metadata` afterward shows it present) — **even though the Go
+client never called `kgo.AllowAutoTopicCreation()`, which defaults to `false`, and `kadm`'s own
+`MetadataRequest` construction never sets `AllowAutoTopicCreation` either** (confirmed by reading
+`kmsg.NewPtrMetadataRequest`'s `Default()`, a no-op, leaving the field at its zero value). The
+auto-creation is happening broker-side, independent of anything the Go client requests — almost
+certainly `cp-kafka`'s own `auto.create.topics.enable` broker default, which
+`testcontainers-go/modules/kafka` does not override. **This is a new decision, not previously
+named in §2 or §4: `testsupport/kafka.go` must set `KAFKA_AUTO_CREATE_TOPICS_ENABLE=false` at the
+container level in M9.1.** A client-side `kgo.AllowAutoTopicCreation()` toggle (client already
+defaults to not-allowing) is not the lever — it does not prevent this. Without the container-level
+fix, any acceptance test exercising a "topic does not exist" scenario pollutes every test that
+runs after it in the same container (a fresh nonexistent-topic name per test would dodge it, but
+disabling it at the source is simpler and matches what a careful adapter author would want anyway).
+
+**KF-4(e) — idempotent vs. non-idempotent produce: confirms P58e E14, no behavior change.** First
+produce took 22.78ms with the default (idempotent) producer and 21.52ms with
+`kgo.DisableIdempotentWrite()` — a negligible difference in this single-broker container. As §1.8
+and the plan's own note already anticipate, this does **not** discharge the risk `DisableIdempotentWrite`
+guards against: the container sets `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1`, which a real
+multi-broker cluster does not, so `InitProducerId`'s real-world cost is not visible here.
+`DisableIdempotentWrite` stays in **P58e E14** regardless.
+
+**KF-4(f) — header/attrs cross-check: PASS, no divergence, matching §1.8's prediction.** The Go
+side reads back `headers = map[string]string{"source":"seed"}` and constructs
+`attrs = {"partition":0,"offset":"0"}` for the same seeded message the TypeScript adapter would
+render as `headers = Record<string,string|string[]>` JSON and `attrs = {partition:number,
+offset:string}` JSON (`src/engine/adapters/kafka/read.ts:37-50,288`) — structurally identical once
+folded through **P58e E8**'s single-value case. No adjustment to E8 needed.
+
+**KF-4(g) — `Ping` against an unreachable host: confirms P58e E4/E15's fast-failure expectation.**
+`kgo.NewClient(kgo.SeedBrokers("127.0.0.1:1")).Ping(ctx)` returned in 282.5µs with a
+`*fmt.wrapError` wrapping `"unable to dial: dial tcp 127.0.0.1:1: connect: connection refused"` — a
+plain `*net.OpError` underneath, reachable via `errors.As`, consistent with the Go re-derivation
+already planned for `E_CONNECT` in §2's `E4`/`errors.go` design and **P58e E15**'s `Connect` probe
+latency expectations.
+
+**Summary — nothing here changes P58 D7 or forks a major design decision away from what §2 already
+specifies.** Two concrete, previously-unstated action items land in M9.1: (1) `testsupport/kafka.go`
+must pass `kafka.WithClusterID(...)` (KF-4(a)) and (2) must disable
+`KAFKA_AUTO_CREATE_TOPICS_ENABLE` at the container level (KF-4(d)). One design refinement lands in
+M9.2: the E9 clamp must be captured from the delivering fetch's own watermark, never refreshed via
+a follow-up peek poll (KF-3).
 
 ## 13. M9.1–M9.4 results
 
