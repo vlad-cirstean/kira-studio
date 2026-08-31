@@ -1,7 +1,9 @@
-// Package migrations embeds the schema migrations byte-for-byte from
-// src/main/storage/migrations/*.sql. They are plain SQLite DDL with no dialect issue, and keeping
-// them identical to the TypeScript build means the Go schema is provably the same schema
-// (P52 §4.3).
+// Package migrations embeds the schema migration(s). The app has never shipped, so there is no
+// installed base with a partially-applied schema to preserve — what were five incremental steps
+// (0001_init through 0005_p28_tree_filters) are collapsed into the single 0001_init.sql that
+// produces the exact same final schema in one shot (verified table-by-table via
+// PRAGMA table_info/foreign_key_list/index_list against the old five-file sequence before they
+// were deleted).
 package migrations
 
 import (
@@ -12,27 +14,21 @@ import (
 //go:embed *.sql
 var files embed.FS
 
-// Migration is one forward-only schema step, matching src/main/storage/migrations/index.ts's
-// shape (version, name, sql).
+// Migration is one forward-only schema step.
 type Migration struct {
 	Version int
 	Name    string
 	SQL     string
 }
 
-// names lists the embedded files in the exact order they must apply, mirroring
-// src/main/storage/migrations/index.ts's own explicit ordering rather than trusting directory
-// listing order.
+// names lists the embedded files in the exact order they must apply, rather than trusting
+// directory listing order.
 var names = []struct {
 	version int
 	name    string
 	file    string
 }{
 	{1, "init", "0001_init.sql"},
-	{2, "p2", "0002_p2.sql"},
-	{3, "p11", "0003_p11.sql"},
-	{4, "misc_fixes", "0004_misc_fixes.sql"},
-	{5, "p28_tree_filters", "0005_p28_tree_filters.sql"},
 }
 
 // All returns every migration in ascending version order.
