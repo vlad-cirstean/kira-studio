@@ -13,7 +13,7 @@ info:
   productIdentifier: "com.kirathecat.kira-studio"
   description: "A visual database client for macOS" # The application description
   copyright: "(c) 2026, Kira the Cat" # Copyright text
-  comments: "Kira Studio native shell (P52 walking skeleton)" # Comments
+  comments: "Kira Studio — a visual database client for macOS" # Comments
   version: "0.0.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
@@ -76,7 +76,3 @@ fileAssociations:
 #    iconName: jpegFileIcon
 #    role: Editor
 #    mimeType: image/jpeg  # (optional)
-
-# Other data
-other:
-  - name: My Other Data
