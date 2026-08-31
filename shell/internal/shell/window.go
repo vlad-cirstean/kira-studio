@@ -63,8 +63,11 @@ func boundsFromRect(r application.Rect) model.WindowBounds {
 
 // Attach wires resize/move persistence (debounced 300ms, matching window.ts's
 // BOUNDS_DEBOUNCE_MS) and the startup log line. The returned detach unsubscribes all four
-// window-event listeners and cancels any pending debounced write; call it once, from
-// beforeFlush.
+// window-event listeners and cancels any pending debounced write; call it once, from beforeFlush
+// (P2 R1: main.go used to discard it, so a resize/move landing during the shutdown flush-wait —
+// after beforeFlush but before teardown closes the DB — could still fire persist() against a
+// LayoutRepo whose *sql.DB teardown had already closed, racing the shutdown sequence this
+// listener has no other way to know is underway).
 func Attach(win *application.WebviewWindow, d WindowDeps) (detach func()) {
 	db := newDebouncer(boundsDebounce)
 

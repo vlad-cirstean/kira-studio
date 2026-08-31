@@ -148,9 +148,20 @@ func main() {
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker})
 
+	// detachWindow holds the current main window's shell.Attach cleanup, set by newWindow below and
+	// called from beforeFlush per shell.Attach's own doc comment (P2 R1: this used to be discarded
+	// entirely at the newWindow call site, so a resize/move landing during the shutdown flush-wait
+	// could still fire persist() against a LayoutRepo whose DB teardown had already closed it).
+	var detachWindow func()
+
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
-	beforeFlush := sync.OnceFunc(func() { metricsTicker.Stop() })
+	beforeFlush := sync.OnceFunc(func() {
+		metricsTicker.Stop()
+		if detachWindow != nil {
+			detachWindow()
+		}
+	})
 	teardown := sync.OnceFunc(func() {
 		eventsDetach()
 		oplogWiring.Stop()
@@ -208,9 +219,12 @@ func main() {
 
 	windowDeps := shell.WindowDeps{Layout: repositories.Layout, StartedAt: startedAt}
 	newWindow := func() {
+		if detachWindow != nil {
+			detachWindow()
+		}
 		win := app.Window.NewWithOptions(shell.Options(windowDeps, shell.Harden(), "/"))
 		mainWindow = win
-		shell.Attach(win, windowDeps)
+		detachWindow = shell.Attach(win, windowDeps)
 	}
 	shell.AttachReopen(app, newWindow)
 
