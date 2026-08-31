@@ -165,16 +165,16 @@ func (r *Router) childrenNative(ctx context.Context, connectionID string, path m
 }
 
 func (r *Router) Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
-	return r.describeNative(ctx, connectionID, path)
+	return r.describeNative(ctx, connectionID, path, tabID)
 }
 
-func (r *Router) describeNative(ctx context.Context, connectionID string, path model.NodePath) (model.ObjectMeta, error) {
+func (r *Router) describeNative(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
 	adapter, err := requireLiveAdapter(connectionID)
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
 	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "describe"},
+	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "describe", TabID: tabID},
 		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
 			meta, err := adapter.Describe(ctx, path, op)
 			if err != nil {
@@ -195,16 +195,16 @@ func (r *Router) describeNative(ctx context.Context, connectionID string, path m
 }
 
 func (r *Router) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
-	return r.definitionNative(ctx, connectionID, path)
+	return r.definitionNative(ctx, connectionID, path, tabID)
 }
 
-func (r *Router) definitionNative(ctx context.Context, connectionID string, path model.NodePath) (model.ObjectDefinition, error) {
+func (r *Router) definitionNative(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
 	adapter, err := requireLiveAdapter(connectionID)
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
 	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "definition"},
+	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "definition", TabID: tabID},
 		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
 			def, err := adapter.Definition(ctx, path, op)
 			if err != nil {

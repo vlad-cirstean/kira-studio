@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
+	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -69,5 +71,73 @@ func TestRouter_ChildrenNative_NilNodesMarshalAsEmptyArray(t *testing.T) {
 	}
 	if !strings.Contains(string(b), `"Nodes":[]`) {
 		t.Errorf("marshalled = %s, want a \"Nodes\":[] field, not null", b)
+	}
+}
+
+// describeDefinitionFakeAdapter answers Describe/Definition with minimal fixtures.
+type describeDefinitionFakeAdapter struct {
+	adapters.Adapter
+}
+
+func (describeDefinitionFakeAdapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
+	return model.ObjectMeta{}, nil
+}
+
+func (describeDefinitionFakeAdapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
+	return model.ObjectDefinition{}, nil
+}
+
+// P2 R1: Describe/Definition must thread tabID through to the op:start event the same way every
+// other tab-scoped op does — the frontend's per-tab op log and status bar key off it. router.go
+// used to accept tabID from tree.Backend's own signature and then never put it in the OpSpec it
+// built, so op:start always reported a nil TabID for these two kinds.
+func TestRouter_DescribeAndDefinition_ThreadTabIDIntoOpStart(t *testing.T) {
+	const connID = "conn-tabid"
+	adapters.SetLiveAdapter(connID, describeDefinitionFakeAdapter{})
+	defer adapters.DeleteLiveAdapter(connID)
+
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
+	events, unsubscribe := r.Host().Subscribe()
+	defer unsubscribe()
+
+	awaitOpStartTabID := func(t *testing.T, kind string) *string {
+		t.Helper()
+		for {
+			select {
+			case evt := <-events:
+				if evt.Topic != oplog.EventOpStart {
+					continue
+				}
+				var payload struct {
+					Kind  string  `json:"kind"`
+					TabID *string `json:"tabId"`
+				}
+				if err := json.Unmarshal(evt.Payload, &payload); err != nil {
+					t.Fatalf("unmarshal op:start payload: %v", err)
+				}
+				if payload.Kind != kind {
+					continue
+				}
+				return payload.TabID
+			case <-time.After(time.Second):
+				t.Fatalf("no op:start event for kind %q within 1s", kind)
+				return nil
+			}
+		}
+	}
+
+	tabID := "tab-1"
+	if _, err := r.Describe(context.Background(), connID, model.NodePath{ConnectionID: connID}, &tabID); err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	if got := awaitOpStartTabID(t, "describe"); got == nil || *got != tabID {
+		t.Errorf("describe op:start TabID = %v, want %q", got, tabID)
+	}
+
+	if _, err := r.Definition(context.Background(), connID, model.NodePath{ConnectionID: connID}, &tabID); err != nil {
+		t.Fatalf("Definition: %v", err)
+	}
+	if got := awaitOpStartTabID(t, "definition"); got == nil || *got != tabID {
+		t.Errorf("definition op:start TabID = %v, want %q", got, tabID)
 	}
 }
