@@ -213,14 +213,16 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   the release workflow zips the `.app` instead. A deliberate scope decision: verifying a DMG pipeline
   needs real macOS, which was not available when the decision was made — not an oversight.
 - **The CI workflow updates are staged, not applied.** `.github/workflows/{ci,release}.yml` still hold
-  their pre-P57 Electron content; the intended files live in `docs/v1/plans/p57-pending-ci-workflows/`
+  their pre-P57 Electron content; the intended files live in `docs/v1/plans/p58-pending-ci-workflows/`
   with copy-and-commit steps, because the session that wrote them lacked GitHub's `workflow` OAuth
   scope. Until someone applies them, everything in §7 describes intent, not what runs.
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
 - **`shell/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
-  and `appicon.icon/Assets/kira_icon_vector.svg` were swapped from Wails' scaffolded default to
-  `build/icon.png`/`build/icon.svg` (the app's real icon), and `wails3 task common:generate:icons`
+  and `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
+  scaffolded default (a duplicate root `build/icon.png`/`build/icon.svg` copy of the same artwork
+  existed alongside it until P1's dependency/script/folder audit removed it as dead weight), and
+  `wails3 task common:generate:icons`
   correctly regenerated `darwin/icons.icns` from the new artwork — this sandbox has no macOS
   hardware, and `Assets.car` generation needs Apple's `actool`/Icon Composer toolchain
   (`wails3 generate icons`'s `-iconcomposerinput`/`-macassetdir` flags), which does not exist on
