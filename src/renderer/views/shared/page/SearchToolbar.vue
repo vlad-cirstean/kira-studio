@@ -154,17 +154,22 @@ watch(
   },
 );
 
+// P2 R1: searchState is a shallowReactive record now (search.ts), so a nested `e.index = …`
+// mutation on an already-read entry would no longer be tracked — every writer, this one included,
+// replaces the whole entry, the same way startSearch's own onProgress/done callbacks above do.
 function goNext(): void {
   const e = entry.value;
   if (!e || e.matches.length === 0) return;
-  e.index = (e.index + 1) % e.matches.length;
-  emit('goToMatch', e.matches[e.index]);
+  const index = (e.index + 1) % e.matches.length;
+  props.api.searchState[props.tabId] = { ...e, index };
+  emit('goToMatch', e.matches[index]);
 }
 function goPrev(): void {
   const e = entry.value;
   if (!e || e.matches.length === 0) return;
-  e.index = (e.index - 1 + e.matches.length) % e.matches.length;
-  emit('goToMatch', e.matches[e.index]);
+  const index = (e.index - 1 + e.matches.length) % e.matches.length;
+  props.api.searchState[props.tabId] = { ...e, index };
+  emit('goToMatch', e.matches[index]);
 }
 
 function close(): void {
