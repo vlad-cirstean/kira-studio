@@ -99,6 +99,18 @@ Two things follow, and they are the reason for the shape of §9.
 > Node child is spawned, idle, and answers nothing. Deleting a sidecar that is still being called by
 > a kind nobody remembered is the one failure this phase can make that looks fine in every test and
 > breaks a real user's connection.
+>
+> **Amended, not reversed (`docs/v1/plans/P58f-cutover.md` D2, P58e's own OQ-2 asked the question).**
+> There never was an `enginehost`'s own request counter — `enginehost` is a transport layer that
+> cannot distinguish adapter traffic from lifecycle traffic, and three kind-agnostic paths (`ping`,
+> `cache:configure`, `cache:clear`) survive a perfectly migrated app by design, so "the counter reads
+> zero" was never a literal instrument that could exist. **P58e's own interim instrument is ratified
+> as C2's permanent definition**: a warning-emitting counter lives in `adapterhost.Router`, counts
+> only connection-scoped requests actually routed to the Node child, and logs a `slog.Warn` naming
+> the kind and op on every one. That instrument itself is deleted in M10 along with everything else
+> that references the Node child, once C2 has been run and recorded for the last time (P58e M9.4's
+> own run: ten of ten kinds passed, the log line's grep returned 0, and the child was confirmed alive
+> and idle throughout — not merely silent).
 
 The sub-phases:
 
@@ -523,6 +535,17 @@ dependency or the ecosystem's clear default.** `shell/go.mod` gains eight module
 is already there. RabbitMQ adds nothing. `package.json`'s ten runtime dependencies all leave (§1.12).
 The net dependency count across both ecosystems falls.
 
+> **Superseded (`docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` B7, then closed by implementation —
+> P58f OQ-1 table).** This sentence's `mattn/go-sqlite3` line did not survive contact with a real
+> probe: §1.5 of P58b found it coerces SQLite's storage-class-faithful values to the column's
+> *declared* type, which the adapter's value codec cannot tolerate, and `modernc.org/sqlite` (pure
+> Go) does the faithful thing by default. B7 picked `modernc.org/sqlite` for the adapter alone,
+> still expecting `mattn/go-sqlite3` to remain for `internal/storage`'s own database — but that
+> module shipped for both consumers by the time the migration finished, making the whole product's
+> own Go code cgo-free (only Wails' own macOS bindings still need `CGO_ENABLED=1`), a materially
+> better outcome than this decision predicted. `mattn/go-sqlite3` is not in `shell/go.mod` at all
+> as of P58f M10.
+
 **D7 — Kafka uses `github.com/twmb/franz-go` with `pkg/kadm`.** This is the phase's highest-risk
 single decision and it gets the most reasoning.
 
@@ -610,6 +633,20 @@ becomes `true`.** Three parts:
    port must include a case that runs a cancel and then immediately runs an unrelated query on the
    same adapter, asserting the second one succeeds — the exact regression those issues describe.
 
+> **Part 1 superseded, parts 2 and 3 ported onto the replacement driver
+> (`docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` B7/§1.5).** The driver is `modernc.org/sqlite`,
+> not `mattn/go-sqlite3` — see D6's own amendment for why. Parts 2 and 3 both survive, restated
+> against the actual driver: `modernc.org/sqlite` also has no side-connection cancel mechanism, so
+> `caps.cancel` still flips from the old `node:sqlite`-era permanent `false` to a real `true`, now
+> through the driver's own `interruptOnDone` semantics turning a cancelled per-op context into a
+> real `sqlite3_interrupt` (`shell/internal/adapters/sqlite/adapter.go`). The hazard is the same
+> shape under a different driver — `sqlite3_interrupt` is still connection-wide, not
+> statement-wide — so the mitigation is unchanged: every op still gets its own dedicated `*sql.Conn`
+> for its whole lifetime. The specific `mattn/go-sqlite3` GitHub issue numbers this section cited
+> (#488, #745, #681) document the hazard in the driver that was *not* shipped; they no longer apply
+> literally, but the class of bug they describe is exactly what the per-op-connection mitigation
+> still guards against.
+
 **D9 — the L2/L3 cache moves into Go as `shell/internal/enginecache`, and `cache:configure` stops
 being a wire op.** `cache/lru.ts`'s byte-budgeted `Map`-backed LRU has a direct Go shape (a map plus
 `container/list`, or an insertion-ordered slice — an implementation call). Two behaviours must port
@@ -686,6 +723,20 @@ UI decision for a later phase, and this plan deliberately does not make it. `App
 `NodeVersion` field, by contrast, has no honest value left and is removed — checked, and
 `docs/v1/plans/P57-cutover.md` D7 already records that `control.appInfo` has **zero callers** in
 `src/renderer`, so nothing observes it.
+
+> **Corrected premise (`docs/v1/plans/P58f-cutover.md` §1.9, ratified as P58f D11).** This
+> paragraph names the wrong surface. `EngineService.Status()` — the bound call returning `{alive,
+> pid}` this paragraph fixes — has **zero renderer callers**;
+> `tests/ui/support/bootSnapshots.ts:21` says so outright (*"`engineStatus` is deliberately absent —
+> nothing in the renderer ever calls it"*), confirmed against the real source:
+> `workbench/state/engine.ts` reads the status pill from the **data-plane `ping`**'s
+> `PingPayload.enginePid`, not from this bound call at all; `bridge/control.ts`'s `engineStatus`
+> binding was already dead code before P58. Fixing `Status()` alone, as written above, would leave
+> the pill reading `down` on every launch once the child it pings stops existing, since nothing
+> forwards `ping` in-process. `EngineService.Status()` still stays bound, for the reason given above
+> (deleting a bound service costs a binding regen and a `control.ts` edit for nothing) — but the
+> change that actually keeps the pill honest is answering the data-plane `ping` locally, which is
+> what `docs/v1/plans/P58f-cutover.md` D11 does.
 
 **D15 — the vendored Node runtime, `build:engine`, the two shell test scripts and the Kafka
 native-module packaging gap all retire in the same milestone.** They are one thing wearing four
@@ -1073,6 +1124,17 @@ message, never a silent pass.
   changing the encoding.)
 - **`tests/ipc/**/*.frontend.spec.ts`** (7 specs) and **`tests/ipc/**/*.fixture.ts`** (7 modules) —
   unchanged, byte-compatible. D13 exists to guarantee this and §8 makes it a criterion.
+
+  > **Amended count (`docs/v1/plans/P58f-cutover.md` §1.11/§5.1).** Six, not seven, by the time D13
+  > landed — `rabbitmq` is one of the seven `*.backend.spec.ts` files that ever existed
+  > (`clickhouse`, `kafka`, `mariadb`, `mysql`, `rabbitmq`, `redis`, `sqs`), but RabbitMQ was already
+  > dropped as a supported connection kind before this phase started (D6: *"RabbitMQ adds
+  > nothing"*), so it was never a candidate for a Go fixture generator. The Go generator
+  > (`shell/internal/ipcfixture`) covers `clickhouse`, `kafka`, `mariadb`, `mysql`, `redis`, `sqs` —
+  > six adapters, six `*.fixture.ts` modules, unchanged and byte-compatible exactly as this
+  > paragraph requires. `postgres` and `sqlite` were never in the seven above and generate no
+  > fixture of their own either, for unrelated reasons specific to each (see
+  > `docs/ARCHITECTURE.md`'s Testing section).
 - **`tests/e2e-real/`** — both specs keep working; their fixtures lose the vendored-node and
   `build:engine` prerequisites.
 - **`tests/unit/`**'s renderer specs — unchanged except the two whose subject moves to Go
@@ -1131,6 +1193,14 @@ spec per newly-native engine is tempting and mostly wrong: this tier is delibera
 job is *wiring*, not adapter coverage (§5.3's job). The one addition worth making is a spec for the
 S3 `objectDownload` file-write contract, which `P57-e2e-revisit.md` §7 left conditional and which is
 the last full-stack behaviour with no automated home.
+
+> **Struck (`docs/v1/plans/P58f-cutover.md` D17, closing P58d's own OQ-5).** This proposal cannot be
+> built, on either side of P58. `tests/e2e-real/` is the `-tags server` build with no native window
+> at all (`docs/ARCHITECTURE.md`'s Process model), and a real `objectDownload` file-write exercises
+> Wails' AppKit save panel — a UI surface that requires a real desktop session and does not exist in
+> server mode. Nobody should re-propose this spec: the coverage it would have provided stays exactly
+> where §6's manual macOS checklist below already puts it (**"A real S3 download through the AppKit
+> save panel"**), a human procedure, not an automatable one.
 
 ### 5.6 The fixture-generator port (D13)
 
@@ -1200,6 +1270,14 @@ of `src/engine/`. That is the entire list, and §5.2 checks it rather than asser
 7. **During P58a–P58e the app carries two adapter hosts and a cache split across two processes**
    (§4.6). Temporary, bounded by C2, and the price of six shippable sub-phases instead of one
    big-bang — but it is real complexity that exists for months.
+8. **MySQL loses `allowPublicKeyRetrieval`, a real if narrow security-posture regression**
+   (`docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` B22, closing that phase's own OQ-4). The old
+   client gated whether the server's RSA public key could be requested over a plaintext connection;
+   `go-sql-driver/mysql` requests it unconditionally, with no opt-in gate the adapter could withhold.
+   `mysql/client.ts`'s `applyEngineOptions` becomes empty and the MySQL connection profile keeps
+   existing only for its server label. This is the phase's first genuine security-posture loss, not
+   merely a cosmetic or error-text difference — three sub-phases asked for it to be added to this
+   list and none did until now.
 
 **What gets better.**
 
@@ -1219,6 +1297,18 @@ of `src/engine/`. That is the entire list, and §5.2 checks it rather than asser
 9. **Int64 offsets, native UTF-8, and typed nulls** remove three whole classes of JS-side workaround
    (`toNativeOffset`'s safe-integer guard, `truncateUtf8ToBoundary`'s continuation-byte walk, and the
    `string | null` plumbing that made the null/empty-string distinction fragile).
+10. **MongoDB's document view stops lying about what is stored, for whole-number doubles**
+    (`docs/v1/plans/P58c-mongo-redis.md` OQ-4). `bson.Raw` keeps the on-disk BSON type tag; the old
+    JS driver's decode-then-`EJSON.stringify` round trip does not, so a stored double that happens to
+    be a whole number (e.g. `3.0`) rendered as `{"$numberInt":"3"}` — indistinguishable from a value
+    that was actually stored as an int32. Go renders the same value as `{"$numberDouble":"3.0"}`,
+    matching what is actually on disk. This is a genuine rendering-fidelity gain for the general case,
+    even though the one worked example this plan and P58c both used to illustrate it
+    (`widgets.price` in the committed fixture) turned out, once checked against a real container, not
+    to exhibit the divergence itself — both drivers pick the BSON type from the stored value, not
+    from the arithmetic that produced it, so that particular field renders identically either way.
+    The underlying engineering point, and the gain it describes, are both real; only that one example
+    was not.
 
 ## 8. Acceptance criteria
 

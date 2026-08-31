@@ -80,7 +80,7 @@ team works, and how to run things in whichever box a session happens to be on.
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc., with a `!` or `BREAKING CHANGE:`
   footer for breaking changes.
 
-## Docker (for `tests/db/` testcontainers)
+## Docker (for `tests/db/`'s container fixtures, used directly by `tests/e2e-real/`)
 
 - **Claude Code on the web's Linux containers**: the `docker` CLI is preinstalled but the daemon
   isn't running, and there's no systemd (`PID 1` isn't systemd), so `systemctl start docker` does
@@ -111,15 +111,22 @@ team works, and how to run things in whichever box a session happens to be on.
   run fine under plain Node with the identical image (confirmed fine on a real machine — a Bun-here
   quirk, not a real bug). Postgres is a confirmed instance: `@testcontainers/postgresql`'s default
   wait strategy passes its healthcheck and then `.start()` never resolves under `bun run`, while the
-  identical container/strategy/image resolves in ~2s under plain Node. The workaround for any script
-  that needs a container from Bun: bundle it with esbuild (`--bundle --platform=node --format=cjs`)
-  and run it under the vendored `shell/runtime/node/bin/node`, the way `scripts/run-ipc-backend.sh`
-  already does — and copy `tests/db/fixtures/` beside the bundle output, since `tests/db/support/`'s
-  seed-SQL reads are `__dirname`-relative, which becomes the bundle's own directory.
-  `scripts/capture-postgres-tree.ts` is the manual capture tool built on this, for any `tests/ui/`
-  fixture needing a real captured shape ("capture, don't hand-write", P50 D5).
+  identical container/strategy/image resolves in ~2s under plain Node. The workaround `tests/e2e-real/`
+  itself uses (`support/postgres.ts`, `support/mariadb.ts`): invoke Playwright via its plain Node CLI
+  entrypoint (`node node_modules/.bin/playwright test --project=e2e-real`), never `bunx playwright
+  test`, so `tests/db/support/{postgres,mariadb}.ts`'s container start runs under real Node from the
+  first line. **As of P58f M10 there is no vendored Node runtime to bundle a script against any
+  more** — the old workaround for a *standalone* script needing a container from Bun (esbuild-bundle
+  it, run it under `shell/runtime/node/bin/node`, the way the now-deleted `scripts/run-ipc-backend.sh`
+  did) no longer applies, because that runtime is gone. `scripts/capture-postgres-tree.ts` and
+  `scripts/capture-tree.ts` — the manual tools built on that workaround, for capturing a real shape
+  into a `tests/ui/` fixture ("capture, don't hand-write", P50 D5) — are deleted with it (P58f D15),
+  and their replacement, a one-off-capture mode in `shell/internal/ipcfixture`'s Go generator, has not
+  actually been built: only the six committed per-adapter fixture generators exist (see `tests/ipc/`
+  below). Capturing a genuinely new `tests/ui/` shape today needs that one-off mode written first —
+  there is no drop-in tool for it right now.
 
-## `tests/ipc/` — building and testing in this environment (P50, updated P57)
+## `tests/ipc/` — building and testing in this environment (P50, updated P57, backend moved to Go P58f)
 
 See `docs/ARCHITECTURE.md`'s Testing section for what this tier is and why its fixture is generated
 rather than hand-written. This section is only about running it here.
@@ -127,47 +134,61 @@ rather than hand-written. This section is only about running it here.
 - **Neither half needs `xvfb`** — P57 removed Electron, so no `_electron.launch()`-style native
   window is left anywhere in the repo. The frontend half (`bun run test:ipc:fe`) drives Playwright's
   headless Chromium against a static file server, the same way `tests/ui/` does.
-- **The backend half needs the vendored Node runtime** (`scripts/vendor-node.sh` →
-  `shell/runtime/node/bin/node`). `scripts/run-ipc-backend.sh` bundles each
-  `tests/ipc/**/*.backend.spec.ts` with esbuild (`--bundle --platform=node --format=cjs
-  --loader:.sql=text --external:@confluentinc/kafka-javascript --external:ssh2
-  --external:cpu-features`) and runs each bundle under that Node, one process per spec file,
-  sequentially (each file's container helper is a module-scope memo assuming one file per process).
-  Required rather than incidental: Bun cannot load some of the adapters this tier drives. The script
-  also copies `tests/db/fixtures/` beside the bundle output rather than editing `tests/db/`.
-- **Regenerating a fixture**: `KIRA_IPC_FIXTURES=write sh scripts/run-ipc-backend.sh` writes each
-  `<adapter>.fixture.ts` via raw `JSON.stringify`; run `bunx biome check --write` on it afterward
-  before committing — formatting only, the content doesn't change.
-- **All seven adapters' backend halves run for real here** against containers pulled via
-  `mirror.gcr.io`. Only ClickHouse needed extra work (its own container helper, below). Kafka's
-  capture has one quirk of its own: a read fans across both partitions and interleaves by arrival,
-  not by key/offset, so the fixture sorts the captured page by key (`sortStreamByKey`), and the
-  consumer group's coordinator host:port is frozen the same way ClickHouse's `.inner_id.<uuid>` is.
+- **The backend half is Go now, not a bundled TypeScript spec (P58f D13)** — there is no
+  `*.backend.spec.ts` file, no esbuild bundling step, and no vendored Node runtime involved at all.
+  `shell/internal/ipcfixture`'s per-adapter Go test (`clickhouse_test.go`, `kafka_test.go`,
+  `mariadb_test.go`, `mysql_test.go`, `redis_test.go`, `sqs_test.go` — postgres and sqlite generate no
+  fixture of their own, see `docs/ARCHITECTURE.md`) drives the real `adapterhost`/`adapters` stack
+  against a real container and writes `tests/ipc/<adapter>/<adapter>.fixture.ts`.
+- **Regenerating a fixture**: `cd shell && KIRA_IPC_FIXTURES=write go test ./internal/ipcfixture/...`
+  writes each `<adapter>.fixture.ts` via `write.go`'s `mustMarshalNoEscape` (Go's `encoding/json`
+  escapes HTML and sorts map keys by default, so the generator uses `SetEscapeHTML(false)` and typed
+  structs, never maps); run `bunx biome check --write` on the written file afterward before
+  committing — formatting only, the content doesn't change.
+- **All six adapters' fixture generators run for real here** against containers pulled via
+  `mirror.gcr.io`. ClickHouse needed no extra work this time, unlike the old TypeScript tier:
+  `testcontainers-go/modules/clickhouse` does not hardcode a restrictive `Ulimits` the way
+  `@testcontainers/clickhouse` did, so the JS tier's `NoUlimitClickHouseContainer` workaround (see the
+  ClickHouse section below) has no Go counterpart because nothing here needs one. Kafka's capture has
+  one quirk of its own: a read fans across both partitions and interleaves by arrival, not by
+  key/offset, so the fixture sorts the captured page by key, and the consumer group's coordinator
+  host:port is frozen the same way ClickHouse's `.inner_id.<uuid>` is.
+- **There is no one-off capture mode yet** (P58f D15's own gap — see the Docker section above):
+  `KIRA_IPC_FIXTURES=write` only regenerates the six fixtures already committed under `tests/ipc/`.
+  Capturing a fresh shape for a new `tests/ui/` fixture needs that mode written first.
 
-## ClickHouse — testing in this environment (P36)
+## ClickHouse — testing in this environment (P36, its workaround resolved P58f)
 
 See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts.
 
-- `@testcontainers/clickhouse`'s constructor hardcodes `.withUlimits({nofile: {hard: 262144, soft:
+- **Historical, kept for the reasoning, not because the workaround still exists.** The old JS tier's
+  `@testcontainers/clickhouse` constructor hardcoded `.withUlimits({nofile: {hard: 262144, soft:
   262144}})`, and this sandbox's own `ulimit -Hn` is fixed at 20000 and cannot be raised even as
-  root (a plain `docker run` with no custom ulimits works fine), so a stock container never comes up
-  here. `hostConfig` is `protected` on testcontainers' `GenericContainer`, so a small subclass that
-  clears `this.hostConfig.Ulimits = []` in its constructor unblocks it —
-  `tests/ipc/clickhouse/container.ts`'s `NoUlimitClickHouseContainer`.
-  `tests/db/support/clickhouse.ts` can't be reused for this: its `ClickHouseContainer` construction
-  is private to its own `start()`, and P50 D1 forbids editing `tests/db/`.
+  root (a plain `docker run` with no custom ulimits works fine), so a stock container never came up
+  here. The fix was a small subclass clearing `this.hostConfig.Ulimits = []` —
+  `tests/ipc/clickhouse/container.ts`'s `NoUlimitClickHouseContainer` — since `hostConfig` was
+  `protected` on testcontainers' `GenericContainer`. **Both that file and `tests/db/support/
+  clickhouse.ts` are deleted as of P58f M10**, and `shell/internal/adapters/testsupport/clickhouse.go`
+  (the sole surviving ClickHouse container fixture, used by both `shell/internal/adapters/clickhouse`
+  and `shell/internal/ipcfixture`) needs no equivalent at all: `testcontainers-go/modules/clickhouse`
+  does not hardcode a restrictive `Ulimits`, so this sandbox's own `ulimit -Hn` ceiling never becomes
+  a problem on the Go side. If a future container image or module version reintroduces a similar
+  ceiling, `testcontainers-go`'s own `WithHostConfigModifier` on the generic container option is the
+  Go analogue of the deleted JS subclass.
 
 ## SQLite — testing in this environment (P35)
 
-- **`tests/db/sqlite.spec.ts` needs no Docker** — `tests/db/support/sqlite.ts` is a temp-file fixture
-  (`mkdtemp` + `node:sqlite`), gated by `sqliteAvailable()` the way other specs gate on
-  `isDockerAvailable()`. Its only environment dependency is `node:sqlite` itself, which needs Bun
-  1.4+/Node 22.5+; an older Bun fails with the legible `SQLITE_UNAVAILABLE_MESSAGE` rather than
-  running the suite (this sandbox's Bun 1.4 has it).
+- **`tests/db/sqlite.spec.ts` is gone (P58f M10, D1)** — its coverage lives in
+  `shell/internal/adapters/sqlite/*_test.go` now, run by `bun run test:go`, no Docker either:
+  `modernc.org/sqlite` (pure Go, no cgo) against a real `t.TempDir()` file. `tests/db/support/
+  sqlite.ts` survives regardless, since `tests/e2e-real/` still reads it directly.
 - **`tests/e2e-real/sqlite-real.spec.ts` runs unconditionally**, Docker-free by design — a real
-  `-tags server` Go binary, a real embedded engine and a real temp-file database driven by a plain
-  Playwright tab. It needs the vendored Node runtime and `bun run build:engine` to have run first
-  (the two prerequisites `wails-dev-setup.sh` checks).
+  `-tags server` Go binary, every adapter served in-process (no separate engine child as of P58f
+  M10), and a real temp-file database driven by a plain Playwright tab. Its only prerequisites are
+  `wails-dev-setup.sh` (pinned `wails3` + generated bindings) and `bun run build` (the frontend
+  bundle `shell/main.go`'s `//go:embed` picks up) — both memoized per worker process by
+  `tests/e2e-real/fixtures.ts`'s `buildPrerequisites()`, which also runs the one step those scripts
+  don't: `go build -tags server`.
 
 ## Secrets / `KIRA_INSECURE_SECRETS` (P25, moved to Go in P52/P57)
 
@@ -196,15 +217,15 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   generator against the runtime library.
 - **`wails.io`/`v3.wails.io` are 403-blocked** — on real macOS hardware too, so this is
   organizational proxy policy, not a sandbox artifact, and the official docs cannot be read from any
-  box here. `proxy.golang.org` and `nodejs.org` are both reachable, which is all the Go toolchain
-  and `scripts/vendor-node.sh` need. **Read the installed module source under
-  `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** — it
-  is the real source for the exact pinned version, and it is how several findings below were
-  confirmed rather than assumed.
-- **`go test ./internal/...` / `go build ./internal/...` need nothing but the Go toolchain** —
-  `mattn/go-sqlite3` is cgo but links only the SQLite amalgamation. Only the root `main` package
-  imports Wails and therefore needs the GTK/WebKit headers, so prefer `./internal/...` for a fast
-  loop.
+  box here. `proxy.golang.org` is reachable, which is all the Go toolchain needs — as of P58f M10
+  there is no vendored Node runtime left to fetch from `nodejs.org` either. **Read the installed
+  module source under `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of
+  the docs site** — it is the real source for the exact pinned version, and it is how several
+  findings below were confirmed rather than assumed.
+- **`go test ./internal/...` / `go build ./internal/...` need nothing but the Go toolchain** — the
+  product's own Go code is entirely cgo-free (`modernc.org/sqlite`, pure Go, for both the sqlite
+  adapter and the app's own storage). Only the root `main` package imports Wails and therefore needs
+  the GTK/WebKit headers, so prefer `./internal/...` for a fast loop.
 - **`wails3 generate bindings -b -i -ts` (run from `shell/`) must happen before any frontend build**,
   not just before `go run .`: `shell/frontend/bindings/**` are real Vite import targets, so missing
   ones fail the build with an unresolvable import rather than a stale-bindings surprise. Regenerate
@@ -235,10 +256,11 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
 
 **P52-P56 findings worth keeping:**
 
-- **`sql.Open("sqlite3", path)` (mattn/go-sqlite3) is lazy** — the file doesn't exist on disk until
-  the first real query, so `os.Chmod(path, 0o600)` right after `sql.Open` fails with "no such file
-  or directory". The startup pragmas (which force the first real connection) must run before the
-  chmod, not after.
+- **`sql.Open("sqlite", path)` (`modernc.org/sqlite`, this repo's own driver, not `mattn/go-sqlite3`
+  — `database/sql`'s `Open` is lazy regardless of the driver) does not touch disk until the first
+  real connection** — `os.Chmod(path, 0o600)` right after `sql.Open` fails with "no such file or
+  directory". `sqlDB.Ping()` (which forces that first connection, applying the DSN pragmas) must run
+  before the chmod, not after (`shell/internal/storage/db.go`).
 - **Comparing a struct that holds an `any` field with `==`/`!=` panics at runtime** ("comparing
   uncomparable type") rather than failing to compile — Go only catches this statically when the
   field's *static* type is already uncomparable, not when it's `any` holding a decoded
@@ -716,6 +738,54 @@ Nothing in this run needed softening or a "not available in this session" carve-
   npm-install-script-approval fact is a generic gotcha whose only subject in this repo is the
   `@confluentinc/kafka-javascript` package P58f removes. Neither belonged in a section about a driver
   the app no longer uses.
+
+## P58f implementation findings — cutover: delete `src/engine`, `enginehost`, vendored Node (M10-M11)
+
+(`docs/v1/plans/P58f-cutover.md` §7 carries the full acceptance-criteria walkthrough.)
+
+- **Deleting a directory is the easy half; finding its type dependencies is the hard half.**
+  `enginehost` was named as "the sidecar's supervisor" by every earlier plan, but three of its four
+  Go consumers used it only for the op-log `Event` type and one backpressure sentinel, not for the
+  child process at all — those moved to `internal/oplog` before `enginehost` itself could be deleted.
+- **A coexistence-window mitigation that covers the pull path and not the push path leaves a
+  silently-wrong number in the UI for five sub-phases** — the same failure class as P57's own
+  `byteSize: 0`, found the same way: by asking what actually produces the value, not by trusting that
+  a mitigation named in one place covers every path that value travels.
+- **A generated fixture outlives the code that generated it, and a mocked frontend spec will keep
+  asserting a dead adapter's behaviour indefinitely.** `kafka.frontend.spec.ts` asserted an empty
+  Configuration section for three weeks after the Go Kafka adapter started returning 32 rows. The
+  anti-drift guarantee `tests/ipc/`'s fixture generator provides holds only while *something*
+  actually regenerates it.
+- **Go's `encoding/json` escapes HTML and sorts map keys by default** — a generator writing
+  TypeScript (`shell/internal/ipcfixture/write.go`) needs `SetEscapeHTML(false)` and typed structs,
+  never maps, or the committed `.fixture.ts` files come out byte-different from a hand-written one
+  for no functional reason.
+- **The Go test suite has no Node dependency left** — `internal/enginetest`'s `engine-fixture.mjs`
+  was the last one, deleted alongside `internal/enginetest` itself.
+- **The product's own Go code is cgo-free** (`modernc.org/sqlite` for both the sqlite adapter and the
+  app's own storage); only Wails' own macOS bindings still need `CGO_ENABLED=1`. This file's own
+  `mattn/go-sqlite3` claims were stale before this phase started — fixed above, not just here.
+- **Both `tests/db/` and `tests/ipc/` survive P58 as something other than what they were**: the first
+  as a shared fixture corpus two other tiers (`shell/internal/adapters/testsupport`,
+  `tests/e2e-real/`) read rather than a spec suite of its own; the second with a Go backend half and
+  no vendored Node dependency, but — unlike the parent plan's own D15/§4.6 anticipated — no
+  generalized one-off-capture mode, only the six fixtures already committed (see the Docker and
+  `tests/ipc/` sections above for the honest state of that gap).
+- **`nativeKinds` itself is gone as a live map, not merely "all true"** — grep the tree and it turns
+  up nowhere as an actual Go variable; `adapterhost.TestKindNodeServed` and its `fakeKind` placeholder
+  were already retired at P58e M9.3, once every kind was native and no coexistence window remained to
+  need one. The only surviving trace is a single stale comment
+  (`shell/internal/storage/repos/connections.go:121`) — worth knowing about, out of scope for a
+  docs-only cutover pass to touch.
+- **The C2 zero-Node-traffic checkpoint (the parent P58 plan's own gate) ran for real** in this
+  environment against a real `-tags server` build with every one of the ten kinds connected: the app
+  boots with no child process at all (`pgrep -P <the spawned server binary's own pid>` empty,
+  confirming M10 deleted the `enginehost.Start` call site, not merely made it unreachable), and the
+  cache readout moves in the status bar and Settings dialog as pages load — the one check `tests/ui/`'s
+  mocked control plane can never reach, since its mock has no `Events.On` analogue at all. **Bundle
+  size, cold start and total RSS with no vendored Node are not available in this session** — no macOS
+  hardware here, same constraint every earlier phase's packaged-build numbers hit; recorded as such in
+  `docs/PERF.md` §3 and its L-D lever note rather than guessed at.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
