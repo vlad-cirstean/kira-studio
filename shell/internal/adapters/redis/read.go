@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -216,7 +217,75 @@ func readList(ctx context.Context, conn *goredis.Client, key string, meta keyMet
 	return builder.Finish(position), nil
 }
 
-// readStream is read.ts's readStream: XRANGE key <start> + COUNT pageSize+1.
+// streamFieldValue is one field/value pair off a stream entry, in wire order.
+type streamFieldValue struct {
+	Field string
+	Value string
+}
+
+// streamFields is a stream entry's field/value pairs, marshaled as a JSON object in the order
+// XADD received them (P2 R1): go-redis's own XMessage.Values is a map[string]interface{}, which
+// discards that order both on assignment and again were it re-marshaled through encoding/json
+// (map keys sort alphabetically) — so this type is built straight from XRANGE's own raw reply
+// (still an ordered array on the wire, RESP2 or RESP3 alike) rather than through XMessage at all.
+type streamFields []streamFieldValue
+
+func (f streamFields) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, fv := range f {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		key, err := json.Marshal(fv.Field)
+		if err != nil {
+			return nil, err
+		}
+		val, err := json.Marshal(fv.Value)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(key)
+		buf.WriteByte(':')
+		buf.Write(val)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+// parseStreamEntry reads one [id, [field, value, field, value, ...]] tuple off a raw XRANGE
+// reply — the shape every element of that reply's own top-level array takes.
+func parseStreamEntry(raw any) (id string, fields streamFields, err error) {
+	tuple, ok := raw.([]interface{})
+	if !ok || len(tuple) != 2 {
+		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: expected a 2-element entry tuple", nil)
+	}
+	id, ok = tuple[0].(string)
+	if !ok {
+		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: entry id is not a string", nil)
+	}
+	if tuple[1] == nil {
+		return id, streamFields{}, nil
+	}
+	rawFields, ok := tuple[1].([]interface{})
+	if !ok {
+		return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: entry fields are not an array", nil)
+	}
+	fields = make(streamFields, 0, len(rawFields)/2)
+	for i := 0; i+1 < len(rawFields); i += 2 {
+		field, fok := rawFields[i].(string)
+		value, vok := rawFields[i+1].(string)
+		if !fok || !vok {
+			return "", nil, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: field/value is not a string", nil)
+		}
+		fields = append(fields, streamFieldValue{Field: field, Value: value})
+	}
+	return id, fields, nil
+}
+
+// readStream is read.ts's readStream: XRANGE key <start> + COUNT pageSize+1, issued via the raw
+// command path (not XRangeN) so the reply's own field order survives into the page (see
+// streamFields above).
 func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyMeta, req readReq, fingerprint string) (page.KeyValuePage, error) {
 	if req.Cursor.Mode == "before" {
 		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported,
@@ -235,12 +304,16 @@ func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyM
 	}
 
 	limit := req.PageSize + 1 // D24's +1 probe, mirroring the SQL adapters
-	entries, err := conn.XRangeN(ctx, key, startID, "+", int64(limit)).Result()
+	raw, err := conn.Do(ctx, "xrange", key, startID, "+", "count", limit).Result()
 	if err != nil {
 		return page.KeyValuePage{}, mapError(err)
 	}
 	if err := adapters.CheckCancelled(ctx); err != nil {
 		return page.KeyValuePage{}, err
+	}
+	entries, ok := raw.([]interface{})
+	if !ok {
+		return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed XRANGE reply: expected an array", nil)
 	}
 
 	probedExtra := len(entries) > req.PageSize
@@ -250,24 +323,24 @@ func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyM
 	}
 
 	builder := page.NewKeyValuePageBuilder("stream", meta.ttlMs, meta.memoryBytes, false)
-	for _, entry := range kept {
-		pairs := make(map[string]string, len(entry.Values))
-		for field, value := range entry.Values {
-			if s, ok := value.(string); ok {
-				pairs[field] = s
-			}
-		}
-		body, err := json.Marshal(pairs)
+	var lastID string
+	for _, rawEntry := range kept {
+		id, fields, err := parseStreamEntry(rawEntry)
 		if err != nil {
 			return page.KeyValuePage{}, err
 		}
-		builder.Push(entry.ID, string(body))
+		body, err := json.Marshal(fields)
+		if err != nil {
+			return page.KeyValuePage{}, err
+		}
+		builder.Push(id, string(body))
+		lastID = id
 	}
 
 	hasMore := probedExtra
 	var nextToken *string
 	if hasMore {
-		token := adapters.EncodePageToken([]string{kept[len(kept)-1].ID}, fingerprint)
+		token := adapters.EncodePageToken([]string{lastID}, fingerprint)
 		nextToken = &token
 	}
 	position := page.PagePosition{

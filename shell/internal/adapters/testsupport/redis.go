@@ -47,6 +47,12 @@ var RedisSetMembers = []string{"red", "green", "blue"}
 // RedisHashFields mirrors 0004_redis_seed.ts's own HASH_FIELDS.
 var RedisHashFields = map[string]string{"age": "30", "city": "NYC"}
 
+// RedisStreamFields is the field order every seeded stream entry's own XAdd uses below —
+// deliberately not alphabetical ("zLast" sorts last, but is added first), so a read path that
+// discards XADD's field order and falls back to Go's default map/JSON key sort (alphabetical)
+// is caught rather than accidentally matching by coincidence (P2 R1).
+var RedisStreamFields = []string{"zLast", "type", "seq"}
+
 // RedisFixture is support/redis.ts's RedisFixture.
 type RedisFixture struct {
 	Config    model.ResolvedConnectionConfig
@@ -209,9 +215,13 @@ func seedRedis(ctx context.Context, conn *goredis.Client) error {
 	}
 
 	for i := 0; i < RedisStreamEntries; i++ {
+		// A []interface{} Values, not a map, deliberately: XAddArgs.Values as a map does not
+		// preserve field order (go-redis's own documented caveat), so a map here would defeat the
+		// point of RedisStreamFields below, which exists to catch read.go relabelling this
+		// (deliberately non-alphabetical) order back to alphabetical.
 		if err := conn.XAdd(ctx, &goredis.XAddArgs{
 			Stream: RedisStreamKey, ID: "*",
-			Values: map[string]any{"type": "click", "seq": fmt.Sprintf("%d", i)},
+			Values: []interface{}{"zLast", "z-value", "type", "click", "seq", fmt.Sprintf("%d", i)},
 		}).Err(); err != nil {
 			return err
 		}

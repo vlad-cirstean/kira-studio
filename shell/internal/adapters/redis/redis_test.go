@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -374,6 +375,24 @@ func TestRedis_Read_Stream(t *testing.T) {
 	}
 	if fields["type"] != "click" {
 		t.Errorf("fields[type] = %q, want click", fields["type"])
+	}
+
+	// P2 R1 regression: the seed fixture's own XAdd order is "zLast", "type", "seq" (deliberately
+	// not alphabetical) — a read path that discards that order and falls back to a Go map/JSON
+	// key sort would instead emit "seq", "type", "zLast", failing this position check.
+	var positions []int
+	for _, field := range testsupport.RedisStreamFields {
+		pos := strings.Index(*body, `"`+field+`"`)
+		if pos < 0 {
+			t.Fatalf("body = %s, missing field %q", *body, field)
+		}
+		positions = append(positions, pos)
+	}
+	for i := 1; i < len(positions); i++ {
+		if positions[i] < positions[i-1] {
+			t.Errorf("body = %s, want field order %v (XADD's own order), not re-sorted", *body, testsupport.RedisStreamFields)
+			break
+		}
 	}
 }
 
