@@ -50,11 +50,6 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
 
-      - name: Vendor the Node runtime and build the engine bundle
-        run: |
-          sh scripts/vendor-node.sh
-          bun run build:engine
-
       - run: bun run package
 
       - name: Zip the signed app bundle for distribution

@@ -36,9 +36,9 @@ jobs:
           (cd shell && wails3 generate bindings -b -i -ts -names)
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run build:engine
       - run: bun run build
-      - run: bun run test:go
+      - name: Go unit tests (container-backed cases skip themselves without Docker — see container-tests)
+        run: bun run test:go
       - run: bun run verify:packaging
 
   ui:
@@ -75,7 +75,7 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  db-unit-tests:
+  container-tests:
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -84,9 +84,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: shell/go.mod
       - run: bun install --frozen-lockfile
       - run: bun run test:unit
-      - run: bun run test:db
+      - name: Go adapter tests against real Testcontainers (Docker is available on this runner)
+        run: bun run test:go
 
   package-smoke:
     needs: checks
@@ -102,18 +106,12 @@ jobs:
         with:
           go-version-file: shell/go.mod
       - run: bun install --frozen-lockfile
-      - name: Vendor the Node runtime and build the engine bundle (main.go refuses to start without both)
-        run: |
-          sh scripts/vendor-node.sh
-          bun run build:engine
       - run: bun run package
-      - name: Assert packaged bundle (docs/PACKAGING.md §4)
+      - name: Assert packaged bundle (docs/PACKAGING.md §4) — no runtime/ tree as of P58f M10
         run: |
           set -eu
           APP="shell/bin/Kira Studio.app"
           test -d "$APP"
-          test -f "$APP/Contents/MacOS/runtime/engine/engine.cjs"
-          test -x "$APP/Contents/MacOS/runtime/node/bin/node"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
             = 'com.kirathecat.kira-studio'
           codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
