@@ -111,3 +111,39 @@ func KVValueAt(t *testing.T, p page.KeyValuePage, row int) *string {
 // Strp returns a pointer to s — every acceptance spec in this repo needs one somewhere and
 // otherwise reinvents it under a different name.
 func Strp(s string) *string { return &s }
+
+// StreamKeyAt reads row's key text from a StreamPage — the Go analogue of sqs.spec.ts's own
+// per-message key reads. SQS's MessageId is always present on a received message, but the reader
+// stays nil-able (chunkCellAt, not a bare string) for the same reason DocIDAt does: a page.Chunk's
+// null-vs-empty-string distinction is a property of the chunk format, not of any one producer's
+// data, and a per-package copy that assumed "always present" would be the exact risk P58c §1.3 gap
+// 3 already named once for Document/KeyValue readers.
+func StreamKeyAt(t *testing.T, p page.StreamPage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Keys, row)
+}
+
+// StreamHeadersAt reads row's pre-serialized headers cell text from a StreamPage — P58d D8's
+// hand-encoded JSON, asserted as a literal string by the tests that need the exact shape.
+func StreamHeadersAt(t *testing.T, p page.StreamPage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Headers, row)
+}
+
+// StreamAttrsAt reads row's pre-serialized system-attributes cell text from a StreamPage.
+func StreamAttrsAt(t *testing.T, p page.StreamPage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Attrs, row)
+}
+
+// StreamTimestampAt reads row's ISO-8601 timestamp cell text from a StreamPage.
+func StreamTimestampAt(t *testing.T, p page.StreamPage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Timestamps, row)
+}
+
+// StreamBodyAt reads row's body cell text from a StreamPage.
+func StreamBodyAt(t *testing.T, p page.StreamPage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Bodies, row)
+}
