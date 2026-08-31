@@ -34,7 +34,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Icons | `@vscode/codicons` | UI chrome |
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod still guards every trust boundary that is still TypeScript: the engine wire protocol's control and data payloads (`src/engine/{control,rpc,data,stdio-main}.ts`) and connection-dialog input. Rows read back out of SQLite are now validated in Go instead (`shell/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
-| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `mattn/go-sqlite3` (the same unmodified upstream SQLite amalgamation `node:sqlite` embeds, so the migrations and queries behave identically); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
+| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
 | Packaging | `wails3 task darwin:package` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`); ships as a zipped `.app`, no DMG, no auto-update, no notarization |
 | DB tests | Testcontainers (Node) | real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |

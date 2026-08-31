@@ -5,21 +5,37 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/kirathecat/kira-studio/shell/internal/config"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // DB wraps the single *sql.DB connection this app ever opens.
 //
-// mattn/go-sqlite3 links the real, unmodified upstream SQLite amalgamation — the same engine
-// node:sqlite embeds — so the migrations and every query behave identically to the Electron
-// build with nothing to re-validate (P52 §2.2). SetMaxOpenConns(1): this app's database is a
-// small, single-writer configuration store, and serialising every statement onto one connection
-// removes the SQLITE_BUSY class of bug entirely at no measurable cost (P52 §5.2).
+// modernc.org/sqlite is a pure-Go transpilation of the same upstream SQLite amalgamation
+// mattn/go-sqlite3 links via cgo — same engine, no cgo toolchain needed to build this binary
+// (the sqlite adapter package already made this switch for the external-file browsing path;
+// this is the same driver, same DSN-based pragma convention, applied to the app's own database).
+// SetMaxOpenConns(1): this app's database is a small, single-writer configuration store, and
+// serialising every statement onto one connection removes the SQLITE_BUSY class of bug entirely
+// at no measurable cost (P52 §5.2).
 type DB struct {
 	*sql.DB
+}
+
+// buildDSN sets the four startup pragmas through the DSN query string rather than as Exec
+// statements after Open — unlike mattn/go-sqlite3's Go-side options, modernc.org/sqlite takes
+// pragmas this way (see adapters/sqlite/client.go's buildDSN), and doing it here means every
+// connection the pool ever opens carries them, not just the first.
+func buildDSN(path string) string {
+	q := url.Values{}
+	q.Set("_busy_timeout", "5000")
+	q.Set("_foreign_keys", "1")
+	q.Set("_journal_mode", "WAL")
+	q.Set("_synchronous", "NORMAL")
+	return "file:" + path + "?" + q.Encode()
 }
 
 // Open creates KIRA_HOME if needed, opens (or creates) the database file at the trimmed
@@ -31,26 +47,18 @@ func Open() (*DB, error) {
 	}
 
 	path := config.DbPath()
-	sqlDB, err := sql.Open("sqlite3", path)
+	sqlDB, err := sql.Open("sqlite", buildDSN(path))
 	if err != nil {
 		return nil, fmt.Errorf("storage: open %s: %w", path, err)
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	// database/sql's Open is lazy — the file does not exist on disk until the first real query,
-	// so the pragmas (which force that first connection) must run before the chmod below, not
-	// after.
-	pragmas := []string{
-		"PRAGMA journal_mode = WAL",
-		"PRAGMA synchronous = NORMAL",
-		"PRAGMA foreign_keys = ON",
-		"PRAGMA busy_timeout = 5000",
-	}
-	for _, p := range pragmas {
-		if _, err := sqlDB.Exec(p); err != nil {
-			_ = sqlDB.Close()
-			return nil, fmt.Errorf("storage: %s: %w", p, err)
-		}
+	// database/sql's Open is lazy — the file does not exist on disk until the first real
+	// connection, so Ping (which forces one, applying the DSN pragmas above) must run before the
+	// chmod below, not after.
+	if err := sqlDB.Ping(); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("storage: open %s: %w", path, err)
 	}
 
 	// Unconditional, not only on create: tightens permissions on an existing loose file too,
