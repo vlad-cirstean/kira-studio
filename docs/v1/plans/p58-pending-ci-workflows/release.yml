@@ -55,9 +55,7 @@ jobs:
       - name: Zip the signed app bundle for distribution
         run: ditto -c -k --keepParent "shell/bin/Kira Studio.app" "kira-studio-macos-arm64.zip"
 
-      - name: Verify packaging (strict — no leftover update-feed artifact may reach a release)
-        env:
-          KIRA_STRICT_UPDATE_CHECK: '1'
+      - name: Verify packaging
         run: bun run verify:packaging
 
       - name: Compose release notes

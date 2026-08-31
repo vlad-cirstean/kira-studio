@@ -790,6 +790,76 @@ Nothing in this run needed softening or a "not available in this session" carve-
   hardware here, same constraint every earlier phase's packaged-build numbers hit; recorded as such in
   `docs/PERF.md` §3 and its L-D lever note rather than guessed at.
 
+## P1 (v1.1) implementation findings — dependency, script and folder audit
+
+Implemented per `docs/v1.1/plans/P1-cutover-closeout-dependency-audit.md`. Headline: **the
+dependency audit found nothing to remove** — every one of `package.json`'s 31 entries and every one
+of `shell/go.mod`'s 24 direct requires has a live consumer. The one `go.mod` change was a
+misclassification, not a removal: `github.com/twmb/franz-go/pkg/kmsg` was listed `// indirect`
+while `internal/adapters/kafka/definition.go` imports it directly — `go mod tidy` promoted it.
+
+**The SPEC row's own named example (`tsgo`) does not survive contact with the tree — keep it.**
+`tsgo` is the *sole* typechecker for 72 files / ≈20 400 lines that `vue-tsc` never reaches: every
+`tests/` tier plus `playwright.config.ts` (via `tsconfig.node.json`) and `tests/unit/` (via its own
+`tsconfig.json`). Dropping it with no replacement would silently remove that whole surface from
+`bun run typecheck`, the pre-commit hook, and CI. The narrower claim that *is* true — plain `tsc`
+(already installed for `vue-tsc`) passes both of `tsgo`'s projects identically today, at a measured
+cost of ≈4.75s more per `bun run typecheck` — is a toolchain-policy swap that contradicts
+`docs/ARCHITECTURE.md`'s own Stack table, not a staleness removal; it is left as an open question
+for the user rather than decided inside an audit.
+
+**Dead exports are invisible to this repo's tooling.** Neither Biome nor `tsgo` flags an exported
+symbol in a module nothing imports — no unused-binding warning fires, because the binding *is*
+used, just not from outside its own file. That is why `src/shared/format.ts`'s `abbreviateCount`
+(dead since the row-estimate badge it fed moved to Go in P58) and `src/shared/vite-raw.d.ts`'s
+`*.sql?raw` ambient declaration (dead since nothing imports a `.sql?raw` specifier any more)
+survived P58f's own cutover untouched. The only way to find one is to enumerate every module under
+a directory and count importers by hand — a `grep` for the exported name alone is not enough: the
+near-miss that makes this easy to get wrong is `src/renderer/format.ts`, a *different* file
+exporting `formatBytes` with five real importers, one `git mv` away from looking like the same
+name.
+
+**`tests/db/support/*` is the non-obvious chain keeping five npm packages alive.** `tests/db/` holds
+no specs any more, but `tests/e2e-real/support/{postgres,mariadb,kafka}.ts` re-export straight from
+`tests/db/support/`, and `tests/e2e-real/*-real.spec.ts` call the exported `start*()` functions.
+That one indirection is what keeps `pg`, `mariadb`, `testcontainers` and the three
+`@testcontainers/*` packages live — re-check this chain specifically before ever proposing to drop
+one of them; a "this file's only consumer" reading of `tests/db/support/` taken in isolation is
+wrong.
+
+**A real, still-open packaging finding, investigated but not fixed here (out of scope for a
+staleness audit without macOS to verify a fix against):** `shell/build/Taskfile.yml`'s
+`install:frontend:deps` → `build:frontend` → `frontend:run` chain still treats `shell/frontend/` as
+its own npm project with a `package.json` — it has none (the app's one frontend builds from the
+repo root via `vite build`). `darwin:build`/`darwin:package` both declare this chain as a
+dependency. A dry run (`wails3 task -x --dry darwin:package`) shows Task has never fingerprinted it
+(`shell/.task/checksum/` holds only `common-generate-icons`) and plans to actually run `npm
+install`/`npm run build -q` inside `shell/frontend/` rather than skipping it by up-to-date check;
+separately confirmed that `npm install` with no `package.json` present fails outright (`ENOENT`).
+Whoever next runs a real macOS `bun run package` should treat this as the first thing to verify,
+not assume it away because `shell/frontend/dist` already exists from the root build.
+
+Also fixed as stale-documentation corrections, none behavior-changing: `README.md`'s Requirements/
+Install/Development/Tests/Architecture sections and top-level layout block (previously documented
+eight scripts and four test directories that don't exist, and Electron/`dist/`-era build output);
+`shell/README.md`/`shell/main.go`'s `bun run build:wails`/`vite.wails.config.ts`/
+`scripts/vendor-node.sh` references, dead since the P57/P58f rewrites; a duplicated root `build/`
+icon directory (byte-identical to `shell/build/appicon.*`); Wails scaffold leftovers
+(`frontend:vendor:puppertino`, a placeholder `other:`/`comments:` block); a stale "S1-S5" claim in
+`scripts/verify-packaging.sh` naming two checks (S3/S4) removed with electron-builder; and a
+`bun run test:db` mention plus an Electron/Node runtime alternative in `scripts/demo-dbs/README.md`,
+neither of which apply post-P58f.
+
+**Folder structure: audited, nothing folded or renamed.** `src/renderer` and `src/shared` both
+still earn their place under the single-Go-backend/single-Vue-frontend shape — `src/shared` is
+consumed by the frontend, five test tiers, *and* mirrored by hand in ten-plus Go files as their
+source of truth for the wire protocol, which is the reason to keep it a top-level sibling rather
+than fold it under `src/renderer`. `src/renderer`'s own name is Electron vocabulary for a process
+that no longer exists, but a name being inaccurate isn't the same as a folder being stale — it
+still does its job. The rename's blast radius (27 external files, zero functional effect) is
+measured and handed to P2's architecture-review round rather than decided here, since P2 runs
+against the tree this phase leaves and its remit is exactly this question.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The live phasing record, phase by
 phase: `docs/v1.1/SPEC.md` (see `docs/v1.1/README.md` for what that folder is and isn't). v1 shipped
 and is kept as history in `docs/v1/SPEC.md`/`docs/v1/README.md`; it is not the process pointer

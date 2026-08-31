@@ -32,3 +32,9 @@ If a future phase needs to revise these again before this ever lands, revise the
 place here (this directory, not `.github/workflows/`) and update this README's own "how many
 generations behind" count — do not let a third generation silently stack on top of a directory
 that still says "P57" or "two generations".
+
+**Revised by v1.1 P1** (dependency/script/folder audit): `release.yml`'s `verify:packaging` step
+set `KIRA_STRICT_UPDATE_CHECK: '1'`, a variable `scripts/verify-packaging.sh` has never read since
+the P57 rewrite dropped its strict-mode branch along with the electron-builder checks. Removed the
+`env:` block and reworded the step name. This is a correction to the staged content, not a new
+generation of it — the "two generations behind" count above is unchanged.
