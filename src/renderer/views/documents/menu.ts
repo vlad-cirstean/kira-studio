@@ -1,8 +1,22 @@
+import { copyText } from '../../clipboard';
 import { confirmDialog } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setActionError, setAllExpanded, toggleExpanded } from './state';
+
+// A rejected clipboard write (denied permission, an unfocused window) must not vanish the same
+// way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
+// its own `@click` binding, so with nothing here to catch it, Copy would fail with zero visible
+// feedback (P43 F6/D7's own `actionError` exists for exactly this).
+async function copyOrReportError(tabId: string, text: string): Promise<void> {
+  try {
+    await copyText(text);
+    setActionError(tabId, null);
+  } catch (err) {
+    setActionError(tabId, err instanceof Error ? err.message : String(err));
+  }
+}
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
 // shared by the per-row context menu and (expand/collapse all only) the toolbar.
@@ -44,7 +58,7 @@ export function rowMenu(
       label: 'Copy document',
       // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already shows,
       // and what saveDocumentEdit/parseDocumentLiteral already accept back.
-      run: () => void navigator.clipboard.writeText(toShellText(body)),
+      run: () => copyOrReportError(tabId, toShellText(body)),
     },
     {
       type: 'item',
@@ -53,7 +67,7 @@ export function rowMenu(
       // The shell form is also what turns *Copy _id* into a working filter (F14, D12/D15): paste
       // it as `{ _id: ObjectId("...") }` and resolveEjsonWrappers/the shell constructor resolve it
       // to the same value either way.
-      run: () => void navigator.clipboard.writeText(parseIdLabel(id).text),
+      run: () => copyOrReportError(tabId, parseIdLabel(id).text),
     },
     { type: 'separator' },
     {
