@@ -294,6 +294,119 @@ test('autocomplete — Mongo filter row', async ({ relaunch, consoleErrors }) =>
   expect(consoleErrors).toEqual([]);
 });
 
+// These two "Copy document" cases live here, not in a documents-only file, because this file
+// already owns the local connectMongo/mongoCreateArgs helpers a Mongo document-view test needs —
+// splitting them out would duplicate that setup rather than share it, for a UI suite with no
+// existing dedicated documents-view spec file to add them to.
+//
+// Same clipboard-spy approach as data-view.spec.ts's own installClipboardSpy: this tier runs
+// WebKit, which has no Chromium-style clipboard-permission grant to make, so spying on writeText
+// proves what actually landed without a real OS clipboard round trip.
+async function installClipboardSpy(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __clipboard: string[] }).__clipboard = [];
+    navigator.clipboard.writeText = (text: string) => {
+      (window as unknown as { __clipboard: string[] }).__clipboard.push(text);
+      return Promise.resolve();
+    };
+  });
+}
+
+async function lastClipboardWrite(page: Page): Promise<string> {
+  return page.evaluate(
+    () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
+  );
+}
+
+test('Mongo document row — Copy document / Copy _id', async ({ relaunch, consoleErrors }) => {
+  const CONNECTION_ID = 'conn-ac-mongo-copy';
+  const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo', 'green');
+  const FIXTURE = widgetsFixture(CONNECTION_ID);
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mongoCreateArgs('Mongo'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+
+  await connectMongo(page, 'Mongo', 'green');
+  await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
+  await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
+  const firstRow = page.locator('[data-testid="document-row"]').first();
+  await expect(firstRow).toBeVisible({ timeout: 15_000 });
+
+  await installClipboardSpy(page);
+
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-document"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+  const copiedDoc = await lastClipboardWrite(page);
+  expect(copiedDoc).toContain('ObjectId("000000000000000000000000")');
+  expect(copiedDoc).toContain('"name": "widget-0"');
+
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-id"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+  expect(await lastClipboardWrite(page)).toBe('ObjectId("000000000000000000000000")');
+
+  expect(consoleErrors).toEqual([]);
+});
+
+// A rejected navigator.clipboard.writeText (denied permission, an unfocused window — real on
+// macOS per docs/ARCHITECTURE.md's own "WebKit's clipboard gesture heuristics" note) used to
+// vanish with nothing on the clipboard and no visible error at all: ContextMenu.vue's
+// `onItemClick` is never awaited by its own `@click` binding, and documents/menu.ts's two copy
+// items called `navigator.clipboard.writeText` directly with no catch of their own — the exact
+// silent failure a "Mongo objects can't be copied" report describes. Confirmed empirically before
+// the fix (this test failed: 0 actionError elements, `[]` consoleErrors, nothing surfaced
+// anywhere) — now documents/menu.ts's copyOrReportError mirrors the delete-document handler's own
+// try/catch + setActionError.
+test('Mongo document row — Copy document surfaces a rejected clipboard write', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-ac-mongo-copy-fail';
+  const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo', 'green');
+  const FIXTURE = widgetsFixture(CONNECTION_ID);
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mongoCreateArgs('Mongo'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+
+  await connectMongo(page, 'Mongo', 'green');
+  await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
+  await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
+  const firstRow = page.locator('[data-testid="document-row"]').first();
+  await expect(firstRow).toBeVisible({ timeout: 15_000 });
+
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = () => Promise.reject(new Error('NotAllowedError: denied'));
+  });
+
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-document"]');
+
+  await expect(page.locator('[data-testid="document-action-error"]')).toBeVisible();
+  await expect(page.locator('[data-testid="document-action-error"]')).toContainText(
+    'NotAllowedError',
+  );
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('autocomplete — console shows SQL keywords on a resolved dialect (MariaDB)', async ({
   relaunch,
   consoleErrors,
