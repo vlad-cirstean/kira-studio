@@ -11,8 +11,9 @@ The tenth engine, SQLite, needs no container at all (P35 D36) — the artefact a
 needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
 `node:sqlite` module the app's own adapter reads it with. See its own section below.
 
-Kafka uses the same image/mode as the `@testcontainers/kafka` harness under `bun run test:db`
-(confluentinc/cp-kafka in KRaft mode) — see `tests/db/support/kafka.ts`. SQS and S3 share one
+Kafka uses the same image/mode as the `@testcontainers/kafka` harness `tests/db/support/kafka.ts`
+provides (confluentinc/cp-kafka in KRaft mode) — re-exported by `tests/e2e-real/support/kafka.ts`
+for that tier's Playwright specs. SQS and S3 share one
 LocalStack container (`SERVICES=sqs,s3`), same as `@testcontainers/localstack`'s own harnesses —
 see `tests/db/support/sqs.ts` and `tests/db/support/s3.ts`.
 
@@ -20,7 +21,7 @@ see `tests/db/support/sqs.ts` and `tests/db/support/s3.ts`.
 
 - [Colima](https://github.com/abiosoft/colima) running with the Docker runtime
 - `docker` and `docker-compose` on the PATH
-- For SQLite only: a `bun` with `node:sqlite` (1.4+), or Electron/Node 22.5+ — no Docker needed
+- For SQLite only: a `bun` with `node:sqlite` (1.4+) — no Docker needed
 
 ## Start the databases
 

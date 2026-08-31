@@ -7,8 +7,10 @@
 # module out of. What survives is the *property* those checks protected (no auto-update, ad-hoc
 # signed, correct bundle identity) reasserted against the Wails bundle's own layout.
 #
-# Static checks (S1-S5) always run. Artifact checks (A1, A3, N2) run only when the bundle exists;
-# otherwise they print "skipped" and pass.
+# Static checks (S1, S2, S5) always run — S3/S4 were electron-builder.yml checks removed in the
+# P57 rewrite; the numbering was never closed up, and check IDs stay as-is since docs/PACKAGING.md
+# cross-references them. Artifact checks (A1, A3, N2) run only when the bundle exists; otherwise
+# they print "skipped" and pass.
 #
 # Every check runs before the script exits, so one run reports everything wrong, not just the
 # first failure.
