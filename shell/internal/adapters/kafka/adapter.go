@@ -171,17 +171,25 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	return countTopic(ctx, adm, topic)
 }
 
-// Preview is index.ts's preview. Wired to produce.go's preview in a later M9.2 commit.
+// Preview is index.ts's preview.
 func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
-	return nil, adapters.New(adapters.CodeQuery, "kafka preview is not implemented yet", nil)
+	topic, err := a.resolveTopicTarget(plan.Path, "read")
+	if err != nil {
+		return nil, err
+	}
+	return preview(plan, topic)
 }
 
-// Mutate is index.ts's mutate. Wired to produce.go's produce in a later M9.2 commit.
+// Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	if a.client == nil {
 		return model.MutationResult{}, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
 	}
-	return model.MutationResult{}, adapters.New(adapters.CodeQuery, "kafka mutate is not implemented yet", nil)
+	topic, err := a.resolveTopicTarget(plan.Path, "read")
+	if err != nil {
+		return model.MutationResult{}, err
+	}
+	return produce(ctx, a.client, topic, a.readOnly, plan, op)
 }
 
 // Execute is index.ts's execute — caps.SQL is false (P10's D13); never reached.
