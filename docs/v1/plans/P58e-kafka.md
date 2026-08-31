@@ -950,3 +950,190 @@ than ported.** Four parts:
 4. **No separate producer client.** The TypeScript builds a fresh `Producer` per mutate because the
    compat wrapper forced `dr_cb`. In Go the adapter's own long-lived client produces directly; the
    only client that stays ephemeral is the browse consumer (**P58e E5**), for a real API reason.
+
+**P58e E15 — `Connect` is `kgo.NewClient` + `Client.Ping(ctx)` + one `kadm.Metadata(ctx)`, and
+`ConnectInfo.Details` becomes `{brokers, cluster}`.** `kgo.NewClient` opens no socket
+(`kgo/client.go`), exactly like the compat `admin.connect()` that `client.ts:92-95` warns about
+(*"admin.connect() alone proves nothing about broker reachability — it resolves on the 'ready' event
+of a synchronously-created librdkafka handle, not a round trip"*). `Client.Ping` is franz-go's own
+bounded reachability probe (`kgo/client.go:628-633`), and the `kadm.Metadata` call that follows both
+proves the admin surface works and supplies the two `Details` values:
+
+- **`cluster`** — `Metadata.Cluster` (`kadm/metadata.go:189`). **P32 D13 recorded this as permanently
+  lost**; it comes back.
+- **`brokers`** — `len(Metadata.Brokers)`, a **live cluster-wide count**, where `client.ts:25-30`
+  could only report the configured bootstrap-address count and said so at length (*"no compat or
+  native admin call exposes broker metadata … worth a real live-broker call the day it is"*). Today
+  is that day.
+- **`librdkafka` is dropped** — franz-go exposes no runtime version constant and inventing one would
+  be worse than the honest omission. `ConnectInfo.ServerVersion` stays the literal `"Kafka"`
+  (`index.ts:43`), which `kafka.spec.ts` 1 asserts and the status-bar tooltip renders.
+
+**P58e E16 — the connection config ports option-for-option, and the sslmode security posture ports
+unchanged.** `client.ts:36-107` → `kgo.SeedBrokers(host:port)`, `kgo.ClientID("kira-studio")`,
+`kgo.DialTimeout(10 * time.Second)` (`CONNECT_TIMEOUT_MS`), `kgo.DialTLSConfig(&tls.Config{})` when
+TLS is on, `kgo.SASL(plain.Auth{User: username, Pass: password}.AsMechanism())` when both credentials
+are present. Defaults `localhost:9092`. URI mode uses `url.Parse` with the same emptiness check
+`redis/client.go:36-47` and `awscfg/config.go` already use — **Go's `url.Parse` is permissive where
+`new URL` throws**, so `client.ts:47`'s `if (!parsed?.host) throw` becomes a `u.Hostname() == ""`
+check, which is what carries the "could not parse the connection URI" `E_QUERY`. **The sslmode
+handling ports byte-identically**, including its own security note (`client.ts:75-77`): every
+non-`disable` mode (`require`/`prefer`/`verify-full`) **verifies**, deliberately unlike libpq's
+`require`, *"and a driver swap is the wrong commit to smuggle one into"* — which is exactly what this
+commit is. An unknown sslmode keeps logging `kafka: unknown sslmode "<x>", ignoring` at `warn`.
+
+**P58e E17 — one Go file per TypeScript file, keeping `produce.go`'s name rather than normalising it
+to `mutate.go`.** **P58 D18**, **P58a A20**, **P58b B19**, **P58c C17**, **P58d D17**, applied.
+`index.ts` → `adapter.go`; everything else keeps its name, **including `produce.go`** — every other
+adapter's mutation file is `mutate.go`, and the temptation to rename for consistency loses the
+diffability the rule exists for. Eight files: `adapter.go`, `caps.go`, `catalog.go`, `client.go`,
+`definition.go`, `errors.go`, `produce.go`, `read.go`. When a Go behaviour disagrees with the
+TypeScript, `kafka/read.go` and `kafka/read.ts` are the two files to put side by side.
+
+**P58e E18 — `nativeKinds` gains `kafka` in one commit that also carries the `TestKindNodeServed`
+retirement and the `tests/e2e-real/` rewrite, because splitting them means shipping a red tree.**
+**P58d D19** said each kind flips in its own commit; that still holds — there is one kind. What is
+different here is that two other changes are *forced by the same line*: `TestKindNodeServed`'s
+contract (§1.9) and `mariadb-real.spec.ts`'s second test (§1.10) both become false the instant
+`nativeKinds["kafka"]` is true. The commit message records all three and the acceptance run that
+preceded them. **Ten of ten.**
+
+**P58e E19 — `testsupport/kafka.go` uses `testcontainers-go/modules/kafka@v0.44.0`, reversing
+P58d D22's precedent, with the reason written down.** §1.15. **P58d D22** chose a bare
+`GenericContainer` over `modules/localstack` on three grounds; two of them apply here and one does
+not, and the one that does not is decisive:
+
+- *Applies:* the module's `go.mod` pulls graph noise for its own tests — `IBM/sarama v1.42.1` plus
+  five `jcmturner` Kerberos modules. Real, and accepted.
+- *Applies:* the repo's precedent is bare containers (`testsupport/redis.go`, `testsupport/localstack.go`).
+- **Does not apply, and this is why the answer flips:** LocalStack is one HTTP service on one port
+  with a health endpoint, so replicating `modules/localstack` was a four-line `ContainerRequest`. A
+  single-node KRaft Kafka is not: it needs two listeners, a starter script that rewrites
+  `KAFKA_ADVERTISED_LISTENERS` from the mapped host port *after* the container starts, a KRaft storage
+  format step, and fifteen environment variables (`kafka.go:52-90`). Reimplementing that by hand is
+  ~70 lines of shell-in-a-Go-string, and this repo has already lost a session to getting one line of
+  it wrong (`0005_kafka_seed.ts:16-28`'s listener gotcha; `tests/db/support/kafka.ts:41-48`'s
+  transaction-log replication factor — **which the Go module already sets and the TypeScript one does
+  not**, `kafka.go:63`).
+
+KF-4(a) proves it starts `confluentinc/cp-kafka:8.0.7` in this sandbox before M9.2 depends on it. The
+named fallback, if the log-regex wait strategy does not match Kafka 4.0's output, is a bare
+`GenericContainer` copying the module's own env map and starter script with
+`wait.ForListeningPort` — taken **explicitly**, with its cost written down at the moment it is taken.
+
+**P58e E20 — `adapterhost.TestKindNodeServed` is deleted and replaced by an exported test
+constructor, `adapterhost.NewRouterAllNodeServed`, because one of its four consumers cannot use a
+synthetic kind.** §1.9 is the measurement. The constraint that rules out the obvious answers:
+`connections/service_test.go`'s `fieldsInput` (`:80-87`) goes through `connections.Service.Create` →
+`connections/input.go:31`'s `model.ValidConnectionKind`, so a `"kira-test-node-served-kind"` literal
+is rejected before the router is consulted, while `tree/service_test.go:63-70`'s raw
+`INSERT INTO connections` and `adapterhost`'s two `KindLookup` fakes would accept one. The shape:
+
+```go
+// nativeKinds is complete as of P58e M9.3 — every kind is served in-process. Router keeps its own
+// copy so the two consumer-side test packages that still cover the (live, P58f-deleted) Node
+// forwarding path have a Router that reaches it; there is no longer any real kind that does.
+type Router struct { …; native map[string]bool }
+
+// NewRouterAllNodeServed constructs a Router that forwards EVERY kind to the Node engine child.
+// Test-only, and it exists for exactly one reason: internal/connections' and internal/tree's tests
+// cover connections.Service's and tree.Service's child-forwarding paths, which are still live
+// shipped code until P58f's M10 collapses the two EngineBackend implementations into one. Before
+// P58e there was always a real kind left to point them at (adapterhost.TestKindNodeServed, retired
+// in M9.3); after it there is none. Delete this with the child.
+func NewRouterAllNodeServed(deps adapters.Deps, cache *enginecache.Cache, child *enginehost.Host, conns KindLookup) *Router
+```
+
+`isNative(kind)` becomes `r.native[kind]`; the package-level `nativeKinds` map stays as the default
+`NewRouter` fills from, so §4.7's flip is still a one-line edit to one table.
+
+*Named alternatives, rejected:*
+- **A synthetic kind everywhere.** Fails in `connections/service_test.go` (verified above), and
+  widening `model/connection.go:47`'s validated kind set for a test is putting a test hook in
+  production data validation.
+- **A mutable package-level override (`adapterhost.SetNativeKindsForTest`).** Global mutable state
+  reachable from four packages; the moment any of those tests gains `t.Parallel()` it is a data race,
+  and `-race` is the bar (§8).
+- **Deleting the four tests now.** They cover code that still ships. P58f deletes the code and the
+  tests together; that is the correct commit for it.
+
+**P58e E21 — `tests/e2e-real/mariadb-real.spec.ts`'s second test is rewritten into the all-native
+survival proof, and the coexistence property is declared retired in the same commit.** §1.10 is why
+this is forced rather than chosen. The rewrite keeps the file's whole vehicle — real `-tags server`
+binary, real MariaDB container, real Kafka container, real `pgrep -P serverPid` + `SIGKILL` — and
+changes what it proves:
+
+| Step | Before (C1b) | After |
+|---|---|---|
+| connect MariaDB | native | unchanged |
+| connect Kafka, expand tree, open `topic:orders` | Node-served; renders a stream page through the child's **index-keyed** chunk encoding | **native**; renders a stream page through Go's **base64** encoding — the app's first native Kafka read, and the first native `offsetWindow` page ever |
+| kill the Node child | Kafka's dot → `error`, MariaDB's stays `connected` | **both stay `connected`**, and both still serve a read after `page.reload()` |
+| `engine-status` | asserted `ok` in test 1 | additionally asserted **`down`** after the kill, which is what makes "the child died and nothing cared" an assertion rather than an absence |
+
+The test is renamed (`C2: every connection survives killing the Node engine child — nothing is
+Node-served any more`) and its header comment is rewritten to say that **P58 D4**'s coexistence
+property was proven three times (checkpoint C1b, checkpoint C1c, and every P58d flip's sweep) and
+has now expired by success. §7 explains why this rewrite is checkpoint C2's automated half.
+
+**P58e E22 — the two packaging scripts' Kafka *messages* are corrected; their check logic is not
+touched.** §1.14. `verify-packaging.sh:86`'s note currently ends *"Kafka connections will fail at
+runtime in this build"* and `sign-bundle.sh:36`'s echo calls the absence *"a known gap"* — both false
+from M9.3 onward. The edit replaces those clauses with a statement of the true state (the module is
+unused; Kafka is served in-process by Go since P58e M9.3; the block is P58f's to delete). No `fail`
+becomes a `note`, no `note` becomes a `fail`, no path changes.
+
+*Named alternative, rejected:* leave both entirely to P58f, as the parent's §3 target tree implies.
+Rejected because a packaging script that prints a false warning about a shipped build is worse than
+one that prints nothing, and because P58f may be a different session weeks later. §10 OQ-4 gives the
+parent's author the veto.
+
+**P58e E23 — P58e's `src/` diff is empty, and §5.2 asserts the strong form.** `git diff --stat src/`
+returns nothing at all, no exclusions — the same form **P58b B21**, **P58c C22** and **P58d D21**
+asserted and met. `toTypedArray`'s base64 branch, `StreamView.vue`'s partition popover
+(`:319-327`, a live second caller of `children(topicPath)` — `index.ts:69-77` explains why that call
+survives even though the tree no longer expands a topic) and `streamFilter.ts`'s encoder are all
+already in the tree and all already work against a native producer, because SQS proved the stream
+wire path in P58d M8.2. If the diff is ever non-empty, either **P58 D1** was broken or the substrate
+has a coupling no plan in this phase has found, and the implementer stops and says so.
+
+**P58e E24 — P58e records checkpoint C2, and builds the instrument it needs, because the one the
+parent names does not exist.** §7 is the whole design. In summary: the parent's C2 is *"a full manual
+pass across all eleven connection kinds must leave `enginehost`'s own request counter at zero"*, and
+`grep -rn "requestCount\|RequestCount" shell/internal/enginehost/` returns **nothing** — there is no
+counter. §7 relocates it to `adapterhost.Router` (the only thing that routes to the child, and the
+only layer that can tell an adapter-serving request from a lifecycle one), makes it emit a
+`slog.Warn` naming the offending kind and op rather than only incrementing, and defines precisely
+which three ops are excluded and why.
+
+**P58e E25 — the Go seeder re-expresses `0005_kafka_seed.ts` from the host with `kadm` + `kgo`,
+rather than shelling into the container, and the TypeScript's own reason for the CLI is quoted and
+shown not to apply.** §1.15, and the same **P58 D12** "byte-identical dataset" weakening
+**P58c C21** and **P58d D24** recorded. `0005_kafka_seed.ts`'s two reasons for the in-container CLI
+were (a) keeping a JS Kafka client out of the test process (F24) and (b) not registering the consumer
+group by *joining* it — *"a standing absurdity in a phase about not joining groups"*. (a) is void: the
+Go test binary links franz-go by construction. (b) is preserved exactly, because
+`kadm.CommitOffsets(ctx, group, offsets)` commits *"as a group outside the context of a Kafka group"*
+(`kgo/config.go:1716-1718` points at it for precisely this use), producing the same
+committed-offsets-with-no-members state the CLI's `--reset-offsets --to-earliest --execute` produced.
+§4.6 turns every seeded shape into a checklist, and KF-4(f) cross-checks the two seeders once against
+a live container.
+
+**P58e E26 — the window arithmetic is extracted into one pure function and gets P58e's single Go unit
+test.** §5.5 argues it against `AGENTS.md`'s bar rather than assuming it. Briefly: the bar names
+*"cursor/pagination arithmetic with real boundary cases"* and *"a decision structure large enough that
+no one can hold it in their head"*, and the window advance/clamp/`hasMore` computation is both — it
+has four interacting inputs (the frozen windows, the records actually delivered, the per-partition
+high watermarks, the empty-poll counter), five distinct outcomes, and **a real regression in its
+history** (P43 iter2 F19/D26, whose symptom was `hasMore` stuck true forever). It is also the only
+part of the adapter that is pure logic reachable without a broker. Everything else in the package is
+explicitly rejected by name in §5.5.
+
+**P58e E27 — every Go test that produces a message creates its own topic; `orders` and `empty-topic`
+are read-only fixtures.** The direct analogue of **P58d D23** and **P58c C24**, and the trap is the
+same shape. `kafka.spec.ts` 16 produces into `EMPTY_TOPIC` with its own comment saying why
+(*"so this doesn't perturb the message-count assumptions tests 7/8/12 make about ORDERS_TOPIC"*) —
+but scenarios **9 and 12 both assert `EMPTY_TOPIC` is empty**, and the only thing keeping them
+correct is that `bun:test` runs the file top to bottom in one process. Go's `testing` runs top-level
+tests in source order too, but nothing enforces it, and `-shuffle` or a future `t.Parallel()` breaks
+it silently: scenario 9 would see 16's message and read `rowCount: 1`. Scenario 21's `gap-topic` is
+already dedicated and stays so.
