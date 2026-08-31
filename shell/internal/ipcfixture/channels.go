@@ -16,12 +16,16 @@ const (
 	channelTreeChildren       = "kira:tree:children"
 	channelTreeDescribe       = "kira:tree:describe"
 	channelTreeDefinition     = "kira:tree:definition"
+	channelOpsRecent          = "kira:ops:recent"
 	channelOpsCancel          = "kira:ops:cancel"
 )
 
 // The two DATA_OP values every committed fixture needs, from src/shared/protocol/data-ops.ts's
 // DATA_OP map — same discipline as the channel constants above.
 const (
-	dataOpRead  = "data:read"
-	dataOpCount = "data:count"
+	dataOpRead       = "data:read"
+	dataOpCount      = "data:count"
+	dataOpExecute    = "data:execute"
+	dataOpMutate     = "data:mutate"
+	dataOpInvalidate = "data:invalidate"
 )

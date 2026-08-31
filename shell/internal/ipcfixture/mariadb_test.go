@@ -2,14 +2,12 @@ package ipcfixture
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"regexp"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mariadb"
@@ -20,6 +18,11 @@ import (
 func TestMain(m *testing.M) {
 	code := m.Run()
 	testsupport.StopMariadb()
+	testsupport.StopMysql()
+	testsupport.StopClickHouse()
+	testsupport.StopRedis()
+	testsupport.StopSqs()
+	testsupport.StopKafka()
 	os.Exit(code)
 }
 
@@ -172,64 +175,5 @@ func TestFixture_MariaDB(t *testing.T) {
 		t.Fatal("in-flight read never returned after cancel")
 	}
 
-	assertMatchesCommittedFixture(t, rec)
-}
-
-// committedFixture is testdata/mariadb.fixture.json: a JSON transcription of the committed
-// tests/ipc/mariadb/mariadb.fixture.ts, produced once via `bun run` (its own header names how) and
-// never hand-edited — the TypeScript file stays authoritative; this is a fast-loop-friendly copy of
-// it so this test needs no Node at all to run (§4.2: "no GTK/WebKit headers").
-type committedFixture struct {
-	ControlSnapshots []ControlSnapshot `json:"controlSnapshots"`
-	PortSnapshots    []PortSnapshot    `json:"portSnapshots"`
-}
-
-func loadCommittedFixture(t *testing.T, path string) committedFixture {
-	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ipcfixture: read committed fixture %s: %v", path, err)
-	}
-	var fx committedFixture
-	if err := json.Unmarshal(raw, &fx); err != nil {
-		t.Fatalf("ipcfixture: parse committed fixture %s: %v", path, err)
-	}
-	return fx
-}
-
-// canonicalize round-trips v through json.Marshal/Unmarshal so two structurally-equal values
-// compare equal regardless of Go map key ordering or numeric type — the same normalization the
-// TypeScript backend spec's own assert-mode applies (JSON.parse(JSON.stringify(...))).
-func canonicalize(t *testing.T, v any) any {
-	t.Helper()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("ipcfixture: canonicalize: %v", err)
-	}
-	var out any
-	if err := json.Unmarshal(b, &out); err != nil {
-		t.Fatalf("ipcfixture: canonicalize: %v", err)
-	}
-	return out
-}
-
-func assertMatchesCommittedFixture(t *testing.T, rec *Recorder) {
-	t.Helper()
-	want := loadCommittedFixture(t, "testdata/mariadb.fixture.json")
-
-	gotControl := canonicalize(t, rec.Control)
-	wantControl := canonicalize(t, want.ControlSnapshots)
-	MaskContinuationTokens(gotControl)
-	MaskContinuationTokens(wantControl)
-	if diff := cmp.Diff(wantControl, gotControl); diff != "" {
-		t.Errorf("control snapshots diff from committed fixture (-want +got):\n%s", diff)
-	}
-
-	gotPort := canonicalize(t, rec.Port)
-	wantPort := canonicalize(t, want.PortSnapshots)
-	MaskContinuationTokens(gotPort)
-	MaskContinuationTokens(wantPort)
-	if diff := cmp.Diff(wantPort, gotPort); diff != "" {
-		t.Errorf("port snapshots diff from committed fixture (-want +got):\n%s", diff)
-	}
+	assertMatchesCommittedJSONFixture(t, rec, "testdata/mariadb.fixture.json")
 }

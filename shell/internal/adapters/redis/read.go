@@ -42,8 +42,15 @@ func readMeta(ctx context.Context, conn *goredis.Client, key string) (keyMeta, e
 	if err != nil {
 		return keyMeta{}, mapError(err)
 	}
+	// go-redis's PTTL reply carries the -1 ("no expiry") and -2 ("key gone") sentinels as raw
+	// nanosecond Durations (time.Duration(-1), time.Duration(-2)), not millisecond-scaled ones —
+	// checking pttl itself (not pttl.Milliseconds()) for negativity is required, since integer
+	// division truncates both -1ns and -2ns to 0ms and would otherwise report a real TTL of zero
+	// for every non-expiring key (a P58f-port-time finding: read.ts's own PTTL check compared the
+	// already-millisecond-scaled ioredis reply, which carries no such sub-millisecond sentinel).
 	var ttlMs *int64
-	if ms := pttl.Milliseconds(); ms >= 0 {
+	if pttl >= 0 {
+		ms := pttl.Milliseconds()
 		ttlMs = &ms
 	}
 	var memoryBytes *int64

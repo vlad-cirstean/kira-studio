@@ -133,6 +133,14 @@ func (r *Recorder) recordPort(op string, payload, response any, delayMs *int) {
 	r.Port = append(r.Port, PortSnapshot{Op: op, Payload: rawJSON(payload), Response: rawJSON(response), DelayMs: delayMs})
 }
 
+// OverrideLastControlResponse replaces the most recently recorded ControlSnapshot's Response —
+// for the rare case where a Recorder call's real answer carries a value the committed fixture
+// freezes (e.g. mysql's InnoDB row-count estimate, frozen.go's FreezeNodeDetail) but the test
+// itself still needs the real, unfrozen result to keep driving the scenario.
+func (r *Recorder) OverrideLastControlResponse(response any) {
+	r.Control[len(r.Control)-1].Response = rawJSON(response)
+}
+
 // ConnectionsList is IPC.connectionsList: bridge.ConnectionsService.List, frozen per §4.3(d).
 func (r *Recorder) ConnectionsList(t *testing.T) []model.ConnectionSummary {
 	t.Helper()
@@ -271,4 +279,64 @@ func (r *Recorder) DataCount(t *testing.T, req adapterhost.CountRequestWire) ada
 	}{Kind: "count", Value: resp.Value, Exact: resp.Exact, Stale: false, Source: resp.Source}
 	r.recordPort(dataOpCount, req, response, nil)
 	return resp
+}
+
+// DataExecute is DATA_OP.execute: adapterhost.Dispatcher.Execute (console/SQL-mode statements),
+// wrapped {kind: 'execute', pages} the same way every backend.spec.ts wraps it.
+func (r *Recorder) DataExecute(t *testing.T, req adapterhost.ExecuteRequestWire) adapterhost.ExecuteResponse {
+	t.Helper()
+	resp, err := r.App.Dispatcher.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatalf("ipcfixture: data execute %s: %v", req.OpID, err)
+	}
+	logicalPages := make([]any, len(resp.Pages))
+	for i, p := range resp.Pages {
+		logical, err := DecodePage(p)
+		if err != nil {
+			t.Fatalf("ipcfixture: decode page %d for %s: %v", i, req.OpID, err)
+		}
+		logicalPages[i] = logical
+	}
+	response := struct {
+		Kind  string `json:"kind"`
+		Pages []any  `json:"pages"`
+	}{Kind: "execute", Pages: logicalPages}
+	r.recordPort(dataOpExecute, req, response, nil)
+	return resp
+}
+
+// DataMutate is DATA_OP.mutate: adapterhost.Dispatcher.Mutate, wrapped {kind: 'mutate',
+// affectedRows} the same way every backend.spec.ts wraps it.
+func (r *Recorder) DataMutate(t *testing.T, req adapterhost.MutateRequestWire) adapterhost.MutateResponse {
+	t.Helper()
+	resp, err := r.App.Dispatcher.Mutate(context.Background(), req)
+	if err != nil {
+		t.Fatalf("ipcfixture: data mutate %s: %v", req.OpID, err)
+	}
+	response := struct {
+		Kind         string `json:"kind"`
+		AffectedRows int    `json:"affectedRows"`
+	}{Kind: "mutate", AffectedRows: resp.AffectedRows}
+	r.recordPort(dataOpMutate, req, response, nil)
+	return resp
+}
+
+// DataInvalidate is DATA_OP.invalidate: adapterhost.Dispatcher.Invalidate, wrapped {kind:
+// 'invalidate'} — the op itself returns nothing, matching data-ops.ts's own void response. The
+// recorded payload omits Scope when empty (every committed fixture's own invalidate payload
+// carries only {connectionId, path} — data-ops.ts's own Scope is optional and Go's
+// InvalidateRequestWire models its "" default, not its absence, so the wire type itself isn't
+// reused for recording here, only for the real call).
+func (r *Recorder) DataInvalidate(t *testing.T, req adapterhost.InvalidateRequestWire) {
+	t.Helper()
+	r.App.Dispatcher.Invalidate(req)
+	payload := struct {
+		ConnectionID string `json:"connectionId"`
+		Path         string `json:"path"`
+		Scope        string `json:"scope,omitempty"`
+	}{ConnectionID: req.ConnectionID, Path: req.Path, Scope: req.Scope}
+	response := struct {
+		Kind string `json:"kind"`
+	}{Kind: "invalidate"}
+	r.recordPort(dataOpInvalidate, payload, response, nil)
 }
