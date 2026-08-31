@@ -56,6 +56,12 @@ func (r *Router) connectNative(ctx context.Context, cfg model.ResolvedConnection
 	if existing, ok := adapters.GetLiveAdapter(cfg.ID); ok {
 		_ = existing.Disconnect(context.Background())
 		adapters.DeleteLiveAdapter(cfg.ID)
+		// P2 R1: mirrors disconnectNative's own DropConnection call below — a reconnect that
+		// races ahead of onPreconnectExit's own async Disconnect (connections/service.go) lands
+		// here, in this branch, rather than through disconnectNative at all, so without this the
+		// old connectionId's L2 pages and L3 counts survive the reconnect and can be served back
+		// as stale data/row-count results against the newly connected adapter.
+		r.cache.DropConnection(cfg.ID)
 	}
 	adapter, err := adapters.CreateAdapter(cfg.Kind, r.deps)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 	"github.com/kirathecat/kira-studio/shell/internal/oplog"
+	"github.com/kirathecat/kira-studio/shell/internal/page"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -139,5 +140,56 @@ func TestRouter_DescribeAndDefinition_ThreadTabIDIntoOpStart(t *testing.T) {
 	}
 	if got := awaitOpStartTabID(t, "definition"); got == nil || *got != tabID {
 		t.Errorf("definition op:start TabID = %v, want %q", got, tabID)
+	}
+}
+
+// reconnectFakeAdapter is just enough of adapters.Adapter to exercise connectNative's own
+// existing-live-adapter branch — Connect/Disconnect/Caps, nothing else (every other method panics
+// via the embedded nil interface if a test accidentally reaches it).
+type reconnectFakeAdapter struct {
+	adapters.Adapter
+}
+
+func (reconnectFakeAdapter) Connect(context.Context, model.ResolvedConnectionConfig, *adapters.OpCtx) (adapters.ConnectInfo, error) {
+	return adapters.ConnectInfo{}, nil
+}
+func (reconnectFakeAdapter) Disconnect(context.Context) error { return nil }
+func (reconnectFakeAdapter) Caps() adapters.Caps              { return adapters.Caps{} }
+
+// P2 R1: connectNative's own "a live adapter is already registered" branch is a real reconnect
+// path (reached whenever connectionsConnect races ahead of onPreconnectExit's async Disconnect) —
+// unlike disconnectNative, it never called cache.DropConnection, so L2 pages and L3 counts keyed
+// by the old connectionId survived the reconnect and could be served back as stale results
+// against the newly connected adapter.
+func TestRouter_ConnectNative_ReconnectDropsStaleCache(t *testing.T) {
+	const kind = "test-reconnect-fake"
+	adapters.Register(kind, func(adapters.Deps) (adapters.Adapter, error) {
+		return reconnectFakeAdapter{}, nil
+	})
+	const connID = "conn-reconnect"
+	adapters.DeleteLiveAdapter(connID)
+
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
+	cfg := model.ResolvedConnectionConfig{ID: connID, Kind: kind}
+
+	if _, err := r.connectNative(context.Background(), cfg); err != nil {
+		t.Fatalf("first connectNative: %v", err)
+	}
+
+	cacheReq := enginecache.ReadRequest{ConnectionID: connID, Path: "p", PageSize: 10, Cursor: model.PageCursor{Mode: "offset"}}
+	key, label := enginecache.PageCacheKey(cacheReq)
+	r.cache.StorePage(key, label, cacheReq, page.TabularPage{ByteSize: 5})
+	if r.cache.Stats().L2Entries != 1 {
+		t.Fatal("setup: expected the seeded page to be cached")
+	}
+
+	// Reconnect while the first adapter is still registered live — connectNative's own
+	// existing-live-adapter branch, not disconnectNative.
+	if _, err := r.connectNative(context.Background(), cfg); err != nil {
+		t.Fatalf("second connectNative (reconnect): %v", err)
+	}
+
+	if r.cache.Stats().L2Entries != 0 {
+		t.Error("reconnect must drop the old connection's cached pages, not just swap the live adapter")
 	}
 }
