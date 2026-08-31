@@ -109,10 +109,6 @@ async function waitForHealth(url: string, timeoutMs: number): Promise<void> {
 export interface KiraApp {
   window: Page;
   baseURL: string;
-  // P58b M6.4's own C1b needs it: the real kira-server-test process's own pid, so a coexistence
-  // test can find and kill its Node engine child (a direct child of this pid, per
-  // internal/enginehost/host.go's own exec.Command) without guessing at process names.
-  serverPid: number;
 }
 
 interface KiraFixtures {
@@ -194,8 +190,7 @@ export const test = base.extend<KiraFixtures>({
     await page.goto(`${baseURL}/`);
     await page.waitForSelector('[data-testid="status-bar"]');
 
-    if (proc.pid === undefined) throw new Error('kira-server-test spawned with no pid');
-    await use({ window: page, baseURL, serverPid: proc.pid });
+    await use({ window: page, baseURL });
 
     await page.close();
     // SIGKILL, not a graceful shutdown (§8) — this tier does not test lifecycle/quit handshakes
