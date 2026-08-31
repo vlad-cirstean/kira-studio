@@ -984,7 +984,7 @@ implementation and real-container testing found that the plan itself could not h
     adapter exists and both connections can be genuinely native/non-native side by side in one
     running app, which is closer to what steps 17-21 are actually trying to prove.
 
-## P58b — MySQL/MariaDB, SQLite, ClickHouse (M6), findings worth keeping for M6.3+
+## P58b — MySQL/MariaDB, SQLite, ClickHouse (M6), findings worth keeping for M6.4+
 
 `docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` covers the design and carries its own §12/§13
 results sections in full detail; this is the condensed, cross-milestone version worth a reader not
@@ -1034,6 +1034,24 @@ re-deriving from the plan doc.
   (no `RowsAffected()` on the `QueryContext` path the console's multi-statement runner needs; a
   generic "OK" is shown instead) and `allowPublicKeyRetrieval` (the driver requests the server's
   RSA public key unconditionally over plaintext when needed, with no option to refuse).
+- **M6.3 (SQLite) found a real `modernc.org/sqlite` bug empirically, before writing any adapter
+  code, by not trusting M6.0's own SQ-1 probe to have already covered it.** SQ-1 tested only a
+  garbage `'not a date'` string in a `DATETIME` column and concluded "storage-class-faithful, no
+  coercion" — true for that one input, false in general: this driver's `rows.Next()` silently
+  re-parses a *valid-looking* date string in a `DATE`/`DATETIME`/`TIMESTAMP`-declared `TEXT` column
+  into a Go `time.Time`, unconditionally, with no DSN opt-out. Caught by writing a throwaway probe
+  program against a real in-memory database before any package code existed (the same M6.0-style
+  discipline, not committed), confirmed against all six storage/declared-type combinations, then
+  fixed in `read.go`'s own SELECT-list construction (a `CASE WHEN typeof(col)='text' THEN col||''
+  ELSE col END` wrap, which defeats SQLite's own decltype-based trigger for the coercion without
+  touching any other storage class). Worth naming as a general lesson for M6.4 (ClickHouse) and any
+  future milestone: an M6.0-style probe is only as complete as the specific inputs it tried, not a
+  substitute for testing the adapter's own code against the real driver once it exists.
+- **M6.3 also confirms the no-PK-test-mistake pattern named in M6.2's own entry above was worth
+  watching for** — and this time it did not recur, because `0009_sqlite_seed.sql` already ships a
+  genuine no-primary-key `no_pk_rowid` table (needed anyway for D22's own rowid-keyset scenario),
+  so the sqlite suite's "mutate: no primary key" test uses it directly with no side-connection probe
+  table required.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

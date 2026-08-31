@@ -1900,3 +1900,72 @@ Both cross-cutting checks (`bun run test:ui`'s full 36-test Playwright suite, `b
 test:ipc:fe`) stayed green after the `nativeKinds` flip, alongside `bun run lint`,
 `bun run typecheck`, and `go test ./... -race` — the same acceptance bar §8 sets for every
 milestone.
+
+**M6.3 — SQLite native adapter (`shell/internal/adapters/sqlite/`, `modernc.org/sqlite`).** Built
+per §4.2's design and B7/B8, tested with 25 subtests against a real temp-file fixture (no
+container — D32/B10), 3× under `go test ./... -race` with no races (each run ≈86s under `-race`,
+almost entirely the one-time 1,000,000-row `big_rows` seed running through race-instrumented VM
+bytecode; the suite itself runs in ~2.4s without `-race`). `nativeKinds["sqlite"]` is now `true`.
+`git diff --stat -- src/` stayed empty through the whole milestone.
+
+Unlike M6.2, no bug survived to the first real test run — the reason is a real, previously
+undocumented **driver quirk found and fixed before any test was written**, by empirically probing
+`modernc.org/sqlite` directly (a throwaway scratch program, the same M6.0-style discipline, not
+committed) rather than trusting M6.0's own SQ-1 probe or §1.5's source read to have already covered
+it:
+
+- **The real finding**: `modernc.org/sqlite`'s own `rows.Next()` unconditionally re-parses a
+  `TEXT` value into a Go `time.Time` whenever the column's declared type is
+  `DATE`/`DATETIME`/`TIMESTAMP` *and* the stored text happens to parse as one of a fixed list of
+  time layouts — confirmed directly against the driver's own `rows.go` source, then confirmed
+  against a live query (`sql.Open("sqlite", "file::memory:")`, a `DATETIME` column, a
+  `'2024-01-01 12:34:56'` row) before writing a line of adapter code. This is not gated by any
+  DSN option — `_texttotime`/`_inttotime` only gate the *undeclared*-column and *integer*-storage
+  cases respectively; the declared-type-driven `TEXT` coercion has no opt-out. SQ-1's own probe
+  (§1.5/§12) tested only a *garbage* `'not a date'` string in a `DATETIME` column, which happens to
+  fail every layout and therefore correctly reports the raw string — SQ-1's own conclusion
+  ("storage-class-faithful, no coercion") is accurate for that one input and wrong in general: a
+  *valid-looking* date string in the same column silently becomes a `time.Time`, which would have
+  broken B7's whole "value follows the value, not the declared type" argument for the overwhelming
+  common case (every real `DATETIME`/`DATE` column holding an actual date). This is now the
+  documented, authoritative correction to §12's own SQ-1 entry.
+  - **The fix**: `read.go`'s `readPage` wraps every selected column in
+    `CASE WHEN typeof(col) = 'text' THEN col || '' ELSE col END` before it ever reaches the driver.
+    A `CASE` expression is not a "simple column reference" in SQLite's own
+    `sqlite3_column_decltype()` terms, so the coercion's own trigger condition (a declared
+    `DATE`/`DATETIME`/`TIMESTAMP` type on the *result column*) never fires — verified empirically
+    against all six relevant storage/declared-type combinations (NULL, TEXT-valid-date,
+    TEXT-garbage, INTEGER, REAL, BLOB, each stored in a `DATETIME`-declared column) before this
+    landed, not assumed from reading the CASE semantics alone.
+  - **The one narrower, honestly-documented residual**: the query console's `execute()` runs a
+    user's own raw SQL text, which the adapter cannot rewrite the way it rewrites its own
+    `readPage` SELECT list. A console `SELECT dt FROM t` against a `DATETIME` column holding a
+    valid-looking date string still hits the coercion, and `toCellText`'s own `time.Time` branch
+    reformats it to SQLite's canonical `strftime('%Y-%m-%d %H:%M:%f')` shape rather than passing
+    the original bytes through unmodified — a real, narrow capability trade documented in
+    `docs/ARCHITECTURE.md`, the same class of honestly-scoped loss as M6.2's own B4/B22, not
+    silently absorbed.
+- **`no_pk_rowid`, already present in `0009_sqlite_seed.sql`, made the M6.2/P58a "no-PK test
+  mistake" a non-issue here.** Both P58a's Postgres suite and M6.2's mysql-family suite needed a
+  dedicated throwaway probe table for their own "mutate: no primary key" test, because their
+  faithfully-ported seed schema's obvious candidate table turned out to have a real primary key.
+  SQLite's own seed file already carries a genuine no-PK rowid table for its own D22 rowid-keyset
+  scenario, so the sqlite suite's own no-PK mutate test uses it directly — no side connection, no
+  probe table, and no repeat of that now-twice-made mistake, confirming the pattern named in M6.2's
+  own findings write-up was worth watching for.
+- **The cancellation design (B8) is real, not just plausible, and its own "reusable immediately
+  after" proof is stronger than MariaDB/MySQL's own PROCESSLIST-polling equivalent.** Because
+  `*sql.DB.SetMaxOpenConns(1)` means the adapter has exactly one pooled connection, a runaway
+  `WITH RECURSIVE` count over 900,000,000 rows started through `Execute`, followed by
+  `Cancel(opID)`, is proven to have actually interrupted the server-side statement by the very next
+  `Count()` call succeeding within a 3-second bound on the *same* adapter: if `sqlite3_interrupt`
+  had not actually freed the sole connection, that call would have blocked waiting for a pool slot
+  that never frees, not merely returned a wrong answer. No `information_schema.PROCESSLIST`-style
+  external observability was needed to prove it.
+
+No further capability losses or `nativeKinds`-flip breakage were found beyond the two already
+recorded above (the console's `time.Time` reformatting, and the `no_pk_rowid` non-issue) — `caps.Cancel`
+flips from the TypeScript adapter's honest `false` to an equally honest `true` (B8), exactly as
+designed, and every other design fact in §4.2 (keyset-by-rowid, `BEGIN IMMEDIATE`, the `mode=ro`/
+`mode=rw` DSN defence alongside `assertFileExists`, `PRAGMA table_xinfo` over `table_info`) was
+confirmed rather than assumed by the acceptance suite.

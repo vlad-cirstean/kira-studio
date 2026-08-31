@@ -208,14 +208,32 @@ multi-statement runner needs; a generic "OK" is shown instead), and `allowPublic
 no equivalent — the driver requests the server's RSA public key unconditionally over plaintext
 when `caching_sha2_password` needs one and TLS is off, with no option to refuse that request.
 
-### SQLite (`node:sqlite`, P35)
+### SQLite (P35; Go-native as of P58b M6.3)
 
-Uses `node:sqlite`, a Node builtin — no new dependency, no native module, no build step. Requires
-Bun 1.4+ or Node 22.5+ (not present in Bun 1.3). `caps.cancel` is permanently `false`:
-`node:sqlite` has no `sqlite3_interrupt` and the whole API is synchronous, so a running statement
-blocks the event loop and an abort can never be delivered while one runs — this is a fact about the
-driver, not a gap. Keyset pagination falls back through primary key → unique index → the table's
-own implicit `rowid` (never surfaced as mutation identity) before degrading to `LIMIT/OFFSET`.
+**SQLite is Go-native as of P58b M6.3** (`shell/internal/adapters/sqlite/`, `modernc.org/sqlite`)
+— `nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
+an equally honest `true`: `node:sqlite` (a Node builtin, no native module, no build step, requiring
+Bun 1.4+/Node 22.5+) had no `sqlite3_interrupt` and its whole API was synchronous, so a running
+statement blocked the event loop and an abort could never be delivered while one ran; the Go port's
+`modernc.org/sqlite` has a real `sqlite3_interrupt`, reached by cancelling an adapter-owned per-op
+`context.Context` on that op's own dedicated `*sql.Conn` (one connection per op, not a pinned
+shared one — unlike Postgres/MariaDB/MySQL, whose cancellation goes through a side connection
+instead). Keyset pagination falls back through primary key → unique index → the table's own
+implicit `rowid` (never surfaced as mutation identity) before degrading to `LIMIT/OFFSET`, unchanged
+from the Node design.
+
+**A real, previously-undocumented `modernc.org/sqlite` driver quirk**: unlike `node:sqlite`, this
+driver's own `rows.Next()` unconditionally re-parses a `TEXT` value into a Go `time.Time` whenever
+the column's declared type is `DATE`/`DATETIME`/`TIMESTAMP` and the stored text happens to parse as
+a recognised time layout — with no DSN option to disable it. The adapter's own `readPage` (the data
+grid path) routes around this by wrapping every selected column in
+`CASE WHEN typeof(col) = 'text' THEN col || '' ELSE col END`, which defeats the coercion's own
+trigger condition (SQLite reports no declared type for a `CASE` expression) while leaving every
+other storage class (`NULL`/`INTEGER`/`REAL`/`BLOB`) untouched. The query console cannot apply the
+same rewrite (it runs a user's own raw SQL text), so a console `SELECT` of such a column still hits
+the coercion; that one path reformats the value to SQLite's own canonical
+`strftime('%Y-%m-%d %H:%M:%f')` text rather than passing the original bytes through unmodified — a
+narrow, documented capability trade, not a silent gap.
 
 ### ClickHouse (`@clickhouse/client`, P36)
 
