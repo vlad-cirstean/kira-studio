@@ -40,9 +40,13 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold; the engine child keeps writing to stdout/stderr, which the shell pipes into the same sink — single log file, single source of truth |
 
-Driver libraries — the best-maintained option per engine: `pg`, `mariadb`, `mongodb`, `ioredis`,
-`@confluentinc/kafka-javascript` (native, heavier, but actively maintained where `kafkajs` has
-stalled), `@aws-sdk/client-sqs`, `@aws-sdk/client-s3`.
+Driver libraries — the best-maintained option per engine, Go-native for nine of ten kinds as of
+P58d (`b40a09e`..): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
+`mysqlfamily` core), `mattn/go-sqlite3` (sqlite), a hand-rolled `net/http` client (clickhouse, no
+driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb), `redis/go-redis/v9` (redis),
+`aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg` config-and-error-mapping
+package). Kafka is the only kind still Node-served, on `@confluentinc/kafka-javascript` (native,
+heavier, but actively maintained where `kafkajs` has stalled) — its own Go port is P58e's.
 
 App identity: organisation **kirathecat**, app name **Kira Studio**, bundle ID
 `com.kirathecat.kira-studio` (the `-shell` suffix carried during the P52–P56 coexistence window is
@@ -93,13 +97,13 @@ driver is never loaded into the engine process's baseline memory.
 | PostgreSQL | database → schema → tables (ungrouped), views/matviews/functions/sequences grouped into per-kind folders | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `pg_cancel_backend(pid)` on a side connection |
 | MariaDB | database → tables (ungrouped), views/routines grouped into per-kind folders (routines labelled "Routines") | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
 | MySQL | database → tables (ungrouped), views/routines grouped into per-kind folders (routines labelled "Routines"); no sequences (MySQL has no SEQUENCE engine) | tabular | keyset on PK, else `LIMIT/OFFSET` | yes | `KILL QUERY <threadId>` on a side connection |
-| SQLite | one `database` node per `PRAGMA database_list` entry (in practice always exactly `main`) → tables (ungrouped), views grouped into a folder; no sequences or routines (SQLite has neither) | tabular | keyset on PK, else a unique index, else the table's own implicit `rowid` (never mutation identity); `LIMIT/OFFSET` only for a view or a text-sorted request | yes (`count(*)` measured at ~9 ms/1M rows) | none — SQLite has no interruptible statement (`sqlite3_interrupt` doesn't exist in `node:sqlite`, and the whole API is synchronous) |
+| SQLite | one `database` node per `PRAGMA database_list` entry (in practice always exactly `main`) → tables (ungrouped), views grouped into a folder; no sequences or routines (SQLite has neither) | tabular | keyset on PK, else a unique index, else the table's own implicit `rowid` (never mutation identity); `LIMIT/OFFSET` only for a view or a text-sorted request | yes (`count(*)` measured at ~9 ms/1M rows) | `modernc.org/sqlite`'s real `sqlite3_interrupt`, reached by cancelling an adapter-owned per-op `context.Context` on that op's own dedicated `*sql.Conn` (Go-native as of P58b M6.3 — the Node adapter had no such mechanism at all) |
 | ClickHouse | one node per `system.databases` row → tables (ungrouped), views/materialized views grouped into per-kind folders; no sequences or routines (ClickHouse has neither); `system` is kept, not hidden | tabular | `LIMIT/OFFSET` only — a MergeTree `PRIMARY KEY` is a sparse index, with no unique row key to build a keyset cursor on | yes (`count()` reads part metadata) | `KILL QUERY WHERE query_id = '<id>' SYNC` on a second HTTP request (the client's own connection pool already has one free) |
-| MongoDB | database → collections (ungrouped, indexes shown in the definition view) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `AbortSignal` on the cursor, `killOp` fallback |
-| Redis | db index (a leaf — its key namespace is unbounded, browsed in a Browse tab) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | abort the SCAN loop; `CLIENT KILL` for blocking cmds |
+| MongoDB | database → collections (ungrouped, indexes shown in the definition view) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `$currentOp` + `killOp` on the *same* client the adapter already holds (never a side connection) |
+| Redis | db index (a leaf — its key namespace is unbounded, browsed in a Browse tab) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | a permanent, honest `false` — go-redis's blocking commands override the caller's context for the wait itself, so `CheckCancelled` between bounded `SCAN`-family rounds is the entire cancellation surface (`caps.cancel` stays `true`, since that surface is genuinely effective) |
 | Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | close the assigned consumer, `AbortSignal` |
-| SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | `AbortSignal` on the SDK call |
-| S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab) | key/value (object browser) | `ListObjectsV2` continuation token | `KeyCount` per listed page only (no cheap exact bucket count) | `AbortController` on the SDK call |
+| SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | none server-side — the op's own `context.Context`, passed directly to every AWS SDK call (never a detached context), is the entire mechanism; `caps.cancel` stays `true` since that is genuinely effective |
+| S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab) | key/value (object browser) | `ListObjectsV2` continuation token | **per-object** exact field-row count via `HeadObject` (not a bucket-wide key count — S3 has no cheap exact answer to "how many keys total") | none server-side — same as SQS, the op's own `context.Context` on every SDK call; also load-bearing for `DownloadObject`'s temp-file cleanup ordering |
 
 **SQS read policy.** Reads are **never automatic**. The stream view has an explicit
 **Poll** button with a visible warning: `ReceiveMessage` makes messages invisible to real
@@ -274,29 +278,65 @@ is a required-but-never-joined constant and browsing never pays a group-join rou
 is permanently `false` — a topic's log is immutable, so there is no per-message delete or update at
 the protocol level, only retention/compaction.
 
-### SQS
+### SQS (Go-native as of P58d M8.2)
 
-Adapter over `@aws-sdk/client-sqs`. `caps.pagination = 'batch'` — every poll is an independent,
-non-resumable `ReceiveMessage` call with no addressable position; the stream view never
-auto-loads, only an explicit Poll button. `canDelete` is a real per-item removal via the message's
-receipt handle (kept adapter-local, in-memory, never round-tripped over the wire — a receipt handle
-is only valid for the message it names, on the session that received it). No `canUpdate`: a
-delivered message can't be edited in place, only replaced by delete + resend.
+**Go-native as of P58d M8.2** (`shell/internal/adapters/sqs/`, `aws-sdk-go-v2/service/sqs`) —
+`nativeKinds["sqs"]` is `true`, the eighth of ten kinds P58 migrates. `caps.pagination = 'batch'` —
+every poll is an independent, non-resumable `ReceiveMessage` call with no addressable position;
+the stream view never auto-loads, only an explicit Poll button. `canDelete` is a real per-item
+removal via the message's receipt handle (kept adapter-local, in-memory, never round-tripped over
+the wire — a receipt handle is only valid for the message it names, on the session that received
+it, and the Go port needs an explicit mutex plus a FIFO eviction queue where the JavaScript
+original relied on single-threadedness and `Map` insertion order, neither of which survives
+translation). No `canUpdate`: a delivered message can't be edited in place, only replaced by
+delete + resend.
 
-### S3
+**Unlike every native adapter built before this sub-phase, neither SQS nor S3 has a server-side
+kill mechanism at all.** Both adapters pass the op's own `context.Context` directly to every AWS
+SDK call rather than through `adapters.RunWithAbortRace` (every other native adapter's shared
+detached-context helper) — a cancelled context aborts an in-flight request through the SDK's own
+plumbing, confirmed against a real LocalStack container (P58d M8.0's AWS-1(e)/AWS-3(e) probes).
+Using the shared helper here would have let a cancelled operation keep running server-side after
+the caller unblocked: a cancelled `ReceiveMessage` would still complete and hide messages via
+`VisibilityTimeout`, and a cancelled `DownloadObject` would still be writing its temp file while
+the caller's cleanup already ran.
 
+The SQS `headers` cell is built by a hand-written encoder over `MessageAttributeValue`, never a
+plain `json.Marshal` of the SDK struct — the latter emits every field (`BinaryValue`,
+`StringListValues`, …) with an explicit `null` even when absent, which the JavaScript original's
+`JSON.stringify(message.MessageAttributes ?? {})` never produced. The profile-resolution error also
+changed observably: a nonexistent named AWS profile now fails **at connect time**
+(`config.LoadDefaultConfig` returns `config.SharedConfigProfileNotExistError` directly) rather than
+at first use, which is a gain the Test button reports sooner.
+
+### S3 (Go-native as of P58d M8.3)
+
+**Go-native as of P58d M8.3** (`shell/internal/adapters/s3/`, `aws-sdk-go-v2/service/s3`) —
+`nativeKinds["s3"]` is `true`, reaching **nine of ten** native kinds; only Kafka is left for P58e.
 The only engine with `caps.fileTransfer` — items are whole files, streamed to/from a local path via
 a native OS dialog (`downloadObject`), not a value the mutation-preview model can show inline.
 `fileTransfer` is orthogonal to the three write flags: Download reads regardless of a connection's
 read-only flag; Upload is gated on `fileTransfer && canInsert` together.
 
 `caps.keyBrowser = true` (P41): a bucket's prefix/object space has no fixed size and can nest
-arbitrarily deep, so `s3/catalog.ts`'s `bucket` node is `hasChildren: false` — the tree stops at the
+arbitrarily deep, so `s3/catalog.go`'s `bucket` node is `hasChildren: false` — the tree stops at the
 bucket, and `/`-delimited prefix/object navigation happens in a Browse tab instead
 (SPEC.md §8.18). Object node paths still carry the *full* bucket-relative key on their own
-`object` segment, nested under every ancestor `prefix` segment (`catalog.ts`'s `listPrefixChildren`
+`object` segment, nested under every ancestor `prefix` segment (`catalog.go`'s `listPrefixChildren`
 — `bucket:b/prefix:reports/object:reports%2Fnote.txt`, not a bare local filename), the same
 convention the tree used before this phase and unrelated to it.
+
+`DownloadObject` is the phase's first and only real file transfer: it writes to a sibling
+`.kira-partial-<uuid>` temp file and renames on success, unlinking on any failure or cancellation.
+This is only safe because the copy runs on the caller's own goroutine — the op's own context goes
+directly into `io.Copy` via the SDK call (the same no-detached-context rule SQS follows), so a
+cancelled download's cleanup never races a writer that `RunWithAbortRace` would have left running
+in the background. `PutObject`'s insert path matches a collision check structurally on
+`*types.NotFound` rather than on a mapped error code — a narrowing from the original TypeScript,
+which treated any query-level error as "probably not found, proceed." S3 object metadata keys come
+back **lowercased** from `HeadObject`/`GetObject` regardless of the case they were sent in (a real
+S3/LocalStack behavior for `x-amz-meta-*` headers, confirmed against a live container) — not a
+casing bug in the adapter.
 
 **RabbitMQ was dropped from v1's scope** (P58 findings) before it was ever ported to Go — it was
 Node-served-only via an HTTP-management-API adapter with no AMQP client, and rather than carry it

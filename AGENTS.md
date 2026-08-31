@@ -570,5 +570,73 @@ key/value page renders with a real memory-usage badge — the first `KeyValuePag
 the first native `caps.keyBrowser` engine, and the first native `TreeChildren.Truncated` producer.
 Nothing in this run needed softening or a "not available in this session" carve-out.
 
+## P58d implementation findings — SQS, S3, native (M8)
+
+- **M8.0's five probes (TC-4, AWS-1 through AWS-4) all confirmed the plan's own decisions**, with
+  two corrections and one real gap found. `SERVICES=s3,sqs` showed no measurable LocalStack
+  startup benefit in this sandbox once the image was warm (TC-4) — kept anyway since trimming what
+  the container initializes is still the right default. S3 metadata keys come back **lowercased**
+  from `HeadObject`/`GetObject` regardless of the case sent (AWS-3(d)), a real S3/LocalStack
+  behavior not anticipated by the plan's own research. The plan's §4.6 S3 seed checklist was
+  missing `SECOND_DELETE_TARGET_KEY` (AWS-4) — needed by the Go acceptance suite's tab-delete
+  scenario and added to `testsupport/s3.go`.
+- **AWS-1(e)/AWS-3(e) confirmed P58d D3's entire premise**: a cancelled `context.Context` aborts
+  an in-flight AWS SDK request (a `ReceiveMessage` long-poll, a `GetObject` streaming body read)
+  promptly, through the SDK's own plumbing — no `adapters.RunWithAbortRace` needed or wanted.
+  Neither SQS nor S3 has any server-side kill mechanism at all, unlike every native adapter built
+  in P58 so far; using the shared detached-context helper would have let a cancelled operation
+  keep running server-side after the caller unblocked (a cancelled `ReceiveMessage` still hiding
+  messages via `VisibilityTimeout`; a cancelled `DownloadObject` still writing its temp file while
+  cleanup already ran).
+- **P58d D6's default held**: `PutObject` with a seekable `*os.File` body succeeded under the
+  SDK's default `RequestChecksumCalculation` with no override needed (AWS-3(a)). A non-seekable
+  body failed immediately, client-side, before any request left the process — a harder cliff than
+  "LocalStack might reject it": the SDK itself refuses a non-seekable body over plain HTTP,
+  regardless of what the server would have done.
+- **Two JavaScript guarantees did not survive translation, both invisible in a port that "reads
+  correct"** (P58d D9): single-threadedness (SQS's `queueUrls`/`receiptHandles` caches needed an
+  explicit mutex, since two tabs on one Go connection are two goroutines through one `*Adapter`)
+  and `Map` insertion order (the receipt-handle FIFO eviction needed an explicit ordered-eviction
+  queue, since Go's map iteration order is deliberately randomised — a literal port would have
+  evicted an arbitrary handle rather than the oldest one, with a failure mode indistinguishable
+  from the legitimate "not received this session" case).
+- **P58d D8's headers-cell finding**: a naive `json.Marshal` of `types.MessageAttributeValue`
+  produces every field with an explicit `null` when absent (`BinaryValue`, `StringListValues`,
+  `StringListValues`), which the JavaScript original's `JSON.stringify(message.MessageAttributes
+  ?? {})` never produced (`JSON.stringify` drops `undefined` fields). A hand-written encoder
+  emitting only non-nil/non-empty fields, confirmed via a probe and pinned by an exact-string
+  acceptance assertion, is the fix.
+- **P58d D14's tightening**: S3's insert-collision check now matches structurally on
+  `*types.NotFound` rather than "any query-level error" — a malformed request or throttling error
+  now correctly fails the insert instead of being treated as "probably not found, proceed," which
+  the original TypeScript's broader `E_QUERY`-catches-everything fallthrough allowed.
+- **P58d D7's credential-timing change**: a nonexistent named AWS profile now fails at
+  `config.LoadDefaultConfig` (connect time) with `config.SharedConfigProfileNotExistError`, rather
+  than at first use — a gain (the Test button reports it sooner), the same standard P58b B4/B22
+  and P58c C2 held their own connect-time behavior changes to.
+- **§1.11's three predecessor closeout claims, checked against the tree at M8.3's own commit**:
+  P58b's four `tests/db/{clickhouse,mariadb,mysql,sqlite}.spec.ts` deletions are still outstanding
+  (P58c raised this as its own OQ-1; unresolved, carried forward as P58d's OQ-1 too — disposition
+  still belongs to the parent plan's author). `docs/ARCHITECTURE.md`'s per-database mapping table
+  had two more stale cells (SQLite's Cancel cell still said "none — SQLite has no interruptible
+  statement," Redis's still said `CLIENT KILL` for blocking cmds) despite two consecutive
+  sub-phases' acceptance criteria requiring the fix — both fixed here, this time as a grep-checked
+  criterion (`docs/v1/plans/P58d-sqs-s3.md` §8 criterion 8) rather than a prose self-assessment,
+  since the prose form has now failed twice.
+- **The general lesson P58c C14/C15 earned and P58d collected**: a placeholder parked on the kind
+  that goes native *last* costs its author one line and costs nobody anything afterwards. P58d
+  moved no placeholder at all — `TestKindNodeServed` was already `"kafka"` since P58c M7.1, and
+  `mariadb-real.spec.ts`'s coexistence half stayed Kafka-paired through both of P58d's flips with
+  zero changes. P58e (Kafka's own sub-phase) should expect the opposite: both placeholders point
+  at Kafka, and it inherits the cost this phase never had to pay.
+- **28 of `s3.spec.ts`'s scenarios ported as-is** — the highest ratio of any P58 sub-phase — because
+  S3's spec is almost entirely about the adapter's own key/prefix logic rather than about a driver
+  quirk. One new test was added beyond the port: a mid-stream download cancellation (extending
+  scenario 26, which only covered an *already*-cancelled context and never reached `io.Copy`) —
+  the case **P58d D3** exists to keep correct, and the one place a probe alone couldn't reach.
+- **`nativeKinds` reaches nine of ten** (`{postgres, mariadb, mysql, sqlite, clickhouse, mongodb,
+  redis, sqs, s3}`) at this sub-phase's own final commit. Only `kafka` remains Node-served — P58e's
+  whole job.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

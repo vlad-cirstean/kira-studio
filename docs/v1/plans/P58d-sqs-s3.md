@@ -1750,3 +1750,70 @@ isn't visible here) and §4.6's missing `SECOND_DELETE_TARGET_KEY` (real — M8.
 must seed it). AWS-3(d)'s lowercased-metadata-keys finding is new information for
 `docs/ARCHITECTURE.md`'s S3 section (§8 criterion 8) and for any Go test asserting an exact metadata
 key.
+
+## 13. M8.1–M8.3 results
+
+All three milestones ran for real, against real `localstack/localstack:3` containers, in the order
+§9 sequenced them. Nothing here required a design change to §2's decisions; every deviation from
+the plan's own prediction is recorded as it was found rather than smoothed over.
+
+**M8.1.** `testsupport/spec.go` gained `StreamKeyAt`/`StreamHeadersAt`/`StreamAttrsAt`/
+`StreamTimestampAt`/`StreamBodyAt`, all built on the existing `chunkCellAt` — no surprises, the same
+five-reader shape the plan predicted. `testsupport/localstack.go` landed the bare-`GenericContainer`
+starter (**P58d D22**) and the `X-Amz-Target`-keyed counting reverse proxy (**P58d D10**), with a
+connectivity test (`TestLocalStackProxyCounts`) proving one `GetQueueUrl` moves the counter by
+exactly one and an unrelated `CreateQueue` moves it by zero. `go test ./... -race` stayed green with
+`nativeKinds` untouched, confirmed by a full run before M8.2 began.
+
+**M8.2 — SQS.** `awscfg/` (config.go, errors.go), `sqs/` (eight files, one per `sqs/*.ts`) and
+`testsupport/sqs.go` landed as planned. 18 acceptance tests pass under `-race` against a real
+container on the first full run after fixing one self-inflicted test bug (an expected string in
+the headers-cell test used the wrong byte count before the real adapter output corrected it — not
+an adapter defect). §5.3's four called-out cases are all present: the count-before/definition/
+count-after sandwich (scenario 6) passed unmodified; the exact-string headers-cell assertion
+(`{"source":{"DataType":"String","StringValue":"seed"}}`) matched **P58d D8**'s hand encoder
+byte-for-byte on the first try; the counting-proxy scenarios (15/16) confirmed the queue-URL cache
+issues exactly one `GetQueueUrl` per cache miss and zero on a hit or a shared `count()` call; and
+the repeated-small-polls drain test (scenario 8) needed no guard-loop tuning beyond the plan's own
+`DRAIN_MESSAGE_COUNT + 3` bound. `nativeKinds += sqs` landed in its own commit, immediately followed
+by a full `tests/e2e-real/` sweep (all 5 specs green, including the Kafka/MariaDB coexistence pair
+unmodified) and a throwaway render check: a real `orders-queue` queue rendered a real `StreamPage`
+via an explicit Poll click — the app's first native `StreamPage` render, confirming §7's first
+acceptance item. `tests/db/sqs.spec.ts` was deleted in the milestone's last commit; the D20 re-grep
+found `tests/db/support/sqs.ts` still has a real second consumer (`tests/ipc/sqs/sqs.backend.spec.ts`),
+so it — and `fixtures/0006_sqs_seed.ts` — stayed, exactly as §1.11 predicted.
+
+**M8.3 — S3.** `s3/` (eight files, one per `s3/*.ts`, no `definition.go`) and `testsupport/s3.go`
+landed as planned, with one addition M8.0's own AWS-4 finding required: `S3SecondDeleteTargetKey`
+in `mutable-bucket`, missing from the plan's original §4.6 checklist. 28 acceptance tests pass
+under `-race`, all 24-of-28 ported-as-is scenarios matching the plan's own count, plus the one new
+case §5.4 called out: a mid-stream download cancellation extending scenario 26 (started a goroutine
+downloading the oversized object, cancelled after the first bytes landed, asserted `E_CANCELLED` or
+`E_QUERY` — a benign race against a fast `HeadObject` — and an empty destination directory either
+way). Stable across five repeated runs with `-race`, no flake observed. **P58d D14**'s tightening
+(matching the insert-collision check on `*types.NotFound` structurally) needed no adjustment; **P58d
+D13**'s seven preserved attributes round-tripped through `PutObject`/`HeadObject` on the first run.
+`nativeKinds += s3` landed in its own commit — **nine of ten kinds now native** — immediately
+followed by a full `tests/e2e-real/` sweep (green) and a second throwaway render check: a real
+object opened into a real `KeyValuePage` after a real Browse-tab descent into a seeded bucket — the
+app's first native S3 object page and the second native `caps.keyBrowser` engine (after Redis in
+checkpoint C1c), confirming §7's second acceptance item. `tests/db/s3.spec.ts` was deleted last; the
+D20 re-grep found **no** other consumer of either `tests/db/support/s3.ts` or
+`fixtures/0007_s3_seed.ts`, so both went with it — disposition (a) of **OQ-1**, matching P58c's own
+choice for its two deletions.
+
+**Phase-level checks, all run after M8.3's flip**: `bun run lint`, all four `typecheck:*` targets,
+`bun run test:unit`, `cd shell && go test ./... -race`, `bun run test:ui` (36/36), `bun run
+test:ipc:fe` (7/7, `sqs.frontend.spec.ts`'s mocked tier unaffected by the native flip, exactly as
+§5.1 predicted), and the full `tests/e2e-real/` suite (5/5) are all green. `git diff --stat src/`,
+`git diff --stat tests/ui tests/ipc tests/e2e-real`, and `git diff --stat shell/internal/page
+shell/internal/enginecache shell/internal/enginebackend` are all empty, exactly as **P58d D21**
+and §1.3 required.
+
+**What turned out differently from the plan's own prediction, named once rather than left implicit**:
+TC-4's "`SERVICES=s3,sqs` measurably cuts startup" claim didn't hold in this sandbox (§12); S3
+metadata keys are lowercased by the service, a fact neither this plan nor its predecessors
+mentioned (§12, now in `docs/ARCHITECTURE.md`'s S3 section); and §4.6's S3 seed checklist needed
+one more key than originally written. Nothing else — **P58d D3** (the sub-phase's central,
+riskiest decision) held exactly as designed, confirmed twice by real probes and twice more by 46
+acceptance tests and two live render checks against real containers.
