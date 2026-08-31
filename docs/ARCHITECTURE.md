@@ -40,13 +40,14 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold; the engine child keeps writing to stdout/stderr, which the shell pipes into the same sink — single log file, single source of truth |
 
-Driver libraries — the best-maintained option per engine, Go-native for nine of ten kinds as of
-P58d (`b40a09e`..): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
+Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
+M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
 `mysqlfamily` core), `mattn/go-sqlite3` (sqlite), a hand-rolled `net/http` client (clickhouse, no
 driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb), `redis/go-redis/v9` (redis),
 `aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg` config-and-error-mapping
-package). Kafka is the only kind still Node-served, on `@confluentinc/kafka-javascript` (native,
-heavier, but actively maintained where `kafkajs` has stalled) — its own Go port is P58e's.
+package), `github.com/twmb/franz-go` + `franz-go/pkg/kadm` (kafka). The Node engine child still
+spawns and still runs — P58f's own M10 deletes it — but as of P58e M9.3 it answers no connection
+traffic for any kind at all (checkpoint C2, `docs/v1/plans/P58e-kafka.md` §7).
 
 App identity: organisation **kirathecat**, app name **Kira Studio**, bundle ID
 `com.kirathecat.kira-studio` (the `-shell` suffix carried during the P52–P56 coexistence window is
@@ -101,7 +102,7 @@ driver is never loaded into the engine process's baseline memory.
 | ClickHouse | one node per `system.databases` row → tables (ungrouped), views/materialized views grouped into per-kind folders; no sequences or routines (ClickHouse has neither); `system` is kept, not hidden | tabular | `LIMIT/OFFSET` only — a MergeTree `PRIMARY KEY` is a sparse index, with no unique row key to build a keyset cursor on | yes (`count()` reads part metadata) | `KILL QUERY WHERE query_id = '<id>' SYNC` on a second HTTP request (the client's own connection pool already has one free) |
 | MongoDB | database → collections (ungrouped, indexes shown in the definition view) | documents | `_id` keyset, `skip/limit` fallback | `countDocuments` (slow) / `estimatedDocumentCount` | `$currentOp` + `killOp` on the *same* client the adapter already holds (never a side connection) |
 | Redis | db index (a leaf — its key namespace is unbounded, browsed in a Browse tab) | key/value | `SCAN` cursor (never `KEYS`) | `DBSIZE` only (approx per-prefix) | a permanent, honest `false` — go-redis's blocking commands override the caller's context for the wait itself, so `CheckCancelled` between bounded `SCAN`-family rounds is the entire cancellation surface (`caps.cancel` stays `true`, since that surface is genuinely effective) |
-| Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | close the assigned consumer, `AbortSignal` |
+| Kafka | cluster → topics (ungrouped), consumer groups (folder) | stream | offset window per partition | end-offset − begin-offset | none server-side — Kafka's protocol has no cancel operation at all, so the op's own `context.Context`, passed directly to every `kadm`/`kgo` call, is the entire mechanism; `caps.cancel` stays `true` since that surface is genuinely effective |
 | SQS | region → queues | stream | receive batches | `ApproximateNumberOfMessages` | none server-side — the op's own `context.Context`, passed directly to every AWS SDK call (never a detached context), is the entire mechanism; `caps.cancel` stays `true` since that is genuinely effective |
 | S3 | account → buckets (a leaf — a bucket's prefix/object space is unbounded, browsed in a Browse tab) | key/value (object browser) | `ListObjectsV2` continuation token | **per-object** exact field-row count via `HeadObject` (not a bucket-wide key count — S3 has no cheap exact answer to "how many keys total") | none server-side — same as SQS, the op's own `context.Context` on every SDK call; also load-bearing for `DownloadObject`'s temp-file cleanup ordering |
 
@@ -260,23 +261,44 @@ a tooltip naming it. Cancellation goes through `KILL QUERY WHERE query_id = '<id
 second HTTP request (`net/http`'s own connection pool, sized to always have one free), since the
 server keeps executing a query after the original socket closes.
 
-### Kafka (`@confluentinc/kafka-javascript`, P32)
+### Kafka (Go-native as of P58e M9.3)
 
-The Kafka adapter's driver wraps a native NAN addon (built against V8's C++ API, not N-API) — it is
-**ABI-specific per JS runtime**, not portable the way a pure-JS dependency is. Under the Electron
-shell that meant an ABI rebuild step before every run and before packaging; against the vendored
-Node runtime there is **no rebuild step at all** — the addon loads under a stock Node exactly as it
-landed on disk from `bun install`. **Bun still cannot load this addon at any ABI** — confirmed
-empirically, not just from the docs (a matching-ABI build still crashes with `undefined symbol:
-v8::FunctionTemplate::SetClassName` when required from Bun) — which is why `tests/db/kafka.spec.ts`
-runs esbuild-bundled under the vendored Node (`node:test`, via `scripts/run-db-tests.sh`'s
-`--path-ignore-patterns`) while every other engine's spec in that directory runs under Bun.
+**Go-native as of P58e M9.3** (`shell/internal/adapters/kafka/`, `github.com/twmb/franz-go` +
+`franz-go/pkg/kadm`) — `nativeKinds["kafka"]` is `true`, the **tenth and last** of ten kinds, and the
+flip that records checkpoint C2 (the parent P58 plan's zero-traffic proof: a full manual pass across
+all ten kinds, plus cancel/settings-save/cache-clear, left `adapterhost.Router.ChildRoutes()` at
+zero — the Node engine child is spawned, idle, and answers no connection traffic at all). franz-go
+replaces the old TypeScript driver's ABI-specific compiled binding (built against V8's C++ API — the
+one engine Bun could never load at any ABI) with a pure-Go client: no compiled binding, no ABI, no
+rebuild step, and no packaged-bundle native-module gap (`docs/PACKAGING.md` §6).
 
-The adapter never joins a consumer group for a read-only browse — it assigns partitions directly
-(`assign()`, explicit start offsets, a bounded poll loop) rather than `subscribe()`, so `group.id`
-is a required-but-never-joined constant and browsing never pays a group-join round trip. `canDelete`
-is permanently `false` — a topic's log is immutable, so there is no per-message delete or update at
-the protocol level, only retention/compaction.
+The adapter never joins a consumer group for a read-only browse — `kgo.ConsumePartitions` assigns
+partitions directly at explicit start offsets (a construction-time option, so the browse client is
+fresh and ephemeral per read, never the adapter's long-lived admin-and-produce client), never
+`subscribe()`/`kgo.ConsumerGroup`. This is now **structural**, not merely configured: there is no
+group-join call in the browse path at all, where the old driver's `group.id` was a
+required-but-never-joined constant. End-of-log detection is a per-fetch `HighWatermark` comparison
+(captured from the fetch that actually delivered the last record, never a follow-up peek poll) rather
+than a `partition.eof` event, with a fixed-count empty-poll counter kept as a second, independent
+terminator — the same clamp the old driver needed after a real regression (P43 iter2 F19/D26), now
+without the native event that made it possible before.
+
+Two capabilities the old driver's binding never exposed come back: a topic's Configuration section
+now has real rows (`kadm.DescribeTopicConfigs`) instead of "not available: no `DescribeConfigs`
+call", and `ConnectInfo.details.cluster` reports a real cluster id (`kadm.Metadata`). One row is
+lost: the group definition's CLASSIC-vs-KIP-848 `type` row has no `kadm` source and is dropped;
+`partitionAssignor` merges into a `protocol` row that already carries the same value. Idempotent
+producing is franz-go's default and is explicitly disabled (`kgo.DisableIdempotentWrite()`) to match
+the old driver's own default and avoid an `InitProducerId` hang on a single-broker cluster whose
+transaction-log replication factor is Kafka's default of 3.
+
+Cancellation has no server-side kill at all — Kafka's protocol has none, the same shape as SQS and
+S3 — so the op's own `context.Context` on every `kadm`/`kgo` call is the entire mechanism, with one
+detail neither SQL adapter's port prepares a reader for: `kgo.Client.PollRecords` returns a
+`Fetches`, not an error, and a cancelled context surfaces as an injected fake fetch carrying
+`ctx.Err()` (`Fetches.Err()`), so the browse loop checks that explicitly rather than relying on a
+returned error. `canDelete` is permanently `false` — a topic's log is immutable, so there is no
+per-message delete or update at the protocol level, only retention/compaction.
 
 ### SQS (Go-native as of P58d M8.2)
 
@@ -312,7 +334,8 @@ at first use, which is a gain the Test button reports sooner.
 ### S3 (Go-native as of P58d M8.3)
 
 **Go-native as of P58d M8.3** (`shell/internal/adapters/s3/`, `aws-sdk-go-v2/service/s3`) —
-`nativeKinds["s3"]` is `true`, reaching **nine of ten** native kinds; only Kafka is left for P58e.
+`nativeKinds["s3"]` is `true`, reaching **nine of ten** native kinds — Kafka went native next, in
+P58e, reaching ten of ten (see the Kafka section above).
 The only engine with `caps.fileTransfer` — items are whole files, streamed to/from a local path via
 a native OS dialog (`downloadObject`), not a value the mutation-preview model can show inline.
 `fileTransfer` is orthogonal to the three write flags: Download reads regardless of a connection's
@@ -759,11 +782,11 @@ run, so whichever spec's stub loads first wins for the whole run.
 **`tests/db/` needs a real external resource** — a Testcontainers-managed Docker container per
 engine (`bun run test:db`, requires Colima on macOS or a Docker daemon on Linux). It is **entirely
 untouched by the shell migration**: the adapters did not move, and Bun + Testcontainers is
-unaffected by what the shell is written in. It also absorbed the former `tests/electron-db/`: the
-Kafka spec now lives beside every other engine's as `tests/db/kafka.spec.ts`, and
-`scripts/run-db-tests.sh` runs it esbuild-bundled under the vendored Node while the rest of the
-directory runs under Bun. Bun still cannot load the Kafka driver's native addon at any ABI, but a
-stock Node loads it with no ABI dance at all — the Electron-ABI rebuild step is gone.
+unaffected by what the shell is written in. `tests/db/kafka.spec.ts`, the one file in this
+directory that could not run under Bun at all (the old TypeScript driver's compiled binding loaded
+under no Bun ABI), was deleted in P58e M9 — its subject is now
+`shell/internal/adapters/kafka/kafka_test.go`, and `scripts/run-db-tests.sh` is a plain `bun test
+tests/db` with no Node half left to run.
 
 One container per engine, one fixture module per engine that seeds a realistic dataset: wide tables,
 `NULL`s, unicode, large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs,

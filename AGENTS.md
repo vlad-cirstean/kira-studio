@@ -184,22 +184,6 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   weaken it, even if the variable is accidentally left set. `tests/ui/secrets.spec.ts`'s "keychain
   available" scenario is the guard that this stays true.
 
-## Native Kafka driver — building and testing in this environment (P32, resolved P57)
-
-See `docs/ARCHITECTURE.md`'s Kafka section for *why* (ABI-specific native addon, Bun can't load it
-at all). This section is only about running it here.
-
-- **No ABI rebuild step exists or is needed.** The engine — the only process that ever loads this
-  addon — runs under a plain vendored Node, so the addon `bun install` built loads exactly as it
-  landed on disk. If a future Node major bump ever produces an ABI mismatch, the fix is an ordinary
-  `bun rebuild`/`npm rebuild @confluentinc/kafka-javascript` against the vendored Node's own
-  version — no `electron-rebuild`, no `CKJS_LINKING` dance, no Electron headers to fetch.
-- **A native npm dependency's install script (`node-pre-gyp`, `node-gyp`, …) may silently not run**
-  on a newer npm: it default-denies install scripts per package (`npm warn install-scripts … not yet
-  covered by allowScripts`) until `npm install-scripts approve <pkg>`. Hit vendoring this driver
-  against a freshly-downloaded Node runtime — the first `npm install` silently left
-  `build/Release/*.node` missing. Approve, then re-run install (or `npm rebuild <pkg>`).
-
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
 - **None of this toolchain persists across sessions.** Re-run at the start of any fresh container:
@@ -637,6 +621,101 @@ Nothing in this run needed softening or a "not available in this session" carve-
 - **`nativeKinds` reaches nine of ten** (`{postgres, mariadb, mysql, sqlite, clickhouse, mongodb,
   redis, sqs, s3}`) at this sub-phase's own final commit. Only `kafka` remains Node-served — P58e's
   whole job.
+
+## P58e implementation findings — Kafka, native (M9)
+
+- **M9.0's three probes (KF-2, KF-3, KF-4) all confirmed the plan's own decisions**, with one
+  refinement to the clamp design and one new container-level fix. KF-4(a) needed
+  `kafka.WithClusterID(...)` — `testcontainers-go/modules/kafka@v0.44.0` has no default and fails
+  outright without it (`CLUSTER_ID is required`), contrary to §1.15's own reading. KF-4(d) found the
+  container auto-creates a nonexistent topic on its own (`auto.create.topics.enable`'s broker
+  default, independent of anything the Go client requests), so `testsupport/kafka.go` sets
+  `KAFKA_AUTO_CREATE_TOPICS_ENABLE=false` at the container level — otherwise a "topic does not exist"
+  acceptance case would pollute every test run after it in the same container.
+- **KF-2 confirmed P58e E3's entire premise, no correction needed**: a cancelled `context.Context`
+  aborts a genuinely-blocking `PollRecords` promptly (300.71ms against a 300ms cancel) through
+  `Fetches.Err()`, not a returned error — `errors.Is(fetches.Err(), context.Canceled)`. The first
+  version of this probe was a false pass (it drained the client before the poll had anything left to
+  block on); fixed by producing records deliberately left unconsumed so the probed poll actually
+  blocks on `FetchMaxWait`. `Close()` racing a live poll unblocks it the same way, via
+  `kgo.ErrClientClosed`.
+- **KF-3 resolved the P58e E9 fork to "signal available," the primary branch, with one refinement
+  the plan's own framing did not anticipate**: `FetchPartition.HighWatermark`/`LastStableOffset` on
+  the fetch that actually delivers a transaction's last record before its commit marker do carry the
+  proof the clamp needs — confirmed on both a transactional `gap-topic` and a plain contrast topic.
+  The refinement: every subsequent poll blocks for the *full* remaining context timeout with no
+  partition metadata at all (`FetchMaxWait` bounds a per-broker round trip, not `PollRecords`' own
+  return latency), so the clamp must be derived once, from the delivering fetch's own watermark —
+  never refreshed via a follow-up "peek" poll. `read.go` captures it exactly that way.
+- **Two silent behaviour changes ported deliberately, both invisible in code that "reads correct"**
+  (§1.8): franz-go's idempotent producing is on by default where the old driver's was off, which
+  would hang a single-broker cluster's `InitProducerId` round trip — `kgo.DisableIdempotentWrite()`
+  matches the old default. KF-4(e) found the difference immeasurable in this sandbox's own
+  single-broker container (`KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1` dodges the exact hang
+  this guards against), so the setting proved **prudent, not empirically necessary here** — kept
+  regardless, for a real multi-broker cluster this sandbox cannot construct. Separately, Go's
+  `string([]byte)` does not replace invalid UTF-8 the way `Buffer.toString('utf8')` did;
+  `strings.ToValidUTF8(s, "�")` applies to `key`, `body` and every header value.
+- **The `TestKindNodeServed` retirement's real diff size**: 6 files, 59 insertions, 39 deletions (98
+  lines total) — smaller than the plan's own framing might suggest, because
+  `NewRouterAllNodeServed`'s shape (an empty `native` map on an otherwise-identical `Router`) let
+  three of its four consumers change only their constructor call. `connections/service_test.go`'s
+  `fieldsInput` is the one that could not use a synthetic kind at all (`model.ValidConnectionKind`
+  rejects anything outside the closed ten-kind set before the router is ever consulted) — the general
+  lesson this collects: **the last kind to go native is where a "definitely-not-native" placeholder
+  finally costs something, and the cost is a test constructor, not a rename.**
+- **The Electron/`dr_cb`/NAN-buffer-adoption comment in the old TypeScript producer had no Go
+  analogue whatsoever** and was deleted rather than ported (P58e E14) — one of the clearest "the
+  migration deletes a workaround" moments in the whole phase. `kgo.ProduceSync` on the adapter's own
+  long-lived client replaced a fresh `Producer` per mutate, and is a genuine capability gain: each
+  `ProduceResult` carries the broker-acknowledged partition/offset, where the old driver could only
+  report "queued," not "acknowledged."
+- **P58d's own predicted debt collected in full**: *"P58e (Kafka's own sub-phase) should expect the
+  opposite: both placeholders point at Kafka, and it inherits the cost this phase never had to
+  pay."* Both did — `TestKindNodeServed` and `mariadb-real.spec.ts`'s coexistence half — and both
+  moved in this sub-phase's own M9.3 commit, the one commit the plan's own §0.3 said would
+  necessarily carry all three changes at once (the flip, the constant retirement, the e2e rewrite)
+  because splitting them means shipping a red tree.
+- **`nativeKinds` reaches ten of ten** at M9.3's own commit — every kind is now served in-process by
+  a Go adapter, and `tests/e2e-real/mariadb-real.spec.ts`'s second test is the all-native survival
+  proof that replaced the coexistence property it used to prove (P58 D4 held three times over; it
+  cannot hold a fourth, because after M9.3 there is nothing Node-served left to coexist with).
+- **Checkpoint C2 (the parent P58 plan's zero-traffic proof) ran for real** in M9.4, across all ten
+  kinds in one live `-tags server` session against real containers (`postgres:17`, `mariadb:11.4`,
+  `mysql:8.4`, `clickhouse/clickhouse-server:26.3`, `mongo`, `redis:7`, two `localstack/localstack:3`
+  instances for sqs/s3, `confluentinc/cp-kafka:8.0.7`; sqlite needed none), plus a real cancelled
+  Postgres console statement, a settings-driven cache-budget push, and an explicit cache clear:
+
+  | Kind | Result |
+  |---|---|
+  | postgres | pass |
+  | mariadb | pass |
+  | mysql | pass |
+  | sqlite | pass |
+  | clickhouse | pass |
+  | mongodb | pass |
+  | redis | pass |
+  | kafka | pass |
+  | sqs | pass |
+  | s3 | pass |
+
+  `grep -c 'routed a connection request to the Node engine child' <the run's real KIRA_HOME log
+  file>` returned **0**. The child was confirmed alive and idle throughout, not merely silent: the
+  status bar's `engine-status` read `ok` before the pass and after it, `pgrep -P <serverPid>` found
+  it as a real running child process, and the log itself carried ordinary `INFO`-level adapter lines
+  from the very same run (e.g. the SQS/S3 LocalStack endpoint overrides) — proof the check would have
+  caught a `WARN` line had one fired, not a vacuous grep against an empty file. Container
+  availability was never a constraint in this session (Docker was up and every image mirror-pulled
+  cleanly), so no kind needed the "not available in this session" carve-out. The pass ran as a
+  throwaway `tests/e2e-real/` script, per the parent's own §6 discipline and checkpoint C1c's own
+  precedent — not committed, since its only job was to produce this evidence once.
+- **`AGENTS.md`'s own "Native Kafka driver — building and testing in this environment (P32, resolved
+  P57)" section is deleted, not rewritten** (P58 §8 criterion 10): its ABI-rebuild-avoidance fact is
+  now redundant with `tests/ipc/`'s own section (which already explains why kafka's *TypeScript*
+  backend spec — genuinely untouched, per P58e E23/§5.1 — still needs the vendored Node), and its
+  npm-install-script-approval fact is a generic gotcha whose only subject in this repo is the
+  `@confluentinc/kafka-javascript` package P58f removes. Neither belonged in a section about a driver
+  the app no longer uses.
 
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

@@ -2204,15 +2204,127 @@ a follow-up peek poll (KF-3).
 
 ## 13. M9.1–M9.4 results
 
-*(To be filled in by the implementing session. Must include, at minimum: the acceptance suite's
-pass count and how many of §5.3's six called-out cases needed adjustment and why; which branch of
-**P58e E9** landed; whether **P58e E14**'s `DisableIdempotentWrite` proved necessary or merely
-prudent; the `TestKindNodeServed` retirement's real diff size across the four consumers; the
-`tests/e2e-real/` sweep results after the flip; and **checkpoint C2's own per-kind table** — ten
-rows, each pass or explicitly "not available in this session", plus the
-`grep -c 'routed a connection request to the Node engine child'` result and the evidence that the
-child was alive throughout. Anything that turned out differently from this plan's own prediction is
-named once, plainly, rather than left implicit.)*
+**M9.1 — the fixture and the failing suite.** `testsupport/kafka.go` needed two fixes §1.15 did not
+anticipate, both found by M9.0's own probes and folded in here: `kafka.WithClusterID(...)` is not
+optional (the module fails outright with `CLUSTER_ID is required` without it), and the container
+needs `KAFKA_AUTO_CREATE_TOPICS_ENABLE=false` set explicitly (the broker's own default silently
+auto-creates a queried-but-missing topic, which would otherwise pollute every test that runs after a
+nonexistent-topic scenario in the same container). `kafka_test.go` landed with all 21
+`tests/db/kafka.spec.ts` scenarios ported plus one new case, failing at `CreateAdapter` with
+`E_UNSUPPORTED "kafka connections are not supported yet"` — the right reason (no constructor
+registered), confirmed rather than assumed.
+
+**M9.2 — the adapter, and the acceptance suite's final shape.** All 22 top-level `Test*` functions in
+`kafka_test.go` pass under `go test ./internal/adapters/kafka/... -race` against a real
+`confluentinc/cp-kafka:8.0.7` container (23.3s), plus `read_test.go`'s 6-case
+`TestAdvanceWindows` table for **P58e E26**'s window-arithmetic unit test — **28 passing cases in
+total**, zero flakes across the runs this session made. Of §5.3's six called-out scenarios, all six
+needed adjustment, exactly as predicted, and none needed a different fix than the plan named:
+scenario 6's Configuration half is **inverted, not ported** (asserted populated, no "not available"
+note — **P58e E11**'s capability recovery); scenario 11 re-baselines onto `ListedOffsets` inspection
+rather than a caught error (**P58e E12**); scenarios 17 and 18 are **rewritten to check the broker
+directly** (`ListGroups` before/after a full browse; `FetchOffsets` against the browse's own group
+name) rather than trusting the adapter's own `definition()` view, because franz-go's own
+no-group-join guarantee needed an assertion that could not just trust the code under test; scenario 20
+re-baselines onto the real `int64` boundary now that **P58e E6** deletes `toNativeOffset`'s guard
+entirely (the old `E_UNSUPPORTED` case is gone as a capability gain, not a loss); scenario 21
+re-baselines onto **P58e E9**'s watermark clamp in place of librdkafka's `partition.eof`, and is the
+one case whose outcome traces straight back to KF-3's own finding. Two more adjustments the plan's
+own §5.3 table didn't single out but the acceptance run needed: scenario 2 collapses to a plain caps
+assertion (there is no separate "supported operations" enumeration to port), and scenario 1 gains a
+`details["cluster"]` assertion for **P58e E15**'s recovered capability. One case is genuinely new
+(not a port): a mid-browse cancellation alongside scenario 15, the one **P58e E3**'s `Fetches.Err()`
+contract needs and an already-cancelled-context case alone cannot reach.
+
+**P58e E9 resolved to its primary branch — "signal available," not the `LastStableOffset` fallback.**
+KF-3 confirmed `FetchPartition.HighWatermark` on the fetch that actually delivers a transaction's
+last record before its commit marker carries exactly the proof the clamp needs, on both a
+transactional and a plain topic. The one refinement KF-3 forced and §2's own text now carries: the
+watermark must be captured from that delivering fetch and never refreshed by a later "peek" poll,
+since a poll with nothing new to deliver blocks for the caller's *entire* remaining context timeout
+with no partition metadata at all — not a quick, informative "nothing here yet" the way a
+literal-minded design might assume.
+
+**P58e E14's `DisableIdempotentWrite` proved prudent, not empirically necessary in this sandbox.**
+KF-4(e) measured a negligible 22.78ms vs 21.52ms difference between idempotent and non-idempotent
+first-produce latency, because this sandbox's own single-broker container already sets
+`KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1` — the exact setting whose *absence* on a real
+multi-broker cluster is what makes `InitProducerId` hang. The setting stays in `client.go` regardless,
+guarding a failure mode this sandbox cannot construct rather than one it already exhibits.
+
+**The `TestKindNodeServed` retirement's real diff (commit `423058c`): 6 files, 59 insertions, 39
+deletions — 98 lines total, smaller than a naive four-consumer estimate.**
+`NewRouterAllNodeServed`'s shape (an empty `native` map on an otherwise-unchanged `Router`) let three
+of the four consumers (`adapterhost/integration_test.go`, `adapterhost/dataframe_test.go`,
+`tree/service_test.go`) change only their constructor call. `connections/service_test.go`'s
+`fieldsInput` was the one real constraint, exactly as §1.9 predicted: `model.ValidConnectionKind`
+rejects a synthetic kind before the router is ever consulted, so it needed a real behavioural
+adjustment, not a rename.
+
+**M9.3's `tests/e2e-real/` sweep: all 5 tests across all 3 spec files green** after the flip
+(`postgres-real.spec.ts` ×2, `sqlite-real.spec.ts` ×1, `mariadb-real.spec.ts` ×2 — the second of
+which is the checkpoint-C2-automated-half rewrite itself, **P58e E21**). Re-confirmed again in M9.4
+after the packaging/doc edits, with no regression.
+
+**Checkpoint C2 — the manual pass, run for real in M9.4.** Ten kinds, one live `-tags server`
+session, real containers throughout (`postgres:17-alpine`, `mariadb:11.4`, `mysql:8.4`,
+`clickhouse/clickhouse-server:26.3` via the ulimit-free container helper, `mongo:7`, `redis:7`, two
+independent `localstack/localstack:3` instances for sqs and s3, `confluentinc/cp-kafka:8.0.7`;
+sqlite needed a real seeded temp file, no container). For each kind: create the connection, connect
+it, expand its tree, dblclick into a real object (a table's grid, a document, a redis/s3 browse
+descent into a keyvalue view, a Kafka/SQS stream page), then disconnect. Docker never became a
+constraint in this session — every image was already mirror-pulled or pulled cleanly — so no kind
+needed the "not available in this session" carve-out §7.3 requires when one does.
+
+| Kind | Result |
+|---|---|
+| postgres | pass |
+| mariadb | pass |
+| mysql | pass |
+| sqlite | pass |
+| clickhouse | pass |
+| mongodb | pass |
+| redis | pass |
+| kafka | pass |
+| sqs | pass |
+| s3 | pass |
+
+The three paths a per-kind pass misses were exercised in the same session: a real Postgres
+`SELECT pg_sleep(5);` console statement, stopped mid-flight via the stop button (a real
+`Router.Cancel` round trip); a settings-dialog cache-budget change (`Router.PushCacheConfig`,
+`cache:configure`); and the settings dialog's own "Clear caches" button (`cache:clear`).
+
+`grep -c 'routed a connection request to the Node engine child' <the run's real KIRA_HOME log file>`
+**→ 0.** The child was confirmed alive and idle throughout, not merely silent: `engine-status` read
+`ok` both before the pass and after it, `pgrep -P <serverPid>` found a real running child process,
+and the very same log file carried ordinary `INFO`-level lines from the run itself (the SQS and S3
+adapters' own LocalStack endpoint-override notices) — proof the grep would have caught a `WARN` line
+had one fired, rather than passing vacuously against an empty or silent log. The pass ran as a
+throwaway, uncommitted `tests/e2e-real/` script, per the parent's own §6 discipline and checkpoint
+C1c's own precedent (`AGENTS.md`'s "Checkpoint C1c" entry) — it existed only to produce this
+evidence once, not to become a fourth permanent spec in that tier.
+
+**M9.4 — the deletions and the packaging fixes, both exactly as scoped.** The re-grep §1.11
+predicted was re-run before deleting anything: `grep -rln "support/kafka\|0005_kafka_seed" tests/
+scripts/ package.json` still shows `tests/e2e-real/support/kafka.ts` and
+`tests/ipc/kafka/kafka.backend.spec.ts` as live consumers of both `tests/db/support/kafka.ts` and
+`tests/db/fixtures/0005_kafka_seed.ts` — both **kept**, exactly as predicted, and only
+`tests/db/kafka.spec.ts` was deleted. `scripts/run-db-tests.sh` collapsed to one line (`bun test
+tests/db`); the remaining `tests/db/` suite (mariadb/mysql/sqlite, 114 tests) still passes in full,
+and `clickhouse.spec.ts`'s one failure is this sandbox's pre-existing `ulimit`/`rlimit` restriction
+(`AGENTS.md`'s ClickHouse section), unrelated to the deletion. `scripts/verify-packaging.sh`'s and
+`scripts/sign-bundle.sh`'s Kafka notes were corrected to say the module is unused rather than "a
+known gap"/"will fail at runtime" — **P58e E22**'s own framing ("message-string corrections only, no
+logic change") held exactly as written; the surrounding A2/A4 comments were also corrected, since
+leaving them calling this "a real, open gap" next to a message that no longer says so would have been
+a smaller but still-real inconsistency. `docs/PACKAGING.md`'s §6 gap bullet and §4 human-checklist
+item 8 got the same correction (outside this plan's own file list, but in scope for the same reason).
+
+**Nothing turned out to contradict this plan's own predictions.** Every §2 decision, every §6 probe
+disposition and every §7 design choice landed exactly as designed; the only two additions beyond what
+§2 named outright were KF-4(a)'s `WithClusterID` requirement and KF-4(d)'s auto-create-topics fix,
+both container-configuration details rather than adapter-design corrections, and both already folded
+into §12's own M9.0 write-up before M9.1 started.
 
 ### Critical files for implementation
 
