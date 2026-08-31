@@ -1441,3 +1441,656 @@ sub-phase's**, because it is last:
 - **`cache:stats`** — **P58a A16**'s merge is unchanged; the child keeps reporting its own (empty)
   stats and the Router keeps summing them until P58f.
 - **`shell/main.go`** — the tenth blank import. §8 makes it a per-milestone acceptance check.
+
+## 5. Testing plan
+
+### 5.1 What survives untouched
+
+- **`tests/ui/`** entirely — both wire planes mocked; **P58a A10** holds.
+- **`tests/ipc/`** entirely — all three halves of all seven adapters, `kafka` included. §1.11 records
+  the cost of that being true: after M9.3, **every one of the seven `*.backend.spec.ts` files drives a
+  TypeScript adapter that serves nothing in the real app**, which is the state **P58 D13**'s generator
+  port exists to end, in P58f.
+- **`tests/unit/`** entirely. Nothing in P58e has a TypeScript unit-test subject that moves.
+- **`package.json`.** `test:db` invokes `scripts/run-db-tests.sh`, whose contents change but whose
+  name and behaviour-for-the-caller do not.
+- **`tests/e2e-real/postgres-real.spec.ts`** and **`sqlite-real.spec.ts`** — unchanged; only
+  `mariadb-real.spec.ts`'s second test moves.
+
+### 5.2 The `src/` non-change, asserted in its strong form
+
+Every milestone from M9.1 onward ends with `git diff --stat src/` returning **empty** — no exclusion
+(**P58e E23**). If it is ever non-empty the implementer stops and says so rather than absorbing it.
+
+### 5.3 The Kafka Go tier
+
+`shell/internal/adapters/kafka/kafka_test.go`, driven by `testcontainers-go` against
+`confluentinc/cp-kafka:8.0.7`, seeded per §4.6. `tests/db/kafka.spec.ts` is **776 lines, 21
+scenarios** (`grep -c "^  test('"`). How each ports:
+
+| | Count | Scenarios |
+|---|---:|---|
+| **Ports as-is** | 13 | 1, 3, 4, 5, 7, 8, 9, 10, 12, 13, 14, 15, 16 |
+| **Re-baselined against the Go driver, never loosened** | 4 | 11 (`E_QUERY` via **P58e E12**, and a new message), 19 (`ListOffsetsAfterMilli`'s different no-record-after answer), 20 (**P58e E6** — the int64 boundary), 21 (**P58e E9**'s clamp instead of `partition.eof`) |
+| **Inverted, because the capability came back** | 1 | 6's Configuration half (**P58e E11**) |
+| **Collapses to a caps assertion** | 1 | 2 |
+| **Rewritten, with a reason** | 2 | 17 and 18 — see below |
+
+**Six cases carry more weight than the rest**, and §8 requires each by name:
+
+| Test | Why |
+|---|---|
+| **a browse creates no consumer group** (17, rewritten) | **The parent's §5.3 names this as one of only two tests it adds beyond the ported list**: *"a browse never creates group state (`ListGroups` is unchanged before and after) — kafka — P10 D6's promise, made structural by P32 and re-proven against a different client."* The TypeScript pages `orders` in full and then asserts the group list still holds exactly `CONSUMER_GROUP`. The Go version tightens it to the parent's own wording: snapshot `adm.ListGroups(ctx)` **before**, page `orders` to exhaustion at `pageSize: 2`, snapshot **after**, and assert the two sets are equal — a stronger assertion than "the seeded group is still the only one", because it also catches a browse that *deletes* or *mutates* group state. KF-1 already proved the property holds for franz-go by construction; this is the regression guard that keeps it true if someone ever adds `kgo.ConsumerGroup(...)` to §4.3's option list |
+| **a browse commits no offsets** (18, rewritten) | Same phase-promise half. The TypeScript asks the adapter for `definition(groupPath('kira-studio-browse'))` and accepts either `E_NOT_FOUND` or a group with no `orders[...]` rows. The Go version drops the adapter from the loop and asks the broker directly — `adm.FetchOffsets(ctx, "kira-studio-browse")` — asserting either a group-not-found `kerr` or an empty `OffsetResponses`. Going below the adapter matters: the TypeScript version would pass even if `buildGroupDefinition` had a bug that hid rows |
+| **the transaction commit-marker gap still terminates** (21, re-baselined) | P43 iter2 F19/D26, and **P58e E9**'s whole subject. Creates `gap-topic`, produces one record inside a franz-go transaction (`kgo.TransactionalID` + `BeginTransaction`/`EndTransaction`), then pages to exhaustion with a bounded guard loop and asserts `rowCount == 1`, `hasMore == false`, `nextToken == nil`. **The assertion that fails against a naive port** is the third one: without the clamp, `Next` stops one behind `End` (the commit marker's offset counts toward the watermark but is never delivered) and `hasMore` stays true forever. This is the single most important test in the suite and the only one whose subject is a previously-shipped bug |
+| **the Configuration section has real rows and no "not available" note** (6, inverted) | **P58e E11**, and the phase's promised capability recovery. Asserts the section is non-empty, that a known key is present (`cleanup.policy` or `retention.ms` — KF-4(f) picks one the container actually reports), and that `notes` contains **nothing** matching `/DescribeConfigs/`. The TypeScript asserts the exact opposite in both halves, so this cannot be a port |
+| **`ConnectInfo.Details` carries a real cluster id and a live broker count** (1, extended) | **P58e E15**, and P32 D13's recovery. Ports scenario 1 verbatim (`serverVersion == "Kafka"`, `details["brokers"]` non-empty, disconnect, then `children` → `E_CONNECT`) and adds `details["cluster"] != ""` — the assertion that proves the recovery landed rather than being claimed in a doc |
+| **an already-cancelled context aborts the browse** (15, ported) plus **a mid-browse cancellation** (new) | **P58e E3**. Scenario 15 only covers an *already*-cancelled context, which never reaches `PollRecords`. The new case is the one **P58e E3** exists to keep correct and the one KF-2 alone cannot reach: start a browse of `orders` at `pageSize: 6` on a goroutine against a `context.WithCancel`, cancel once the first records land, assert `E_CANCELLED` and that the call returns within a bound well under `FetchMaxWait`. Direct analogue of P58a's `pg_sleep(30)` test and P58d's mid-stream download case |
+
+**P58e E27** governs every producing case: scenario 16's produce-then-browse round trip creates its
+own topic, never `empty-topic`.
+
+**Two scenarios that look portable and are not, flagged so nobody ports them by reflex:**
+
+- **Scenario 11's 20-second timeout.** Its own comment says the allowance was *"carried over from
+  kafkajs's equivalent … unverified in this sandbox (no Docker)"* — a librdkafka metadata-retry
+  budget. franz-go's own retry behaviour is governed by `kgo.RetryTimeout` (`kgo/config.go:916`) and
+  is a different number. KF-4(d) measures the real latency and the Go test's timeout is set from that,
+  not copied.
+- **Scenario 20's `Number.MAX_SAFE_INTEGER` token.** **P58e E6**. Re-baselined to the int64 boundary,
+  with a comment recording that the `E_UNSUPPORTED` branch was removed as a gain.
+
+### 5.4 What P58e deliberately does not test
+
+- **The `tests/ipc/kafka/` fixtures against the Go producer.** §1.11 — **P58 D13**'s job, P58f's
+  milestone. Doing the last of seven early would leave two generators in the tree for one sub-phase
+  and would regenerate a fixture (`kafka.fixture.ts`, 367 lines, with two documented freezes: the
+  coordinator `host:port` and `sortStreamByKey`) that P58f has to regenerate again anyway.
+- **An `E_AUTH` round trip.** The container is `PLAINTEXT` with no ACLs; producing a real
+  `SaslAuthenticationFailed` needs a SASL-configured broker, and producing a
+  `TopicAuthorizationFailed` needs ACLs enabled. Neither TypeScript nor Go has such a scenario today.
+  The mapping ports on `kerr`'s own named codes (**P58e E4**) and the gap is recorded (§10 OQ-7), not
+  papered over. **This is the same disposition P58d OQ-4 took for SQS/S3** and it is now the second
+  adapter family with an untested `E_AUTH` branch.
+- **A multi-broker cluster.** Every `replicas`/`isr` assertion runs against a single broker, so the
+  Partitions section's `replicas 1 · isr 1` is degenerate. A three-broker testcontainers network is
+  possible and is not worth it for one definition row; the TypeScript never did it either.
+- **TLS.** `kgo.DialTLSConfig` is exercised by no test in either language. **P58e E16** ports the
+  posture unchanged and says so.
+- **Packaging.** No bundle change; **P58e E22** touches two strings and no check.
+
+### 5.5 Unit-level, against `AGENTS.md`'s own bar — exactly one test qualifies
+
+**P58e adds one Go unit test.** P58d added none and said why; P58c added two (its parsers). The
+reasoning here is neither, and it is worth doing in the open because "one" looks like a compromise
+and is not.
+
+**What qualifies: the window arithmetic (`read.go`'s `advanceWindows`), extracted for the purpose
+(P58e E26).** The bar names *"cursor/pagination arithmetic with real boundary cases"* and
+*"a decision structure large enough that no one can hold it in their head"*. This function has:
+
+- **four inputs that interact** — the frozen `[]partitionWindow`, the records actually delivered in
+  this poll, the per-partition `HighWatermark`s observed this poll, and the empty-poll counter;
+- **five outcomes that are all reachable and all different** — every window drained (`hasMore` false,
+  no token); some drained (`hasMore` true, token); a partition provably at end-of-log with a *gap*
+  inside `[next, end)` (clamp fires, `hasMore` may become false); an empty poll with no end-of-log
+  evidence (do **not** clamp — `read.ts:304-305`'s explicit asymmetry); a partition absent from the
+  fetch entirely (leave it alone);
+- **a real regression in its history** — P43 iter2 F19/D26, whose symptom (`hasMore` stuck true
+  forever, every later browse re-hitting EOF for zero rows) is exactly what a table-driven test
+  catches and what an acceptance test catches only for the one transaction shape scenario 21 builds.
+
+The test is table-driven over the five outcomes plus the two boundaries (`next == end` on entry;
+`HighWatermark` exactly equal to `End` versus one below it), with a comment above it naming the rule
+it guards, per the bar's own instruction.
+
+**Candidates considered and rejected by name, so nobody re-proposes them:**
+
+- **`headersToPlain`'s repeated-key promotion** (string → `[]string`). Three branches over a slice;
+  the bar's own exclusion (*"a branch is not complexity"*). Pinned instead by an exact-string
+  acceptance assertion on a seeded message's `headers` cell.
+- **The offset clamp in `freshWindows`** (`requested < low ? low : requested > high ? high :
+  requested`). Two comparisons; pinned by scenarios 19's and 20's own assertions.
+- **`mapError`'s dispatch** (**P58e E4**). A closed set of `errors.As`/code comparisons — the bar's
+  *"single bad-input → single-error paths"*. Pinned by scenarios 11 and 15 against a real broker,
+  which is the only place the real error values exist.
+- **Page-token encode/decode.** `sqltext.go:61-91`'s, already covered by P58a M1's own tests.
+- **`abbreviateCount`'s Go port** (§4.2). If it turns out to need writing, it is a five-line loop
+  whose output is asserted byte-exactly by the tree-node `detail` assertion in scenario 4 — the same
+  disposition **P58d D15** took for S3's `formatBytes`.
+
+### 5.6 `tests/e2e-real/` — the one file that changes, and the sweep that runs after the flip
+
+**One spec changes, and it is forced.** §1.10, **P58e E21**. This is the first `tests/e2e-real/`
+change in the whole of P58 — P58a, P58b, P58c and P58d each asserted the tier unchanged and each
+met it. P58e cannot, and the reason is not that this plan is less disciplined but that the property
+the file tests **ceases to exist** in M9.3's commit.
+
+**The full suite still runs after the flip**, per `AGENTS.md`'s P58b M6.4 finding, restated as this
+sub-phase's rule:
+
+> A `tests/e2e-real/*.spec.ts` regression sweep must be re-run in full after every `nativeKinds`
+> flip, not just for the kind that just went native, because a shared code path —
+> `adapterhost.Router` above all — is common to every native adapter.
+
+M9.3 ends with `postgres-real.spec.ts` (2 tests), `sqlite-real.spec.ts` and the **rewritten**
+`mariadb-real.spec.ts` (2 tests) green, including their `expect(consoleErrors).toEqual([])`
+assertions. The sweep after this particular flip is the one most likely to find something, for a
+reason worth naming: it is the first sweep in which **no** connection in the app is served by the
+Node child, so any path that silently depended on the child answering — `cache:stats`' merge
+(**P58a A16**), `MarkAllErrored`, `Router.Cancel`'s fallback — runs in a configuration it has never
+run in before.
+
+## 6. M9.0 — three probes, and why not five
+
+Three throwaway Go programs under the scratch directory (**never committed; no product code lands in
+M9.0**), each answering one question with a printed PASS/FAIL. The deliverable is a findings section
+appended to this document (§12) and, for anything surprising, an `AGENTS.md` entry.
+
+**Why three and not five.** §1.3 is the ledger. P58d's M8.0 ran five probes because **nothing** about
+its two adapters' driver had been exercised in this repo: the container, the request shape, the
+credential model, the checksum default and the cell rendering were all open. P58e's driver has
+already been run against a real `confluentinc/cp-kafka:8.0.7` broker in this repo, in P58a's own M0,
+against a probe list **P58 D7** wrote specifically for it — and it passed on every point, including
+the two capability recoveries. Re-running `ConsumePartitions`-creates-no-group would be the third
+time that claim is established (once in the parent's research, once in KF-1). The parent's **R4**
+(*"M0 before M5, and specifically M0's Kafka probe before P58e is planned"*) has already been
+satisfied; running it again would satisfy a ceremony, not the rule.
+
+What *is* open is the set of questions KF-1 did not ask, and each of the three probes below maps to
+one row of §1.3's "not asked" block. They are written against `AGENTS.md`'s hardest-won lesson, from
+P58b M6.3: *"an M6.0-style probe is only as complete as the specific inputs it tried."* KF-3 and
+KF-4 are therefore **input inventories**, not capability checks.
+
+Ordering: KF-4(a) first (everything else needs a container), then KF-2, then KF-3, then the rest of
+KF-4.
+
+| Probe | What it runs | Asserts | If it fails |
+|---|---|---|---|
+| **KF-2 (cancellation)** — the load-bearing one | Against a seeded broker: **(a)** a browse client built with `kgo.ConsumePartitions` at the start of a topic with more records than one fetch returns; call `PollRecords(ctx, n)` on a `context.WithCancel` cancelled after 300 ms mid-loop; print how soon it returns, whether `fetches.Err()` is non-nil, whether `errors.Is(fetches.Err(), context.Canceled)` holds, and what `fetches.Err0()` reports; **(b)** the same with the ctx cancelled *before* the first poll; **(c)** `adm.ListEndOffsets(ctx, topic)` with ctx cancelled after 50 ms, printing `%T` and whether `errors.Is(err, context.Canceled)` survives kadm's own wrapping; **(d)** call `cl.Close()` from a second goroutine mid-`PollRecords` and print whether the injected fetch carries `kgo.ErrClientClosed`; **(e)** repeat (a) 20 times and print the max return latency | (a) the loop unblocks **promptly** — under ~50 ms, not at `FetchMaxWait` — and the error is reachable through `Fetches.Err()`, which is **P58e E3**'s entire premise; (b) the pre-cancelled path is caught by `CheckNotStarted` before any client is built; (c) admin calls surface a *returned* error, so the mapper sees it; (d) `defer cl.Close()` racing a live loop produces `ErrClientClosed`, not a spurious `E_QUERY`; (e) no flake | **(a) failing is a stop and raise.** It would mean Kafka has no effective cancellation in Go where it had one in TypeScript, and `caps.cancel: true` becomes a lie — the same standard **P58d D3**'s AWS-1(e) was held to. The named remediation, taken **explicitly**: close the browse client from a `ctx.Done()` watcher goroutine, accept that this is `RunWithAbortRace`-shaped, and write the cost down. (c) failing changes **P58e E4**'s first branch to a string test, which is worse and must be recorded as such |
+| **KF-3 (end-of-log and the commit-marker gap)** | Build `gap-topic` (1 partition) and produce **one** record inside a franz-go transaction (`kgo.TransactionalID`, `BeginTransaction`, `ProduceSync`, `EndTransaction(ctx, TryCommit)`). Then: **(a)** `adm.ListStartOffsets`/`ListEndOffsets` — print low and high (the high should be **2**: one record plus one commit marker); **(b)** a browse client at offset 0 with `FetchMaxWait(1s)`; poll repeatedly and, for **every** poll, print `fetches.NumRecords()`, and for every `FetchTopicPartition` seen, print `Partition`, `len(Records)`, `HighWatermark`, `LastStableOffset`, `LogStartOffset` and `Err`; **(c)** keep polling five more times after the record is delivered and print whether the partition still appears in the fetch at all; **(d)** the same experiment on an **ordinary** fully-read partition (no transaction), for the contrast; **(e)** the same on a partition with a compacted hole, if it can be produced cheaply — otherwise record it as not reproduced | **(b)/(c) are the fork P58e E9 turns on.** Either franz-go returns a `FetchPartition` with `len(Records) == 0` and `HighWatermark >= End` for the drained-with-a-gap partition — in which case the clamp fires on the `HighWatermark` test as designed — or it stops returning the partition entirely, in which case the clamp must key off `LastStableOffset` observed on the *last* fetch that did include it, or off the empty-poll counter alone. (a) confirms the high watermark really is one past the delivered record, which is the whole premise of P43 iter2 F19/D26 | Neither answer is a failure — both are designs. What **is** a failure is neither signal being available, which would leave `MAX_EMPTY_POLLS` as the sole terminator and **reintroduce a previously-fixed bug**. In that case §4.3 grows an explicit `ListEndOffsets` re-check at the end of a browse whose windows did not drain, and the extra round trip is written down against **P58e E9** |
+| **KF-4 (container and input inventory)** | **(a)** `modules/kafka.Run(ctx, "confluentinc/cp-kafka:8.0.7")` in this sandbox, mirror-retagged (**already namespaced — no `library/` prefix**); time it, confirm the `wait.ForLog(".*Transitioning from RECOVERY to RUNNING.*").AsRegexp()` matches Kafka 4.0's output, and confirm no ulimit problem; **(b)** the Go seeder from §4.6 end to end, then `adm.Metadata`, `ListGroups`, `DescribeGroups`, `DescribeTopicConfigs`, `FetchOffsets` — printing **every** field of each, including which config keys the container reports and what `Config.Source` values appear; **(c)** `ListOffsetsAfterMilli` at three timestamps: before every record, between two, and after all — printing each partition's returned `Offset` and `Timestamp`, especially for the "no record after" case; **(d)** `ListStartOffsets`/`ListEndOffsets` on a topic that does not exist — print the returned error, the `ListedOffsets` map contents, `ListedOffsets.Error()`'s value, `%T`, and **the wall-clock latency**; also check `adm.Metadata(ctx)` afterwards to see whether the topic was **auto-created** by the attempt; **(e)** `ProduceSync` with and without `kgo.DisableIdempotentWrite()`, printing the returned `Partition`/`Offset` per record and the latency of the first produce each way; **(f)** produce one record with a String header and print the Go `headers`/`attrs` cell text beside the TypeScript adapter's for the same message; **(g)** `kgo.NewClient` + `Ping` against an unreachable host:port, printing `%T`, message and latency | (a) the fixture **P58e E19** depends on starts here; (b) the inventory §5.3's assertions are written against, rather than guessed — **specifically which config key to assert in the inverted scenario 6**; (c) settles §4.3 step 5 and scenario 19's re-baseline; (d) settles **P58e E12** against a live broker (the map-inspection path) *and* scenario 11's timeout *and* the auto-creation hazard — if a failed offsets listing auto-creates the topic, the fixture is polluted and `kgo.AllowAutoTopicCreation` must be confirmed default-off; (e) settles **P58e E14**'s idempotency call and prints the `InitProducerId` cost; (f) is **P58d D8**'s cross-check in its Kafka form — expected to show **no** divergence (§1.8), and the probe's job is to prove that rather than assume it; (g) settles **P58e E4**'s `E_CONNECT` branch and **P58e E15**'s probe latency | (a) failing → the bare-`GenericContainer` fallback named in **P58e E19**, taken explicitly with its cost written down. (d) showing auto-creation → set `kgo.AllowAutoTopicCreation` off explicitly and record it as a new decision. (e) showing idempotency succeeds here anyway → **keep `DisableIdempotentWrite` regardless**, because the container sets `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1` and a user's cluster does not (§1.8) — a green probe does not discharge that risk, and the plan says so in advance so nobody "simplifies" the option away |
+
+## 7. Checkpoint C2 — P58e owns it, and the instrument it names does not exist
+
+P58 §0.3 defines two checkpoints. **Checkpoint C1** (after M5) was recorded by P58a, extended by
+P58b as **checkpoint C1b** and re-run by P58c as **checkpoint C1c**. **Checkpoint C2** has never been
+run, and it is defined as:
+
+> **C2 — the zero-traffic proof.** Before M10 (the deletion milestone) starts, a full manual pass
+> across all eleven connection kinds must leave `enginehost`'s own request counter at **zero** — the
+> Node child is spawned, idle, and answers nothing. Deleting a sidecar that is still being called by
+> a kind nobody remembered is the one failure this phase can make that looks fine in every test and
+> breaks a real user's connection.
+
+The parent's **R1** is unambiguous: *"nothing in M10 starts before C2 is recorded."* M10 is P58f's
+first milestone; M9 is the last milestone before it. **P58e is therefore the sub-phase that owes
+checkpoint C2**, and it is also the first sub-phase in which C2 can possibly pass — before M9.3,
+Kafka is Node-served and the counter can never be zero.
+
+Unlike P58b's and P58c's checkpoints, this is not a checkpoint this plan invents. It is one the
+parent declared and left unassigned by name, and P58e is where the assignment lands by construction.
+
+### 7.1 The instrument does not exist, and three requests survive the flip
+
+`grep -rn "requestCount\|RequestCount\|Requests()" shell/internal/enginehost/` returns **nothing**.
+There is no counter in `enginehost`, and the parent's one-line C2 definition does not survive
+contact with the code in two further ways:
+
+**First, `enginehost` is the wrong layer.** `Host.Call`/`CallTimeout` (`host.go:291-298`) and
+`Host.SendData` are transport primitives that cannot tell an adapter-serving request from a
+lifecycle one. The discrimination lives one layer up, in `adapterhost.Router`, which is the **only**
+thing in the process that routes anything to the child.
+
+**Second, three request paths survive M9.3 and are not adapter traffic**, so a literal
+"counter at zero" is unreachable even in a perfectly migrated app. Traced for this plan:
+
+| Surviving path | Where | Why it is not adapter traffic |
+|---|---|---|
+| `"ping"` | `dataframe.go:61-63` — **always** forwards to the child (**P58a A17**) | `src/renderer/workbench/state/engine.ts:13-24`'s `initEngineState` issues **exactly one** per app boot or `page.reload()`, with **no timer**. It is what paints the status bar's `engine` indicator; it says nothing about any connection |
+| `"cache:configure"` | `enginehost/config.go:16-18` via `Router.PushCacheConfig` (`router.go:75-80`) | Called once at startup (`main.go:145`) and on every settings save (`bridge/settings.go:36`). A cache budget push, not a connection |
+| `"cache:clear"` | `dataframe.go:70` — answered locally **and** forwarded | User-initiated, kind-agnostic (**P58a A16**) |
+| `adapter:cancel` fallback | `router.go:400-413` — an opID the Go scheduler does not own is forwarded unconditionally | **This one is genuinely ambiguous.** After M9.3 the Go scheduler owns every op, so the fallback should never fire — which makes it *exactly* the kind of thing C2 should catch if it does. It counts |
+
+So the honest form of the check is **"zero adapter-serving requests"**, not "zero requests", and the
+excluded three must be named rather than quietly not counted. **P58e E24** states this and §10 OQ-2
+puts it to the parent's author.
+
+### 7.2 The design
+
+`adapterhost.Router` gains one unexported helper and one exported reader, ~10 lines total, deleted by
+P58f along with the child:
+
+```go
+// noteChildRoute records that a request reached the Node engine child on behalf of a real
+// connection — the thing checkpoint C2 (P58 §0.3) must observe zero of before P58f's M10 deletes
+// the sidecar. It deliberately does NOT count the three kind-agnostic paths that survive a fully
+// native app: "ping" (A17, one per boot, paints the status bar), "cache:configure" (settings), and
+// "cache:clear" — none of them belongs to a connection, and none of them is what a forgotten kind
+// would look like. The slog line names the kind and the op because "the counter is 3" is not
+// actionable and "connection kind X still routes adapter:children to the child" is.
+func (r *Router) noteChildRoute(op, kind string) {
+    r.childRoutes.Add(1)
+    slog.Warn("adapterhost: routed a connection request to the Node engine child",
+        "scope", "adapterhost", "op", op, "kind", kind)
+}
+
+// ChildRoutes reports how many connection-scoped requests have reached the Node child in this
+// process's lifetime. Checkpoint C2's instrument; zero is the passing value.
+func (r *Router) ChildRoutes() int64 { return r.childRoutes.Load() }
+```
+
+Called from all seven connection-scoped child paths: `connectViaChild`, `testViaChild`,
+`disconnectViaChild`, `childrenViaChild`, `describeViaChild`, `definitionViaChild`, `Cancel`'s
+fallback, and `forwardToChild` **only** when reached from `HandleDataFrame`'s connection-scoped
+branch (`dataframe.go:80-83`) — not from the `ping`/`cache:clear` cases above it.
+
+`childRoutes` is an `atomic.Int64` on the `Router` struct, which already carries a mutex for a
+different purpose (`statsMu`, **P58a A16**) and is documented as such — this one needs no mutex and
+should not borrow that one.
+
+### 7.3 Running it, in two halves
+
+**The automated half is `tests/e2e-real/mariadb-real.spec.ts`'s rewritten second test
+(P58e E21).** That is not a coincidence and it is why the rewrite is a gain rather than a
+consolation: the file that used to prove *"a Node-served kind dies with the child"* becomes the file
+that proves *"no kind dies with the child, because none of them uses it"*. Killing the child and
+observing that both connections keep serving reads **is** the zero-traffic property, observed from
+the outside, on a real built binary. It runs in CI-shaped conditions and it runs on every future
+sweep.
+
+**The manual half is the pass the parent describes**, recorded in §13 with *"not available in this
+session"* written out rather than implied, per the parent's §6 discipline:
+
+1. Start the app (`-tags server`), with `slog` at `warn` or below, log captured to a file.
+2. For **each of the ten kinds**, in one session: create a connection, connect it, expand its tree
+   one level, open one object, and disconnect. `sqlite` needs no container; the other nine need
+   `postgres:17`, `mariadb:11.4`, `mysql:8.4`, `clickhouse/clickhouse-server:26.3`, `mongo`,
+   `redis:7`, `localstack/localstack:3` (×2, sqs and s3) and `confluentinc/cp-kafka:8.0.7` — all
+   mirror-pulled per `AGENTS.md`'s Docker section. **Where a container cannot be brought up in the
+   session, that kind is recorded as unavailable rather than skipped silently**, because an
+   unexercised kind is precisely the failure C2 exists to catch.
+3. Additionally exercise the three paths a per-kind pass misses: a **cancel** (press stop on a long
+   read), a **settings save** (cache budget), and a **cache clear**.
+4. `grep -c 'routed a connection request to the Node engine child' <logfile>` → **0**.
+5. Confirm the child was in fact alive throughout (`engine-status` reads `ok`, `pgrep -P <serverPid>`
+   is non-empty) — a zero count from a child that never started proves nothing.
+
+Step 5 is the one a careless run gets wrong, and it is why the check is "spawned, idle, and answers
+nothing" rather than "answers nothing".
+
+### 7.4 Why P58e declares no new checkpoint of its own
+
+P58b added **checkpoint C1b** on the grounds that it was *"the half of C1 that P58a could not run"*;
+P58c added **checkpoint C1c** because it was the sub-phase that broke C1b's own vehicle; P58d added
+none and said so. P58e **also breaks C1b's vehicle** (§1.10) — but the property that vehicle proved
+is not one a later run can re-establish, because it has expired: after M9.3 there is no Node-served
+kind to coexist with. Manufacturing a "checkpoint C1d" for a proof that can no longer be constructed
+would be worse than ceremony; it would be dishonest. **Checkpoint C2 is what replaces it**, and it is
+the checkpoint the parent already declared for exactly this moment.
+
+## 8. Acceptance criteria
+
+**Per milestone**
+
+- **M9.0** — all three probes have a recorded PASS, or a recorded FAIL with its consequence taken
+  explicitly (§6). **No product code committed.** **P58e E3**'s premise (KF-2(a)) and **P58e E9**'s
+  clamp signal (KF-3(b)/(c)) are either confirmed or corrected in writing before M9.2 starts.
+- **M9.1** — `cd shell && go test ./... -race` green with **`nativeKinds` unchanged**;
+  `testsupport/kafka.go` present with `StartKafka`/`StopKafka` and every constant §4.6's checklist
+  names; `kafka_test.go` and `main_test.go` present and **failing** for the right reason (no adapter
+  registered), per **P58 D12** / its **R3**; **`grep -rn 'TestKindNodeServed' shell/internal` still
+  shows `"kafka"`** (M9.1 moves nothing); `git diff --stat src/` empty.
+- **M9.2** — `go test ./internal/adapters/kafka/ -race` green against a real container, or explicitly
+  recorded as Docker-unavailable; **`nativeKinds` still does not contain `kafka`** (the flip is
+  M9.3's); §5.3's six called-out cases all present and passing; §5.5's single unit test present;
+  `git diff --stat src/` empty; `git diff --stat tests/` empty.
+- **M9.3** — `nativeKinds` contains `kafka`, reaching **ten of ten**; **`shell/main.go` has the tenth
+  blank import** (§4.7's most-forgotten step); `grep -rn 'TestKindNodeServed' shell/` returns
+  **nothing** and all four consumers compile against `NewRouterAllNodeServed` (**P58e E20**);
+  `tests/e2e-real/mariadb-real.spec.ts`'s second test rewritten (**P58e E21**) and **the full
+  `tests/e2e-real/` suite green** (§5.6); `Router.ChildRoutes()` and its `slog.Warn` present
+  (**P58e E24**); the whole existing suite (`bun run lint`, `bun run typecheck`, `bun run test:unit`,
+  `bun run test:go`, `bun run test:ui`, `bun run test:ipc:fe`) green; `git diff --stat src/` empty.
+- **M9.4** — **checkpoint C2 recorded** (§7), with each of the ten kinds marked pass or explicitly
+  unavailable and the `grep -c` result quoted; `tests/db/kafka.spec.ts` deleted, and
+  `tests/db/support/kafka.ts` + `fixtures/0005_kafka_seed.ts` **kept** after a re-grep whose result is
+  recorded either way (**P58 D12**, §1.11); `scripts/run-db-tests.sh` reduced to its Bun half
+  (**P58e E19**); the two packaging message strings corrected (**P58e E22**); the docs edits below.
+
+**Phase-level**
+
+1. `bun run lint`, `bun run typecheck` (all four projects), `bun run test:unit`, `bun run test:go`,
+   `bun run test:ui`, `bun run test:ipc:fe` are green.
+2. `cd shell && go test ./... -race` is green. **`-race` is the bar, not plain `go test`** — and in
+   P58e it earns its keep for a reason no previous sub-phase had: **the browse client is created,
+   consumed and `Close()`d on the op's goroutine while a `PollRecords` may be in flight**, and §5.3's
+   new mid-browse cancellation case deliberately races a cancel against a live fetch. `-race` is what
+   catches a teardown ordering mistake there.
+3. **`git diff --stat src/` is empty.** Not "empty except one file" — empty (**P58e E23**).
+4. **`git diff --stat tests/ui tests/ipc` is empty**, including every `*.fixture.ts` (§1.11, §5.1).
+   `tests/e2e-real/` is **not** in this list, for the first time in the phase, and §5.6 says why.
+5. `git diff --stat shell/internal/page shell/internal/enginecache shell/internal/enginebackend
+   shell/internal/enginehost` is empty (§1.4 — the substrate and the sidecar transport both needed
+   nothing).
+6. The whole `git diff --stat` scope, enumerated in advance so a surprise is visible:
+   - **`shell/internal/adapters/`** — one new directory (`kafka/`), `testsupport/` grown by one file
+     and **no edited file** (P58d M8.1 already built the stream readers).
+   - **`shell/internal/adapterhost/`** — `router.go` (`nativeKinds`, the `TestKindNodeServed`
+     retirement, `NewRouterAllNodeServed`, the C2 counter) plus two `_test.go` files.
+   - **`shell/internal/{tree,connections}/`** — one `_test.go` each, **P58e E20** only.
+   - **`shell/main.go`** — one blank import. **`shell/go.mod`/`go.sum`** — three franz-go modules
+     plus one test-only testcontainers module.
+   - **`tests/db/`** — one spec deletion, **no support or fixture deletion**.
+   - **`tests/e2e-real/`** — one spec, one test inside it.
+   - **`scripts/`** — three files, message strings and one script body.
+   - **`docs/`, `AGENTS.md`** — per §3.
+   - **`src/`, `tests/ui/`, `tests/ipc/`, `package.json`, `.github/`** — nothing.
+7. `AGENTS.md` gains a **"P58e implementation findings"** entry on the P52–P58d pattern, carrying at
+   minimum: M9.0's three probe results; whether KF-2(a) confirmed that a cancelled `context.Context`
+   really unblocks an in-flight `PollRecords` promptly and through `Fetches.Err()` rather than a
+   returned error (**P58e E3**'s premise); which signal KF-3 showed franz-go actually gives for the
+   commit-marker gap, and therefore which branch of **P58e E9** landed; the two silent behaviour
+   changes §1.8 names (**idempotent producing on by default**, and **`string([]byte)` not replacing
+   invalid UTF-8 where `Buffer.toString('utf8')` did**); the **`TestKindNodeServed` retirement's real
+   constraint** (one of four consumers goes through `model.ValidConnectionKind`, so a synthetic kind
+   was not an option — the general lesson being *the last kind to go native is where a
+   "definitely-not-native" placeholder finally costs something, and the cost is a test constructor,
+   not a rename*); the collection of P58d's own predicted debt, quoted; and **the fact that the
+   `AGENTS.md` "Native Kafka driver" section's whole subject is gone** — that section is **rewritten,
+   not left**, per the parent's §8 criterion 11.
+8. `docs/ARCHITECTURE.md` is updated, and **criterion 8 is phrased as a grep rather than as a prose
+   claim**, because the prose form failed twice before P58d made it mechanical (§1.12):
+   - `grep -n "only kind still Node-served\|@confluentinc/kafka-javascript\|librdkafka\|native NAN addon\|AbortSignal" docs/ARCHITECTURE.md`
+     returns **nothing outside the Testing section's historical `tests/ipc/` note** — i.e. the Stack
+     line (`:48-49`), the mapping table's Kafka Cancel cell (`:104`) and the whole **Kafka** per-engine
+     section (`:263-281`) are all rewritten;
+   - `grep -n "only Kafka is left for P58e" docs/ARCHITECTURE.md` returns **nothing** (`:315`, the S3
+     section's own forward reference);
+   - the mapping table's **Kafka** row's Cancel cell reads the Go mechanism (no server-side kill; the
+     op's own `context.Context` on every `kadm`/`kgo` call; `caps.cancel` stays `true` because that
+     surface is genuinely effective) — the same shape the SQS and S3 rows got in P58d;
+   - a new **Kafka (Go-native as of P58e M9)** section names: franz-go + kadm and why (**P58 D7**);
+     that the browse still never joins a group and that this is now **structural rather than
+     configured** (`Subscribe` is simply never called); **the two recovered capabilities**
+     (`DescribeConfigs` → a real Configuration section; cluster id → `ConnectInfo.details.cluster`)
+     and the one lost row (**P58e E13**); the idempotency default (§1.8); and that
+     `caps.canUpdate`/`canDelete` stay permanently false for the same protocol reason as before;
+   - the **Stack** driver line names franz-go and no longer lists a Node-served kind.
+9. This document gains its own **§12 M9.0 results** and **§13 M9.1–M9.4 results** sections, the way
+   P58a's, P58b's, P58c's and P58d's §12/§13 record what actually happened — **including checkpoint
+   C2's own per-kind table** and including any decision that turned out wrong.
+10. **`AGENTS.md`'s "Native Kafka driver — building and testing in this environment (P32, resolved
+    P57)" section is rewritten or deleted**, because after M9.3 there is no native addon in any path
+    the app takes. Its two remaining true statements (Bun cannot load the addon; a native npm package's
+    install script may silently not run) belong elsewhere or nowhere: the first is only about
+    `tests/db/kafka.spec.ts`, which M9.4 deletes; the second is a general npm fact whose only subject
+    in this repo is the package P58f removes. **Recording the deletion is part of criterion 7.**
+
+## 9. Sequencing
+
+Five milestones, in order, with the commits inside each. The parent's hard rules apply unchanged: its
+**R2** (the substrate lands before any adapter) is already satisfied and P58e adds no substrate; its
+**R3** (an adapter's Go tests land and fail before its implementation) is encoded in M9.1/M9.2's
+commit lists; its **R4** (probes before the work they inform) is why M9.0 is first; its **R1**
+(nothing in M10 before checkpoint C2) is why M9.4 exists at all and is what makes it P58e's last
+milestone rather than P58f's first.
+
+**M9.0 — probes** *(no commits to `shell/`)*
+1. `docs: record P58e M9.0 probe results` — this document gains §12; **P58e E3**'s premise and
+   **P58e E9**'s clamp signal are confirmed or corrected in writing.
+
+**M9.1 — the fixture and the failing suite** *(`nativeKinds` unchanged throughout)*
+2. `test(kafka): a container fixture with the seeded orders/empty topics and a consumer group` —
+   `testsupport/kafka.go` (**P58e E19**, **P58e E25**) plus a trivial connectivity test proving the
+   seed matches §4.6's checklist. `shell/go.mod` gains `testcontainers-go/modules/kafka` here.
+3. `test(kafka): the Go acceptance suite, against a real cp-kafka container` — `kafka_test.go`,
+   `main_test.go`, **failing** (**P58 D12** / its **R3**), including §5.3's six called-out cases.
+   `shell/go.mod` gains the three franz-go modules here, because the suite's own fixture and
+   scenario 21's transactional producer import them. **Full `go test ./... -race` runs here**,
+   `nativeKinds` untouched.
+
+**M9.2 — the adapter**
+4. `feat(kafka): client, connect and the topic/group catalog` — `client.go`, `errors.go`, `caps.go`,
+   `catalog.go`, and `adapter.go`'s connect/disconnect/children. Carries **P58e E15**'s two
+   capability recoveries and **P58e E16**'s security-posture port; the commit whose `Ping`-then-
+   `Metadata` probe decides whether a wrong host is `E_CONNECT` or a silent success.
+5. `feat(kafka): browse a topic at explicit offsets, and count it` — `read.go`. **The commit to
+   review hardest in this milestone.** Carries **P58e E5** (the ephemeral browse client),
+   **P58e E3** (the `Fetches.Err()` contract), **P58e E7** (the int64 token), **P58e E8** (the three
+   UTF-8 cells), **P58e E9** (the clamp) and **P58e E12** (the missing-topic map inspection). First
+   `offsetWindow` position Go has ever produced.
+6. `test(kafka): the window-advance arithmetic` — `read_test.go`, **P58e E26**. Landed immediately
+   after its subject rather than before it, deliberately: unlike an acceptance suite, a unit test over
+   a pure function extracted *for* the test has nothing to fail against until the function exists,
+   and **P58 D12**'s test-first rule is about adapter behaviour against a real server, not about
+   every Go file.
+7. `feat(kafka): topic and consumer-group definitions` — `definition.go`. Carries **P58e E11**'s
+   recovered Configuration section and **P58e E13**'s reduced Group section.
+8. `feat(kafka): produce a message` — `produce.go`. Carries **P58e E14**, including
+   `DisableIdempotentWrite` and the deleted Electron/`dr_cb` comment.
+
+**M9.3 — the flip, and the two placeholders**
+9. `refactor(adapterhost): retire TestKindNodeServed ahead of the last flip` — **P58e E20**, landed
+   **immediately before** the flip rather than in the same commit as it. This is the one place this
+   plan splits what §0.3 called an atomic change, and the reason is that the constant's replacement is
+   a pure refactor that must be green **on its own**: `NewRouterAllNodeServed` with `nativeKinds`
+   still missing `kafka` behaves identically to today for all four consumers, so the commit proves
+   the new constructor works before the flip removes the old constant's meaning.
+10. `feat(adapterhost): serve kafka in-process — ten of ten` — `nativeKinds += kafka`, `main.go` += the
+    tenth blank import, `mariadb-real.spec.ts`'s second test rewritten (**P58e E21**), and the C2
+    counter/`slog.Warn` (**P58e E24**). **Full `tests/e2e-real/` sweep runs here**; the commit message
+    records it, the acceptance run, and the first native Kafka read in the real app.
+
+**M9.4 — checkpoint C2, the deletions, the docs**
+11. `test: delete tests/db/kafka.spec.ts, its subject now in Go` (**P58 D12**) — **re-grep
+    `support/kafka.ts`'s and `0005_kafka_seed.ts`'s consumers first**; both are expected to stay
+    (§1.11). Also `scripts/run-db-tests.sh` reduced to its Bun half (**P58e E19**), which is the same
+    commit because the script's Node half exists only for the file being deleted.
+12. `chore(packaging): the Kafka native-module note is no longer true` — **P58e E22**, two strings.
+13. `docs: P58e findings — the last adapter, and checkpoint C2` — `AGENTS.md` (including the
+    rewritten/deleted "Native Kafka driver" section, criterion 10), `docs/ARCHITECTURE.md` (per §8
+    criterion 8's grep form), and this document's §12/§13 **including checkpoint C2's per-kind
+    table**.
+
+**Why the fixture and the suite are one milestone rather than two.** P58d split them (M8.1's shared
+lifts, then M8.2/M8.3's per-adapter suites) because the lifts had two consumers and had to land
+before either. P58e has one adapter, one fixture and one suite, and no lift at all — splitting them
+would produce a milestone whose only content is a container starter with nothing to start it for.
+
+**Why checkpoint C2 is its own milestone rather than an acceptance bullet on M9.3.** Three reasons,
+in order of weight. It needs the full ten-kind manual pass, which takes a session's worth of
+containers and cannot be a line item. It is the parent's own gate on P58f (**R1**), so it needs a
+commit that can be pointed at. And its result is a **table with per-kind pass/unavailable entries**
+that §13 has to carry — the same "record 'not available in this session' rather than leaving it
+implied" discipline the parent's §6 requires and that P58a's own C1 table modelled.
+
+## 10. Open questions for the parent plan's author
+
+Each of these affects P58f as much as P58e, or records a predecessor plan's claim that the tree
+contradicts. None is silently resolved; where P58e needs a working assumption to proceed it is stated
+as *interim* and marked reversible.
+
+**OQ-1 — P58b's four `tests/db/*.spec.ts` deletions are still outstanding, three sub-phases later,
+and after M9.4 they are the *only* thing left in the directory.** §1.12.
+`tests/db/{clickhouse,mariadb,mysql,sqlite}.spec.ts` are all still in the tree at `1065518`; P58a's,
+P58c's and P58d's own deletions all landed. P58c raised this as its OQ-1 and P58d carried it forward
+as its own. The question is now materially different from the one they asked: after M9.4,
+`bun run test:db` runs four container suites against TypeScript adapters serving no real connection,
+**with nothing else in the directory**, and `scripts/run-db-tests.sh` is a one-line wrapper around
+them. The parent's author still owns the choice between (a) *"each sub-phase deletes its own"* — which
+is what P58e does (**P58 D12**), (b) *"P58e deletes all five"*, and (c) *"amend P58 D12's third rule;
+every remaining `tests/db/*.spec.ts` retires in P58f alongside `src/engine/`"*. **P58e interim: (a).**
+Note that (c)'s never-written-down argument — a still-passing TypeScript spec is a live oracle to diff
+a Go port against — is **weakest here of anywhere**, because `kafka.spec.ts` cannot run under
+`bun test` at all and needs the vendored Node plus an esbuild bundle to be an oracle (§1.15).
+
+**OQ-2 — checkpoint C2's own definition needs amending, and P58e amends it interim.** §7. The
+parent's C2 says *"leave `enginehost`'s own request counter at zero"*; there is no such counter
+(`grep` returns nothing), `enginehost` cannot tell adapter traffic from lifecycle traffic, and three
+kind-agnostic request paths survive a perfectly migrated app — `ping` (**P58a A17**, one per boot),
+`cache:configure` (startup + every settings save) and `cache:clear`. **P58e interim: relocate the
+instrument to `adapterhost.Router`, count only connection-scoped requests, emit a `slog.Warn` naming
+the kind and op rather than only incrementing, and record the exclusions explicitly.** If the
+parent's author wants the literal form, the alternative is to make those three paths not reach the
+child at all — which is a real design change to **P58a A17** (`ping` is what paints the status bar's
+engine indicator) and should be scoped as its own piece of work, not absorbed here.
+
+**OQ-3 — `tests/e2e-real/mariadb-real.spec.ts`'s coexistence half necessarily retires, and P58e picks
+its replacement rather than deleting the test.** §1.10, **P58e E21**. **P58 D4**'s coexistence
+property was proven three times (checkpoint C1b, checkpoint C1c, and both P58d flips' sweeps) and
+cannot be proven a fourth time, because after M9.3 there is nothing left to coexist with. **P58e
+interim: rewrite the second test into the all-native survival proof** — kill the child, assert both
+connections stay `connected` and still serve reads, and assert `engine-status` flips to `down` — which
+doubles as checkpoint C2's automated half (§7.3). The alternative is deleting the test outright and
+leaving C2 entirely manual; the parent's author may prefer that if P58f is going to delete the file
+anyway, but a session between M9.4 and M10 with no automated zero-traffic evidence is exactly the
+window **R1** exists to close.
+
+**OQ-4 — who owns the packaging scripts' Kafka blocks, and when.** §1.14, **P58e E22**. The parent's
+§3 assigns the *deletion* to P58f (`sign-bundle.sh EDITED … Kafka note deleted`), but two message
+strings become **factually false** at M9.3 — `verify-packaging.sh:86`'s *"Kafka connections will fail
+at runtime in this build"* and `sign-bundle.sh:36`'s *"a known gap"*. **P58e interim: correct the two
+strings, change no check logic, leave the blocks.** The parent's author may prefer that a sub-phase
+never touch another's files; if so, say so, because the alternative is a packaging run printing a
+false warning about a shipped build for however long P58f takes. Separately: the parent's §6 manual
+row *"A Kafka connection in a packaged build … the first time this has ever been verifiable in a
+packaged bundle"* is now satisfiable on macOS and is **not** claimed by P58e, which has no macOS box.
+
+**OQ-5 — the group definition loses its `type` row, and the plan chose not to reach past kadm for
+it.** §1.7, **P58e E13**. `kadm.DescribedGroup` has no `Type` field; the CLASSIC-vs-CONSUMER
+(KIP-848) distinction `definition.ts:116-117` deliberately added is available only through a raw
+`kmsg.ListGroupsRequest` v5+ response field that kadm does not surface. **P58e interim: drop the row,
+merge `partitionAssignor` into `protocol` (they name the same value), and record it as a small,
+named regression offsetting two recoveries.** If the parent's author considers the row load-bearing —
+its own comment calls it *"exactly where 'classic vs KIP-848 consumer protocol' … belong[s]"* — the
+honest vehicle is ~15 lines of `kgo.Client.Request` against a generated protocol struct, and it
+should be scoped as its own piece of work rather than smuggled into the port.
+
+**OQ-6 — `preview()`'s rendered text still names an API that will not exist after P58f.**
+`produce.ts:46-50` renders `producer.produce('<topic>', null, Buffer.from(...), '<key>')` — a
+node-rdkafka call signature. **P58e interim: port it byte-identically**, because the parent's §0.2
+forbids behavioural rewrites and a mutation preview is a user-visible string that
+`tests/ipc/kafka/kafka.fixture.ts` may freeze. But after P58f no such call exists anywhere in the
+repo, and the string becomes archaeology. The parent's author should decide whether P58f re-renders
+it (e.g. `ProduceSync <topic> key=<key>`) and, if so, record it against **P58 D13**'s fixture
+regeneration so the two land together rather than the fixture diffing on a string nobody meant to
+change.
+
+**OQ-7 — Kafka joins SQS and S3 as an adapter with an untested `E_AUTH` branch, and P58e does not
+add one.** §5.4. The `cp-kafka` container runs `PLAINTEXT` with no ACLs; producing a real
+`kerr.SaslAuthenticationFailed` needs a SASL-configured broker and a `TopicAuthorizationFailed` needs
+ACLs enabled. Neither language's suite has such a scenario today, and **P58d OQ-4** took the same
+disposition for the AWS pair. **P58e interim: port the mapping on the strength of `kerr`'s own named
+codes (KF-4 prints the real shapes for the branches that *are* reachable), record the gap in
+`AGENTS.md`, and add no test.** If the parent's author wants the gap closed, the cheapest honest
+vehicle is a second container customizer enabling SASL/PLAIN in one scenario, and it should be scoped
+as its own piece of work — noting it would then close the gap for *one* of the three adapters that
+have it.
+
+**OQ-8 — P58a's KF-1 did not record how it started its container, which is the one thing this plan
+had to re-derive rather than inherit.** §1.3. `P58a-substrate-postgres.md` §12 says the probes ran
+*"against `postgres:17-alpine` and `confluentinc/cp-kafka:8.0.7` (both pulled via `mirror.gcr.io` and
+retagged)"* but not whether the Kafka container came from `testcontainers-go/modules/kafka`, a bare
+`GenericContainer`, or a hand-run `docker run`. Since `shell/go.mod` has no testcontainers Kafka
+module and the probe was a throwaway scratch module, the tree cannot answer it. **P58e interim:
+KF-4(a) re-establishes it.** Recorded not as a criticism but as a process note worth adopting: a
+probe's *harness* is as much a result as its assertions, and a future M-point-zero should record the
+container mechanism alongside the finding — the cost is one sentence and it saved nothing here.
+
+**OQ-9 — after P58e the Node engine child spawns, runs, and serves nothing, and `engine-status` still
+reads `ok`.** §0.2 and §7. This is the correct state (the parent's **R1** requires the sidecar to
+survive until checkpoint C2 is recorded, and P58f's M10 deletes it), but it means shipping a build —
+if any ships between M9.4 and M10 — whose status bar advertises a healthy engine that answers exactly
+one `ping` per boot. **P58e interim: change nothing.** The parent's author should confirm that no
+release is expected in that window; if one is, the honest minimum is a one-line change to the status
+bar's tooltip, which is a `src/` change and therefore outside **P58e E23**'s strong form and outside
+this sub-phase.
+
+## 11. Environment notes for the implementing session
+
+- **A fresh container has none of the toolchain.** Go, plus
+  `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` for anything that builds
+  `internal/shell` or the root `main` package. `./internal/adapters/...` needs none of it — franz-go
+  is pure Go — so the fast loop for the whole of M9.1–M9.2 is `go test ./internal/adapters/kafka`
+  and never `./...`. Only M9.3's `tests/e2e-real/` sweep and M9.4's checkpoint C2 need the headers.
+- **Docker**: `nohup dockerd > /tmp/dockerd.log 2>&1 & disown` here; `colima start` on macOS. P58e's
+  adapter work needs exactly **one** image: **`confluentinc/cp-kafka:8.0.7`**, which is **already
+  namespaced**, so it mirrors at `mirror.gcr.io/confluentinc/cp-kafka:8.0.7` with **no `library/`
+  prefix** — `AGENTS.md`'s Docker section uses this exact image as its own worked example of that
+  rule. M9.3's sweep additionally needs `mariadb:11.4` and `postgres:17` (both official →
+  `library/`). **Checkpoint C2 (M9.4) needs all nine container-backed kinds' images**, which is the
+  largest image set any single milestone in this phase has required; budget a session for it and
+  pull them in one pass.
+- **Kafka is slow to start.** `tests/db/support/kafka.ts:21` allows 120 s and the Go module's own
+  post-start hook waits on a log regex with no explicit timeout beyond testcontainers' default.
+  Budget accordingly, and remember the module's start is **two-phase** — the container starts, then a
+  `PostStarts` hook copies a starter script and *then* waits for readiness (`kafka.go:76-90`), so a
+  "container started" log line is not readiness.
+- **`sh scripts/run-db-tests.sh` is the only way to run the TypeScript Kafka spec**, and it is worth
+  exactly one run before writing the Go successor — but it is **not** the cheap live oracle the four
+  previous sub-phases recommended (§1.15). It needs `scripts/vendor-node.sh` (for
+  `shell/runtime/node/bin/node`) plus an esbuild bundle, and `bun test tests/db/kafka.spec.ts` does
+  not work at all. If the session's budget is tight, skip it: KF-4(f)'s cell diff is the part that
+  actually matters and it is cheaper.
+- **`go test ./... -race` is the bar**, not `go test ./...`. §8 criterion 2 gives P58e's own reason:
+  the browse client's create/consume/`Close()` lifecycle runs on the op's goroutine while a
+  `PollRecords` may be in flight, and §5.3's mid-browse cancellation case races a cancel against a
+  live fetch deliberately.
+- **franz-go, kadm, kmsg and `modules/kafka` are already in this box's module cache** (§1.13), so
+  M9.1's `go get` is a cache hit and every §1.7 claim can be re-checked by reading
+  `$(go env GOPATH)/pkg/mod/github.com/twmb/franz-go@v1.21.6/` rather than fetching anything —
+  the same technique `AGENTS.md`'s Wails section prescribes for a docs site that is 403-blocked.
+- **A background process started in one shell invocation cannot be signalled from a later one**
+  (P51's finding, still true). M9.3's sweep and M9.4's checkpoint C2 pass — start, exercise, kill,
+  read the log — are **one** Bash invocation each, with a 150 s+ timeout, polling a log file rather
+  than sleeping a fixed interval.
+- **There is no real X display here**, so checkpoint C2's manual pass runs against
+  `tests/e2e-real`'s own `-tags server` vehicle, not `xdotool`/screenshots. P58a already established
+  that the screenshot path does not work; do not spend a session on it.
+- **Install `wails3` pinned** to `shell/go.mod`'s exact version (`v3.0.0-beta.15`), never `@latest`
+  (P55's finding). **`shell/frontend/bindings` is git-ignored** and must be regenerated
+  (`wails3 generate bindings -b -i -ts -names`) before `bun run build` resolves its imports; P58e
+  changes no bound method signature, so one regeneration per fresh container is enough.
+- **`shell/runtime/` is git-ignored too**, and P58e still needs both halves: `scripts/vendor-node.sh`
+  for `runtime/node/bin/node` and `bun run build:engine` for `runtime/engine/engine.cjs`. The app
+  refuses to start without the engine bundle (P56 D12), and **after M9.3 the child still starts and
+  serves zero of ten kinds** — which is the whole point of checkpoint C2 and not a setup mistake to
+  work around.
+- **Comparing a struct containing an `any` field with `==` panics at runtime** rather than failing to
+  compile (P55's finding). `model.ConnectionState.Caps` is such a field — use `go-cmp` (already a
+  dependency), never `==`.
+- **`.claude/worktrees/` exists and is empty** at `1065518`, and `git status --short` is clean. An
+  earlier session in this workspace reported a stray copy of `src/engine/adapters/kafka` under
+  `.claude/worktrees/agent-ae3fb894ac34e73cc/`; it is **gone**, it was an artifact of an unrelated
+  session, and nothing in this plan depends on it. Recorded here rather than as an open question
+  because there is nothing left to decide — but if a future session finds that directory repopulated,
+  it is not a source of truth and `git grep` will not see it.
+
+## 12. M9.0 results
+
+*(To be filled in by the implementing session, per §6. Each of KF-2, KF-3 and KF-4 gets a PASS/FAIL
+with the printed evidence, and any correction to §1 or §2 is folded back into the relevant section
+rather than only recorded here. KF-2(a) and KF-3(b)/(c) are the two whose answers can change a
+design; both must be resolved in writing before M9.2 begins.)*
+
+## 13. M9.1–M9.4 results
+
+*(To be filled in by the implementing session. Must include, at minimum: the acceptance suite's
+pass count and how many of §5.3's six called-out cases needed adjustment and why; which branch of
+**P58e E9** landed; whether **P58e E14**'s `DisableIdempotentWrite` proved necessary or merely
+prudent; the `TestKindNodeServed` retirement's real diff size across the four consumers; the
+`tests/e2e-real/` sweep results after the flip; and **checkpoint C2's own per-kind table** — ten
+rows, each pass or explicitly "not available in this session", plus the
+`grep -c 'routed a connection request to the Node engine child'` result and the evidence that the
+child was alive throughout. Anything that turned out differently from this plan's own prediction is
+named once, plainly, rather than left implicit.)*
+
+### Critical files for implementation
+
+- `src/engine/adapters/kafka/read.ts` — the 337-line ground truth for the browse: `PartitionWindow`, `freshWindows`, the bounded poll loop, and the P43 iter2 F19/D26 EOF clamp at `:299-308` that **P58e E9** must reproduce without `partition.eof`.
+- `shell/internal/adapterhost/router.go` — `nativeKinds` (`:19`), `TestKindNodeServed` (`:30`, retired by **P58e E20**), and the seven `*ViaChild` paths checkpoint C2's counter instruments (§7).
+- `tests/e2e-real/mariadb-real.spec.ts` — the coexistence proof whose second test (`:140-276`, specifically `:235` and `:256`) fails deterministically in the flip's own commit; **P58e E21** rewrites it into checkpoint C2's automated half.
+- `src/engine/adapters/kafka/definition.ts` — where both recovered capabilities land (**P58e E11**'s Configuration section, replacing `:58-68`'s permanent "not available" note) and where the numeric-enum apparatus at `:12-33` is deleted rather than ported (**P58e E13**).
+- `tests/db/kafka.spec.ts` — 776 lines, 21 scenarios, the port's own specification; scenarios 6, 11, 17, 18, 20 and 21 are the six that do not port as-is.
+- `shell/internal/adapters/sqs/read.go` — the closest structural sibling in Go: the only other `page.NewStreamPageBuilder` caller, and the model for **P58e E8**'s cell construction.
