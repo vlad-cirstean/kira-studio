@@ -24,8 +24,10 @@ var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": tr
 // real (and wrong) routing decision (P58b B16; AGENTS.md's P58a findings recorded the mechanical
 // fix this constant replaces: five files, one grep, every time a kind goes native). Update this to
 // the next still-Node-served kind in the same commit that flips its current value's own
-// nativeKinds bit — currently P58c's MongoDB.
-const TestKindNodeServed = "mongodb"
+// nativeKinds bit. Kafka (P58c C14): the last of the ten kinds to go native (P58e), so this is the
+// final move before P58f retires the constant entirely — never point it at redis (this
+// sub-phase's own second kind) or at a P58d kind (sqs/s3, native one sub-phase before Kafka).
+const TestKindNodeServed = "kafka"
 
 // KindLookup is the one thing the router needs from internal/connections to make a per-connection
 // routing decision — a two-line method on *repos.ConnectionsRepo satisfies it (A11).
@@ -255,7 +257,16 @@ func (r *Router) childrenNative(ctx context.Context, connectionID string, path m
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
-	return value.(adapters.TreeChildren), nil
+	children := value.(adapters.TreeChildren)
+	// Same nil-slice-over-the-wire hazard describeNative/definitionNative already guard against
+	// (P58b's own closeout finding): a native adapter's `var nodes []model.TreeNode` left empty
+	// marshals as `null`, not `[]`, and Adapter rule 5 requires Children() to answer a leaf with
+	// an empty list, never null -- project/state/tree.ts's `if (treeState.children[k])` and
+	// filterTree.ts's `Object.entries` both treat null as "not loaded" or crash outright.
+	if children.Nodes == nil {
+		children.Nodes = []model.TreeNode{}
+	}
+	return children, nil
 }
 
 func (r *Router) childrenViaChild(connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
