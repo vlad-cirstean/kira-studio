@@ -103,7 +103,10 @@ func resolveTarget(cfg model.ResolvedConnectionConfig, log func(level, message s
 		case "require", "verify-full":
 			scheme = "https"
 		default:
-			log("warn", "unknown sslmode \""+sslmode+"\", ignoring")
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return resolvedTarget{}, adapters.New(adapters.CodeConnect, "clickhouse: unknown sslmode \""+sslmode+"\"", nil)
 		}
 	}
 

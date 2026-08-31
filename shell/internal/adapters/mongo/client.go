@@ -11,6 +11,7 @@ import (
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -50,7 +51,10 @@ func Connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		case "verify-full":
 			clientOpts.SetTLSConfig(&tls.Config{})
 		default:
-			log("warn", `mongodb: unknown sslmode "`+sslmode+`", ignoring`)
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return nil, adapters.New(adapters.CodeConnect, `mongodb: unknown sslmode "`+sslmode+`"`, nil)
 		}
 	}
 

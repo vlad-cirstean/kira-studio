@@ -103,7 +103,10 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 			}
 			mc.TLSConfig = tlsName
 		default:
-			log("warn", "mysql-family: unknown sslmode \""+sslmode+"\", ignoring")
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return nil, adapters.New(adapters.CodeConnect, "mysql-family: unknown sslmode \""+sslmode+"\"", nil)
 		}
 	}
 

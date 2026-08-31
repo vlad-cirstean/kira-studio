@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -69,7 +70,10 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		case "verify-full":
 			connConfig.TLSConfig = &tls.Config{ServerName: connConfig.Host}
 		default:
-			log("warn", "postgres: unknown sslmode \""+sslmode+"\", ignoring")
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return nil, adapters.New(adapters.CodeConnect, "postgres: unknown sslmode \""+sslmode+"\"", nil)
 		}
 	}
 

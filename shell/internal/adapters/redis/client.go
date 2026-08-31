@@ -12,6 +12,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -30,7 +31,7 @@ type connectFields struct {
 }
 
 // resolveFields is client.ts's resolveFields.
-func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message string)) (connectFields, int) {
+func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message string)) (connectFields, int, error) {
 	var host, username, password, database string
 	var port int
 
@@ -76,7 +77,10 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 		case "require", "prefer", "verify-full":
 			tlsEnabled = true
 		default:
-			log("warn", `redis: unknown sslmode "`+sslmode+`", ignoring`)
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return connectFields{}, 0, adapters.New(adapters.CodeConnect, `redis: unknown sslmode "`+sslmode+`"`, nil)
 		}
 	}
 
@@ -87,7 +91,7 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 		}
 	}
 
-	return connectFields{host: host, port: port, username: username, password: password, tls: tlsEnabled}, defaultDbIndex
+	return connectFields{host: host, port: port, username: username, password: password, tls: tlsEnabled}, defaultDbIndex, nil
 }
 
 // dbConnectionSet mirrors client.ts's DbConnectionSet exactly, keyed by logical db index instead
@@ -224,7 +228,10 @@ func (s *dbConnectionSet) evictLRULocked() {
 
 // connectRedis is client.ts's connectRedis.
 func connectRedis(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*dbConnectionSet, int, error) {
-	fields, defaultDbIndex := resolveFields(cfg, log)
+	fields, defaultDbIndex, err := resolveFields(cfg, log)
+	if err != nil {
+		return nil, 0, err
+	}
 	set := newDbConnectionSet(fields, defaultDbIndex, log)
 	if _, err := set.primary(ctx); err != nil { // eagerly validates the connection
 		return nil, 0, err

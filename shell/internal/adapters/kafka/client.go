@@ -13,6 +13,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -76,7 +77,10 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		case "require", "prefer", "verify-full":
 			ssl = true
 		default:
-			log("warn", `kafka: unknown sslmode "`+sslmode+`", ignoring`)
+			// An unrecognized sslmode must fail loudly rather than silently fall back to a
+			// plaintext connection — a typo here would otherwise send credentials and data
+			// unencrypted while the user believes TLS is configured.
+			return nil, nil, nil, adapters.New(adapters.CodeConnect, `kafka: unknown sslmode "`+sslmode+`"`, nil)
 		}
 	}
 
