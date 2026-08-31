@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
-A visual database client (DataGrip/DBeaver class) for macOS, built on Electron, TypeScript and
-Vue 3 — one workbench across ten database engines.
+A visual database client (DataGrip/DBeaver class) for macOS, built on Wails (Go) and Vue 3 — one
+workbench across ten database engines.
 
 ## Status
 
@@ -15,7 +15,7 @@ Vue 3 — one workbench across ten database engines.
   application for Keychain ACL purposes, so the first launch after installing a new build may show
   one "Kira Studio wants to use your confidential information stored in…" prompt — **Always
   Allow** answers it permanently for that build.
-- **Credentials are encrypted at rest** via the macOS Keychain (`safeStorage`) — see
+- **Credentials are encrypted at rest** via the macOS Keychain (Go's `keybase/go-keychain`) — see
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Storage section.
 
 ## Supported engines
@@ -100,8 +100,11 @@ A couple of things worth knowing up front:
 ## Requirements
 
 - macOS 13 or later, Apple Silicon (`arm64`).
-- [Bun](https://bun.sh) — the package manager, script runner and test runner. Electron runs on its
-  own embedded Node; Bun is tooling only.
+- [Go](https://go.dev) 1.25+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`, pinned version
+  read from `shell/go.mod` by `scripts/wails-dev-setup.sh`) — the app is a native Go binary; every
+  database adapter runs in-process in Go, no sidecar runtime.
+- [Bun](https://bun.sh) — the package manager, script runner and test runner for the Vue frontend
+  and its test suites. Bun is tooling only; nothing ships an embedded Node runtime.
 - Xcode command-line tools, for packaging.
 - **Optional, for the DB test suite and the local fixture stack:** [Colima](https://github.com/abiosoft/colima)
   with a running Docker-compatible daemon.
@@ -114,49 +117,45 @@ There's no release yet, so installing means building it yourself:
 git clone <repo-url>
 cd kira-studio
 bun install
-bun run package:mac
+bun run package
 ```
 
-Artifacts land in `dist/`: `Kira Studio-0.1.0-arm64.dmg`, `Kira Studio-0.1.0-arm64.zip`, and
-the unpacked `dist/mac-arm64/Kira Studio.app`. `bun run package:mac:dir` builds only the `.app`
-and is faster for iterating.
+The built, signed (ad-hoc) app lands at `shell/bin/Kira Studio.app` — nothing is written to
+`dist/`.
 
 Since the build is unsigned (ad-hoc), the first launch needs a Gatekeeper workaround:
 right-click → Open, or:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+xattr -dr com.apple.quarantine "shell/bin/Kira Studio.app"
 ```
 
-See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the electron-builder config and the full
+See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the Wails bundle layout and the full
 verification checklist.
 
 ## Development
 
 ```sh
 bun install
-bun run dev        # electron-vite dev, HMR for the renderer
+bun run dev        # builds the frontend, then `wails3 task dev` — native window, HMR
 ```
 
 | Script | What it does |
 |---|---|
-| `bun run dev` | Dev build with renderer HMR |
-| `bun run build` | Production build into `out/` |
-| `bun run start` | Preview the production build |
+| `bun run dev` | `bun run build`, then `cd shell && wails3 task dev` (`predev` runs `scripts/wails-dev-setup.sh` first — checks the pinned `wails3` version and generated bindings) |
+| `bun run build` | Production Vue build into `shell/frontend/dist` |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
-| `bun run typecheck` | Runs all four splits below |
-| `bun run typecheck:node` | main + engine + preload (native TypeScript, `tsgo`) |
-| `bun run typecheck:web` | renderer, including `.vue` files (`vue-tsc`) |
-| `bun run typecheck:db` | `tests/db` + `tests/electron-db` |
-| `bun run typecheck:unit` | `tests/unit` |
-| `bun run test:db` | Testcontainers integration suite |
+| `bun run typecheck` | Runs the three splits below |
+| `bun run typecheck:node` | `src/shared` plus every `tests/` tier and `playwright.config.ts` (native TypeScript, `tsgo`) |
+| `bun run typecheck:web` | `src/renderer`, including `.vue` files, plus `src/shared` (`vue-tsc`) |
+| `bun run typecheck:unit` | `tests/unit` (`tsgo`) |
 | `bun run test:unit` | Unit suite — no external resource, finishes in about a second |
-| `bun run test:e2e` | Builds, then runs Playwright against the real app |
-| `bun run test:ipc` | IPC-boundary suite: real backend + mocked-IPC frontend (see below) |
-| `bun run package:mac` | `.dmg` + `.zip` + `.app`, unsigned arm64 |
-| `bun run package:mac:dir` | `.app` only (faster) |
-| `bun run verify:packaging` | Confirms the packaging config still ships no auto-update behavior |
+| `bun run test:ui` | Builds, then runs Playwright (WebKit) against the built bundle with both wire planes mocked |
+| `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
+| `bun run test:go` | The Go test suite (`cd shell && go test ./...`) |
+| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `shell/bin/Kira Studio.app` |
+| `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
 **App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
 environment variable relocates that whole directory — the test suite uses it to keep tests off a
@@ -168,27 +167,27 @@ six seconds. Bypass it for a work-in-progress commit with `git commit --no-verif
 
 ## Tests
 
-Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`.
+Four TypeScript suites under `tests/` (`unit/`, `ui/`, `ipc/`, `e2e-real/`), plus the Go suite
+under `shell/`. `tests/db/` is a shared fixture corpus (fixtures + support code), not a spec suite
+of its own — no `xvfb` is needed for any tier.
 
-- **`bun run test:unit`** — plain TypeScript modules exercised with fakes (a `bun:sqlite`-backed
-  Drizzle instance, a fake `requestAnimationFrame` queue, hand-written fake clients) rather than a
-  real container or a real Electron process. No external resource needed; finishes in about a
-  second. Sparse by design — added only where a unit test is a better fit than the UI coverage
-  below, never as a substitute for it.
-- **`bun run test:db`** — a Testcontainers integration suite against real engines. Requires Colima
-  running (`colima start --cpu 4 --memory 6 --disk 40`); the harness resolves `DOCKER_HOST` from
-  the active Docker context itself and prints a clear message if the daemon is unreachable. Kafka
-  and SQS run against `@testcontainers/kafka` and `@testcontainers/localstack`. One file lives in
-  `tests/electron-db/` instead of `tests/db/` and runs under a real Electron process rather than
-  Bun (`bun run test:db:kafka`) — the native Kafka driver is built against Electron's own Node ABI
-  and can't load under Bun at all.
-- **`bun run test:ipc`** — per-adapter IPC-boundary suite (see
-  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): `test:ipc:be` drives the real
-  control-channel/data-op stack against a real container with no Electron renderer at all;
-  `test:ipc:fe` drives the real rendered UI in Playwright with both IPC halves mocked. Both read
-  from one fixture module per adapter, generated from a real backend run rather than hand-written.
-- **`bun run test:e2e`** — Playwright driving the built Electron app via `_electron.launch()`. It
-  builds first. On a headless Linux machine, wrap it: `xvfb-run -a bun run test:e2e`.
+- **`bun run test:unit`** — plain TypeScript modules exercised with fakes rather than a real
+  container or a real window process. No external resource needed; finishes in about a second.
+  Sparse by design — added only where a unit test is a better fit than the UI coverage below,
+  never as a substitute for it.
+- **`bun run test:ui`** — Playwright against the built bundle, real WebKit, with both wire planes
+  (control and data) mocked. Builds first.
+- **`bun run test:ipc:fe`** — the frontend half of the per-adapter IPC-boundary suite (see
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): real rendered UI, mocked IPC.
+  The backend half is Go (`shell/internal/ipcfixture`), run via `bun run test:go` with
+  `KIRA_IPC_FIXTURES=write` to regenerate the fixture modules both halves read.
+- **`tests/e2e-real/`** — two specs against a real `-tags server` Go binary, deliberately launched
+  through plain Node rather than `bunx` (`node node_modules/.bin/playwright test
+  --project=e2e-real`) rather than through a `package.json` script — see `AGENTS.md`'s Docker
+  section for why.
+- **`bun run test:go`** — the Go test suite (`cd shell && go test ./...`), including the
+  Testcontainers-backed cases against real engines; container-backed cases self-skip without
+  Docker. With Colima, start it first: `colima start --cpu 4 --memory 6 --disk 40`.
 - **Local fixture databases for manual testing** — see
   [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md): nine of the ten engines (SQLite
   needs no container), a ~20k-row e-commerce dataset for the relational/document/key-value stores
@@ -196,36 +195,39 @@ Five suites, under `tests/`: `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`.
 
 ## Architecture
 
-Kira Studio runs as three processes: the Vue 3 renderer, an Electron main process for windowing
-and app-local storage, and every database driver isolated in its own `utilityProcess` ("engine").
-Control (connect, cancel, settings) flows through main; bulk result pages travel directly between
-renderer and engine over a `MessagePort`, skipping main entirely — see
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Process model section for the diagram.
+Kira Studio is a native Wails (Go) app: one Go process handles windowing, IPC, SQLite storage, the
+op log and every database driver in-process — no sidecar, no second runtime. The Vue 3 frontend
+runs in the OS's own WebView (WKWebView on macOS). Control (connect, cancel, settings) flows
+through Wails' generated bindings; bulk result pages travel over a dedicated `JSONStream` data
+plane — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Process model section for the
+diagram.
 
 Two facts worth knowing before reading further:
-- **Drivers live in a separate process**, so the renderer never touches a wire protocol directly.
-- **Adapters are capability-driven** (`src/shared/caps.ts`): adding an engine is one new directory
-  under `src/engine/adapters/`, not a change to the UI.
+- **Every driver runs in-process in Go**, behind one adapter interface — the frontend never
+  touches a wire protocol directly.
+- **Adapters are capability-driven** (`src/shared/caps.ts`, mirrored by each Go adapter's own
+  `caps.go`): adding an engine is one new package under `shell/internal/adapters/`, not a change
+  to the UI.
 
 Top-level layout:
 
 ```
-src/main       Electron main process — windowing, IPC, SQLite storage, op log
-src/engine     utilityProcess host — adapters, scheduler, cache
-src/preload    contextBridge surface between main and renderer
-src/renderer   the Vue 3 app
-src/shared     wire protocol + domain types shared across processes
-tests/unit     unit suite — no external resource
-tests/db       Testcontainers integration suite
-tests/electron-db  the one Testcontainers spec that needs a real Electron process (Kafka)
-tests/ipc      per-adapter IPC-boundary suite — real backend + mocked-IPC frontend
-tests/e2e      Playwright end-to-end suite
-docs           architecture, performance, packaging, design system; docs/v1 is the v1 record
+shell/internal  the Go app: adapters, storage, IPC bridge, tree service, connection state, ops
+shell/frontend  generated Wails bindings + the built frontend bundle (both gitignored)
+src/renderer    the Vue 3 app
+src/shared      wire protocol + domain types the Go side mirrors as its own source of truth
+tests/unit      unit suite — no external resource
+tests/ui        Playwright against the built bundle, WebKit, both wire planes mocked
+tests/ipc       per-adapter IPC-boundary suite — real Go backend + mocked-IPC frontend
+tests/e2e-real  Playwright against a real `-tags server` Go binary
+tests/db        shared fixture corpus (fixtures/support code, not a spec suite of its own)
+docs            architecture, performance, packaging, design system; docs/v1.1 is the live record
 scripts/demo-dbs   local fixture databases for manual testing
 ```
 
-See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown as of v1 (docs/v1 is
-the v1 record — see `docs/v1/README.md`).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and
+[`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) for this chapter's own phases (`docs/v1/SPEC.md` is the
+v1 record — see `docs/v1/README.md`).
 
 ## Documentation
 
@@ -234,11 +236,14 @@ the v1 record — see `docs/v1/README.md`).
   Authoritative for behavior; the tree outranks it.
 - [`docs/PERF.md`](docs/PERF.md) — performance budgets, how each is measured, and the recorded
   numbers.
-- [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, electron-builder config, verification
+- [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
+- [`docs/v1.1/`](docs/v1.1/) — the live phasing record (see `docs/v1.1/README.md`):
+  [`SPEC.md`](docs/v1.1/SPEC.md) and [`plans/`](docs/v1.1/plans/), one implementation plan per
+  phase, this chapter's own P1 onward.
 - [`docs/v1/`](docs/v1/) — the v1 record, not a living spec (see `docs/v1/README.md`):
   [`SPEC.md`](docs/v1/SPEC.md), the specification v1 was built against, and
-  [`plans/`](docs/v1/plans/), one implementation plan per phase, P0 through P45.
+  [`plans/`](docs/v1/plans/), one implementation plan per phase, P0 through P58f.
 - [`docs/design/kira-design-system/`](docs/design/kira-design-system/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
