@@ -48,19 +48,15 @@ func (r *Router) PushCacheConfig(settings model.Settings) {
 
 // Connect is the Go analogue of control.ts's handleConnect.
 func (r *Router) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
-	return r.connectNative(ctx, cfg)
-}
-
-func (r *Router) connectNative(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
 	// A reconnect is a disconnect + connect, never two live clients for the same connection.
 	if existing, ok := adapters.GetLiveAdapter(cfg.ID); ok {
 		_ = existing.Disconnect(context.Background())
 		adapters.DeleteLiveAdapter(cfg.ID)
-		// P2 R1: mirrors disconnectNative's own DropConnection call below — a reconnect that
-		// races ahead of onPreconnectExit's own async Disconnect (connections/service.go) lands
-		// here, in this branch, rather than through disconnectNative at all, so without this the
-		// old connectionId's L2 pages and L3 counts survive the reconnect and can be served back
-		// as stale data/row-count results against the newly connected adapter.
+		// P2 R1: mirrors Disconnect's own DropConnection call below — a reconnect that races
+		// ahead of onPreconnectExit's own async Disconnect (connections/service.go) lands here,
+		// in this branch, rather than through Disconnect at all, so without this the old
+		// connectionId's L2 pages and L3 counts survive the reconnect and can be served back as
+		// stale data/row-count results against the newly connected adapter.
 		r.cache.DropConnection(cfg.ID)
 	}
 	adapter, err := adapters.CreateAdapter(cfg.Kind, r.deps)
@@ -88,10 +84,6 @@ func (r *Router) connectNative(ctx context.Context, cfg model.ResolvedConnection
 // Test is control.ts's handleTest: a throwaway adapter, never registered live, connected and
 // unconditionally disconnected.
 func (r *Router) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
-	return r.testNative(ctx, cfg)
-}
-
-func (r *Router) testNative(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
 	adapter, err := adapters.CreateAdapter(cfg.Kind, r.deps)
 	if err != nil {
 		return "", err
@@ -112,10 +104,6 @@ func (r *Router) testNative(ctx context.Context, cfg model.ResolvedConnectionCon
 // Disconnect covers all three fire-and-forget call sites (onPreconnectExit, Remove, Disconnect —
 // A11's own count settled on three connections.Backend methods, not four).
 func (r *Router) Disconnect(ctx context.Context, connectionID string) error {
-	return r.disconnectNative(ctx, connectionID)
-}
-
-func (r *Router) disconnectNative(ctx context.Context, connectionID string) error {
 	adapter, ok := adapters.GetLiveAdapter(connectionID)
 	if !ok {
 		return nil
@@ -137,10 +125,6 @@ func (r *Router) disconnectNative(ctx context.Context, connectionID string) erro
 // ---- tree.Backend ----
 
 func (r *Router) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
-	return r.childrenNative(ctx, connectionID, path)
-}
-
-func (r *Router) childrenNative(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
 	adapter, err := requireLiveAdapter(connectionID)
 	if err != nil {
 		return adapters.TreeChildren{}, err
@@ -159,10 +143,10 @@ func (r *Router) childrenNative(ctx context.Context, connectionID string, path m
 		return adapters.TreeChildren{}, err
 	}
 	children := value.(adapters.TreeChildren)
-	// Same nil-slice-over-the-wire hazard describeNative/definitionNative already guard against
-	// (P58b's own closeout finding): a native adapter's `var nodes []model.TreeNode` left empty
-	// marshals as `null`, not `[]`, and Adapter rule 5 requires Children() to answer a leaf with
-	// an empty list, never null -- project/state/tree.ts's `if (treeState.children[k])` and
+	// Same nil-slice-over-the-wire hazard Describe/Definition already guard against (P58b's own
+	// closeout finding): a native adapter's `var nodes []model.TreeNode` left empty marshals as
+	// `null`, not `[]`, and Adapter rule 5 requires Children() to answer a leaf with an empty
+	// list, never null -- project/state/tree.ts's `if (treeState.children[k])` and
 	// filterTree.ts's `Object.entries` both treat null as "not loaded" or crash outright.
 	if children.Nodes == nil {
 		children.Nodes = []model.TreeNode{}
@@ -171,10 +155,6 @@ func (r *Router) childrenNative(ctx context.Context, connectionID string, path m
 }
 
 func (r *Router) Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
-	return r.describeNative(ctx, connectionID, path, tabID)
-}
-
-func (r *Router) describeNative(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
 	adapter, err := requireLiveAdapter(connectionID)
 	if err != nil {
 		return model.ObjectMeta{}, err
@@ -201,10 +181,6 @@ func (r *Router) describeNative(ctx context.Context, connectionID string, path m
 }
 
 func (r *Router) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
-	return r.definitionNative(ctx, connectionID, path, tabID)
-}
-
-func (r *Router) definitionNative(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
 	adapter, err := requireLiveAdapter(connectionID)
 	if err != nil {
 		return model.ObjectDefinition{}, err
@@ -216,7 +192,7 @@ func (r *Router) definitionNative(ctx context.Context, connectionID string, path
 			if err != nil {
 				return nil, err
 			}
-			// Same nil-slice-over-the-wire hazard as describeNative above, for Notes/Constraints/
+			// Same nil-slice-over-the-wire hazard as Describe above, for Notes/Constraints/
 			// Sections.
 			model.ValidateObjectDefinition(&def)
 			op.SetRows(len(def.Statements))

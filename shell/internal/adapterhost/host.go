@@ -1,7 +1,7 @@
-// Package adapterhost is the Go analogue of src/engine/{scheduler/ops.ts,control.ts,rpc.ts,data.ts}
-// plus the per-kind router that decides, for each connection, whether a Go-native adapter or the
-// Node engine child serves it (P58 D4). It is the one package downstream of both
-// shell/internal/adapters (the adapter contract) and shell/internal/enginehost (the Node sidecar).
+// Package adapterhost is the Go analogue of src/engine/{scheduler/ops.ts,control.ts,rpc.ts,data.ts}:
+// Router serves every connection kind in-process against shell/internal/adapters (the adapter
+// contract) — there is no more routing decision to make, since P58f deleted the Node engine child
+// this package used to forward non-native kinds to.
 package adapterhost
 
 import (

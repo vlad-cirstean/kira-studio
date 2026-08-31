@@ -90,7 +90,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 		return
 	}
 
-	r.handleNativeDataOp(session, probe.Op, probe.ID, probe.Payload)
+	r.handleDataOp(session, probe.Op, probe.ID, probe.Payload)
 }
 
 // pingPayload is port.ts's PingPayload (src/shared/protocol/port.ts:18-22), byte-compatible with
@@ -114,7 +114,7 @@ func decodeAndValidate[T interface{ Validate() error }](payload json.RawMessage,
 	return (*out).Validate()
 }
 
-func (r *Router) handleNativeDataOp(session *Session, op string, id int, payload json.RawMessage) {
+func (r *Router) handleDataOp(session *Session, op string, id int, payload json.RawMessage) {
 	ctx := context.Background()
 	switch op {
 	case "data:read":

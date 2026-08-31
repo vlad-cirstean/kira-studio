@@ -49,21 +49,21 @@ func (childrenNilAdapter) Children(ctx context.Context, path model.NodePath, op 
 }
 
 // C16: a native adapter's nil Nodes slice must cross the wire as `[]`, never `null` — the same
-// hazard describeNative/definitionNative were already fixed for at P58b's closeout. Asserting on
-// the marshalled JSON, not len(nodes)==0, is the point: len() is 0 for both nil and empty slices,
-// so a test that only checked length would pass on the very bug this guards against.
-func TestRouter_ChildrenNative_NilNodesMarshalAsEmptyArray(t *testing.T) {
+// hazard Describe/Definition were already fixed for at P58b's closeout. Asserting on the
+// marshalled JSON, not len(nodes)==0, is the point: len() is 0 for both nil and empty slices, so a
+// test that only checked length would pass on the very bug this guards against.
+func TestRouter_Children_NilNodesMarshalAsEmptyArray(t *testing.T) {
 	const connID = "conn-children-nil"
 	adapters.SetLiveAdapter(connID, childrenNilAdapter{})
 	defer adapters.DeleteLiveAdapter(connID)
 
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
-	children, err := r.childrenNative(context.Background(), connID, model.NodePath{ConnectionID: connID})
+	children, err := r.Children(context.Background(), connID, model.NodePath{ConnectionID: connID})
 	if err != nil {
-		t.Fatalf("childrenNative: %v", err)
+		t.Fatalf("Children: %v", err)
 	}
 	if children.Nodes == nil {
-		t.Fatal("childrenNative must normalize a nil Nodes slice before returning")
+		t.Fatal("Children must normalize a nil Nodes slice before returning")
 	}
 
 	b, err := json.Marshal(children)
@@ -143,7 +143,7 @@ func TestRouter_DescribeAndDefinition_ThreadTabIDIntoOpStart(t *testing.T) {
 	}
 }
 
-// reconnectFakeAdapter is just enough of adapters.Adapter to exercise connectNative's own
+// reconnectFakeAdapter is just enough of adapters.Adapter to exercise Connect's own
 // existing-live-adapter branch — Connect/Disconnect/Caps, nothing else (every other method panics
 // via the embedded nil interface if a test accidentally reaches it).
 type reconnectFakeAdapter struct {
@@ -156,12 +156,12 @@ func (reconnectFakeAdapter) Connect(context.Context, model.ResolvedConnectionCon
 func (reconnectFakeAdapter) Disconnect(context.Context) error { return nil }
 func (reconnectFakeAdapter) Caps() adapters.Caps              { return adapters.Caps{} }
 
-// P2 R1: connectNative's own "a live adapter is already registered" branch is a real reconnect
-// path (reached whenever connectionsConnect races ahead of onPreconnectExit's async Disconnect) —
-// unlike disconnectNative, it never called cache.DropConnection, so L2 pages and L3 counts keyed
-// by the old connectionId survived the reconnect and could be served back as stale results
-// against the newly connected adapter.
-func TestRouter_ConnectNative_ReconnectDropsStaleCache(t *testing.T) {
+// P2 R1: Connect's own "a live adapter is already registered" branch is a real reconnect path
+// (reached whenever connectionsConnect races ahead of onPreconnectExit's async Disconnect) —
+// unlike Disconnect, it never called cache.DropConnection, so L2 pages and L3 counts keyed by the
+// old connectionId survived the reconnect and could be served back as stale results against the
+// newly connected adapter.
+func TestRouter_Connect_ReconnectDropsStaleCache(t *testing.T) {
 	const kind = "test-reconnect-fake"
 	adapters.Register(kind, func(adapters.Deps) (adapters.Adapter, error) {
 		return reconnectFakeAdapter{}, nil
@@ -172,8 +172,8 @@ func TestRouter_ConnectNative_ReconnectDropsStaleCache(t *testing.T) {
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 	cfg := model.ResolvedConnectionConfig{ID: connID, Kind: kind}
 
-	if _, err := r.connectNative(context.Background(), cfg); err != nil {
-		t.Fatalf("first connectNative: %v", err)
+	if _, err := r.Connect(context.Background(), cfg); err != nil {
+		t.Fatalf("first Connect: %v", err)
 	}
 
 	cacheReq := enginecache.ReadRequest{ConnectionID: connID, Path: "p", PageSize: 10, Cursor: model.PageCursor{Mode: "offset"}}
@@ -183,10 +183,10 @@ func TestRouter_ConnectNative_ReconnectDropsStaleCache(t *testing.T) {
 		t.Fatal("setup: expected the seeded page to be cached")
 	}
 
-	// Reconnect while the first adapter is still registered live — connectNative's own
-	// existing-live-adapter branch, not disconnectNative.
-	if _, err := r.connectNative(context.Background(), cfg); err != nil {
-		t.Fatalf("second connectNative (reconnect): %v", err)
+	// Reconnect while the first adapter is still registered live — Connect's own
+	// existing-live-adapter branch, not Disconnect.
+	if _, err := r.Connect(context.Background(), cfg); err != nil {
+		t.Fatalf("second Connect (reconnect): %v", err)
 	}
 
 	if r.cache.Stats().L2Entries != 0 {
