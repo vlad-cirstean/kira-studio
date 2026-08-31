@@ -643,6 +643,73 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue inside a.db.Conn(ctx) waiting
+	// for the sole connection, rather than ever reaching a statement at all — cancelling that
+	// queued op's own local ctx must still report E_CANCELLED, not the generic E_QUERY runOnConn's
+	// mapError fallback used to produce for db.Conn's own ctx.Err() return.
+	t.Run("cancel while queued behind the pool limit reports E_CANCELLED, not E_QUERY", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+
+		opA := adapters.NewOpCtx("op-pool-a")
+		errChA := make(chan error, 1)
+		go func() {
+			_, err := a.Execute(context.Background(), model.ConsoleRequest{
+				Path: nodePath(cfg.ID, seg("database", "main")),
+				Statements: []string{
+					`WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 900000000) SELECT count(*) FROM seq`,
+				},
+			}, opA)
+			errChA <- err
+		}()
+
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			if opA.Command() != "" {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		time.Sleep(200 * time.Millisecond) // let op A actually hold the sole pooled connection
+
+		// Registered as a cleanup, not run inline after the assertions below: a t.Fatalf there
+		// (the very thing this test exists to catch) would otherwise skip this and leave op A's
+		// runaway statement abandoned, hanging connectedAdapter's own Disconnect cleanup forever
+		// on a.inFlight.Wait().
+		t.Cleanup(func() {
+			_, _ = a.Cancel(context.Background(), "op-pool-a")
+			select {
+			case <-errChA:
+			case <-time.After(5 * time.Second):
+				t.Error("op A's Execute never returned after Cancel")
+			}
+		})
+
+		ctxB, cancelB := context.WithCancel(context.Background())
+		errChB := make(chan error, 1)
+		go func() {
+			_, err := a.Count(ctxB, adapters.CountRequest{
+				Path: nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+			}, adapters.NewOpCtx("op-pool-b"))
+			errChB <- err
+		}()
+
+		time.Sleep(100 * time.Millisecond) // let op B actually reach the blocking db.Conn(ctxB) call
+		cancelB()
+
+		select {
+		case err := <-errChB:
+			if err == nil {
+				t.Fatal("Count while queued behind the pool limit succeeded, want it cancelled")
+			}
+			var ae *adapters.Error
+			if !errors.As(err, &ae) || ae.Code != adapters.CodeCancelled {
+				t.Fatalf("Count error = %v, want an E_CANCELLED *adapters.Error", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Count never returned after cancelling its own local ctx — cancel is a no-op while queued behind the pool limit")
+		}
+	})
+
 	t.Run("the file is not modified by a read session, and no -wal/-shm sidecar appears", func(t *testing.T) {
 		a := newAdapter(t)
 		if _, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-23-connect")); err != nil {

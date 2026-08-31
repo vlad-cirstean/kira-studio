@@ -152,6 +152,14 @@ func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(cont
 	}
 	conn, err := a.db.Conn(ctx)
 	if err != nil {
+		// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue here waiting for the
+		// sole connection — database/sql's own db.conn() returns exactly ctx.Err() when the wait
+		// is cut short by cancellation, and only then, so this can't misfire on a real connect
+		// failure. Without this check that op:end reported E_QUERY instead of E_CANCELLED — a
+		// generic error toast in the renderer instead of the silent stop Cancel is supposed to be.
+		if cancelErr := adapters.CheckCancelled(ctx); cancelErr != nil {
+			return zero, cancelErr
+		}
 		return zero, mapError(err)
 	}
 
