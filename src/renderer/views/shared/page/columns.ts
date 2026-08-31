@@ -38,13 +38,26 @@ function getMeasureCtx(): CanvasRenderingContext2D {
 
 /** Drops the memoized measuring context so the next initialWidths() call re-reads the current
  *  appearance tokens (P31 D11) — without this, a font change leaves every unstored column sized
- *  for whatever font was active when this module first measured, for the rest of the session. */
+ *  for whatever font was active when this module first measured, for the rest of the session.
+ *  Also drops initialWidths' own result cache below, for the same reason. */
 export function resetMeasureCtx(): void {
   measureCtx = null;
+  widthsCache = new WeakMap();
 }
+
+// P2 R1: DataGrid.vue's `widths` computed depends on the tab's stored columnWidths (so a resize
+// drag's own patchDataTabState call invalidates it) *and* calls initialWidths(page) unconditionally
+// inside — every pointermove during a drag re-ran this canvas-measurement pass over every column
+// and up to 50 sample rows each, even though a resize never changes the page's own data. Pages are
+// frozen and stable by reference (same premise as nameIndexCache below), so a WeakMap keyed by the
+// page turns every measurement after the first, for a given page, into a reference check.
+let widthsCache = new WeakMap<TabularPage, Record<string, number>>();
 
 /** Measures the wider of the header and a sample of the first rows, clamped to [64, 480] px. */
 export function initialWidths(page: TabularPage): Record<string, number> {
+  const cached = widthsCache.get(page);
+  if (cached) return cached;
+
   const ctx = getMeasureCtx();
   const decoder = new TextDecoder();
   const widths: Record<string, number> = {};
@@ -61,6 +74,7 @@ export function initialWidths(page: TabularPage): Record<string, number> {
     }
     widths[column.name] = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(max + CELL_PADDING)));
   }
+  widthsCache.set(page, widths);
   return widths;
 }
 
