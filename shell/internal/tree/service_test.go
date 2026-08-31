@@ -48,9 +48,10 @@ func newHarness(t *testing.T) *harness {
 
 	host := enginetest.Host(t)
 	fake := &fakeStates{status: map[string]string{}}
-	// adapterhost.TestKindNodeServed is not in nativeKinds — this router always forwards to the
-	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
-	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
+	// the same behaviour these tests exercised before the Backend refactor, and now the only way to
+	// get it, since every real kind is native as of P58e M9.3.
+	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 	svc := tree.New(r.Connections, r.Metadata, router, fake)
 	return &harness{svc: svc, repos: r, host: host, fake: fake}
 }
@@ -63,7 +64,7 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 	if _, err := h.repos.Connections.DB.Exec(
 		`INSERT INTO connections (id, name, kind, color, mode, read_only, created_at, updated_at, sort_order)
 		 VALUES (?, ?, ?, 'blue', 'fields', 0, ?, ?, 0)`,
-		id, name, adapterhost.TestKindNodeServed, now, now,
+		id, name, "kafka", now, now,
 	); err != nil {
 		t.Fatalf("seed connection: %v", err)
 	}

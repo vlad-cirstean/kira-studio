@@ -18,17 +18,6 @@ import (
 // engine child until its own milestone lands.
 var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true, "sqlite": true, "clickhouse": true, "mongodb": true, "redis": true, "sqs": true, "s3": true}
 
-// TestKindNodeServed is a connection kind guaranteed to still route to the Node engine child —
-// exported so other packages' tests can use one definitely-not-yet-native kind as a placeholder
-// without hardcoding a literal that a later milestone's own nativeKinds flip silently turns into a
-// real (and wrong) routing decision (P58b B16; AGENTS.md's P58a findings recorded the mechanical
-// fix this constant replaces: five files, one grep, every time a kind goes native). Update this to
-// the next still-Node-served kind in the same commit that flips its current value's own
-// nativeKinds bit. Kafka (P58c C14): the last of the ten kinds to go native (P58e), so this is the
-// final move before P58f retires the constant entirely — never point it at redis (this
-// sub-phase's own second kind) or at a P58d kind (sqs/s3, native one sub-phase before Kafka).
-const TestKindNodeServed = "kafka"
-
 // KindLookup is the one thing the router needs from internal/connections to make a per-connection
 // routing decision — a two-line method on *repos.ConnectionsRepo satisfies it (A11).
 type KindLookup interface {
@@ -47,6 +36,12 @@ type Router struct {
 	child      *enginehost.Host // nil once P58f deletes the Node sidecar
 	conns      KindLookup
 
+	// native is the set of kinds this Router serves in-process. NewRouter shares the package-level
+	// nativeKinds map by reference, so a later flip of that map is visible without reconstructing
+	// the Router; NewRouterAllNodeServed gives it an empty map instead, so every kind forwards to
+	// the child regardless of nativeKinds' own contents.
+	native map[string]bool
+
 	// statsMu guards the router's own passively-observed snapshot of the child's last cache:stats
 	// push (A16, dataframe.go's observeChildEvent/mergedCacheStats) — a separate mutex from
 	// enginecache.Cache's own, since these two fields have nothing to do with Go's cache.
@@ -61,7 +56,21 @@ func NewRouter(deps adapters.Deps, cache *enginecache.Cache, child *enginehost.H
 	host := NewHost(deps, cache)
 	return &Router{
 		deps: deps, host: host, dispatcher: NewDispatcher(host, cache),
-		cache: cache, child: child, conns: conns,
+		cache: cache, child: child, conns: conns, native: nativeKinds,
+	}
+}
+
+// NewRouterAllNodeServed constructs a Router that forwards EVERY kind to the Node engine child.
+// Test-only, and it exists for exactly one reason: internal/connections' and internal/tree's tests
+// cover connections.Service's and tree.Service's child-forwarding paths, which are still live
+// shipped code until P58f's M10 collapses the two EngineBackend implementations into one. Before
+// P58e there was always a real kind left to point them at (adapterhost.TestKindNodeServed, retired
+// in M9.3); after it there is none. Delete this with the child.
+func NewRouterAllNodeServed(deps adapters.Deps, cache *enginecache.Cache, child *enginehost.Host, conns KindLookup) *Router {
+	host := NewHost(deps, cache)
+	return &Router{
+		deps: deps, host: host, dispatcher: NewDispatcher(host, cache),
+		cache: cache, child: child, conns: conns, native: map[string]bool{},
 	}
 }
 
@@ -79,12 +88,12 @@ func (r *Router) PushCacheConfig(settings model.Settings) {
 	}
 }
 
-// isNative reports whether kind is currently served by a Go adapter in this process.
-func isNative(kind string) bool { return nativeKinds[kind] }
+// isNative reports whether kind is currently served by a Go adapter through this Router.
+func (r *Router) isNative(kind string) bool { return r.native[kind] }
 
 // IsNativeKind is connections.Backend's fourth method (A15): MarkAllErrored uses it to skip a
 // Go-native connection when the Node engine child exits.
-func (r *Router) IsNativeKind(kind string) bool { return isNative(kind) }
+func (r *Router) IsNativeKind(kind string) bool { return r.isNative(kind) }
 
 // ---- connections.Backend ----
 
@@ -92,7 +101,7 @@ func (r *Router) IsNativeKind(kind string) bool { return isNative(kind) }
 // engine child (Node-served), chosen by cfg.Kind directly — there is no connection state yet to
 // look up (§4.9).
 func (r *Router) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
-	if isNative(cfg.Kind) {
+	if r.isNative(cfg.Kind) {
 		return r.connectNative(ctx, cfg)
 	}
 	return r.connectViaChild(cfg)
@@ -144,7 +153,7 @@ func (r *Router) connectViaChild(cfg model.ResolvedConnectionConfig) (connection
 // Test is control.ts's handleTest (native): a throwaway adapter, never registered live, connected
 // and unconditionally disconnected — or a plain forward for a Node-served kind.
 func (r *Router) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
-	if isNative(cfg.Kind) {
+	if r.isNative(cfg.Kind) {
 		return r.testNative(ctx, cfg)
 	}
 	return r.testViaChild(cfg)
@@ -200,7 +209,7 @@ func (r *Router) testViaChild(cfg model.ResolvedConnectionConfig) (string, error
 // Disconnect routes on the connection's own kind (sites 1, 2, 5 all forward here — A11's own
 // count settled on three connections.Backend methods, not four).
 func (r *Router) Disconnect(ctx context.Context, connectionID string) error {
-	if kind, ok := r.conns.KindOf(connectionID); ok && isNative(kind) {
+	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
 		return r.disconnectNative(ctx, connectionID)
 	}
 	return r.disconnectViaChild(connectionID)
@@ -233,7 +242,7 @@ func (r *Router) disconnectViaChild(connectionID string) error {
 // ---- tree.Backend ----
 
 func (r *Router) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && isNative(kind) {
+	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
 		return r.childrenNative(ctx, connectionID, path)
 	}
 	return r.childrenViaChild(connectionID, path)
@@ -290,7 +299,7 @@ func (r *Router) childrenViaChild(connectionID string, path model.NodePath) (ada
 }
 
 func (r *Router) Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && isNative(kind) {
+	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
 		return r.describeNative(ctx, connectionID, path)
 	}
 	return r.describeViaChild(connectionID, path, tabID)
@@ -340,7 +349,7 @@ func (r *Router) describeViaChild(connectionID string, path model.NodePath, tabI
 }
 
 func (r *Router) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && isNative(kind) {
+	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
 		return r.definitionNative(ctx, connectionID, path)
 	}
 	return r.definitionViaChild(connectionID, path, tabID)

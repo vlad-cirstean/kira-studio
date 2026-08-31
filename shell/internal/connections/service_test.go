@@ -60,9 +60,12 @@ func newHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// adapterhost.TestKindNodeServed is not in nativeKinds — this router always forwards to the
-	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
-	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
+	// the same behaviour these tests exercised before the Backend refactor, and now the only way to
+	// get it, since every real kind is native as of P58e M9.3. fieldsInput's Kind must be a real,
+	// valid connection kind (model.ValidConnectionKind), so a synthetic placeholder is not an
+	// option here — see adapterhost.NewRouterAllNodeServed's own doc comment.
+	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
@@ -75,11 +78,13 @@ func newHarness(t *testing.T) *harness {
 }
 
 // fieldsInput returns a valid, connectable fields-mode Input for name — the fixture's
-// adapter:connect/adapter:test key their canned behaviour off Name's prefix.
+// adapter:connect/adapter:test key their canned behaviour off Name's prefix. Kind is "kafka", a
+// real, valid connection kind (model.ValidConnectionKind requires one) that newHarness's
+// NewRouterAllNodeServed router keeps Node-served regardless of nativeKinds' own contents.
 func fieldsInput(name string) connections.Input {
 	return connections.Input{
 		ConnectionFields: model.ConnectionFields{
-			Name: name, Kind: adapterhost.TestKindNodeServed, Color: "blue", Mode: "fields",
+			Name: name, Kind: "kafka", Color: "blue", Mode: "fields",
 			Host: strPtr("localhost"), Port: intPtr(5432), Options: map[string]any{},
 		},
 	}
@@ -111,9 +116,9 @@ func newUnavailableCipherHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// adapterhost.TestKindNodeServed is not in nativeKinds — this router always forwards to the
-	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
-	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
+	// see newHarness's own comment above.
+	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
@@ -222,7 +227,7 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	h := newHarness(t)
 	in := connections.Input{
 		ConnectionFields: model.ConnectionFields{
-			Name: "uri-conn", Kind: adapterhost.TestKindNodeServed, Color: "blue", Mode: "uri",
+			Name: "uri-conn", Kind: "kafka", Color: "blue", Mode: "uri",
 			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
 		},
 	}

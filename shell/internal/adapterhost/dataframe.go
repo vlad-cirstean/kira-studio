@@ -77,7 +77,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	_ = json.Unmarshal(probe.Payload, &connProbe)
 
 	kind, known := r.conns.KindOf(connProbe.ConnectionID)
-	if !known || !isNative(kind) {
+	if !known || !r.isNative(kind) {
 		r.forwardToChild(frame)
 		return
 	}

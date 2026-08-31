@@ -90,8 +90,11 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 // An unknown (or non-native) connection's data op is forwarded, never answered locally — with no
 // child attached, that means no frame is ever sent to the session at all.
 func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
-	r, conns := newTestRouter()
-	conns["conn-2"] = TestKindNodeServed
+	conns := fakeKindLookup{}
+	// NewRouterAllNodeServed forwards every kind to the child, so "kafka" here stays Node-served
+	// regardless of nativeKinds' own contents — the property this test needs.
+	r := NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, conns)
+	conns["conn-2"] = "kafka"
 
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)

@@ -20,8 +20,10 @@ import (
 // response.
 func TestForwardToChild_RealEngineChild(t *testing.T) {
 	host := enginetest.Host(t)
-	conns := fakeKindLookup{"conn-1": TestKindNodeServed}
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), host, conns)
+	// "kafka" is an arbitrary real kind here — NewRouterAllNodeServed forwards every kind to the
+	// child regardless of nativeKinds, which is what a test of the forwarding seam itself needs.
+	conns := fakeKindLookup{"conn-1": "kafka"}
+	r := NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), host, conns)
 
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)
