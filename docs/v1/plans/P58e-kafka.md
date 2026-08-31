@@ -1137,3 +1137,307 @@ correct is that `bun:test` runs the file top to bottom in one process. Go's `tes
 tests in source order too, but nothing enforces it, and `-shuffle` or a future `t.Parallel()` breaks
 it silently: scenario 9 would see 16's message and read `rowCount: 1`. Scenario 21's `gap-topic` is
 already dedicated and stays so.
+
+## 3. Target tree
+
+```
+shell/internal/adapters/
+  kafka/                        NEW    M9.2  (P58e E17) 8 files, one per kafka/*.ts:
+    adapter.go                  NEW          index.ts — the Adapter impl, path resolution, Cancel
+    caps.go                     NEW          caps.ts — the 21-field literal, comments included
+    catalog.go                  NEW          catalog.ts — root (topics ∪ groups), partitions
+    client.go                   NEW          client.ts — kgo options, Ping, one long-lived client
+    definition.go               NEW          definition.ts — topic (partitions + REAL configs,
+                                             P58e E11) and group (5 rows, P58e E13) definitions
+    errors.go                   NEW          errors.ts — kerr codes + Go net/ctx re-derivations
+    produce.go                  NEW          produce.ts — sentinels, preview, ProduceSync
+    read.go                     NEW          read.ts — freshWindows, the browse loop, countTopic
+    read_test.go                NEW    M9.3  P58e E26's single unit test (window arithmetic)
+    kafka_test.go               NEW    M9.1  the acceptance suite (lands failing, P58 D12 / R3)
+    main_test.go                NEW    M9.1  TestMain -> StopKafka (P58b B15, never t.Cleanup)
+  testsupport/
+    kafka.go                    NEW    M9.1  modules/kafka container (P58e E19) + the Go
+                                             re-expression of 0005_kafka_seed.ts (P58e E25)
+  testsupport/spec.go           UNCHANGED    StreamKeyAt/HeadersAt/AttrsAt/TimestampAt/BodyAt all
+                                             landed in P58d M8.1 — P58e needs no lift at all
+
+shell/internal/adapterhost/router.go        EDITED  M9.3  nativeKinds += kafka (TEN OF TEN);
+                                                    TestKindNodeServed DELETED and replaced by
+                                                    NewRouterAllNodeServed (P58e E20); the
+                                                    child-route counter + slog.Warn (P58e E24, §7)
+shell/internal/adapterhost/integration_test.go  EDITED M9.3  P58e E20
+shell/internal/adapterhost/dataframe_test.go    EDITED M9.3  P58e E20
+shell/internal/tree/service_test.go             EDITED M9.3  P58e E20
+shell/internal/connections/service_test.go      EDITED M9.3  P58e E20
+shell/main.go                               EDITED  M9.3  the tenth blank import — §4.7's
+                                                    most-forgotten step
+shell/go.mod / go.sum                       EDITED  M9.1/M9.2  + franz-go, franz-go/pkg/kadm,
+                                                    franz-go/pkg/kmsg (runtime);
+                                                    + testcontainers-go/modules/kafka (test-only,
+                                                    P58e E19 — reverses P58d D22's precedent)
+
+shell/internal/{page,enginecache,enginebackend}/**  UNCHANGED  §1.4 — deliberately, not by omission
+shell/internal/adapters/{sqltext,sqlmutate,abort,caps,errors,registry,live,adapter}.go  UNCHANGED
+shell/internal/{oplog,enginehost,storage,bridge,shell,appcore}/**  UNCHANGED
+src/**                                              UNCHANGED  P58e E23 — every file
+
+tests/e2e-real/mariadb-real.spec.ts         EDITED  M9.3  the second test rewritten (P58e E21).
+                                                    THE FIRST tests/e2e-real/ CHANGE IN THE PHASE
+tests/e2e-real/support/kafka.ts             UNCHANGED  a 3-line re-export; its subject survives
+tests/db/kafka.spec.ts                      DELETED M9.4 last commit (P58 D12)
+tests/db/support/kafka.ts                   UNCHANGED  two live consumers (§1.11) — KEPT
+tests/db/fixtures/0005_kafka_seed.ts        UNCHANGED  two live consumers (§1.11) — KEPT
+tests/db/support/page.ts                    UNCHANGED  readStream becomes dead; three other
+                                                    exports still live (§1.11)
+tests/ipc/**                                UNCHANGED  §1.11 — the generator port is P58f's
+tests/ui/**                                 UNCHANGED  P58a A10
+package.json                                UNCHANGED  test:db still invokes the script
+
+scripts/run-db-tests.sh                     EDITED  M9.4  collapses to `bun test tests/db`
+                                                    (P58e E19's sibling; deletion is P58f's)
+scripts/verify-packaging.sh                 EDITED  M9.4  one message string (P58e E22)
+scripts/sign-bundle.sh                      EDITED  M9.4  one message string (P58e E22)
+
+docs/ARCHITECTURE.md                        EDITED  the Stack line's "only kind still Node-served";
+                                                    the mapping table's Kafka Cancel cell; the whole
+                                                    Kafka per-engine section; the S3 section's
+                                                    "only Kafka is left for P58e" (§8 criterion 8)
+docs/v1/plans/P58e-kafka.md                 EDITED  §12 M9.0 results, then §13 M9.1-M9.4 results
+AGENTS.md                                   EDITED  the P58e findings entry; the "Native Kafka
+                                                    driver" section, whose subject is gone
+```
+
+## 4. Designs
+
+### 4.1 `client.go` — options, not a property map
+
+`client.ts`'s single `RdConfig` record of raw librdkafka properties becomes typed `kgo.Opt`s. The
+whole of `client.ts:9-17`'s comment about *"one config vocabulary in this file instead of two"* and
+its three `as never` casts evaporates: franz-go has one option vocabulary and it is type-checked.
+
+| `client.ts` property | Go |
+|---|---|
+| `bootstrap.servers` | `kgo.SeedBrokers(net.JoinHostPort(host, strconv.Itoa(port)))` |
+| `client.id: 'kira-studio'` | `kgo.ClientID("kira-studio")` |
+| `socket.connection.setup.timeout.ms: 10_000` | `kgo.DialTimeout(10 * time.Second)` |
+| `security.protocol: plaintext \| ssl \| sasl_plaintext \| sasl_ssl` | the cross product of `kgo.DialTLSConfig(&tls.Config{})` and `kgo.SASL(...)`, set independently — franz-go has no single protocol enum, which removes a four-way string switch |
+| `sasl.mechanism: 'PLAIN'` + `sasl.username`/`sasl.password` | `kgo.SASL(plain.Auth{User: u, Pass: p}.AsMechanism())` |
+
+`connect(ctx, cfg, log) (*kgo.Client, *kadm.Client, error)`:
+
+1. resolve host/port/username/password from URI or fields mode (**P58e E16**), defaulting
+   `localhost:9092`;
+2. resolve `options.sslmode` with the same three-value accept list and the same `warn` log line;
+3. `kgo.NewClient(opts...)` — **no I/O yet**;
+4. `cl.Ping(ctx)` — the bounded reachability probe that turns a wrong host/port into `E_CONNECT`
+   here rather than at the first tree expansion (`client.ts:92-95`'s own reason, unchanged);
+5. `adm := kadm.NewClient(cl)` (`kadm/kadm.go:118`);
+6. on any failure, `cl.Close()` before returning the mapped error — the direct analogue of
+   `client.ts:98`'s `admin.disconnect().catch(() => {})`, and the P13 D2 discipline
+   `router.go:120-122` already applies from the other side.
+
+`Disconnect` is `cl.Close()`; `kgo.Client.Close` is idempotent-safe against a nil receiver guard the
+adapter keeps.
+
+### 4.2 `catalog.go` — one metadata call answers three questions
+
+| Function | Ports | Key points |
+|---|---|---|
+| `listRoot` | `catalog.ts:15-18` | topics ∪ groups as **root-level siblings**, in that order, each sorted by name. `catalog.ts:12-14`'s reason ports with it (*"a consumer group can span many topics, or none of the ones currently browsed, so nesting it under one topic would misrepresent it"*). The TypeScript runs both halves under `Promise.all`; the Go port runs them sequentially — two round trips either way, and an `errgroup` for two calls on one connection buys latency this tree level does not need |
+| `listTopics` | `catalog.ts:23-49` | `adm.Metadata(ctx)` → `Topics.FilterInternal()` (**P58e E10**) → one `model.TreeNode` per topic with `Kind: "topic"`, `HasChildren: false` (P23 D3), and `Detail: abbreviateCount(len(t.Partitions)) + " partition(s)"`. **`abbreviateCount` has no Go home yet** — `src/shared/format.ts`'s K/M/B/T abbreviation is renderer-side. Grep first: if no Go analogue exists in `internal/`, it is ~12 lines local to `catalog.go`, and the plan says so rather than discovering it (a partition count reaching 1 000 is possible on a real cluster, so `fmt.Sprintf("%d", n)` is not equivalent) |
+| `listGroups` | `catalog.ts:51-70` | `adm.ListGroups(ctx)` → filter `strings.HasPrefix(name, "__")` → `Kind: "consumerGroup"`, `HasChildren: false`, sorted |
+| `listPartitions` | `catalog.ts:72-92` | `adm.Metadata(ctx, topic)` → `TopicDetails[topic].Partitions.Sorted()` (`kadm/metadata.go:50`, already partition-ordered) → `Kind: "partition"`, name `strconv.FormatInt(int64(p.Partition), 10)`, two-segment path. **This call must survive** even though the tree never expands a topic — `index.ts:69-77` records that `StreamView.vue`'s partition-filter popover is a second live caller re-fetching on every open, and that *"deleting this the way P19's D5 deleted column enumeration would break that filter"* |
+
+Sorting: `catalog.ts` uses `a.name.localeCompare(b.name)`. The Go port uses `sort.Strings`-equivalent
+byte ordering, matching what every other native adapter already does — a divergence only for names
+differing by locale collation, which Kafka topic names (`[a-zA-Z0-9._-]`) cannot exhibit. Recorded,
+not probed.
+
+### 4.3 `read.go` — the browse, precisely
+
+The largest file, and the one whose design **P58e E9** and **KF-3** govern.
+
+**`freshWindows(ctx, adm, topic, rawFilter)`** ports `read.ts:76-143`:
+
+1. `starts, err := adm.ListStartOffsets(ctx, topic)`; `ends, err := adm.ListEndOffsets(ctx, topic)` —
+   two calls where librdkafka's `fetchTopicOffsets` was one. **Then `ListedOffsets.Error()` on each**
+   (**P58e E12**), which is what turns a nonexistent topic into `E_QUERY`.
+2. `CheckCancelled(ctx)`.
+3. Parse the filter. `parseKafkaStreamFilter`'s Go port is a `json.Unmarshal` into
+   `struct{Offset *string; Partitions []int32; TimestampMs *int64}` with a zod-equivalent shape check;
+   any failure is `E_QUERY "malformed stream filter"` byte-identically (`read.ts:94`).
+4. Partition narrowing: a non-empty `Partitions` selects a **union**; an empty result is
+   `E_QUERY "topic <t> has no partition(s) <joined>"`, byte-identical including the `", "` join.
+5. `timestampMs` wins over `offset`: `adm.ListOffsetsAfterMilli(ctx, ms, topic)` reseeds every
+   selected partition's start. **The one semantic difference to re-baseline:** kadm's own doc says
+   *"If a partition has no offsets after the requested millisecond, the offset will be the current end
+   offset"*, where librdkafka returned a sentinel. That makes the partition's window empty rather
+   than full-range — arguably more correct, and KF-4(c) prints the real answer before §5.3's
+   scenario 19 asserts anything.
+6. Otherwise `offset` is `strconv.ParseInt`d (a failure is `E_QUERY "malformed offset filter: \"<x>\""`,
+   byte-identical) and **clamped into `[low, high]` per partition** (`read.ts:130-135`).
+7. Returns `[]partitionWindow{Partition int32; Next int64; End int64}`.
+
+**`readTopic(ctx, cl, adm, topic, req, op)`** ports `read.ts:193-319`:
+
+```
+1.  req.Cursor.Mode == "before" -> E_UNSUPPORTED
+      "kafka offset-window pagination is forward-only; there is no previous page"   (byte-identical)
+2.  fingerprint := RequestFingerprint(struct{Topic; PageSize; Filter}{...})          (P58e E7)
+3.  windows := (Mode == "after") ? decode(req.Cursor.Token, fingerprint)
+                                 : freshWindows(...)
+4.  remaining := windows where Next < End
+    if len(remaining) == 0 -> NewStreamPageBuilder(nil).Finish(position(windows, false, ...))
+                              -- NO CLIENT IS EVER CONSTRUCTED (read.ts:212-215)
+5.  CheckCancelled(ctx)
+6.  op.SetCommand("browse <topic> (<n> partition(s) of <m>)")                        (Adapter rule 3)
+7.  browse, err := kgo.NewClient(baseOpts..., kgo.ConsumePartitions(...at exact offsets),
+                                 kgo.FetchMaxWait(1*time.Second))                    (P58e E5)
+    defer browse.Close()
+8.  loop while collected < pageSize && !allDone() && !allEof():
+      CheckCancelled(ctx)
+      fetches := browse.PollRecords(ctx, pageSize-collected)
+      if err := fetches.Err(); err != nil { ... }                                    (P58e E3)
+      fetches.EachPartition(record HighWatermark per partition)
+      if fetches.NumRecords() == 0 { emptyPolls++; if >= 2 break; continue }
+      emptyPolls = 0
+      for each record: window-check (offset in [Next, End)), push, Next = offset+1
+9.  CheckCancelled(ctx)
+10. clamp: for each provably-drained partition, Next = End                           (P58e E9)
+11. hasMore := any(Next < End); Finish(position(windows, hasMore, fingerprint, pageSize))
+```
+
+Row construction, per `read.ts:281-291`, with **P58e E8** applied:
+
+| Cell | Source | Note |
+|---|---|---|
+| `Key *string` | `nil` when `r.Key == nil`, else `Strp(strings.ToValidUTF8(string(r.Key), "�"))` | a nil key is a real `null`, not `""` — the null/empty distinction `page/chunk.go` is careful about |
+| `Headers string` | `json.Marshal` of `map[string]any` built by the `headersToPlain` port | **P58e E8**; repeated key → `[]string` |
+| `Attrs string` | `{"partition": <int32>, "offset": "<decimal>"}` | the number/string asymmetry ports verbatim |
+| `Timestamp *string` | `nil` when `r.Timestamp.IsZero()`, else `r.Timestamp.UTC().Format("2006-01-02T15:04:05.000Z07:00")` | **P58d D11**'s exact-three-fractional-digits format, because this is a cell value a user reads and `tests/ipc/kafka/kafka.fixture.ts` freezes one. Never `time.RFC3339Nano`, which drops trailing zeros |
+| `Body string` | `strings.ToValidUTF8(string(r.Value), "�")`, `""` when `r.Value == nil` | `read.ts:290`'s own `: ''` fallback — an empty body is `""`, not null |
+
+`ObjectDefinition.GeneratedAt` follows the six existing native adapters (`time.Now().UTC().Format(
+time.RFC3339Nano)`), **not** the TypeScript — **P58d D11**'s split, applied unchanged.
+
+**`countTopic`** ports `read.ts:323-337`: `ListStartOffsets` + `ListEndOffsets`, `Error()` on each,
+then `sum(high - low)` across every partition as an `int64`, `Exact: true`. Go's `int64` removes the
+`Number(BigInt(high) - BigInt(low))` narrowing the TypeScript had to accept.
+
+**`position(windows, hasMore, fingerprint, pageSize)`** ports `read.ts:52-66` exactly:
+`{Offset: nil, PageSize: pageSize, HasMore: hasMore, NextToken: <token or nil>, PrevToken: nil,
+Strategy: "offsetWindow"}`. The first `offsetWindow` position any native adapter has ever emitted.
+
+### 4.4 `definition.go` — where two capability recoveries land
+
+**Topic** (`definition.ts:35-97`):
+- `adm.Metadata(ctx, topic)` → `Partitions.Sorted()` → the **Partitions** section, rows
+  `{Name: "<p>", Value: "leader <n>", Detail: "replicas 1,2 · isr 1,2"}` — the `·` separator and the
+  `,`-join port byte-identically, since `kafka.spec.ts` 6 asserts `/^leader \d+$/` on the value.
+- `adm.DescribeTopicConfigs(ctx, topic)` → the **Configuration** section, now populated
+  (**P58e E11**). `ResourceConfigs.On(topic, fn)` (`kadm/configs.go:62`) is the safe accessor;
+  a `ResourceConfig.Err` degrades to an empty section **plus a note**, reusing the same
+  "a missing section must not fail the whole tab" shape `definition.ts:58-64` already describes for
+  the ACL-denied case — which stops being permanent and becomes ACL-dependent again, as the
+  TypeScript's own comment hoped.
+- `statements[0]` is the `{partitions: [...], config: [...]}` JSON, 2-space-indented
+  (`json.MarshalIndent`). Note Go sorts map keys where `JSON.stringify` uses insertion order — the
+  doc here is built from **structs and slices**, not maps, so field order is the struct's and the
+  divergence **P58d D17**'s SQS `definition.go` row had to record does not arise.
+
+**Group** (`definition.ts:99-195`):
+- `adm.DescribeGroups(ctx, groupID)` → `DescribedGroups.On(groupID, ...)`; a missing group is
+  `E_NOT_FOUND "consumer group not found: <id>"` byte-identically (`definition.ts:113`).
+- **Group** section, five rows (**P58e E13**): `state` (already a string), `protocolType`, `protocol`,
+  `coordinator` (`host:port`), `members` (count). The `|| '—'` em-dash fallback for empty strings
+  ports verbatim — it is what the renderer shows for an unset value.
+- **Members** section: `{Name: m.ClientID, Value: m.ClientHost, Detail: m.MemberID}`, in
+  `DescribedGroup.Members`' own order (kadm documents it as sorted by `InstanceID` or `MemberID`).
+- **Committed offsets** section: `adm.FetchOffsets(ctx, group)` in its own error scope, so *"a group
+  with read access but no offset-fetch permission still shows its Group/Members sections rather than
+  failing the whole load"* (`definition.ts:144-145`). Rows are `{Name: "<topic>[<p>]", Value:
+  "<offset>"}`, sorted by topic then partition (`OffsetResponses.Sorted()`, `kadm/groups.go:759`).
+  On failure, `notes = ["Committed offsets could not be read."]`, byte-identical.
+
+### 4.5 `produce.go` and `adapter.go`
+
+**`produce.go`** ports `produce.ts` with the four **P58e E14** changes:
+- `$key`/`$body`/`$headers` sentinels and `assertInsert`'s message
+  (*"kafka only supports producing new messages (insert)"*) port byte-identically;
+- `parseHeaders`'s three error messages port byte-identically (`malformed $headers JSON`,
+  `$headers must be a JSON object of string values`, `$headers.<k> must be a string`);
+- `Preview` is **synchronous, no network, no catalog lookup** (Adapter rule 3), rendering
+  `producer.produce('<topic>', null, Buffer.from(...), '<key>' | null)` verbatim — the string is a
+  user-visible preview and changing it to a franz-go-shaped call would be a behavioural rewrite the
+  parent's §0.2 forbids. §10 OQ-6 raises whether it *should* eventually change;
+- `Mutate` calls `AssertWritable(readOnly)` **first** (`produce.ts:96`: *"enforced here, not only
+  greyed out in the UI"*), `op.SetCommand(strings.Join(preview, ";\n"))` second, then builds one
+  `*kgo.Record` per op and issues **one** `ProduceSync` for the whole batch;
+- `affectedRows` counts acknowledged records; `ProduceResults.FirstErr()` fails the whole mutation.
+
+**`adapter.go`** ports `index.ts`:
+- `Connect` → §4.1, `ConnectInfo{ServerVersion: "Kafka", Details: {"brokers": …, "cluster": …}}`
+  (**P58e E15**);
+- `Children`: empty path → `listRoot`; `consumerGroup` root → `[]model.TreeNode{}` (Adapter rule 5,
+  and `index.ts:61-62` names the rule explicitly); a non-`topic` non-`consumerGroup` root →
+  `E_NOT_FOUND "unexpected root path segment kind: <k>"`; one-segment `topic` → `listPartitions`;
+  anything deeper → `[]`;
+- `Describe` → `Unsupported(kind, "describe")` — `caps.describe` is false (P31 D2);
+- `Definition` → topic or group, else `E_NOT_FOUND "definition requires a topic or consumer group
+  path, got: <encoded>"`;
+- `Read`/`Count` → `resolveTopicTarget`, whose message ports verbatim
+  (`read requires a topic path, got: <encoded>`);
+- `Execute` → `NoQueryConsole(kind)` (`caps.sql` false, P10 D13);
+- `DownloadObject` → `Unsupported(kind, "file transfer")`;
+- `Cancel` → `false`, permanently, with the comment extended to name **P58e E3**.
+
+### 4.6 `testsupport/kafka.go` — the container and the seed checklist
+
+One `startKafka()` on `modules/kafka.Run(ctx, "confluentinc/cp-kafka:8.0.7")` (**P58e E19**), one
+`fixture[T]` memo, an exported `StartKafka(t)` with the `IsDockerAvailable` gate, and an exported
+`StopKafka()` called from `main_test.go` **after `m.Run()` — never `t.Cleanup`**, for the reason
+`fixture.go`'s package doc gives (**P58b B15**: *"Go runs that cleanup the instant that test returns,
+so a fixture documented as 'one container per test binary' actually restarted per test function"*).
+
+**P58e E25's cost, made concrete.** `0005_kafka_seed.ts` is a TypeScript function, not a `.sql` file,
+so the Go seeder re-expresses it. The checklist, so it is a table rather than a memory:
+
+| Shape | `0005_kafka_seed.ts` | Go seeder (`kadm` + `kgo` from the host) |
+|---|---|---|
+| `orders` topic | 2 partitions, replication factor 1 | `adm.CreateTopics(ctx, 2, 1, nil, "orders")` |
+| `empty-topic` | 1 partition, RF 1, never written | same, never produced to |
+| `orders` messages | **6**, each `source:seed` header + key `key-<i>` + body `{"seq":<i>}` | 6 `*kgo.Record{Topic, Key: []byte("key-<i>"), Value: []byte(`{"seq":<i>}`), Headers: [{Key:"source", Value:[]byte("seed")}]}` through one `ProduceSync`. **> one partition's worth deliberately**, *"so browsing genuinely spans both"* (`0005:8`) |
+| `kira-test-group` | registered with committed offsets and **no members**, via `--reset-offsets --to-earliest --execute` | `adm.CommitOffsets(ctx, "kira-test-group", offsetsAtStartFor("orders"))` (**P58e E25**) — same state, still no group join |
+| exported constants | `ORDERS_TOPIC`, `EMPTY_TOPIC`, `ORDERS_PARTITION_COUNT=2`, `ORDERS_MESSAGE_COUNT=6`, `CONSUMER_GROUP` | `KafkaOrdersTopic`, `KafkaEmptyTopic`, `KafkaOrdersPartitionCount`, `KafkaOrdersMessageCount`, `KafkaConsumerGroup` |
+| **new, P58e E27** | — | a `CreateTopic(t, name)` helper + a side `*kgo.Client` so every producing test gets its own topic |
+| **new, scenario 21** | `gap-topic`, created and written **transactionally** inside the spec, not the seed | the acceptance suite creates it with `kgo.TransactionalID` + `BeginTransaction`/`EndTransaction`, driving the driver under test exactly as `kafka.spec.ts:696-738` drives its own. **The container's `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1` is what makes this possible** and the Go module sets it (§1.15) |
+
+**The cross-check that buys back most of what P58e E25 costs**, nearly free because KF-4 already has a
+container up: start the TypeScript fixture (`sh scripts/run-db-tests.sh` brings one up) and the Go
+fixture side by side once, and diff the two topic inventories (names, partition counts, per-partition
+start/end offsets) and one message's full `headers`/`attrs` cell text. Recorded in §12 as a probe
+result, not repeated per run.
+
+### 4.7 The router flip, and what else it touches
+
+`nativeKinds` is the whole mechanism (P58 §4.6). Enumerated so the implementer checks each rather
+than trusting "the router handles it" — and for Kafka the list is **longer than any previous
+sub-phase's**, because it is last:
+
+- **Control plane** — `connections.{Test,Connect,Disconnect,Remove}` and
+  `tree.{Children,Describe,Definition}` start reaching `adapterhost.Host` for kafka. Nothing to write.
+- **Data plane** — kafka's pages start arriving base64-encoded and `toTypedArray`'s first branch
+  handles them. SQS already proved the `StreamPage` wire path in P58d M8.2, so this is the second
+  stream producer, not the first — but it is **the first `offsetWindow` position ever to cross the
+  wire from Go**, which `views/stream/`'s pager reads (`data-pagination`). §5.6's sweep is not
+  optional.
+- **Cancel** — routes on op ownership, not kind (**P58a A13**). A flip changes nothing here, but
+  `Router.Cancel`'s child fallback (`router.go:400-413`) survives and §7 counts it.
+- **`connections.MarkAllErrored`** — **P58a A15**'s narrowing now excludes **every** kind (§1.9).
+  Not dead, but a no-op.
+- **`adapterhost.TestKindNodeServed`** — deleted in this same commit (**P58e E20**), touching four
+  test files.
+- **`tests/e2e-real/mariadb-real.spec.ts`** — rewritten in this same commit (**P58e E21**).
+- **`cache:stats`** — **P58a A16**'s merge is unchanged; the child keeps reporting its own (empty)
+  stats and the Router keeps summing them until P58f.
+- **`shell/main.go`** — the tenth blank import. §8 makes it a per-milestone acceptance check.
