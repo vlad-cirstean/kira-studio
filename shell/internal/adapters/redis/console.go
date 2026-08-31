@@ -96,7 +96,10 @@ func resultToPage(command string, reply any) page.KeyValuePage {
 }
 
 // execute is console.ts's execute — one op-log row for the whole batch (P5.5 D9's precedent).
-func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
+// A read-only connection is gated per-command via Redis's own COMMAND table (isReadOnlyCommand),
+// not a blanket refusal — SPEC.md's read-only contract disables "anything but a read", and a flat
+// console-execution ban would take reads away too.
+func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, readOnly bool, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
 	var lines []string
 	for _, s := range statements {
 		if trimmed := strings.TrimSpace(s); trimmed != "" {
@@ -126,6 +129,9 @@ func execute(ctx context.Context, set *dbConnectionSet, dbIndex int, op *adapter
 			continue
 		}
 		command, args := tokens[0], tokens[1:]
+		if readOnly && !set.isReadOnlyCommand(ctx, conn, command) {
+			return nil, adapters.AssertWritable(true)
+		}
 		argv := make([]any, 0, len(args)+1)
 		argv = append(argv, command)
 		for _, a := range args {

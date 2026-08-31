@@ -102,6 +102,9 @@ type dbConnectionSet struct {
 	mu          sync.Mutex
 	connections map[int]*goredis.Client
 	lru         []int
+
+	cmdMu   sync.Mutex
+	cmdInfo map[string]*goredis.CommandInfo
 }
 
 func newDbConnectionSet(fields connectFields, defaultDbIndex int, log func(level, message string)) *dbConnectionSet {
@@ -153,6 +156,26 @@ func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client
 
 func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, error) {
 	return s.get(ctx, s.defaultDbIndex)
+}
+
+// isReadOnlyCommand answers the read-only guard by asking Redis's own COMMAND table rather than
+// hand-maintaining a read/write command list — the server is authoritative, including for Lua
+// scripts (EVAL/EVALSHA/FCALL) and admin commands, which COMMAND INFO already flags as non-readonly.
+// The table is fetched once per connection set and cached; command flags don't change mid-session.
+// An unrecognized command name is treated as a write (deny by default) rather than assumed safe.
+func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis.Client, name string) bool {
+	s.cmdMu.Lock()
+	defer s.cmdMu.Unlock()
+	if s.cmdInfo == nil {
+		info, err := client.Command(ctx).Result()
+		if err != nil {
+			// Can't consult the table — fail closed rather than let an unverifiable command run.
+			return false
+		}
+		s.cmdInfo = info
+	}
+	info, ok := s.cmdInfo[strings.ToLower(name)]
+	return ok && info.ReadOnly
 }
 
 func (s *dbConnectionSet) closeAll() {

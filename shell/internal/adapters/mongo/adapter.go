@@ -283,7 +283,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	}
 	a.inFlight.Add(1)
 	defer a.inFlight.Done()
-	return execute(ctx, db, op, req.Statements)
+	return execute(ctx, db, a.readOnly, op, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers

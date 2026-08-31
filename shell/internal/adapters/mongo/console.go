@@ -32,6 +32,55 @@ var supportedConsoleMethods = func() map[string]bool {
 	return m
 }()
 
+// writeConsoleMethods is the read-only guard's classification of MongoConsoleMethods — insertOne
+// through deleteMany are unconditionally writes; find/findOne/countDocuments are unconditionally
+// reads. aggregate is neither by default (isAggregateWrite below decides it per statement) since a
+// pipeline can carry a $out/$merge stage that writes despite the method name.
+var writeConsoleMethods = map[string]bool{
+	"insertOne":  true,
+	"insertMany": true,
+	"updateOne":  true,
+	"updateMany": true,
+	"deleteOne":  true,
+	"deleteMany": true,
+}
+
+// isAggregateWrite reports whether an aggregate() pipeline's first argument contains a $out or
+// $merge stage — the two aggregation stages that write to a collection despite arriving through
+// find-shaped syntax. A pipeline that fails to parse as the expected bson.A/bson.D shape is not
+// flagged here; runStatement's own asDocArray call reports that error normally.
+func isAggregateWrite(stmt parsedStatement) bool {
+	if len(stmt.args) == 0 || stmt.args[0] == nil {
+		return false
+	}
+	pipeline, ok := stmt.args[0].(bson.A)
+	if !ok {
+		return false
+	}
+	for _, stage := range pipeline {
+		d, ok := stage.(bson.D)
+		if !ok {
+			continue
+		}
+		for _, elem := range d {
+			if elem.Key == "$out" || elem.Key == "$merge" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isWriteStatement is the read-only guard's per-statement verdict, checked before runStatement
+// dispatches — SPEC.md's read-only contract disables "anything but a read", not console execution
+// outright, so this must classify rather than blanket-refuse.
+func isWriteStatement(stmt parsedStatement) bool {
+	if stmt.method == "aggregate" {
+		return isAggregateWrite(stmt)
+	}
+	return writeConsoleMethods[stmt.method]
+}
+
 func parseStatement(text string) (parsedStatement, error) {
 	parser, err := NewLiteralParser(strings.TrimSpace(text))
 	if err != nil {
@@ -392,7 +441,7 @@ func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStat
 
 // execute ports console.ts's execute — one op-log row for the whole batch (P5.5 D9), CheckCancelled
 // between statements, one page per statement.
-func execute(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -406,6 +455,9 @@ func execute(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx, 
 		stmt, err := parseStatement(text)
 		if err != nil {
 			return nil, err
+		}
+		if readOnly && isWriteStatement(stmt) {
+			return nil, adapters.AssertWritable(true)
 		}
 		p, err := runStatement(ctx, db, stmt, op)
 		if err != nil {

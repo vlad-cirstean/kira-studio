@@ -202,6 +202,18 @@ func (s *ConnSet) Get(ctx context.Context, database string) (Entry, error) {
 		return Entry{}, mapError(err)
 	}
 
+	// A read-only connection is enforced by the server itself, not just Mutate's own app-level
+	// AssertWritable check — matching ClickHouse's readonly=2 and SQLite's mode=ro precedent, and
+	// closing the gap the console's Execute() would otherwise leave (it has no per-statement
+	// write/read classifier of its own, unlike Redis/Mongo's console).
+	if s.cfg.ReadOnly {
+		if _, err := conn.ExecContext(ctx, "SET SESSION TRANSACTION READ ONLY"); err != nil {
+			_ = conn.Close()
+			_ = db.Close()
+			return Entry{}, mapError(err)
+		}
+	}
+
 	s.mu.Lock()
 	s.dbs[key] = db
 	s.conns[key] = conn
