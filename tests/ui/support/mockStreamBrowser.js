@@ -59,6 +59,20 @@
     return socket;
   }
 
+  // btoa needs a binary string, not raw bytes — the only primitive available here, since this file
+  // runs in the page (injected via page.addInitScript), not in Node, so `Buffer` is not available
+  // (P58f D8).
+  function toBase64(bytes) {
+    var binary = '';
+    var i;
+    for (i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  // Returns { chunk, byteLength }: `chunk` is the wire shape (page.Chunk's own four base64 fields,
+  // P58 D5), `byteLength` is the real byte cost computed from the typed arrays before encoding —
+  // chunkByteSize must never derive sizes from the encoded strings (P57's byteSize: 0 incident,
+  // AGENTS.md).
   function encodeChunk(values, truncatedRows) {
     var i, j;
     var encoder = new TextEncoder();
@@ -77,11 +91,18 @@
     }
     // page.ts's `isTruncated` binary-searches this array, so it must be sorted — every caller so
     // far passes it already sorted (LogicalTabularPage.truncatedRows's own doc comment).
+    var truncated = new Uint32Array(truncatedRows || []);
     return {
-      data: data,
-      offsets: offsets,
-      nulls: nulls,
-      truncated: new Uint32Array(truncatedRows || []),
+      chunk: {
+        data: toBase64(data),
+        // page.Uint32LE.MarshalJSON's contract (internal/page/chunk.go:38): base64 of the
+        // little-endian bytes, not of decimal digits — a Uint32Array's buffer is little-endian on
+        // every platform this app targets.
+        offsets: toBase64(new Uint8Array(offsets.buffer)),
+        nulls: toBase64(nulls),
+        truncated: toBase64(new Uint8Array(truncated.buffer)),
+      },
+      byteLength: data.byteLength + offsets.byteLength + nulls.byteLength + truncated.byteLength,
     };
   }
 
@@ -93,19 +114,14 @@
   // matter what the app actually retained — a gap only surfaced once a spec finally exercised it.
   var COLUMN_ENVELOPE_BYTES = 64;
 
-  function chunkByteSize(chunk) {
-    return (
-      chunk.data.byteLength +
-      chunk.offsets.byteLength +
-      chunk.nulls.byteLength +
-      chunk.truncated.byteLength
-    );
+  function chunkByteSize(sized) {
+    return sized.byteLength;
   }
 
-  function sumChunkBytes(chunks) {
+  function sumChunkBytes(sizedChunks) {
     var total = 0;
     var i;
-    for (i = 0; i < chunks.length; i++) total += chunkByteSize(chunks[i]);
+    for (i = 0; i < sizedChunks.length; i++) total += chunkByteSize(sizedChunks[i]);
     return total;
   }
 
@@ -131,7 +147,7 @@
         columns: logical.columns,
         rowCount: logical.rows.length,
         truncatedCells: logical.truncatedCells,
-        chunks: chunks,
+        chunks: chunks.map((c) => c.chunk),
         byteSize: tabularByteSize,
       });
     }
@@ -141,8 +157,8 @@
       return Object.assign({}, base, {
         kind: 'document',
         rowCount: logical.ids.length,
-        ids: ids,
-        bodies: bodies,
+        ids: ids.chunk,
+        bodies: bodies.chunk,
         byteSize: sumChunkBytes([ids, bodies]),
       });
     }
@@ -155,8 +171,8 @@
         ttlMs: logical.ttlMs,
         memoryBytes: logical.memoryBytes,
         rowCount: logical.fields.length,
-        fields: fields,
-        values: values,
+        fields: fields.chunk,
+        values: values.chunk,
         byteSize: sumChunkBytes([fields, values]),
       });
     }
@@ -169,11 +185,11 @@
       kind: 'stream',
       rowCount: logical.keys.length,
       visibilityTimeoutSeconds: logical.visibilityTimeoutSeconds,
-      keys: keys,
-      headers: headers,
-      attrs: attrs,
-      timestamps: timestamps,
-      bodies: streamBodies,
+      keys: keys.chunk,
+      headers: headers.chunk,
+      attrs: attrs.chunk,
+      timestamps: timestamps.chunk,
+      bodies: streamBodies.chunk,
       byteSize: sumChunkBytes([keys, headers, attrs, timestamps, streamBodies]),
     });
   }

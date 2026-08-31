@@ -99,22 +99,22 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     offB();
   });
 
-  test('6. a JSON-round-tripped TextColumnChunk is revived into real typed arrays', async () => {
-    // JSON.stringify on a Uint8Array/Uint32Array serialises it as a plain object keyed "0","1",...
-    // (TypedArrays are not Array.isArray) — exactly what JSON.parse hands back to onmessage, since
-    // JSONStream's own decode is a plain JSON.parse. Found live: a real data:read response failed
-    // downstream with "chunk.data is not a Uint8Array" (protocol/page.ts's assertChunkStructure)
-    // until reviveChunks (P57 finding, discovered by the C1 boot proof) fixed it.
-    const jsonRoundTripped = {
+  test('6. a base64-encoded TextColumnChunk is revived into real typed arrays', async () => {
+    // Every buffer crosses the wire as base64 of its exact little-endian bytes (page.Chunk's
+    // MarshalJSON, P58 D5) — decoded straight into the typed array's backing buffer. The Node
+    // engine's index-keyed JSON.stringify shape this used to also cover, and the decode branch for
+    // it, are both gone (P58f D8) — base64 is the only shape port.ts's toTypedArray accepts now.
+    const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+    const wireEncoded = {
       page: {
         kind: 'tabular',
         columns: [{ name: 'id' }],
         chunks: [
           {
-            data: { 0: 97, 1: 98 },
-            offsets: { 0: 0, 1: 1, 2: 2 },
-            nulls: { 0: 0 },
-            truncated: {},
+            data: toBase64(new Uint8Array([97, 98])),
+            offsets: toBase64(new Uint8Array(new Uint32Array([0, 1, 2]).buffer)),
+            nulls: toBase64(new Uint8Array([0])),
+            truncated: toBase64(new Uint8Array(0)),
           },
         ],
       },
@@ -123,8 +123,8 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     const p = request('read');
     await flush();
     const sent = socket.sent.at(-1) as SentRequest;
-    socket.__message({ kind: 'res', id: sent.id, ok: true, payload: jsonRoundTripped });
-    const result = (await p) as typeof jsonRoundTripped;
+    socket.__message({ kind: 'res', id: sent.id, ok: true, payload: wireEncoded });
+    const result = (await p) as typeof wireEncoded;
     const chunk = result.page.chunks[0] as unknown as {
       data: Uint8Array;
       offsets: Uint32Array;
