@@ -102,6 +102,17 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   await view.locator('[data-testid="stream-poll"]').click();
   await expect(streamCellEditorPanel).toHaveCount(0);
 
+  // --- P2 R1 regression: SQS has no addressable cursor, so a second Poll's data:read carries
+  //     the identical connectionId/path/pageSize/cursor as the first — without invalidating the
+  //     cache first, the second Poll would silently be served the first Poll's now-stale page
+  //     instead of ever reaching a fresh ReceiveMessage --------------------------------------
+  const opsSoFar = await stream.ops();
+  expect(opsSoFar.filter((o) => o.op === 'data:read').length).toBeGreaterThanOrEqual(2);
+  expect(opsSoFar).toContainEqual({
+    op: 'data:invalidate',
+    payload: { connectionId: 'test-sqs', path: ORDERS_QUEUE_PATH },
+  });
+
   // --- row context menu: copy-key + copy-body, read-only -----------------------------------
   await firstRow.click({ button: 'right' });
   const menu = page.locator('[data-testid="context-menu"]');

@@ -161,7 +161,18 @@ export function stop(tabId: string): void {
 
 // D10: SQS's toolbar calls this directly from an explicit "Poll" click — same operation as
 // `load`, named separately so the view never has to explain why a batch-strategy tab "loads".
+//
+// P2 R1: SQS has no addressable position (read.go's own comment: "every poll is an independent,
+// non-resumable snapshot"), so every poll's data:read carries the identical connectionId/path/
+// pageSize/cursor — the exact same enginecache.PageCacheKey as the poll before it. Without
+// invalidating first, a second Poll click would silently be served the first poll's cached page
+// and never reach the adapter's real ReceiveMessage call — same fix as reload()'s own invalidate,
+// same default scope (ipcfixture/sqs_test.go already recorded this exact call for this exact
+// scenario, anticipating this fix).
 export async function poll(tabId: string): Promise<void> {
+  const tab = findStreamTab(tabId);
+  if (!tab?.connectionId) return;
+  await data.invalidate(tab.connectionId, tab.path);
   await load(tabId);
 }
 
