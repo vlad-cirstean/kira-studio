@@ -1625,3 +1625,128 @@ decision (a test-only code path in the shell) rather than a test.
 - **Comparing a struct containing an `any` field with `==` panics at runtime** rather than failing to
   compile (P55's finding). `model.ConnectionState.Caps` is such a field — use `go-cmp` (already a
   dependency), never `==`.
+
+## 12. M8.0 results
+
+Ran all five probes in a throwaway scratch Go module against `localstack/localstack:3` on real
+Docker (`docker` 29.3.1, this sandbox), per §6. No product code lands from this milestone.
+
+**TC-4 — PASS, with one prediction corrected.** The bare `GenericContainer` starts here in ~4 s once
+the image layer is warm (first pull/first container in a session pays a one-time ~18 s cold-start
+tax that has nothing to do with `SERVICES`). `CreateQueue` and `CreateBucket` both succeeded through
+the SDK with no Docker socket bind configured anywhere — **P58d D22**'s load-bearing half holds.
+**Correction to the plan's own prediction:** run three times each way, alternating order to control
+for warm-cache effects, `SERVICES=s3,sqs` showed **no measurable startup improvement** over the
+default (all-services) image in this sandbox — both land at 3.8–4.3 s. The plan's "SERVICES
+measurably cuts startup" claim does not hold here; `SERVICES=s3,sqs` is kept anyway for the reason
+that survives regardless (trimming what the container tries to initialize is still the right default
+even where this sandbox's local disk/network make the difference too small to see), and this
+correction is the answer if a future session re-measures and is confused by a flat result.
+
+**AWS-1 (SQS) — PASS on every point, including the load-bearing one.**
+- (a) A mangled `QueueUrl` host does not matter at all: the physical request target is
+  `Options.BaseEndpoint`, always, regardless of what host is embedded in the URL string a prior
+  `CreateQueue` returned — confirming §1.6's model outright rather than merely "not breaking".
+- (b) `X-Amz-Target` is exactly `AmazonSQS.<Operation>` for every operation tried
+  (`CreateQueue`, `ListQueues`, `GetQueueUrl`, `ReceiveMessage`, `GetQueueAttributes`) —
+  **P58d D10**'s discriminator is confirmed on the wire, not just from the source read.
+- (c) The naive `json.Marshal` of `types.MessageAttributeValue` produces exactly the
+  all-fields-with-nulls shape **P58d D8** exists to avoid:
+  `{"source":{"DataType":"String","BinaryListValues":null,"BinaryValue":null,"StringListValues":null,"StringValue":"seed"}}`.
+  The JS adapter's own source (`src/engine/adapters/sqs/read.ts`'s `pushMessage`,
+  `JSON.stringify(message.MessageAttributes ?? {})`) confirms the target shape is
+  `{"source":{"DataType":"String","StringValue":"seed"}}` — `JSON.stringify` drops `undefined`
+  fields, which is exactly what **P58d D8**'s hand encoder reproduces by emitting only non-nil/
+  non-empty fields. `attrs` needs no encoder either way: `json.Marshal` of `map[string]string`
+  already matches `JSON.stringify` of the same map.
+- (d) `GetQueueUrl`/`ReceiveMessage` against a missing queue both come back as
+  `*smithy.OperationError` wrapping a `smithy.APIError` with `ErrorCode() ==
+  "AWS.SimpleQueueService.NonExistentQueue"` and message `The specified queue does not exist.` —
+  recorded for §5.3's re-baseline.
+- **(e) — the single most load-bearing assertion in M8.0 — PASS.** A `ReceiveMessage` with
+  `WaitTimeSeconds: 20`, cancelled after 300 ms, returned in **330 µs** with
+  `errors.Is(err, context.Canceled) == true`. **P58d D3**'s entire premise is confirmed: the SDK's
+  own context plumbing aborts an in-flight long-poll immediately, through
+  `*smithy.OperationError`'s wrap, with no `RunWithAbortRace` needed or wanted.
+- (f) `VisibilityTimeout`, `ApproximateNumberOfMessages`, `QueueArn`, `CreatedTimestamp` and
+  `LastModifiedTimestamp` are all present on `GetQueueAttributes(All)` against LocalStack.
+
+**AWS-2 (credentials) — PASS, confirming P58d D7's timing change exactly.** A nonexistent
+`SharedConfigProfile` fails **at `config.LoadDefaultConfig`**, both with no config file present at
+all and with a config file present naming a different profile — in both cases the error is a bare
+(unwrapped) `config.SharedConfigProfileNotExistError` with message `failed to get shared config
+profile, does-not-exist`. A present profile resolves region and credentials correctly. Static
+credentials never touch the filesystem and a wrong static key produces nothing from
+`LoadDefaultConfig` — the first place it could surface is a real request, confirming §5.7's "no
+`E_AUTH` round trip" gap is a real gap in test coverage, not a missing behavior.
+
+**AWS-3 (S3) — PASS, with one new finding not in the plan's own research.**
+- (a) `PutObject` with an `*os.File` body and explicit `ContentLength`, under the SDK's **default**
+  `RequestChecksumCalculation`, succeeded outright. **P58d D6** needs no override.
+- (b) A non-seekable `io.Reader` body failed immediately, client-side, before any request left the
+  process: `compute input header checksum failed, unseekable stream is not supported without TLS
+  and trailing checksum`. This is a harder cliff than "LocalStack might reject it" — the SDK itself
+  refuses a non-seekable body over plain HTTP (LocalStack's endpoint is HTTP, not HTTPS) regardless
+  of what the server would have done. It changes nothing about **P58d D6** (the design already
+  always hands the SDK a seekable `*os.File`) but sharpens the reason: it is not a LocalStack quirk
+  to work around, it is the SDK's own contract for an unencrypted connection.
+- (c) `HeadObject`/`GetObject` on a missing key: `*types.NotFound` (HEAD) and `*types.NoSuchKey`
+  (GET), both `*smithy.OperationError`-wrapped, both structurally `errors.As`-matchable — confirming
+  **P58d D14**'s collision-check design matches on the right type.
+- **(d) — a genuine new finding, not anticipated by the plan's research: S3 metadata keys come back
+  lowercased.** A `Metadata: {"SeededBy": "aws3-probe"}` sent on `PutObject` reads back from
+  `HeadObject` as `map[string]string{"seededby": "aws3-probe"}` — LocalStack (and real S3, per
+  AWS's own documented behavior for `x-amz-meta-*` headers) lowercases metadata keys in transit.
+  Neither `s3/mutate.ts` nor this plan's **P58d D13** mentions this, and it does not change the
+  design (metadata is preserved as a whole map either way), but it means a Go test asserting an
+  exact metadata key must assert the lowercased form, and it is worth one line in
+  `docs/ARCHITECTURE.md`'s S3 section so a future reader does not "fix" what looks like a casing bug.
+  `StorageClass` came back **empty**, not `"STANDARD"`, on LocalStack — confirming **P58d D16**'s
+  relative-assertion design (`oversized == small - 1`) was the right call regardless of which way
+  this resolved. All six other preserved attributes (`ContentType`, `CacheControl`,
+  `ContentEncoding`, `ContentDisposition`, `ContentLanguage`, plus `Metadata`) round-tripped exactly.
+- (e) A 5 MB `GetObject`, cancelled after the first 100 KB was read from the body stream: the next
+  read after `cancel()` returned in 86 µs with `errors.Is(err, context.Canceled) == true`. The
+  mid-stream cancellation §4.4's `DownloadObject` design and §5.4's new mid-stream test both depend
+  on is real and prompt — **P58d D3** holds for `GetObject`'s streaming body exactly as it holds for
+  `ReceiveMessage`'s long-poll.
+- (f) `ListObjectsV2` with `Delimiter: "/"` over `reports/`, `reports/2024/summary.json`,
+  `reports/notes.txt` and an exact-prefix marker object at key `reports/` itself: `CommonPrefixes`
+  correctly groups everything under `reports/2024/` into one prefix, while `Contents` returns both
+  `reports/` (the exact-prefix marker) and `reports/notes.txt` — confirming `catalog.ts`'s need to
+  skip the exact-prefix marker explicitly (§4.3's `catalog.go` row) rather than assuming
+  `ListObjectsV2` already excludes it.
+- (g) All seven of **P58d D13**'s preserved attributes survive a `PutObject`/`HeadObject` round
+  trip (folded into (d) above).
+
+**AWS-4 (cross-check) — done by direct source comparison rather than a live dual-container run, and
+one real gap found in this plan's own §4.6.** Reading `tests/db/fixtures/0006_sqs_seed.ts` and
+`0007_s3_seed.ts` directly (the ground truth a live run would only reproduce) against §4.6's Go
+seeder checklist:
+- The SQS shapes match exactly: `orders-queue` (5 messages, `{"seq":<i>}` bodies, one `source`
+  String attribute each), `drain-queue` (7 identical-shaped messages), `empty-queue` (created,
+  empty). No correction needed.
+- **The S3 checklist in §4.6 is missing one seeded object**: `0007_s3_seed.ts` also seeds
+  `SECOND_DELETE_TARGET_KEY = 'second-delete-target.txt'` into `mutable-bucket` (body *"a second
+  object, deleted from an open tab instead of the tree"*), needed because the TypeScript's delete
+  scenario removes one object from a tree row and a different one from an open tab in the same test.
+  §4.6's table lists `editable.json`, `readonly-target.txt` and `delete-target.txt` for
+  `mutable-bucket` but not this fourth object. `testsupport/s3.go` must seed it too, as
+  `S3SecondDeleteTargetKey`, or the tab-based delete scenario (S3 test suite scenario mirroring
+  `s3.spec.ts`'s tab-delete case) has no second object to target. Recorded here rather than
+  discovered mid-M8.3.
+- The `headers`/`attrs` cell comparison was settled by AWS-1(c) together with a direct read of
+  `src/engine/adapters/sqs/read.ts`'s `pushMessage` (verbatim above) rather than by running the
+  bun test harness a second time — the source read is the same ground truth a live diff would
+  produce, and it is unambiguous: `JSON.stringify(message.MessageAttributes ?? {})` in JS is
+  reproduced by **P58d D8**'s hand encoder emitting only non-nil/non-empty fields, and `attrs`'
+  `json.Marshal(map[string]string)` already matches `JSON.stringify` of the same map with no encoder
+  needed.
+
+**Consequences for M8.1 onward:** none of the five probes forced a design change to §2's decisions.
+**P58d D3** and **P58d D6** are both confirmed as written. The two corrections are: TC-4's startup-
+time claim (§6's table wording, harmless — the container still starts, the claimed saving just
+isn't visible here) and §4.6's missing `SECOND_DELETE_TARGET_KEY` (real — M8.3's `testsupport/s3.go`
+must seed it). AWS-3(d)'s lowercased-metadata-keys finding is new information for
+`docs/ARCHITECTURE.md`'s S3 section (§8 criterion 8) and for any Go test asserting an exact metadata
+key.
