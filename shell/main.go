@@ -22,6 +22,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mongo"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/postgres"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/redis"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/s3"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqlite"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqs"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
