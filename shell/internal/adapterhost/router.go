@@ -3,7 +3,9 @@ package adapterhost
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
@@ -14,9 +16,10 @@ import (
 
 // nativeKinds is the single source of truth for which connection kinds are served in-process. A
 // kind is added here in the same commit as its adapter's tests going green, and never earlier
-// (A12). Postgres is native as of M5 (checkpoint C1) — every other kind still routes to the Node
-// engine child until its own milestone lands.
-var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true, "sqlite": true, "clickhouse": true, "mongodb": true, "redis": true, "sqs": true, "s3": true}
+// (A12). Ten of ten as of P58e M9.3 (checkpoint C2, §7) — every kind is now served by a Go
+// adapter, and the Node engine child, still spawned until P58f's M10, answers no connection
+// traffic at all.
+var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true, "sqlite": true, "clickhouse": true, "mongodb": true, "redis": true, "sqs": true, "s3": true, "kafka": true}
 
 // KindLookup is the one thing the router needs from internal/connections to make a per-connection
 // routing decision — a two-line method on *repos.ConnectionsRepo satisfies it (A11).
@@ -41,6 +44,11 @@ type Router struct {
 	// the Router; NewRouterAllNodeServed gives it an empty map instead, so every kind forwards to
 	// the child regardless of nativeKinds' own contents.
 	native map[string]bool
+
+	// childRoutes counts connection-scoped requests routed to the Node engine child — checkpoint
+	// C2's instrument (§7, P58e E24). Zero for the life of the process is the passing value once
+	// every kind is native; see noteChildRoute for exactly what is (and is not) counted.
+	childRoutes atomic.Int64
 
 	// statsMu guards the router's own passively-observed snapshot of the child's last cache:stats
 	// push (A16, dataframe.go's observeChildEvent/mergedCacheStats) — a separate mutex from
@@ -95,6 +103,23 @@ func (r *Router) isNative(kind string) bool { return r.native[kind] }
 // Go-native connection when the Node engine child exits.
 func (r *Router) IsNativeKind(kind string) bool { return r.isNative(kind) }
 
+// noteChildRoute records that a request reached the Node engine child on behalf of a real
+// connection — the thing checkpoint C2 (P58 §0.3) must observe zero of before P58f's M10 deletes
+// the sidecar. It deliberately does NOT count the three kind-agnostic paths that survive a fully
+// native app: "ping" (A17, one per boot, paints the status bar), "cache:configure" (settings), and
+// "cache:clear" — none of them belongs to a connection, and none of them is what a forgotten kind
+// would look like. The slog line names the kind and the op because "the counter is 3" is not
+// actionable and "connection kind X still routes adapter:children to the child" is.
+func (r *Router) noteChildRoute(op, kind string) {
+	r.childRoutes.Add(1)
+	slog.Warn("adapterhost: routed a connection request to the Node engine child",
+		"scope", "adapterhost", "op", op, "kind", kind)
+}
+
+// ChildRoutes reports how many connection-scoped requests have reached the Node child in this
+// process's lifetime. Checkpoint C2's instrument; zero is the passing value.
+func (r *Router) ChildRoutes() int64 { return r.childRoutes.Load() }
+
 // ---- connections.Backend ----
 
 // Connect is the Go analogue of control.ts's handleConnect (native) or a plain forward to the
@@ -136,6 +161,7 @@ func (r *Router) connectNative(ctx context.Context, cfg model.ResolvedConnection
 }
 
 func (r *Router) connectViaChild(cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
+	r.noteChildRoute("connect", cfg.Kind)
 	payload, err := r.child.CallTimeout(enginehost.OpConnect, map[string]any{"config": cfg}, enginehost.ConnectTimeout)
 	if err != nil {
 		return connections.ConnectResult{}, err
@@ -181,6 +207,7 @@ func (r *Router) testNative(ctx context.Context, cfg model.ResolvedConnectionCon
 // normal {ok:false, error} response, not a thrown protocol error — CallTimeout's own error return
 // stays reserved for a genuine transport failure (timeout, engine down, unknown op).
 func (r *Router) testViaChild(cfg model.ResolvedConnectionConfig) (string, error) {
+	r.noteChildRoute("test", cfg.Kind)
 	payload, err := r.child.CallTimeout(enginehost.OpTest, map[string]any{"config": cfg}, enginehost.ConnectTimeout)
 	if err != nil {
 		return "", err
@@ -209,10 +236,11 @@ func (r *Router) testViaChild(cfg model.ResolvedConnectionConfig) (string, error
 // Disconnect routes on the connection's own kind (sites 1, 2, 5 all forward here — A11's own
 // count settled on three connections.Backend methods, not four).
 func (r *Router) Disconnect(ctx context.Context, connectionID string) error {
-	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
+	kind, _ := r.conns.KindOf(connectionID)
+	if r.isNative(kind) {
 		return r.disconnectNative(ctx, connectionID)
 	}
-	return r.disconnectViaChild(connectionID)
+	return r.disconnectViaChild(connectionID, kind)
 }
 
 func (r *Router) disconnectNative(ctx context.Context, connectionID string) error {
@@ -234,7 +262,8 @@ func (r *Router) disconnectNative(ctx context.Context, connectionID string) erro
 	return nil
 }
 
-func (r *Router) disconnectViaChild(connectionID string) error {
+func (r *Router) disconnectViaChild(connectionID, kind string) error {
+	r.noteChildRoute("disconnect", kind)
 	_, err := r.child.Call(enginehost.OpDisconnect, map[string]any{"connectionId": connectionID})
 	return err
 }
@@ -242,10 +271,11 @@ func (r *Router) disconnectViaChild(connectionID string) error {
 // ---- tree.Backend ----
 
 func (r *Router) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
+	kind, _ := r.conns.KindOf(connectionID)
+	if r.isNative(kind) {
 		return r.childrenNative(ctx, connectionID, path)
 	}
-	return r.childrenViaChild(connectionID, path)
+	return r.childrenViaChild(connectionID, path, kind)
 }
 
 func (r *Router) childrenNative(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
@@ -278,7 +308,8 @@ func (r *Router) childrenNative(ctx context.Context, connectionID string, path m
 	return children, nil
 }
 
-func (r *Router) childrenViaChild(connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
+func (r *Router) childrenViaChild(connectionID string, path model.NodePath, kind string) (adapters.TreeChildren, error) {
+	r.noteChildRoute("children", kind)
 	payload, err := r.child.Call(enginehost.OpChildren, map[string]any{"connectionId": connectionID, "path": path})
 	if err != nil {
 		return adapters.TreeChildren{}, err
@@ -299,10 +330,11 @@ func (r *Router) childrenViaChild(connectionID string, path model.NodePath) (ada
 }
 
 func (r *Router) Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
+	kind, _ := r.conns.KindOf(connectionID)
+	if r.isNative(kind) {
 		return r.describeNative(ctx, connectionID, path)
 	}
-	return r.describeViaChild(connectionID, path, tabID)
+	return r.describeViaChild(connectionID, path, tabID, kind)
 }
 
 func (r *Router) describeNative(ctx context.Context, connectionID string, path model.NodePath) (model.ObjectMeta, error) {
@@ -332,7 +364,8 @@ func (r *Router) describeNative(ctx context.Context, connectionID string, path m
 	return value.(model.ObjectMeta), nil
 }
 
-func (r *Router) describeViaChild(connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
+func (r *Router) describeViaChild(connectionID string, path model.NodePath, tabID *string, kind string) (model.ObjectMeta, error) {
+	r.noteChildRoute("describe", kind)
 	payload, err := r.child.Call(enginehost.OpDescribe, map[string]any{
 		"connectionId": connectionID, "path": path, "tabId": tabID,
 	})
@@ -349,10 +382,11 @@ func (r *Router) describeViaChild(connectionID string, path model.NodePath, tabI
 }
 
 func (r *Router) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
-	if kind, ok := r.conns.KindOf(connectionID); ok && r.isNative(kind) {
+	kind, _ := r.conns.KindOf(connectionID)
+	if r.isNative(kind) {
 		return r.definitionNative(ctx, connectionID, path)
 	}
-	return r.definitionViaChild(connectionID, path, tabID)
+	return r.definitionViaChild(connectionID, path, tabID, kind)
 }
 
 func (r *Router) definitionNative(ctx context.Context, connectionID string, path model.NodePath) (model.ObjectDefinition, error) {
@@ -379,7 +413,8 @@ func (r *Router) definitionNative(ctx context.Context, connectionID string, path
 	return value.(model.ObjectDefinition), nil
 }
 
-func (r *Router) definitionViaChild(connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
+func (r *Router) definitionViaChild(connectionID string, path model.NodePath, tabID *string, kind string) (model.ObjectDefinition, error) {
+	r.noteChildRoute("definition", kind)
 	payload, err := r.child.Call(enginehost.OpDefinition, map[string]any{
 		"connectionId": connectionID, "path": path, "tabId": tabID,
 	})
@@ -409,6 +444,10 @@ func (r *Router) Cancel(ctx context.Context, opID string) (bool, error) {
 	if r.child == nil {
 		return false, nil
 	}
+	// This fallback routes on op ownership, not kind (A13) — the router has no connection to look a
+	// kind up from here, so noteChildRoute's kind is empty. After M9.3 the Go scheduler owns every
+	// op, so this should never fire; if it does, it counts.
+	r.noteChildRoute("cancel", "")
 	payload, err := r.child.Call(enginehost.OpCancel, map[string]any{"opId": opID})
 	if err != nil {
 		return false, err

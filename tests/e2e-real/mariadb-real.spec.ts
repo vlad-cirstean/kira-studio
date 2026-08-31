@@ -11,19 +11,20 @@ import {
 import { installPassthrough } from './support/passthrough';
 
 // C1b (docs/v1/plans/P58b-mysql-sqlite-clickhouse.md §7) — the half of P58a's own C1 that could not
-// run before a second adapter went native: MariaDB (native as of M6.2) and a still-Node-served kind
-// coexisting in one running app, proving P58 D4's coexistence property for real rather than only in
-// adapterhost's own router unit tests. This sandbox has no real X display (P58a §13), so — as with
-// E2 — this is tests/e2e-real/'s own substitute: a real -tags server Go binary, real bindings, a
-// real MariaDB container and a real second container, reached over http://127.0.0.1 from a headless
-// browser tab.
+// run before a second adapter went native: MariaDB (native as of M6.2), proven end to end against a
+// real Go-native adapter in a running app, rather than only in adapterhost's own router unit tests.
+// This sandbox has no real X display (P58a §13), so — as with E2 — this is tests/e2e-real/'s own
+// substitute: a real -tags server Go binary, real bindings and a real MariaDB container, reached
+// over http://127.0.0.1 from a headless browser tab.
 //
-// The Node-served half is Kafka, not MongoDB (P58c C15) — MongoDB went native in this same
-// sub-phase (M7.3), which would otherwise have made this test's own coexistence assertion pass for
-// the wrong reason (both connections native, both surviving the kill, proving nothing). Kafka is
-// the last of the ten kinds to go native (P58e), so this is the last re-pointing this vehicle needs
-// before P58f retires the whole coexistence concept — see AGENTS.md's P58a/P58b/P58c findings for
-// why "the kind that goes native last" is the rule, not "whichever kind is convenient today".
+// This file's second test used to be C1b's coexistence half: MariaDB (native) proven to survive
+// killing the Node engine child while a still-Node-served kind (Kafka, moved here by P58c C14) did
+// not — the only evidence in the whole of P58 that P58 D4's coexistence property held in a running
+// app. Kafka went native in P58e M9.3, the last of the ten kinds to do so, and that retires the
+// property it proved: after M9.3 there is no Node-served kind left to coexist with. The second test
+// is now checkpoint C2's automated half instead (docs/v1/plans/P58e-kafka.md §7.3, P58e E21) — the
+// all-native survival proof that replaces it, using the same two connections and the same real
+// pgrep+SIGKILL vehicle.
 
 let maria: MariaFixture | null = null;
 let kafka: KafkaFixture | null = null;
@@ -134,22 +135,30 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   expect(consoleErrors).toEqual([]);
 });
 
-// Steps 11-12 of C1b's own checklist: the coexistence half. This is the load-bearing test in this
-// file — the only evidence in the entire P58 phase that the coexistence property (P58 D4) holds in
-// a running app, not only in adapterhost's own router unit tests.
-test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-served) does not', async ({
+// C2: every connection survives killing the Node engine child — nothing is Node-served any more
+// (docs/v1/plans/P58e-kafka.md §7.3, P58e E21). P58 D4's coexistence property was proven three
+// times (checkpoint C1b, checkpoint C1c, and every P58d flip's own sweep) and cannot be proven a
+// fourth time, because after P58e M9.3 there is nothing left for a native kind to coexist with. What
+// replaces it: kill the child entirely, and both connections — one that was native from M6.2, one
+// that only became native in this same milestone — keep their status, keep serving reads, and the
+// status bar's own engine indicator is the only thing that notices the child is gone.
+test('C2: every connection survives killing the Node engine child — nothing is Node-served any more', async ({
   kira,
   consoleErrors,
 }) => {
+  // bridge/port.ts's own request() has a 30s DEFAULT_TIMEOUT_MS with no override for "ping"
+  // (src/ is untouched, P58e E23) — the engine-status "down" assertion below cannot resolve faster
+  // than that timeout fires, so this test needs more room than the file's other, faster ones.
+  test.setTimeout(120_000);
+
   if (!maria) throw new Error('mariadb fixture did not start');
   if (!kafka) throw new Error('kafka fixture did not start');
   const { window: page, serverPid } = kira;
   await installPassthrough(page);
 
-  // The native half, connected first.
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-mariadb"]');
-  await page.fill('[data-testid="connection-name"]', 'Coexist MariaDB');
+  await page.fill('[data-testid="connection-name"]', 'Survive MariaDB');
   await page.fill('[data-testid="connection-host"]', maria.config.host ?? '');
   await page.fill('[data-testid="connection-port"]', String(maria.config.port));
   await page.fill('[data-testid="connection-database"]', maria.config.database ?? '');
@@ -162,21 +171,22 @@ test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-
 
   const mariaRow = page
     .locator('[data-testid="tree-row"][data-kind="connection"]')
-    .filter({ hasText: 'Coexist MariaDB' });
+    .filter({ hasText: 'Survive MariaDB' });
   await mariaRow.click({ button: 'right' });
   await page.click('[data-testid="menu-item-connect"]');
   await expect(mariaRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 15_000,
   });
 
-  // Step 11: the Node-served half, in the same session — its own tree expands and a topic opens
-  // and renders a stream page, all via the Node child's own index-keyed chunk encoding (still the
-  // proof toTypedArray's second branch is needed and still works, P58a A10). Kafka has no
-  // database:/schema: levels at all — topics sit directly under the connection root — so unlike
-  // MongoDB there is no `kira_test`-named-database collision with MariaDB's own tree to sidestep.
+  // Kafka, in the same session — its own tree expands and a topic opens and renders a stream page,
+  // now through the Go-native adapter's own base64-encoded StreamPage (toTypedArray's first branch)
+  // rather than the Node child's index-keyed chunks: the app's first native Kafka read, and the
+  // first native offsetWindow position ever to cross the wire. Kafka has no database:/schema:
+  // levels at all — topics sit directly under the connection root — so there is no `kira_test`-named
+  // node collision with MariaDB's own tree to sidestep.
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-kafka"]');
-  await page.fill('[data-testid="connection-name"]', 'Coexist Kafka');
+  await page.fill('[data-testid="connection-name"]', 'Survive Kafka');
   await page.fill('[data-testid="connection-host"]', kafka.host);
   await page.fill('[data-testid="connection-port"]', String(kafka.port));
   await page.click('[data-testid="connection-save"]');
@@ -186,7 +196,7 @@ test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-
 
   const kafkaRow = page
     .locator('[data-testid="tree-row"][data-kind="connection"]')
-    .filter({ hasText: 'Coexist Kafka' });
+    .filter({ hasText: 'Survive Kafka' });
   await kafkaRow.click({ button: 'right' });
   await page.click('[data-testid="menu-item-connect"]');
   const kafkaStatusDot = kafkaRow.locator('.status-dot');
@@ -198,28 +208,21 @@ test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-
   await ordersTopicRow.dblclick();
   const streamView = page.locator('[data-testid="stream-view"][data-path="topic:orders"]');
   await expect(streamView).toBeVisible({ timeout: 10_000 });
-  // The seeded orders topic's real messages, rendered through a real stream page — proof this
-  // is a live read from the Node-served adapter, not a canned fixture.
+  // The seeded orders topic's real messages, rendered through a real stream page — proof this is a
+  // live read from the native Go adapter, not a canned fixture.
   await expect(streamView.locator('[data-testid="stream-row"]').first()).toBeVisible({
     timeout: 10_000,
   });
 
-  // After reload, the MariaDB row above is stale — re-locate both by their now-restored state.
-  const mariaRowAfterReload = page
-    .locator('[data-testid="tree-row"][data-kind="connection"]')
-    .filter({ hasText: 'Coexist MariaDB' });
-  await expect(mariaRowAfterReload.locator('.status-dot')).toHaveAttribute(
-    'data-status',
-    'connected',
-    {
-      timeout: 15_000,
-    },
-  );
+  // Both connections are up and the child is confirmed alive before it dies — a zero-traffic count
+  // from a child that never started proves nothing (P58e §7.3 step 5).
+  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
+    timeout: 15_000,
+  });
 
-  // Step 12: the Node child is a direct child of the real server process — found the same way the
-  // plan's own checklist describes (`ps --forest`-equivalent), not guessed at by name, since the
-  // vendored Node runtime's own binary name is an implementation detail this test should not
-  // depend on.
+  // The Node child is a direct child of the real server process — found the same way the plan's own
+  // checklist describes (`ps --forest`-equivalent), not guessed at by name, since the vendored Node
+  // runtime's own binary name is an implementation detail this test should not depend on.
   const childPidsRaw = execFileSync('pgrep', ['-P', String(serverPid)], {
     encoding: 'utf8',
   }).trim();
@@ -229,41 +232,50 @@ test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-
     process.kill(pid, 'SIGKILL');
   }
 
-  // The Kafka connection (Node-served) flips to error; the MariaDB connection (native) stays
-  // connected and still serves a read. If MariaDB also flips, MarkAllErrored was not narrowed to
-  // Node-served kinds (P58a A15) — or was narrowed against a stale nativeKinds snapshot.
-  await expect(kafkaStatusDot).toHaveAttribute('data-status', 'error', { timeout: 15_000 });
-  await expect(mariaRowAfterReload.locator('.status-dot')).toHaveAttribute(
-    'data-status',
-    'connected',
-  );
+  // Give the death-detection loop (connections.Service's own engine:down subscription,
+  // MarkAllErrored's trigger) a window to have fired — it reacts to the same local process-exit
+  // event the log line above proves already happened, so this is generous, not a guess at a real
+  // delay — then confirm neither connection moved: MarkAllErrored still runs on every engine exit,
+  // but its Node-served narrowing (P58a A15) now skips every kind, so it emits nothing.
+  await page.waitForTimeout(2_000);
+  await expect(mariaRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected');
+  await expect(kafkaStatusDot).toHaveAttribute('data-status', 'connected');
 
-  // Both connections' states persist across a reload too, not just in the live session — unlike
-  // the MongoDB pairing this test used before P58c (P58c C15), Kafka's tree has no `database:`
-  // segment at all, so there is no `kira_test`-named-node collision with MariaDB's own tree left
-  // to sidestep here.
+  // The status bar's engine indicator is the one thing that does notice — it pings once per
+  // boot/reload with no timer of its own (P58a A17), so the reload below is what surfaces the dead
+  // child. Unlike everything else in this file, this cannot resolve quickly: bridge/port.ts's
+  // request() has a 30s DEFAULT_TIMEOUT_MS and "ping" gets no override, so the dead child's silent
+  // non-answer only becomes "down" once that timeout fires.
   await page.reload();
   await page.waitForSelector('[data-testid="status-bar"]');
+  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute(
+    'data-status',
+    'down',
+    {
+      timeout: 35_000,
+    },
+  );
+
+  // Both connections' states persist across the reload too, not just in the live session.
   const mariaRowFinal = page
     .locator('[data-testid="tree-row"][data-kind="connection"]')
-    .filter({ hasText: 'Coexist MariaDB' });
+    .filter({ hasText: 'Survive MariaDB' });
   await expect(mariaRowFinal.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 15_000,
   });
   const kafkaRowFinal = page
     .locator('[data-testid="tree-row"][data-kind="connection"]')
-    .filter({ hasText: 'Coexist Kafka' });
-  await expect(kafkaRowFinal.locator('.status-dot')).toHaveAttribute('data-status', 'error', {
+    .filter({ hasText: 'Survive Kafka' });
+  await expect(kafkaRowFinal.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 15_000,
   });
 
+  // A read through each still-connected adapter, after the reload — proof neither ever depended on
+  // the Node child that is now dead.
   await mariaRowFinal.locator('.twisty').click();
   const mariaDbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');
   await expect(mariaDbRow).toBeVisible({ timeout: 10_000 });
   await mariaDbRow.locator('.twisty').click();
-
-  // A read through the still-native, still-connected MariaDB adapter — proof it never depended on
-  // the Node child that just died.
   const regionsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/table:regions"]',
   );
@@ -271,6 +283,16 @@ test('C1b: MariaDB (native) survives killing the Node engine child; Kafka (Node-
   await regionsRow.dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('[data-testid="grid-row"]').first()).toBeVisible({ timeout: 10_000 });
+
+  await kafkaRowFinal.locator('.twisty').click();
+  const ordersTopicRowFinal = page.locator('[data-testid="tree-row"][data-path="topic:orders"]');
+  await expect(ordersTopicRowFinal).toBeVisible({ timeout: 10_000 });
+  await ordersTopicRowFinal.dblclick();
+  const streamViewFinal = page.locator('[data-testid="stream-view"][data-path="topic:orders"]');
+  await expect(streamViewFinal).toBeVisible({ timeout: 10_000 });
+  await expect(streamViewFinal.locator('[data-testid="stream-row"]').first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   expect(consoleErrors.filter((e) => !e.includes('WebSocket'))).toEqual([]);
 });

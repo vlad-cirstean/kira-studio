@@ -25,6 +25,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/s3"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqlite"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqs"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/kafka"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
 	"github.com/kirathecat/kira-studio/shell/internal/config"

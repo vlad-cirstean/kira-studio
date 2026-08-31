@@ -78,6 +78,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 
 	kind, known := r.conns.KindOf(connProbe.ConnectionID)
 	if !known || !r.isNative(kind) {
+		r.noteChildRoute(probe.Op, kind)
 		r.forwardToChild(frame)
 		return
 	}
