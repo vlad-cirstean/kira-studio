@@ -1,0 +1,935 @@
+// Ported from tests/db/kafka.spec.ts, case by case where practical — the spec's own numbering is
+// kept in each test's name so the two can be diffed. docs/v1/plans/P58e-kafka.md §5.3 names the
+// six cases that carry the most weight: scenario 17 (a browse joins no consumer group) and 18 (a
+// browse commits no offsets) are rewritten to check the broker directly rather than trusting the
+// adapter; scenario 21 (a transaction's commit marker still terminates the browse) is the single
+// most important test in the suite, since it pins the P43 iter2 F19/D26 regression; scenario 6's
+// Configuration half is inverted, not ported (P58e E11's capability recovery); scenario 1 gains a
+// cluster-id assertion (P58e E15); and the mid-browse cancellation case (new, alongside 15) is the
+// one P58e E3 exists to keep correct. §9 M9.1: this file lands failing — no "kafka" adapter is
+// registered yet (M9.2) — and every test below fails at CreateAdapter with E_UNSUPPORTED
+// "kafka connections are not supported yet", which is the right reason for this milestone.
+package kafka_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/twmb/franz-go/pkg/kgo"
+
+	"github.com/kirathecat/kira-studio/shell/internal/adapters"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/kafka"
+	"github.com/kirathecat/kira-studio/shell/internal/adapters/testsupport"
+	"github.com/kirathecat/kira-studio/shell/internal/page"
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
+)
+
+var deps = adapters.Deps{Log: func(level, message string) {}}
+
+func newAdapter(t *testing.T) adapters.Adapter {
+	t.Helper()
+	a, err := adapters.CreateAdapter("kafka", deps)
+	if err != nil {
+		t.Fatalf("CreateAdapter: %v", err)
+	}
+	return a
+}
+
+func connectedAdapter(t *testing.T, f *testsupport.KafkaFixture) adapters.Adapter {
+	t.Helper()
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), f.Config, adapters.NewOpCtx("connect")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+	return a
+}
+
+func nodePath(f *testsupport.KafkaFixture, segments ...model.PathSegment) model.NodePath {
+	return testsupport.NodePath(f.Config.ID, segments...)
+}
+
+func topicPath(f *testsupport.KafkaFixture, topic string) model.NodePath {
+	return nodePath(f, testsupport.Seg("topic", topic))
+}
+
+func groupPath(f *testsupport.KafkaFixture, group string) model.NodePath {
+	return nodePath(f, testsupport.Seg("consumerGroup", group))
+}
+
+func offsetRead(path model.NodePath, pageSize int) adapters.ReadRequest {
+	return adapters.ReadRequest{Path: path, PageSize: pageSize, Cursor: model.PageCursor{Mode: "offset", Offset: 0}}
+}
+
+// rowSeq reads a seeded/produced message's {"seq": N} body back into an int.
+func rowSeq(t *testing.T, sp page.StreamPage, row int) int {
+	t.Helper()
+	body := testsupport.StreamBodyAt(t, sp, row)
+	if body == nil {
+		t.Fatalf("row %d: body is nil", row)
+	}
+	var v struct {
+		Seq int `json:"seq"`
+	}
+	if err := json.Unmarshal([]byte(*body), &v); err != nil {
+		t.Fatalf("row %d: body %q: %v", row, *body, err)
+	}
+	return v.Seq
+}
+
+// sameStrings compares two string slices as sets, without mutating either argument.
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	ac := append([]string(nil), a...)
+	bc := append([]string(nil), b...)
+	sort.Strings(ac)
+	sort.Strings(bc)
+	for i := range ac {
+		if ac[i] != bc[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// 1. connect / disconnect. Extended per P58e E15: ConnectInfo.Details now carries a real cluster
+// id (P32 D13's recovery) alongside the live broker count, not merely a configured-address count.
+func TestKafka_ConnectDisconnect(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := newAdapter(t)
+
+	info, err := a.Connect(context.Background(), f.Config, adapters.NewOpCtx("op-1"))
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if info.ServerVersion != "Kafka" {
+		t.Errorf("ServerVersion = %q, want Kafka", info.ServerVersion)
+	}
+	if info.Details["brokers"] == "" {
+		t.Error("Details[brokers] is empty, want a live broker count")
+	}
+	if info.Details["cluster"] == "" {
+		t.Error("Details[cluster] is empty, want a real cluster id (P58e E15)")
+	}
+	if err := a.Disconnect(context.Background()); err != nil {
+		t.Fatalf("Disconnect: %v", err)
+	}
+
+	if _, err := a.Children(context.Background(), nodePath(f), adapters.NewOpCtx("op-1b")); err == nil {
+		t.Fatal("Children after disconnect: want an error")
+	} else if code, _ := adapters.CodeOf(err); code != adapters.CodeConnect {
+		t.Errorf("code = %v, want E_CONNECT", code)
+	}
+}
+
+// 2. cap honesty. Collapses to a plain caps assertion (§5.3) — no container needed.
+func TestKafka_Caps(t *testing.T) {
+	a := newAdapter(t)
+	c := a.Caps()
+	if c.Tabular {
+		t.Error("Tabular = true, want false")
+	}
+	if !c.Stream {
+		t.Error("Stream = false, want true")
+	}
+	if c.DefaultPageKind != page.PageKindStream {
+		t.Errorf("DefaultPageKind = %v, want stream", c.DefaultPageKind)
+	}
+	if !c.Definition {
+		t.Error("Definition = false, want true")
+	}
+	if c.SQL {
+		t.Error("SQL = true, want false")
+	}
+	if !c.ExactCount {
+		t.Error("ExactCount = false, want true")
+	}
+	if c.Pagination != adapters.PaginationOffsetWindow {
+		t.Errorf("Pagination = %v, want offsetWindow", c.Pagination)
+	}
+	if !c.CanInsert || c.CanUpdate || c.CanDelete {
+		t.Errorf("CanInsert/CanUpdate/CanDelete = %v/%v/%v, want true/false/false", c.CanInsert, c.CanUpdate, c.CanDelete)
+	}
+	if !c.Writable {
+		t.Error("Writable = false, want true")
+	}
+	if !c.Cancel {
+		t.Error("Cancel = false, want true")
+	}
+	if c.FileTransfer {
+		t.Error("FileTransfer = true, want false")
+	}
+}
+
+// 3. tree enumeration: root is topics + consumer groups, siblings.
+func TestKafka_Children_RootIsTopicsAndGroups(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	children, err := a.Children(context.Background(), nodePath(f), adapters.NewOpCtx("op-3"))
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	var topics, groups []string
+	for _, n := range children.Nodes {
+		switch n.Kind {
+		case "topic":
+			topics = append(topics, n.Name)
+		case "consumerGroup":
+			groups = append(groups, n.Name)
+			if n.HasChildren {
+				t.Errorf("group %s: HasChildren = true, want false", n.Name)
+			}
+		}
+	}
+	if !sameStrings(topics, []string{testsupport.KafkaEmptyTopic, testsupport.KafkaOrdersTopic}) {
+		t.Errorf("topics = %v, want [%s %s]", topics, testsupport.KafkaEmptyTopic, testsupport.KafkaOrdersTopic)
+	}
+	if !sameStrings(groups, []string{testsupport.KafkaConsumerGroup}) {
+		t.Errorf("groups = %v, want [%s]", groups, testsupport.KafkaConsumerGroup)
+	}
+}
+
+// 4. tree enumeration: a topic node has hasChildren:false (P23 D3), children() still works — the
+// tree no longer expands a topic, but StreamView.vue's partition filter is a second, live caller
+// of exactly this call (index.ts:69-77).
+func TestKafka_Children_TopicHasNoChildrenButPartitionsEnumerate(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	root, err := a.Children(context.Background(), nodePath(f), adapters.NewOpCtx("op-4a"))
+	if err != nil {
+		t.Fatalf("Children root: %v", err)
+	}
+	var ordersNode *model.TreeNode
+	for i := range root.Nodes {
+		if root.Nodes[i].Kind == "topic" && root.Nodes[i].Name == testsupport.KafkaOrdersTopic {
+			ordersNode = &root.Nodes[i]
+		}
+	}
+	if ordersNode == nil {
+		t.Fatal("orders topic node not found")
+	}
+	if ordersNode.HasChildren {
+		t.Error("orders node: HasChildren = true, want false (P23 D3)")
+	}
+
+	partitions, err := a.Children(context.Background(), topicPath(f, testsupport.KafkaOrdersTopic), adapters.NewOpCtx("op-4b"))
+	if err != nil {
+		t.Fatalf("Children partitions: %v", err)
+	}
+	if len(partitions.Nodes) != testsupport.KafkaOrdersPartitionCount {
+		t.Errorf("partitions = %d, want %d", len(partitions.Nodes), testsupport.KafkaOrdersPartitionCount)
+	}
+	var names []string
+	for _, n := range partitions.Nodes {
+		if n.Kind != "partition" || n.HasChildren {
+			t.Errorf("node %+v: want kind=partition, hasChildren=false", n)
+		}
+		names = append(names, n.Name)
+	}
+	if !sameStrings(names, []string{"0", "1"}) {
+		t.Errorf("partition names = %v, want [0 1]", names)
+	}
+}
+
+// 5. children of a leaf (partition / consumer group).
+func TestKafka_Children_LeavesAreEmpty(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	partitionLeaf := nodePath(f, testsupport.Seg("topic", testsupport.KafkaOrdersTopic), testsupport.Seg("partition", "0"))
+	partitionChildren, err := a.Children(context.Background(), partitionLeaf, adapters.NewOpCtx("op-5a"))
+	if err != nil {
+		t.Fatalf("Children partition leaf: %v", err)
+	}
+	if len(partitionChildren.Nodes) != 0 {
+		t.Errorf("Nodes = %v, want empty", partitionChildren.Nodes)
+	}
+
+	groupChildren, err := a.Children(context.Background(), groupPath(f, testsupport.KafkaConsumerGroup), adapters.NewOpCtx("op-5b"))
+	if err != nil {
+		t.Fatalf("Children group leaf: %v", err)
+	}
+	if len(groupChildren.Nodes) != 0 {
+		t.Errorf("Nodes = %v, want empty", groupChildren.Nodes)
+	}
+}
+
+// 6. describe stays unsupported; definition shows a topic and a consumer group. The Configuration
+// half is INVERTED, not ported (P58e E11): kafka.spec.ts 6 asserts an empty Configuration section
+// plus a "DescribeConfigs" note, because the TypeScript client has no DescribeConfigs call at all.
+// kadm.DescribeTopicConfigs recovers that capability (confirmed against a real broker by KF-1 and
+// inventoried by KF-4(b): 32 real config rows, cleanup.policy and retention.ms both present and
+// stable), so this test asserts the opposite of its TypeScript ancestor.
+func TestKafka_DescribeUnsupported_DefinitionConfigurationIsPopulated(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	if _, err := a.Describe(ctx, topicPath(f, testsupport.KafkaOrdersTopic), adapters.NewOpCtx("op-6a")); err == nil {
+		t.Fatal("Describe: want an error")
+	} else if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Errorf("Describe code = %v, want E_UNSUPPORTED", code)
+	}
+
+	topicDef, err := a.Definition(ctx, topicPath(f, testsupport.KafkaOrdersTopic), adapters.NewOpCtx("op-6b"))
+	if err != nil {
+		t.Fatalf("Definition(topic): %v", err)
+	}
+	if topicDef.Kind != "topic" {
+		t.Errorf("Kind = %q, want topic", topicDef.Kind)
+	}
+	var partitions, config *model.DefinitionSection
+	var titles []string
+	for i := range topicDef.Sections {
+		titles = append(titles, topicDef.Sections[i].Title)
+		switch topicDef.Sections[i].Title {
+		case "Partitions":
+			partitions = &topicDef.Sections[i]
+		case "Configuration":
+			config = &topicDef.Sections[i]
+		}
+	}
+	if !sameStrings(titles, []string{"Partitions", "Configuration"}) {
+		t.Errorf("section titles = %v, want [Partitions Configuration]", titles)
+	}
+	if partitions == nil || len(partitions.Rows) != testsupport.KafkaOrdersPartitionCount {
+		t.Fatalf("Partitions section = %+v, want %d rows", partitions, testsupport.KafkaOrdersPartitionCount)
+	}
+	leaderPattern := regexp.MustCompile(`^leader \d+$`)
+	for _, r := range partitions.Rows {
+		if !leaderPattern.MatchString(r.Value) {
+			t.Errorf("partition row %+v: value doesn't match /^leader \\d+$/", r)
+		}
+	}
+	if config == nil || len(config.Rows) == 0 {
+		t.Fatal("Configuration section is empty, want real rows (P58e E11)")
+	}
+	foundKnownKey := false
+	for _, r := range config.Rows {
+		if r.Name == "cleanup.policy" || r.Name == "retention.ms" {
+			foundKnownKey = true
+		}
+	}
+	if !foundKnownKey {
+		t.Errorf("Configuration rows = %+v, want to contain cleanup.policy or retention.ms", config.Rows)
+	}
+	for _, n := range topicDef.Notes {
+		if strings.Contains(n, "DescribeConfigs") {
+			t.Errorf("notes = %v, want nothing mentioning DescribeConfigs (the capability came back)", topicDef.Notes)
+		}
+	}
+
+	// The seed consumer group has real committed offsets but no active members — the "empty
+	// section, not an empty tab" case.
+	groupDef, err := a.Definition(ctx, groupPath(f, testsupport.KafkaConsumerGroup), adapters.NewOpCtx("op-6c"))
+	if err != nil {
+		t.Fatalf("Definition(group): %v", err)
+	}
+	if groupDef.Kind != "consumerGroup" {
+		t.Errorf("Kind = %q, want consumerGroup", groupDef.Kind)
+	}
+	var groupTitles []string
+	var groupSection, offsets *model.DefinitionSection
+	for i := range groupDef.Sections {
+		groupTitles = append(groupTitles, groupDef.Sections[i].Title)
+		switch groupDef.Sections[i].Title {
+		case "Group":
+			groupSection = &groupDef.Sections[i]
+		case "Committed offsets":
+			offsets = &groupDef.Sections[i]
+		}
+	}
+	// P58e E13: kadm.DescribedGroup has no Type field, so the group definition loses its `type`
+	// row and definition.ts's numeric-enum apparatus (reverseLookup) is deleted, not ported —
+	// State is already a string on this client.
+	if !sameStrings(groupTitles, []string{"Group", "Members", "Committed offsets"}) {
+		t.Errorf("group section titles = %v, want [Group Members Committed offsets]", groupTitles)
+	}
+	if groupSection == nil {
+		t.Fatal("Group section missing")
+	}
+	var stateValue string
+	for _, r := range groupSection.Rows {
+		if r.Name == "state" {
+			stateValue = r.Value
+		}
+	}
+	if matched, _ := regexp.MatchString(`^[A-Za-z ]+$`, stateValue); !matched {
+		t.Errorf("state = %q, want a name, not a bare digit", stateValue)
+	}
+	if offsets == nil || len(offsets.Rows) != testsupport.KafkaOrdersPartitionCount {
+		t.Fatalf("Committed offsets section = %+v, want %d rows", offsets, testsupport.KafkaOrdersPartitionCount)
+	}
+	var offsetNames []string
+	for _, r := range offsets.Rows {
+		offsetNames = append(offsetNames, r.Name)
+	}
+	want := []string{fmt.Sprintf("%s[0]", testsupport.KafkaOrdersTopic), fmt.Sprintf("%s[1]", testsupport.KafkaOrdersTopic)}
+	if !sameStrings(offsetNames, want) {
+		t.Errorf("offset row names = %v, want %v", offsetNames, want)
+	}
+}
+
+// 7. read: browses a topic across partitions, offsetWindow pagination.
+func TestKafka_Read_BrowsesAcrossPartitions(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	p, err := a.Read(context.Background(), offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), testsupport.KafkaOrdersMessageCount), adapters.NewOpCtx("op-7"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	sp, ok := p.(page.StreamPage)
+	if !ok {
+		t.Fatalf("Read returned %T, want page.StreamPage", p)
+	}
+	if sp.Position.Strategy != "offsetWindow" {
+		t.Errorf("Strategy = %q, want offsetWindow", sp.Position.Strategy)
+	}
+	if sp.RowCount != testsupport.KafkaOrdersMessageCount {
+		t.Errorf("RowCount = %d, want %d", sp.RowCount, testsupport.KafkaOrdersMessageCount)
+	}
+	if sp.Position.HasMore {
+		t.Error("HasMore = true, want false")
+	}
+	if sp.VisibilityTimeoutSeconds != nil {
+		t.Errorf("VisibilityTimeoutSeconds = %v, want nil", sp.VisibilityTimeoutSeconds)
+	}
+
+	keyPattern := regexp.MustCompile(`^key-\d$`)
+	seqs := make([]int, sp.RowCount)
+	for r := 0; r < sp.RowCount; r++ {
+		key := testsupport.StreamKeyAt(t, sp, r)
+		if key == nil || !keyPattern.MatchString(*key) {
+			t.Errorf("row %d: key = %v, want /^key-\\d$/", r, key)
+		}
+		headers := testsupport.StreamHeadersAt(t, sp, r)
+		if headers == nil {
+			t.Fatalf("row %d: headers is nil", r)
+		}
+		var h map[string]any
+		if err := json.Unmarshal([]byte(*headers), &h); err != nil {
+			t.Fatalf("row %d: headers %q: %v", r, *headers, err)
+		}
+		if h["source"] != "seed" {
+			t.Errorf("row %d: headers.source = %v, want seed", r, h["source"])
+		}
+		attrs := testsupport.StreamAttrsAt(t, sp, r)
+		if attrs == nil {
+			t.Fatalf("row %d: attrs is nil", r)
+		}
+		var rawAttrs map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(*attrs), &rawAttrs); err != nil {
+			t.Fatalf("row %d: attrs %q: %v", r, *attrs, err)
+		}
+		// P58e E8: the number/string asymmetry ports verbatim — partition is a JSON number,
+		// offset a JSON string.
+		var partitionNum float64
+		if err := json.Unmarshal(rawAttrs["partition"], &partitionNum); err != nil {
+			t.Errorf("row %d: attrs.partition is not a JSON number: %v", r, err)
+		}
+		var offsetStr string
+		if err := json.Unmarshal(rawAttrs["offset"], &offsetStr); err != nil {
+			t.Errorf("row %d: attrs.offset is not a JSON string: %v", r, err)
+		}
+		if ts := testsupport.StreamTimestampAt(t, sp, r); ts == nil {
+			t.Errorf("row %d: timestamp is nil, want a value", r)
+		}
+		seqs[r] = rowSeq(t, sp, r)
+	}
+	sort.Ints(seqs)
+	for i, s := range seqs {
+		if s != i {
+			t.Errorf("seqs = %v, want 0..%d", seqs, testsupport.KafkaOrdersMessageCount-1)
+			break
+		}
+	}
+}
+
+// 8. read: a smaller page size pages forward with a token.
+func TestKafka_Read_PagesForwardWithToken(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	seen := make(map[int]bool)
+	cursor := model.PageCursor{Mode: "offset", Offset: 0}
+	for guard := 0; guard < testsupport.KafkaOrdersMessageCount+2; guard++ {
+		req := adapters.ReadRequest{Path: topicPath(f, testsupport.KafkaOrdersTopic), PageSize: 2, Cursor: cursor}
+		p, err := a.Read(context.Background(), req, adapters.NewOpCtx(fmt.Sprintf("op-8-%d", guard)))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		sp := p.(page.StreamPage)
+		for r := 0; r < sp.RowCount; r++ {
+			seen[rowSeq(t, sp, r)] = true
+		}
+		if !sp.Position.HasMore {
+			break
+		}
+		if sp.Position.NextToken == nil {
+			t.Fatal("expected a nextToken on a truncated page")
+		}
+		cursor = model.PageCursor{Mode: "after", Token: *sp.Position.NextToken}
+	}
+	if len(seen) != testsupport.KafkaOrdersMessageCount {
+		t.Errorf("seen = %d distinct messages, want %d", len(seen), testsupport.KafkaOrdersMessageCount)
+	}
+}
+
+// 9. read: an empty topic returns a terminal empty page.
+func TestKafka_Read_EmptyTopicIsTerminalEmptyPage(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	p, err := a.Read(context.Background(), offsetRead(topicPath(f, testsupport.KafkaEmptyTopic), 10), adapters.NewOpCtx("op-9"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	sp := p.(page.StreamPage)
+	if sp.RowCount != 0 || sp.Position.HasMore {
+		t.Errorf("RowCount/HasMore = %d/%v, want 0/false", sp.RowCount, sp.Position.HasMore)
+	}
+}
+
+// 10. read: forward-only — a "before" cursor is E_UNSUPPORTED.
+func TestKafka_Read_BeforeCursorIsUnsupported(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	req := adapters.ReadRequest{Path: topicPath(f, testsupport.KafkaOrdersTopic), PageSize: 10, Cursor: model.PageCursor{Mode: "before", Token: "anything"}}
+	_, err := a.Read(context.Background(), req, adapters.NewOpCtx("op-10"))
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Errorf("code = %v, want E_UNSUPPORTED", code)
+	}
+}
+
+// 11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND. Re-baselined (P58e E12): a missing
+// topic surfaces inside ListedOffsets' own per-partition Err, not as a returned error from
+// ListStartOffsets/ListEndOffsets — a literal try/catch port would silently return an empty
+// window set and a blank page. KF-4(d) measured this at ~4ms against a real broker, nowhere near
+// kafka.spec.ts 11's 20s allowance for kafkajs's own metadata-retry budget, so no extended timeout
+// is needed here.
+func TestKafka_Read_NonexistentTopicIsQueryError(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	_, err := a.Read(context.Background(), offsetRead(topicPath(f, "this-topic-was-never-created"), 10), adapters.NewOpCtx("op-11"))
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
+		t.Errorf("code = %v, want E_QUERY", code)
+	}
+}
+
+// 12. count: exact via high/low watermark subtraction.
+func TestKafka_Count_ExactViaWatermarkSubtraction(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	got, err := a.Count(ctx, adapters.CountRequest{Path: topicPath(f, testsupport.KafkaOrdersTopic)}, adapters.NewOpCtx("op-12a"))
+	if err != nil {
+		t.Fatalf("Count(orders): %v", err)
+	}
+	if got.Value != testsupport.KafkaOrdersMessageCount || !got.Exact {
+		t.Errorf("Count(orders) = %+v, want {%d true}", got, testsupport.KafkaOrdersMessageCount)
+	}
+	gotEmpty, err := a.Count(ctx, adapters.CountRequest{Path: topicPath(f, testsupport.KafkaEmptyTopic)}, adapters.NewOpCtx("op-12b"))
+	if err != nil {
+		t.Fatalf("Count(empty): %v", err)
+	}
+	if gotEmpty.Value != 0 || !gotEmpty.Exact {
+		t.Errorf("Count(empty) = %+v, want {0 true}", gotEmpty)
+	}
+}
+
+// 13. preview/mutate: update/delete/execute stay unsupported (D13, canUpdate/canDelete false).
+// Only insert (produce) is supported — see test 16 for that path working end to end.
+func TestKafka_UpdateDeleteExecuteStayUnsupported(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	previewPlan := model.MutationPlan{Path: topicPath(f, testsupport.KafkaOrdersTopic), Ops: []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{}}}}
+	if _, err := a.Preview(previewPlan); err == nil {
+		t.Fatal("Preview: want an error")
+	} else if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Errorf("Preview code = %v, want E_UNSUPPORTED", code)
+	}
+
+	updatePlan := model.MutationPlan{Path: topicPath(f, testsupport.KafkaOrdersTopic), Ops: []model.MutationRowOp{{Kind: "update", Key: model.RowValues{}, Changes: model.RowValues{}}}}
+	if _, err := a.Mutate(context.Background(), updatePlan, adapters.NewOpCtx("op-13a")); err == nil {
+		t.Fatal("Mutate update: want an error")
+	} else if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Errorf("Mutate code = %v, want E_UNSUPPORTED", code)
+	}
+
+	req := model.ConsoleRequest{Path: topicPath(f, testsupport.KafkaOrdersTopic), Statements: []string{"x"}}
+	if _, err := a.Execute(context.Background(), req, adapters.NewOpCtx("op-13b")); err == nil {
+		t.Fatal("Execute: want an error")
+	} else if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Errorf("Execute code = %v, want E_UNSUPPORTED", code)
+	}
+}
+
+// 14. cancel is a permanent no-op (D6/D14).
+func TestKafka_Cancel_PermanentNoOp(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	ok, err := a.Cancel(context.Background(), "some-op-id")
+	if err != nil || ok {
+		t.Errorf("Cancel = %v/%v, want false/nil", ok, err)
+	}
+}
+
+// 15. read: an already-cancelled context aborts the browse before anything runs.
+func TestKafka_Read_AlreadyCancelledContext(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := a.Read(ctx, offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), 10), adapters.NewOpCtx("op-15"))
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeCancelled {
+		t.Errorf("code = %v, want E_CANCELLED", code)
+	}
+}
+
+// 15b. NEW (§5.3): a mid-browse cancellation — the case scenario 15 alone cannot reach, since an
+// already-cancelled context never reaches PollRecords. P58e E3: kgo.Client.PollRecords returns a
+// Fetches, not an error, and injects a fake fetch carrying ctx.Err() on cancellation — a literal
+// port that inspects only returned errors would keep polling against a dead context. KF-2(a)
+// measured real cancellation latency around 100-300ms in this environment, well under kgo's own
+// FetchMaxWait.
+func TestKafka_Read_MidBrowseCancellation(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		_, err := a.Read(ctx, offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), testsupport.KafkaOrdersMessageCount), adapters.NewOpCtx("op-15b"))
+		errCh <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		elapsed := time.Since(start)
+		if err == nil {
+			t.Fatal("want an error")
+		}
+		if code, _ := adapters.CodeOf(err); code != adapters.CodeCancelled {
+			t.Errorf("code = %v, want E_CANCELLED", code)
+		}
+		if elapsed > 5*time.Second {
+			t.Errorf("Read returned after %s, want well under FetchMaxWait", elapsed)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Read did not return within 10s of cancellation")
+	}
+}
+
+// 16. mutate: producing a message actually appears in a fresh browse (canInsert). P58e E27: its
+// own topic, never empty-topic — orders and empty-topic stay read-only fixtures.
+func TestKafka_Mutate_ProduceThenBrowse(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	const topic = "test-16-produce"
+	testsupport.CreateTopic(t, f, topic)
+
+	plan := model.MutationPlan{
+		Path: topicPath(f, topic),
+		Ops: []model.MutationRowOp{{
+			Kind: "insert",
+			Values: model.RowValues{
+				{Name: "$key", Value: testsupport.Strp("produced-key")},
+				{Name: "$body", Value: testsupport.Strp(`{"seq":999}`)},
+				{Name: "$headers", Value: nil},
+			},
+		}},
+	}
+	result, err := a.Mutate(ctx, plan, adapters.NewOpCtx("op-16a"))
+	if err != nil {
+		t.Fatalf("Mutate: %v", err)
+	}
+	if result.AffectedRows != 1 {
+		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+
+	p, err := a.Read(ctx, offsetRead(topicPath(f, topic), 10), adapters.NewOpCtx("op-16b"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	sp := p.(page.StreamPage)
+	if sp.RowCount != 1 {
+		t.Fatalf("RowCount = %d, want 1", sp.RowCount)
+	}
+	key := testsupport.StreamKeyAt(t, sp, 0)
+	if key == nil || *key != "produced-key" {
+		t.Errorf("key = %v, want produced-key", key)
+	}
+	body := testsupport.StreamBodyAt(t, sp, 0)
+	if body == nil || *body != `{"seq":999}` {
+		t.Errorf("body = %v, want {\"seq\":999}", body)
+	}
+}
+
+// 17. a browse joins no consumer group (D19/D30). Rewritten (§5.3) to the parent's own wording: a
+// browse never creates group state. Snapshots adm.ListGroups before and after paging the whole of
+// ORDERS_TOPIC at a small page size (several ephemeral consumers under the hood) and asserts the
+// two sets are equal — stronger than "the seeded group is still present", since it also catches a
+// browse that deletes or mutates group state.
+func TestKafka_Read_BrowseJoinsNoConsumerGroup(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	before, err := f.Admin.ListGroups(ctx)
+	if err != nil {
+		t.Fatalf("ListGroups before: %v", err)
+	}
+
+	cursor := model.PageCursor{Mode: "offset", Offset: 0}
+	for guard := 0; guard < testsupport.KafkaOrdersMessageCount+2; guard++ {
+		req := adapters.ReadRequest{Path: topicPath(f, testsupport.KafkaOrdersTopic), PageSize: 2, Cursor: cursor}
+		p, err := a.Read(ctx, req, adapters.NewOpCtx(fmt.Sprintf("op-17-%d", guard)))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		sp := p.(page.StreamPage)
+		if !sp.Position.HasMore {
+			break
+		}
+		if sp.Position.NextToken == nil {
+			t.Fatal("expected a nextToken on a truncated page")
+		}
+		cursor = model.PageCursor{Mode: "after", Token: *sp.Position.NextToken}
+	}
+
+	after, err := f.Admin.ListGroups(ctx)
+	if err != nil {
+		t.Fatalf("ListGroups after: %v", err)
+	}
+	if !sameStrings(before.Groups(), after.Groups()) {
+		t.Errorf("groups before = %v, after = %v, want equal (P10 D6)", before.Groups(), after.Groups())
+	}
+}
+
+// 18. a browse commits no offsets (D19/D30). Rewritten (§5.3) to ask the broker directly rather
+// than through the adapter's own definition() — going below the adapter matters, since a bug in
+// buildGroupDefinition that hid rows would still let an adapter-level assertion pass.
+func TestKafka_Read_BrowseCommitsNoOffsets(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	req := offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), testsupport.KafkaOrdersMessageCount)
+	if _, err := a.Read(ctx, req, adapters.NewOpCtx("op-18")); err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+
+	offsets, err := f.Admin.FetchOffsets(ctx, "kira-studio-browse")
+	if err != nil {
+		return // the browse group was never created — exactly as promised
+	}
+	if got := len(offsets[testsupport.KafkaOrdersTopic]); got != 0 {
+		t.Errorf("committed offsets for %s under kira-studio-browse = %d rows, want 0", testsupport.KafkaOrdersTopic, got)
+	}
+}
+
+// 19. a timestamp filter still seeks (D20). Learns each seeded message's real timestamp rather
+// than assuming a hand-picked value falls between two of them, and seeks via a hand-built
+// KafkaStreamFilter JSON string (src/shared/domain/streamFilter.ts's own wire shape:
+// {"offset":null,"partitions":[],"timestampMs":N}) — the same field ReadRequest.Filter already
+// carries for every adapter.
+func TestKafka_Read_TimestampFilterSeeks(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+
+	full, err := a.Read(ctx, offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), testsupport.KafkaOrdersMessageCount), adapters.NewOpCtx("op-19a"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	sp := full.(page.StreamPage)
+	timestamps := make([]int64, sp.RowCount)
+	for r := 0; r < sp.RowCount; r++ {
+		ts := testsupport.StreamTimestampAt(t, sp, r)
+		if ts == nil {
+			t.Fatalf("row %d: timestamp is nil", r)
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, *ts)
+		if err != nil {
+			t.Fatalf("row %d: timestamp %q: %v", r, *ts, err)
+		}
+		timestamps[r] = parsed.UnixMilli()
+	}
+	sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] < timestamps[j] })
+	boundary := timestamps[len(timestamps)/2]
+	expectedCount := 0
+	for _, ts := range timestamps {
+		if ts >= boundary {
+			expectedCount++
+		}
+	}
+
+	filterJSON := fmt.Sprintf(`{"offset":null,"partitions":[],"timestampMs":%d}`, boundary)
+	req := adapters.ReadRequest{
+		Path: topicPath(f, testsupport.KafkaOrdersTopic), PageSize: testsupport.KafkaOrdersMessageCount,
+		Filter: &filterJSON, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}
+	filtered, err := a.Read(ctx, req, adapters.NewOpCtx("op-19b"))
+	if err != nil {
+		t.Fatalf("Read filtered: %v", err)
+	}
+	fp := filtered.(page.StreamPage)
+	if fp.RowCount != expectedCount {
+		t.Errorf("RowCount = %d, want %d", fp.RowCount, expectedCount)
+	}
+	for r := 0; r < fp.RowCount; r++ {
+		ts := testsupport.StreamTimestampAt(t, fp, r)
+		if ts == nil {
+			t.Fatalf("row %d: timestamp is nil", r)
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, *ts)
+		if err != nil {
+			t.Fatalf("row %d: timestamp %q: %v", r, *ts, err)
+		}
+		if parsed.UnixMilli() < boundary {
+			t.Errorf("row %d: timestamp %s (%d ms) < boundary %d ms", r, *ts, parsed.UnixMilli(), boundary)
+		}
+	}
+}
+
+// 20. an oversized start offset is refused, not truncated (D23). Re-baselined (P58e E6):
+// Number.MAX_SAFE_INTEGER+1 is an ordinary int64 in Go (toNativeOffset's guard is deleted, not
+// ported — Go's own int64 removes the hazard it existed for), so this hand-crafts a page token
+// whose window offset exceeds int64's own range (2^63) instead. NOTE: this constructs the
+// adapter's own internal per-partition window JSON by hand (field names "partition"/"next"/"end",
+// matching read.ts's own naming per P58e E17's diffability rule) — M9.2's read.go is the actual
+// source of truth for this shape and this test may need adjusting once it exists.
+func TestKafka_Read_OversizedOffsetTokenIsRefused(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	const oversized = "9223372036854775808" // int64 max is 9223372036854775807
+	windowsJSON := fmt.Sprintf(`[{"partition":0,"next":%s,"end":%s}]`, oversized, oversized)
+	pageSize := 10
+	fingerprint := adapters.RequestFingerprint(struct {
+		Topic    string  `json:"topic"`
+		PageSize int     `json:"pageSize"`
+		Filter   *string `json:"filter"`
+	}{Topic: testsupport.KafkaOrdersTopic, PageSize: pageSize, Filter: nil})
+	token := adapters.EncodePageToken([]string{windowsJSON}, fingerprint)
+	req := adapters.ReadRequest{
+		Path: topicPath(f, testsupport.KafkaOrdersTopic), PageSize: pageSize,
+		Cursor: model.PageCursor{Mode: "after", Token: token},
+	}
+
+	_, err := a.Read(context.Background(), req, adapters.NewOpCtx("op-20"))
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
+		t.Errorf("code = %v, want E_QUERY", code)
+	}
+	if ae, ok := err.(*adapters.Error); ok && !strings.Contains(ae.Message, "malformed page token") {
+		t.Errorf("message = %q, want to mention %q", ae.Message, "malformed page token")
+	}
+}
+
+// 21. read: a partition ending in a transaction's commit marker still terminates (D26). Re-
+// baselined against franz-go (P58e E9): a partition's high watermark counts a transaction's own
+// commit marker as an offset the consumer never receives as a delivered message, so `next` can
+// land one behind `end` forever unless the clamp fires on the provably-drained watermark
+// comparison (P43 iter2 F19/D26). This is the single most important test in the suite — the
+// assertion that fails against a naive port is the third one below, not the first. Drives the
+// driver under test's own franz-go client directly (kgo.TransactionalID +
+// BeginTransaction/ProduceSync/EndTransaction), the same way produce.ts drove node-rdkafka's
+// classic Producer, so gap-topic is dedicated and transaction-only.
+func TestKafka_Read_TransactionCommitMarkerGapStillTerminates(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	ctx := context.Background()
+
+	const gapTopic = "gap-topic"
+	testsupport.CreateTopic(t, f, gapTopic)
+
+	txClient, err := kgo.NewClient(
+		kgo.SeedBrokers(fmt.Sprintf("%s:%d", *f.Config.Host, *f.Config.Port)),
+		kgo.TransactionalID("kira-test-gap-txn"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	defer txClient.Close()
+
+	if err := txClient.BeginTransaction(); err != nil {
+		t.Fatalf("BeginTransaction: %v", err)
+	}
+	rec := &kgo.Record{Topic: gapTopic, Key: []byte("gap-key"), Value: []byte(`{"seq":0}`)}
+	if err := txClient.ProduceSync(ctx, rec).FirstErr(); err != nil {
+		t.Fatalf("ProduceSync: %v", err)
+	}
+	if err := txClient.EndTransaction(ctx, kgo.TryCommit); err != nil {
+		t.Fatalf("EndTransaction: %v", err)
+	}
+
+	a := connectedAdapter(t, f)
+	var lastPage page.StreamPage
+	cursor := model.PageCursor{Mode: "offset", Offset: 0}
+	// Read to exhaustion, mirroring test 8's own paging loop — the transactional message is the
+	// only row this topic will ever produce, so the very first page is already terminal.
+	for guard := 0; guard < 4; guard++ {
+		req := adapters.ReadRequest{Path: topicPath(f, gapTopic), PageSize: 10, Cursor: cursor}
+		p, err := a.Read(ctx, req, adapters.NewOpCtx(fmt.Sprintf("op-21-%d", guard)))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		lastPage = p.(page.StreamPage)
+		if !lastPage.Position.HasMore {
+			break
+		}
+		if lastPage.Position.NextToken == nil {
+			t.Fatal("expected a nextToken on a truncated page")
+		}
+		cursor = model.PageCursor{Mode: "after", Token: *lastPage.Position.NextToken}
+	}
+	if lastPage.RowCount != 1 {
+		t.Fatalf("RowCount = %d, want 1", lastPage.RowCount)
+	}
+	if got := rowSeq(t, lastPage, 0); got != 0 {
+		t.Errorf("seq = %d, want 0", got)
+	}
+	// The assertion that fails against the pre-fix tree: `hasMore` stayed true and `nextToken`
+	// non-null forever, because `next` (stuck at the commit marker's offset) never caught up to
+	// `end` (the watermark including it) through any number of empty re-browses.
+	if lastPage.Position.HasMore {
+		t.Error("HasMore = true, want false (P43 iter2 F19/D26 clamp did not fire)")
+	}
+	if lastPage.Position.NextToken != nil {
+		t.Error("NextToken != nil, want nil")
+	}
+}
