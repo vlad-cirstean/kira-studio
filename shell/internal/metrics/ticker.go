@@ -23,6 +23,12 @@ var (
 
 const Interval = 5 * time.Second
 
+// RescanEvery is how many Interval ticks pass between CachedPIDs' full process-table resolves —
+// a spawned helper (or one that's exited) is reflected in the reading within one rescan interval
+// either way, which is an acceptable lag for a status-bar metric against not walking every
+// process on the machine every single tick for the life of the app (P2 R1).
+const RescanEvery = 12 // 12 * Interval = 60s
+
 // Ticker samples on a fixed cadence and fans each Sample out to every OnSample subscriber. P52
 // §8.4's measurement (Sampler, AppProcessSet) is done; this is only the cadence P55 §6.1 adds —
 // main.go starts it with no subscriber yet, which is a complete behaviour (D15), not a stub.

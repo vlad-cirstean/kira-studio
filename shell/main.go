@@ -131,10 +131,11 @@ func main() {
 	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
 	oplogWiring.Start()
 
-	metricsTicker := metrics.NewTicker(
+	processSet := metrics.NewCachedPIDs(
 		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
-		metrics.Interval,
+		metrics.RescanEvery,
 	)
+	metricsTicker := metrics.NewTicker(processSet.PIDs, metrics.Interval)
 	metricsTicker.Start()
 
 	// The two adapters below are needed inside the Services list, which is itself an argument to
