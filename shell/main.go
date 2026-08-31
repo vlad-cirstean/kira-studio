@@ -39,7 +39,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// Any files in frontend/dist are embedded into the binary — built by `bun run build:wails` from
+// Any files in frontend/dist are embedded into the binary — built by `bun run build` from
 // the real src/renderer (P52 §2.3), not by this scaffold's own removed demo frontend project.
 //
 //go:embed all:frontend/dist

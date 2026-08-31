@@ -46,10 +46,11 @@ async function acquireBuildLock(): Promise<() => Promise<void>> {
 }
 
 // Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/wails-dev-setup.sh`
-// (pinned wails3, generated bindings, vendored Node runtime, bundled engine) plus `bun run
-// build:wails` (shell/frontend/dist, which main.go's `//go:embed all:frontend/dist` picks up),
-// then the one step those scripts don't do — `go build -tags server`. Memoized per worker process
-// so a spec file with multiple tests builds once, not once per test.
+// (pinned wails3, generated bindings — no vendored Node runtime or bundled engine to check for
+// since P58f) plus `bun run build` (shell/frontend/dist, which main.go's `//go:embed
+// all:frontend/dist` picks up), then the one step those scripts don't do — `go build -tags
+// server`. Memoized per worker process so a spec file with multiple tests builds once, not once
+// per test.
 let prerequisitesReady: Promise<void> | undefined;
 
 function buildPrerequisites(): Promise<void> {

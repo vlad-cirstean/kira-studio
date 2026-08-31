@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 
-// Built by `bun run build` (vite.wails.config.ts → shell/frontend/dist), the exact bytes the real
+// Built by `bun run build` (vite.config.ts → shell/frontend/dist), the exact bytes the real
 // Wails bundle embeds (P52 shell/main.go's `//go:embed all:frontend/dist`) — this tier serves the
 // same static output a packaged app does, just over plain HTTP instead of Wails' own AssetServer.
 const DIST_DIR = resolve(__dirname, '../../../shell/frontend/dist');

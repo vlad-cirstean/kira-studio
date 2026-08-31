@@ -1,17 +1,19 @@
 # Kira Studio Shell
 
-The Wails v3 (Go) native shell being built to replace Electron's `src/main`/`src/preload`, per
+The Wails v3 (Go) native shell — every database driver runs in-process here, alongside windowing,
+IPC, SQLite storage and the op log. Originally scaffolded per
 [`docs/v1/plans/P52-wails-go-migration.md`](../docs/v1/plans/P52-wails-go-migration.md) (built on
-the spike in [`docs/v1/plans/P51-wails-go-node-engine-spike.md`](../docs/v1/plans/P51-wails-go-node-engine-spike.md)).
+the spike in [`docs/v1/plans/P51-wails-go-node-engine-spike.md`](../docs/v1/plans/P51-wails-go-node-engine-spike.md));
+see [`docs/v1/plans/P58f-cutover.md`](../docs/v1/plans/P58f-cutover.md) for the later cutover that
+removed the Node engine sidecar those two plans still describe.
 
 Not standalone: it embeds `frontend/dist`, built from the real `src/renderer` by the repo root's
-`bun run build:wails` (see `../vite.wails.config.ts`) — build that first. From the repo root:
+`bun run build` (see `../vite.config.ts`) — build that first. From the repo root:
 
 ```
-bun run build:wails        # builds src/renderer into shell/frontend/dist
-sh scripts/vendor-node.sh  # vendors a trimmed Node runtime into shell/runtime/node
+bun run build                          # builds src/renderer into shell/frontend/dist
 cd shell
-wails3 generate bindings -b -i -ts
+wails3 generate bindings -b -i -ts -names
 go run .
 ```
 
