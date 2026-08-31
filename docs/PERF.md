@@ -276,22 +276,19 @@ P32's other unverified-in-this-sandbox items).
 | L-G cell editor populate | p95 > 50 ms | 4.9 ms | no |
 | L-H scroll response | p95 > 8 ms | p95 = 14.2 ms, which reads as "fired" by the letter of the trigger — but per the methodology note in §2.1, this p95 elevation is a frame-scheduling artifact confirmed by the double-rAF test, not app work exceeding budget; the metric the lever is meant to gate (p50, the work-bound figure) is 5.6 ms, comfortably under budget. Pulling the pre-approved remedy (reducing `OVERSCAN_ROWS`) would not address an artifact of frame scheduling, so this is recorded as not fired | no (see caveat) |
 
-**L-D after the Wails/Go migration (P57 M8).** The 252 MB this row used to carry was an
-electron-builder `--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer
-exists, so the figure was retired rather than carried forward against a different bundle. The
-measurement is now `du -sh "shell/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS
-hardware in this environment. The closest real evidence is P51 part 4's spike bundle, measured at
-251 MB on actual Apple Silicon *before* `scripts/vendor-node.sh`'s 81 MB trim (`include/` +
-`lib/node_modules/npm`) was moved into vendor time, which projects to ≈ 170 MB — a projection from a
-differently-laid-out spike bundle, not a measurement of the shipping one, and not a basis for
-declaring the > 300 MB trigger unfired. Record the real number here on the next macOS run.
+**L-D after the Wails/Go migration.** The 252 MB this row used to carry was an electron-builder
+`--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer exists, so the figure
+was retired rather than carried forward against a different bundle. The measurement is now
+`du -sh "shell/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS hardware in this
+environment.
 
 **L-D after P58f M10.** `scripts/vendor-node.sh` and the `runtime/` tree it populated are gone
 outright, not merely trimmed — there is no vendored Node runtime or engine-child bundle left to
 weigh at all, only the one Go binary plus its embedded frontend assets. **Not available in this
-session**: no macOS hardware here either, and no projection is offered this time — the P57 M8
-projection above was already a poor basis for the > 300 MB call, and stacking a second projection
-on top of it would be worse. Record the real `du -sh` number in §3 on the next macOS run.
+session**: no macOS hardware here either, and no projection is offered — a projection built from an
+earlier spike bundle's own different layout was tried once already for this row and was not a sound
+basis for declaring the > 300 MB trigger fired or unfired; that reasoning does not improve by
+reapplying it. Record the real `du -sh` number in §3 on the next macOS run.
 
 Per D21: every pre-approved lever has been evaluated against real measurements; only L-A fired and
 has been applied; the 350 MB budget still fails, dominated by non-app-controllable Chromium/Electron
