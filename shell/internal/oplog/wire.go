@@ -1,7 +1,7 @@
 // Package oplog is the Go analogue of src/main/oplog.ts: pure orchestration over
-// internal/storage/repos.OpsRepo's Append/Finish/Prune — subscribing to the engine's
-// op:start/op:end events, forwarding an update for the renderer's op-log panel, and reconciling
-// whatever was still running when the engine process exits.
+// internal/storage/repos.OpsRepo's Append/Finish/Prune — subscribing to op:start/op:end events,
+// forwarding an update for the renderer's op-log panel, and reconciling whatever was still running
+// when the event source's channel closes (app shutdown, P58f D9).
 package oplog
 
 import (
@@ -23,15 +23,15 @@ type Event struct {
 	Payload json.RawMessage
 }
 
-// Event topics this package's consume loop switches on. EventOpStart/EventOpEnd mirror
-// ENGINE_EVENT.opStart/opEnd (src/shared/protocol/engine-ops.ts:21-25); EventEngineDown is this
-// package's own copy of the synthetic "engine:down" topic enginehost.Host used to publish when its
-// child process exited — kept as a plain string rather than an import, since a non-Node
-// EventSource (adapterhost.Host) has no reason to depend on enginehost just to name it.
+// Event topics this package's consume loop switches on, mirroring ENGINE_EVENT.opStart/opEnd
+// (src/shared/protocol/engine-ops.ts:21-25). There is no EventEngineDown any more (P58f D9):
+// adapterhost.Host, the only producer left, never published one — that was enginehost.Host's own
+// synthetic topic for a Node child exiting — and reconciliation now runs whenever the event
+// channel closes for any reason, orderly shutdown included, rather than waiting for a topic that
+// nothing sends.
 const (
-	EventOpStart    = "op:start"
-	EventOpEnd      = "op:end"
-	EventEngineDown = "engine:down"
+	EventOpStart = "op:start"
+	EventOpEnd   = "op:end"
 )
 
 // EventSource is the slice of a producer oplog consumes — adapterhost.Host in production, a fake
@@ -49,7 +49,7 @@ const pruneEveryOps = 500
 // also accepts "running", a status op:end itself is never sent with).
 var opEndStatuses = map[string]bool{"ok": true, "error": true, "cancelled": true}
 
-var engineExitedError = "engine process exited"
+var appExitedError = "app exited"
 
 // inFlightOp is oplog.ts's InFlightOp.
 type inFlightOp struct {
@@ -105,7 +105,9 @@ func (w *Wiring) prune() {
 }
 
 // consume is the only reader and writer of inFlight, so that map needs no mutex — nobody should
-// add one.
+// add one. The `for evt := range events` loop ends when the event source's channel closes — Stop's
+// unsubscribe (main's before-quit) causes that in production — at which point finishInFlight
+// reconciles whatever never reached a terminal state (P58f D9).
 func (w *Wiring) consume(events <-chan Event) {
 	inFlight := map[string]inFlightOp{}
 	completedSincePrune := 0
@@ -116,10 +118,9 @@ func (w *Wiring) consume(events <-chan Event) {
 			w.handleOpStart(evt.Payload, inFlight)
 		case EventOpEnd:
 			completedSincePrune = w.handleOpEnd(evt.Payload, inFlight, completedSincePrune)
-		case EventEngineDown:
-			w.handleEngineDown(inFlight)
 		}
 	}
+	w.finishInFlight(inFlight, appExitedError)
 }
 
 func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFlightOp) {
@@ -192,11 +193,13 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	return completedSincePrune
 }
 
-// handleEngineDown mirrors oplog.ts's engine:down handler: the engine host has already rejected
-// every pending IPC call by the time this fires, so this finishes whatever op-log rows were
-// still 'running' at that moment with the same message, and drops them from inFlight so a crash
-// mid-session cannot grow the map without bound.
-func (w *Wiring) handleEngineDown(inFlight map[string]inFlightOp) {
+// finishInFlight mirrors oplog.ts's engine:down handler, generalised from "the engine child died"
+// to "the event source is done" (P58f D9): whatever op-log rows were still 'running' when consume's
+// range loop ended is finished with message, and dropped from inFlight so a crash mid-session
+// cannot grow the map without bound. A hard kill (SIGKILL, OOM, a panic outside Host.safeRun) still
+// leaves 'running' rows — this only runs on an orderly channel close, same as it only ran on an
+// orderly child exit before P58f.
+func (w *Wiring) finishInFlight(inFlight map[string]inFlightOp, message string) {
 	now := time.Now()
 	for opID, rec := range inFlight {
 		delete(inFlight, opID)
@@ -210,9 +213,9 @@ func (w *Wiring) handleEngineDown(inFlight map[string]inFlightOp) {
 		}
 
 		if err := w.ops.Finish(opID, model.OpFinish{
-			Status: "error", DurationMs: durationMs, Rows: nil, Command: nil, Error: &engineExitedError,
+			Status: "error", DurationMs: durationMs, Rows: nil, Command: nil, Error: &message,
 		}); err != nil {
-			slog.Warn("engine-down finish failed", "scope", "oplog", "opId", opID, "err", err)
+			slog.Warn("shutdown finish failed", "scope", "oplog", "opId", opID, "err", err)
 		}
 	}
 }

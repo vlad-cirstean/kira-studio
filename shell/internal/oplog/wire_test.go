@@ -169,10 +169,12 @@ func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 	}
 }
 
-// TestEngineDownReconcilesInFlight covers this package's actual subject: everything still tracked
-// as running when the engine exits must be finished with the exit error and dropped from the
-// in-flight map, while an op that already reached a terminal state is left alone.
-func TestEngineDownReconcilesInFlight(t *testing.T) {
+// TestShutdownReconcilesInFlight covers this package's actual subject: everything still tracked as
+// running when the event channel closes must be finished with the shutdown error and dropped from
+// the in-flight map, while an op that already reached a terminal state is left alone. Closing the
+// channel is what Stop (main's before-quit, via fakeSource's unsubscribe) does in production too
+// (P58f D9) — there is no separate synthetic "engine died" event to send any more.
+func TestShutdownReconcilesInFlight(t *testing.T) {
 	h := newHarness(t, 30)
 	var updates updateCollector
 	h.wiring.OnUpdate(updates.handle)
@@ -186,23 +188,21 @@ func TestEngineDownReconcilesInFlight(t *testing.T) {
 	h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload("op4", "ok")}
 	waitUntil(t, time.Second, func() bool { return rowExists(t, h.ops, "op4") && fetchOp(t, h.ops, "op4").Status == "ok" })
 
-	h.src.ch <- oplog.Event{Topic: oplog.EventEngineDown}
+	// Stop's unsubscribe closes the channel; consume's range loop returns and finishInFlight runs.
+	// Must not panic or hang.
+	h.wiring.Stop()
 
 	for _, id := range []string{"op1", "op2", "op3"} {
 		waitUntil(t, time.Second, func() bool { return fetchOp(t, h.ops, id).Status == "error" })
 		row := fetchOp(t, h.ops, id)
-		if row.Error == nil || *row.Error != "engine process exited" {
-			t.Errorf("%s.Error = %v, want \"engine process exited\"", id, row.Error)
+		if row.Error == nil || *row.Error != "app exited" {
+			t.Errorf("%s.Error = %v, want \"app exited\"", id, row.Error)
 		}
 		if row.DurationMs == nil || *row.DurationMs < 0 {
 			t.Errorf("%s.DurationMs = %v, want a non-negative value", id, row.DurationMs)
 		}
 	}
 	if row := fetchOp(t, h.ops, "op4"); row.Status != "ok" {
-		t.Errorf("op4 (already finished before engine:down) status = %q, want untouched ok", row.Status)
+		t.Errorf("op4 (already finished before shutdown) status = %q, want untouched ok", row.Status)
 	}
-
-	// The goroutine's `for evt := range events` returns once the channel closes — Stop (via
-	// fakeSource's unsubscribe) closing it here must not panic or hang.
-	h.wiring.Stop()
 }
