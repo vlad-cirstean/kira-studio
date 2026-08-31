@@ -117,14 +117,25 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	return model.ObjectMeta{}, adapters.Unsupported("kafka", "describe")
 }
 
-// Definition is index.ts's definition. Wired to definition.go's buildTopicDefinition/
-// buildGroupDefinition in a later M9.2 commit; a connected adapter reports a clean, non-panicking
-// E_QUERY until then.
+// Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	if _, err := a.requireAdmin(); err != nil {
+	adm, err := a.requireAdmin()
+	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
-	return model.ObjectDefinition{}, adapters.New(adapters.CodeQuery, "kafka definition is not implemented yet", nil)
+	if len(path.Segments) == 0 {
+		return model.ObjectDefinition{}, adapters.New(adapters.CodeNotFound,
+			"definition requires a topic or consumer group path, got: "+model.EncodePath(path.Segments), nil)
+	}
+	switch path.Segments[0].Kind {
+	case "topic":
+		return buildTopicDefinition(ctx, adm, path.Segments[0].Name)
+	case "consumerGroup":
+		return buildGroupDefinition(ctx, adm, path.Segments[0].Name)
+	default:
+		return model.ObjectDefinition{}, adapters.New(adapters.CodeNotFound,
+			"definition requires a topic or consumer group path, got: "+model.EncodePath(path.Segments), nil)
+	}
 }
 
 func (a *Adapter) resolveTopicTarget(path model.NodePath, what string) (string, error) {
