@@ -14,9 +14,9 @@ import (
 
 // nativeKinds is the single source of truth for which connection kinds are served in-process. A
 // kind is added here in the same commit as its adapter's tests going green, and never earlier
-// (A12). Empty through the whole of P58a's M4; M5's last commit sets nativeKinds["postgres"] =
-// true, which is what C1 exercises.
-var nativeKinds = map[string]bool{}
+// (A12). Postgres is native as of M5 (checkpoint C1) — every other kind still routes to the Node
+// engine child until its own milestone lands.
+var nativeKinds = map[string]bool{"postgres": true}
 
 // KindLookup is the one thing the router needs from internal/connections to make a per-connection
 // routing decision — a two-line method on *repos.ConnectionsRepo satisfies it (A11).

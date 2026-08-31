@@ -1618,3 +1618,46 @@ No `go.mod` change, no target-tree change, no milestone re-sequencing.
 `docs/v1/plans/P58-go-native-adapters.md` does not need updating for these: D7 stands as written,
 and PG-1/PG-2's findings are implementation detail inside M5's own Postgres adapter, not a
 substrate-level decision the parent plan makes.
+
+## 13. M1-M5 results (run for real in this sandbox)
+
+All five milestones are done. `go test ./... -race` is green across every package; `bun run lint`,
+`bun run typecheck` (all four projects), `bun run test:unit`, `bun run test:go`, `bun run test:ui`
+(36/36), and `bun run test:ipc:fe` (8/8) are all green. `nativeKinds` is `{"postgres": true}`.
+`tests/db/postgres.spec.ts` is deleted. `tests/db/support/postgres.ts` is **not** deleted, a
+deliberate deviation from §8's own M5 bullet — AGENTS.md's own P58a findings section explains why
+(other tests gained real dependencies on it since this plan was written). Real bugs found and
+fixed during implementation — a local-abort/pgx-context-cancellation race in the Cancel path, a
+missing base64 branch in `toTypedArray`, a stale `build:wails` script reference, and three
+placeholder `"postgres"` kind literals in pre-existing M4 tests — are written up in AGENTS.md's own
+"P58a — Go substrate + Postgres adapter" findings section rather than duplicated here.
+
+**C1, recorded.** This sandbox has no real X display for §7's own literal `xdotool`/screenshot
+steps; the proof ran instead through this repo's own established real-app substitute for that
+class of check (`tests/e2e-real/`, P57's replacement for interactive-GUI e2e testing) — the same
+real `-tags server` Go binary, real bindings, real Postgres container, and real UI code paths, just
+reached over `http://127.0.0.1` from a headless browser tab instead of a physical window.
+
+| Step | Result |
+| --- | --- |
+| 1-5 (Docker, images, app build/boot) | PASS — `tests/e2e-real/postgres-real.spec.ts`'s own fixture |
+| 6 (app rendered) | PASS — substitute's own equivalent (`status-bar` present) |
+| 7 (connect; real server-version handshake) | **PASS** |
+| 8 (tree expansion; relation kinds; `~N rows`) | **PASS** |
+| 9 (definition view) | not run at the UI layer — covered by `postgres_test.go`'s own Describe-adjacent cases |
+| 10 (real cell text via the base64 chunk path) | **PASS** — and is what surfaced the `toTypedArray` bug |
+| 11 (page forward/back, keyset) | **PASS** — added as a second `postgres-real.spec.ts` test against real `app.big_rows`; asserts `data-pagination="keyset"`, not just row identity |
+| 12 (count, then a cache hit) | not run at the UI layer — `postgres_test.go`'s `TestPostgres_Count` |
+| 13 (two-statement console batch, one op-log row) | not run at the UI layer — `postgres_test.go`'s `TestPostgres_ExecuteOnePagePerStatement` |
+| 14 (staged edit's preview text and landing) | not run at the UI layer — `postgres_test.go`'s `TestPostgres_PreviewNeverExecutes`/`TestPostgres_MutateUpdate` |
+| 15 (stop button; `pg_stat_activity` clean afterward) | server-side half **PASS** via `postgres_test.go`'s `TestPostgres_Cancel` (real `pg_cancel_backend`, a real running backend); not driven through the UI's own stop button this session |
+| 16 (Node child still running throughout) | not run this session — covered structurally by M4's `adapterhost` integration tests |
+| 17-20 (MariaDB coexistence, interleaved op-log, summed cache stats) | not run this session — MariaDB has no Go adapter yet (P58b); M4's own router-forwarding tests already cover the mechanism against a real Node child |
+| 21 (kill Node child, only MariaDB errors) | not run this session, same reason as 17-20 |
+
+The load-bearing steps for this milestone specifically — 7, 8, and above all 10 and 11, the ones
+that actually exercise the new Go-native data plane's wire format end to end — all passed for real
+and surfaced one genuine, previously-undetected bug (the `toTypedArray` base64 branch). Steps 12-16
+are verified below the UI layer, at the adapter/dispatcher layer, in this session; steps 17-21 are
+deferred to whichever future session first has a native and a Node-served connection live side by
+side for real, which will be closer to P58b than to this one.

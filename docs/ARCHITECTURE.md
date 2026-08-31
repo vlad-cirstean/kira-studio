@@ -179,6 +179,17 @@ MySQL share one driver (`mariadb`, a genuine dual client) and one core (`engine/
 mysql-family/`) — `mariadb/` and `mysql/` each hold only their own profile (server label,
 `applyEngineOptions`) and re-export everything else.
 
+**PostgreSQL is Go-native as of P58a M5** (`shell/internal/adapters/postgres/`, `pgx/v5`) —
+`nativeKinds["postgres"]` is `true`, so a Postgres connection is served in-process by
+`adapterhost.Router`, never by the Node engine child. MariaDB and MySQL are unaffected and stay
+Node-served (`src/engine/adapters/mysql-family/`) until P58b. The Go port keeps the design facts
+above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the tracked backend
+pid) exactly; what changed is only which process runs the adapter and how its query context is
+handled — a caller-side op cancellation must never be the same `context.Context` passed to `pgx`'s
+own `Query`/`Exec`, since pgx (unlike Node's `pg`) honours context cancellation by racing its own
+cancel request against the adapter's explicit `pg_cancel_backend` call
+(`internal/adapters/postgres/query.go`'s `runWithAbortRace`).
+
 ### SQLite (`node:sqlite`, P35)
 
 Uses `node:sqlite`, a Node builtin — no new dependency, no native module, no build step. Requires
@@ -522,9 +533,13 @@ never reads a data-plane frame") could not survive Go adapters existing at all, 
 has to decide, per connection, which process answers. `shell/internal/adapterhost/dataframe.go`'s
 `HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
 op, that connection's `connectionId` — to route it: a **Go-native** connection (`nativeKinds`, A12;
-empty until P58a M5's Postgres lands) is answered in-process by `adapterhost.Dispatcher`, its
-response `json.Marshal`ed directly (base64 chunk encoding, P58 D5) with no engine involved at all;
-a **Node-served** connection's frame is forwarded to the engine's stdin unread, exactly as before.
+`{"postgres": true}` as of P58a M5, every other kind still Node-served) is answered in-process by
+`adapterhost.Dispatcher`, its response `json.Marshal`ed directly (base64 chunk encoding, P58 D5)
+with no engine involved at all; a **Node-served** connection's frame is forwarded to the engine's
+stdin unread, exactly as before. `src/renderer/bridge/port.ts`'s `reviveChunks`/`toTypedArray`
+decode either wire shape transparently: a base64 string (a Go-native chunk) or `JSON.stringify`'s
+index-keyed object (a Node-served one, P57's own finding) — `isChunkLike`'s own check only looks at
+the outer object's four key names, not which shape each one carries.
 `ping` always reaches the Node engine regardless (A17 — the status pill still reports its pid while
 it does most of the work); `cache:stats`/`cache:clear` are answered locally, merging both caches'
 counters while reporting the configured budget once, not doubled (A16).

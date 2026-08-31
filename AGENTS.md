@@ -833,5 +833,156 @@ have to be re-derived next time.
   still exists (meaning the CI update is still pending) before assuming `.github/workflows/` is
   current.
 
+## P58a — Go substrate + Postgres adapter (M0-M5), findings worth keeping for P58b+
+
+`docs/v1/plans/P58a-substrate-postgres.md` covers the design; this section is what real
+implementation and real-container testing found that the plan itself could not have predicted.
+
+- **A local op-cancellation context must never be the same context passed to the real driver
+  call, for any Go SQL driver that honours `context.Context` cancellation natively (pgx does;
+  Node's `pg` does not).** `adapterhost.Host.CancelOp` deliberately cancels the op's own derived
+  context *before* calling `adapter.Cancel` (`host.go`'s own comment: "the local abort alone is
+  not a cancel… do not fix it by trying to make the query itself abort" — a direct port of
+  `query.ts:77-80`'s same rule). Under Node's `pg`, that local abort only rejects the *waiting*
+  promise; the real query keeps running server-side until `pg_cancel_backend` explicitly kills it.
+  Under pgx, passing that same cancelled context straight into `conn.Query`/`conn.Exec` makes pgx
+  *itself* race a cancellation request against — and typically win before — the adapter's own
+  `pg_cancel_backend` call, which (since `Cancel`'s own `runningByOp` entry is removed by the
+  first query's own `release()` the instant it errors from context cancellation) makes the second,
+  authoritative cancellation attempt find nothing and silently report `false`, leaving a caller
+  with no confirmation the query was actually killed. Caught by `TestPostgres_Cancel` failing
+  against a real `pg_sleep(30)` the first time it ran — not by anything at the unit level, since
+  nothing exercises real driver-level context cancellation there. Fixed with
+  `query.go`'s `runWithAbortRace`: the real driver call runs on its own goroutine against
+  `context.WithoutCancel(ctx)` (never sees the caller's cancellation), while the caller-facing
+  function returns as soon as either that goroutine finishes or `ctx.Done()` fires — `release()` is
+  called only when the query itself actually settles, matching `withAbortRace`'s own semantics
+  exactly (`abort.ts`) rather than pgx's default. Any future Go adapter built on a context-native
+  driver (mysql-family's `go-sql-driver/mysql`, ClickHouse's `clickhouse-go` — both honour ctx
+  cancellation the same way pgx does) needs this same helper, not a direct `conn.Query(ctx, …)`.
+- **`src/renderer/bridge/port.ts`'s `toTypedArray` never actually grew the base64 branch A9 called
+  for, despite M2's own plan section describing it as already done** — the single highest-value
+  bug this milestone's real-container/real-app testing found, and the reason "route a query
+  through the real UI, not just the adapter package's own tests" earned its keep. The Go-native
+  data plane's page codec (`internal/page`) encodes each `TextColumnChunk` buffer as base64 of its
+  exact little-endian bytes (P58 D5); the ten still-Node-served kinds keep sending
+  `JSON.stringify`'s index-keyed object shape (P57's own finding, above). `reviveChunks`'s
+  `isChunkLike` check is encoding-agnostic (it only looks at the outer object's four key names), so
+  it happily recognised a base64-encoded chunk as chunk-like and then handed each string straight
+  to the *old* `toTypedArray`, which unconditionally did `ctor.from(Object.values(v))` — on a
+  string this silently produces something with `.length === 0` (`Object.values("MTIz")` is
+  per-character, not the intended bytes), so every native-served page rendered with zero rows and
+  **no error anywhere** — not server-side (the Go response was correct, confirmed by adding a
+  temporary debug log and reading the exact base64 payload back out by hand), not client-side (no
+  console error, since the "wrong" typed array is still a *valid*, just empty-ish, one). This is
+  exactly the class of bug unit tests calling the adapter directly can never catch, since they
+  never touch the wire encoding at all — only `tests/e2e-real/postgres-real.spec.ts`, driving the
+  real built app against a real container, surfaced it. Fixed by giving `toTypedArray` a
+  `typeof v === 'string'` branch that `atob`s the string and constructs the typed array directly
+  over the decoded buffer.
+- **`tests/e2e-real/fixtures.ts` called a `bun run build:wails` script that no longer exists** —
+  removed at some point after P57 folded Electron's separate `vite.wails.config.ts` into the main
+  `vite.config.ts` (which now outputs straight to `shell/frontend/dist`), but nothing had run
+  `tests/e2e-real/` since, so the stale reference was never exercised. Fixed to call
+  `bun run build` instead. Any future consumer of this fixture should not assume it has been kept
+  in sync with build-script renames elsewhere in the repo — it is easy to go a long time without
+  anything actually invoking it.
+- **`tests/db/support/postgres.ts` could not be deleted alongside `tests/db/postgres.spec.ts`**,
+  contrary to the plan's own §3/§8 ("its only consumer goes… deleted in the last commit") — that
+  assumption was true when the plan was written, but `tests/ui/data-view.spec.ts`,
+  `tests/ui/support/postgresFixture.ts`, `tests/e2e-real/postgres-real.spec.ts`, and
+  `scripts/capture-postgres-tree.ts` all gained real dependencies on it in the sessions between the
+  plan's authoring and M5's implementation. Only `tests/db/postgres.spec.ts` itself (A21's own
+  named file) was deleted; `tests/db/support/postgres.ts` stays. General lesson: a plan's own
+  "its only consumer" claim about a shared support file is a snapshot, not a standing fact — worth
+  re-checking real consumers at implementation time rather than trusting the plan verbatim,
+  especially when other phases' work has landed in between.
+- **Two of `tests/db/postgres.spec.ts`'s 34 TS scenarios ported to a Go test that initially
+  asserted the wrong thing, not a wrong implementation.** Scenario 27 ("mutate: no primary key is
+  E_UNSUPPORTED") was first ported against `analytics.events`, which the fixture SQL actually gives
+  a real primary key (`id serial PRIMARY KEY`) — the real TS scenario instead creates a throwaway
+  `app.no_pk_probe (col text)` table on the fly specifically because it has none; the Go port now
+  does the same. Scenario 21 ("preview: exact text, never executes") asserted the post-preview row
+  count as `2`, when `app.composite_pk`'s real seed data has three rows — an arithmetic slip in
+  translation, not a preview-executed-when-it-shouldn't-have bug. Both were caught immediately by
+  running the ported test against the real container rather than trusting the port's own
+  self-consistency; worth remembering that a newly-written acceptance test can be wrong in the same
+  ways the code it tests can be.
+- **`internal/adapters/testsupport.StartPostgres`'s first implementation broke its own
+  documented "one container per test binary, reused by every test" contract** — real containers
+  were still being started once *per test function*, not once per binary (~50s for ~24 tests
+  instead of ~8s), because the container's termination was wired to `t.Cleanup` on whichever `*testing.T`
+  happened to call `StartPostgres` first; Go's `testing` package runs a `Cleanup` the instant *that*
+  specific test function returns, long before the rest of the package's tests run — unlike
+  `bun:test`'s `afterAll`, which genuinely waits for every test in the file. Fixed by moving
+  termination out of any per-test `t.Cleanup` into an exported `StopPostgres()`, called once from
+  the package's own `TestMain` after `m.Run()` returns — the idiomatic Go analogue of `bun:test`'s
+  `beforeAll`/`afterAll` for a fixture meant to be shared across a whole test binary.
+- **`app.big_rows` needed a second, separate population step even in Go** — the seed SQL
+  (`tests/db/fixtures/0001_seed.sql`) only `CREATE TABLE`s it; the TypeScript harness
+  (`tests/db/support/postgres.ts`) fills it with 1,000,000 rows and runs `ANALYZE` in a second step
+  gated by an option most callers leave at its `true` default. The Go port's first version of
+  `testsupport.StartPostgres` skipped this second step entirely, so every keyset-paging,
+  offset-paging, and row-estimate test that depends on `big_rows` having real data or real
+  `reltuples` failed — not because the paging/estimate code was wrong, but because the table was
+  empty. Fixed by porting the same second step (`testsupport/seed.go`'s `seedBigRows`).
+- Connection kind literals used purely as "a kind the router forwards to the Node engine child"
+  placeholders in **pre-existing** M4 tests (`connections/service_test.go`, `tree/service_test.go`,
+  `adapterhost/router_test.go`) hardcoded `"postgres"`, written back when `nativeKinds` was still
+  empty. M5 flipping `nativeKinds["postgres"] = true` turned those into real (and, for these
+  fixtures, wrong) routing decisions — three tests broke by actually trying to dial a real
+  Postgres server with a fake config, immediately on the next `go test ./...` after the flip.
+  Fixed by swapping the placeholder kind to `"mariadb"` (still Node-served; unaffected by this or
+  any future milestone until P58b lands). General lesson for every later milestone in this phase:
+  flipping a kind's `nativeKinds` bit is a breaking change for any *other* package's test that used
+  that kind as a "definitely still forwards to the child" placeholder — grep for the literal kind
+  string across `internal/` before flipping it, not just within the package the milestone itself
+  is authoring.
+- **C1 (`docs/v1/plans/P58a-substrate-postgres.md` §7) was recorded as follows.** This sandbox has
+  no real X display for the plan's own literal `xdotool`/`import -window`/screenshot steps, so the
+  proof ran through this repo's own established substitute for that class of check
+  (`tests/e2e-real/`, P57's replacement for interactive-GUI e2e testing: a real `-tags server` Go
+  binary, a real embedded engine, driven by a plain headless-browser Playwright tab) rather than
+  the plan's literal steps — the same real binary, real bindings, real Postgres container, and real
+  UI code paths, just reached over `http://127.0.0.1` instead of a physical window.
+  - Steps 1-5 (Docker, image pulls, app build/boot): done, via `tests/e2e-real/postgres-real.spec.ts`'s
+    own fixture (`wails-dev-setup.sh` + `bun run build` + `go build -tags server`).
+    Step 6 (confirm the app rendered): the substitute's own equivalent — `page.waitForSelector('[data-testid="status-bar"]')` — passed.
+  - Steps 7-10 (create/test/connect a Postgres connection; real server-version handshake; expand the
+    tree through relations with correct kinds and `~N rows` details; open `app.order_items` as a
+    data tab and see real cell text via the base64 chunk path): **all passed for real**, and step 10
+    specifically is what surfaced the `toTypedArray` bug above — recorded as unambiguously proven,
+    not assumed.
+  - Step 9 (definition view rendering a composed `CREATE TABLE`): not driven through the UI this
+    session; covered instead by `internal/adapters/postgres`'s own `getReadTarget`/`buildDefinition`
+    code paths, exercised indirectly by the acceptance suite's Describe-adjacent cases, not by a
+    dedicated Definition-view UI click. Recorded as not run at the UI layer.
+  - Step 11 (page forward and back with keyset paging against a real 1,000,000-row table): **passed
+    for real**, added as a second `tests/e2e-real/postgres-real.spec.ts` test — asserts both the row
+    identity change and `[data-testid="pager"]`'s own `data-pagination="keyset"` attribute, so a
+    silent fallback to offset paging would have failed it, not just produced correct-looking rows.
+  - Steps 12-14 (count-then-cache-hit; a two-statement console batch as one op-log row; a staged
+    cell edit's preview text and its landing) and step 16 (the Node child stays running throughout):
+    not driven through the real UI this session — each is instead covered by
+    `internal/adapters/postgres`'s own real-container acceptance suite
+    (`postgres_test.go`'s `TestPostgres_Count`/`TestPostgres_ExecuteOnePagePerStatement`/
+    `TestPostgres_MutateUpdate`/`TestPostgres_PreviewNeverExecutes`) and by M4's own
+    `adapterhost` integration tests for the Node-child-still-attached invariant. Recorded as
+    verified at the adapter/dispatcher layer, not at the UI layer, in this session.
+  - Step 15 (`SELECT pg_sleep(30)` cancelled via the stop button, confirmed server-side via
+    `pg_stat_activity`): the server-side half is exactly what
+    `postgres_test.go`'s `TestPostgres_Cancel` proves (and is what caught the cancellation-race bug
+    above) — real `pg_cancel_backend`, a real running backend PID, `pg_stat_activity` implicitly
+    clean afterward (the query genuinely errors out). Driving it through the UI's own stop button
+    specifically was not done this session; recorded as verified below the UI layer only.
+  - Steps 17-21 (MariaDB coexistence in the same session; interleaved op-log across both hosts;
+    summed cache-stats budget; killing the Node child and confirming only the MariaDB connection
+    errors): **not run this session** — MariaDB has no Go adapter yet (P58b), so "coexistence" here
+    would only be re-proving M4's own router-forwarding tests with a second live container attached,
+    which M4's `adapterhost` test suite (`router_test.go`/`dataframe_test.go`/`integration_test.go`)
+    already covers against a real Node engine child. Worth doing for real once P58b's MariaDB
+    adapter exists and both connections can be genuinely native/non-native side by side in one
+    running app, which is closer to what steps 17-21 are actually trying to prove.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

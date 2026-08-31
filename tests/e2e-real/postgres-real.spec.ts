@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { installPassthrough } from './support/passthrough';
 import {
@@ -22,12 +23,10 @@ test.beforeAll(async () => {
     test.skip(true, DOCKER_UNAVAILABLE_MESSAGE);
     return;
   }
-  // seedBigTable:false — this spec never touches app.big_rows, and skipping its 1M-row insert (and
-  // matching ANALYZE) is safe here in a way it wasn't for E1's SQLite fixture (§3.3/§7 item 1):
-  // that ANALYZE was load-bearing because the SQLite adapter's tree-children query joins
-  // sqlite_stat1 unconditionally, so a never-ANALYZE'd database 422s on the very first expand. The
-  // Postgres adapter's tree-children query carries no such dependency on app.big_rows specifically.
-  pg = await startPostgres({ seedBigTable: false });
+  // seedBigTable:true (P58a's own addition, C1 §7 step 11) — the second test below pages
+  // app.big_rows through the real keyset wire path (BuildKeysetPosition against a real 1M-row
+  // table, not a canned fixture); the first test's own assertions are unaffected either way.
+  pg = await startPostgres({ seedBigTable: true });
 });
 
 test.afterAll(async () => {
@@ -102,6 +101,73 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
     timeout: 15_000,
   });
+
+  expect(consoleErrors).toEqual([]);
+});
+
+async function firstGutterNumber(page: Page): Promise<string> {
+  return (await page.locator('[data-testid="grid-gutter-cell"]').first().innerText()).trim();
+}
+
+// C1 §7 step 11 — keyset paging (BuildKeysetPosition) against a real 1,000,000-row table, over the
+// real base64 wire path, forward then back: the pagination mode itself (not just row counts) is
+// asserted, since an adapter that silently fell back to offset paging on a keyset-eligible sort
+// would still show correct rows here, just not via the code path this step exists to prove.
+test('real Postgres: keyset paging over app.big_rows, forward then back', async ({
+  kira,
+  consoleErrors,
+}) => {
+  if (!pg) throw new Error('postgres fixture did not start');
+  const { window: page } = kira;
+  await installPassthrough(page);
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Real Postgres Paging');
+  await page.fill('[data-testid="connection-host"]', pg.config.host ?? '');
+  await page.fill('[data-testid="connection-port"]', String(pg.config.port));
+  await page.fill('[data-testid="connection-database"]', pg.config.database ?? '');
+  await page.fill('[data-testid="connection-username"]', pg.config.username ?? '');
+  await page.fill('[data-testid="connection-password"]', pg.config.password ?? '');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+  await page.reload();
+  await page.waitForSelector('[data-testid="status-bar"]');
+
+  const connRow = page
+    .locator('[data-testid="tree-row"][data-kind="connection"]')
+    .filter({ hasText: 'Real Postgres Paging' });
+  await connRow.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 15_000,
+  });
+
+  await connRow.locator('.twisty').click();
+  await page.locator('[data-testid="tree-row"][data-path="database:kira_test"] .twisty').click();
+  await page
+    .locator('[data-testid="tree-row"][data-path="database:kira_test/schema:app"] .twisty')
+    .click();
+  const bigRowsRow = page.locator(
+    '[data-testid="tree-row"][data-path="database:kira_test/schema:app/table:big_rows"]',
+  );
+  await expect(bigRowsRow).toBeVisible();
+  await bigRowsRow.dblclick();
+
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
+
+  // A `nextToken`/`prevToken` pair, not an offset — BuildKeysetPosition against a real 1M-row
+  // table with an id-PK default sort.
+  await expect
+    .poll(() => page.locator('[data-testid="pager"]').getAttribute('data-pagination'))
+    .toBe('keyset');
+
+  await page.click('[data-testid="pager-next"]');
+  await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('101');
+
+  await page.click('[data-testid="pager-prev"]');
+  await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
 
   expect(consoleErrors).toEqual([]);
 });

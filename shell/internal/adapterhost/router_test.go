@@ -17,16 +17,19 @@ func (f fakeKindLookup) KindOf(connectionID string) (string, bool) {
 
 func TestRouter_IsNativeKind(t *testing.T) {
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
-	if r.IsNativeKind("postgres") {
-		t.Error("nativeKinds is empty at M4 — nothing should report native yet")
-	}
-
-	nativeKinds["postgres"] = true
-	defer delete(nativeKinds, "postgres")
 	if !r.IsNativeKind("postgres") {
-		t.Error("IsNativeKind must reflect nativeKinds live, not a snapshot taken at construction")
+		t.Error("postgres has been native since M5 — it should already report native")
 	}
 	if r.IsNativeKind("mariadb") {
+		t.Error("mariadb has no adapter yet (M6) — nothing else should report native")
+	}
+
+	nativeKinds["mariadb"] = true
+	defer delete(nativeKinds, "mariadb")
+	if !r.IsNativeKind("mariadb") {
+		t.Error("IsNativeKind must reflect nativeKinds live, not a snapshot taken at construction")
+	}
+	if r.IsNativeKind("sqlite") {
 		t.Error("only the kind actually added to nativeKinds should report native")
 	}
 }

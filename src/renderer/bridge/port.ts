@@ -74,7 +74,20 @@ function isChunkLike(
   );
 }
 
-function toTypedArray<T>(v: unknown, ctor: { from(v: number[]): T }): T {
+function toTypedArray<T>(
+  v: unknown,
+  ctor: { from(v: number[]): T; new (buffer: ArrayBuffer): T },
+): T {
+  if (typeof v === 'string') {
+    // A9: a Go-native-served connection's own page codec sends each buffer as base64 of its exact
+    // little-endian bytes (P58 D5) rather than JSON.stringify's index-keyed object — decoded
+    // straight into the typed array's backing buffer, no per-element round trip. The ten
+    // still-Node-served kinds keep sending the object shape below until P58f (P58 §1.2).
+    const binary = atob(v);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new ctor(bytes.buffer);
+  }
   return ctor.from(Object.values(v as Record<string, number>));
 }
 

@@ -58,7 +58,10 @@ function buildPrerequisites(): Promise<void> {
     try {
       const env = envWithGoBin();
       execFileSync('sh', ['scripts/wails-dev-setup.sh'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
-      execFileSync('bun', ['run', 'build:wails'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
+      // `build:wails` (a separate `vite.wails.config.ts`) was folded into the main `vite build`
+      // once P57 removed Electron — this repo's own `vite.config.ts` already outputs straight to
+      // `shell/frontend/dist`, main.go's `//go:embed` target.
+      execFileSync('bun', ['run', 'build'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       await mkdir(resolve(SHELL_DIR, 'bin'), { recursive: true });
       execFileSync('go', ['build', '-tags', 'server', '-o', SERVER_BINARY, '.'], {
         cwd: SHELL_DIR,
@@ -160,7 +163,10 @@ export const test = base.extend<KiraFixtures>({
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const stderr: string[] = [];
-    proc.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      stderr.push(chunk.toString());
+      process.stderr.write(chunk);
+    });
     const exited = new Promise<number | null>((r) => proc.once('exit', r));
 
     const baseURL = `http://127.0.0.1:${port}`;

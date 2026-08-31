@@ -48,8 +48,8 @@ func newHarness(t *testing.T) *harness {
 
 	host := enginetest.Host(t)
 	fake := &fakeStates{status: map[string]string{}}
-	// nativeKinds is empty through the whole of P58a's M4, so this router always forwards to the
-	// engine fixture — the same behaviour these tests exercised before the Backend refactor.
+	// "mariadb" is not in nativeKinds (postgres is, as of M5) — this router always forwards to the
+	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
 	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 	svc := tree.New(r.Connections, r.Metadata, router, fake)
 	return &harness{svc: svc, repos: r, host: host, fake: fake}
@@ -62,7 +62,7 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 	now := model.NowISO()
 	if _, err := h.repos.Connections.DB.Exec(
 		`INSERT INTO connections (id, name, kind, color, mode, read_only, created_at, updated_at, sort_order)
-		 VALUES (?, ?, 'postgres', 'blue', 'fields', 0, ?, ?, 0)`,
+		 VALUES (?, ?, 'mariadb', 'blue', 'fields', 0, ?, ?, 0)`,
 		id, name, now, now,
 	); err != nil {
 		t.Fatalf("seed connection: %v", err)
