@@ -20,7 +20,7 @@ import (
 // requires).
 func TestRealKeychainRoundTrip(t *testing.T) {
 	const (
-		testService = "Kira Studio Safe Storage (test)"
+		testService = "Kira Studio Secrets (test)"
 		testAccount = "Kira Studio (test)"
 	)
 

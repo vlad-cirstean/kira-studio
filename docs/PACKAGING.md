@@ -133,7 +133,7 @@ Signing/notarization are deferred past v1 by SPEC.md §3; the DMG is a scope dec
 
 **Keychain consequence of ad-hoc signing.** Credentials are encrypted under an AES-256-GCM key held in
 a macOS Keychain generic-password item (`shell/internal/secrets/keyring_darwin.go`, service
-"Kira Studio Safe Storage"). Keychain ACLs are keyed to a stable code-signing identity, which is
+"Kira Studio Secrets"). Keychain ACLs are keyed to a stable code-signing identity, which is
 exactly what ad-hoc signing defers, so the first launch after installing a new build may show one
 "Kira Studio wants to use your confidential information stored in…" prompt; **Always Allow** answers it
 permanently for that build. Expected, and the honest cost of deferring signing — not worth working

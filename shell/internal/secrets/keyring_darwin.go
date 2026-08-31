@@ -13,9 +13,12 @@ import (
 // library, confirmed against its real source for P55 — see docs/v1/plans/
 // P55-go-application-services.md §1.1 for the six gotchas handled below).
 const (
-	keychainService = "Kira Studio Safe Storage" // distinct from the Electron build's own item
+	// "Safe Storage" is Chromium/Electron's own naming convention for this kind of Keychain item
+	// (what safeStorage itself would have called it) — this app has no Electron/Chromium in it
+	// (P57), so naming this item after a mechanism it doesn't use would be misleading.
+	keychainService = "Kira Studio Secrets"
 	keychainAccount = "Kira Studio"
-	keychainLabel   = "Kira Studio Safe Storage"
+	keychainLabel   = "Kira Studio Secrets"
 	keyBytes        = 32
 )
 

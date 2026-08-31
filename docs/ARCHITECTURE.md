@@ -389,15 +389,20 @@ authorization decision rather than a prompt per connection, item-count and item-
 irrelevant, and `SecretStore.copy()` stays a raw column copy that never needs the OS key at all.
 
 The key is 32 random bytes held as one generic-password item via `github.com/keybase/go-keychain`
-(service `Kira Studio Safe Storage`, account `Kira Studio`), and values are sealed with
+(service `Kira Studio Secrets`, account `Kira Studio`), and values are sealed with
 **AES-256-GCM** under a `kira:v2:<base64>` envelope. Two item attributes are load-bearing:
 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, so the key is never restorable from a backup onto
 another machine, and non-synchronizable, so it never reaches iCloud Keychain. `secrets/keyring_darwin.go`
 is the only file in the repo that touches the keychain library; `secrets/cipher.go` is the only
 file that encrypts or decrypts, so a future re-key or a real cross-platform secret store stays a
-contained change. The **service name itself must never change** (P57 D12, which deliberately kept
-`Kira Studio Safe Storage` through the rename): the OS looks the item up by service name, not by
-bundle identifier, so changing it orphans every existing user's stored key.
+contained change. The service name was `Kira Studio Safe Storage` through P52-P57 (P57 D12 kept it
+stable across the Electron-to-Wails rename specifically so existing users' stored keys weren't
+orphaned) but is now `Kira Studio Secrets`: "Safe Storage" is Chromium/Electron's own naming
+convention for this kind of item, and this app has had no Electron/Chromium in it since P57 — so the
+name was actively misleading about what created it. The app has not shipped, so there is no
+installed base to orphan; the OS looks the item up by service name, not by bundle identifier, so
+**this is the last time the name can change for free** — once real users exist, a rename needs a
+migration (read the old service name once, re-write under the new one, then stop looking).
 
 Two things changed with the cipher, and both are deliberate. The envelope bumped **`kira:v1:` →
 `kira:v2:`** because the cipher genuinely changed (AES-256-GCM under our own key, against Chromium's
