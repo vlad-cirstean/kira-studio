@@ -1615,3 +1615,203 @@ have to rediscover it.
   compile (P55's finding). `model.ConnectionState.Caps` is such a field — use `go-cmp` (already a
   dependency), never `==`. This bites harder in P58c than in P58b because `bson.D` and `bson.RawValue`
   are both `any`-bearing at the leaves; use `go-cmp` for every document comparison too.
+
+## 12. M7.0 results
+
+All four probes run, against real `mongo:7`/`redis:7` containers pulled through `mirror.gcr.io` and
+retagged, in a throwaway scratch Go module (`go.mongodb.org/mongo-driver/v2` v2.8.2,
+`github.com/redis/go-redis/v9` v9.22.0, both `testcontainers-go/modules/{mongodb,redis}` v0.44.0 —
+no product code, nothing committed under `shell/`, per §6's own rule). Ordered TC-3, MG-1, MG-2,
+RD-1 as specified. Two of the four findings below overturn or resolve an open point in §1/§2 rather
+than merely confirming it — both are load-bearing for M7.1 and M7.3/M7.4 and are called out first.
+
+### TC-3 — both containers start; two of the plan's own assumptions were wrong
+
+**PASS**, after two fixes, both now confirmed working and required:
+
+1. **`modules/mongodb`'s default wait strategy resolves on the entrypoint's first, throwaway,
+   auth-less boot — confirmed, exactly as §1.13 predicted.** With `WithUsername`/`WithPassword` set
+   and the module's own default wait strategy, the container reports ready in ~2s and the very
+   first real client connection then fails: `connection(...) incomplete read of message header:
+   ...: connection reset by peer` — the throwaway instance was already mid-shutdown. **Fix,
+   confirmed working:** override the wait strategy explicitly —
+   `testcontainers.WithWaitStrategy(wait.ForLog("Waiting for connections").WithOccurrence(2).WithStartupTimeout(60*time.Second))`
+   passed alongside `tcmongodb.WithUsername`/`WithPassword` to `tcmongodb.Run`. With it, the
+   container is ready in ~6s and `buildInfo` answers immediately. `testsupport/mongo.go` (M7.3)
+   must use this exact override; the module's own default is unusable for this fixture.
+2. **`modules/redis@v0.44.0` has no `WithPassword` option at all** — its only `Option` functions are
+   `WithTLS`, `WithConfigFile`, `WithLogLevel`, `WithSnapshotting` (confirmed by reading
+   `options.go`). §6's own probe cell asked whether "`WithPassword` behaves" the way ClickHouse's
+   `WithPassword("")` didn't (P58b's TC-2 finding) — wrong premise; no such function exists to
+   behave one way or another. **The real mechanism, confirmed working:**
+   `testcontainers.WithCmdArgs("--requirepass", "kira")` — the same generic primitive
+   `WithLogLevel` itself is built on. Confirmed: an unauthenticated `PING` against the
+   `--requirepass` container is refused (`NOAUTH Authentication required`), and an authenticated
+   one succeeds. `testsupport/redis.go` (M7.4) uses `WithCmdArgs`, not a `WithPassword` that does
+   not exist.
+3. **No ulimit rejection** — neither module needed the ClickHouse-style ulimit workaround
+   (P58b's `NoUlimitClickHouseContainer`); both started clean under this sandbox's fixed 20 000
+   ceiling.
+
+### MG-1 — every rendering matched byte-for-byte, and the one predicted divergence doesn't occur in the real fixture
+
+**PASS**, all ~14 inputs, after two probe-construction fixes below (not driver findings) and one
+real API-shape finding:
+
+- **`bson.MarshalExtJSON` cannot encode a bare scalar or array `RawValue` at the top level.**
+  `Encoder.Encode` always starts its writer at "TopLevel", and every scalar/array `WriteXxx` call
+  rejects that position (`"WriteObjectID can only write while positioned on a Element or Value but
+  is positioned on a TopLevel"`, and the same for `WriteDecimal128`/`WriteBinaryWithSubtype`/
+  `WriteTimestamp`/`WriteArray`/`WriteInt64`/`WriteNull`). No lower-level `EncodeValue` exists
+  either (checked: `MarshalExtJSON`, `MarshalExtJSONIndent`, `IndentExtJSON` are the package's
+  entire public ext-JSON surface). **`IDText`'s Go port cannot call `MarshalExtJSON` on a bare
+  `_id` value directly** — it must wrap the value in a single-field document
+  (`bson.D{{Key: "v", Value: idValue}}`), marshal that, and strip the fixed `{"v":`/`}` wrapper.
+  Confirmed working this way for every scalar/array type tried (ObjectID, Decimal128, Binary,
+  Timestamp, Long, array, null). C4's `IDText` design needs this wrap-and-strip step spelled out;
+  it is not optional plumbing.
+- **`MarshalExtJSONIndent(val, canonical, escapeHTML, prefix, indent)` exists as a native function**
+  (`bson/marshal.go`) — the plan's §1.4/C2 fourth point assumed indenting had to be
+  `MarshalExtJSON` + a separate `json.Indent` call; there is a one-call alternative. Internally it
+  is exactly that (`MarshalExtJSON` then `json.Indent`), so behaviour is identical either way, but
+  `definition.ts`'s relaxed-pretty-print port can use the one-call form directly rather than
+  wiring the two-step version P58 §1.8 assumed.
+- **The predicted C2 fidelity divergence does not occur for `widgets.price` in the real fixture —
+  verified against a real container with the real `mongodb` npm driver, not assumed.**
+  §1.4/C2's central example claims `0003_mongo_seed.ts:22`'s `price: (i + 1) * 1.5` stores as a
+  BSON **double** at `i = 1` (value `3`), so Go's `bson.Raw` would render `$numberDouble` while
+  JS's driver-decode-then-`EJSON.stringify` re-derives `$numberInt` — a visible divergence. **This
+  is false.** Inserted `{_id: 1, price: (1 + 1) * 1.5}` (i.e. the plain JS number `3`) through the
+  real `mongodb` npm driver against a real `mongo:7` container and checked the **server-side**
+  stored type with `$type`: it is `"int"`, not `"double"`. The JS driver's own BSON serializer
+  picks the on-disk type **from the value**, not from the arithmetic that produced it — a
+  whole-number JS `number` serializes as BSON int32 regardless of whether it came from `3` or
+  `2 * 1.5`. Repeating the seed's own formula for `i = 0..5` confirms the pattern exactly:
+  fractional results (`i` even: `1.5, 4.5, 7.5`) store as `double` and render `$numberDouble` on
+  **both** sides identically; whole-number results (`i` odd: `3, 6, 9`) store as `int32` and render
+  `$numberInt` on **both** sides identically. There is no case in the real fixture where Go and JS
+  disagree on `price`'s rendering. **C2's underlying engineering point stays correct and the Go
+  port must still decode as `bson.Raw`/`bson.D`, never `bson.M`** — a real double genuinely does
+  exist elsewhere (e.g. an explicit `Double(...)` write, or a value outside int32 range with a
+  fractional part), and `bson.Raw`'s type-tag fidelity is still the right general behaviour. But
+  **the specific "`widgets.price` will visibly change on M7.3 landing" narrative in C2/§5.3 is
+  wrong**, and the "EJSON rendering is byte-stable... plus one `<`-bearing document" test (§5.3's
+  table) needs a *different*, deliberately-constructed double-valued field to demonstrate the
+  fidelity property at all — `widgets.price` cannot do it. M7.3's implementer should either add
+  one explicitly-`Double`-wrapped field to the Go seeder (documented as a fixture addition, not a
+  literal port of `0003_mongo_seed.ts`, which has no such field) or drop the "visible behaviour
+  change" framing from C2/OQ-4 entirely and keep only the type-tag-fidelity engineering rationale.
+  **OQ-4 (the user-visible-behaviour-change question) may be moot** — there may be nothing for a
+  user to ever actually see differently on `widgets`.
+- Every other case matched byte-for-byte: field order preserved through a nested object
+  (`meta.weight`/`meta.note`), `escapeHTML: false` confirmed (a `<b>&amp;</b>` string round-trips
+  unescaped, matching JS's non-escaping default), non-ASCII (`pässwörd 🔐`) identical, `null`
+  identical, empty array/document identical, `Decimal128`/`Binary`/`Timestamp`/`Long` all
+  identical, and the relaxed indented validator form identical including the `minimum: 5` (not
+  `{"$numberInt":"5"}`) rendering C2's fourth point requires.
+
+### MG-2 — `$currentOp` must be polled through the same client the slow op ran on, not a side connection
+
+**PASS**, after one real architecture finding:
+
+- **`$currentOp` with `allUsers: false` only ever matches the polling connection's own
+  authenticated user's ops — polling as `root` while the slow op runs as `kira` finds nothing,
+  every time, confirmed empirically** (the root client's own poll only ever matched its own
+  `$currentOp` aggregate query). This is not a bug; it is what `allUsers: false` means. It also
+  happens to already match the real TypeScript adapter's own architecture exactly —
+  `index.ts`'s `cancel(opId)` runs `$currentOp`/`killOp` through the **adapter's own connection**,
+  the same user/session that issued the slow op, never a separate privileged side connection the
+  way `postgres`/`mysqlfamily`'s cancel does. **Worth stating as an explicit rule for the Go port**,
+  since a naive implementation modelled on the SQL adapters' side-connection cancel pattern (a
+  second connection dedicated to `pg_cancel_backend`-style calls) would get this wrong in a way
+  nothing would catch until a real multi-user deployment: `mongo/adapter.go`'s `Cancel` must issue
+  `$currentOp`/`killOp` on the **same `*mongo.Client`** the adapter already holds, never a second
+  one.
+- Confirmed working end to end as the **unprivileged `kira` user** (readWrite on `kira_test` only,
+  no admin/clusterMonitor role): `$currentOp` found the tracked op (matched on `command.comment`),
+  `killOp` succeeded with no privilege error, `opid` was a plain `int32` (not a compound value —
+  §1.6's "not necessarily numeric" caution still holds in general, just not observed here), the
+  killed operation's own error was a genuine server-side `mongo.CommandError` (code `11601`,
+  name `Interrupted`) — never satisfying `errors.Is(err, context.Canceled)` — confirming the
+  `E_QUERY`, not `E_CANCELLED`, mapping C13 specifies. `$currentOp` stopped matching within 500ms
+  of the kill.
+- `$function` (scenario 22's slow-operation mechanism) is available and runs on `mongo:7` as the
+  unprivileged user — no substitute needed.
+- A `context`-cancelled `$function` aggregate (not killed server-side, just locally abandoned)
+  left the pooled `*mongo.Client` answering `ping` cleanly afterward — the ctx-cancel path C6
+  specifies is clean, as expected.
+
+### RD-1 — HSCAN order is unstable (as predicted), and a source-confirmed answer to C9's open question
+
+**PASS** (no hard failures), four real findings:
+
+1. **HSCAN field order and round boundaries are not stable across two identically-seeded, freshly
+   started containers — confirmed, matching §1.11's TS-side finding exactly.** Two independent
+   5 000-field `HSCAN ... COUNT 1000` sweeps (fresh container each) returned all 5 000 fields in
+   both, but in a different order, with different per-round counts and different cursor values at
+   every step (e.g. round 1 returned 1000 fields one run, 1002 or 1003 another; final cursor
+   values differed entirely). §5.4's hash/set/zset paging tests must assert only "some rows, more
+   to come" and the exact **set** of pairs for the small fixture keys — never an exact order or an
+   exact per-round count, from the first test written, not after a flaky run.
+2. **SSCAN/ZSCAN/`SCAN MATCH` all behave exactly as expected** — `[]string` members (or
+   `[member, score, ...]` flattened pairs for ZSCAN) plus a `uint64` cursor, matching the
+   TypeScript adapter's `[cursor, elements]` pairing conceptually.
+3. **C9's open question is now answered from the driver's own source, not just reasoned about:
+   go-redis's blocking commands ignore the caller's `context` for the purposes of the blocking
+   wait itself.** `BLPop`'s implementation (`list_commands.go`) calls
+   `cmd.setReadTimeout(timeout)` — the **blocking timeout parameter**, not anything derived from
+   `ctx` — unconditionally overriding whatever deadline `ctx` might carry. Confirmed empirically: a
+   `BLPop(ctx, 10*time.Second, ...)` with `ctx` cancelled after 300ms ran for the full ~10 seconds
+   and returned the normal timeout-reached `redis.Nil`, never observing the cancellation at all. A
+   large `LRANGE` cancelled mid-flight was tried first and was inconclusive (completed in under a
+   second regardless, likely dominated by client-side decode rather than network wait) — BLPop is
+   the clean test because it blocks server-side. **This means C9's named alternative (passing the
+   op's own context straight to go-redis, claimed to make "a single long command... interruptible
+   for the first time") would not have delivered that benefit for any blocking command** — the
+   blocking timeout wins regardless of ctx. C9's chosen approach (`RunWithAbortRace` on a detached
+   context, `CheckCancelled` between SCAN rounds) is confirmed as the only approach that actually
+   works for this driver, not merely the safer one; the road not taken was never viable to begin
+   with. (Whether ctx cancellation is honoured for a *non-blocking* single command such as a slow
+   `EVAL` remains unverified — the `LRANGE` attempt didn't settle it either way — but it no longer
+   matters for C9's decision, since the blocking-command case alone already forecloses the
+   alternative.)
+4. **Default protocol is RESP3, and reply shapes genuinely differ from RESP2 — confirms C10 is
+   necessary, not precautionary.** `client.Options().Protocol` defaults to `3`. Under that default,
+   `HGETALL`/`CONFIG GET` via the generic `Do(ctx, ...)` path return `map[interface{}]interface{}`;
+   with `Protocol: 2` explicitly set, the same calls return a flat `[]interface{}` — exactly the
+   shape `formatReplyItem`'s array-vs-scalar branch in `console.ts` is written against. `XRANGE`'s
+   own reply shape (`[]interface{}` of `[id, [field, value, ...]]` pairs) was identical under both
+   protocols in this check, so it is specifically the map-shaped replies (hash-like commands) that
+   diverge. C10's `Protocol: 2` pin is confirmed necessary, not just a precaution against an
+   unverified assumption.
+5. **`PTTL`/`MEMORY USAGE` behave exactly as C11 specifies**: `-1` for a key with no TTL, `-2` for a
+   missing key (both as plain `int64`, no error); `MEMORY USAGE` returns `redis.Nil` (a real Go
+   error value) for a missing key, confirming the "best-effort swallow" C11 requires is swallowing
+   a real `redis.Nil`, not a generic error.
+6. **go-redis's `SET k v NX` failure shape is `redis.Nil`, not a non-`OK` string — confirms C13/§4.3
+   exactly.** The `SetNX` convenience method returns `(false, nil)` for an existing key (no error);
+   the raw `Do(ctx, "SET", k, v, "NX")` path returns `(nil, redis.Nil)`. Neither is a string to
+   pattern-match against — `mutate.go`'s insert-path guard must check `errors.Is(err, redis.Nil)`,
+   never a message-text comparison.
+
+### What this changes for M7.1–M7.4
+
+- **M7.1's `testsupport/mongo.go` and `testsupport/redis.go` designs are now fully specified, not
+  approximated**: the exact `WithWaitStrategy` override for Mongo and the exact `WithCmdArgs`
+  password mechanism for Redis, both confirmed working, replace the "if it fails" contingency §6
+  wrote for each.
+- **C2/§5.3/OQ-4 need a small correction before M7.3's acceptance suite is written**: either add a
+  genuinely double-valued field to the Go seeder (not a literal `0003_mongo_seed.ts` port — a
+  deliberate fixture addition, documented as such) to give the fidelity-gain test something real
+  to assert against, or drop the "visible behaviour change on `widgets`" framing and keep only the
+  general `bson.Raw`-vs-`bson.M` engineering rationale. Left as a decision for the M7.3
+  implementer rather than resolved here, since it changes what §4.5's fixture table promises.
+  **`IDText`'s design (C3/§4.1) additionally needs the wrap-and-strip mechanism spelled out**, since
+  `MarshalExtJSON` cannot take a bare value.
+- **C9 is no longer a judgement call weighed against an untested alternative — it is the only
+  approach that works**, for blocking commands specifically. No change to the decision itself
+  (§2's C9 already chose this path), but §2's own "unverified" framing around the alternative's
+  cost should read as "confirmed non-viable for blocking commands" once M7.4 is written.
+- **`mongo/adapter.go`'s `Cancel` must never open a second `*mongo.Client` for
+  `$currentOp`/`killOp`** — MG-2's finding makes this a correctness requirement, not a style
+  preference: a side connection would silently never find the op it's trying to kill.

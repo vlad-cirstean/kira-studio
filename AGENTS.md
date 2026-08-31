@@ -468,5 +468,44 @@ full results):
   engine child as a real process child (`pgrep -P <serverPid>`) instead of guessing at the vendored
   runtime's binary name.
 
+**P58c M7.0 findings** (`docs/v1/plans/P58c-mongo-redis.md` §12 carries the full results):
+
+- **A plan's own worked example is only as good as the code path it assumed, not the reasoning
+  around it.** P58c's central C2 divergence claim — that `widgets.price` (`(i+1)*1.5` at `i=1`)
+  stores as a BSON double, so Go's `bson.Raw` would render `$numberDouble` where JS's
+  decode-then-`EJSON.stringify` re-derives `$numberInt` — is false, checked against a real
+  container with the real `mongodb` npm driver: the JS driver's own serializer picks the on-disk
+  BSON type **from the value**, not from the arithmetic that produced it, so a whole-number result
+  stores as int32 regardless of being computed as `2 * 1.5`. Both sides render it identically.
+  The underlying engineering point (`bson.Raw`/`bson.D` preserve the on-disk type tag,
+  `bson.M` does not) is still correct and still required — there just isn't a real case of it in
+  this specific fixture field. Re-verify a plan's own concrete example against a real driver before
+  writing a test that assumes it, even when the general principle behind the example is sound.
+- **`bson.MarshalExtJSON` cannot encode a bare scalar or array value at the top level** — only a
+  document. Rendering a single field's value standalone (exactly what `IDText`'s `_id`-only render
+  needs) requires wrapping it in a one-field document, marshalling that, and stripping the fixed
+  `{"key":`/`}` wrapper text. No lower-level "encode one value" function exists in the package.
+- **`$currentOp` with `allUsers: false` only matches the polling connection's own authenticated
+  user's operations.** Polling from a different, privileged connection than the one that issued the
+  op being searched for finds nothing, ever — not a bug, but easy to get backwards if a Go port
+  copies the SQL adapters' side-connection cancel pattern (a second connection dedicated to the
+  server-side kill). Mongo's `Cancel` must run `$currentOp`/`killOp` on the **same** client the
+  adapter already holds.
+- **go-redis's blocking commands (`BLPop` and family) override the read timeout to the blocking
+  duration, ignoring the caller's `context` entirely for the wait itself** — confirmed both from
+  source (`list_commands.go`'s `cmd.setReadTimeout(timeout)`) and empirically (a `ctx` cancelled at
+  300ms did not stop a `BLPop(ctx, 10*time.Second, ...)` from running the full ten seconds). Passing
+  an op's own context straight to a driver call is not a free interruptibility win for every kind of
+  command — check whether the specific command family actually honours it before assuming so.
+- **Redis's default RESP protocol is 3, not 2, and it changes reply shapes, not just wire framing** —
+  `HGETALL`/`CONFIG GET` return a Go `map[interface{}]interface{}` under the default and a flat
+  `[]interface{}` under an explicit `Protocol: 2`. A generic console command dispatcher built
+  against "an array of alternating field/value strings" silently breaks under the client library's
+  own default unless the protocol version is pinned explicitly.
+- **HSCAN's field order and per-round counts are not stable across two identically-seeded, freshly
+  started containers** — reconfirmed independently of the TypeScript fixture's own two freezes
+  (§1.11): a real Go client against two fresh 5 000-field hashes returned every field both times,
+  in a different order, with different round boundaries each time.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
