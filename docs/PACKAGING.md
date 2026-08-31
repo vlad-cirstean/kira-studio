@@ -240,6 +240,24 @@ typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
   scope. Until someone applies them, everything in §7 describes intent, not what runs.
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
+- **`shell/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
+  and `appicon.icon/Assets/kira_icon_vector.svg` were swapped from Wails' scaffolded default to
+  `build/icon.png`/`build/icon.svg` (the app's real icon), and `wails3 task common:generate:icons`
+  correctly regenerated `darwin/icons.icns` from the new artwork — this sandbox has no macOS
+  hardware, and `Assets.car` generation needs Apple's `actool`/Icon Composer toolchain
+  (`wails3 generate icons`'s `-iconcomposerinput`/`-macassetdir` flags), which does not exist on
+  Linux and silently produces nothing rather than failing loudly. The previous, Wails-icon-based
+  `Assets.car` was restored rather than left deleted, so the bundle still has *a* valid asset
+  catalog, but on a real macOS build `CFBundleIconName` (`darwin/Info.plist`) resolves against
+  `Assets.car` **before** `CFBundleIconFile` falls back to `icons.icns` — so until someone re-runs
+  `wails3 task common:generate:icons` on macOS, a packaged app still shows the old Wails icon
+  despite `icons.icns` itself being correct. `icon.json` was also simplified while making this
+  change: the scaffolded layer was tuned for a small monochrome glyph over an automatic gray
+  background (0.85 scale, forced near-white/gray recolor in dark/tinted appearances, a specular
+  highlight and translucency) — all wrong for a full-color, pre-composed 1024×1024 icon, so those
+  were replaced with a 1.0-scale, unrecolored, non-specular single layer. That JSON change is
+  unverified beyond `wails3 generate icons` accepting it (no way to render an `.icon` bundle without
+  macOS); whoever regenerates `Assets.car` on real hardware should eyeball the result.
 
 ## 7. CI, releases, and auto-update
 
