@@ -182,9 +182,10 @@ list is only updated from an *observed* run, never from expectation.
    `KIRA_HOME` is unset in a packaged run. — *not yet run*
 7. Create a connection, expand the tree, open a data tab, scroll, open the cell editor, quit cleanly.
    The View menu has no Reload / Toggle DevTools in a `-tags production` build. — *not yet run*
-8. Kafka: connecting is **expected to fail** in a packaged build today — `engine.cjs` `require()`s a
-   native module nothing vendors into the bundle (§6). Record the actual failure, and do not treat a
-   pass here as possible until that gap closes. — *not yet run*
+8. Kafka: connecting is **expected to succeed** in a packaged build — Kafka is served in-process by
+   the native Go adapter since P58e M9 and never reaches the Node engine's `require()` of
+   `@confluentinc/kafka-javascript` (§6, now moot for this reason). This is the first time this has
+   ever been verifiable in a packaged bundle — record the actual result. — *not yet run*
 9. Cold start: launch 3 times, discard the first, take the median from the startup log line in
    `~/.kira-studio/logs/`; record against the ≤ 1500 ms target. RSS cross-check: rebuild the
    5-connection/10-tab scenario by hand and sum the app's processes via `ps -o rss=`, against 350 MB. —
@@ -216,18 +217,17 @@ typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
 
 ## 6. Known gaps
 
-- **Kafka's native module is not vendored into the packaged bundle.** `build:engine` marks
-  `@confluentinc/kafka-javascript` `--external`, but no build step copies that dependency (or any
-  `node_modules/` tree) alongside `engine.cjs`, the way `vendor-node.sh` does for the Node runtime. A
-  packaged build therefore produces a working app whose **Kafka connections fail at `require()` time**.
-  Both `sign-bundle.sh` and `verify-packaging.sh` treat the missing
+- **Resolved (P58e M9, was open since P57 M7): Kafka's native module was never vendored into the
+  packaged bundle.** `build:engine` still marks `@confluentinc/kafka-javascript` `--external`, and no
+  build step copies that dependency (or any `node_modules/` tree) alongside `engine.cjs`, the way
+  `vendor-node.sh` does for the Node runtime — that part of the tree is unchanged. What changed is that
+  it no longer matters: Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and is served
+  in-process, never reaching the Node engine child, so a packaged build's Kafka connections do not go
+  through `require()` at all any more. `sign-bundle.sh` and `verify-packaging.sh` still probe for
   `Contents/MacOS/runtime/engine/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node`
-  as a non-fatal note rather than asserting success against something nothing produces; if it ever does
-  appear, both scripts pick it up (individual ad-hoc signature, Mach-O arm64 and signature checks). This
-  is a real open gap, not a regression from removing Electron — the old pipeline's mechanism for it
-  (`electron-rebuild` for the Electron ABI plus `asarUnpack`) is gone along with the ABI and the asar —
-  and it is plausibly moot if P58 removes the Node engine sidecar entirely. Tracked in
-  `docs/v1/plans/P57-cutover.md`'s M7 entry.
+  and print a harmless note when it is absent (which it always is); those checks are dead code kept
+  only until P58f deletes the Node engine sidecar (and `@confluentinc/kafka-javascript` from
+  `package.json`) along with them.
 - **Ad-hoc signature only** (identity `-`). The build is not distributable outside the machine that
   built it, and SPEC.md §3 defers signing/notarization past v1. `wails3 tool sign [--notarize]` is
   available via `darwin:sign`/`darwin:sign:notarize` but is wired into nothing.

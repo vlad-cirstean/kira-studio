@@ -70,11 +70,12 @@ else
   # (main.go's resolveEngine() looks for both next to the running executable — see
   # shell/build/darwin/Taskfile.yml's create:app:bundle). Node's node_modules resolution for
   # @confluentinc/kafka-javascript (external to the esbuild bundle, P52 §10.1) is NOT checked
-  # here: no build step vendors it into the packaged bundle yet — a real, open gap, not a
-  # regression from this milestone (P57 M7 only removes Electron from the build; P58 is expected
-  # to remove the Node engine sidecar, and with it the question of whether this gap is worth
-  # closing at all). Tracked in docs/v1/plans/P57-cutover.md's M7 entry rather than silently
-  # assumed solved.
+  # here: no build step vendors it into the packaged bundle. This used to be a real
+  # runtime-failure gap (a packaged Kafka connection would `require()`-fail in the Node engine);
+  # it stopped being one at P58e M9.3, when Kafka became a native Go adapter served in-process and
+  # stopped reaching the Node engine child at all. The block below (and A4) checks for a module
+  # that can no longer matter either way — kept as dead code until P58f deletes the Node engine
+  # sidecar and this check along with it.
   if [ ! -f "$APP/Contents/MacOS/runtime/engine/engine.cjs" ]; then
     fail "engine.cjs missing" "\"$APP/Contents/MacOS/runtime/engine/engine.cjs\" is missing"
   fi
@@ -83,7 +84,7 @@ else
   fi
   KAFKA_NATIVE="$APP/Contents/MacOS/runtime/engine/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node"
   if [ ! -f "$KAFKA_NATIVE" ]; then
-    note "\"$KAFKA_NATIVE\" is missing — Kafka's native module is not yet vendored into the packaged bundle (known gap, see this script's A2 comment); Kafka connections will fail at runtime in this build"
+    note "\"$KAFKA_NATIVE\" is missing — this module is unused: Kafka is served in-process by a native Go adapter since P58e M9.3, not by the Node engine child, so nothing vendoring it would change (P58f removes this check with the child)"
   fi
 
   # A3: bundle identifier (D11 — this is the first milestone this ever passes against a real
@@ -98,10 +99,11 @@ else
     note "skipped A3 — PlistBuddy not available on this runner"
   fi
 
-  # A4: the Kafka driver's native module, once vendored (see A2's note), must be unpacked
-  # alongside engine.cjs and never left compressed inside anything this runtime would need to
-  # extract at load time — Wails ships a plain directory tree, not an asar, so there is no
-  # asar-specific half of this check left (unlike the old A6).
+  # A4: if the Kafka driver's native module were ever vendored anyway (see A2's note — it never
+  # is, and it no longer needs to be), it would need to be unpacked alongside engine.cjs and never
+  # left compressed inside anything this runtime would need to extract at load time — Wails ships
+  # a plain directory tree, not an asar, so there is no asar-specific half of this check left
+  # (unlike the old A6). Guarded by `-f "$KAFKA_NATIVE"`, so this never runs in practice.
   if [ -f "$KAFKA_NATIVE" ]; then
     if command -v file >/dev/null 2>&1; then
       if ! file "$KAFKA_NATIVE" | grep -q 'Mach-O.*arm64'; then

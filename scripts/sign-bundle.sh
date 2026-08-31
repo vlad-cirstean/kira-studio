@@ -1,8 +1,10 @@
 #!/bin/sh
 # sign-bundle.sh — P52 §10.1's four codesign lines, made real (P57 §4.13). Ad-hoc signs the
-# vendored node binary and (once vendored — see verify-packaging.sh's A2 comment for the open gap)
-# the Kafka native module individually before the deep-sign over the whole bundle, since codesign
-# does not descend into a plain (non-framework) nested Mach-O on its own.
+# vendored node binary individually before the deep-sign over the whole bundle, since codesign
+# does not descend into a plain (non-framework) nested Mach-O on its own. Also signs the Kafka
+# native module if present (see verify-packaging.sh's A2 comment) — it never is, and no longer
+# needs to be: Kafka is served in-process by a native Go adapter since P58e M9.3, not by the Node
+# engine child, so nothing ever vendors this module. P58f removes this block with the child.
 #
 # Paths are shell/build/darwin/Taskfile.yml's create:app:bundle output layout, not P52's — that
 # plan explicitly warned its own paths were written from an earlier session and would need
@@ -33,7 +35,7 @@ KAFKA_NATIVE="$APP/Contents/MacOS/runtime/engine/node_modules/@confluentinc/kafk
 if [ -f "$KAFKA_NATIVE" ]; then
   codesign --force --sign - "$KAFKA_NATIVE"
 else
-  echo "sign-bundle.sh: note — \"$KAFKA_NATIVE\" not present, skipping (Kafka's native module is not yet vendored into the packaged bundle — a known gap, not this script's job to fix)"
+  echo "sign-bundle.sh: note — \"$KAFKA_NATIVE\" not present, skipping (this module is unused: Kafka is served in-process by Go since P58e M9.3, not by the Node engine child)"
 fi
 
 codesign --force --deep --sign - "$APP"
