@@ -53,7 +53,7 @@ export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
 export const defaultSettings: Settings = {
   appearance: {
-    fontFamily: '"SF Mono", Menlo, monospace',
+    fontFamily: '"JetBrains Mono", "DejaVu Sans Mono", monospace',
     fontSize: 12,
     rowDensity: 'comfortable',
     wordWrap: true,

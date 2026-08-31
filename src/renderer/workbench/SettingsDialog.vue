@@ -164,10 +164,11 @@ async function onClearCaches(): Promise<void> {
                 @change="onFontFamilyChange"
               />
               <datalist id="kira-font-families">
+                <option value="'JetBrains Mono', 'DejaVu Sans Mono', monospace" />
+                <option value="'DejaVu Sans Mono', monospace" />
                 <option value="'SF Mono', Menlo, monospace" />
                 <option value="Menlo, monospace" />
                 <option value="Monaco, monospace" />
-                <option value="'JetBrains Mono', monospace" />
               </datalist>
               <span
                 class="font-preview"
