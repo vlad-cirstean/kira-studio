@@ -1,0 +1,210 @@
+package testsupport
+
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	goredis "github.com/redis/go-redis/v9"
+
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
+)
+
+// tests/db/support/redis.ts's own constants, ported verbatim (C21).
+const (
+	RedisImage            = "redis:7"
+	RedisPassword         = "kira"
+	RedisPrimaryDbIndex   = 0
+	RedisSecondaryDbIndex = 1
+	redisPort             = "6379/tcp"
+	redisStartupTimeout   = 60 * time.Second
+
+	// 0004_redis_seed.ts's own constants.
+	RedisListKey        = "queue:jobs"
+	RedisListLength     = 30
+	RedisBigListKey     = "queue:big-jobs"
+	RedisBigListLength  = 1200
+	RedisSetKey         = "tags:featured"
+	RedisZSetKey        = "leaderboard"
+	RedisStreamKey      = "events:log"
+	RedisHashKey        = "user:1:profile"
+	RedisTTLKey         = "session:abc"
+	RedisBigHashKey     = "user:1:bighash"
+	RedisBigHashLength  = 5000
+	RedisStreamEntries  = 5
+	RedisSecondaryDbKey = "other-db:marker"
+)
+
+// RedisSetMembers mirrors 0004_redis_seed.ts's own SET_MEMBERS.
+var RedisSetMembers = []string{"red", "green", "blue"}
+
+// RedisHashFields mirrors 0004_redis_seed.ts's own HASH_FIELDS.
+var RedisHashFields = map[string]string{"age": "30", "city": "NYC"}
+
+// RedisFixture is support/redis.ts's RedisFixture.
+type RedisFixture struct {
+	Config    model.ResolvedConnectionConfig
+	Host      string
+	Port      int
+	container testcontainers.Container
+}
+
+var redisMemo fixture[RedisFixture]
+
+// StartRedis is support/redis.ts's startRedis. Skips the test when Docker is unreachable.
+func StartRedis(t *testing.T) *RedisFixture {
+	t.Helper()
+	if !IsDockerAvailable() {
+		t.Skip(DockerUnavailableMessage)
+	}
+	f, err := redisMemo.get(startRedis)
+	if err != nil {
+		t.Fatalf("redis container: %v", err)
+	}
+	return f
+}
+
+// StopRedis terminates the memoized container, if one was ever started. Call once, from the test
+// binary's own TestMain, after m.Run() returns — never from an individual test.
+func StopRedis() {
+	redisMemo.stop(func(f *RedisFixture) { _ = f.container.Terminate(context.Background()) })
+}
+
+func startRedis() (*RedisFixture, error) {
+	ctx := context.Background()
+
+	// modules/redis has no WithPassword option (M7.0's own TC-3-adjacent finding) — the plain
+	// image's own --requirepass flag, via GenericContainer, is what support/redis.ts's
+	// RedisContainer().withPassword() does under the hood anyway.
+	req := testcontainers.ContainerRequest{
+		Image:        RedisImage,
+		ExposedPorts: []string{redisPort},
+		Cmd:          []string{"redis-server", "--requirepass", RedisPassword},
+		WaitingFor:   wait.ForLog("Ready to accept connections").WithStartupTimeout(redisStartupTimeout),
+	}
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mappedPort, err := container.MappedPort(ctx, redisPort)
+	if err != nil {
+		return nil, err
+	}
+	port := int(mappedPort.Num())
+
+	primary := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisPrimaryDbIndex, Protocol: 2,
+	})
+	secondary := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", host, port), Password: RedisPassword, DB: RedisSecondaryDbIndex, Protocol: 2,
+	})
+	defer primary.Close()
+	defer secondary.Close()
+
+	if err := seedRedis(ctx, primary); err != nil {
+		return nil, err
+	}
+	if err := secondary.Set(ctx, RedisSecondaryDbKey, "present", 0).Err(); err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	cfg := model.ResolvedConnectionConfig{
+		ID: "test-redis", SortOrder: 0, CreatedAt: now, UpdatedAt: now,
+		Name: "Test Redis", Kind: "redis", Color: "red", Mode: "fields", ReadOnly: false,
+		Host: Strp(host), Port: intp(port), Database: Strp("0"), Username: nil,
+		Options: map[string]any{}, Password: Strp(RedisPassword),
+	}
+	return &RedisFixture{Config: cfg, Host: host, Port: port, container: container}, nil
+}
+
+func seedRedis(ctx context.Context, conn *goredis.Client) error {
+	// A root-level key with no ':' — namespace splitting must still surface it as a 'key' leaf
+	// directly under the db, not swallow it while walking namespaces.
+	if err := conn.Set(ctx, "counter", "42", 0).Err(); err != nil {
+		return err
+	}
+
+	if err := conn.Set(ctx, RedisTTLKey, "token-abc", 0).Err(); err != nil {
+		return err
+	}
+	if err := conn.Expire(ctx, RedisTTLKey, 10_000*time.Second).Err(); err != nil {
+		return err
+	}
+
+	if err := conn.Set(ctx, "user:1:name", "Alice", 0).Err(); err != nil {
+		return err
+	}
+	if err := conn.Set(ctx, "user:1:email", "alice@example.com", 0).Err(); err != nil {
+		return err
+	}
+	if err := conn.HSet(ctx, RedisHashKey, RedisHashFields).Err(); err != nil {
+		return err
+	}
+	if err := conn.Set(ctx, "user:2:name", "Bob", 0).Err(); err != nil {
+		return err
+	}
+
+	bigHashFields := make(map[string]string, RedisBigHashLength)
+	for i := 0; i < RedisBigHashLength; i++ {
+		bigHashFields[fmt.Sprintf("f%d", i)] = fmt.Sprintf("v%d", i)
+	}
+	if err := conn.HSet(ctx, RedisBigHashKey, bigHashFields).Err(); err != nil {
+		return err
+	}
+
+	jobs := make([]any, RedisListLength)
+	for i := range jobs {
+		jobs[i] = fmt.Sprintf("job-%d", i)
+	}
+	if err := conn.RPush(ctx, RedisListKey, jobs...).Err(); err != nil {
+		return err
+	}
+
+	bigJobs := make([]any, RedisBigListLength)
+	for i := range bigJobs {
+		bigJobs[i] = fmt.Sprintf("big-job-%d", i)
+	}
+	if err := conn.RPush(ctx, RedisBigListKey, bigJobs...).Err(); err != nil {
+		return err
+	}
+
+	setMembers := make([]any, len(RedisSetMembers))
+	for i, m := range RedisSetMembers {
+		setMembers[i] = m
+	}
+	if err := conn.SAdd(ctx, RedisSetKey, setMembers...).Err(); err != nil {
+		return err
+	}
+
+	zMembers := []goredis.Z{
+		{Score: 10, Member: "alice"},
+		{Score: 20, Member: "bob"},
+		{Score: 30, Member: "carol"},
+	}
+	if err := conn.ZAdd(ctx, RedisZSetKey, zMembers...).Err(); err != nil {
+		return err
+	}
+
+	for i := 0; i < RedisStreamEntries; i++ {
+		if err := conn.XAdd(ctx, &goredis.XAddArgs{
+			Stream: RedisStreamKey, ID: "*",
+			Values: map[string]any{"type": "click", "seq": fmt.Sprintf("%d", i)},
+		}).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

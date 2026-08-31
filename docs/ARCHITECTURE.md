@@ -303,17 +303,39 @@ Node-served-only via an HTTP-management-API adapter with no AMQP client, and rat
 through the native-adapter migration it was cut. `connectionKindSchema`/`nodeKindSchema` no longer
 carry `rabbitmq`/`exchange`; there is no successor section here.
 
-### MongoDB / Redis
+### MongoDB / Redis (P9/P41; Go-native as of P58c M7.3/M7.4)
 
-MongoDB: document-shaped, `_id` keyset pagination falling back to `skip/limit`, `AbortSignal` +
-`killOp` cancellation. Redis: key/value-shaped, `SCAN`-cursor pagination (never `KEYS`), `DBSIZE`
-for an approximate count only.
+**Both are Go-native as of P58c** (`shell/internal/adapters/mongo/` and `.../redis/`) —
+`nativeKinds["mongodb"]` and `nativeKinds["redis"]` are both `true`, the sixth and seventh of ten
+kinds P58 migrates. MongoDB: document-shaped, `_id` keyset pagination falling back to
+`skip`/`limit`, cancellation via `$currentOp` + `killOp` on the *same* client the adapter already
+holds (never a side connection — `$currentOp`'s default `allUsers: false` only matches the polling
+connection's own authenticated user). Redis: key/value-shaped, `SCAN`-cursor pagination (never
+`KEYS`), exact per-key counts via O(1) type-length commands, and — unlike every other adapter —
+`Cancel` is a permanent, honest `false`: go-redis's blocking commands override the caller's context
+for the wait itself, so `CheckCancelled` between bounded `SCAN`-family rounds is the entire
+cancellation surface (`caps.cancel` stays `true` regardless, since that surface is genuinely
+effective).
+
+`mongo/literal.go` — the JSON5-lite tokenizer/BSON-constructor parser every Mongo filter/document/
+console surface runs through — was written and unit-tested alone first (P58 D11), with no driver
+and no container, before the rest of the package. One structural requirement threads through the
+whole package: `IDText` (a document's `_id`, rendered as canonical extended JSON text for a page's
+`ids` column, *Copy `_id`*, and a page token) and `literal.go`'s own parser must form a closed loop
+— whatever `IDText` emits, the parser must accept back, through two different real paths
+(`mutate.go`'s `parseIdKey`, which treats it as a bare value, and a filter box, which wraps it as
+`{_id: ...}`). `bson.MarshalExtJSON`/`UnmarshalExtJSON` share a real gotcha this closure exposed
+twice: neither can encode or decode a bare scalar at the top level, only a document — both
+directions need a value wrapped in a one-field document first.
 
 Redis is the other `caps.keyBrowser = true` engine (P41, alongside S3): a db index's own key
-namespace is unbounded, so `redis/catalog.ts`'s `database` node is `hasChildren: false` and the
+namespace is unbounded, so `redis/catalog.go`'s `database` node is `hasChildren: false` and the
 `:`-split namespace/key navigation that used to expand inline in the tree happens in a Browse tab
 instead (SPEC.md §8.18) — `SCAN`'s own cursor/count-budget discipline is unchanged, only where the
-result is shown moved.
+result is shown moved. Redis's `DbConnectionSet` is a `mysql-family`-style LRU (an 8-entry cap,
+keyed by db index rather than by database name), with go-redis's `Protocol: 2` pinned explicitly —
+its RESP3 default changes reply shapes for `HGETALL`/`CONFIG GET` and the console's own generic
+dispatch, from a flat array to a map.
 
 ## Storage
 

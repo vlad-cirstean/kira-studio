@@ -1815,3 +1815,35 @@ real API-shape finding:
 - **`mongo/adapter.go`'s `Cancel` must never open a second `*mongo.Client` for
   `$currentOp`/`killOp`** — MG-2's finding makes this a correctness requirement, not a style
   preference: a side connection would silently never find the op it's trying to kill.
+
+## 13. M7.1–M7.4 results
+
+All four milestones landed with no plan revision needed beyond what §12 already flagged. Full
+details, findings and the exact commits are in `AGENTS.md`'s own P58c M7.1/M7.3/M7.4 findings
+entries; this section is the short version, for a reader of this plan alone.
+
+- **M7.1** (shared lifts): `TestKindNodeServed` moved off `mongodb` onto `kafka` (C14);
+  `Router.childrenNative` normalizes a nil `Nodes` slice to `[]` (C16);
+  `testsupport.DocIDAt`/`DocBodyAt`/`KVPairs`/`KVValueAt` added; `mariadb-real.spec.ts`'s
+  coexistence pairing re-pointed to Kafka (C15). Full `tests/e2e-real/` suite green.
+- **M7.2** (`mongo/literal.go`, alone, no Docker): the tokenizer/parser/constructor-table/
+  EJSON-wrapper port, with `literal_test.go` written first per P58 D11. Found and fixed one real
+  gap under test: `bson.MarshalExtJSON` cannot encode a bare scalar at the top level, so `IDText`
+  wraps a value in a one-field document, marshals, and strips the wrapper text back off (the same
+  shape M7.0's own probe found on the `$oid`-rendering side).
+- **M7.3** (`mongo` adapter, `nativeKinds += mongodb`): the full package, 22 acceptance cases
+  against a real `mongo:7` container, including the four load-bearing ones §5.3 named. Found and
+  fixed one more real gap: `ResolveEJSONWrappers`' `bson.UnmarshalExtJSON` call has the same
+  top-level restriction as `MarshalExtJSON`, on the decode side — fixed with the same
+  wrap-in-a-document trick. Full `tests/e2e-real/` suite re-verified green after the flip.
+- **M7.4** (`redis` adapter, `nativeKinds += redis`, seven of ten kinds native): the full package,
+  18 acceptance cases plus a 5-case tokenizer unit suite, against a real `redis:7` container — the
+  smoothest first real run of any P58 sub-phase (one failure, and it was a test-fixture mistake,
+  not an adapter bug). Full `tests/e2e-real/` suite re-verified green after the flip.
+- **Checkpoint C1c** ran for real, via a throwaway `tests/e2e-real/` script (not committed, per
+  §5.6). All 14 steps passed in one session: MariaDB (native) and Kafka (Node-served) coexist and
+  survive/fail the Node child's kill exactly as C1b proved; MongoDB (native) renders a real
+  `DocumentPage` through the real renderer for the first time; Redis (native) opens a real Browse
+  tab, navigates its namespace tree, and renders a real `KeyValuePage` with a memory-usage badge —
+  the first native `caps.keyBrowser` engine and the first native `TreeChildren.Truncated`
+  producer. Nothing needed a "not available in this session" carve-out.

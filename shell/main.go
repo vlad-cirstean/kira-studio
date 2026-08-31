@@ -21,6 +21,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/clickhouse"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mongo"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/postgres"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/redis"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/sqlite"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"

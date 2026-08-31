@@ -1,0 +1,210 @@
+package redis
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	goredis "github.com/redis/go-redis/v9"
+
+	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
+)
+
+const (
+	connectTimeout = 10 * time.Second
+	maxConnections = 8
+	defaultDBIndex = 0
+)
+
+type connectFields struct {
+	host     string
+	port     int
+	username string
+	password string
+	tls      bool
+}
+
+// resolveFields is client.ts's resolveFields.
+func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message string)) (connectFields, int) {
+	var host, username, password, database string
+	var port int
+
+	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
+		if u, err := url.Parse(*cfg.URI); err == nil {
+			host = u.Hostname()
+			if p := u.Port(); p != "" {
+				port, _ = strconv.Atoi(p)
+			}
+			if u.User != nil {
+				username = u.User.Username()
+				password, _ = u.User.Password()
+			}
+			database = strings.TrimPrefix(u.Path, "/")
+		}
+	} else {
+		if cfg.Host != nil {
+			host = *cfg.Host
+		}
+		if cfg.Port != nil {
+			port = *cfg.Port
+		}
+		if cfg.Username != nil {
+			username = *cfg.Username
+		}
+		if cfg.Password != nil {
+			password = *cfg.Password
+		}
+		if cfg.Database != nil {
+			database = *cfg.Database
+		}
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	if port == 0 {
+		port = 6379
+	}
+
+	tlsEnabled := false
+	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
+		switch sslmode {
+		case "require", "prefer", "verify-full":
+			tlsEnabled = true
+		default:
+			log("warn", `redis: unknown sslmode "`+sslmode+`", ignoring`)
+		}
+	}
+
+	defaultDbIndex := defaultDBIndex
+	if trimmed := strings.TrimSpace(database); trimmed != "" {
+		if n, err := strconv.Atoi(trimmed); err == nil && n >= 0 {
+			defaultDbIndex = n
+		}
+	}
+
+	return connectFields{host: host, port: port, username: username, password: password, tls: tlsEnabled}, defaultDbIndex
+}
+
+// dbConnectionSet mirrors client.ts's DbConnectionSet exactly, keyed by logical db index instead
+// of database name (P9's D9): one distinct *redis.Client per db index, each carrying its own DB
+// option baked in at construction rather than sharing one connection and issuing a runtime
+// SELECT.
+type dbConnectionSet struct {
+	fields         connectFields
+	defaultDbIndex int
+	log            func(level, message string)
+
+	mu          sync.Mutex
+	connections map[int]*goredis.Client
+	lru         []int
+}
+
+func newDbConnectionSet(fields connectFields, defaultDbIndex int, log func(level, message string)) *dbConnectionSet {
+	return &dbConnectionSet{
+		fields: fields, defaultDbIndex: defaultDbIndex, log: log,
+		connections: make(map[int]*goredis.Client),
+	}
+}
+
+func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client, error) {
+	s.mu.Lock()
+	if existing, ok := s.connections[dbIndex]; ok {
+		s.touchLocked(dbIndex)
+		s.mu.Unlock()
+		return existing, nil
+	}
+	if len(s.connections) >= maxConnections {
+		s.evictLRULocked()
+	}
+	s.mu.Unlock()
+
+	opts := &goredis.Options{
+		Addr:        fmt.Sprintf("%s:%d", s.fields.host, s.fields.port),
+		Username:    s.fields.username,
+		Password:    s.fields.password,
+		DB:          dbIndex,
+		ClientName:  "kira-studio",
+		DialTimeout: connectTimeout,
+		// C10: RESP2, not the client library's own RESP3 default — HGETALL/CONFIG GET and
+		// friends return a flat array under RESP2 and a map under RESP3, and this adapter's
+		// generic per-type readers are written against the RESP2 array shape.
+		Protocol: 2,
+	}
+	if s.fields.tls {
+		opts.TLSConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized: false
+	}
+	client := goredis.NewClient(opts)
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		return nil, mapError(err)
+	}
+
+	s.mu.Lock()
+	s.connections[dbIndex] = client
+	s.touchLocked(dbIndex)
+	s.mu.Unlock()
+	return client, nil
+}
+
+func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, error) {
+	return s.get(ctx, s.defaultDbIndex)
+}
+
+func (s *dbConnectionSet) closeAll() {
+	s.mu.Lock()
+	all := make([]*goredis.Client, 0, len(s.connections))
+	for _, c := range s.connections {
+		all = append(all, c)
+	}
+	s.connections = make(map[int]*goredis.Client)
+	s.lru = nil
+	s.mu.Unlock()
+	for _, c := range all {
+		_ = c.Close()
+	}
+}
+
+func (s *dbConnectionSet) touchLocked(key int) {
+	for i, k := range s.lru {
+		if k == key {
+			s.lru = append(s.lru[:i], s.lru[i+1:]...)
+			break
+		}
+	}
+	s.lru = append(s.lru, key)
+}
+
+// evictLRULocked never evicts the primary (client.ts:141-149).
+func (s *dbConnectionSet) evictLRULocked() {
+	victimIdx := -1
+	for i, key := range s.lru {
+		if key != s.defaultDbIndex {
+			victimIdx = i
+			break
+		}
+	}
+	if victimIdx < 0 {
+		return
+	}
+	victimKey := s.lru[victimIdx]
+	s.lru = append(s.lru[:victimIdx], s.lru[victimIdx+1:]...)
+	if victim, ok := s.connections[victimKey]; ok {
+		delete(s.connections, victimKey)
+		_ = victim.Close()
+	}
+}
+
+// connectRedis is client.ts's connectRedis.
+func connectRedis(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*dbConnectionSet, int, error) {
+	fields, defaultDbIndex := resolveFields(cfg, log)
+	set := newDbConnectionSet(fields, defaultDbIndex, log)
+	if _, err := set.primary(ctx); err != nil { // eagerly validates the connection
+		return nil, 0, err
+	}
+	return set, defaultDbIndex, nil
+}

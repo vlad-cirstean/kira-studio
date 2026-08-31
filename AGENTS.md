@@ -535,5 +535,40 @@ full results):
   holds (M7.0's own MG-2 finding, applied), interrupted a `$where`-clause busy loop within
   milliseconds of the call.
 
+**P58c M7.4 findings** (the native `redis` adapter, `nativeKinds += redis` — seven of ten kinds
+native) and **checkpoint C1c**:
+
+- **The redis port had the smoothest first real run of any P58 sub-phase so far**: of 18 acceptance
+  cases against a real `redis:7` container, only one failed on the first try, and the cause was a
+  test-fixture mistake, not an adapter bug — `TestRedis_Mutate_NonStringTypeUneditable` tried to
+  reject an update against `testsupport.RedisListKey`, a key that only exists in **db0**, while
+  C23's own rule runs every mutating test against **db1**; `TYPE` on a key absent from db1 returns
+  `"none"`, which `assertEditableType` correctly treats as "creatable", not "wrong type" — fixed by
+  seeding a real list key directly into db1 via a side client instead.
+- **go-redis v9's `HScan`/`SScan`/`ZScan` cursor type is `uint64`, not the wire's own decimal
+  string** — `readScanFamily`'s page-token payload (`[]string`) still needed the string form for
+  `EncodePageToken`/`DecodePageToken`, so the cursor is converted at the two boundaries
+  (`strconv.FormatUint`/`ParseUint`) rather than threaded through as a string throughout, unlike
+  Mongo's own keyset boundary values which stay as opaque EJSON text end to end.
+- Every other C10-C13 decision (RESP2 via `Protocol: 2`, `$where`-free — no analogous slow-op
+  mechanism was needed since `Cancel` is a permanent no-op — `redis.Error`/`redis.Nil` for error
+  mapping, the `SetNX` bool-result re-derivation instead of a string-`"OK"` check) matched the
+  plan's own prediction exactly, with no probe-vs-production surprises.
+
+**Checkpoint C1c** (§7 of `docs/v1/plans/P58c-mongo-redis.md`) ran for real, via a throwaway
+`tests/e2e-real/` script (not committed, per §5.6 — "P58c adds no new tests/e2e-real spec"; the
+proof is the same C1b vehicle, extended for one run, not a new permanent one). All 14 steps passed
+in one session against real containers: MariaDB (native) connects, its tree expands, `regions`
+renders a real grid; a Kafka connection (Node-served) connects in the same session, its `orders`
+topic renders a real stream page, and `engine-status` reads `ok`; the Node child is `SIGKILL`ed —
+Kafka's status dot flips to `error`, MariaDB's stays `connected` and still serves a read after a
+`page.reload()`; then, new to this checkpoint, a MongoDB connection (now native) connects, its tree
+expands to `kira_test/widgets`, and a document tab renders real field text — the first `DocumentPage`
+Go has ever produced meeting the real renderer; and a Redis connection (now native) connects, its
+`db0` node opens a real Browse tab, the `:`-namespace tree navigates `user:1` → `profile`, and a
+key/value page renders with a real memory-usage badge — the first `KeyValuePage` Go has produced,
+the first native `caps.keyBrowser` engine, and the first native `TreeChildren.Truncated` producer.
+Nothing in this run needed softening or a "not available in this session" carve-out.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
