@@ -287,6 +287,26 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		if backFirstID == nil || *backFirstID != "1" {
 			t.Errorf("page-before's first id = %v, want 1 (display order preserved)", backFirstID)
 		}
+
+		// P2 R1 regression: a "before" page is fetched in descending (fetch) order and reversed to
+		// ascending (display) order — the streaming readPage must swap its tracked first/last raw
+		// rows along with builder.Reverse(), or this page's own NextToken (built from
+		// CellAt(rowCount-1,...), the last *displayed* row) would be built from the wrong row's
+		// keyset value entirely.
+		if backPage.Position.NextToken == nil {
+			t.Fatal("expected a NextToken on the page-before result")
+		}
+		forwardAgain, err := a.Read(ctx, adapters.ReadRequest{
+			Path: tablePath, Sort: sort, PageSize: 5, Cursor: model.PageCursor{Mode: "after", Token: *backPage.Position.NextToken},
+		}, adapters.NewOpCtx("op-10d"))
+		if err != nil {
+			t.Fatalf("Read(after, from page-before's NextToken): %v", err)
+		}
+		forwardAgainPage := forwardAgain.(page.TabularPage)
+		forwardAgainFirstID := cellAt(t, forwardAgainPage, 0, 0)
+		if forwardAgainFirstID == nil || *forwardAgainFirstID != "6" {
+			t.Errorf("page after page-before's NextToken: first id = %v, want 6", forwardAgainFirstID)
+		}
 	})
 
 	t.Run("count", func(t *testing.T) {

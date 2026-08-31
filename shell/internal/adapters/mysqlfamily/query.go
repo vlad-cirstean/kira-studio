@@ -91,6 +91,63 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query s
 	})
 }
 
+// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): onRow is called once per scanned
+// row, in order, with a []*string the callback owns, instead of every row being materialized into
+// a [][]*string only to be transposed into the page builder immediately after. runArrayQuery
+// itself stays as the array-returning shape countRows and the catalog paths want.
+func streamArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
+	setCommand(op, query, params, opts.LogParams)
+	if err := adapters.CheckNotStarted(ctx); err != nil {
+		return err
+	}
+
+	release := track(RunningQuery{ThreadID: threadID})
+
+	_, err := adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (struct{}, error) {
+		rows, err := conn.QueryContext(queryCtx, query, params...)
+		if err != nil {
+			return struct{}{}, mapError(err)
+		}
+		defer rows.Close()
+
+		types, err := rows.ColumnTypes()
+		if err != nil {
+			return struct{}{}, mapError(err)
+		}
+		dbTypes := make([]string, len(types))
+		for i, t := range types {
+			dbTypes[i] = t.DatabaseTypeName()
+		}
+
+		for rows.Next() {
+			raw := make([]sql.RawBytes, len(types))
+			dest := make([]any, len(types))
+			for i := range raw {
+				dest[i] = &raw[i]
+			}
+			if err := rows.Scan(dest...); err != nil {
+				return struct{}{}, mapError(err)
+			}
+			cells := make([]*string, len(types))
+			for i, r := range raw {
+				if r == nil {
+					continue
+				}
+				text := cellText(r, dbTypes[i])
+				cells[i] = &text
+			}
+			if err := onRow(cells); err != nil {
+				return struct{}{}, err
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return struct{}{}, mapError(err)
+		}
+		return struct{}{}, nil
+	})
+	return err
+}
+
 // CommandOptions is query.ts's CommandOptions.
 type CommandOptions struct {
 	// SuppressCommand: setCommand() was already called once for the whole batch (P5 D9) — do not
