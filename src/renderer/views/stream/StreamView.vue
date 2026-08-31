@@ -181,7 +181,13 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+// D10/D12: same "never auto-loads" rule as mount/reconnect above — SQS's Refresh affordance
+// (toolbar button, F5, and the app menu's View > Refresh all route here via view.refresh) must
+// never itself call ReceiveMessage. can-refresh is set to !isBatch below so the affordance is
+// inert for SQS in the first place; this guard is the backstop for the command-registry path,
+// which reaches onRefresh directly regardless of what's rendered.
 function onRefresh(): void {
+  if (isBatch.value) return;
   refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
 }
 
@@ -486,7 +492,7 @@ onUnmounted(() => {
       name-testid="stream-target"
       refresh-testid="stream-refresh"
       stop-testid="stream-stop"
-      :can-refresh="true"
+      :can-refresh="!isBatch"
       :can-stop="running"
       @refresh="onRefresh"
       @stop="onStop"

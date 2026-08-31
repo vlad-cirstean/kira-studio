@@ -31,7 +31,10 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   relaunch,
   consoleErrors,
 }) => {
-  const { window: page } = await relaunch({ control: controlSnapshots, stream: portSnapshots });
+  const { window: page, stream } = await relaunch({
+    control: controlSnapshots,
+    stream: portSnapshots,
+  });
 
   const connRow = connectionRow(page);
   await expect(connRow).toBeVisible();
@@ -63,6 +66,14 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   );
   await expect(view.locator('.no-rows')).toContainText('Click Poll to fetch messages');
   await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
+
+  // --- P2 R1 regression: refresh must never itself consume from the queue — a batch tab's
+  //     Refresh affordance is inert (disabled), unlike every other view kind ---------------
+  await expect(view.locator('[data-testid="stream-refresh"]')).toBeDisabled();
+  const opsBeforeRefresh = await stream.ops();
+  await view.locator('[data-testid="stream-refresh"]').click({ force: true });
+  await expect(view.locator('[data-testid="stream-row"]')).toHaveCount(0);
+  expect(await stream.ops()).toEqual(opsBeforeRefresh);
 
   // sqs has no caps.maxPageSize — all four sizes stay present (the guard that would otherwise
   // filter them down applies only to an adapter that actually exposes a real cap, P50 §4.4).
