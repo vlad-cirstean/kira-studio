@@ -701,3 +701,252 @@ the blocks for P58f. §10 OQ-4 asks the parent's author to confirm the split.
   the module as a whole (`mattn/go-sqlite3`, `modernc.org/sqlite`, Wails' GTK bindings in
   `internal/shell`), so `CGO_ENABLED=0` is still not an option, but the fast loop is
   `go test ./internal/adapters/kafka` and never `./...`.
+
+## 2. Decisions
+
+Per the preamble: this plan's own decisions are always written **P58e E\<n\>**, including in their
+own headers. A bare `E<n>` and a bare `D<n>` appear nowhere in this document.
+
+**P58e E1 — Kafka uses `github.com/twmb/franz-go` v1.21.6 with `pkg/kadm` v1.18.0 and `pkg/kmsg`
+v1.13.1, confirming P58 D7 without amendment and without a fallback branch.** §1.3 is the reason:
+**P58 D7**'s own probe list was executed in P58a's M0 as KF-1 and passed in full, including the two
+capability recoveries it hoped for. The named cgo fallback (`confluentinc/confluent-kafka-go`) is not
+carried forward as a contingency in this plan, because keeping a rejected alternative alive after its
+rejection has been empirically confirmed is how a plan grows branches nobody will ever take.
+`shell/go.mod` gains exactly three runtime modules; `kmsg` is a **direct** require, not indirect,
+because `definition.go` names `kmsg.ConfigSource` (§1.13). `package.json` loses
+`@confluentinc/kafka-javascript` and its `trustedDependencies` entry in P58f, not here.
+
+**P58e E2 — there is no shared package; `internal/adapters/kafka` is the whole of P58e's product
+code.** §1.2. P58d extracted `awscfg` because two adapters documented themselves as duplicates;
+P58b extracted `mysqlfamily` because two profiles shared 1 645 of 1 782 lines. P58e has one adapter
+and nothing to share, and the shared surface it *does* use (`errors.go`, `caps.go`, `sqltext.go`'s
+three token functions) already exists. Stated as a decision rather than left as an absence, so a
+reader arriving from P58d does not go looking for a `kafkacfg`.
+
+**P58e E3 — the op's own `context.Context` goes straight to every `kadm` and `kgo` call; no
+`RunWithAbortRace`; and the browse loop checks `Fetches.Err()` explicitly because a cancelled context
+does not surface as a returned error.** §1.6. Three parts, and the third is the one a reader coming
+from P58d will not expect:
+
+1. **No `adapters.RunWithAbortRace`, for P58d D3's reason.** Kafka has no server-side kill —
+   `Cancel()` is `return false` permanently (`index.ts:134-136`) and there is no protocol operation
+   that stops an in-flight fetch. There is nothing for a driver abort to race, so detaching the
+   context would leave a browse client fetching after the caller unblocked and would defer its
+   `Close()` onto a goroutine the caller no longer waits for. **The package carries a comment at its
+   `Cancel` saying why the shared helper is absent**, because "this adapter doesn't use the helper
+   six others use" reads like a bug to anyone who does not know why.
+2. **`CheckNotStarted(ctx)` before the first call and `CheckCancelled(ctx)` exactly where the
+   TypeScript calls `throwIfCancelled`** — `read.ts:88, 119, 216, 267, 297` and `:334`.
+3. **The fetch loop maps `fetches.Err()` itself.** `kgo.Client.PollRecords` returns `Fetches`, not an
+   error, and injects a fake fetch carrying `ctx.Err()` on cancellation and `kgo.ErrClientClosed` on
+   close (`kgo/consumer.go:474-495`). The loop therefore reads: poll → `if err := fetches.Err(); err
+   != nil { … }` → `errors.Is(err, context.Canceled)` → `E_CANCELLED`; `errors.Is(err,
+   kgo.ErrClientClosed)` → treat as loop end, not an error; otherwise `mapError`. KF-2 confirms both
+   the shape and the promptness, and a failure there is a **stop and raise** exactly as AWS-1(e) was
+   for P58d.
+
+*Named alternative, rejected:* keep the TypeScript's abort-listener bridge shape by launching the
+browse on a goroutine and closing the client from a `select` on `ctx.Done()`. Rejected because it is
+`RunWithAbortRace` rebuilt by hand, with the same two costs and none of the shared helper's care.
+
+**P58e E4 — error mapping is over `*kerr.Error`'s protocol codes, not librdkafka's numeric codes, and
+the four `ERR__` client-local codes are re-derived from Go's own error types.** `errors.ts`'s
+dispatch order ports verbatim — cancellation first, then connect, then timeout, then auth, then the
+unknown-topic → `E_QUERY` special case, then `E_QUERY` as the default — and the default is
+load-bearing, because *"a topic/partition gone at read time (deleted concurrently) is an ordinary
+query-time condition, not a connection failure — E_QUERY, deliberately not E_NOT_FOUND"*
+(`errors.ts:32-35`). The re-derivation:
+
+| `errors.ts` | Go |
+|---|---|
+| `name === 'AbortError' \|\| /aborted/i.test(message)` | `errors.Is(err, context.Canceled)` **first**, before anything else |
+| `CONNECT_CODES` = `ERR__TRANSPORT`, `ERR__RESOLVE`, `ERR__ALL_BROKERS_DOWN`, `ERR__STATE` — **all four are librdkafka client-local, with no protocol code** | `*net.OpError` / `*net.DNSError` via `errors.As`, plus `kgo`'s own dial failures — the same Go re-derivation `postgres/errors.go`, `mysqlfamily/errors.go`, `redis/errors.go` and `awscfg/errors.go` already made. KF-4(d) prints the real shapes |
+| `TIMEOUT_CODES` = `ERR__TIMED_OUT`, `ERR__TIMED_OUT_QUEUE` | `errors.Is(err, context.DeadlineExceeded)` or `errors.Is(err, os.ErrDeadlineExceeded)`, **plus** `kerr.RequestTimedOut` (code 7), which librdkafka's set did not cover |
+| `AUTH_CODES` = `ERR__AUTHENTICATION`, `ERR_SASL_AUTHENTICATION_FAILED`, `ERR_TOPIC_AUTHORIZATION_FAILED`, `ERR_GROUP_AUTHORIZATION_FAILED`, `ERR_CLUSTER_AUTHORIZATION_FAILED` | `var ke *kerr.Error; errors.As(err, &ke)` then `ke.Code` against `kerr.SaslAuthenticationFailed` (58), `TopicAuthorizationFailed` (29), `GroupAuthorizationFailed` (30), `ClusterAuthorizationFailed` (31). The `ERR__AUTHENTICATION` client-local code has no protocol twin and folds into the connect branch |
+| `UNKNOWN_TOPIC_CODES` = `ERR__UNKNOWN_TOPIC`, `ERR_UNKNOWN_TOPIC_OR_PART` | `kerr.UnknownTopicOrPartition` (3) and `kerr.UnknownTopicID` (100) → `E_QUERY`, message verbatim |
+| the three `KafkaJS*`-named secondary fallbacks (`errors.ts:69-71`) | **deleted, not ported** — they exist only because the compat layer threw plain `Error` subclasses before any librdkafka call happened. franz-go has no compat layer |
+| everything else | `E_QUERY`, message verbatim (Adapter rule 4) |
+
+Because `kerr.Error.Error()` is `"MESSAGE: Description"` (`kerr/kerr.go:30-32`), **every user-visible
+Kafka error message changes wording** — the parent's §7 item 4 already names this as a phase-wide,
+accepted cost. §5.3 re-baselines against a real broker rather than guessing (**P58 §1.10**'s first
+non-portable point).
+
+**P58e E5 — the browse client is a fresh, ephemeral `kgo.Client` per `read()`, closed with a
+`defer`; the adapter's long-lived client is admin-and-produce only.** `kgo.ConsumePartitions` is a
+**construction-time** `ConsumerOpt` (`kgo/config.go:1720`), and `AddConsumePartitions` silently
+no-ops on a client that was not built as a direct consumer (`kgo/consumer.go:931-935`:
+`if c.d == nil || cl.cfg.regex { return }`) — so "reuse one client and re-point it" is not merely
+inelegant, it fails silently. This also reproduces the TypeScript exactly (`client.ts:33-35`: *"One
+long-lived Admin client per adapter instance … browse consumers are separate and fully ephemeral
+(P10's D6)"*), and it is what makes `defer cl.Close()` a complete teardown with no listener bridge.
+The browse client carries `kgo.ConsumePartitions(...)`, `kgo.FetchMaxWait(1 * time.Second)` (matching
+`POLL_TIMEOUT_MS`) and **never** `kgo.ConsumeTopics`, `kgo.ConsumerGroup` or any group option — which
+is what makes **P58 D7**'s no-group property structural rather than disciplinary.
+
+**P58e E6 — `toNativeOffset` is deleted rather than ported, and scenario 20 is re-baselined rather
+than dropped.** `read.ts:145-160`'s guard exists solely because *"the native API types offsets as
+`number` while the app's own contract is int64-as-decimal-string"*, and its own comment says the
+failure it prevents is *"a page of plausible-but-wrong messages, the worst failure mode a DB client
+can have."* Go's `int64` and `kgo.NewOffset().At(int64)` remove the hazard entirely — the parent's §7
+"what gets better" item 9 names exactly this. **The consequence for the test is real and must not be
+papered over:** `kafka.spec.ts` 20 hand-crafts a page token whose `next` is
+`String(Number.MAX_SAFE_INTEGER + 1)` and asserts `E_UNSUPPORTED` with the offset in the message.
+That value is an *ordinary* `int64` in Go and produces an empty browse, not an error. The Go scenario
+therefore re-baselines to the boundary that still exists — an offset exceeding `int64`
+(`"9223372036854775808"`), which fails `strconv.ParseInt` → `E_QUERY` *"malformed page token"* — and
+its comment records that the `E_UNSUPPORTED` branch was **removed as a capability gain, not lost**.
+
+**P58e E7 — the page token's window payload uses `int64` numbers, not decimal strings, and a token
+minted by the TypeScript adapter is not decodable by the Go one.** `read.ts:62` puts
+`JSON.stringify(windows)` into `EncodePageToken`'s single-element `string[]`, with `next`/`end` as
+decimal strings because JS has no int64. Go's `partitionWindow{Partition int32; Next int64; End
+int64}` marshals them as numbers. The token stays a `[]string{string(jsonBytes)}` so
+`sqltext.go:61`'s signature is unchanged, and `RequestFingerprint({topic, pageSize, filter})` keeps
+its three inputs exactly (`read.ts:205`). **The stated cost:** a token minted by the Node child before
+the flip, presented to the Go adapter after it, decodes to `"malformed page token"` (`E_QUERY`) rather
+than working — because the JSON shape differs even though the fingerprint matches. This cannot occur
+in practice (a `nativeKinds` flip ships in a rebuilt binary, and every connection reconnects), and
+`sqltext.go:93`'s own doc already scopes fingerprints to *"deterministic within a process"*. Recorded
+so it is a decision rather than a discovery.
+
+*Named alternative, rejected:* keep `next`/`end` as decimal strings for byte-compatibility with the
+TypeScript's token. Rejected because it reintroduces string↔int64 conversion at four sites for a
+compatibility window that does not exist, and because the whole point of **P58e E6** is that Go's
+offsets are integers.
+
+**P58e E8 — `key`, `body` and every header **value** pass through `strings.ToValidUTF8(s, "�")`;
+the `headers` cell is `map[string]any` (string or `[]string`) marshalled by `encoding/json`, with no
+hand-written encoder.** §1.8. Two halves, and the contrast with **P58d D8** is the point:
+
+- **The invalid-UTF-8 half is Kafka's own and has no SQS analogue.** Node's
+  `Buffer.toString('utf8')` (`read.ts:42, 284, 290`) replaces invalid sequences; Go's `string(b)`
+  does not, and `page/builder.go`'s `appendValue` truncation assumes valid UTF-8. Same lossy-decode
+  decision **P58d D12** made for S3 object bodies, same recorded divergence (`TextDecoder` emits one
+  U+FFFD per invalid *sequence*, `strings.ToValidUTF8` one per maximal *run*), applied to three cells
+  instead of one. No fixture value is affected — the seed is ASCII — which is exactly why it is
+  written down here.
+- **The headers half is *simpler* than SQS's, and the plan should say so rather than reflexively
+  reaching for a hand encoder.** **P58d D8** needed one because `types.MessageAttributeValue` is a
+  five-field SDK struct whose `json.Marshal` emits explicit `null`s that `JSON.stringify` never
+  produced. Kafka's TypeScript already builds a **plain** `Record<string, string | string[]>`
+  (`headersToPlain`, `read.ts:37-50`) and `JSON.stringify`s it; franz-go's `RecordHeader{Key string;
+  Value []byte}` maps onto the identical Go shape with the identical repeated-key promotion. So
+  `json.Marshal(map[string]any)` **matches**, and the only divergence is Go's sorted map keys versus
+  JS's insertion order — the same unobserved difference **P58d D8** recorded, since the cell is
+  parsed, not compared. KF-4(f) diffs one seeded message's `headers` and `attrs` cells against the
+  TypeScript's rendering to confirm there is no third difference.
+- The sibling `attrs` cell is `{"partition": <number>, "offset": "<decimal string>"}`
+  (`read.ts:288`) — **note the asymmetry, which ports verbatim**: partition is a JSON number, offset
+  a JSON string. `kafka.spec.ts` 7 asserts exactly that (`typeof row.attrs.partition === 'number'`,
+  `typeof row.attrs.offset === 'string'`), and a Go port that "tidies" offset into a number breaks a
+  cell users read.
+
+**P58e E9 — end-of-log detection is a per-fetch `HighWatermark` comparison, not an event, and
+`MAX_EMPTY_POLLS` is kept as a second, independent terminator.** §1.5, and this is the decision with
+the most history behind it (P43 iter2 F19/D26) and the one **KF-3** exists to confirm. The design:
+
+- The loop keeps a `map[int32]int64` of the highest `HighWatermark` seen per partition, updated on
+  every `fetches.EachPartition(func(FetchTopicPartition))`.
+- A partition is **provably drained** when it appeared in a fetch that delivered no record inside its
+  own `[next, end)` window **and** its reported `HighWatermark >= w.End`. That is the same proof
+  `partition.eof` gave — the frozen `end` was a high watermark, and the consumer has now been told
+  the current high watermark is at or beyond it with nothing left to hand over.
+- After the loop, `for each drained partition: w.Next = w.End` — the clamp, verbatim in effect
+  (`read.ts:306-308`), so `hasMore` cannot stay true forever across a compacted hole, a
+  retention-aged offset or a transaction commit marker.
+- `MAX_EMPTY_POLLS = 2` is **kept**, with `read.ts:304-305`'s reasoning ported verbatim (*"an empty
+  poll with no EOF is indistinguishable from a slow broker, and there genuinely may be more"*). The
+  parent's **P58 D7** said the fallback *"should be ported anyway — it costs nothing and the bug it
+  was written for was real — but it stops being load-bearing"*; this plan agrees and keeps both.
+- **The whole of this lives in one pure function** so it can be tested without a broker — see
+  **P58e E26** and §5.5.
+
+**KF-3's failure mode, stated in advance:** if franz-go does **not** return a `FetchPartition` entry
+for a partition whose only remaining offset is a commit marker, the "provably drained" test never
+fires and the design falls back to `MAX_EMPTY_POLLS` alone — which is the pre-P43-iter2 behaviour and
+would reintroduce a real, previously-fixed bug. The fallback in that case is `LastStableOffset`
+(available on the same struct and transaction-aware by definition): clamp when
+`LastStableOffset >= w.End`. KF-3 prints both fields for exactly this fork.
+
+**P58e E10 — internal-object filtering keeps `name.startsWith("__")` for groups and uses
+`TopicDetail.IsInternal` for topics.** `catalog.ts:8-10`'s `isInternal` is a name heuristic applied to
+both. `kadm.TopicDetail` has a real `IsInternal bool` (`kadm/metadata.go:85`), which is the broker's
+own answer and is strictly better; `kadm.ListedGroup` has no equivalent, so groups keep the prefix
+test. `TopicDetails.FilterInternal()` (`kadm/metadata.go:135`) does the topic half in one call. This
+changes nothing observable (`__consumer_offsets` and `__transaction_state` are both flagged and both
+`__`-prefixed) and is recorded so the asymmetry reads as deliberate.
+
+**P58e E11 — the Configuration section is populated, the "not available" note is deleted, and this is
+the phase's promised capability recovery landing.** `definition.ts:58-68` renders an **empty**
+Configuration section plus the note *"Topic configuration is not available: this Kafka client has no
+DescribeConfigs call"*, and its own comment says *"librdkafka's C API has rd_kafka_DescribeConfigs;
+this binding simply does not wrap it, so this can come back from upstream without any change here."*
+`kadm.DescribeTopicConfigs` (`kadm/configs.go:77`) is that call, confirmed working against a real
+broker by KF-1. The Go section:
+
+- rows are `{name: c.Key, value: c.MaybeValue(), detail: <source>}` sorted by `Key`, where `detail` is
+  `"default"` when `c.Source == kmsg.ConfigSourceDefaultConfig` (5) and the source's own
+  `String()` otherwise — matching the `default: r.detail === 'default'` contract the JSON `doc`
+  already assumes (`definition.ts:77-81`);
+- `Config.MaybeValue()` returns `""` for a nil or `Sensitive` value (`kadm/configs.go:36`), so a
+  sensitive config renders blank rather than panicking on a nil deref;
+- **`notes` becomes empty for a topic**, which is why `router.go:363`'s
+  `model.ValidateObjectDefinition` nil→`[]` normalization matters here (§1.4);
+- `kafka.spec.ts` 6's two assertions — `config?.rows.length === 0` and
+  `topicDef.notes.some(n => /DescribeConfigs/.test(n))` — are **inverted**, not ported. §5.3.
+
+**P58e E12 — a nonexistent topic is detected by inspecting `ListedOffsets`, not by catching an
+error.** §1.7. `kadm.ListStartOffsets`/`ListEndOffsets` return `(ListedOffsets, error)` where a
+missing topic produces *"a special -1 partition … with the expected error code
+kerr.UnknownTopicOrPartition"* inside the map rather than a returned error
+(`kadm/metadata.go:400-497`). A literal port of `try { admin.fetchTopicOffsets(topic) } catch { throw
+mapError(err) }` would therefore return an **empty window set** and a blank page where
+`kafka.spec.ts` 11 requires `E_QUERY`. The Go shape: call, check the returned error, **then** call
+`ListedOffsets.Error()` (`kadm/metadata.go:360`, which folds every per-partition `Err` into one) and
+map that too. This is the sharpest "reads correct, is wrong" hazard in the whole port and it is
+invisible without the test.
+
+**P58e E13 — the group definition loses its `type` and `partitionAssignor` rows, and this is
+recorded as a small, named regression against two recoveries.** §1.7. `kadm.DescribedGroup`
+(`kadm/groups.go:131-148`) has `Group`, `Coordinator`, `State`, `ProtocolType`, `Protocol`,
+`Members`, `AuthorizedOperations`, `Err`, `ErrMessage` — and **no `Type`, no `PartitionAssignor`**.
+
+- **`partitionAssignor` is not lost, it is merged.** kadm's `Protocol` is documented as *"the
+  partition assignor strategy this group is using"* — the same value `definition.ts:125` renders
+  under a second name. One row, `protocol`, carries it.
+- **`type` (CLASSIC vs CONSUMER, KIP-848) genuinely has no kadm source.** The Group section drops
+  from seven rows to five: `state`, `protocolType`, `protocol`, `coordinator`, `members`. `state`
+  is now a plain string from the broker rather than a number needing `reverseLookup`, so
+  `definition.ts:12-33`'s entire enum apparatus is deleted.
+
+*Named alternative, rejected:* issue a raw `kmsg.NewListGroupsRequest()` through
+`kgo.Client.Request` to read the v5+ `GroupType` field, which `kadm.ListGroups` does not surface.
+Rejected for one cosmetic row: it trades a supported, versioned API for a generated protocol struct,
+and `kadm` surfacing it upstream would then leave two code paths. Recorded in §10 OQ-5 so the
+parent's author can overrule.
+
+**P58e E14 — produce goes through `kgo.ProduceSync` on the adapter's long-lived client with
+`kgo.DisableIdempotentWrite()`, and the whole `dr_cb`/Electron-V8-sandbox comment is deleted rather
+than ported.** Four parts:
+
+1. **`DisableIdempotentWrite()`.** §1.8. franz-go enables idempotent producing by default; librdkafka
+   does not. Idempotency requires an `InitProducerId` round trip that **hangs** on a single-broker
+   cluster whose `transaction.state.log.replication.factor` is Kafka's default 3 — a failure this
+   repo has already been bitten by (`tests/db/support/kafka.ts:41-48`). Matching librdkafka's own
+   default is the conservative choice and the one that keeps the port behaviour-preserving.
+2. **`ProduceSync` is a capability gain, claimed rather than smuggled.** `produce.ts:98-107`'s comment
+   concedes its cost: *"produce() below reports 'queued into librdkafka', not 'the broker
+   acknowledged this specific message' — flush() still proves the whole batch drained, just not which
+   messages succeeded individually."* `ProduceResults.FirstErr()` gives per-record errors and each
+   successful `ProduceResult.Record` carries its assigned `Partition`/`Offset`
+   (`kgo/producer.go:305-347`). `affectedRows` becomes the count of records the broker actually
+   acknowledged.
+3. **The 10-line Electron/`dr_cb`/`Nan::NewBuffer`/`ToLocalChecked` comment is deleted, not ported.**
+   Its entire subject — a NAN addon adopting a malloc'd buffer under Electron's V8 sandbox — has no
+   Go analogue whatsoever. This is one of the clearest "the migration deletes a workaround" moments
+   in the phase and belongs in `AGENTS.md`'s findings entry.
+4. **No separate producer client.** The TypeScript builds a fresh `Producer` per mutate because the
+   compat wrapper forced `dr_cb`. In Go the adapter's own long-lived client produces directly; the
+   only client that stays ephemeral is the browse consumer (**P58e E5**), for a real API reason.
