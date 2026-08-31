@@ -43,20 +43,19 @@ func parseProduceHeaders(raw *string) (map[string]string, error) {
 	return out, nil
 }
 
-// renderOpText is produce.ts's renderOpText. The rendered string is ported byte-identically per
-// §10 OQ-6's interim decision, even though it names an API (producer.produce) that has no Go
-// analogue any more — it is a user-visible preview, and changing it would be a behavioural
-// rewrite this commit is the wrong place to smuggle in.
+// renderOpText renders the produce preview against the real kgo.ProduceSync call this adapter
+// makes (P58f D6) — produce.ts's own renderOpText named node-rdkafka's producer.produce(...), an
+// API with no Go analogue, which stopped being a faithful preview the moment this adapter shipped.
 func renderOpText(op model.MutationRowOp, topic string) (string, error) {
 	if op.Kind != "insert" {
 		// A topic's log is immutable — no per-message update or delete (caps.go's own comment).
 		return "", adapters.New(adapters.CodeUnsupported, "kafka only supports producing new messages (insert)", nil)
 	}
-	keyText := "null"
+	keyText := "<none>"
 	if key, _ := op.Values.Get(keyField); key != nil {
-		keyText = "'" + *key + "'"
+		keyText = *key
 	}
-	return "producer.produce('" + topic + "', null, Buffer.from(...), " + keyText + ")", nil
+	return "ProduceSync " + topic + " key=" + keyText, nil
 }
 
 // preview is produce.ts's preview — synchronous (Adapter rule 3): no network, no catalog lookup.
