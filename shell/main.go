@@ -93,9 +93,8 @@ func main() {
 		Repos:     repositories,
 	}
 
-	// The engine memory cap mirrors today's advanced.engineMemoryCapMb setting (P51 §3.6); this
-	// reads it from the just-migrated (possibly still-default) settings row, same as production
-	// would before any user override exists.
+	// Read from the just-migrated (possibly still-default) settings row, same as production would
+	// before any user override exists — the cache budget below needs it.
 	settings, err := deps.Repos.Settings.GetAll()
 	if err != nil {
 		log.Fatalf("kira-studio-shell: read settings: %v", err)
@@ -105,9 +104,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("kira-studio-shell: resolve engine: %v", err)
 	}
-	host, err := enginehost.Start(nodeBin, engineScript,
-		fmt.Sprintf("--max-old-space-size=%d", settings.Advanced.EngineMemoryCapMb),
-	)
+	host, err := enginehost.Start(nodeBin, engineScript)
 	if err != nil {
 		log.Fatalf("kira-studio-shell: start engine: %v", err)
 	}

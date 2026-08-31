@@ -28,7 +28,6 @@ export const cacheSettingsSchema = z.object({
 export type CacheSettings = z.infer<typeof cacheSettingsSchema>;
 
 export const advancedSettingsSchema = z.object({
-  engineMemoryCapMb: z.number().int().min(256).max(4096),
   opLogRetentionDays: z.number().int().min(1).max(365),
 });
 export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
@@ -39,7 +38,7 @@ export const settingsSchema = z.object({
   appearance: appearanceSettingsSchema,
   data: dataSettingsSchema.default({ defaultPageSize: 100 }),
   cache: cacheSettingsSchema.default({ l2BudgetMb: 64 }),
-  advanced: advancedSettingsSchema.default({ engineMemoryCapMb: 512, opLogRetentionDays: 30 }),
+  advanced: advancedSettingsSchema.default({ opLogRetentionDays: 30 }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -65,7 +64,6 @@ export const defaultSettings: Settings = {
     l2BudgetMb: 64,
   },
   advanced: {
-    engineMemoryCapMb: 512,
     opLogRetentionDays: 30,
   },
 };

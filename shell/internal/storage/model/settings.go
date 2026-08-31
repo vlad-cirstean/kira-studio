@@ -18,7 +18,6 @@ type CacheSettings struct {
 }
 
 type AdvancedSettings struct {
-	EngineMemoryCapMb  int `json:"engineMemoryCapMb"`
 	OpLogRetentionDays int `json:"opLogRetentionDays"`
 }
 
@@ -41,7 +40,6 @@ func DefaultSettings() Settings {
 		Data:  DataSettings{DefaultPageSize: 100},
 		Cache: CacheSettings{L2BudgetMb: 64},
 		Advanced: AdvancedSettings{
-			EngineMemoryCapMb:  512,
 			OpLogRetentionDays: 30,
 		},
 	}
@@ -66,7 +64,6 @@ type CachePatch struct {
 }
 
 type AdvancedPatch struct {
-	EngineMemoryCapMb  *int `json:"engineMemoryCapMb,omitempty"`
 	OpLogRetentionDays *int `json:"opLogRetentionDays,omitempty"`
 }
 
@@ -99,7 +96,6 @@ func InRange(lo, hi int) func(int) bool {
 
 var (
 	validL2BudgetMb         = InRange(8, 1024)
-	validEngineMemoryCapMb  = InRange(256, 4096)
 	validOpLogRetentionDays = InRange(1, 365)
 )
 
@@ -117,9 +113,6 @@ func (p SettingsPatch) Validate() error {
 		return fmt.Errorf("model: cache.l2BudgetMb: out of range value %d", *p.Cache.L2BudgetMb)
 	}
 	if p.Advanced != nil {
-		if p.Advanced.EngineMemoryCapMb != nil && !validEngineMemoryCapMb(*p.Advanced.EngineMemoryCapMb) {
-			return fmt.Errorf("model: advanced.engineMemoryCapMb: out of range value %d", *p.Advanced.EngineMemoryCapMb)
-		}
 		if p.Advanced.OpLogRetentionDays != nil && !validOpLogRetentionDays(*p.Advanced.OpLogRetentionDays) {
 			return fmt.Errorf("model: advanced.opLogRetentionDays: out of range value %d", *p.Advanced.OpLogRetentionDays)
 		}

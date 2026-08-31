@@ -99,9 +99,9 @@ type Host struct {
 	sinkGen     uint64
 }
 
-// Start spawns nodeBin running script, with execArgv-equivalent flags (e.g.
-// --max-old-space-size=<engineMemoryCapMb>) passed as extra Node arguments before the script
-// path, matching today's advanced.engineMemoryCapMb behaviour (P51 §3.6).
+// Start spawns nodeBin running script, with any execArgv-equivalent flags passed as extra Node
+// arguments before the script path. No caller passes any today — the one that used to
+// (--max-old-space-size=<engineMemoryCapMb>) was removed along with the setting (P58f D18).
 func Start(nodeBin, script string, nodeArgs ...string) (*Host, error) {
 	args := append(append([]string{}, nodeArgs...), script)
 	cmd := exec.Command(nodeBin, args...)

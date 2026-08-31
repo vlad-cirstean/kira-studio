@@ -89,12 +89,6 @@ function onCacheBudgetChange(e: Event): void {
   void patchSettings({ cache: { l2BudgetMb: value } });
 }
 
-function onEngineMemoryCapChange(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (!Number.isFinite(value) || value < 256 || value > 4096) return;
-  void patchSettings({ advanced: { engineMemoryCapMb: value } });
-}
-
 function onOpLogRetentionChange(e: Event): void {
   const value = Number((e.target as HTMLInputElement).value);
   if (!Number.isFinite(value) || value < 1 || value > 365) return;
@@ -298,18 +292,6 @@ async function onClearCaches(): Promise<void> {
           </template>
 
           <template v-else>
-            <label class="field">
-              <span>Engine memory cap (MB)</span>
-              <TextField
-                type="number"
-                min="256"
-                max="4096"
-                size="md"
-                data-testid="settings-engine-memory-cap"
-                :model-value="String(settingsState.advanced.engineMemoryCapMb)"
-                @change="onEngineMemoryCapChange"
-              />
-            </label>
             <label class="field">
               <span>Operation log retention (days)</span>
               <TextField

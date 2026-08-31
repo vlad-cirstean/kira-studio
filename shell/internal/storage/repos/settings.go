@@ -57,7 +57,6 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "appearance.wordWrap", &result.Appearance.WordWrap)
 	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
 	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
-	leafValid(stored, "advanced.engineMemoryCapMb", &result.Advanced.EngineMemoryCapMb, model.InRange(256, 4096))
 	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
 	return result, nil
 }
@@ -108,11 +107,6 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 	}
 	if a := patch.Advanced; a != nil {
-		if a.EngineMemoryCapMb != nil {
-			if err := upsertSettingsLeaf(tx, "advanced.engineMemoryCapMb", *a.EngineMemoryCapMb); err != nil {
-				return model.Settings{}, err
-			}
-		}
 		if a.OpLogRetentionDays != nil {
 			if err := upsertSettingsLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
 				return model.Settings{}, err
