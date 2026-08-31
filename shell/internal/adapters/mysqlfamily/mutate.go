@@ -3,16 +3,26 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/page"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-// literalRenderer adapts sql-mutate.go's LiteralRenderer to the adapters.ValueRenderer shape
-// RenderRowOp expects — preview() never touches params, so this closure just ignores it.
+// literalRenderer is a MySQL/MariaDB-specific override of sql-mutate.go's shared LiteralRenderer
+// (P2 R1): unlike Postgres under standard_conforming_strings=on (the default) and SQLite, both of
+// which treat backslash as a plain literal character, MySQL and MariaDB treat it as a
+// string-literal escape character by default, so a value containing one needs its own backslash
+// doubled before the surrounding quotes are escaped, or the preview text would mis-render the
+// statement that dialect would actually parse. This is a preview()-only (display) fix — mutate()'s
+// executed path uses paramRenderer/NewParamRenderer with real placeholders and is unaffected.
 func literalRenderer(name string, value *string, _ *[]any) (string, error) {
-	return adapters.LiteralRenderer(name, value)
+	if value == nil {
+		return adapters.LiteralRenderer(name, value)
+	}
+	escaped := strings.ReplaceAll(*value, `\`, `\\`)
+	return adapters.LiteralRenderer(name, &escaped)
 }
 
 // binaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own

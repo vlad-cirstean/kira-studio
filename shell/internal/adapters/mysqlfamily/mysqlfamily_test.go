@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -323,6 +324,32 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 		if count.Value != 2 {
 			t.Errorf("Count after Preview = %d, want unchanged at 2 (preview must never execute)", count.Value)
+		}
+	})
+
+	t.Run("preview escapes backslash in literal values", func(t *testing.T) {
+		// P2 R1 regression: MySQL/MariaDB treat \ as a string-literal escape character (unlike
+		// Postgres/SQLite), so an unescaped backslash in a preview literal would mis-render what
+		// the dialect actually parses — e.g. a trailing \' would escape the closing quote instead
+		// of ending the string. preview() never executes, so this only checks the rendered text.
+		a := connectedAdapter(t, kind, cfg)
+		plan := model.MutationPlan{
+			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Ops: []model.MutationRowOp{{
+				Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}},
+				Changes: model.RowValues{{Name: "name", Value: strp(`C:\temp\'; DROP TABLE customers; --`)}},
+			}},
+		}
+		statements, err := a.Preview(plan)
+		if err != nil {
+			t.Fatalf("Preview: %v", err)
+		}
+		if len(statements) != 1 {
+			t.Fatalf("statements = %v, want exactly 1", statements)
+		}
+		want := `'C:\\temp\\''; DROP TABLE customers; --'`
+		if !strings.Contains(statements[0], want) {
+			t.Errorf("statement = %q, want it to contain %q (backslash doubled before quote escaping)", statements[0], want)
 		}
 	})
 
