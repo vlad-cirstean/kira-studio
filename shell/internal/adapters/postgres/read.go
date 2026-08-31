@@ -204,8 +204,12 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 		visible := row[:len(projectedColumns)]
 		values := make([]*string, len(visible))
 		for i, v := range visible {
-			if v == nil {
-				values[i] = nil
+			// normalizeCellText only ever rewrites a TypeClassBinary cell (the `\x…` -> `0x…`
+			// bytea_output rewrite) — every other type class returns its input string unchanged, so
+			// reusing the already-scanned *string directly avoids a needless extra allocation +
+			// pointer per cell (P2 R1) for what is, on any non-binary column, every row of the page.
+			if v == nil || columns[i].TypeClass != page.TypeClassBinary {
+				values[i] = v
 				continue
 			}
 			normalized := normalizeCellText(*v, columns[i].TypeClass)

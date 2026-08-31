@@ -101,7 +101,11 @@ func buildPage(result rawResult, typeNames map[uint32]string) page.TabularPage {
 	for _, row := range result.rows {
 		values := make([]*string, len(row))
 		for i, v := range row {
-			if v == nil {
+			// normalizeCellText only ever rewrites a TypeClassBinary cell — every other type class
+			// returns its input string unchanged, so reusing the already-scanned *string directly
+			// avoids a needless extra allocation + pointer per cell (P2 R1).
+			if v == nil || columns[i].TypeClass != page.TypeClassBinary {
+				values[i] = v
 				continue
 			}
 			normalized := normalizeCellText(*v, columns[i].TypeClass)

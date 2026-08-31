@@ -677,6 +677,23 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 	if string(stored) != string(want) {
 		t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
 	}
+
+	// P2 R1 regression: readPage's per-cell loop reuses the scanned *string directly for every
+	// non-TypeClassBinary column and only allocates a fresh one for TypeClassBinary — get that
+	// column-typeclass check backwards and a bytea cell would render as pgx's raw `\x0405` text
+	// instead of the app's own `0x0405` convention.
+	read, err := a.Read(ctx, adapters.ReadRequest{
+		Path:   nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "blob_rw")),
+		Cursor: model.PageCursor{Mode: "offset", Offset: 0}, PageSize: 10,
+	}, adapters.NewOpCtx("op-blob-rw-read"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	readPage := read.(page.TabularPage)
+	dataCell := cellAt(t, readPage, 1, 0)
+	if dataCell == nil || *dataCell != "0x0405" {
+		t.Errorf("data cell = %v, want 0x0405", dataCell)
+	}
 }
 
 // 28. execute: one page per statement, including a non-row-returning one.
