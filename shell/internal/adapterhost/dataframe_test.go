@@ -2,6 +2,7 @@ package adapterhost
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -113,15 +114,32 @@ func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
 	assertNothingSent(t, conn)
 }
 
-// ping always forwards, regardless of nativeKinds (A17) — it is never answered locally.
-func TestHandleDataFrame_Ping_NeverAnsweredLocally(t *testing.T) {
+// ping is answered locally — the engine is this process now (P58f D11) — with the same
+// PingPayload shape rpc.ts's ping handler used to return.
+func TestHandleDataFrame_Ping_AnsweredLocally(t *testing.T) {
 	r, _ := newTestRouter()
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)
 	defer detach()
 
 	r.HandleDataFrame(session, mustFrame(t, map[string]any{"kind": "req", "id": 3, "op": "ping"}))
-	assertNothingSent(t, conn)
+	resp := readSent(t, conn)
+	if resp["kind"] != "res" || resp["id"] != float64(3) || resp["ok"] != true {
+		t.Fatalf("resp = %+v, want a res/3/ok:true frame", resp)
+	}
+	payload, ok := resp["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("resp.payload = %+v, want an object", resp["payload"])
+	}
+	if payload["pong"] != true {
+		t.Errorf("payload.pong = %v, want true", payload["pong"])
+	}
+	if pid, ok := payload["enginePid"].(float64); !ok || int(pid) != os.Getpid() {
+		t.Errorf("payload.enginePid = %v, want %d", payload["enginePid"], os.Getpid())
+	}
+	if at, ok := payload["at"].(float64); !ok || at <= 0 {
+		t.Errorf("payload.at = %v, want a positive unix-millis timestamp", payload["at"])
+	}
 }
 
 // cache:clear clears the Go-native cache synchronously, regardless of whether a child is attached

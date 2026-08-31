@@ -8,9 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -113,9 +111,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("kira-studio-shell: start engine: %v", err)
 	}
-	deps.EngineHost = host
-	deps.NodeVersion = nodeVersion(nodeBin)
-
 	adapterDeps := adapters.Deps{Log: func(level, message string) {
 		switch level {
 		case "error":
@@ -292,12 +287,4 @@ func firstExisting(candidates []string) (string, error) {
 		}
 	}
 	return "", os.ErrNotExist
-}
-
-func nodeVersion(nodeBin string) string {
-	out, err := exec.Command(nodeBin, "--version").Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
 }

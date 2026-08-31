@@ -3,6 +3,8 @@ package adapterhost
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
@@ -65,9 +67,10 @@ func (r *Router) pushCacheStats(session *Session, stats enginecache.CacheStats) 
 	session.enqueueLocal(body)
 }
 
-// HandleDataFrame is rpc.ts's dispatch, reimagined as a router: ping always forwards to the child
-// (A17); cache:stats/cache:clear are not connection-scoped (A16); every other op reads its
-// payload's connectionId and routes on that connection's kind (A12/D4).
+// HandleDataFrame is rpc.ts's dispatch, reimagined as a router: ping is answered in-process — the
+// engine is this process now (P58f D11), so there is nothing left to forward it to; cache:stats/
+// cache:clear are not connection-scoped (A16); every other op reads its payload's connectionId and
+// routes on that connection's kind (A12/D4).
 func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	var probe struct {
 		Kind    string          `json:"kind"`
@@ -82,7 +85,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 
 	switch probe.Op {
 	case "ping":
-		r.forwardToChild(frame)
+		r.respondPing(session, probe.ID)
 		return
 	case "cache:stats":
 		r.respondCacheStats(session, probe.ID)
@@ -105,6 +108,20 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 		return
 	}
 	r.handleNativeDataOp(session, probe.Op, probe.ID, probe.Payload)
+}
+
+// pingPayload is port.ts's PingPayload (src/shared/protocol/port.ts:18-22), byte-compatible with
+// what rpc.ts's own ping handler used to return — state/engine.ts and StatusBar.vue read it
+// unchanged (P58f D11).
+type pingPayload struct {
+	Pong      bool  `json:"pong"`
+	EnginePid int   `json:"enginePid"`
+	At        int64 `json:"at"`
+}
+
+// respondPing answers the data plane's own health probe locally.
+func (r *Router) respondPing(session *Session, id int) {
+	r.respond(session, id, pingPayload{Pong: true, EnginePid: os.Getpid(), At: time.Now().UnixMilli()}, nil)
 }
 
 func (r *Router) forwardToChild(frame []byte) {

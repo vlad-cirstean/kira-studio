@@ -7,7 +7,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/shell/internal/tree"
 )
@@ -25,10 +24,8 @@ type Emitter interface{ Emit(name string, data any) }
 // by internal/logging since P55 M0). internal/oplog and the metrics ticker have no bridge service
 // yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
 type Deps struct {
-	DB          *sql.DB
-	EngineHost  *enginehost.Host
-	NodeVersion string
-	StartedAt   int64 // unix millis, for engineStatus/appInfo-style diagnostics later
+	DB        *sql.DB
+	StartedAt int64 // unix millis, for engineStatus/appInfo-style diagnostics later
 
 	Repos       *repos.Repos
 	Connections *connections.Service

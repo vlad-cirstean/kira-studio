@@ -1,6 +1,10 @@
 package bridge
 
-import "github.com/kirathecat/kira-studio/shell/internal/appcore"
+import (
+	"os"
+
+	"github.com/kirathecat/kira-studio/shell/internal/appcore"
+)
 
 // EngineStatus mirrors src/shared/protocol/ipc.ts's EngineStatus.
 type EngineStatus struct {
@@ -12,10 +16,10 @@ type EngineService struct {
 	Deps appcore.Deps
 }
 
+// Status has zero renderer callers (§1.9: the status pill reads the data-plane ping, not this) but
+// stays bound — deleting it means regenerating bindings and editing control.ts for no user-visible
+// gain. It reports unconditionally now: the engine is this process (P58f D11).
 func (s *EngineService) Status() (EngineStatus, error) {
-	if s.Deps.EngineHost == nil || !s.Deps.EngineHost.Alive() {
-		return EngineStatus{Alive: false, PID: nil}, nil
-	}
-	pid := s.Deps.EngineHost.PID()
+	pid := os.Getpid()
 	return EngineStatus{Alive: true, PID: &pid}, nil
 }

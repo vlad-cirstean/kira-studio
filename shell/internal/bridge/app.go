@@ -7,15 +7,15 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/config"
 )
 
-// AppInfo replaces src/shared/protocol/ipc.ts's AppInfo.electron/.chrome fields with go/wails/
-// node — there is no Chromium or Electron version to report under Wails (P52 §4.2). Nothing in
-// the current renderer reads AppInfo's fields (grepped for P52), so this is a clean rename rather
-// than a compatibility shim.
+// AppInfo replaces src/shared/protocol/ipc.ts's AppInfo.electron/.chrome fields with go/wails —
+// there is no Chromium or Electron version to report under Wails (P52 §4.2), and no Node version
+// either now that there is no vendored runtime to report on (P58f D11). Nothing in the current
+// renderer reads AppInfo's fields (grepped for P52; re-checked for P58f — control.appInfo has zero
+// renderer callers), so both are clean deletes rather than compatibility shims.
 type AppInfo struct {
 	AppVersion string `json:"appVersion"`
 	Go         string `json:"go"`
 	Wails      string `json:"wails"`
-	Node       string `json:"node"`
 	KiraHome   string `json:"kiraHome"`
 }
 
@@ -31,7 +31,6 @@ func (s *AppService) Info() (AppInfo, error) {
 		AppVersion: appVersion,
 		Go:         runtime.Version(),
 		Wails:      "v3.0.0-beta.15",
-		Node:       s.Deps.NodeVersion,
 		KiraHome:   config.KiraHome(),
 	}, nil
 }
