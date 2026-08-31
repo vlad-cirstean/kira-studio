@@ -22,8 +22,6 @@
     "typecheck:db": "tsgo --noEmit -p tests/db/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p tests/unit/tsconfig.json",
     "test:ui": "bun run build && playwright test --project=ui",
-    "test:ipc": "bun run test:ipc:be && bun run test:ipc:fe",
-    "test:ipc:be": "sh scripts/run-ipc-backend.sh",
     "test:ipc:fe": "bun run build && playwright test --project=ipc-frontend",
     "test:db": "sh scripts/run-db-tests.sh",
     "test:unit": "bun test tests/unit",
