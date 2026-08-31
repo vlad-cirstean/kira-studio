@@ -507,5 +507,33 @@ full results):
   (§1.11): a real Go client against two fresh 5 000-field hashes returned every field both times,
   in a different order, with different round boundaries each time.
 
+**P58c M7.3 findings** (the native `mongo` adapter, `nativeKinds += mongodb`):
+
+- **`bson.UnmarshalExtJSON` has the same top-level-scalar restriction `MarshalExtJSON` has, but on
+  the decode side, and it fails silently rather than erroring.** Feeding a wrapper object like
+  `{"$oid": "..."}` to `UnmarshalExtJSON` *directly* (as the whole document being decoded) does not
+  resolve it to a `bson.ObjectID` — it decodes as an ordinary two-field-lookalike document, because
+  the extJSON reader only special-cases a `$oid`/`$date`/... shape when it is a *field's value*
+  inside a document, never at the very top level. `ResolveEJSONWrappers`' own wrapper-resolution
+  step needs the same one-field-document wrap-then-unwrap trick M7.0 already found for the encode
+  direction (`IDText`) — confirmed by writing a failing test first, then fixing it.
+- **A page's id/body text and its `op.SetCommand` text use different EJSON modes, and porting both
+  through one shared `EJSON.stringify(x)` call gets it wrong.** `read.ts`'s `idText`/`docsToPage`
+  calls pass `{relaxed: false}` explicitly (canonical: `"price":{"$numberDouble":"1.5"}`); its own
+  `ctx.setCommand` line calls `EJSON.stringify(filter)` with **no options**, which is bson.js's own
+  relaxed default (`"price":1.5`). The Go port needs both modes available side by side, not one
+  canonical helper reused everywhere — an acceptance test asserting the command text would have
+  caught this immediately, and one does.
+- **`mongo-driver/v2`'s builder-pattern options types (`options.Find()`, `options.Count()`, ...)
+  mutate their own receiver via appended closures** — calling a setter without reassigning its
+  return value still works (`findOpts.SetProjection(x)` alone is enough once `findOpts` already
+  holds the pointer), unlike a naive read of the fluent-chaining examples in the driver's own godoc
+  might suggest is required.
+- **The killOp cancellation path worked on the first real run against a live container** — no
+  probe-vs-production gap this time, unlike some of P58b's own findings: `$currentOp` matched by
+  `command.comment`, `killOp` by the returned `opid`, on the *same* client the adapter already
+  holds (M7.0's own MG-2 finding, applied), interrupted a `$where`-clause busy loop within
+  milliseconds of the call.
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).
