@@ -39,6 +39,7 @@ var (
 	containsName   = testsupport.ContainsName
 	kvPairs        = testsupport.KVPairs
 	kvValueAt      = testsupport.KVValueAt
+	kvFieldAt      = testsupport.KVFieldAt
 )
 
 func newAdapter(t *testing.T) adapters.Adapter {
@@ -255,6 +256,52 @@ func TestRedis_Read_Set(t *testing.T) {
 		if !seen[m] {
 			t.Errorf("set members = %v, missing %q", seen, m)
 		}
+	}
+}
+
+// P2 R1 regression: a set's per-row display index (its only "field" — a member has no natural
+// key) is a running total carried across pages, not reset to 0 each call. Without the fix, page 2
+// relabels its rows starting at "0" again, duplicating page 1's own labels instead of continuing
+// from where page 1 left off.
+func TestRedis_Read_Set_Big_RowNumberingContinuesAcrossPages(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+	path := nodePath(fixture, seg("database", "db0"), seg("key", testsupport.RedisBigSetKey))
+
+	p1, err := a.Read(context.Background(), adapters.ReadRequest{
+		Path: path, PageSize: 50, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-set-big-1"))
+	if err != nil {
+		t.Fatalf("Read page 1: %v", err)
+	}
+	kv1 := p1.(page.KeyValuePage)
+	if kv1.RowCount == 0 {
+		t.Fatal("page 1: RowCount = 0, want > 0")
+	}
+	if !kv1.Position.HasMore || kv1.Position.NextToken == nil {
+		t.Fatalf("page 1: HasMore = %v, NextToken = %v, want a truncated first page (5000-member set, page size 50)", kv1.Position.HasMore, kv1.Position.NextToken)
+	}
+	lastLabel1, err := strconv.Atoi(*kvFieldAt(t, kv1, kv1.RowCount-1))
+	if err != nil {
+		t.Fatalf("page 1: last row label not numeric: %v", err)
+	}
+
+	p2, err := a.Read(context.Background(), adapters.ReadRequest{
+		Path: path, PageSize: 50, Cursor: model.PageCursor{Mode: "after", Token: *kv1.Position.NextToken},
+	}, adapters.NewOpCtx("op-set-big-2"))
+	if err != nil {
+		t.Fatalf("Read page 2: %v", err)
+	}
+	kv2 := p2.(page.KeyValuePage)
+	if kv2.RowCount == 0 {
+		t.Fatal("page 2: RowCount = 0, want > 0")
+	}
+	firstLabel2, err := strconv.Atoi(*kvFieldAt(t, kv2, 0))
+	if err != nil {
+		t.Fatalf("page 2: first row label not numeric: %v", err)
+	}
+	if firstLabel2 != lastLabel1+1 {
+		t.Errorf("page 2's first row label = %d, want %d (continuing from page 1's last label %d, not restarting)", firstLabel2, lastLabel1+1, lastLabel1)
 	}
 }
 

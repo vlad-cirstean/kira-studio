@@ -81,18 +81,28 @@ type scanRoundFn func(ctx context.Context, cursor uint64) (elements []string, ne
 // elements are never dropped — the page can overshoot req.pageSize by up to one round. An offset
 // cursor on a cursor-paged key silently restarts the scan from 0 rather than seeking or erroring
 // (redis 24, views/keyvalue/state.ts's D40 depends on this).
+//
+// pairSize==1 (set) has no natural per-row key, so it synthesizes one as a running display index
+// (readList's own strconv.Itoa(offset+i) pattern) — the running total is carried across pages in
+// the token itself (P2 R1), alongside the SSCAN cursor, since nothing else here is a page-spanning
+// counter: without it every page's index restarted at 0, relabelling page 2's rows over page 1's.
 func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, redisType string, meta keyMeta, req readReq, fingerprint string) (page.KeyValuePage, error) {
 	if req.Cursor.Mode == "before" {
 		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported,
 			"redis cursor pagination is forward-only; there is no previous page", nil)
 	}
 	var cursor uint64
+	rowOffset := 0 // meaningful only for pairSize==1 — the running display index carried from prior pages
 	if req.Cursor.Mode == "after" {
 		keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
 		if err != nil {
 			return page.KeyValuePage{}, err
 		}
-		if len(keyValues) != 1 {
+		wantFields := 1
+		if pairSize == 1 {
+			wantFields = 2
+		}
+		if len(keyValues) != wantFields {
 			return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
 		}
 		parsed, err := strconv.ParseUint(keyValues[0], 10, 64)
@@ -100,6 +110,13 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 			return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
 		}
 		cursor = parsed
+		if pairSize == 1 {
+			offset, err := strconv.Atoi(keyValues[1])
+			if err != nil {
+				return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+			}
+			rowOffset = offset
+		}
 	}
 
 	builder := page.NewKeyValuePageBuilder(redisType, meta.ttlMs, meta.memoryBytes, false)
@@ -119,7 +136,7 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 			if pairSize == 2 {
 				builder.Push(elements[i], elements[i+1])
 			} else {
-				builder.Push(strconv.Itoa(rowCount), elements[i])
+				builder.Push(strconv.Itoa(rowOffset+rowCount), elements[i])
 			}
 			rowCount++
 		}
@@ -134,7 +151,11 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 	hasMore := !exhausted
 	var nextToken *string
 	if hasMore {
-		token := adapters.EncodePageToken([]string{strconv.FormatUint(cursor, 10)}, fingerprint)
+		tokenValues := []string{strconv.FormatUint(cursor, 10)}
+		if pairSize == 1 {
+			tokenValues = append(tokenValues, strconv.Itoa(rowOffset+rowCount))
+		}
+		token := adapters.EncodePageToken(tokenValues, fingerprint)
 		nextToken = &token
 	}
 	position := page.PagePosition{

@@ -35,6 +35,8 @@ const (
 	RedisTTLKey         = "session:abc"
 	RedisBigHashKey     = "user:1:bighash"
 	RedisBigHashLength  = 5000
+	RedisBigSetKey      = "tags:big-featured"
+	RedisBigSetLength   = 5000
 	RedisStreamEntries  = 5
 	RedisSecondaryDbKey = "other-db:marker"
 )
@@ -186,6 +188,14 @@ func seedRedis(ctx context.Context, conn *goredis.Client) error {
 		setMembers[i] = m
 	}
 	if err := conn.SAdd(ctx, RedisSetKey, setMembers...).Err(); err != nil {
+		return err
+	}
+
+	bigSetMembers := make([]any, RedisBigSetLength)
+	for i := range bigSetMembers {
+		bigSetMembers[i] = fmt.Sprintf("member-%d", i)
+	}
+	if err := conn.SAdd(ctx, RedisBigSetKey, bigSetMembers...).Err(); err != nil {
 		return err
 	}
 

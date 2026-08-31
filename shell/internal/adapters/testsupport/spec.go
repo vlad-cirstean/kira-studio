@@ -108,6 +108,14 @@ func KVValueAt(t *testing.T, p page.KeyValuePage, row int) *string {
 	return chunkCellAt(t, p.Values, row)
 }
 
+// KVFieldAt reads row's field text from a KeyValuePage directly, preserving row order — the
+// counterpart to KVValueAt for callers checking the "field" column itself, such as a redis set's
+// synthetic per-row display index (its only field value, since a set member has no natural key).
+func KVFieldAt(t *testing.T, p page.KeyValuePage, row int) *string {
+	t.Helper()
+	return chunkCellAt(t, p.Fields, row)
+}
+
 // Strp returns a pointer to s — every acceptance spec in this repo needs one somewhere and
 // otherwise reinvents it under a different name.
 func Strp(s string) *string { return &s }
