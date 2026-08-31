@@ -20,7 +20,7 @@ import (
 // response.
 func TestForwardToChild_RealEngineChild(t *testing.T) {
 	host := enginetest.Host(t)
-	conns := fakeKindLookup{"conn-1": "mariadb"} // never in nativeKinds
+	conns := fakeKindLookup{"conn-1": TestKindNodeServed}
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), host, conns)
 
 	conn := newFakeConn()

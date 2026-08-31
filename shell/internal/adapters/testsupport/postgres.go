@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -43,11 +42,7 @@ type PgFixture struct {
 	container testcontainers.Container
 }
 
-var (
-	memoMu  sync.Mutex
-	memo    *PgFixture
-	memoErr error
-)
+var pgMemo fixture[PgFixture]
 
 // repoRoot resolves the repository root relative to this source file, so the seed SQL path does
 // not depend on the test binary's own working directory.
@@ -67,46 +62,25 @@ const (
 // failure that makes go test ./internal/adapters/postgres unusable without Docker) when the
 // daemon is unreachable.
 //
-// Memoized process-wide (bun:test's own beforeAll/afterAll-per-file precedent, §11b) — termination
-// is deliberately NOT wired to any one test's t.Cleanup: Go's testing package runs a Cleanup as
-// soon as the registering test function returns, which for the first test to call StartPostgres is
-// long before the rest of the package's tests run, killing the shared container out from under
-// them. Call StopPostgres from the package's own TestMain instead (postgres_test.go's).
+// Memoized process-wide by fixture[T] (bun:test's own beforeAll/afterAll-per-file precedent,
+// §11b/B15) — termination is deliberately NOT wired to any one test's t.Cleanup: see fixture.go's
+// own doc comment for why. Call StopPostgres from the package's own TestMain instead.
 func StartPostgres(t *testing.T) *PgFixture {
 	t.Helper()
 	if !IsDockerAvailable() {
 		t.Skip(DockerUnavailableMessage)
 	}
-
-	memoMu.Lock()
-	defer memoMu.Unlock()
-	if memo != nil {
-		return memo
-	}
-	if memoErr != nil {
-		t.Fatalf("postgres container: %v", memoErr)
-	}
-
-	fixture, err := startPostgres()
+	fixture, err := pgMemo.get(startPostgres)
 	if err != nil {
-		memoErr = err
 		t.Fatalf("postgres container: %v", err)
 	}
-	memo = fixture
 	return fixture
 }
 
 // StopPostgres terminates the memoized container, if one was ever started. Call once, from the
 // test binary's own TestMain, after m.Run() returns — never from an individual test.
 func StopPostgres() {
-	memoMu.Lock()
-	fixture := memo
-	memo = nil
-	memoErr = nil
-	memoMu.Unlock()
-	if fixture != nil {
-		_ = fixture.container.Terminate(context.Background())
-	}
+	pgMemo.stop(func(f *PgFixture) { _ = f.container.Terminate(context.Background()) })
 }
 
 func startPostgres() (*PgFixture, error) {
@@ -160,10 +134,8 @@ func startPostgres() (*PgFixture, error) {
 	cfg := model.ResolvedConnectionConfig{
 		ID: "test-postgres", SortOrder: 0, CreatedAt: now, UpdatedAt: now,
 		Name: "Test Postgres", Kind: "postgres", Color: "blue", Mode: "fields", ReadOnly: false,
-		Host: &hostCopy, Port: &portInt, Database: strp(database), Username: strp("postgres"),
-		Options: map[string]any{}, Password: strp(password),
+		Host: &hostCopy, Port: &portInt, Database: Strp(database), Username: Strp("postgres"),
+		Options: map[string]any{}, Password: Strp(password),
 	}
 	return &PgFixture{URI: uri, Config: cfg, container: container}, nil
 }
-
-func strp(s string) *string { return &s }

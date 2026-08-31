@@ -34,7 +34,7 @@ func runRaw(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *a
 	}
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
 
-	return runWithAbortRace(ctx, release, func(queryCtx context.Context) (rawResult, error) {
+	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (rawResult, error) {
 		rows, err := conn.Query(queryCtx, sql, queryArgs(true, params)...)
 		if err != nil {
 			return rawResult{}, mapError(err)

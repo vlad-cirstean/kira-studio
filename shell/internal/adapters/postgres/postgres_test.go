@@ -61,38 +61,16 @@ func connectedAdapter(t *testing.T, fixture *testsupport.PgFixture) adapters.Ada
 }
 
 func nodePath(fixture *testsupport.PgFixture, segments ...model.PathSegment) model.NodePath {
-	return model.NodePath{ConnectionID: fixture.Config.ID, Segments: segments}
+	return testsupport.NodePath(fixture.Config.ID, segments...)
 }
 
-func seg(kind, name string) model.PathSegment { return model.PathSegment{Kind: kind, Name: name} }
-
-func childNames(t *testing.T, children adapters.TreeChildren) []string {
-	t.Helper()
-	names := make([]string, len(children.Nodes))
-	for i, n := range children.Nodes {
-		names[i] = n.Name
-	}
-	return names
-}
-
-func containsName(names []string, want string) bool {
-	for _, n := range names {
-		if n == want {
-			return true
-		}
-	}
-	return false
-}
-
-func cellAt(t *testing.T, p page.TabularPage, col, row int) *string {
-	t.Helper()
-	chunk := p.Chunks[col]
-	if page.IsNull(chunk, row) {
-		return nil
-	}
-	text := page.CellText(chunk, row)
-	return &text
-}
+var (
+	seg          = testsupport.Seg
+	childNames   = testsupport.ChildNames
+	containsName = testsupport.ContainsName
+	cellAt       = testsupport.CellAt
+	strp         = testsupport.Strp
+)
 
 // 1. connect / disconnect
 func TestPostgres_ConnectDisconnect(t *testing.T) {
@@ -707,5 +685,3 @@ func TestPostgres_ExecuteFailingStatementRejectsBatch(t *testing.T) {
 		t.Fatal("expected the second (invalid) statement to fail the whole call")
 	}
 }
-
-func strp(s string) *string { return &s }

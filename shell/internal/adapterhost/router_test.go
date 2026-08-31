@@ -20,8 +20,8 @@ func TestRouter_IsNativeKind(t *testing.T) {
 	if !r.IsNativeKind("postgres") {
 		t.Error("postgres has been native since M5 — it should already report native")
 	}
-	if r.IsNativeKind("mariadb") {
-		t.Error("mariadb has no adapter yet (M6) — nothing else should report native")
+	if r.IsNativeKind(TestKindNodeServed) {
+		t.Errorf("%s has no Go adapter — nothing else should report native", TestKindNodeServed)
 	}
 
 	nativeKinds["mariadb"] = true
@@ -29,7 +29,7 @@ func TestRouter_IsNativeKind(t *testing.T) {
 	if !r.IsNativeKind("mariadb") {
 		t.Error("IsNativeKind must reflect nativeKinds live, not a snapshot taken at construction")
 	}
-	if r.IsNativeKind("sqlite") {
+	if r.IsNativeKind(TestKindNodeServed) {
 		t.Error("only the kind actually added to nativeKinds should report native")
 	}
 }

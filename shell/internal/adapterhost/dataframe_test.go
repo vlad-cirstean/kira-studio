@@ -104,7 +104,7 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 // child attached, that means no frame is ever sent to the session at all.
 func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
 	r, conns := newTestRouter()
-	conns["conn-2"] = "mariadb" // never in nativeKinds
+	conns["conn-2"] = TestKindNodeServed
 
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)

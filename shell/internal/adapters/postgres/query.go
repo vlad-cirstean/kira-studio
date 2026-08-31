@@ -47,41 +47,10 @@ func queryArgs(textMode bool, params []any) []any {
 	return params
 }
 
-// runWithAbortRace is abort.ts's withAbortRace: issue runs the real driver call on a context
-// detached from ctx's own cancellation, on its own goroutine, while this function returns to the
-// caller as soon as either the query settles or ctx is done — whichever first. A local
-// cancellation (host.CancelOp's own ctx.cancel(), the first of its two steps) must unblock the
-// caller immediately without itself touching the still-running server-side query (query.ts:77-80's
-// "do not fix it by trying to make the query itself abort"): unlike Node's pg, pgx honours ctx
-// natively and would otherwise race its own cancel-request against — and typically win before —
-// adapter.go's Cancel/pg_cancel_backend call, the one place the real kill is meant to happen.
-// release is called exactly once, whenever the query actually settles — not merely when ctx fires
-// — so Cancel still finds the tracked backend pid if it is called shortly after a local abort.
-func runWithAbortRace[T any](ctx context.Context, release func(), issue func(context.Context) (T, error)) (T, error) {
-	type result struct {
-		value T
-		err   error
-	}
-	done := make(chan result, 1)
-	go func() {
-		v, err := issue(context.WithoutCancel(ctx))
-		done <- result{value: v, err: err}
-		release()
-	}()
-
-	select {
-	case r := <-done:
-		return r.value, r.err
-	case <-ctx.Done():
-		var zero T
-		return zero, adapters.CheckCancelled(ctx)
-	}
-}
-
 // runArrayQuery is read.ts's and console.ts's own runQuery({rowMode:'array', ...}) call shape:
 // every row scanned as []*string in column order, nil for SQL NULL. The server-side kill is
 // entirely adapter.go's Cancel (pg_cancel_backend over a side connection) — this function does not
-// and must not try to make the query itself abort (see runWithAbortRace).
+// and must not try to make the query itself abort (see adapters.RunWithAbortRace).
 func runArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
 	setCommand(op, sql, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
@@ -90,7 +59,7 @@ func runArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any
 
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
 
-	return runWithAbortRace(ctx, release, func(queryCtx context.Context) ([][]*string, error) {
+	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) ([][]*string, error) {
 		rows, err := conn.Query(queryCtx, sql, queryArgs(opts.TextMode, params)...)
 		if err != nil {
 			return nil, mapError(err)
@@ -136,7 +105,7 @@ func runCommand(ctx context.Context, conn *pgx.Conn, sql string, params []any, o
 
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
 
-	return runWithAbortRace(ctx, release, func(queryCtx context.Context) (int64, error) {
+	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (int64, error) {
 		tag, err := conn.Exec(queryCtx, sql, params...)
 		if err != nil {
 			return 0, mapError(err)

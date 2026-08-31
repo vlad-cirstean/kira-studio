@@ -18,6 +18,15 @@ import (
 // engine child until its own milestone lands.
 var nativeKinds = map[string]bool{"postgres": true}
 
+// TestKindNodeServed is a connection kind guaranteed to still route to the Node engine child —
+// exported so other packages' tests can use one definitely-not-yet-native kind as a placeholder
+// without hardcoding a literal that a later milestone's own nativeKinds flip silently turns into a
+// real (and wrong) routing decision (P58b B16; AGENTS.md's P58a findings recorded the mechanical
+// fix this constant replaces: five files, one grep, every time a kind goes native). Update this to
+// the next still-Node-served kind in the same commit that flips its current value's own
+// nativeKinds bit — currently P58c's MongoDB.
+const TestKindNodeServed = "mongodb"
+
 // KindLookup is the one thing the router needs from internal/connections to make a per-connection
 // routing decision — a two-line method on *repos.ConnectionsRepo satisfies it (A11).
 type KindLookup interface {

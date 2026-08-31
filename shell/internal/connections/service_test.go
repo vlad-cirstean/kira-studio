@@ -60,7 +60,7 @@ func newHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// "mariadb" is not in nativeKinds (postgres is, as of M5) — this router always forwards to the
+	// adapterhost.TestKindNodeServed is not in nativeKinds — this router always forwards to the
 	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
 	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
@@ -79,7 +79,7 @@ func newHarness(t *testing.T) *harness {
 func fieldsInput(name string) connections.Input {
 	return connections.Input{
 		ConnectionFields: model.ConnectionFields{
-			Name: name, Kind: "mariadb", Color: "blue", Mode: "fields",
+			Name: name, Kind: adapterhost.TestKindNodeServed, Color: "blue", Mode: "fields",
 			Host: strPtr("localhost"), Port: intPtr(5432), Options: map[string]any{},
 		},
 	}
@@ -111,7 +111,7 @@ func newUnavailableCipherHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// "mariadb" is not in nativeKinds (postgres is, as of M5) — this router always forwards to the
+	// adapterhost.TestKindNodeServed is not in nativeKinds — this router always forwards to the
 	// engine fixture, the same behaviour these tests exercised before the Backend refactor.
 	router := adapterhost.NewRouter(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
 
@@ -222,7 +222,7 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	h := newHarness(t)
 	in := connections.Input{
 		ConnectionFields: model.ConnectionFields{
-			Name: "uri-conn", Kind: "mariadb", Color: "blue", Mode: "uri",
+			Name: "uri-conn", Kind: adapterhost.TestKindNodeServed, Color: "blue", Mode: "uri",
 			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
 		},
 	}

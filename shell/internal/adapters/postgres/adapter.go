@@ -28,6 +28,15 @@ type Adapter struct {
 
 	mu          sync.Mutex
 	runningByOp map[string]RunningQuery
+
+	// inFlight counts query.go/console.go's own adapters.RunWithAbortRace background goroutines
+	// that are still touching a *pgx.Conn. RunWithAbortRace can return to its caller (on ctx.Done())
+	// well before the goroutine it spawned actually stops using the connection — by design, so a
+	// local op abort does not itself kill the query (query.ts:77-80). Disconnect must not close a
+	// connection out from under one of these goroutines: pgx's own *Conn is not safe for concurrent
+	// use, and closing one mid-Query is a real, race-detector-confirmed data race, not a theoretical
+	// one (found running go test ./... -race for P58b M6.1).
+	inFlight sync.WaitGroup
 }
 
 func (a *Adapter) Kind() string        { return "postgres" }
@@ -77,6 +86,11 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
+	// Every RunWithAbortRace goroutine still touching a connection must actually stop before that
+	// connection is closed (see inFlight's own doc comment). A caller that wants Disconnect to
+	// return promptly on a stuck query calls Cancel first — matching CancelOp's own two-step design,
+	// which already assumes the explicit cancel is what makes the server-side work actually end.
+	a.inFlight.Wait()
 	if a.connSet != nil {
 		a.connSet.CloseAll(ctx)
 	}
@@ -377,7 +391,9 @@ func (a *Adapter) trackerFor(opID string) TrackQuery {
 		}
 		a.runningByOp[opID] = q
 		a.mu.Unlock()
+		a.inFlight.Add(1)
 		return func() {
+			defer a.inFlight.Done()
 			a.mu.Lock()
 			if a.runningByOp[opID] == q {
 				delete(a.runningByOp, opID)
