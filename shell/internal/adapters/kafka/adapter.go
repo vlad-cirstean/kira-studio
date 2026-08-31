@@ -127,20 +127,37 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	return model.ObjectDefinition{}, adapters.New(adapters.CodeQuery, "kafka definition is not implemented yet", nil)
 }
 
-// Read is index.ts's read. Wired to read.go's readTopic in a later M9.2 commit.
+func (a *Adapter) resolveTopicTarget(path model.NodePath, what string) (string, error) {
+	if len(path.Segments) == 0 || path.Segments[0].Kind != "topic" {
+		return "", adapters.New(adapters.CodeNotFound,
+			what+" requires a topic path, got: "+model.EncodePath(path.Segments), nil)
+	}
+	return path.Segments[0].Name, nil
+}
+
+// Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
 	if a.client == nil || a.admin == nil {
 		return nil, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
 	}
-	return nil, adapters.New(adapters.CodeQuery, "kafka read is not implemented yet", nil)
+	topic, err := a.resolveTopicTarget(req.Path, "read")
+	if err != nil {
+		return nil, err
+	}
+	return readTopic(ctx, a.admin, a.opts, topic, req, op)
 }
 
-// Count is index.ts's count. Wired to read.go's countTopic in a later M9.2 commit.
+// Count is index.ts's count.
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	if _, err := a.requireAdmin(); err != nil {
+	adm, err := a.requireAdmin()
+	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	return adapters.CountResult{}, adapters.New(adapters.CodeQuery, "kafka count is not implemented yet", nil)
+	topic, err := a.resolveTopicTarget(req.Path, "read")
+	if err != nil {
+		return adapters.CountResult{}, err
+	}
+	return countTopic(ctx, adm, topic)
 }
 
 // Preview is index.ts's preview. Wired to produce.go's preview in a later M9.2 commit.

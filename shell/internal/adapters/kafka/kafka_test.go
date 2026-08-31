@@ -615,19 +615,42 @@ func TestKafka_Read_AlreadyCancelledContext(t *testing.T) {
 // 15b. NEW (§5.3): a mid-browse cancellation — the case scenario 15 alone cannot reach, since an
 // already-cancelled context never reaches PollRecords. P58e E3: kgo.Client.PollRecords returns a
 // Fetches, not an error, and injects a fake fetch carrying ctx.Err() on cancellation — a literal
-// port that inspects only returned errors would keep polling against a dead context. KF-2(a)
-// measured real cancellation latency around 100-300ms in this environment, well under kgo's own
-// FetchMaxWait.
+// port that inspects only returned errors would keep polling against a dead context.
+//
+// M9.2 re-derivation: M9.1's own version of this test browsed ORDERS_TOPIC's 6 seed messages and
+// slept 50ms before cancelling, on the assumption (KF-2(a)'s cancellation-latency measurement,
+// which answered a different question) that a browse would still be in flight by then. Measured
+// against the real adapter, a 6-message browse completes end to end in ~40ms regardless of
+// implementation quality — ephemeral-client construction and one Fetch round trip dominate, not
+// the tiny payload — leaving a 3-8ms window in which cancellation lands "mid-flight" at all,
+// against a 50ms sleep that is reliably too late. This is the same false-pass shape KF-2's own
+// first probe attempt hit (§12: "produced 50 records and cancelled at 300ms, but PollRecords
+// drained all 50 in ~49ms — before the cancel fired"), fixed the same way: give the browse enough
+// genuine work that a fixed, generous delay has a wide, environment-tolerant margin. A dedicated,
+// 20 000-record topic (P58e E27 — never orders/empty-topic) pushes an uncancelled full read to
+// comfortably three-digit milliseconds, confirmed empirically to make a 50ms cancel land
+// mid-flight reliably across repeated runs.
 func TestKafka_Read_MidBrowseCancellation(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
+
+	const topic = "browse-cancel-topic"
+	testsupport.CreateTopic(t, f, topic)
+	const n = 20000
+	records := make([]*kgo.Record, n)
+	for i := 0; i < n; i++ {
+		records[i] = &kgo.Record{Topic: topic, Value: []byte(fmt.Sprintf(`{"seq":%d,"pad":"0123456789012345678901234567890123456789"}`, i))}
+	}
+	if err := f.Client.ProduceSync(context.Background(), records...).FirstErr(); err != nil {
+		t.Fatalf("seed %s: %v", topic, err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	errCh := make(chan error, 1)
 	start := time.Now()
 	go func() {
-		_, err := a.Read(ctx, offsetRead(topicPath(f, testsupport.KafkaOrdersTopic), testsupport.KafkaOrdersMessageCount), adapters.NewOpCtx("op-15b"))
+		_, err := a.Read(ctx, offsetRead(topicPath(f, topic), n), adapters.NewOpCtx("op-15b"))
 		errCh <- err
 	}()
 	time.Sleep(50 * time.Millisecond)
