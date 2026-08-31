@@ -171,7 +171,11 @@ pages."** `window.__kiraCacheStats` looks like a pure-renderer hook but isn't �
 real eviction algorithm. Replaced by `tests/unit/engine-cache.spec.ts` (new, P57 M5): a direct,
 dependency-free unit test of `ByteLru`/`pages.ts`/`counts.ts` (no browser, no mock, no engine
 process, `bun test tests/unit`) asserting the exact budget-respecting behaviour rather than "≤ some
-number after 20 real page loads." The identical reasoning drops two `tests/e2e/leaks.spec.ts`
+number after 20 real page loads." (That TypeScript test itself did not survive the P58 port: P58a A21
+deleted `tests/unit/engine-cache.spec.ts` along with the `src/engine/` it tested, and the same
+budget-respecting behaviour is now asserted directly in Go, against the real cache the app ships —
+`shell/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases — with no port-side gap left to
+name.) The identical reasoning drops two `tests/e2e/leaks.spec.ts`
 sub-scenarios ("L3 is bounded", "clearing the cache resets the hit rate") for the same
 `src/engine/cache/counts.ts` `ByteLru`, and one `tests/e2e/leaks.spec.ts` sub-scenario ("deleting a
 connection closes its tabs") doesn't port for an unrelated reason: `state/tabs.ts`'s stale-tab-close
@@ -179,9 +183,10 @@ and `project/state/tree.ts`'s `knownConnectionIds` pruning are both deliberately
 `connectionsChanged` *event*, and `tests/ui/support/mockRuntime.ts` has no `Events.On` analogue at
 all — a structural gap this session's `tests/ui/interaction.spec.ts` port already named for its own
 dropped Operations-panel scenario, confirmed again here. `tests/e2e-real/` (the real `-tags server`
-Go process, real embedded engine) is the only tier that could recover the L2/event-driven checks
-this port drops, if ever wanted on top of `engine-cache.spec.ts`'s unit coverage — named as a
-possible follow-up, not built.
+Go process, real embedded adapters — P58f M10 removed the separate engine process this sentence
+originally described) is the only tier that could recover the L2/event-driven checks this port
+drops, if ever wanted on top of `lru_test.go`'s unit coverage — named as a possible follow-up, not
+built.
 
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
@@ -280,6 +285,13 @@ hardware in this environment. The closest real evidence is P51 part 4's spike bu
 `lib/node_modules/npm`) was moved into vendor time, which projects to ≈ 170 MB — a projection from a
 differently-laid-out spike bundle, not a measurement of the shipping one, and not a basis for
 declaring the > 300 MB trigger unfired. Record the real number here on the next macOS run.
+
+**L-D after P58f M10.** `scripts/vendor-node.sh` and the `runtime/` tree it populated are gone
+outright, not merely trimmed — there is no vendored Node runtime or engine-child bundle left to
+weigh at all, only the one Go binary plus its embedded frontend assets. **Not available in this
+session**: no macOS hardware here either, and no projection is offered this time — the P57 M8
+projection above was already a poor basis for the > 300 MB call, and stacking a second projection
+on top of it would be worse. Record the real `du -sh` number in §3 on the next macOS run.
 
 Per D21: every pre-approved lever has been evaluated against real measurements; only L-A fired and
 has been applied; the 350 MB budget still fails, dominated by non-app-controllable Chromium/Electron
@@ -512,9 +524,10 @@ hardware since the migration, and no number in this file changed as a result of 
 **The bundle these procedures run against.** `bun run package` (`cd shell && wails3 task
 darwin:package`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces
 **`shell/bin/Kira Studio.app`**. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
-`out/main/` entry points no longer exist. The measurement-relevant paths inside the bundle:
-`Contents/MacOS/Kira Studio` (the Go binary), `Contents/MacOS/runtime/node/bin/node` (the vendored
-Node runtime) and `Contents/MacOS/runtime/engine/engine.cjs` (the engine child's bundle).
+`out/main/` entry points no longer exist. As of P58f M10 there is also no `Contents/MacOS/runtime/`
+tree of any kind — no vendored Node runtime, no engine-child bundle — since every adapter now runs
+natively inside the one Go binary. The only measurement-relevant path inside the bundle is
+`Contents/MacOS/Kira Studio` itself.
 
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
 1. `bun run package`.
@@ -545,10 +558,11 @@ packaged check is what's left):
 3. Optional second opinion, using the same instrument §2.3/§2.4 measured gate G1 with:
    `cd shell && go run ./cmd/g1measure` (its `-anchor`/`-helper` defaults are
    `metrics.AnchorNeedles`/`HelperNeedles`; min of 10 samples 1 s apart), or a `ps -o rss=` sum over
-   the same set — the `Kira Studio` binary, `runtime/node/bin/node`, and the `com.apple.WebKit.*`
-   helpers. Do not grep `com.apple.WebKit` by hand unfiltered: it also matches every *other* running
-   app's idle WebKit helpers, the over-count §2.4's third bug records (≈ 87 MB of other apps on that
-   machine) and the reason `metrics.AppProcessSet` exists.
+   the same set — as of P58f M10, just the `Kira Studio` binary and the `com.apple.WebKit.*` helpers
+   (there is no vendored Node process left to include). Do not grep `com.apple.WebKit` by hand
+   unfiltered: it also matches every *other* running app's idle WebKit helpers, the over-count
+   §2.4's third bug records (≈ 87 MB of other apps on that machine) and the reason
+   `metrics.AppProcessSet` exists.
 4. Record: `<total> MB — <date>, <machine>`.
 
 **Window-bounds debounce timer on close (F8, D8)** — now `shell/internal/shell/window.go`: the
@@ -562,12 +576,19 @@ and quit within 300 ms of that second move, then relaunch and confirm the window
 **first** rectangle — the in-flight bounds write is dropped on purpose, not flushed. Re-aimed from
 the old check, not re-measured.
 
-**Op-log reconciliation on an engine crash (F10, D10)** — now `internal/oplog`'s
-`handleEngineDown`: every op still `running` when the engine child goes away is finished with
-`status: 'error'` and the message `engine process exited`. Verify by force-killing the engine child
-— the vendored Node process, `Contents/MacOS/runtime/node/bin/node`, which Activity Monitor lists as
-`node` — while a long-running op is in flight, then confirming the Operations panel shows that op as
-failed rather than stuck `running` forever.
+**Op-log reconciliation on an engine crash (F10, D10)** — **no manual procedure any more, as of
+P58f M10.** There is no separate engine child process left to kill: every adapter runs in-process
+inside the one Go binary, so "kill the child" is no longer a distinct failure mode — it would mean
+killing the whole app. The reconciliation this check protected now happens at two levels instead,
+both covered by automated tests rather than a manual run: (1) `adapterhost.Host.safeRun` (P58 D16)
+recovers a panic inside any single adapter call into a normal failed op (`E_INTERNAL`) on that op's
+own `op:end`, so one adapter's crash cannot leave that op stuck `running`; (2) `internal/oplog`'s
+`Wiring.finishInFlight` — generalised from "the engine child died" to "the event source is done"
+(P58f D9) — finishes any row still `running` when the op-event channel itself closes, e.g. at
+shutdown. A hard kill of the whole process (SIGKILL, OOM, a panic outside `safeRun`) still leaves
+`running` rows on next launch, same as before P58f; there is nothing left this manual procedure
+would exercise that `shell/internal/adapterhost` and `shell/internal/oplog`'s own unit tests don't
+already cover.
 
 **Log file retention (F12, D12)** — now `internal/logging`'s `Sweep`, which deletes `kira-*.log`
 files older than `LogRetentionDays` (30) by mtime at startup. Verify by backdating a log file's mtime

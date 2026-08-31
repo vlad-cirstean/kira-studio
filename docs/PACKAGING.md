@@ -6,9 +6,11 @@ Kira Studio ships as an unsigned (ad-hoc), local, arm64-only macOS build in v1 �
 
 Packaging is Wails v3's own [Task](https://taskfile.dev)-based pipeline (P57): config lives in
 `shell/build/config.yml`, the task graph in `shell/Taskfile.yml` and `shell/build/darwin/Taskfile.yml`,
-and the entry points in the repo-root `package.json`'s `scripts` plus `scripts/vendor-node.sh`,
-`scripts/sign-bundle.sh` and `scripts/verify-packaging.sh`. There is no `electron-builder.yml`, no
-asar, and no native-module ABI rebuild step — all deleted with Electron in P57 M7.
+and the entry points in the repo-root `package.json`'s `scripts` plus `scripts/sign-bundle.sh` and
+`scripts/verify-packaging.sh`. There is no `electron-builder.yml`, no asar, and no native-module ABI
+rebuild step — all deleted with Electron in P57 M7. **As of P58f M10, there is no vendored Node
+runtime and no bundled Node engine either** — `scripts/vendor-node.sh` is deleted outright, and
+every database adapter is served in-process by the Go binary itself.
 
 ## 1. Building locally
 
@@ -18,17 +20,15 @@ exactly that version, and is also wired as `predev`.
 
 ```sh
 bun install
-sh scripts/wails-dev-setup.sh   # wails3 CLI + generated bindings + the two runtime pieces below
-bun run build:engine            # esbuild → shell/runtime/engine/engine.cjs
+sh scripts/wails-dev-setup.sh   # wails3 CLI + generated bindings
 bun run build                   # vite build → shell/frontend/dist (embedded by shell/main.go)
 bun run package                 # wails3 task darwin:package, then scripts/sign-bundle.sh
 ```
 
 `scripts/wails-dev-setup.sh` is idempotent and does only what is missing: it installs the pinned
-`wails3`, generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored, and
-`src/renderer/bridge/*.ts` imports them, so `bun run build` fails without them), runs
-`scripts/vendor-node.sh`, and runs `bun run build:engine`. Both runtime pieces and
-`shell/{bin,frontend/dist,frontend/bindings,runtime}` are gitignored (`shell/.gitignore`).
+`wails3` and generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored,
+and `src/renderer/bridge/*.ts` imports them, so `bun run build` fails without them).
+`shell/{bin,frontend/dist,frontend/bindings}` are gitignored (`shell/.gitignore`).
 
 Expected artifacts (nothing lands in `dist/` or `out/` any more):
 
@@ -51,17 +51,11 @@ shell/bin/Kira Studio.app/
       Kira Studio                    the compiled Go binary — the literal filename, space included,
                                      must equal CFBundleExecutable or the bundle neither launches
                                      nor codesigns
-      runtime/
-        node/bin/node                vendored Node runtime (scripts/vendor-node.sh)
-        engine/engine.cjs            bundled Node engine child process (bun run build:engine)
 ```
 
-**Both `runtime/` pieces must exist before packaging.** `shell/main.go`'s `resolveEngine()` looks for
-`runtime/node/bin/node` and `runtime/engine/engine.cjs` *next to the running executable* — i.e.
-`Contents/MacOS/runtime/…` in a packaged bundle — and `log.Fatalf`s if either is missing. Without them
-the build still succeeds, producing a deceptively small `.app` (~14 MB of Go binary instead of that
-plus the pair's own ~126 MB) that then refuses to start at all. `create:app:bundle` guards this with an
-explicit precondition and fails with a message naming both commands.
+There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is the whole app.
+`create:app:bundle` used to assert `runtime/{node,engine}` existed and copy that tree in before
+signing; both the guard and the copy step are gone, since there is nothing left to vendor.
 
 **Dev loop:** `bun run dev` (`bun run build && cd shell && wails3 task dev`) launches a real native
 window with hot reload; `predev` runs `wails-dev-setup.sh` first. `wails3 task darwin:run` builds and
@@ -92,37 +86,23 @@ and has not been narrowed.
 | `darwin:package` | `deps: build`, then `create:app:bundle` |
 | `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=12.0` |
 | `darwin:build` → `build:docker` | off macOS only: cross-compiles in the `wails-cross` Docker image. Never exercised in this repo (§5) |
-| `create:app:bundle` | makes `Contents/{MacOS,Resources}`, copies `icons.icns`, `Assets.car` (if present), the binary and `Info.plist`, asserts `runtime/{node,engine}` exist, copies `runtime/` in, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere) |
+| `create:app:bundle` | makes `Contents/{MacOS,Resources}`, copies `icons.icns`, `Assets.car` (if present), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere) |
 
 `common:build:frontend` runs the same `bun run build` the checklist above already ran; Task's
 `sources`/`generates` up-to-date checking makes the second invocation a no-op against fresh output, so
 building the renderer first is cheap insurance, not duplicated work.
 
-**`scripts/vendor-node.sh`** — downloads Node **22.20.0** from nodejs.org (SHA-256 pinned per
-platform) into `shell/runtime/node/`, then trims what a runtime never needs: `include/` (~64 MB of C
-headers, only used to compile native addons *against* this Node) and `lib/node_modules/npm` (~17 MB).
-It also removes the now-dangling `bin/{npm,npx,corepack}` symlinks — a dangling symlink fails
-`codesign --deep --strict` resource validation, and the engine child is always spawned as
-`node <script>` directly. This is an ordinary nodejs.org runtime, not the system `node` and not
-Electron's embedded one.
-
-**`bun run build:engine`** — esbuild bundles `src/engine/stdio-main.ts` to
-`shell/runtime/engine/engine.cjs` (`--platform=node --format=cjs`), with
-`@confluentinc/kafka-javascript`, `ssh2` and `cpu-features` marked `--external` — same externals as
-before, but see §6: nothing vendors those externals into the bundle.
-
 **`scripts/sign-bundle.sh`** — ad-hoc signing, run by `bun run package` after the Task pipeline. macOS
-only; exits 1 elsewhere and exits 1 if the bundle or the vendored node binary is missing.
+only; exits 1 elsewhere.
 
 ```sh
-codesign --force --sign - "$APP/Contents/MacOS/runtime/node/bin/node"
-codesign --force --sign - "…/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node"  # only if present (§6)
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 ```
 
-The two nested Mach-O files are signed individually first because `codesign` does not descend into a
-plain (non-framework) nested executable on its own. `create:app:bundle` already ran its own
+One deep sign over the whole bundle is all that is left (P58f M10) — there is no nested vendored Node
+binary or Kafka native module to sign individually any more, so the two `codesign --force --sign -`
+calls that used to precede the deep sign are gone with them. `create:app:bundle` already ran its own
 `codesign --force --deep --sign -`; `sign-bundle.sh` re-signs and then *verifies* — redundant but
 harmless, and it is the script a human or CI actually invokes.
 
@@ -142,20 +122,18 @@ around with a bundled private key.
 ## 3. Verification checklist — results from this environment
 
 This environment is **Linux, with no macOS, no `codesign`, and no `/usr/libexec/PlistBuddy`**. Nothing
-below is a claim about a real packaged bundle; the layout in §1 is read from
-`create:app:bundle` and `resolveEngine()`, not observed in one.
+below is a claim about a real packaged bundle; the layout in §1 is read from `create:app:bundle`, not
+observed in one.
 
 | Check | Result |
 |---|---|
 | `bun run build` (vite → `shell/frontend/dist`) | **pass** — run here this session |
-| `bun run build:engine` (esbuild → `shell/runtime/engine/engine.cjs`) | **pass** — run here this session |
-| `sh scripts/vendor-node.sh` | **pass** — run here this session, on the `linux-x64` branch (checksum-pinned); the `darwin-arm64` download is a different archive and was not exercised |
 | `bun run typecheck`, `bun run lint` | **pass** |
-| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; A1–A4/N1–N2 correctly reported *skipped*, since no `shell/bin/Kira Studio.app` exists here |
+| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; A1/A3/N2 correctly reported *skipped*, since no `shell/bin/Kira Studio.app` exists here |
 | `wails3 task darwin:package` | **not run** — needs macOS (or the untested Docker cross-compile path, §5) |
 | `scripts/sign-bundle.sh` | **not run** — `codesign` is macOS-only and the script refuses to run off Darwin |
 | Real bundle contents, `Info.plist` values, ad-hoc signatures | **not verified** — no bundle was produced here |
-| `.app` on-disk size | **not measured** — expect roughly 140 MB from `create:app:bundle`'s own figures (~14 MB binary + ~126 MB `runtime/`); not a recorded number |
+| `.app` on-disk size | **not measured** — expect substantially less than the pre-P58f figure now that there is no ~126 MB vendored `runtime/` tree to carry, likely close to the compiled Go binary's own size alone; not a recorded number |
 
 Not verifiable off macOS (needs a human on real hardware — see §4): code signature checks, Gatekeeper
 quarantine behavior, launching the app at all, `~/.kira-studio/` creation, cold-start timing, packaged
@@ -168,13 +146,13 @@ also checked automatically on macOS by the `package-smoke` job in the intended `
 list is only updated from an *observed* run, never from expectation.
 
 1. `bun run package` completes and `sign-bundle.sh` prints `signed and verified`. — *not yet run*
-2. `codesign -dv --verbose=2 "shell/bin/Kira Studio.app"` reports `Signature=adhoc`, and the same for
-   `Contents/MacOS/runtime/node/bin/node`. — *not yet run*
-3. `bun run verify:packaging` passes against the real bundle — i.e. A1–A4/N1–N2 actually execute
+2. `codesign -dv --verbose=2 "shell/bin/Kira Studio.app"` reports `Signature=adhoc`. There is no
+   nested vendored Node binary to check separately any more (P58f M10). — *not yet run*
+3. `bun run verify:packaging` passes against the real bundle — i.e. A1/A3/N2 actually execute
    instead of reporting "skipped". — *not yet run*
-4. Launching the app shows the workbench with the engine status dot green. If it exits immediately,
-   `resolveEngine()` could not find `Contents/MacOS/runtime/{node/bin/node,engine/engine.cjs}` — the
-   log line names both paths. — *not yet run*
+4. Launching the app shows the workbench with the engine status dot green — "the engine" is this
+   process itself now (P58f D11), so there is no vendored runtime for a missing-file check to name;
+   a launch failure here is an ordinary Go panic/crash, not a missing-sidecar error. — *not yet run*
 5. Gatekeeper: an unsigned, unnotarized build needs right-click → Open, or
    `xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"`. Expected, not a defect. —
    *not yet run*
@@ -182,15 +160,17 @@ list is only updated from an *observed* run, never from expectation.
    `KIRA_HOME` is unset in a packaged run. — *not yet run*
 7. Create a connection, expand the tree, open a data tab, scroll, open the cell editor, quit cleanly.
    The View menu has no Reload / Toggle DevTools in a `-tags production` build. — *not yet run*
-8. Kafka: connecting is **expected to succeed** in a packaged build — Kafka is served in-process by
-   the native Go adapter since P58e M9 and never reaches the Node engine's `require()` of
-   `@confluentinc/kafka-javascript` (§6, now moot for this reason). This is the first time this has
-   ever been verifiable in a packaged bundle — record the actual result. — *not yet run*
+8. Kafka: connecting is **expected to succeed** in a packaged build — Kafka has been served
+   in-process by the native Go adapter since P58e M9, and as of P58f M10 there is no Node engine
+   left for a native-module `require()` to fail against even in principle. — *not yet run*
 9. Cold start: launch 3 times, discard the first, take the median from the startup log line in
    `~/.kira-studio/logs/`; record against the ≤ 1500 ms target. RSS cross-check: rebuild the
-   5-connection/10-tab scenario by hand and sum the app's processes via `ps -o rss=`, against 350 MB. —
+   5-connection/10-tab scenario by hand and sum the app's processes via `ps -o rss=`, against 350 MB —
+   expect a materially better number than any pre-P58f measurement, since there is no second
+   process's baseline RSS to add on top of the webview and shell any more. —
    *not yet run, see `docs/PERF.md` §3, whose recorded numbers still predate this bundle*
-10. Record the `.app` on-disk size (`du -sh`, lever L-D, budget ≤ 300 MB). — *not yet run*
+10. Record the `.app` on-disk size (`du -sh`, lever L-D, budget ≤ 300 MB) — expect a large drop from
+    any pre-P58f measurement, now that the ~126 MB vendored `runtime/` tree is gone. — *not yet run*
 
 ## 5. Off-macOS: what this environment could actually check
 
@@ -207,27 +187,25 @@ frameworks. On Linux that leaves three doors, and none of them was opened here:
   (a printed warning), and `sign-bundle.sh` exits 1 on purpose.
 
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
-"skipped A1-A4/N1-N2" note and passes on the static checks alone, and even with a bundle it would skip
+"skipped A1/A3/N2" note and passes on the static checks alone, and even with a bundle it would skip
 A1/A3/N2 for want of `codesign`/`PlistBuddy`. **A green `verify:packaging` on Linux proves only the
 static checks (S1/S2/S5), not that any bundle is correct.**
 
 What *is* fully verifiable off macOS: everything that feeds the bundle rather than being the bundle —
-the renderer build, the engine bundle, the vendored Node runtime (on this platform's own Node archive),
-typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
+the renderer build, typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
 
 ## 6. Known gaps
 
-- **Resolved (P58e M9, was open since P57 M7): Kafka's native module was never vendored into the
-  packaged bundle.** `build:engine` still marks `@confluentinc/kafka-javascript` `--external`, and no
-  build step copies that dependency (or any `node_modules/` tree) alongside `engine.cjs`, the way
-  `vendor-node.sh` does for the Node runtime — that part of the tree is unchanged. What changed is that
-  it no longer matters: Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and is served
-  in-process, never reaching the Node engine child, so a packaged build's Kafka connections do not go
-  through `require()` at all any more. `sign-bundle.sh` and `verify-packaging.sh` still probe for
-  `Contents/MacOS/runtime/engine/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node`
-  and print a harmless note when it is absent (which it always is); those checks are dead code kept
-  only until P58f deletes the Node engine sidecar (and `@confluentinc/kafka-javascript` from
-  `package.json`) along with them.
+- **Closed (P57 M7 → P58e M9 → P58f M10, in that order).** The packaging gap started as "Kafka's
+  native module was never vendored into the packaged bundle" (P57 M7): `build:engine` marked
+  `@confluentinc/kafka-javascript` `--external` and no build step vendored it, so a packaged build's
+  Kafka connections would fail at `require()` time. P58e M9 made the gap moot without closing it:
+  Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and stopped reaching the Node engine child
+  at all, so the dead `require()` path was simply never exercised — `sign-bundle.sh` and
+  `verify-packaging.sh` kept probing for the native module and printing a harmless "not present" note.
+  P58f M10 closed it for real: the Node engine, `build:engine`, and every check that probed for that
+  module are deleted outright, not merely dead-code-kept. There is no native-module packaging
+  question left to have a gap in.
 - **Ad-hoc signature only** (identity `-`). The build is not distributable outside the machine that
   built it, and SPEC.md §3 defers signing/notarization past v1. `wails3 tool sign [--notarize]` is
   available via `darwin:sign`/`darwin:sign:notarize` but is wired into nothing.
@@ -271,22 +249,26 @@ scope.
 
 | Job | Runner | What it does |
 |---|---|---|
-| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, install the `wails3` version pinned in `shell/go.mod`, generate bindings, then `lint`, `typecheck`, `build:engine`, `build`, `test:go`, `verify:packaging` |
+| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, install the `wails3` version pinned in `shell/go.mod`, generate bindings, then `lint`, `typecheck`, `build`, `test:go`, `verify:packaging` |
 | `ui` | `ubuntu-latest` | bindings, Playwright WebKit plus its system libraries, `bun run test:ui`; uploads `playwright-report/` on failure |
-| `db-unit-tests` | `ubuntu-latest` | `bun run test:unit`, `bun run test:db` |
-| `package-smoke` | `macos-15`, skipped on pull requests | `vendor-node.sh` + `build:engine`, `bun run package`, then asserts the bundle: `engine.cjs` and `runtime/node/bin/node` present, `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `Signature=adhoc`, `du -sh`; finally `bun run verify:packaging` |
+| `container-tests` | `ubuntu-latest` | `bun run test:unit`, `bun run test:go` |
+| `package-smoke` | `macos-15`, skipped on pull requests | `bun run package`, then asserts the bundle: `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `Signature=adhoc`, `du -sh`; finally `bun run verify:packaging` |
 
-`test:db` **is** in CI now, on Linux. The old constraint was Electron-specific in practice: the suite
-had to run on the same macOS runner as the rest, and GitHub-hosted macOS runners have no Docker or
-nested virtualization. With the shell in Go and the DB adapters plain Bun, the Testcontainers suite
-moves to `ubuntu-latest`, where Docker exists.
+`checks`' own `test:go` step (on `macos-15`, no Docker) only ever exercises the driver-independent
+half of `shell/internal/adapters/*/*_test.go` — every Testcontainers-backed test skips itself with a
+named `DockerUnavailableMessage` when no Docker daemon answers, rather than failing. The real,
+full-coverage run of that same `test:go` needs a runner with Docker, which is what `container-tests`
+is for. This split predates P58f and is unaffected by it: `tests/db/`'s per-engine specs used to be
+the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Docker nor nested
+virtualization); P58f D1 moved that coverage into `shell/internal/adapters/*/*_test.go`
+(`docs/ARCHITECTURE.md`'s Testing section) without changing which runner needs to be the one that
+actually exercises it.
 
 **Cutting a release** (`release.yml`, on tags matching `v*.*.*`):
 
 1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes `package.json`'s `version` from the
    tag itself — no pre-tag version-bump commit is needed.
-2. It generates bindings, runs `lint`/`typecheck`, runs `vendor-node.sh` + `build:engine`, then
-   `bun run package` unmodified.
+2. It generates bindings, runs `lint`/`typecheck`, then `bun run package` unmodified.
 3. It zips the ad-hoc-signed bundle with `ditto -c -k --keepParent "shell/bin/Kira Studio.app"
    kira-studio-macos-arm64.zip`, re-runs `verify:packaging`, and opens a **draft** GitHub Release with
    that zip attached plus an artifact upload.
