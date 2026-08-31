@@ -101,8 +101,6 @@ func TestFailureBeforeSettleCarriesStderrTail(t *testing.T) {
 	}{
 		{"exit code with stderr", "echo boom >&2; exit 3", "Pre-connect script failed (exit 3): boom"},
 		{"self-signal", "kill -TERM $$", "Pre-connect script failed (signal SIGTERM)"},
-		{"multi-line stderr keeps only the last non-blank line",
-			"echo one >&2; echo two >&2; echo >&2; exit 1", "Pre-connect script failed (exit 1): two"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

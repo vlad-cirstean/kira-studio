@@ -325,7 +325,7 @@ at all). This section is only about running it here.
   `project/state/tree.ts`'s `knownConnectionIds` pruning); and the L2/L3 engine-cache budget
   checks, which live in the Node child this tier never starts. The honest response is to drop the
   scenario with this reasoning, or move it to a tier that can reach the real subject (cache-budget
-  coverage moved to `tests/unit/engine-cache.spec.ts`) — never to assert against the mock's own
+  coverage moved to `shell/internal/enginecache/{cache,lru}_test.go`) — never to assert against the mock's own
   fixture as if that proved anything.
 - **`window.kira` no longer exists** — `contextBridge` was Electron-only, and nothing puts the
   generated `@bindings/*` services on `window` for a test to reach. A spec that used it as a

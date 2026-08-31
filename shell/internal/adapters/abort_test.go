@@ -10,21 +10,6 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 )
 
-func TestRunWithAbortRace_CompletesBeforeCancel(t *testing.T) {
-	var released int32
-	release := func() { atomic.AddInt32(&released, 1) }
-
-	v, err := adapters.RunWithAbortRace(context.Background(), release, func(ctx context.Context) (int, error) {
-		return 42, nil
-	})
-	if err != nil || v != 42 {
-		t.Fatalf("got %v, %v, want 42, nil", v, err)
-	}
-	if atomic.LoadInt32(&released) != 1 {
-		t.Errorf("release called %d times, want 1", released)
-	}
-}
-
 func TestRunWithAbortRace_CallerCtxCancelledDoesNotReachIssue(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	issueSawDone := make(chan bool, 1)

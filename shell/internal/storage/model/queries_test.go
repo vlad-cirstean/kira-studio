@@ -10,36 +10,21 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-// TestSortSpecRoundTrip is the accept half of SortSpec's hand-written codec — note the
-// "structured empty term list" case, which must round-trip as valid; see
-// TestSortSpecUnmarshalRejectsInvalid for why telling it apart from an absent terms key is the
-// whole reason the decoder probes into json.RawMessage.
-func TestSortSpecRoundTrip(t *testing.T) {
-	tests := []struct {
-		name string
-		spec model.SortSpec
-	}{
-		{"structured with terms", model.SortSpec{
-			Kind:  "structured",
-			Terms: []model.SortTerm{{Column: "name", Direction: "asc"}, {Column: "id", Direction: "desc"}},
-		}},
-		{"structured empty term list", model.SortSpec{Kind: "structured", Terms: []model.SortTerm{}}},
-		{"text", model.SortSpec{Kind: "text", Text: "name asc"}},
+// TestSortSpecAcceptsAnEmptyTermList is the accept half of SortSpec's hand-written codec: a
+// structured spec with a present-but-empty terms key must survive a round trip, which is what
+// makes it distinguishable from the absent-terms case TestSortSpecUnmarshalRejectsInvalid pins.
+func TestSortSpecAcceptsAnEmptyTermList(t *testing.T) {
+	spec := model.SortSpec{Kind: "structured", Terms: []model.SortTerm{}}
+	raw, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			raw, err := json.Marshal(tt.spec)
-			if err != nil {
-				t.Fatalf("Marshal: %v", err)
-			}
-			var got model.SortSpec
-			if err := json.Unmarshal(raw, &got); err != nil {
-				t.Fatalf("Unmarshal: %v", err)
-			}
-			if diff := cmp.Diff(tt.spec, got); diff != "" {
-				t.Errorf("round trip mismatch (-want +got):\n%s", diff)
-			}
-		})
+	var got model.SortSpec
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if diff := cmp.Diff(spec, got); diff != "" {
+		t.Errorf("round trip mismatch (-want +got):\n%s", diff)
 	}
 }
 

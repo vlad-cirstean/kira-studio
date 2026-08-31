@@ -11,19 +11,6 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-// fakeConn is a StreamSession that records every frame handed to Send.
-type fakeConn struct {
-	sent chan []byte
-}
-
-func newFakeConn() *fakeConn { return &fakeConn{sent: make(chan []byte, 16)} }
-
-func (c *fakeConn) Send(frame []byte) error {
-	c.sent <- frame
-	return nil
-}
-func (c *fakeConn) Receive() ([]byte, error) { select {} } // never used directly in these tests
-
 func newTestRouter() (*Router, fakeKindLookup) {
 	conns := fakeKindLookup{}
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, conns)

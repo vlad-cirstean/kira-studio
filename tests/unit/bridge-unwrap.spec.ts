@@ -33,14 +33,11 @@ describe('src/renderer/bridge/control.ts — unwrap (P57 D5)', () => {
     ).rejects.toMatchObject({ message: 'PG is not connected', code: 'E_DISCONNECTED' });
   });
 
-  test('3. an empty cause (a bare errors.New) falls through to E_INTERNAL', async () => {
+  test('3. neither a structured cause nor a parseable message: E_INTERNAL, message preserved', async () => {
     await expect(unwrap(callErrorLike('boom', {}))).rejects.toMatchObject({
       message: 'boom',
       code: 'E_INTERNAL',
     });
-  });
-
-  test('4. an unparseable message falls through to E_INTERNAL', async () => {
     await expect(unwrap(callErrorLike('network gone'))).rejects.toMatchObject({
       message: 'network gone',
       code: 'E_INTERNAL',

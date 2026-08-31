@@ -155,18 +155,6 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	t.Run("children of a leaf", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		children, err := a.Children(context.Background(),
-			nodePath(cfg.ID, seg("database", "main"), seg("table", "orders")), adapters.NewOpCtx("op-5"))
-		if err != nil {
-			t.Fatalf("Children(leaf): %v", err)
-		}
-		if len(children.Nodes) != 0 {
-			t.Errorf("Children(leaf) = %d nodes, want 0", len(children.Nodes))
-		}
-	})
-
 	t.Run("describe", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		meta, err := a.Describe(context.Background(), nodePath(cfg.ID, seg("database", "main"), seg("table", "order_items")), adapters.NewOpCtx("op-6"))

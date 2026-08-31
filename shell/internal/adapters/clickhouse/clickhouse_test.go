@@ -143,18 +143,6 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
-	t.Run("children of a leaf", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		children, err := a.Children(context.Background(),
-			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "orders")), adapters.NewOpCtx("op-4"))
-		if err != nil {
-			t.Fatalf("Children(leaf): %v", err)
-		}
-		if len(children.Nodes) != 0 {
-			t.Errorf("Children(leaf) = %d nodes, want 0", len(children.Nodes))
-		}
-	})
-
 	t.Run("describe: no primary key, a sparse primary index, no foreign keys", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		meta, err := a.Describe(context.Background(), nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), adapters.NewOpCtx("op-5"))

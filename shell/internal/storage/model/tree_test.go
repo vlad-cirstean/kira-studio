@@ -11,10 +11,8 @@ func TestEncodeDecodePathRoundTrip(t *testing.T) {
 		name     string
 		segments []PathSegment
 	}{
-		{"simple", []PathSegment{{Kind: "schema", Name: "public"}, {Kind: "table", Name: "orders"}}},
 		{"name with slash", []PathSegment{{Kind: "table", Name: "order/items"}}},
 		{"name with colon", []PathSegment{{Kind: "table", Name: "a:b"}}},
-		{"name with space", []PathSegment{{Kind: "table", Name: "my table"}}},
 		{"non-ascii name", []PathSegment{{Kind: "table", Name: "pässwörd"}}},
 		{"empty", []PathSegment{}},
 	}

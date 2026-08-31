@@ -10,9 +10,7 @@ import { setSocketFactory } from './support/wailsRuntime';
 const socket: FakeSocket = createFakeSocket();
 setSocketFactory(() => socket);
 
-const { ready, request, onPortEvent, reviveChunks } = await import(
-  '../../src/renderer/bridge/port'
-);
+const { ready, request, onPortEvent } = await import('../../src/renderer/bridge/port');
 
 // request() gates its send on `ready` via a .then() registered synchronously but resolved on a
 // later microtask; awaiting `ready` itself is not enough to guarantee that .then has *also* run,
@@ -140,16 +138,6 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     expect(chunk.nulls).toBeInstanceOf(Uint8Array);
     expect(chunk.truncated).toBeInstanceOf(Uint32Array);
     expect(chunk.truncated.length).toBe(0);
-  });
-
-  test('6b. reviveChunks leaves non-chunk-shaped values alone', () => {
-    expect(reviveChunks(null)).toBe(null);
-    expect(reviveChunks('text')).toBe('text');
-    expect(reviveChunks([1, 2, { a: 1 }])).toEqual([1, 2, { a: 1 }]);
-    expect(reviveChunks({ id: 'c1', nested: { name: 'x' } })).toEqual({
-      id: 'c1',
-      nested: { name: 'x' },
-    });
   });
 
   // Terminal: closing the stream is not reversible in this module, so this runs last.

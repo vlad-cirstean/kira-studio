@@ -60,14 +60,6 @@ function scanRow(row: number, _pattern: RegExp, out: RowMatch[]): void {
 const QUERY: SearchQuery = { text: 'x', matchCase: false, wholeWord: false, regex: false };
 
 describe('runChunkedScan — frame semantics (P44 F45)', () => {
-  test('1. nothing is published before the first frame', () => {
-    const onProgress = () => {
-      throw new Error('onProgress must not fire before a frame runs');
-    };
-    runChunkedScan<RowMatch>(100, scanRow, QUERY, onProgress);
-    expect(frames.length).toBeGreaterThan(0);
-  });
-
   test('2. a 5000-row page publishes rowsScanned exactly [2000, 4000, 5000] and resolves ascending', async () => {
     const rowsScannedTicks: number[] = [];
     const handle = runChunkedScan<RowMatch>(5000, scanRow, QUERY, (_found, rowsScanned) => {

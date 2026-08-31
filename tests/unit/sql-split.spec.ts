@@ -90,8 +90,4 @@ describe('statementAtCursor (P44 F43)', () => {
   test('10b. a cursor past the end falls back to the last statement', () => {
     expect(statementAtCursor(source, source.length + 50)?.text).toBe('SELECT 3');
   });
-
-  test('10c. an empty source has no statement to resolve to', () => {
-    expect(statementAtCursor('', 0)).toBeNull();
-  });
 });

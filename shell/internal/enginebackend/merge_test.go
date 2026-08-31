@@ -8,12 +8,10 @@ import (
 )
 
 type fakeSource struct {
-	ch   chan enginehost.Event
-	subs int
+	ch chan enginehost.Event
 }
 
 func (f *fakeSource) Subscribe() (<-chan enginehost.Event, func()) {
-	f.subs++
 	return f.ch, func() {}
 }
 

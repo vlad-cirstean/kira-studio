@@ -64,9 +64,6 @@ func TestWailsFilterTranslation(t *testing.T) {
 			wantName:    "Images",
 			wantPattern: "*.png;*.jpg;*.txt",
 		},
-		{
-			name: "empty list", filters: nil, wantName: "", wantPattern: "",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

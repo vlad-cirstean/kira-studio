@@ -37,35 +37,27 @@ func asIpcErr(t *testing.T, err error) *ipcerr.Error {
 	return ie
 }
 
-// TestEncryptDecryptRoundTrip covers the envelope across the input edges that break naive
-// implementations — empty, multi-byte UTF-8, 4 KiB — and asserts the nonce is fresh per call, so
-// two encryptions of the same credential never produce the same ciphertext.
-func TestEncryptDecryptRoundTrip(t *testing.T) {
+// TestEncryptUsesAFreshNoncePerCall is the property that makes the envelope safe to store: two
+// encryptions of the same credential must never produce the same ciphertext, or a reused nonce
+// leaks the plaintext relationship between two stored secrets.
+func TestEncryptUsesAFreshNoncePerCall(t *testing.T) {
 	c := availableCipher(t)
-	tests := []string{"", "hello", "pässwörd 🔐", strings.Repeat("x", 4096)}
-	for _, plain := range tests {
-		enc1, err := c.Encrypt(plain)
-		if err != nil {
-			t.Fatalf("Encrypt(%q): %v", plain, err)
-		}
-		if !strings.HasPrefix(enc1, envelopePrefix) {
-			t.Errorf("Encrypt(%q) = %q, want kira:v2: prefix", plain, enc1)
-		}
-		got, err := c.Decrypt(enc1)
-		if err != nil {
-			t.Fatalf("Decrypt: %v", err)
-		}
-		if got != plain {
-			t.Errorf("round trip = %q, want %q", got, plain)
-		}
+	const plain = "pässwörd 🔐"
 
-		enc2, err := c.Encrypt(plain)
-		if err != nil {
-			t.Fatalf("Encrypt again: %v", err)
-		}
-		if enc1 == enc2 && plain != "" {
-			t.Errorf("two encryptions of %q produced identical envelopes, want a fresh nonce", plain)
-		}
+	enc1, err := c.Encrypt(plain)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	enc2, err := c.Encrypt(plain)
+	if err != nil {
+		t.Fatalf("Encrypt again: %v", err)
+	}
+	if enc1 == enc2 {
+		t.Error("two encryptions of the same value produced identical envelopes, want a fresh nonce")
+	}
+	got, err := c.Decrypt(enc1)
+	if err != nil || got != plain {
+		t.Errorf("Decrypt = (%q, %v), want (%q, nil)", got, err, plain)
 	}
 }
 

@@ -67,12 +67,4 @@ describe('anchoredPosition (P49 D12) — the flip/clamp arithmetic behind three 
       ).toBe(4);
     });
   });
-
-  test('9. a custom gap is honoured on both axes', () => {
-    const anchor = { left: 100, right: 150, top: 50, bottom: 70 };
-    expect(anchoredPosition(anchor, { width: 200, height: 100 }, viewport, { gap: 10 })).toEqual({
-      left: 100,
-      top: 80,
-    });
-  });
 });

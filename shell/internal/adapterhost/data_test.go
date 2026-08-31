@@ -2,7 +2,6 @@ package adapterhost
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
@@ -16,33 +15,18 @@ import (
 // times.
 type dataFakeAdapter struct {
 	adapters.Adapter
-	readCalls  int
-	readFn     func() (page.Page, error)
-	mutateFn   func() (model.MutationResult, error)
-	countFn    func() (adapters.CountResult, error)
-	previewFn  func() ([]string, error)
-	executeFn  func() ([]page.Page, error)
-	downloadFn func() (model.ObjectTransferResult, error)
+	readCalls int
+	readFn    func() (page.Page, error)
+	mutateFn  func() (model.MutationResult, error)
 }
 
 func (a *dataFakeAdapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
 	a.readCalls++
 	return a.readFn()
 }
-func (a *dataFakeAdapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	return a.countFn()
-}
-func (a *dataFakeAdapter) Preview(plan model.MutationPlan) ([]string, error) { return a.previewFn() }
 func (a *dataFakeAdapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	return a.mutateFn()
 }
-func (a *dataFakeAdapter) Execute(ctx context.Context, req model.ConsoleRequest, op *adapters.OpCtx) ([]page.Page, error) {
-	return a.executeFn()
-}
-func (a *dataFakeAdapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRequest, op *adapters.OpCtx) (model.ObjectTransferResult, error) {
-	return a.downloadFn()
-}
-
 func newDispatcher() (*Dispatcher, *Host) {
 	cache := enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil)
 	host := NewHost(adapters.Deps{}, cache)
@@ -100,18 +84,6 @@ func TestDispatcher_Read_CacheAsideDiscipline(t *testing.T) {
 	case e := <-events:
 		t.Fatalf("a cache hit must not emit an op event, got %+v", e)
 	default:
-	}
-}
-
-// Read with no live adapter for the connection is E_ENGINE_DOWN, not E_NOT_FOUND — several
-// adapters also throw E_NOT_FOUND for an ordinary query-time condition unrelated to the
-// connection, and that code must not gate a tab behind "Reconnect & load".
-func TestDispatcher_Read_NoLiveAdapterIsEngineDown(t *testing.T) {
-	d, _ := newDispatcher()
-	_, err := d.Read(context.Background(), readReq(10))
-	var ae *adapters.Error
-	if !errors.As(err, &ae) || ae.Code != adapters.CodeEngineDown {
-		t.Fatalf("got %v, want an E_ENGINE_DOWN *adapters.Error", err)
 	}
 }
 

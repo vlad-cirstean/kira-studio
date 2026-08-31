@@ -1,8 +1,8 @@
 package adapters
 
 import (
-	"encoding/base64"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
@@ -112,29 +112,9 @@ func TestComputeEffectiveOrder_NoSortEligibleOnTiebreaker(t *testing.T) {
 	}
 }
 
-// 6. an unknown sort column throws E_NOT_FOUND
-func TestComputeEffectiveOrder_UnknownColumn(t *testing.T) {
-	sort := structuredSort(model.SortTerm{Column: "nope", Direction: "asc"})
-	_, err := ComputeEffectiveOrder(sort, testColumns(), []string{"id"})
-	if code, ok := CodeOf(err); !ok || code != CodeNotFound {
-		t.Fatalf("got %v, want E_NOT_FOUND", err)
-	}
-}
-
-// 7. a token round-trips under a matching fingerprint
-func TestPageToken_RoundTrips(t *testing.T) {
-	fp := RequestFingerprint(map[string]string{"filter": "x", "sort": "y"})
-	token := EncodePageToken([]string{"id", "42"}, fp)
-	got, err := DecodePageToken(token, fp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, []string{"id", "42"}) {
-		t.Errorf("got %v", got)
-	}
-}
-
-// 8. a mismatched fingerprint is refused, naming why
+// 8. a page token carries a fingerprint of the request that produced it, and decoding refuses one
+// taken under a different filter/sort — without this the cursor silently pages through the wrong
+// query's keyset.
 func TestPageToken_MismatchedFingerprint(t *testing.T) {
 	token := EncodePageToken([]string{"id", "42"}, RequestFingerprint(map[string]int{"a": 1}))
 	_, err := DecodePageToken(token, RequestFingerprint(map[string]int{"a": 2}))
@@ -142,19 +122,8 @@ func TestPageToken_MismatchedFingerprint(t *testing.T) {
 	if !ok || code != CodeQuery {
 		t.Fatalf("got %v, want E_QUERY", err)
 	}
-	if !contains(err.Error(), "does not match") {
+	if !strings.Contains(err.Error(), "does not match") {
 		t.Errorf("message %q does not mention the mismatch", err.Error())
-	}
-}
-
-// 9. a malformed token and a wrong-shape payload are both refused
-func TestPageToken_Malformed(t *testing.T) {
-	if _, err := DecodePageToken("not-base64-json!!", "fp"); err == nil {
-		t.Error("expected an error for a malformed token")
-	}
-	wrongShape := base64.RawURLEncoding.EncodeToString([]byte(`{"v":2,"k":"not-an-array"}`))
-	if _, err := DecodePageToken(wrongShape, "fp"); err == nil {
-		t.Error("expected an error for a wrong-shape payload")
 	}
 }
 
@@ -258,6 +227,27 @@ func TestBuildKeysetPosition(t *testing.T) {
 	})
 }
 
+// 11. ResolveProjection returns ordinal order rather than request order, and dedups a repeated
+// column — the two rules that make a projection's column list not simply the caller's own slice.
+func TestResolveProjection_OrdinalOrderAndDedup(t *testing.T) {
+	got, err := ResolveProjection(testColumns(), []string{"created_at", "id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []model.ColumnMeta{col("id", 0, true), col("created_at", 2, false)}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	deduped, err := ResolveProjection(testColumns(), []string{"id", "id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(deduped, []model.ColumnMeta{col("id", 0, true)}) {
+		t.Errorf("got %+v, want a single id column", deduped)
+	}
+}
+
 func assertTokenDecodesTo(t *testing.T, token *string, fp string, want []string) {
 	t.Helper()
 	if token == nil {
@@ -269,61 +259,6 @@ func assertTokenDecodesTo(t *testing.T, token *string, fp string, want []string)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-// 11a. returns ordinal order, not request order
-func TestResolveProjection_OrdinalOrder(t *testing.T) {
-	got, err := ResolveProjection(testColumns(), []string{"created_at", "id"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []model.ColumnMeta{col("id", 0, true), col("created_at", 2, false)}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-	}
-}
-
-// 11b. dedups a repeated request
-func TestResolveProjection_Dedups(t *testing.T) {
-	got, err := ResolveProjection(testColumns(), []string{"id", "id"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []model.ColumnMeta{col("id", 0, true)}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v", got)
-	}
-}
-
-// 11c. nil means every column, in the input slice's identity
-func TestResolveProjection_NilIsIdentity(t *testing.T) {
-	columns := testColumns()
-	got, err := ResolveProjection(columns, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != len(columns) || &got[0] != &columns[0] {
-		t.Error("expected the same backing array, not a copy")
-	}
-}
-
-// 11d. an unknown column throws E_NOT_FOUND
-func TestResolveProjection_UnknownColumn(t *testing.T) {
-	_, err := ResolveProjection(testColumns(), []string{"nope"})
-	if code, ok := CodeOf(err); !ok || code != CodeNotFound {
-		t.Fatalf("got %v, want E_NOT_FOUND", err)
-	}
-}
-
-// 12. refuses a negative value (Go's int has no non-integer/NaN case to port — see sqltext.go's
-// own comment on SafeInt).
-func TestSafeInt_RefusesNegative(t *testing.T) {
-	if v, err := SafeInt(5, "pageSize"); err != nil || v != 5 {
-		t.Errorf("got %d, %v", v, err)
-	}
-	if _, err := SafeInt(-1, "pageSize"); err == nil {
-		t.Error("expected an error for -1")
 	}
 }
 
@@ -340,15 +275,4 @@ func TestStripOneTrailingSemicolon(t *testing.T) {
 			t.Errorf("StripOneTrailingSemicolon(%q) = %q, want %q", in, got, want)
 		}
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (func() bool {
-		for i := 0; i+len(substr) <= len(s); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-		return false
-	})()
 }

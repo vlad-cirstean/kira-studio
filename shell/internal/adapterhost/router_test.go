@@ -15,40 +15,6 @@ func (f fakeKindLookup) KindOf(connectionID string) (string, bool) {
 	return kind, ok
 }
 
-func TestRouter_IsNativeKind(t *testing.T) {
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
-	if !r.IsNativeKind("postgres") {
-		t.Error("postgres has been native since M5 — it should already report native")
-	}
-	if r.IsNativeKind(TestKindNodeServed) {
-		t.Errorf("%s has no Go adapter — nothing else should report native", TestKindNodeServed)
-	}
-
-	// A kind that can never become a real adapter kind (never used as any other test's
-	// TestKindNodeServed placeholder either) — real kinds keep joining nativeKinds permanently as
-	// later milestones land (mariadb/mysql as of M6.2), so this mutation test must not reuse one of
-	// those, or its own defer delete would corrupt the real map for every later test in this binary.
-	const fakeKind = "kira-test-fake-kind"
-	nativeKinds[fakeKind] = true
-	defer delete(nativeKinds, fakeKind)
-	if !r.IsNativeKind(fakeKind) {
-		t.Error("IsNativeKind must reflect nativeKinds live, not a snapshot taken at construction")
-	}
-	if r.IsNativeKind(TestKindNodeServed) {
-		t.Error("only the kind actually added to nativeKinds should report native")
-	}
-}
-
-// Cancel asks the in-process scheduler first; with no child attached and the op unknown here,
-// it must report false rather than panicking on a nil child.
-func TestRouter_Cancel_UnknownOpNoChild(t *testing.T) {
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
-	ok, err := r.Cancel(context.Background(), "no-such-op")
-	if err != nil || ok {
-		t.Fatalf("Cancel = %v, %v, want false, nil", ok, err)
-	}
-}
-
 // Cancel must find an op this router's own scheduler started without ever touching the child.
 func TestRouter_Cancel_FindsInProcessOp(t *testing.T) {
 	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})

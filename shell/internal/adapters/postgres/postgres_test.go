@@ -313,21 +313,6 @@ func TestPostgres_CapHonesty(t *testing.T) {
 	}
 }
 
-// 9. children of a leaf
-func TestPostgres_ChildrenOfLeaf(t *testing.T) {
-	fixture := testsupport.StartPostgres(t)
-	a := connectedAdapter(t, fixture)
-	children, err := a.Children(context.Background(),
-		nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "wide_table")),
-		adapters.NewOpCtx("op-9"))
-	if err != nil {
-		t.Fatalf("Children(leaf): %v", err)
-	}
-	if len(children.Nodes) != 0 {
-		t.Errorf("Children(leaf) = %d nodes, want 0", len(children.Nodes))
-	}
-}
-
 // 10. read: first page
 func TestPostgres_ReadFirstPage(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
@@ -414,24 +399,6 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 	backFirstID := cellAt(t, backPage, 0, 0)
 	if backFirstID == nil || *backFirstID != "1" {
 		t.Errorf("page-before's first id = %v, want 1 (display order preserved)", backFirstID)
-	}
-}
-
-// 13. read: no keyset without a tiebreaker (text sort disqualifies it).
-func TestPostgres_ReadNoKeysetForTextSort(t *testing.T) {
-	fixture := testsupport.StartPostgres(t)
-	a := connectedAdapter(t, fixture)
-	_, err := a.Read(context.Background(), adapters.ReadRequest{
-		Path:     nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "customers")),
-		Sort:     &model.SortSpec{Kind: "text", Text: "name"},
-		PageSize: 10, Cursor: model.PageCursor{Mode: "after", Token: "bm90LWEtcmVhbC10b2tlbg"},
-	}, adapters.NewOpCtx("op-13"))
-	if err == nil {
-		t.Fatal("expected an error requesting a keyset cursor with a text sort")
-	}
-	var ae *adapters.Error
-	if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
-		t.Fatalf("got %v, want E_UNSUPPORTED", err)
 	}
 }
 

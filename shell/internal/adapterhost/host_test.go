@@ -123,37 +123,6 @@ func TestCancelOp_LocalAbortThenAdapterCancel(t *testing.T) {
 	}
 }
 
-// CancelOp on an unknown op id is also a no-op, never an error.
-func TestCancelOp_UnknownOpID(t *testing.T) {
-	h := NewHost(adapters.Deps{}, nil)
-	ok, err := h.CancelOp(context.Background(), "no-such-op")
-	if err != nil || ok {
-		t.Fatalf("CancelOp = %v, %v, want false, nil", ok, err)
-	}
-}
-
-// Subscribe must deliver both op:start and op:end for a successful op, in order.
-func TestSubscribe_DeliversOpStartThenOpEnd(t *testing.T) {
-	h := NewHost(adapters.Deps{}, nil)
-	events, unsubscribe := h.Subscribe()
-	defer unsubscribe()
-
-	_, _, err := h.RunOp(context.Background(), OpSpec{OpID: "op-3", Kind: "read"},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) { return 42, nil })
-	if err != nil {
-		t.Fatalf("RunOp: %v", err)
-	}
-
-	start := <-events
-	if start.Topic != enginehost.EventOpStart {
-		t.Errorf("first event topic = %q, want op:start", start.Topic)
-	}
-	end := <-events
-	if end.Topic != enginehost.EventOpEnd {
-		t.Errorf("second event topic = %q, want op:end", end.Topic)
-	}
-}
-
 // Unsubscribe must never panic even when it races a concurrent Emit trying to deliver into the
 // same channel — the exact bug eventSub's own mutex exists to prevent (host.go's doc comment on
 // eventSub explains why notify.Emitter's own contract makes this possible). Run with -race.

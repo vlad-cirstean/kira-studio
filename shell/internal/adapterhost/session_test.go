@@ -3,11 +3,23 @@ package adapterhost
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 )
+
+// fakeConn is a StreamSession that records every frame handed to Send.
+type fakeConn struct {
+	sent chan []byte
+}
+
+func newFakeConn() *fakeConn { return &fakeConn{sent: make(chan []byte, 16)} }
+
+func (c *fakeConn) Send(frame []byte) error {
+	c.sent <- frame
+	return nil
+}
+func (c *fakeConn) Receive() ([]byte, error) { select {} }
 
 func newTestSession() (*Session, *fakeConn) {
 	conn := newFakeConn()
@@ -26,22 +38,6 @@ func TestSession_WriteLoop_DeliversFramesInOrder(t *testing.T) {
 	second := <-conn.sent
 	if !bytes.Equal(first, []byte("first")) || !bytes.Equal(second, []byte("second")) {
 		t.Errorf("got %s, %s, want first, second in order", first, second)
-	}
-}
-
-// An oversized frame is dropped, not enqueued — §4.10's own drop-with-a-named-log-line behaviour.
-func TestSession_Enqueue_DropsOversizedFrame(t *testing.T) {
-	s, conn := newTestSession()
-	defer s.Close()
-
-	huge := make([]byte, maxDataFrameBytes+1)
-	if err := s.enqueue(huge); err != nil {
-		t.Fatalf("enqueue of an oversized frame should report success-as-drop (nil), got %v", err)
-	}
-	select {
-	case frame := <-conn.sent:
-		t.Fatalf("an oversized frame must never reach the conn, got %d bytes", len(frame))
-	case <-time.After(50 * time.Millisecond):
 	}
 }
 

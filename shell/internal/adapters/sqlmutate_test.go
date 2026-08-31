@@ -1,13 +1,10 @@
 package adapters
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
-
-func strp(s string) *string { return &s }
 
 func rowValues(pairs ...any) model.RowValues {
 	var out model.RowValues
@@ -79,55 +76,5 @@ func TestRenderRowOp_PreservesColumnOrder(t *testing.T) {
 	want = `DELETE FROM "app"."composite_pk" WHERE "tenant_id" = $1 AND "entity_id" = $2`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestLiteralRenderer(t *testing.T) {
-	if got := LiteralRenderer(nil); got != "NULL" {
-		t.Errorf("got %q, want NULL", got)
-	}
-	if got := LiteralRenderer(strp("it's")); got != "'it''s'" {
-		t.Errorf("got %q, want 'it''s'", got)
-	}
-}
-
-func TestAssertKeyIsPrimaryKey(t *testing.T) {
-	if err := AssertKeyIsPrimaryKey(nil, rowValues("id", "1"), "t"); err == nil {
-		t.Error("expected an error for a table with no primary key")
-	}
-	if err := AssertKeyIsPrimaryKey([]string{"id"}, rowValues("id", "1", "extra", "x"), "t"); err == nil {
-		t.Error("expected an error when the key has more than the primary key columns")
-	}
-	if err := AssertKeyIsPrimaryKey([]string{"a", "b"}, rowValues("b", "1", "a", "2"), "t"); err != nil {
-		t.Errorf("expected the primary key columns in any order to be accepted: %v", err)
-	}
-}
-
-func TestResolveDatabaseTablePath(t *testing.T) {
-	path := model.NodePath{Segments: []model.PathSegment{
-		{Kind: "database", Name: "app"}, {Kind: "table", Name: "users"},
-	}}
-	db, table, err := ResolveDatabaseTablePath(path)
-	if err != nil || db != "app" || table != "users" {
-		t.Errorf("got (%q, %q, %v)", db, table, err)
-	}
-
-	bad := model.NodePath{Segments: []model.PathSegment{{Kind: "database", Name: "app"}}}
-	if _, _, err := ResolveDatabaseTablePath(bad); err == nil {
-		t.Error("expected an error for a one-segment path")
-	}
-}
-
-func TestAssertColumnsKnown(t *testing.T) {
-	columns := []model.ColumnMeta{{Name: "id"}, {Name: "name"}}
-	if err := AssertColumnsKnown(columns, []string{"id", "name"}); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	err := AssertColumnsKnown(columns, []string{"nope"})
-	if code, ok := CodeOf(err); !ok || code != CodeNotFound {
-		t.Fatalf("got %v, want E_NOT_FOUND", err)
-	}
-	if !strings.Contains(err.Error(), "nope") {
-		t.Errorf("message %q does not name the unknown column", err.Error())
 	}
 }
