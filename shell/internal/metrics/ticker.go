@@ -15,8 +15,9 @@ import (
 var (
 	// "Kira Studio" is the shipping executable name (P57 D11: shell/Taskfile.yml's APP_NAME,
 	// matched here since AppProcessSet finds this app's own process by executable path substring,
-	// not by pid tree — see sampler.go's header comment).
-	AnchorNeedles = []string{"Kira Studio", "runtime/node/bin/node"}
+	// not by pid tree — see sampler.go's header comment). P58f: no vendored Node child needle any
+	// more — every adapter is served in-process by this binary.
+	AnchorNeedles = []string{"Kira Studio"}
 	HelperNeedles = []string{"com.apple.WebKit", "webkitgtk", "bwrap"}
 )
 

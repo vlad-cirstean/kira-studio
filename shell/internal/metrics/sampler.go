@@ -112,10 +112,10 @@ func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
 }
 
 // AppProcessSet finds this app's own process set: pids matching anchorNeedles directly (this
-// app's own executables — e.g. the Go binary and the vendored Node child, which live under a
-// bundle path unique to this app), plus pids matching helperNeedles (e.g. "com.apple.WebKit" for
-// WKWebView's XPC helpers) that are actually this app's own helpers — not simply every process on
-// the machine whose executable happens to match the substring.
+// app's own executable, which lives under a bundle path unique to this app), plus pids matching
+// helperNeedles (e.g. "com.apple.WebKit" for WKWebView's XPC helpers) that are actually this app's
+// own helpers — not simply every process on the machine whose executable happens to match the
+// substring.
 //
 // Why the helper/anchor split exists: a native webview's helper processes are not children of
 // this app in the ppid sense (WKWebView's are reparented to launchd, ppid=1), so a plain substring
@@ -131,11 +131,11 @@ func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
 // Scans the system's process table exactly once, regardless of how many needles are given (P57
 // finding: an earlier version called MatchingPIDs — a full process.Processes() enumeration plus
 // an Exe() syscall on every process on the machine — once per needle, i.e. once per *element* of
-// AnchorNeedles/HelperNeedles combined. With this app's own needle lists that's 5 full system-wide
-// scans every 5s tick for the life of the process, almost all of it re-deriving the exact same
-// process-to-executable-path facts five times over. One scan, checked against every needle per
-// process, produces the identical result for a small, fixed syscall cost instead of one that scales
-// with the needle count).
+// AnchorNeedles/HelperNeedles combined. With this app's own needle lists that's several full
+// system-wide scans every 5s tick for the life of the process, almost all of it re-deriving the
+// exact same process-to-executable-path facts over and over. One scan, checked against every
+// needle per process, produces the identical result for a small, fixed syscall cost instead of one
+// that scales with the needle count).
 func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
 	procs, err := process.Processes()
 	if err != nil {

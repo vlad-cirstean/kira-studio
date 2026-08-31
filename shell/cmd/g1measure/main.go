@@ -26,7 +26,7 @@ func main() {
 	var samples int
 	var intervalSec int
 	flag.StringVar(&anchorFlag, "anchor", strings.Join(metrics.AnchorNeedles, ","),
-		"comma-separated executable-path substrings identifying this app's own executables (Go binary, vendored Node)")
+		"comma-separated executable-path substrings identifying this app's own executable (the Go binary)")
 	flag.StringVar(&helperFlag, "helper", strings.Join(metrics.HelperNeedles, ","),
 		"comma-separated executable-path substrings identifying native-webview helper processes — filtered to this app's own on darwin, see AppProcessSet")
 	flag.IntVar(&samples, "samples", 10, "number of samples")

@@ -167,17 +167,6 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
-      - |
-        # main.go's resolveEngine() looks for the vendored Node runtime and the bundled engine
-        # next to the running executable — Contents/MacOS/ inside a packaged .app — so both must
-        # be copied in here, or the app builds fine (looking deceptively small, ~14 MB instead of
-        # this pair's own ~126 MB) and then refuses to start at all.
-        if [ ! -x runtime/node/bin/node ] || [ ! -f runtime/engine/engine.cjs ]; then
-          echo "create:app:bundle: shell/runtime/{node,engine} missing — run scripts/vendor-node.sh and bun run build:engine first" >&2
-          exit 1
-        fi
-        rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/runtime"
-        cp -R runtime "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/runtime"
       - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
 
   codesign:adhoc:

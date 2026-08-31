@@ -160,8 +160,6 @@ export const test = base.extend<KiraFixtures>({
     };
 
     const proc = spawn(SERVER_BINARY, [], {
-      // main.go's resolveEngine() looks for runtime/{node,engine} relative to cwd (falling back to
-      // the executable's own directory) — cwd must be shell/ or it fails outright (§8).
       cwd: SHELL_DIR,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],

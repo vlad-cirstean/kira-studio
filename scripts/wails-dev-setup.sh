@@ -2,11 +2,11 @@
 # wails-dev-setup.sh — wired as `predev` (P57 M7: this is the only build now, so the `:wails`
 # suffix retired with the Electron one it used to disambiguate from). `bun run dev` (`bun run
 # build && cd shell && wails3 task dev`) is not self-contained: the `wails3` CLI is a Go binary
-# bun/npm can't fetch, the generated bindings `bun run build` needs are gitignored and don't exist
-# in a fresh clone, and shell/main.go's own `resolveEngine()` refuses to *start* the app without
-# the vendored Node runtime and the bundled engine (also gitignored). This script checks each of
-# those and does only the ones actually missing, so a fresh clone's first `bun run dev` just works
-# and a warm one stays fast.
+# bun/npm can't fetch, and the generated bindings `bun run build` needs are gitignored and don't
+# exist in a fresh clone. This script checks each of those and does only the ones actually
+# missing, so a fresh clone's first `bun run dev` just works and a warm one stays fast. P58f: there
+# is no vendored Node runtime or bundled engine to check for any more — every adapter is served
+# in-process by native Go.
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -62,14 +62,4 @@ fi
 if [ ! -d "$ROOT_DIR/shell/frontend/bindings" ]; then
   echo "wails-dev-setup: generating Wails bindings (shell/frontend/bindings is gitignored)"
   (cd "$ROOT_DIR/shell" && wails3 generate bindings -b -i -ts -names)
-fi
-
-if [ ! -x "$ROOT_DIR/shell/runtime/node/bin/node" ]; then
-  echo "wails-dev-setup: vendoring the Node runtime (shell/runtime/node is gitignored)"
-  sh "$ROOT_DIR/scripts/vendor-node.sh"
-fi
-
-if [ ! -f "$ROOT_DIR/shell/runtime/engine/engine.cjs" ]; then
-  echo "wails-dev-setup: building the bundled engine (shell/runtime/engine is gitignored)"
-  (cd "$ROOT_DIR" && bun run build:engine)
 fi
