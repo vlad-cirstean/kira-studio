@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
+	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
@@ -24,6 +25,9 @@ type ConnectionsUpdateArgs struct {
 }
 
 func (s *ConnectionsService) Update(args ConnectionsUpdateArgs) (model.ConnectionSummary, error) {
+	if args.ID == "" {
+		return model.ConnectionSummary{}, ipcerr.BadRequest("id is required")
+	}
 	return s.Deps.Connections.Update(args.ID, args.Input)
 }
 
@@ -33,10 +37,16 @@ type ConnectionsIDArgs struct {
 }
 
 func (s *ConnectionsService) Duplicate(args ConnectionsIDArgs) (model.ConnectionSummary, error) {
+	if args.ID == "" {
+		return model.ConnectionSummary{}, ipcerr.BadRequest("id is required")
+	}
 	return s.Deps.Connections.Duplicate(args.ID)
 }
 
 func (s *ConnectionsService) Remove(args ConnectionsIDArgs) error {
+	if args.ID == "" {
+		return ipcerr.BadRequest("id is required")
+	}
 	return s.Deps.Connections.Remove(args.ID)
 }
 
@@ -49,8 +59,13 @@ func (s *ConnectionsService) Reorder(args ConnectionsReorderArgs) ([]model.Conne
 }
 
 // Reveal never errors (P25 D9) — an undecryptable secret comes back as a RevealResult carrying
-// its own Error field, not a rejected call.
+// its own Error field, not a rejected call. A bare id is reported the same way, rather than as a
+// rejected call, for consistency with that rule.
 func (s *ConnectionsService) Reveal(args ConnectionsIDArgs) connections.RevealResult {
+	if args.ID == "" {
+		msg := "id is required"
+		return connections.RevealResult{Password: nil, Error: &msg}
+	}
 	return s.Deps.Connections.Reveal(args.ID)
 }
 
@@ -60,10 +75,16 @@ func (s *ConnectionsService) Test(input connections.Input) connections.TestResul
 }
 
 func (s *ConnectionsService) Connect(args ConnectionsIDArgs) (model.ConnectionState, error) {
+	if args.ID == "" {
+		return model.ConnectionState{}, ipcerr.BadRequest("id is required")
+	}
 	return s.Deps.Connections.Connect(args.ID)
 }
 
 func (s *ConnectionsService) Disconnect(args ConnectionsIDArgs) (model.ConnectionState, error) {
+	if args.ID == "" {
+		return model.ConnectionState{}, ipcerr.BadRequest("id is required")
+	}
 	return s.Deps.Connections.Disconnect(args.ID)
 }
 

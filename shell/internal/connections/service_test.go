@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,6 +31,7 @@ type fakeBackend struct {
 	mu         sync.Mutex
 	lastConfig model.ResolvedConnectionConfig
 	connectN   atomic.Int64
+	testN      atomic.Int64
 	release    chan struct{}
 }
 
@@ -46,7 +48,12 @@ func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionC
 	return connections.ConnectResult{ServerVersion: "1.0", Caps: map[string]any{}}, nil
 }
 
+// Test never itself rejects a bad Port the way a real adapter would (postgres/client.go's
+// uint16(*cfg.Port) truncation being the concrete case, P2 R1) — it always answers OK, so
+// TestTestValidatesInputBeforeProbing below can only pass by Service.Test's own Validate() call
+// stopping a bad request before it ever reaches here.
 func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
+	b.testN.Add(1)
 	return "1.0", nil
 }
 
@@ -55,6 +62,8 @@ func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error
 func (b *fakeBackend) releaseSlow() { close(b.release) }
 
 func (b *fakeBackend) connectCount() int { return int(b.connectN.Load()) }
+
+func (b *fakeBackend) testCount() int { return int(b.testN.Load()) }
 
 func (b *fakeBackend) lastConnectConfig() model.ResolvedConnectionConfig {
 	b.mu.Lock()
@@ -377,5 +386,30 @@ func TestInFlightConnectDedupe(t *testing.T) {
 
 	if n := h.backend.connectCount(); n != 1 {
 		t.Errorf("Backend.Connect was called %d times, want exactly 1", n)
+	}
+}
+
+// TestTestValidatesInputBeforeProbing is a regression test for the P2 R1 finding where Test was
+// the one Input-accepting entry point (unlike Create/Update) that never called Validate() —  a
+// port outside 1-65535 reached the backend unchecked, and postgres/client.go's own
+// `uint16(*cfg.Port)` would silently wrap it around to a different, in-range port rather than
+// erroring. fakeBackend.Test never rejects a bad port itself, so this can only pass if
+// Service.Test's own Validate() call stops the request before the backend is ever reached.
+func TestTestValidatesInputBeforeProbing(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("bad-port")
+	badPort := 70000 // out of range; uint16(70000) would silently become 4464
+	in.Port = &badPort
+
+	result := h.svc.Test(in)
+
+	if result.OK {
+		t.Fatal("Test(port: 70000).OK = true, want a validation failure")
+	}
+	if result.Error == nil || !strings.Contains(*result.Error, "port") {
+		t.Fatalf("Test(port: 70000).Error = %v, want a message naming the port", result.Error)
+	}
+	if n := h.backend.testCount(); n != 0 {
+		t.Errorf("Backend.Test was called %d times, want 0 — Validate() should have short-circuited first", n)
 	}
 }

@@ -341,8 +341,15 @@ func (s *Service) Reveal(id string) RevealResult {
 }
 
 // Test never errors: a test run is never armed and never leaves a process behind, however it
-// ended (the deferred Stop mirrors connections.ts:348-351's `finally`).
+// ended (the deferred Stop mirrors connections.ts:348-351's `finally`). It still runs the same
+// Validate() Create/Update do (P2 R1: this was the one Input-accepting entry point that skipped
+// it) — without that, an out-of-range Port reaches postgres/client.go's `uint16(*cfg.Port)`
+// unchecked and silently wraps around to a different, in-range port instead of being rejected.
 func (s *Service) Test(in Input) TestResult {
+	if err := in.Validate(); err != nil {
+		msg := errorMessage(err)
+		return TestResult{OK: false, Error: &msg}
+	}
 	r := resolveFromInput(in)
 	defer s.deps.Preconnect.Stop(r.config.ID)
 
