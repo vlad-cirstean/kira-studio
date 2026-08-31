@@ -48,7 +48,7 @@
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
 
   /* Appearance tokens: defaults here, overwritten at runtime from `settings` (Step 6). */
-  --kira-font-family: "SF Mono", Menlo, monospace;
+  --kira-font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
   --kira-font-size: 12px;
   --kira-row-height: 28px; /* comfortable; compact = 22px */
 
