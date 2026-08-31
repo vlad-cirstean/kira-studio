@@ -30,7 +30,6 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
 	"github.com/kirathecat/kira-studio/shell/internal/config"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
-	"github.com/kirathecat/kira-studio/shell/internal/enginebackend"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
 	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/logging"
@@ -145,9 +144,10 @@ func main() {
 	// Configure pushes the budget to both caches (§4.9).
 	router.PushCacheConfig(settings)
 
-	// A14: internal/oplog stays byte-unchanged, consuming one merged EventSource fanning the Node
-	// engine's own op:start/op:end events together with the router's in-process scheduler's.
-	oplogWiring := oplog.New(enginebackend.Merge(host, router.Host()), repositories.Ops, settings.Advanced.OpLogRetentionDays)
+	// The router's in-process scheduler is oplog's only EventSource now (P58f D9) — every kind has
+	// been native since P58e, so the Node child never produces an op:start/op:end of its own to fan
+	// in (enginebackend.Merge, which used to do that, is deleted).
+	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
 	oplogWiring.Start()
 
 	metricsTicker := metrics.NewTicker(

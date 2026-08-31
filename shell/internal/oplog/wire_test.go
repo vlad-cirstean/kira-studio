@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
@@ -17,14 +16,14 @@ import (
 
 // fakeSource is an EventSource a test drives directly, without a real engine child.
 type fakeSource struct {
-	ch chan enginehost.Event
+	ch chan oplog.Event
 }
 
 func newFakeSource() *fakeSource {
-	return &fakeSource{ch: make(chan enginehost.Event, 1024)}
+	return &fakeSource{ch: make(chan oplog.Event, 1024)}
 }
 
-func (f *fakeSource) Subscribe() (<-chan enginehost.Event, func()) {
+func (f *fakeSource) Subscribe() (<-chan oplog.Event, func()) {
 	return f.ch, func() { close(f.ch) }
 }
 
@@ -156,13 +155,13 @@ func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 
 	seedRawOp(t, h.ops, "stale-at-500", staleAt)
 	for i := 0; i < 500; i++ {
-		h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload(fmt.Sprintf("op%d", i), "ok")}
+		h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload(fmt.Sprintf("op%d", i), "ok")}
 	}
 	waitUntil(t, 2*time.Second, func() bool { return updates.count() == 500 })
 	waitUntil(t, time.Second, func() bool { return !rowExists(t, h.ops, "stale-at-500") })
 
 	seedRawOp(t, h.ops, "stale-at-501", staleAt)
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload("op500", "ok")}
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload("op500", "ok")}
 	waitUntil(t, 2*time.Second, func() bool { return updates.count() == 501 })
 	time.Sleep(100 * time.Millisecond) // give a hypothetical (buggy) third prune a moment to run
 	if !rowExists(t, h.ops, "stale-at-501") {
@@ -181,13 +180,13 @@ func TestEngineDownReconcilesInFlight(t *testing.T) {
 
 	startedAt := model.NowISO()
 	for _, id := range []string{"op1", "op2", "op3"} {
-		h.src.ch <- enginehost.Event{Topic: enginehost.EventOpStart, Payload: opStartPayload(id, nil, nil, "read", startedAt)}
+		h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayload(id, nil, nil, "read", startedAt)}
 	}
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpStart, Payload: opStartPayload("op4", nil, nil, "read", startedAt)}
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventOpEnd, Payload: opEndPayload("op4", "ok")}
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayload("op4", nil, nil, "read", startedAt)}
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload("op4", "ok")}
 	waitUntil(t, time.Second, func() bool { return rowExists(t, h.ops, "op4") && fetchOp(t, h.ops, "op4").Status == "ok" })
 
-	h.src.ch <- enginehost.Event{Topic: enginehost.EventEngineDown}
+	h.src.ch <- oplog.Event{Topic: oplog.EventEngineDown}
 
 	for _, id := range []string{"op1", "op2", "op3"} {
 		waitUntil(t, time.Second, func() bool { return fetchOp(t, h.ops, id).Status == "error" })

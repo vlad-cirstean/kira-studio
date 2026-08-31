@@ -1,12 +1,18 @@
 package adapterhost
 
 import (
+	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
-
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 )
+
+// ErrStreamFull is what enqueue returns when the session's queue has no room for a frame right
+// now. Moved from enginehost (P58f D9): HandleDataFrame's own dispatch is the only caller of
+// enqueue/enqueueLocal, and enginehost's own retry-with-backoff around it (stream.go) has no
+// counterpart here — a locally-produced or forwarded frame that finds the queue full is dropped,
+// not retried (enqueueLocal's own comment explains why).
+var ErrStreamFull = errors.New("adapterhost: stream sink full")
 
 // StreamSession is the whole of what the router needs from a renderer connection — the same
 // method set as bridge.StreamSession (A11's per-consumer-interface discipline; this package must
@@ -96,14 +102,14 @@ func (s *Session) enqueue(frame []byte) error {
 		return nil
 	}
 	if s.queuedBytes.Load() >= sessionQueueBytes {
-		return enginehost.ErrStreamFull
+		return ErrStreamFull
 	}
 	select {
 	case s.queue <- frame:
 		s.queuedBytes.Add(int64(len(frame)))
 		return nil
 	default:
-		return enginehost.ErrStreamFull
+		return ErrStreamFull
 	}
 }
 

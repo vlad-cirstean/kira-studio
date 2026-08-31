@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
+	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 )
 
 // fakeAdapter overrides only the methods a test needs; every other adapters.Adapter method panics
@@ -134,7 +134,7 @@ func TestSubscribe_UnsubscribeRacesEmitWithoutPanicking(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			h.emitJSON(enginehost.EventOpStart, opStartPayload{OpID: "x"})
+			h.emitJSON(oplog.EventOpStart, opStartPayload{OpID: "x"})
 		}()
 		go func() {
 			defer wg.Done()

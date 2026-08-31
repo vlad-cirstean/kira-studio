@@ -14,9 +14,9 @@ import (
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	idgen "github.com/kirathecat/kira-studio/shell/internal/id"
 	"github.com/kirathecat/kira-studio/shell/internal/notify"
+	"github.com/kirathecat/kira-studio/shell/internal/oplog"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
@@ -43,11 +43,11 @@ type runningOp struct {
 // each subscription rather than shared, so subscribers never contend with each other.
 type eventSub struct {
 	mu     sync.Mutex
-	ch     chan enginehost.Event
+	ch     chan oplog.Event
 	closed bool
 }
 
-func (s *eventSub) deliver(e enginehost.Event) {
+func (s *eventSub) deliver(e oplog.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -56,8 +56,8 @@ func (s *eventSub) deliver(e enginehost.Event) {
 	select {
 	case s.ch <- e:
 	default:
-		// A stalled subscriber's full buffer is skipped, matching enginehost.Host.publish's own
-		// policy — dropping one event is better than blocking every other subscriber.
+		// A stalled subscriber's full buffer is skipped — dropping one event is better than
+		// blocking every other subscriber.
 	}
 }
 
@@ -77,7 +77,7 @@ type Host struct {
 	deps  adapters.Deps
 	cache *enginecache.Cache
 
-	events notify.Emitter[enginehost.Event]
+	events notify.Emitter[oplog.Event]
 
 	mu      sync.Mutex
 	running map[string]runningOp
@@ -134,7 +134,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	}()
 
 	startedAt := model.NowISO()
-	h.emitJSON(enginehost.EventOpStart, opStartPayload{
+	h.emitJSON(oplog.EventOpStart, opStartPayload{
 		OpID: opID, ConnectionID: spec.ConnectionID, TabID: spec.TabID, Kind: spec.Kind, StartedAt: startedAt,
 	})
 
@@ -157,7 +157,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	if c := op.Command(); c != "" {
 		command = &c
 	}
-	h.emitJSON(enginehost.EventOpEnd, opEndPayload{
+	h.emitJSON(oplog.EventOpEnd, opEndPayload{
 		OpID: opID, Status: status, DurationMs: durationMs, Rows: op.Rows(), Command: command, Error: errMsg,
 	})
 
@@ -186,7 +186,7 @@ func (h *Host) emitJSON(topic string, payload any) {
 	if err != nil {
 		return
 	}
-	h.events.Emit(enginehost.Event{Topic: topic, Payload: body})
+	h.events.Emit(oplog.Event{Topic: topic, Payload: body})
 }
 
 // CancelOp is scheduler/ops.ts's cancelOp, in the same order and for the same reason: the local
@@ -212,10 +212,10 @@ func (h *Host) CancelOp(ctx context.Context, opID string) (bool, error) {
 }
 
 // Subscribe returns this subscriber's own channel of every op:start/op:end event Host emits, and
-// an unsubscribe func — the same shape as enginehost.Host.Subscribe, which is what lets
-// enginebackend.Merge fan the two into one oplog.EventSource (A14).
-func (h *Host) Subscribe() (<-chan enginehost.Event, func()) {
-	sub := &eventSub{ch: make(chan enginehost.Event, 32)}
+// an unsubscribe func — the exact shape oplog.EventSource wants, since this Host is oplog's only
+// producer now (P58f D9; it used to be fanned together with enginehost.Host's own events).
+func (h *Host) Subscribe() (<-chan oplog.Event, func()) {
+	sub := &eventSub{ch: make(chan oplog.Event, 32)}
 	unsubscribe := h.events.Subscribe(sub.deliver)
 	return sub.ch, func() {
 		unsubscribe()

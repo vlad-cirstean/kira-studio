@@ -83,7 +83,8 @@ func NewRouterAllNodeServed(deps adapters.Deps, cache *enginecache.Cache, child 
 }
 
 // Host returns the router's own scheduler, for callers that need to Subscribe to op:start/op:end
-// (enginebackend.Merge) or push cache config to the same Cache the router's Backend methods use.
+// (oplog.New, main.go — P58f D9) or push cache config to the same Cache the router's Backend
+// methods use.
 func (r *Router) Host() *Host { return r.host }
 
 // PushCacheConfig pushes engine-relevant settings (today: the L2 cache byte budget) into both

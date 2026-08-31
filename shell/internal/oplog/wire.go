@@ -9,17 +9,36 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	"github.com/kirathecat/kira-studio/shell/internal/notify"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
 )
 
-// EventSource is the slice of enginehost.Host oplog consumes. A one-method interface lets the
-// reconciliation logic — this package's actual subject — be driven by synthetic events in a
-// deterministic test, while a real *enginehost.Host satisfies it too.
+// Event is the op-log's own event shape. EventSource is a consumer-declared interface (A11's
+// discipline), so its payload type belongs with the consumer, here, rather than with whichever
+// producer happens to publish it first (P58f D9) — enginehost.Event was that producer's own type,
+// borrowed only because oplog was its sole consumer.
+type Event struct {
+	Topic   string
+	Payload json.RawMessage
+}
+
+// Event topics this package's consume loop switches on. EventOpStart/EventOpEnd mirror
+// ENGINE_EVENT.opStart/opEnd (src/shared/protocol/engine-ops.ts:21-25); EventEngineDown is this
+// package's own copy of the synthetic "engine:down" topic enginehost.Host used to publish when its
+// child process exited — kept as a plain string rather than an import, since a non-Node
+// EventSource (adapterhost.Host) has no reason to depend on enginehost just to name it.
+const (
+	EventOpStart    = "op:start"
+	EventOpEnd      = "op:end"
+	EventEngineDown = "engine:down"
+)
+
+// EventSource is the slice of a producer oplog consumes — adapterhost.Host in production, a fake
+// channel in a test. A one-method interface lets the reconciliation logic — this package's actual
+// subject — be driven by synthetic events deterministically.
 type EventSource interface {
-	Subscribe() (<-chan enginehost.Event, func())
+	Subscribe() (<-chan Event, func())
 }
 
 // pruneEveryOps mirrors oplog.ts's PRUNE_EVERY_OPS (D11: bounds the table at HARD_CAP_ROWS +
@@ -61,8 +80,8 @@ func (w *Wiring) OnUpdate(fn func(model.OpRecord)) (unsubscribe func()) {
 }
 
 // Start prunes once (oplog.ts:28) and then consumes events on one goroutine until Stop is called
-// or the event source's channel closes on its own (enginehost.Host's, once the engine exits and
-// every subscriber channel is closed — P54 §4.2).
+// or the event source's channel closes on its own (adapterhost.Host's, once app teardown
+// unsubscribes every subscriber — P54 §4.2, P58f D9).
 func (w *Wiring) Start() {
 	w.prune()
 	events, unsubscribe := w.src.Subscribe()
@@ -71,7 +90,7 @@ func (w *Wiring) Start() {
 }
 
 // Stop ends the consumer goroutine early (main's before-quit; a test's own cleanup). Idempotent
-// only in the sense that enginehost.Host's own unsubscribe already tolerates a second call —
+// only in the sense that the event source's own unsubscribe already tolerates a second call —
 // Wiring itself is only ever Stopped once in practice.
 func (w *Wiring) Stop() {
 	if w.unsubscribe != nil {
@@ -87,17 +106,17 @@ func (w *Wiring) prune() {
 
 // consume is the only reader and writer of inFlight, so that map needs no mutex — nobody should
 // add one.
-func (w *Wiring) consume(events <-chan enginehost.Event) {
+func (w *Wiring) consume(events <-chan Event) {
 	inFlight := map[string]inFlightOp{}
 	completedSincePrune := 0
 
 	for evt := range events {
 		switch evt.Topic {
-		case enginehost.EventOpStart:
+		case EventOpStart:
 			w.handleOpStart(evt.Payload, inFlight)
-		case enginehost.EventOpEnd:
+		case EventOpEnd:
 			completedSincePrune = w.handleOpEnd(evt.Payload, inFlight, completedSincePrune)
-		case enginehost.EventEngineDown:
+		case EventEngineDown:
 			w.handleEngineDown(inFlight)
 		}
 	}
