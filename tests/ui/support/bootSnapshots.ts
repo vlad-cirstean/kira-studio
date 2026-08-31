@@ -1,8 +1,8 @@
 import { defaultLayout } from '@shared/domain/layout';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import { defaultSettings } from '@shared/domain/settings';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../../ipc/support/types';
+import { IPC } from './ipcChannels';
 
 const KEYCHAIN_AVAILABLE: SecretStorageStatus = {
   available: true,

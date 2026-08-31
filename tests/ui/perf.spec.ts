@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 import {
   BIG_ROWS_META,
   BIG_ROWS_PATH,

@@ -4,8 +4,8 @@ import { resolve } from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
 import { defaultSettings } from '@shared/domain/settings';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../../ipc/support/types';
+import { IPC } from './ipcChannels';
 
 // The real Wails runtime, served under /wails/ so the app's own `import ... from
 // '/wails/runtime.js'` (control.ts, port.ts, every generated binding) loads real

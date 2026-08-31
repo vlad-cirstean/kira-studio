@@ -1,8 +1,8 @@
 import { resolve } from 'node:path';
-import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { MariaDbContainer, type StartedMariaDbContainer } from '@testcontainers/mariadb';
 import { createConnection, importFile } from 'mariadb';
 import { Wait } from 'testcontainers';
+import type { ResolvedConnectionConfig } from './connectionConfig';
 import { resolveDockerHost } from './docker';
 
 resolveDockerHost();

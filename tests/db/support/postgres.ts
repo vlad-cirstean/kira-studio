@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Client } from 'pg';
+import type { ResolvedConnectionConfig } from './connectionConfig';
 import { resolveDockerHost } from './docker';
 
 resolveDockerHost();

@@ -1,8 +1,8 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
+import { IPC } from './support/ipcChannels';
 
 // Ported from tests/e2e/connections.spec.ts (P57 D16, per P57-cutover.md §11's
 // connections/secrets finding). No real adapter needed — every scenario here only exercises

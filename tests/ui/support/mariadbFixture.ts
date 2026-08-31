@@ -1,8 +1,8 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
+import { IPC } from './ipcChannels';
 
 // Real captures against a real MariaDB container, seeded with tests/db/fixtures/0002_mariadb_seed.sql
 // — via `node out/scripts/capture-tree.cjs mariadb --recipe-file ...` (scripts/capture-tree.ts, the

@@ -1,5 +1,4 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
@@ -18,6 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
+import { IPC } from './support/ipcChannels';
 import type { ControlLogEntry } from './support/mockRuntime';
 import type { SeenPortRequest } from './support/mockStream';
 import {

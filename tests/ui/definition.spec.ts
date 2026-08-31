@@ -1,6 +1,6 @@
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
   DB_PATH,

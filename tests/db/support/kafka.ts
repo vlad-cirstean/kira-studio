@@ -1,6 +1,6 @@
-import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
 import { KafkaContainer, type StartedKafkaContainer } from '@testcontainers/kafka';
 import { seedKafka } from '../fixtures/0005_kafka_seed';
+import type { ResolvedConnectionConfig } from './connectionConfig';
 import { resolveDockerHost } from './docker';
 
 resolveDockerHost();

@@ -1,8 +1,8 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 
 // Ported from tests/e2e/secrets.spec.ts (P57 D16), per P57-cutover.md §11's connections/secrets
 // finding — but only a small slice of it. Scenarios 2-4 there (7 of the file's 9 substantive

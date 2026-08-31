@@ -1,7 +1,7 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 import {
   COMPOSITE_PK_COLUMNS,
   COMPOSITE_PK_PATH,

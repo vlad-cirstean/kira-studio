@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../../ipc/support/types';
+import { IPC } from './ipcChannels';
 
 // Real captures against a real Postgres container, seeded with tests/db/fixtures/0001_seed.sql —
 // via scripts/capture-postgres-tree.ts, not hand-written (P50 D5's discipline: a hand-written tree

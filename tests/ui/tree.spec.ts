@@ -1,8 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
+import { IPC } from './support/ipcChannels';
 import {
   ANALYTICS_CHILDREN,
   ANALYTICS_PATH,

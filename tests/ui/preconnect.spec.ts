@@ -1,7 +1,7 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 
 // Ported from tests/e2e/preconnect.spec.ts (P57 D16). That file is split in two, mirroring
 // connections.spec.ts/tree.spec.ts's own discipline: a dialog+failure-before-connect half that

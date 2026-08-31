@@ -1,7 +1,7 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
+import { IPC } from './ipcChannels';
 
 // Real captures against a real Mongo 7 container, seeded with tests/db/fixtures/0003_mongo_seed.ts
 // (the same seed tests/db/mongo.spec.ts and tests/e2e/mongo.spec.ts use) — via

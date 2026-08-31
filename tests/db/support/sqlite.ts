@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import type { ResolvedConnectionConfig } from '@shared/protocol/engine-ops';
+import type { ResolvedConnectionConfig } from './connectionConfig';
 
 const BIG_ROWS = 1_000_000;
 const SEED_SQL_PATH = resolve(__dirname, '../fixtures/0009_sqlite_seed.sql');

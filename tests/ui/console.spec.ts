@@ -1,9 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
-import { IPC } from '@shared/protocol/ipc';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
   DB_PATH,

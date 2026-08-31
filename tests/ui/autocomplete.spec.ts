@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
-import { IPC } from '@shared/protocol/ipc';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 import {
   DB_PATH as MARIADB_DB_PATH,
   connectAndExpandControl as mariadbConnectAndExpandControl,
