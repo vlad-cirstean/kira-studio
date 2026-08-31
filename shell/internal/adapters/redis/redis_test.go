@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 
@@ -446,6 +447,34 @@ func TestRedis_Mutate_InsertUpdateDelete(t *testing.T) {
 	v := kvValueAt(t, p.(page.KeyValuePage), 0)
 	if v == nil || *v != "updated" {
 		t.Errorf("value after update = %v, want updated", v)
+	}
+
+	// P2 R1: editing a value must not silently clear the key's existing TTL — a plain SET
+	// (without KEEPTTL) would reset it to none.
+	side := goredis.NewClient(&goredis.Options{
+		Addr: fixture.Host + ":" + strconv.Itoa(fixture.Port), Password: testsupport.RedisPassword,
+		DB: testsupport.RedisSecondaryDbIndex, Protocol: 2,
+	})
+	defer side.Close()
+	if err := side.Expire(context.Background(), "mutate:probe", time.Hour).Err(); err != nil {
+		t.Fatalf("seed TTL: %v", err)
+	}
+	ttlPlan := model.MutationPlan{Path: path, Ops: []model.MutationRowOp{{
+		Kind: "update",
+		Key:  model.RowValues{{Name: "_key", Value: strp("mutate:probe")}},
+		Changes: model.RowValues{
+			{Name: "$value", Value: strp("updated again")},
+		},
+	}}}
+	if _, err := a.Mutate(context.Background(), ttlPlan, adapters.NewOpCtx("op-18c")); err != nil {
+		t.Fatalf("Mutate (update, with TTL): %v", err)
+	}
+	ttl, err := side.TTL(context.Background(), "mutate:probe").Result()
+	if err != nil {
+		t.Fatalf("TTL after update: %v", err)
+	}
+	if ttl <= 0 {
+		t.Errorf("TTL after update = %v, want it preserved (> 0)", ttl)
 	}
 
 	deletePlan := model.MutationPlan{Path: path, Ops: []model.MutationRowOp{{

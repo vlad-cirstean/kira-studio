@@ -53,7 +53,10 @@ func renderOpText(op model.MutationRowOp) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "SET " + key + " " + value, nil
+		// KEEPTTL: editing a value must not silently clear whatever expiry the key already had —
+		// a plain SET (this adapter's own prior behaviour) resets TTL to none, which is a real
+		// data-loss surprise on every edit of a key that happens to expire (P2 R1 finding).
+		return "SET " + key + " " + value + " KEEPTTL", nil
 	case "delete":
 		key, err := keyNameFrom(op.Key, "delete")
 		if err != nil {
@@ -144,7 +147,9 @@ func mutateDB(ctx context.Context, conn *goredis.Client, op *adapters.OpCtx, rea
 			if err := assertEditableType(ctx, conn, key); err != nil {
 				return model.MutationResult{}, err
 			}
-			if err := conn.Set(ctx, key, value, 0).Err(); err != nil {
+			// goredis.KeepTTL, not 0: a plain SET clears the key's existing expiry, silently
+			// dropping a TTL the user never asked to change (P2 R1 finding).
+			if err := conn.Set(ctx, key, value, goredis.KeepTTL).Err(); err != nil {
 				return model.MutationResult{}, mapError(err)
 			}
 			affectedRows++
