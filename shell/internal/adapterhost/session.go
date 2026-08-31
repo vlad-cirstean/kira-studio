@@ -73,14 +73,30 @@ func (s *Session) writeLoop() {
 	}
 }
 
-// enqueueLocal is HandleDataFrame's own path for a frame this process produced itself (a native
-// dispatcher's response, a cache:stats answer). There is no retry-with-backoff here: a
-// locally-produced response has no OS pipe to push back through, so a full queue just drops the
-// frame — the renderer's own pending request then times out exactly as it would if the process had
-// died, which port.ts already handles, rather than blocking whichever goroutine hit the full queue.
+// enqueueLocal is HandleDataFrame's own path for an unsolicited event frame this process produced
+// itself (a cache:stats push) — not correlated with any renderer-side pending request, so a full
+// queue can safely just drop it: the next stats-changed notification supersedes it, and nothing is
+// left waiting on this one specifically.
 func (s *Session) enqueueLocal(frame []byte) {
 	if err := s.enqueue(frame); err != nil {
-		slog.Warn("adapterhost: dropping a response frame, session queue full", "scope", "adapterhost")
+		slog.Warn("adapterhost: dropping an event frame, session queue full", "scope", "adapterhost")
+	}
+}
+
+// enqueueResponse is HandleDataFrame's own path for a response frame, correlated by id with a
+// renderer-side pending request (port.ts's `pending` map). Unlike enqueueLocal's events, silently
+// dropping this frame would leave that request unanswered forever: a data op's request has no
+// client-side timeout of its own (§5.1/D25 — cancellation is meant to be the only escape hatch),
+// and cancellation itself only resolves the pending promise by producing a response through this
+// same path. So this never drops: it blocks for room in the queue instead (safe because
+// HandleDataFrame already runs on its own goroutine per inbound frame — this never serialises
+// behind the next Receive()), unblocking either once the writer drains the queue or once the
+// session closes, at which point port.ts's own onclose already rejects every pending request.
+func (s *Session) enqueueResponse(frame []byte) {
+	select {
+	case s.queue <- frame:
+		s.queuedBytes.Add(int64(len(frame)))
+	case <-s.done:
 	}
 }
 

@@ -3,6 +3,7 @@ package adapterhost
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 )
 
 func newTestRouter() *Router {
-	return NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
+	deps := adapters.Deps{Log: func(level, message string) {}}
+	return NewRouter(deps, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 }
 
 func mustFrame(t *testing.T, v any) []byte {
@@ -185,4 +187,23 @@ func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
 	detach()
 	r.cache.Clear()
 	assertNothingSent(t, conn)
+}
+
+// P2 R1: a response payload too large to ever fit in a data frame must still settle its pending
+// request — respond() replaces it with a small error response rather than trying (and failing) to
+// enqueue the oversized frame, which a renderer-side pending request (no client-side timeout of
+// its own, §5.1/D25) would then wait on forever.
+func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
+	r := newTestRouter()
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	huge := strings.Repeat("a", maxResponsePayloadBytes+1024)
+	r.respond(session, 9, huge, nil)
+
+	resp := readSent(t, conn)
+	if resp["kind"] != "res" || resp["id"] != float64(9) || resp["ok"] != false {
+		t.Fatalf("resp = %+v, want a res/9/ok:false frame", resp)
+	}
 }

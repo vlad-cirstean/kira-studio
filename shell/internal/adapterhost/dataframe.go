@@ -3,7 +3,9 @@ package adapterhost
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
@@ -176,6 +178,13 @@ func (r *Router) handleNativeDataOp(session *Session, op string, id int, payload
 	}
 }
 
+// maxResponsePayloadBytes leaves generous room for wireResponse's own envelope (kind/id/ok) below
+// session.go's hard maxDataFrameBytes cap — resp is checked against this before ever reaching the
+// queue, so a payload that would be silently unrepresentable there is turned into an error response
+// instead of a frame that can never be delivered (P2 R1: a dropped response has no other way to
+// ever settle its pending request, per enqueueResponse's own doc comment).
+const maxResponsePayloadBytes = maxDataFrameBytes - 4096
+
 func (r *Router) respond(session *Session, id int, payload any, err error) {
 	if err != nil {
 		r.respondError(session, id, err)
@@ -184,27 +193,37 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 	body, encErr := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: payload})
 	if encErr != nil {
 		r.deps.Log("error", "failed to encode a response frame: "+encErr.Error())
+		r.respondError(session, id, adapters.New(adapters.CodeQuery, "failed to encode the response", nil))
 		return
 	}
-	session.enqueueLocal(body)
+	if len(body) > maxResponsePayloadBytes {
+		r.deps.Log("error", "response frame exceeds the size limit, substituting an error response")
+		r.respondError(session, id, adapters.New(adapters.CodeQuery, "the response was too large to return", nil))
+		return
+	}
+	session.enqueueResponse(body)
 }
 
 func (r *Router) respondError(session *Session, id int, err error) {
 	code := ""
-	if ae, ok := err.(*adapters.Error); ok {
+	var ae *adapters.Error
+	if errors.As(err, &ae) {
 		code = string(ae.Code)
 	}
 	body, encErr := json.Marshal(wireResponse{Kind: "res", ID: id, OK: false, Error: &wireError{Message: err.Error(), Code: code}})
 	if encErr != nil {
-		return
+		// Vanishingly unlikely (every field here is a plain string/int) but still must not leave
+		// id's pending request unanswered forever — a hardcoded literal needs no encoder at all.
+		body = []byte(`{"kind":"res","id":` + strconv.Itoa(id) + `,"ok":false,"error":{"message":"internal error"}}`)
 	}
-	session.enqueueLocal(body)
+	session.enqueueResponse(body)
 }
 
 func (r *Router) respondCacheStats(session *Session, id int) {
 	body, err := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: r.cache.Stats()})
 	if err != nil {
+		r.respondError(session, id, adapters.New(adapters.CodeQuery, "failed to encode the response", nil))
 		return
 	}
-	session.enqueueLocal(body)
+	session.enqueueResponse(body)
 }
