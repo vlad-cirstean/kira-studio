@@ -207,44 +207,60 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	sqlParts = append(sqlParts, "LIMIT ?"+offsetSQL)
 	query := strings.Join(sqlParts, "\n")
 
-	rawRows, err := runArrayQuery(ctx, conn, query, params, op, true)
-	if err != nil {
-		return page.TabularPage{}, err
-	}
-
-	probedExtra := len(rawRows) > req.PageSize
-	keptRows := rawRows
-	if probedExtra {
-		keptRows = rawRows[:req.PageSize]
-	}
-
+	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]any and
+	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
+	// displayed row (sqltext.go), so those two full-width fetch rows are the only ones worth keeping
+	// around past the row's own AppendRow call. The SQL's own "LIMIT pageSize+1" (D24) guarantees at
+	// most one row ever arrives past req.PageSize, so probing it needs no early cancellation — the
+	// callback just declines to push or track it.
 	builder := page.NewTabularPageBuilder(columns)
-	for _, row := range keptRows {
+	var rowCount int
+	var probedExtra bool
+	var firstRow, lastRow []any
+	err = streamArrayQuery(ctx, conn, query, params, op, true, func(row []any) error {
+		rowCount++
+		if rowCount > req.PageSize {
+			probedExtra = true
+			return nil
+		}
+
 		cells := make([]*string, len(projectedColumns))
 		for i := range cells {
 			cells[i] = toCellText(row[i])
 		}
 		if err := builder.AppendRow(cells); err != nil {
-			return page.TabularPage{}, err
+			return err
 		}
-	}
-	if reverseRows {
-		builder.Reverse()
+
+		if firstRow == nil {
+			firstRow = row
+		}
+		lastRow = row
+		return nil
+	})
+	if err != nil {
+		return page.TabularPage{}, err
 	}
 
-	displayRows := keptRows
 	if reverseRows {
-		displayRows = make([][]any, len(keptRows))
-		for i, row := range keptRows {
-			displayRows[len(keptRows)-1-i] = row
-		}
+		builder.Reverse()
+		firstRow, lastRow = lastRow, firstRow
+	}
+	displayRowCount := rowCount
+	if probedExtra {
+		displayRowCount--
 	}
 
 	position, err := adapters.BuildKeysetPosition(adapters.KeysetPositionArgs{
-		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: len(displayRows),
+		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
 		ProbedExtra: probedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
 		Fingerprint: fingerprint,
-		CellAt:      func(row, col int) *string { return toCellText(displayRows[row][col]) },
+		CellAt: func(row, col int) *string {
+			if row == 0 {
+				return toCellText(firstRow[col])
+			}
+			return toCellText(lastRow[col])
+		},
 	})
 	if err != nil {
 		return page.TabularPage{}, err

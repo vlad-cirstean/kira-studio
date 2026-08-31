@@ -180,6 +180,28 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params [
 	return out, err
 }
 
+// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): onRow is called once per scanned
+// row, in order, with a []any the callback owns, instead of every row being materialized into a
+// [][]any only to be transposed into the page builder immediately after. runArrayQuery itself
+// stays as the array-returning shape countRows wants.
+func streamArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params []any, op *adapters.OpCtx, logParams bool, onRow func(row []any) error) error {
+	return runRows(ctx, conn, sqlText, params, op, logParams, func(rows *sql.Rows) error {
+		cols, err := rows.Columns()
+		if err != nil {
+			return err
+		}
+		vals := make([]any, len(cols))
+		dest := make([]any, len(cols))
+		for i := range vals {
+			dest[i] = &vals[i]
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return err
+		}
+		return onRow(vals)
+	})
+}
+
 // runCommand is mutate.ts's runQuery-for-writes counterpart — INSERT/UPDATE/DELETE, never SELECT.
 // suppressCommand mirrors mutate.ts's own "setCommand() was already called once for the whole
 // batch" rule (P5 D9's precedent).
