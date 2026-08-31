@@ -1811,3 +1811,92 @@ point moves to the adapter, a smaller change than SQ-1 was written expecting to 
 `SLEEP()`/`KILL QUERY` divergence is new and is folded into §5.3's testing plan (the acceptance
 suite's own long-running statement) rather than into §2, since it changes a test fixture's shape,
 not a design decision.
+
+## 13. M6.1–M6.4 results (run for real in this sandbox)
+
+**M6.1 — the three shared lifts, plus one bug the lifts themselves surfaced.** All three lifts
+(`adapters.RunWithAbortRace`, `testsupport.fixture[T]`, the `Seg`/`NodePath`/`ChildNames`/
+`ContainsName`/`CellAt`/`Strp` spec helpers, and `adapterhost.TestKindNodeServed`) landed exactly
+as designed in §4/B14/B15/B16, with one real find along the way: running the whole `shell/`
+module under `go test ./... -race` while wiring `RunWithAbortRace` into Postgres's own
+`query.go`/`console.go` reproduced a genuine data race, not a lift-authoring mistake — roughly
+2 of every 5 runs, `postgres.Adapter.Disconnect` could close the pooled `*pgx.Conn` while a
+`RunWithAbortRace` background goroutine from a just-cancelled query was still reading from it,
+because the tracker removed the query's entry (letting `Disconnect` proceed past its "any queries
+still running?" check) before the abandoned goroutine's own `conn.Query` call had actually
+returned. Fixed with an `inFlight sync.WaitGroup` on `postgres.Adapter`: `trackerFor`'s track()
+calls `Add(1)`, the query's release path calls `Done()` regardless of which side (caller or
+abandoned goroutine) finishes last, and `Disconnect` calls `a.inFlight.Wait()` before closing the
+pool. Verified clean across 8+ consecutive `-race` runs afterward. B16 also cost one unplanned
+fix: flipping any kind into `nativeKinds` is permanent for the life of the test binary, so three
+pre-existing tests that used the literals `"postgres"`/`"mariadb"` purely as a "this kind still
+forwards to the Node child" placeholder broke the moment that kind actually went native —
+`adapterhost.TestKindNodeServed` (`"mongodb"`, a kind with no Go adapter at all and none scheduled
+before P58c) replaced those literals in `router_test.go`, `dataframe_test.go`,
+`integration_test.go`, `connections/service_test.go`, and `tree/service_test.go`.
+
+**M6.2 — MySQL/MariaDB native adapter (`mysqlfamily` + thin `mariadb`/`mysql` profiles).** Built
+per §4's design and P34 D7/D9 (one `Adapter` implementation, two profile packages differing only
+in DSN options and error text), tested with `runFamilySuite`'s 18 subtests run against both a
+real `mariadb:11.4` and a real `mysql:8.4` testcontainer (36 subtests total), 3× under
+`go test ./... -race` with no races. `nativeKinds["mariadb"]` and `nativeKinds["mysql"]` are now
+both `true`. `git diff --stat -- src/` stayed empty through the whole milestone, confirming B21.
+Four real bugs, not test-authoring artifacts, were found by the *first* real run against the
+containers:
+- **The root-cause bug, affecting three of the four initial failures at once**:
+  `mysqlfamily/read.go`'s `readPage` appended the `LIMIT`/`OFFSET` bind parameters in the wrong
+  order relative to where their `?` placeholders appear in the generated SQL text. The offset
+  value was being appended to `params` *before* the page-size value, but the SQL text always
+  emits `LIMIT ?` ahead of the optional `OFFSET ?` — so on every first-page read (offset 0), the
+  server bound `LIMIT 0`, discarded all rows, and every read test failed with an empty page and no
+  error. Go's `database/sql` binds positionally with no protection against this class of mistake
+  (unlike `pgx`'s named-in-code arguments in the Postgres adapter). Fixed by appending
+  `req.PageSize + 1` to `params` before the conditional offset append, so parameter order always
+  matches placeholder order left to right. This single reorder fixed the quoting, read-first-page,
+  and read-keyset subtests simultaneously.
+- **A repeated test-authoring mistake, same shape as P58a's own**: the "mutate: no primary key"
+  subtest used `kira_analytics.events`, which — copying the TypeScript fixture's schema faithfully
+  — has a real `AUTO_INCREMENT PRIMARY KEY`, so it was not exercising the no-PK path at all. Fixed
+  identically to the P58a fix: a genuine throwaway `no_pk_probe` table created via a side
+  connection (`sideDSN`) for that one subtest. Worth naming explicitly for M6.3/M6.4: when a
+  fixture's seed schema is ported faithfully from an existing TS fixture that *does* have a PK on
+  its main table, "no primary key" test cases need their own dedicated table, every time — this is
+  now the second milestone in a row where reusing the main seeded table for that case silently
+  produced a false-positive pass.
+- **`router_test.go`'s own internal `IsNativeKind` mutation test would have corrupted the real
+  `nativeKinds` map** once `mariadb` (the literal it had been using as a "definitely not native"
+  placeholder) actually went native: the test's `nativeKinds["mariadb"] = true; defer
+  delete(nativeKinds, "mariadb")` pattern would delete the real, permanent `mariadb` entry after
+  the test ran, silently breaking `IsNativeKind("mariadb")` for every test running later in the
+  same binary. Fixed by introducing `const fakeKind = "kira-test-fake-kind"` — a string that can
+  never become a real adapter kind and is never reused as any other test's
+  `TestKindNodeServed`-style placeholder either, with a comment recording why the distinction
+  matters now that kinds keep joining `nativeKinds` permanently as later milestones land.
+- **`testsupport/mysqlfamily_seed.go`'s seed-helper parameter was literally named `sql`**,
+  shadowing the `database/sql` import inside its own function body — caught by `go vet`, not by a
+  test failure; renamed to `seedSQL`.
+
+Two capability losses were confirmed as real rather than theoretical, both already anticipated in
+§1/§2 but worth recording as observed, not just predicted:
+- **B4 — the query console's "N row(s) affected" status text is gone.** `go-sql-driver/mysql`
+  exposes no `RowsAffected()` through the `database/sql` `QueryContext` path the console's
+  multi-statement `execute()` loop needs (it needs to run arbitrary statements, not just ones it
+  knows in advance are DML, so it cannot switch to `ExecContext` per statement without first
+  parsing the SQL itself). `mysqlfamily/console.go`'s `buildPage` reports a generic `"OK"` for any
+  zero-column result instead. Same driver limitation also loses `tinyint(1)` → boolean
+  reclassification in the console specifically (`ColumnTypeLength` is commented out upstream in
+  go-sql-driver, so the console path — unlike `read.go`'s own `typeClassFor`, which reads
+  `DataType` text directly from `information_schema` — has no length to test against 1); the
+  console's TINYINT columns always classify as `number`, never `boolean`. `read.go`'s regular data
+  view is unaffected — B3/B4 as designed.
+- **B22 — `allowPublicKeyRetrieval` has no equivalent knob.** go-sql-driver/mysql requests the
+  server's RSA public key unconditionally over plaintext whenever `caching_sha2_password` needs
+  one and TLS is off, with no option to gate or refuse that request the way the Node driver's
+  `allowPublicKeyRetrieval: false` could. Documented as a real, if narrow, security-posture
+  regression versus the Node engine rather than worked around, since no equivalent driver option
+  exists to restore the old behavior.
+
+Both cross-cutting checks (`bun run test:ui`'s full 36-test Playwright suite, `bun run
+test:ipc:fe`) stayed green after the `nativeKinds` flip, alongside `bun run lint`,
+`bun run typecheck`, and `go test ./... -race` — the same acceptance bar §8 sets for every
+milestone.

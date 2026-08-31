@@ -181,14 +181,32 @@ mysql-family/`) — `mariadb/` and `mysql/` each hold only their own profile (se
 
 **PostgreSQL is Go-native as of P58a M5** (`shell/internal/adapters/postgres/`, `pgx/v5`) —
 `nativeKinds["postgres"]` is `true`, so a Postgres connection is served in-process by
-`adapterhost.Router`, never by the Node engine child. MariaDB and MySQL are unaffected and stay
-Node-served (`src/engine/adapters/mysql-family/`) until P58b. The Go port keeps the design facts
+`adapterhost.Router`, never by the Node engine child. The Go port keeps the design facts
 above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the tracked backend
 pid) exactly; what changed is only which process runs the adapter and how its query context is
 handled — a caller-side op cancellation must never be the same `context.Context` passed to `pgx`'s
 own `Query`/`Exec`, since pgx (unlike Node's `pg`) honours context cancellation by racing its own
 cancel request against the adapter's explicit `pg_cancel_backend` call
 (`internal/adapters/postgres/query.go`'s `runWithAbortRace`).
+
+**MariaDB and MySQL are Go-native as of P58b M6.2**
+(`shell/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`) —
+`nativeKinds["mariadb"]` and `nativeKinds["mysql"]` are both `true`. The shared-core/thin-profile
+split carries over unchanged from the Node design: `mysqlfamily/` holds one `Adapter`
+implementation, and `mariadb/`/`mysql/` each hold only their own `Profile` (server label,
+`ApplyEngineOptions`). Same abort pattern as Postgres but for the opposite reason: where pgx
+honours ctx cancellation and the adapter has to race it against an explicit
+`pg_cancel_backend`, go-sql-driver's `database/sql` path does the opposite — cancelling the
+`context.Context` passed to `QueryContext`/`ExecContext` closes the underlying connection outright
+(`driver: bad connection` on the next statement), so `mysqlfamily` never passes the op's own
+context to the driver at all, using `adapters.RunWithAbortRace` with a background context and an
+explicit `KILL QUERY <threadId>` on a side connection instead
+(`internal/adapters/mysqlfamily/query.go`). Two capability losses versus the Node adapter, both
+inherent to `go-sql-driver/mysql` rather than fixable in the port: the query console's "N row(s)
+affected" status text is gone (no `RowsAffected()` on the `QueryContext` path the console's
+multi-statement runner needs; a generic "OK" is shown instead), and `allowPublicKeyRetrieval` has
+no equivalent — the driver requests the server's RSA public key unconditionally over plaintext
+when `caching_sha2_password` needs one and TLS is off, with no option to refuse that request.
 
 ### SQLite (`node:sqlite`, P35)
 

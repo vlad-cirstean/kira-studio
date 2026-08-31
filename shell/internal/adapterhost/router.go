@@ -16,7 +16,7 @@ import (
 // kind is added here in the same commit as its adapter's tests going green, and never earlier
 // (A12). Postgres is native as of M5 (checkpoint C1) — every other kind still routes to the Node
 // engine child until its own milestone lands.
-var nativeKinds = map[string]bool{"postgres": true}
+var nativeKinds = map[string]bool{"postgres": true, "mariadb": true, "mysql": true}
 
 // TestKindNodeServed is a connection kind guaranteed to still route to the Node engine child —
 // exported so other packages' tests can use one definitely-not-yet-native kind as a placeholder

@@ -984,5 +984,56 @@ implementation and real-container testing found that the plan itself could not h
     adapter exists and both connections can be genuinely native/non-native side by side in one
     running app, which is closer to what steps 17-21 are actually trying to prove.
 
+## P58b — MySQL/MariaDB, SQLite, ClickHouse (M6), findings worth keeping for M6.3+
+
+`docs/v1/plans/P58b-mysql-sqlite-clickhouse.md` covers the design and carries its own §12/§13
+results sections in full detail; this is the condensed, cross-milestone version worth a reader not
+re-deriving from the plan doc.
+
+- **The M6.0 probes earned their keep**: MY-1 found that MySQL 8.4's `SLEEP()` swallows
+  `KILL QUERY` via its own documented return value instead of raising an error (MariaDB raises
+  `Error 1317` as expected) — a genuine per-engine divergence, not a probe bug, that changed the
+  acceptance suite's own choice of long-running statement for MySQL's cancellation test rather than
+  any design decision. SQ-1 found that `modernc.org/sqlite` executes every statement in a
+  multi-statement `Exec` string instead of silently dropping the tail the way `node:sqlite` does —
+  B9's console contract is unchanged, but its enforcement point moves into the adapter (reject a
+  multi-statement payload before executing) rather than relying on the driver. CH-1 found a real
+  server response quirk: a plain GET with `query=` in the URL is rejected for every statement, not
+  only DDL/DML — `clickhouse/client.go` must always POST.
+- **The cancellation-race bug from P58a recurred as a design question, not a repeat bug, in
+  M6.1**: hoisting `runWithAbortRace` into the shared `adapters.RunWithAbortRace` surfaced that
+  Postgres's own `Disconnect` could still race an abandoned goroutine against pool closure (see the
+  P58a section above) — fixed with an `inFlight sync.WaitGroup`, verified race-clean across 8+ runs
+  before any M6.2 code was written on top of the lift.
+- **The no-primary-key test mistake from P58a repeated itself verbatim in M6.2.** Faithfully
+  porting a TypeScript fixture's seed schema (`kira_analytics.events`, which has a real
+  `AUTO_INCREMENT PRIMARY KEY`) into the Go mysql-family fixture, then reusing that same table for
+  a "mutate: no primary key" test case, produced a false-positive pass both times — once for
+  Postgres in P58a, once for MariaDB/MySQL in M6.2. Both were fixed the same way: a genuine
+  throwaway no-PK table created via a side connection, dedicated to that one test. This is now a
+  named pattern to check for explicitly in M6.3 (SQLite) and M6.4 (ClickHouse): if a fixture's main
+  seeded table has a primary key, the no-PK test needs its own table, not a shortcut through the
+  existing seed.
+- **Flipping a kind's `nativeKinds` bit stays a cross-package breaking change, confirmed again in
+  M6.2.** `adapterhost.TestKindNodeServed` (introduced in M6.1 specifically to stop this class of
+  break from recurring) covered the five files M5's Postgres flip had already fixed, but
+  `router_test.go`'s own internal `IsNativeKind` mutation test had a second, narrower instance of
+  the same problem: it used the literal `"mariadb"` as a "this can't possibly be native" scratch
+  value for a live-mutation assertion (add it to `nativeKinds`, assert, `defer delete`) — once
+  M6.2 made `mariadb` really native, that `defer delete` would have permanently un-nativized it for
+  every test running later in the same binary. Fixed with a dedicated
+  `const fakeKind = "kira-test-fake-kind"` that can never become a real adapter kind and is never
+  reused as any other test's `TestKindNodeServed`-style placeholder. General lesson refined further
+  for M6.3/M6.4: grep for the literal kind string across `internal/` before flipping it, **and**
+  check for any test using that literal as a scratch/mutation value, not only as a
+  forwards-to-the-child placeholder — the two uses need different placeholders now that
+  `TestKindNodeServed` exists for the first case.
+- **Two real, driver-level capability losses were confirmed for mysql-family**, both documented in
+  `docs/ARCHITECTURE.md`'s PostgreSQL/MariaDB/MySQL section rather than worked around, since no
+  equivalent exists in `go-sql-driver/mysql`: the query console's "N row(s) affected" status text
+  (no `RowsAffected()` on the `QueryContext` path the console's multi-statement runner needs; a
+  generic "OK" is shown instead) and `allowPublicKeyRetrieval` (the driver requests the server's
+  RSA public key unconditionally over plaintext when needed, with no option to refuse).
+
 Current-state architecture reference: `docs/ARCHITECTURE.md`. The v1 record of what was specified,
 phase by phase: `docs/v1/SPEC.md` (see `docs/v1/README.md` for what that folder is and isn't).

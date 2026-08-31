@@ -24,9 +24,14 @@ func TestRouter_IsNativeKind(t *testing.T) {
 		t.Errorf("%s has no Go adapter — nothing else should report native", TestKindNodeServed)
 	}
 
-	nativeKinds["mariadb"] = true
-	defer delete(nativeKinds, "mariadb")
-	if !r.IsNativeKind("mariadb") {
+	// A kind that can never become a real adapter kind (never used as any other test's
+	// TestKindNodeServed placeholder either) — real kinds keep joining nativeKinds permanently as
+	// later milestones land (mariadb/mysql as of M6.2), so this mutation test must not reuse one of
+	// those, or its own defer delete would corrupt the real map for every later test in this binary.
+	const fakeKind = "kira-test-fake-kind"
+	nativeKinds[fakeKind] = true
+	defer delete(nativeKinds, fakeKind)
+	if !r.IsNativeKind(fakeKind) {
 		t.Error("IsNativeKind must reflect nativeKinds live, not a snapshot taken at construction")
 	}
 	if r.IsNativeKind(TestKindNodeServed) {

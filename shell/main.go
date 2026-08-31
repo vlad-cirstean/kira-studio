@@ -16,6 +16,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mariadb"
+	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/mysql"
 	_ "github.com/kirathecat/kira-studio/shell/internal/adapters/postgres"
 	"github.com/kirathecat/kira-studio/shell/internal/appcore"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge"
