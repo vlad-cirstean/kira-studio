@@ -86,6 +86,48 @@ func runArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any
 	})
 }
 
+// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): instead of materializing every
+// scanned row into a [][]*string only to be transposed into the page builder immediately after,
+// onRow is called once per row, in order, with a []*string the callback owns (safe to retain
+// beyond the call, unlike a slice into a shared backing array). Used by the read path's readPage;
+// runArrayQuery itself stays as the array-returning shape countRows and the catalog paths want.
+func streamArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
+	setCommand(op, sql, params, opts.LogParams)
+	if err := adapters.CheckNotStarted(ctx); err != nil {
+		return err
+	}
+
+	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+
+	_, err := adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (struct{}, error) {
+		rows, err := conn.Query(queryCtx, sql, queryArgs(opts.TextMode, params)...)
+		if err != nil {
+			return struct{}{}, mapError(err)
+		}
+		defer rows.Close()
+
+		width := len(rows.FieldDescriptions())
+		for rows.Next() {
+			dest := make([]any, width)
+			cells := make([]*string, width)
+			for i := range cells {
+				dest[i] = &cells[i]
+			}
+			if err := rows.Scan(dest...); err != nil {
+				return struct{}{}, mapError(err)
+			}
+			if err := onRow(cells); err != nil {
+				return struct{}{}, err
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return struct{}{}, mapError(err)
+		}
+		return struct{}{}, nil
+	})
+	return err
+}
+
 // CommandOptions is query.ts's CommandOptions.
 type CommandOptions struct {
 	// SuppressCommand: setCommand() was already called once for the whole batch (P5 D9) — do not
