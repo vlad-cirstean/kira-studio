@@ -469,3 +469,235 @@ records the same one-per-run-vs-one-per-sequence divergence **P58d D12** recorde
 difference that here it applies to three cells rather than one, and one of them (`key`) is asserted
 by `kafka.spec.ts` 7 (`assert.match(row.key ?? '', /^key-\d$/)`), which no fixture value can
 distinguish.
+
+### 1.9 Flipping `"kafka"`: the grep, and the placeholder debt P58c/P58d deferred here
+
+`grep -rn 'kafka' shell/internal --include=*.go`, run for this plan exactly as `AGENTS.md`'s P58a
+findings require (*"Flipping a kind's `nativeKinds` bit is a cross-package breaking change. Grep the
+literal kind string across `internal/` before flipping it"*). **Three hits, and one of them is the
+problem:**
+
+| File:line | What it is | Fate |
+|---|---|---|
+| `internal/storage/model/connection.go:49` | the valid-connection-kind set | Correct, untouched |
+| `internal/adapters/sqs/mutate.go:15` | a prose comment (*"mirrors mongo's `$document`, kafka's `$body`"*) | Correct, untouched |
+| **`internal/adapterhost/router.go:30`** | **`const TestKindNodeServed = "kafka"`** | **Must be retired in the flip's own commit** |
+
+`grep -rn 'TestKindNodeServed' shell/` returns **10 lines across 5 files** — its declaration plus
+five real uses and three explanatory comments:
+
+| File | Use | Can it take a synthetic kind? |
+|---|---|---|
+| `adapterhost/router.go:21-30` | the declaration + 9 lines of doc comment | — |
+| `adapterhost/integration_test.go:23` | `conns := fakeKindLookup{"conn-1": TestKindNodeServed}` | **Yes** — a hand-written `KindLookup` fake, no validation |
+| `adapterhost/dataframe_test.go:94` | `conns["conn-2"] = TestKindNodeServed` | **Yes**, same |
+| `tree/service_test.go:66` | a raw `INSERT INTO connections (…, kind, …) VALUES (…, ?, …)` | **Yes** — raw SQL, bypasses `model.ValidConnectionKind` entirely |
+| `connections/service_test.go:82` (`fieldsInput`) and `:225` | `model.ConnectionFields{Kind: adapterhost.TestKindNodeServed, …}` handed to `connections.Service.Create` | **No.** `connections/input.go:31` calls `model.ValidConnectionKind(in.Kind)` against `model/connection.go:47`'s closed ten-kind set. A synthetic kind is rejected before the router is ever consulted |
+
+That last row is why **P58e E20** is a decision rather than a rename. Two of those tests'
+whole subject is `connections.Service`'s **child-forwarding** path — which still exists in shipped
+code until P58f's M10 collapses the two `EngineBackend` implementations — so deleting them now would
+be deleting coverage of live code.
+
+**Everything else the flip touches, enumerated so the implementer checks rather than trusting "the
+router handles it":**
+
+- **`connections.MarkAllErrored`** (`connections/service.go:529-548`) — **P58a A15** narrowed it to
+  Node-served kinds via `s.deps.Backend.IsNativeKind(summary.Kind)`. After M9.3 that guard `continue`s
+  for **every** connection and the function emits nothing. It is not dead code (P58f deletes it) but
+  it is a no-op, and the test that proved it worked is the one **P58e E21** rewrites.
+- **`adapterhost.Router.Cancel`** (`router.go:396-414`) — routes on op ownership, not kind
+  (**P58a A13**), and still forwards an *unknown* opID to the child unconditionally. This is one of
+  the three surviving child-request paths §7 has to account for in checkpoint C2.
+- **`Router.HandleDataFrame`** (`dataframe.go:49-84`) — `"ping"` **always** forwards to the child
+  (**P58a A17**, `:61-63`); `"cache:stats"` is answered locally (**P58a A16**); `"cache:clear"` is
+  answered locally **and** forwarded. Every other op reads `payload.connectionId` and routes on kind,
+  which after M9.3 is always native. §7 again.
+- **`Router.PushCacheConfig`** (`router.go:75-80`) — pushes to both caches, including the child's,
+  and is called at startup (`main.go:145`) and on every settings save (`bridge/settings.go:36`).
+  §7 again.
+- **`shell/main.go`** — one blank import (`main.go:19-27` currently lists nine, alphabetically
+  scrambled: mariadb, mysql, clickhouse, mongo, postgres, redis, s3, sqlite, sqs). **The single most
+  likely thing to be forgotten**, because omitting it produces no compile error: `CreateAdapter`
+  returns `E_UNSUPPORTED "kafka connections are not supported yet"` (`registry.go`) at connect time,
+  in the real app only, and never in `go test ./internal/adapters/kafka` (which constructs the
+  adapter through `CreateAdapter` *after* the package's own blank import in its `_test.go`). §8
+  makes it a per-milestone acceptance check, exactly as P58b §4.6, P58c §4.6 and P58d §4.7 did.
+
+### 1.10 `tests/e2e-real/mariadb-real.spec.ts` — the file that necessarily breaks
+
+Read in full (276 lines) because it is the single most consequential file outside
+`shell/internal/adapters/` that P58e touches, and because P58d's own findings entry predicted this
+exact moment.
+
+**What it is.** Two tests. The first (`:50-135`, *"C1b: real MariaDB (native), end to end, keyset
+paging over big_rows"*) drives MariaDB alone and asserts `engine-status` is `ok` at the end — it is
+unaffected by P58e. The second (`:140-276`) is the load-bearing one, and its own header comment
+(`:137-139`) says so: *"the only evidence in the entire P58 phase that the coexistence property
+(P58 D4) holds in a running app, not only in adapterhost's own router unit tests."*
+
+**Why it breaks.** Its shape is: connect MariaDB (native) → connect Kafka (Node-served) → open
+`topic:orders` and render a real stream page → `pgrep -P serverPid` → `SIGKILL` every child →
+
+```
+await expect(kafkaStatusDot).toHaveAttribute('data-status', 'error', { timeout: 15_000 });
+await expect(mariaRowAfterReload.locator('.status-dot')).toHaveAttribute('data-status', 'connected');
+```
+
+and again after a reload (`:256-258`). After M9.3, `MarkAllErrored` skips Kafka exactly as it skips
+MariaDB, so the Kafka dot **stays `connected`** and both assertions at `:235` and `:256` fail. This
+is a deterministic failure in the flip's own commit, not a flake.
+
+**What the file already says about its own retirement.** `:20-26`:
+
+> The Node-served half is Kafka, not MongoDB (P58c C15) … Kafka is the last of the ten kinds to go
+> native (P58e), **so this is the last re-pointing this vehicle needs before P58f retires the whole
+> coexistence concept** — see AGENTS.md's P58a/P58b/P58c findings for why "the kind that goes native
+> last" is the rule.
+
+The file's own author anticipated P58f retiring it. What the file does *not* anticipate is that P58e
+is where it stops passing — P58f is one sub-phase too late. **P58e E21** rewrites the second test
+into the proof that is actually true after M9.3, and §7 explains why that rewrite is *also*
+checkpoint C2's automated half rather than a consolation prize.
+
+**The support file, and the re-grep-before-delete rule.** `tests/e2e-real/support/kafka.ts` (3 lines)
+is a pure re-export: `export { type KafkaFixture, startKafka } from '../../db/support/kafka';`. So
+`tests/db/support/kafka.ts` has a **live consumer in `tests/e2e-real/`** — and §1.11 finds a second
+one in `tests/ipc/`.
+
+### 1.11 The "its only consumer" re-grep, and the two files that must survive the spec deletion
+
+The mistake `AGENTS.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim
+about a shared support file is a snapshot, not a standing fact"*), and which **P58d D20** turned into
+a procedure. `grep -rln "support/kafka\|0005_kafka_seed" tests/ scripts/ package.json`:
+
+| File | Lines | Consumers other than `tests/db/kafka.spec.ts` | Fate |
+|---|---:|---|---|
+| `tests/db/kafka.spec.ts` | 776 | — | **DELETED**, M9.4's own commit (**P58 D12**) |
+| `tests/db/support/kafka.ts` | 91 | `tests/e2e-real/support/kafka.ts:3`, `tests/ipc/kafka/kafka.backend.spec.ts:16` | **KEPT** |
+| `tests/db/fixtures/0005_kafka_seed.ts` | 121 | `tests/db/support/kafka.ts:3`, `tests/ipc/kafka/kafka.backend.spec.ts:14` | **KEPT** |
+| `tests/db/support/page.ts`'s `readStream` | (1 of 4 exports) | after this deletion: **none** — `sqs.spec.ts` went in P58d M8.2 | Dead export; `page.ts` itself still has three live consumers (`clickhouse`/`mariadb`/`mysql`/`sqlite` specs use `readTabular`). **Left alone**; P58f deletes the directory |
+| `scripts/run-db-tests.sh` | 25 | `package.json:28`'s `test:db` | **SIMPLIFIED**, not deleted (**P58e E19**) |
+
+**P58d's own §1.11 table is confirmed a second time**, and this is the third consecutive sub-phase
+for which the naive "delete the support file with the spec" instinct would have broken another tier.
+
+**`scripts/run-db-tests.sh`, and what the parent means by "its whole reason for existing".** The
+script is 25 lines and does two things: `bun test tests/db --path-ignore-patterns '**/kafka.spec.ts'`,
+then esbuild-bundles `kafka.spec.ts` and runs it under `shell/runtime/node/bin/node`. Its own header
+comment says why: *"Bun cannot load `@confluentinc/kafka-javascript`'s native addon under any ABI
+(P32 F21), so that one file runs esbuild-bundled under a real Node process instead."* Once
+`kafka.spec.ts` is deleted, **the entire second half plus the ignore-pattern is dead**, and the
+script collapses to one line. The parent assigns this to M9; the *deletion* of the script is M10's
+(parent §9's M10 list names `scripts/run-{db-tests,ipc-backend}.sh`). **P58e E19** takes the
+simplification and leaves the deletion.
+
+### 1.12 Two predecessor closeout claims the tree contradicts, both inherited
+
+Checked with `ls`, `git log` and the actual files.
+
+1. **P58b's four `tests/db/*.spec.ts` deletions are still outstanding — now for the fourth
+   consecutive sub-phase.** At `1065518`, `tests/db/` holds `clickhouse.spec.ts`, `kafka.spec.ts`,
+   `mariadb.spec.ts`, `mysql.spec.ts`, `sqlite.spec.ts` — five files. `postgres.spec.ts` (P58a M5),
+   `mongo.spec.ts`/`redis.spec.ts` (P58c M7.3/M7.4) and `sqs.spec.ts`/`s3.spec.ts` (P58d M8.2/M8.3)
+   are all gone, so **P58a, P58c and P58d each honoured their own deletion rule and P58b still has
+   not**. P58c raised it as its OQ-1, P58d carried it forward as its own OQ-1, and after M9.4
+   `bun run test:db` would run **four** full container suites against TypeScript adapters serving no
+   real connection in the app — with nothing else left in the directory. §10 OQ-1, and the question
+   is now sharper than it was: with Kafka gone, `tests/db/` is *entirely* dead weight.
+2. **`docs/ARCHITECTURE.md`'s Stack line and its Kafka row are both about to become false, and the
+   mapping table has a history of being missed.** P58d §1.11 recorded the table failing its own
+   acceptance criterion **twice in two consecutive sub-phases**, and fixed it by phrasing criterion 8
+   as a grep. P58e inherits that discipline and needs four specific edits (`:48-49` *"Kafka is the
+   only kind still Node-served"*; `:104`'s Kafka row Cancel cell *"close the assigned consumer,
+   `AbortSignal`"*; `:263-281`'s whole **Kafka (`@confluentinc/kafka-javascript`, P32)** section;
+   `:315`'s *"only Kafka is left for P58e"*). §8 criterion 8 phrases all four as greps.
+
+### 1.13 The dependency situation, and the one thing that is already on disk
+
+- **`shell/go.sum` has zero franz-go entries** (`grep -c franz shell/go.sum` → `0`), so nothing is
+  pulled in transitively today.
+- **But the module cache already has all three**, from P58a's own KF-1 probe:
+  `$(go env GOPATH)/pkg/mod/github.com/twmb/franz-go@v1.21.6/`,
+  `.../franz-go/pkg/kadm@v1.18.0/`, `.../franz-go/pkg/kmsg@v1.13.1/`, each with a matching
+  `cache/download/.../@v/*.zip`. **This is why every franz-go claim in this document is "researched"
+  in P58d's strong sense** — the source was read from disk, not fetched or inferred, and no network
+  access was needed to write §1.7.
+- **`testcontainers-go/modules/kafka@v0.44.0` is also already in the cache**, matching the
+  `testcontainers-go` core `shell/go.mod` already pins. Its `go.mod` requires
+  **`github.com/IBM/sarama v1.42.1`** — an entire second Kafka client — plus `jcmturner/gokrb5/v8`
+  and its four sibling Kerberos modules, for its **own tests**. That is the same class of graph noise
+  **P58d D22** rejected `modules/localstack` over, and §1.15/**P58e E19** weigh it against what the
+  module actually buys.
+- **`github.com/twmb/franz-go/pkg/kmsg` is a direct import, not just transitive.** `definition.go`
+  needs `kmsg.ConfigSourceDefaultConfig` to render a topic config row's `default` detail
+  (`kmsg/generated.go:68274-68281`), and `kadm.Config.Source` is typed `kmsg.ConfigSource`. So
+  `go.mod` names it explicitly rather than letting it sit indirect.
+
+### 1.14 The packaging gap, located precisely
+
+The parent's sub-phase table calls Kafka *"the one carrying the still-open native-module packaging
+gap"* without saying where it lives. `grep -n -i "kafka\|confluent" scripts/verify-packaging.sh
+scripts/sign-bundle.sh`:
+
+| Location | What it says | State after M9.3 |
+|---|---|---|
+| `verify-packaging.sh:72` | a comment: *"`@confluentinc/kafka-javascript` (external to the esbuild bundle, P52 §10.1) is NOT checked …"* | Still literally true |
+| `verify-packaging.sh:84-86` | **A2**: if `…/runtime/engine/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node` is missing, `note "… Kafka's native module is not yet vendored into the packaged bundle (known gap …); **Kafka connections will fail at runtime in this build**"` | **The last clause becomes false.** Kafka connections are served in-process by Go |
+| `verify-packaging.sh:101-113` | **A4**: if the file *is* present, check arch and ad-hoc signature | Correct but unreachable; harmless |
+| `sign-bundle.sh:32-36` | signs the same path if present; otherwise `echo "… not present, skipping (Kafka's native module is not yet vendored into the packaged bundle — **a known gap**, not this script's job to fix)"` | *"a known gap"* becomes false — there is no gap, the subject is gone |
+
+So the gap is **two message strings that become factually wrong on M9.3**, wrapped around checks
+whose subject P58f deletes. The parent's own §3 assigns the *deletion* to P58f
+(`scripts/sign-bundle.sh  EDITED  no nested node binary; Kafka note deleted`), and the parent's §6
+manual-check table assigns *"A Kafka connection in a packaged build — Connect, browse a topic,
+produce a message — the first time this has ever been verifiable in a packaged bundle"* to the
+phase's macOS pass, not to any milestone. **P58e E22** takes the narrow, defensible slice: rewrite
+the two strings so a packaging run does not print a false warning, change no check logic, and leave
+the blocks for P58f. §10 OQ-4 asks the parent's author to confirm the split.
+
+### 1.15 Environment and container facts checked for this plan
+
+- **Image: `confluentinc/cp-kafka:8.0.7`**, pinned by `tests/db/support/kafka.ts:19` with its own
+  reasoning (P32 D25: *"bumped from 7.6.1 (Kafka 3.6) to the 8.0 line (Apache Kafka 4.0) — a phase
+  whose entire premise is Kafka 4 protocol compatibility that only ever ran against Kafka 3.6
+  verified nothing"*). Already namespaced, so it mirrors at
+  `mirror.gcr.io/confluentinc/cp-kafka:8.0.7` with **no `library/` prefix** — `AGENTS.md`'s Docker
+  section names this exact image in its own rule, as its worked example.
+- **`testcontainers-go/modules/kafka@v0.44.0`, read in full (230 lines).** `Run(ctx, img, opts...)`
+  sets fifteen `KAFKA_*` env vars, replaces the entrypoint with a wait-for-script shim, copies a
+  starter script that rewrites `KAFKA_ADVERTISED_LISTENERS` from the mapped host port, formats a KRaft
+  storage dir with a random uuid, and waits on
+  `wait.ForLog(".*Transitioning from RECOVERY to RUNNING.*").AsRegexp()`. Three facts decide
+  **P58e E19**:
+  1. **It already sets `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"`** (`kafka.go:63`) — the
+     exact variable `tests/db/support/kafka.ts:48` had to add by hand because the *TypeScript*
+     module omits it. The Go module is strictly better here, on the one setting this repo has already
+     been bitten by.
+  2. **`validateKRaftVersion` short-circuits for any image that is not `confluentinc/confluent-local`**
+     (`kafka.go:210-213`: *"do not validate if the image is not the official one"*), so
+     `confluentinc/cp-kafka:8.0.7` passes through untouched.
+  3. **It sets no ulimits** — the ClickHouse subclass problem (`AGENTS.md`'s ClickHouse section) has
+     no analogue here.
+  Against that: `IBM/sarama` + gokrb5 in its `go.mod` (§1.13), and a log-regex wait strategy that is
+  a Kafka-4.0 message this repo has never asserted against from Go. KF-4(a) settles the latter.
+- **Seeding cannot copy the TypeScript's mechanism, and should not.** `0005_kafka_seed.ts` runs the
+  broker's own CLI *inside* the container (`container.exec`), and its 18-line comment (`:11-28`)
+  explains the reason precisely: *"this is what keeps a JS Kafka client out of the Playwright/Node
+  process entirely (F24)"*, plus a hard-won in-container-listener gotcha (bootstrap via `:9092`, the
+  BROKER listener, never `:9093`, because *"the AdminClient's very next call reconnects to the
+  address the broker just advertised for that listener — the host-mapped port — which is not
+  reachable from inside the container"*). **Neither reason survives translation**: the Go test binary
+  already links franz-go, so there is no client to keep out, and seeding from the host over the
+  PLAINTEXT listener has no advertisement problem at all. **P58e E25** seeds from Go.
+- **`bun test`-ing the old suite is not a live oracle here, unlike every previous sub-phase.**
+  P58b §11, P58c §11 and P58d §11 all recommended running the TypeScript spec beside the Go one to
+  diff against. `tests/db/kafka.spec.ts` **cannot run under `bun test` at all** — it is the one file
+  `scripts/run-db-tests.sh` excludes, and it needs `shell/runtime/node/bin/node` plus an esbuild
+  bundle. It *can* still be run (`sh scripts/run-db-tests.sh` does exactly that) and is worth one run
+  before writing the Go successor, but it costs `scripts/vendor-node.sh` + `bun run build:engine`
+  first. §11 says so rather than repeating the previous sub-phases' cheaper advice.
+- **`./internal/adapters/kafka` needs no GTK/WebKit headers.** franz-go is pure Go; cgo stays on for
+  the module as a whole (`mattn/go-sqlite3`, `modernc.org/sqlite`, Wails' GTK bindings in
+  `internal/shell`), so `CGO_ENABLED=0` is still not an option, but the fast loop is
+  `go test ./internal/adapters/kafka` and never `./...`.
