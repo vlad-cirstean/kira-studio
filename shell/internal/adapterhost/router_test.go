@@ -11,16 +11,9 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-type fakeKindLookup map[string]string
-
-func (f fakeKindLookup) KindOf(connectionID string) (string, bool) {
-	kind, ok := f[connectionID]
-	return kind, ok
-}
-
-// Cancel must find an op this router's own scheduler started without ever touching the child.
+// Cancel must find an op this router's own scheduler started.
 func TestRouter_Cancel_FindsInProcessOp(t *testing.T) {
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
@@ -61,7 +54,7 @@ func TestRouter_ChildrenNative_NilNodesMarshalAsEmptyArray(t *testing.T) {
 	adapters.SetLiveAdapter(connID, childrenNilAdapter{})
 	defer adapters.DeleteLiveAdapter(connID)
 
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 	children, err := r.childrenNative(context.Background(), connID, model.NodePath{ConnectionID: connID})
 	if err != nil {
 		t.Fatalf("childrenNative: %v", err)

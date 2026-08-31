@@ -12,10 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
 
-func newTestRouter() (*Router, fakeKindLookup) {
-	conns := fakeKindLookup{}
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, conns)
-	return r, conns
+func newTestRouter() *Router {
+	return NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 }
 
 func mustFrame(t *testing.T, v any) []byte {
@@ -56,13 +54,10 @@ func assertNothingSent(t *testing.T, conn *fakeConn) {
 	}
 }
 
-// A native connection's data:read is answered locally, never forwarded — the response frame is a
-// real {kind:"res", ok:true, payload:{...}} built by the dispatcher.
+// A connection's data:read is answered locally — the response frame is a real
+// {kind:"res", ok:true, payload:{...}} built by the dispatcher.
 func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
-	r, conns := newTestRouter()
-	nativeKinds["fakekind"] = true
-	defer delete(nativeKinds, "fakekind")
-	conns["conn-1"] = "fakekind"
+	r := newTestRouter()
 
 	fake := &dataFakeAdapter{readFn: func() (page.Page, error) {
 		return page.TabularPage{RowCount: 1, ByteSize: 5}, nil
@@ -93,14 +88,10 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 	}
 }
 
-// An unknown (or non-native) connection's data op is forwarded, never answered locally — with no
-// child attached, that means no frame is ever sent to the session at all.
-func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
-	conns := fakeKindLookup{}
-	// NewRouterAllNodeServed forwards every kind to the child, so "kafka" here stays Node-served
-	// regardless of nativeKinds' own contents — the property this test needs.
-	r := NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, conns)
-	conns["conn-2"] = "kafka"
+// A connection with no live adapter attached still gets a real (error) response, not silence —
+// there is no child left to forward an unrecognized connection's op to (P58f Phase 4).
+func TestHandleDataFrame_NoLiveAdapter_RespondsWithError(t *testing.T) {
+	r := newTestRouter()
 
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)
@@ -111,13 +102,17 @@ func TestHandleDataFrame_NonNative_ForwardsNoLocalResponse(t *testing.T) {
 		"payload": map[string]any{"connectionId": "conn-2", "pageSize": 10, "cursor": map[string]any{"mode": "offset", "offset": 0}},
 	})
 	r.HandleDataFrame(session, frame)
-	assertNothingSent(t, conn)
+
+	resp := readSent(t, conn)
+	if resp["kind"] != "res" || resp["id"] != float64(2) || resp["ok"] != false {
+		t.Fatalf("resp = %+v, want a res/2/ok:false frame", resp)
+	}
 }
 
 // ping is answered locally — the engine is this process now (P58f D11) — with the same
 // PingPayload shape rpc.ts's ping handler used to return.
 func TestHandleDataFrame_Ping_AnsweredLocally(t *testing.T) {
-	r, _ := newTestRouter()
+	r := newTestRouter()
 	conn := newFakeConn()
 	session, detach := r.AttachStream(conn)
 	defer detach()
@@ -142,10 +137,9 @@ func TestHandleDataFrame_Ping_AnsweredLocally(t *testing.T) {
 	}
 }
 
-// cache:clear clears the Go-native cache synchronously, regardless of whether a child is attached
-// to receive the forwarded copy.
+// cache:clear clears the Go-native cache synchronously and answers with a real {} response.
 func TestHandleDataFrame_CacheClear_ClearsGoCache(t *testing.T) {
-	r, _ := newTestRouter()
+	r := newTestRouter()
 	cacheReq := enginecache.ReadRequest{ConnectionID: "c", Path: "p", PageSize: 10, Cursor: model.PageCursor{Mode: "offset"}}
 	key, label := enginecache.PageCacheKey(cacheReq)
 	r.cache.StorePage(key, label, cacheReq, page.TabularPage{ByteSize: 5})
@@ -166,7 +160,7 @@ func TestHandleDataFrame_CacheClear_ClearsGoCache(t *testing.T) {
 // D12: a session subscribes to the Go cache's stats-changed notifications on attach and gets an
 // unsolicited cache:stats event frame when they fire; detach unsubscribes.
 func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
-	r, _ := newTestRouter()
+	r := newTestRouter()
 	conn := newFakeConn()
 	_, detach := r.AttachStream(conn)
 
@@ -191,22 +185,4 @@ func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
 	detach()
 	r.cache.Clear()
 	assertNothingSent(t, conn)
-}
-
-// A16: counters sum; the budget reports once, not doubled.
-func TestMergedCacheStats_SumsCountersReportsBudgetOnce(t *testing.T) {
-	r, _ := newTestRouter()
-	r.statsMu.Lock()
-	r.lastChildStats = enginecache.CacheStats{L2Bytes: 1000, L2BudgetBytes: 64 << 20, L2Entries: 10, L2Hits: 20, L2Misses: 5, L3Entries: 7}
-	r.haveChildStats = true
-	r.statsMu.Unlock()
-
-	got := r.mergedCacheStats()
-	goStats := r.cache.Stats() // all zero: nothing native has run in this test
-	if got.L2BudgetBytes != goStats.L2BudgetBytes {
-		t.Errorf("L2BudgetBytes = %d, want the Go side's own configured budget (%d), not summed", got.L2BudgetBytes, goStats.L2BudgetBytes)
-	}
-	if got.L2Bytes != 1000 || got.L2Entries != 10 || got.L2Hits != 20 || got.L2Misses != 5 || got.L3Entries != 7 {
-		t.Errorf("got = %+v, want the child's counters summed with Go's own (zero here)", got)
-	}
 }

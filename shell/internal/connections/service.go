@@ -1,6 +1,6 @@
 // Package connections is the Go analogue of src/main/connections.ts: the full connection
 // lifecycle service — CRUD, the in-memory connection-state map, connect/disconnect wired to
-// internal/preconnect and internal/enginehost, and the in-flight-connect dedupe.
+// internal/preconnect and internal/adapterhost, and the in-flight-connect dedupe.
 package connections
 
 import (
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
 	idgen "github.com/kirathecat/kira-studio/shell/internal/id"
 	"github.com/kirathecat/kira-studio/shell/internal/notify"
 	"github.com/kirathecat/kira-studio/shell/internal/preconnect"
@@ -23,17 +22,15 @@ import (
 )
 
 // Backend is the slice of adapter lifecycle operations this service calls through instead of
-// straight into *enginehost.Host (A11's per-consumer-interface discipline — the same shape as
-// tree.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally; a thin
-// enginehost-only stub can too, which is what keeps this package's own tests two-line stubs.
-// Four methods, matching A11's own count: Test and Connect each need their own method (they
-// resolve config differently and return different shapes), Disconnect covers all three
-// fire-and-forget call sites (onPreconnectExit, Remove, Disconnect), and IsNativeKind is not one
-// of the nine call sites at all — it is MarkAllErrored's own need (A15), not a Host.Call
-// replacement.
+// straight into internal/adapterhost (A11's per-consumer-interface discipline — the same shape as
+// tree.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally; a two-line
+// fake can too, which is what keeps this package's own tests simple. Three methods: Test and
+// Connect each need their own method (they resolve config differently and return different
+// shapes), and Disconnect covers all three fire-and-forget call sites (onPreconnectExit, Remove,
+// Disconnect).
 type Backend interface {
-	// Connect resolves cfg.Kind to a live adapter (native) or forwards to the engine child
-	// (Node-served), and returns what the caller needs to build the connected state.
+	// Connect resolves cfg.Kind to a live adapter and returns what the caller needs to build the
+	// connected state.
 	Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (ConnectResult, error)
 	// Test probes cfg without ever registering a live adapter — control.ts's handleTest:
 	// connect, read the server version, unconditionally disconnect. A real Go error, not a
@@ -41,10 +38,6 @@ type Backend interface {
 	Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (serverVersion string, err error)
 	// Disconnect is fire-and-forget at every call site today, so it stays that shape here.
 	Disconnect(ctx context.Context, connectionID string) error
-	// IsNativeKind reports whether kind is currently served by a Go adapter in this process
-	// (adapterhost's own nativeKinds, A12). MarkAllErrored uses this to skip a Go-native
-	// connection when the Node engine child exits — it is unaffected, because it is (A15).
-	IsNativeKind(kind string) bool
 }
 
 // ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
@@ -69,15 +62,12 @@ type RevealResult struct {
 	Error    *string `json:"error"`
 }
 
-// Deps is everything the service needs from the rest of the app. Host stays alongside Backend: it
-// is still used directly for watch()'s engine:down subscription (MarkAllErrored's own trigger),
-// which is not one of the nine Backend-routed call sites.
+// Deps is everything the service needs from the rest of the app.
 type Deps struct {
 	Conns      *repos.ConnectionsRepo
 	Secrets    *repos.SecretsRepo
 	Metadata   *repos.MetadataCacheRepo
 	Cipher     *secrets.Cipher
-	Host       *enginehost.Host
 	Backend    Backend
 	Preconnect *preconnect.Supervisor
 }
@@ -111,12 +101,10 @@ func New(d Deps) *Service {
 	}
 }
 
-// Start wires the preconnect exit handler and the engine-down watcher (D14: split from New so
-// main.go controls wiring order and every test can attach its own listener before the first
-// event).
+// Start wires the preconnect exit handler (D14: split from New so main.go controls wiring order
+// and every test can attach its own listener before the first event).
 func (s *Service) Start() {
 	s.deps.Preconnect.OnExit(s.onPreconnectExit)
-	go s.watch()
 }
 
 // Shutdown kills every live pre-connect process. Called from main's before-quit.
@@ -127,9 +115,9 @@ func (s *Service) Shutdown() {
 // onPreconnectExit is preconnect.ts:154-168's port: any exit while armed means the connection can
 // no longer reach its target — best-effort disconnect the adapter and surface why.
 func (s *Service) onPreconnectExit(exit preconnect.Exit) {
-	// D6: the best-effort adapter:disconnect (up to enginehost.DefaultTimeout) runs on its own
-	// goroutine, exactly as connections.ts:155's `void … .catch(() => {})` does — this handler
-	// must not block the shared preconnect exit-emitter goroutine for that long.
+	// D6: the best-effort adapter:disconnect runs on its own goroutine, exactly as
+	// connections.ts:155's `void … .catch(() => {})` does — this handler must not block the
+	// shared preconnect exit-emitter goroutine for however long that disconnect takes.
 	go func() {
 		_ = s.deps.Backend.Disconnect(context.Background(), exit.ConnectionID)
 	}()
@@ -147,21 +135,6 @@ func (s *Service) onPreconnectExit(exit preconnect.Exit) {
 	}
 	msg := fmt.Sprintf("Pre-connect script exited %s%s — connection dropped.", detail, tail)
 	s.emitState(model.ConnectionState{ConnectionID: exit.ConnectionID, Status: "error", Error: &msg, Since: nowMillis()})
-}
-
-// watch subscribes to the engine host and marks every connected/connecting connection errored the
-// moment the engine process exits. Nothing in src/main consumes ENGINE_EVENT.connectionState
-// (P55 §1.2) — engine:down is the only topic this watches. The loop exits on its own once
-// Host.Subscribe's channel closes (after EventEngineDown is published, per P54 §4.2), so it needs
-// no stop channel.
-func (s *Service) watch() {
-	events, unsubscribe := s.deps.Host.Subscribe()
-	defer unsubscribe()
-	for evt := range events {
-		if evt.Topic == enginehost.EventEngineDown {
-			s.MarkAllErrored("engine process exited")
-		}
-	}
 }
 
 func nowMillis() int64 { return time.Now().UnixMilli() }
@@ -516,36 +489,6 @@ func (s *Service) StateOf(id string) model.ConnectionState {
 }
 
 func (s *Service) SecretsStatus() secrets.Status { return s.deps.Cipher.Status() }
-
-// MarkAllErrored is called when engine-host reports the engine process exited (D2/D11 gap
-// coverage per connections.ts's own comment). D6: the preconnect.Stop calls below run
-// synchronously on the caller's goroutine (watch's, in production) — that goroutine has nothing
-// else to do once the engine is gone, and a deterministic shutdown is worth more there than
-// concurrency, unlike onPreconnectExit's own best-effort disconnect above.
-//
-// A15: narrowed to Node-served connections. A Go-native connection is unaffected by the Node
-// child exiting, because it is — without this, killing the Node child would drop a live
-// Go-native connection (and stop its pre-connect script) for no reason at all.
-func (s *Service) MarkAllErrored(reason string) {
-	s.mu.Lock()
-	snapshot := make([]model.ConnectionState, 0, len(s.states))
-	for _, st := range s.states {
-		snapshot = append(snapshot, st)
-	}
-	s.mu.Unlock()
-
-	for _, st := range snapshot {
-		if st.Status != "connected" && st.Status != "connecting" {
-			continue
-		}
-		if summary, err := s.deps.Conns.Get(st.ConnectionID); err == nil && summary != nil && s.deps.Backend.IsNativeKind(summary.Kind) {
-			continue
-		}
-		s.deps.Preconnect.Stop(st.ConnectionID)
-		errCopy := reason
-		s.emitState(model.ConnectionState{ConnectionID: st.ConnectionID, Status: "error", Error: &errCopy, Since: nowMillis()})
-	}
-}
 
 func (s *Service) OnStateChange(fn func(model.ConnectionState)) (unsubscribe func()) {
 	return s.stateChanged.Subscribe(fn)

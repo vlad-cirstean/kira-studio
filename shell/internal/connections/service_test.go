@@ -1,21 +1,17 @@
 package connections_test
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
-	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/shell/internal/connections"
-	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
-	"github.com/kirathecat/kira-studio/shell/internal/enginetest"
 	"github.com/kirathecat/kira-studio/shell/internal/preconnect"
 	"github.com/kirathecat/kira-studio/shell/internal/secrets"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
@@ -26,14 +22,54 @@ import (
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
 
+// fakeBackend replaces the real adapterhost.Router (via a real Node engine fixture) these tests
+// used before P58f Phase 4 deleted the Node sidecar — every kind has been Go-native since P58e
+// M9.3, so there is no more Node-served path left to exercise here, only Backend's own contract.
+// Connect blocks on release until it is closed, for TestInFlightConnectDedupe's slow-connect case.
+type fakeBackend struct {
+	mu         sync.Mutex
+	lastConfig model.ResolvedConnectionConfig
+	connectN   atomic.Int64
+	release    chan struct{}
+}
+
+func newFakeBackend() *fakeBackend { return &fakeBackend{release: make(chan struct{})} }
+
+func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
+	b.mu.Lock()
+	b.lastConfig = cfg
+	b.mu.Unlock()
+	b.connectN.Add(1)
+	if cfg.Name == "slow-conn" {
+		<-b.release
+	}
+	return connections.ConnectResult{ServerVersion: "1.0", Caps: map[string]any{}}, nil
+}
+
+func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
+	return "1.0", nil
+}
+
+func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error { return nil }
+
+func (b *fakeBackend) releaseSlow() { close(b.release) }
+
+func (b *fakeBackend) connectCount() int { return int(b.connectN.Load()) }
+
+func (b *fakeBackend) lastConnectConfig() model.ResolvedConnectionConfig {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.lastConfig
+}
+
 // harness wires a real SQLite db (through the real migrations), a real available cipher (the
-// Linux KIRA_INSECURE_SECRETS fallback), a real vendored-Node engine fixture, and a real
-// preconnect supervisor behind one connections.Service.
+// Linux KIRA_INSECURE_SECRETS fallback), a fakeBackend, and a real preconnect supervisor behind
+// one connections.Service.
 type harness struct {
 	svc     *connections.Service
 	repos   *repos.Repos
 	secrets *repos.SecretsRepo
-	host    *enginehost.Host
+	backend *fakeBackend
 }
 
 func newHarness(t *testing.T) *harness {
@@ -58,29 +94,22 @@ func newHarness(t *testing.T) *harness {
 		t.Fatalf("cipher unavailable: %+v", cipher.Status())
 	}
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
-	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
-	// the same behaviour these tests exercised before the Backend refactor, and now the only way to
-	// get it, since every real kind is native as of P58e M9.3. fieldsInput's Kind must be a real,
-	// valid connection kind (model.ValidConnectionKind), so a synthetic placeholder is not an
-	// option here — see adapterhost.NewRouterAllNodeServed's own doc comment.
-	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	backend := newFakeBackend()
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Host: host, Backend: router, Preconnect: pre,
+		Cipher: cipher, Backend: backend, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
 
-	return &harness{svc: svc, repos: r, secrets: secretsRepo, host: host}
+	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend}
 }
 
-// fieldsInput returns a valid, connectable fields-mode Input for name — the fixture's
-// adapter:connect/adapter:test key their canned behaviour off Name's prefix. Kind is "kafka", a
-// real, valid connection kind (model.ValidConnectionKind requires one) that newHarness's
-// NewRouterAllNodeServed router keeps Node-served regardless of nativeKinds' own contents.
+// fieldsInput returns a valid, connectable fields-mode Input for name. Kind is "kafka", any real,
+// valid connection kind (model.ValidConnectionKind requires one) — fakeBackend does not
+// distinguish between kinds.
 func fieldsInput(name string) connections.Input {
 	return connections.Input{
 		ConnectionFields: model.ConnectionFields{
@@ -114,20 +143,17 @@ func newUnavailableCipherHarness(t *testing.T) *harness {
 		t.Fatalf("cipher unexpectedly available: %+v", cipher.Status())
 	}
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
-	host := enginetest.Host(t)
 	pre := preconnect.New()
-	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
-	// see newHarness's own comment above.
-	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
+	backend := newFakeBackend()
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Host: host, Backend: router, Preconnect: pre,
+		Cipher: cipher, Backend: backend, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
 
-	return &harness{svc: svc, repos: r, secrets: secretsRepo, host: host}
+	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend}
 }
 
 // serviceWithUnavailableCipher builds a second Service over h's own db/repos, but with a cipher
@@ -247,20 +273,8 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	if _, err := h.svc.Connect(created.ID); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	payload, err := h.host.Call("fixture:last-connect-config", nil)
-	if err != nil {
-		t.Fatalf("fixture:last-connect-config: %v", err)
-	}
-	var got struct {
-		Config struct {
-			URI string `json:"uri"`
-		} `json:"config"`
-	}
-	if err := json.Unmarshal(payload, &got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got.Config.URI != "postgresql://u:p@h:5432/db" {
-		t.Errorf("engine-bound uri = %q, want the password re-injected", got.Config.URI)
+	if got := h.backend.lastConnectConfig().URI; got == nil || *got != "postgresql://u:p@h:5432/db" {
+		t.Errorf("backend-bound uri = %v, want the password re-injected", got)
 	}
 }
 
@@ -346,9 +360,7 @@ func TestInFlightConnectDedupe(t *testing.T) {
 
 	// Give every goroutine time to reach the shared in-flight attempt before releasing it.
 	time.Sleep(200 * time.Millisecond)
-	if _, err := h.host.Call("fixture:release-slow", nil); err != nil {
-		t.Fatalf("fixture:release-slow: %v", err)
-	}
+	h.backend.releaseSlow()
 	wg.Wait()
 
 	for i, err := range errs {
@@ -363,17 +375,7 @@ func TestInFlightConnectDedupe(t *testing.T) {
 		}
 	}
 
-	payload, err := h.host.Call("fixture:request-count", map[string]any{"op": "adapter:connect"})
-	if err != nil {
-		t.Fatalf("fixture:request-count: %v", err)
-	}
-	var count struct {
-		Count int `json:"count"`
-	}
-	if err := json.Unmarshal(payload, &count); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if count.Count != 1 {
-		t.Errorf("adapter:connect was called %d times, want exactly 1", count.Count)
+	if n := h.backend.connectCount(); n != 1 {
+		t.Errorf("Backend.Connect was called %d times, want exactly 1", n)
 	}
 }

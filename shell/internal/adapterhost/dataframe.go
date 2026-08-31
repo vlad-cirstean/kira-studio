@@ -34,25 +34,17 @@ type wireEvent struct {
 	Payload any    `json:"payload"`
 }
 
-// AttachStream makes conn the current renderer connection: a Session (A18's single writer) that
-// also becomes the engine child's Sink, so both producers share one queue and one conn.Send
-// caller, and subscribes it to the Go cache's own stats-changed notifications (D12) — the status
-// bar's cache readout has had no producer since the Node child's cache stopped serving pages, and
-// this is what fixes it. detach supersedes this session — call it when the renderer's side closes.
+// AttachStream makes conn the current renderer connection: a Session (A18's single writer)
+// subscribed to the Go cache's own stats-changed notifications (D12), which is what feeds the
+// status bar's cache readout. detach supersedes this session — call it when the renderer's side
+// closes.
 func (r *Router) AttachStream(conn StreamSession) (session *Session, detach func()) {
-	session = newSession(r, conn)
-	var detachChild func()
-	if r.child != nil {
-		detachChild = r.child.AttachStream(session)
-	}
+	session = newSession(conn)
 	unsubscribeStats := r.cache.OnStatsChanged(func(stats enginecache.CacheStats) {
 		r.pushCacheStats(session, stats)
 	})
 	return session, func() {
 		unsubscribeStats()
-		if detachChild != nil {
-			detachChild()
-		}
 		session.Close()
 	}
 }
@@ -68,9 +60,9 @@ func (r *Router) pushCacheStats(session *Session, stats enginecache.CacheStats) 
 }
 
 // HandleDataFrame is rpc.ts's dispatch, reimagined as a router: ping is answered in-process — the
-// engine is this process now (P58f D11), so there is nothing left to forward it to; cache:stats/
-// cache:clear are not connection-scoped (A16); every other op reads its payload's connectionId and
-// routes on that connection's kind (A12/D4).
+// engine is this process now (P58f D11); cache:stats/cache:clear are not connection-scoped (A16);
+// every other op is served in-process too, since every kind has been native since P58e M9.3
+// (P58f Phase 4 deleted the Node child this used to forward a non-native kind's op to).
 func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	var probe struct {
 		Kind    string          `json:"kind"`
@@ -92,21 +84,10 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 		return
 	case "cache:clear":
 		r.cache.Clear()
-		r.forwardToChild(frame) // the child's own {} response flows back via the normal pass-through
+		r.respond(session, probe.ID, struct{}{}, nil)
 		return
 	}
 
-	var connProbe struct {
-		ConnectionID string `json:"connectionId"`
-	}
-	_ = json.Unmarshal(probe.Payload, &connProbe)
-
-	kind, known := r.conns.KindOf(connProbe.ConnectionID)
-	if !known || !r.isNative(kind) {
-		r.noteChildRoute(probe.Op, kind)
-		r.forwardToChild(frame)
-		return
-	}
 	r.handleNativeDataOp(session, probe.Op, probe.ID, probe.Payload)
 }
 
@@ -122,20 +103,6 @@ type pingPayload struct {
 // respondPing answers the data plane's own health probe locally.
 func (r *Router) respondPing(session *Session, id int) {
 	r.respond(session, id, pingPayload{Pong: true, EnginePid: os.Getpid(), At: time.Now().UnixMilli()}, nil)
-}
-
-func (r *Router) forwardToChild(frame []byte) {
-	if r.child == nil {
-		return
-	}
-	if err := r.child.SendData(frame); err != nil {
-		// The engine is gone. The session stays open: enginehost has already failed every
-		// pending control-plane call with E_ENGINE_DOWN, and the renderer's own pending map is
-		// what surfaces that for a data-plane request too — closing the stream here would
-		// additionally reject frames the renderer has not sent yet, which is not today's
-		// behaviour (bridge/stream.go's own prior comment, carried forward).
-		r.deps.Log("warn", "engine stream send failed: "+err.Error())
-	}
 }
 
 func decodeAndValidate[T interface{ Validate() error }](payload json.RawMessage, out *T) error {
@@ -234,57 +201,10 @@ func (r *Router) respondError(session *Session, id int, err error) {
 	session.enqueueLocal(body)
 }
 
-// observeChildEvent is A16's live half: the engine pushes a cache:stats event unsolicited whenever
-// its own stats change (cache/index.ts's 1 Hz throttle), and this is the router's one chance to
-// see it — every child data frame passes through Session.Send before being relayed to the
-// renderer. The frame is still relayed unchanged after this; the renderer's own explicit
-// cache:stats request (rare — nothing in the renderer actually issues one today) is what gets the
-// merged, not-summed-twice answer built from this snapshot (respondCacheStats).
-func (r *Router) observeChildEvent(frame []byte) {
-	var probe struct {
-		Kind    string          `json:"kind"`
-		Topic   string          `json:"topic"`
-		Payload json.RawMessage `json:"payload"`
-	}
-	if err := json.Unmarshal(frame, &probe); err != nil || probe.Kind != "evt" || probe.Topic != "cache:stats" {
-		return
-	}
-	var stats enginecache.CacheStats
-	if err := json.Unmarshal(probe.Payload, &stats); err != nil {
-		return
-	}
-	r.statsMu.Lock()
-	r.lastChildStats, r.haveChildStats = stats, true
-	r.statsMu.Unlock()
-}
-
 func (r *Router) respondCacheStats(session *Session, id int) {
-	body, err := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: r.mergedCacheStats()})
+	body, err := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: r.cache.Stats()})
 	if err != nil {
 		return
 	}
 	session.enqueueLocal(body)
-}
-
-// mergedCacheStats is A16: the two caches' counters sum; the configured budget (not a counter)
-// reports once, since both caches are configured with the same settings.cache.l2BudgetMb and
-// summing it would report double the number the user actually set.
-func (r *Router) mergedCacheStats() enginecache.CacheStats {
-	goStats := r.cache.Stats()
-
-	r.statsMu.Lock()
-	child, haveChild := r.lastChildStats, r.haveChildStats
-	r.statsMu.Unlock()
-	if !haveChild {
-		return goStats
-	}
-
-	return enginecache.CacheStats{
-		L2Bytes:       goStats.L2Bytes + child.L2Bytes,
-		L2BudgetBytes: goStats.L2BudgetBytes,
-		L2Entries:     goStats.L2Entries + child.L2Entries,
-		L2Hits:        goStats.L2Hits + child.L2Hits,
-		L2Misses:      goStats.L2Misses + child.L2Misses,
-		L3Entries:     goStats.L3Entries + child.L3Entries,
-	}
 }

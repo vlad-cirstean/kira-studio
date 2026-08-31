@@ -1,14 +1,13 @@
 package tree_test
 
 import (
+	"context"
 	"encoding/json"
+	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/shell/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
-	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
-	"github.com/kirathecat/kira-studio/shell/internal/enginehost"
-	"github.com/kirathecat/kira-studio/shell/internal/enginetest"
 	"github.com/kirathecat/kira-studio/shell/internal/storage"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/repos"
@@ -24,11 +23,39 @@ func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
 	return model.ConnectionState{ConnectionID: connectionID, Status: f.status[connectionID]}
 }
 
+// fakeBackend replaces the real adapterhost.Router (via a real Node engine fixture) these tests
+// used before P58f Phase 4 deleted the Node sidecar — every kind has been Go-native since P58e
+// M9.3, so there is no more Node-served path left to exercise here, only tree.Backend's own
+// contract. Children answers one leaf node, truncated whenever the requested path's last segment
+// name starts with "trunc-" — the same fixture convention these tests were written against.
+type fakeBackend struct {
+	childrenN atomic.Int64
+}
+
+func (b *fakeBackend) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
+	b.childrenN.Add(1)
+	nodes := []model.TreeNode{{Kind: "table", Name: "x", Path: "table:x", HasChildren: false}}
+	last := path.Segments[len(path.Segments)-1]
+	if strings.HasPrefix(last.Name, "trunc-") {
+		t := true
+		return adapters.TreeChildren{Nodes: nodes, Truncated: &t}, nil
+	}
+	return adapters.TreeChildren{Nodes: nodes}, nil
+}
+
+func (b *fakeBackend) Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error) {
+	return model.ObjectMeta{}, nil
+}
+
+func (b *fakeBackend) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
+	return model.ObjectDefinition{}, nil
+}
+
 type harness struct {
-	svc   *tree.Service
-	repos *repos.Repos
-	host  *enginehost.Host
-	fake  *fakeStates
+	svc     *tree.Service
+	repos   *repos.Repos
+	backend *fakeBackend
+	fake    *fakeStates
 }
 
 func newHarness(t *testing.T) *harness {
@@ -46,14 +73,10 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { _ = r.Close() })
 
-	host := enginetest.Host(t)
 	fake := &fakeStates{status: map[string]string{}}
-	// NewRouterAllNodeServed forwards every kind to the engine fixture regardless of nativeKinds —
-	// the same behaviour these tests exercised before the Backend refactor, and now the only way to
-	// get it, since every real kind is native as of P58e M9.3.
-	router := adapterhost.NewRouterAllNodeServed(adapters.Deps{}, enginecache.NewCache(64<<20, nil), host, r.Connections)
-	svc := tree.New(r.Connections, r.Metadata, router, fake)
-	return &harness{svc: svc, repos: r, host: host, fake: fake}
+	backend := &fakeBackend{}
+	svc := tree.New(r.Connections, r.Metadata, backend, fake)
+	return &harness{svc: svc, repos: r, backend: backend, fake: fake}
 }
 
 // seedConnection inserts a bare connection row so requireConnected's not-connected fallback has
@@ -73,17 +96,10 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 
 func requestCount(t *testing.T, h *harness, op string) int {
 	t.Helper()
-	payload, err := h.host.Call("fixture:request-count", map[string]any{"op": op})
-	if err != nil {
-		t.Fatalf("fixture:request-count: %v", err)
+	if op != "adapter:children" {
+		t.Fatalf("requestCount: unsupported op %q", op)
 	}
-	var got struct {
-		Count int `json:"count"`
-	}
-	if err := json.Unmarshal(payload, &got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	return got.Count
+	return int(h.backend.childrenN.Load())
 }
 
 // TestSchemaMismatchDropsRow covers the validate-before-serve half of the cache-aside path: a

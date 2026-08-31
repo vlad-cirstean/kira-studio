@@ -36,14 +36,12 @@ const (
 )
 
 // Session is A18: one writer goroutine per attached renderer connection, owning a bounded queue
-// that both producers enqueue into — the engine child's own data frames (via Send, satisfying
-// enginehost.Sink) and HandleDataFrame's own locally-produced responses (via enqueueLocal).
-// Two goroutines calling a blocking conn.Send directly would be a data race waiting to be found on
-// macOS (application.StreamConn.Send blocks; TrySend is the non-blocking one) — this is what
-// keeps there being exactly one caller of conn.Send.
+// that HandleDataFrame's locally-produced responses enqueue into (via enqueueLocal). A dedicated
+// writer goroutine is what keeps there being exactly one caller of conn.Send, since a blocking
+// conn.Send called from two goroutines directly would be a data race waiting to be found on macOS
+// (application.StreamConn.Send blocks; TrySend is the non-blocking one).
 type Session struct {
-	router *Router
-	conn   StreamSession
+	conn StreamSession
 
 	queue       chan []byte
 	queuedBytes atomic.Int64
@@ -51,8 +49,8 @@ type Session struct {
 	closeOnce   sync.Once
 }
 
-func newSession(router *Router, conn StreamSession) *Session {
-	s := &Session{router: router, conn: conn, queue: make(chan []byte, sessionQueueFrames), done: make(chan struct{})}
+func newSession(conn StreamSession) *Session {
+	s := &Session{conn: conn, queue: make(chan []byte, sessionQueueFrames), done: make(chan struct{})}
 	go s.writeLoop()
 	return s
 }
@@ -75,20 +73,11 @@ func (s *Session) writeLoop() {
 	}
 }
 
-// Send is enginehost.Sink's method: every data frame the engine child produces arrives here.
-// A16's passive stats merge starts with a peek at this exact frame, before it ever reaches the
-// queue — see router.go's observeChildEvent.
-func (s *Session) Send(frame []byte) error {
-	s.router.observeChildEvent(frame)
-	return s.enqueue(frame)
-}
-
 // enqueueLocal is HandleDataFrame's own path for a frame this process produced itself (a native
-// dispatcher's response, a merged cache:stats answer). Unlike enginehost's own deliver(), there is
-// no retry-with-backoff here: a locally-produced response has no OS pipe to push back through, so
-// a full queue just drops the frame — the renderer's own pending request then times out exactly as
-// it would if the process had died, which port.ts already handles, rather than blocking whichever
-// goroutine hit the full queue.
+// dispatcher's response, a cache:stats answer). There is no retry-with-backoff here: a
+// locally-produced response has no OS pipe to push back through, so a full queue just drops the
+// frame — the renderer's own pending request then times out exactly as it would if the process had
+// died, which port.ts already handles, rather than blocking whichever goroutine hit the full queue.
 func (s *Session) enqueueLocal(frame []byte) {
 	if err := s.enqueue(frame); err != nil {
 		slog.Warn("adapterhost: dropping a response frame, session queue full", "scope", "adapterhost")

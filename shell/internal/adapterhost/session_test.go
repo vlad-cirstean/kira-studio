@@ -1,11 +1,6 @@
 package adapterhost
 
-import (
-	"testing"
-
-	"github.com/kirathecat/kira-studio/shell/internal/adapters"
-	"github.com/kirathecat/kira-studio/shell/internal/enginecache"
-)
+import "testing"
 
 // fakeConn is a StreamSession that records every frame handed to Send.
 type fakeConn struct {
@@ -22,17 +17,13 @@ func (c *fakeConn) Receive() ([]byte, error) { select {} }
 
 func newTestSession() (*Session, *fakeConn) {
 	conn := newFakeConn()
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
-	return newSession(r, conn), conn
+	return newSession(conn), conn
 }
 
-// enqueue reports ErrStreamFull once both the frame-count and byte bounds are exhausted, and
-// Session.Send (the enginehost.Sink method) propagates that unchanged — enginehost's own deliver()
-// is what retries on it.
+// enqueue reports ErrStreamFull once both the frame-count and byte bounds are exhausted.
 func TestSession_Enqueue_ReportsStreamFullOnceQueueSaturated(t *testing.T) {
 	conn := &blockingConn{}
-	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil), nil, fakeKindLookup{})
-	s := newSession(r, conn)
+	s := newSession(conn)
 	defer s.Close()
 
 	// The writer goroutine pulls one frame out and blocks forever trying to send it

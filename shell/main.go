@@ -119,13 +119,13 @@ func main() {
 		}
 	}}
 	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)
-	router := adapterhost.NewRouter(adapterDeps, goCache, host, repositories.Connections)
+	router := adapterhost.NewRouter(adapterDeps, goCache)
 	deps.Router = router
 
 	preconnectSupervisor := preconnect.New()
 	connectionsSvc := connections.New(connections.Deps{
 		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
-		Cipher: cipher, Host: host, Backend: router, Preconnect: preconnectSupervisor,
+		Cipher: cipher, Backend: router, Preconnect: preconnectSupervisor,
 	})
 	connectionsSvc.Start()
 	deps.Connections = connectionsSvc
