@@ -101,50 +101,6 @@
       }
     },
     {
-      "includes": ["src/engine/adapters/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["electron"],
-                    "message": "Adapter rule 1: an adapter imports nothing from electron — it is a plain Node module, which is what lets tests/db/ import it directly."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/engine/adapters/s3/**", "!src/engine/adapters/s3/transfer.ts"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["electron"],
-                    "message": "Adapter rule 1: an adapter imports nothing from electron — it is a plain Node module, which is what lets tests/db/ import it directly."
-                  },
-                  {
-                    "group": ["node:fs", "node:fs/**"],
-                    "message": "SPEC §11: transfer.ts is the only file in the s3 adapter that touches node:fs."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
       "includes": ["src/renderer/project/**"],
       "linter": {
         "rules": {

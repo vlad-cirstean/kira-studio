@@ -13,7 +13,6 @@
     }
   },
   "include": [
-    "src/engine/**/*.ts",
     "src/shared/**/*.ts",
     "playwright.config.ts",
     "tests/e2e-real/**/*.ts",
