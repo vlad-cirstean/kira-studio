@@ -50,10 +50,16 @@ func listBuckets(ctx context.Context, client *s3.Client, scopedBucket string) ([
 	return nodes, nil
 }
 
+// prefixLister is the one *s3.Client method listPrefixChildren needs (P58f D14) — declared here so
+// catalog_test.go can drive the truncation conjunction with a fake instead of a live server.
+type prefixLister interface {
+	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+}
+
 // listPrefixChildren is catalog.ts's listPrefixChildren: a prefix tree from ListObjectsV2 with
 // Delimiter — CommonPrefixes are the "folders" one level down, Contents (minus the exact-prefix-
 // match "directory marker" object some tools create) are the leaf objects at this level.
-func listPrefixChildren(ctx context.Context, client *s3.Client, bucket string, prefixSegments []string, op *adapters.OpCtx) (adapters.TreeChildren, error) {
+func listPrefixChildren(ctx context.Context, client prefixLister, bucket string, prefixSegments []string, op *adapters.OpCtx) (adapters.TreeChildren, error) {
 	prefix := ""
 	if len(prefixSegments) > 0 {
 		prefix = strings.Join(prefixSegments, "/") + "/"

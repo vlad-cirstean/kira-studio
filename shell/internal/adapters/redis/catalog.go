@@ -114,10 +114,16 @@ func dbIndexFromName(name string) (int, error) {
 	return n, nil
 }
 
+// scanner is the one *goredis.Client method listNamespaceChildren needs (P58f D14) — declared here
+// so catalog_test.go can drive the truncation conjunction with a fake instead of a live server.
+type scanner interface {
+	Scan(ctx context.Context, cursor uint64, match string, count int64) *goredis.ScanCmd
+}
+
 // listNamespaceChildren ports catalog.ts's listNamespaceChildren: the ':'-splitting SCAN walk.
 // namespaceSegments is just the local segments collected while descending the tree, joined back
 // into a scan prefix here, never reconstructed from a leaf.
-func listNamespaceChildren(ctx context.Context, conn *goredis.Client, dbName string, namespaceSegments []string, op *adapters.OpCtx) (adapters.TreeChildren, error) {
+func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, namespaceSegments []string, op *adapters.OpCtx) (adapters.TreeChildren, error) {
 	prefix := ""
 	if len(namespaceSegments) > 0 {
 		prefix = strings.Join(namespaceSegments, ":") + ":"
