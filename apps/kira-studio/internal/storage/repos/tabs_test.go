@@ -37,7 +37,7 @@ func TestTabsRepoSaveRejectsInvalidRecords(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := r.Save([]model.TabRecord{tc.rec}); err == nil {
+			if err := r.Save("main", []model.TabRecord{tc.rec}); err == nil {
 				t.Fatalf("Save(%+v) = nil, want a validation error", tc.rec)
 			}
 		})
@@ -51,11 +51,11 @@ func TestTabsRepoSaveRejectsWholeBatchOnOneInvalidRecord(t *testing.T) {
 
 	good := validTabRecord("t-good")
 	bad := model.TabRecord{ID: "t-bad", Path: "p", Kind: "not-a-real-kind", State: json.RawMessage(`{}`)}
-	if err := r.Save([]model.TabRecord{good, bad}); err == nil {
+	if err := r.Save("main", []model.TabRecord{good, bad}); err == nil {
 		t.Fatal("Save with one invalid record = nil, want an error")
 	}
 
-	got, err := r.List()
+	got, err := r.List("main")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -69,11 +69,11 @@ func TestTabsRepoSaveAndListRoundTrip(t *testing.T) {
 	r := newTabsRepo(t)
 
 	recs := []model.TabRecord{validTabRecord("t1"), validTabRecord("t2")}
-	if err := r.Save(recs); err != nil {
+	if err := r.Save("main", recs); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
-	got, err := r.List()
+	got, err := r.List("main")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

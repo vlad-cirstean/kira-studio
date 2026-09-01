@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-const tabsSelectAllSQL = `SELECT id, connection_id, path, kind, state_json, "order", active FROM tabs ORDER BY "order" ASC`
+const tabsSelectAllSQL = `SELECT id, connection_id, path, kind, state_json, "order", active FROM tabs WHERE window_key = ? ORDER BY "order" ASC`
 
 type TabsRepo struct {
 	DB *sql.DB
@@ -19,15 +19,17 @@ type TabsRepo struct {
 	selectAll *sql.Stmt
 }
 
-func (r *TabsRepo) List() ([]model.TabRecord, error) {
+// List returns windowKey's own tab set — every window keeps an independent list (P8 F6), scoped
+// by the `tabs_window` index (windowKey, "order").
+func (r *TabsRepo) List(windowKey string) ([]model.TabRecord, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 	if r.selectAll != nil {
-		rows, err = r.selectAll.Query()
+		rows, err = r.selectAll.Query(windowKey)
 	} else {
-		rows, err = r.DB.Query(tabsSelectAllSQL)
+		rows, err = r.DB.Query(tabsSelectAllSQL, windowKey)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("repos/tabs: query: %w", err)
@@ -69,12 +71,16 @@ func (r *TabsRepo) List() ([]model.TabRecord, error) {
 	return out, nil
 }
 
-// Save replaces the whole tab set in one transaction, rewriting `order` as the array index so
-// the stored order is always dense (tabs.ts's replaceTabs). Every record is validated up front
+// Save replaces windowKey's own tab set in one transaction, rewriting `order` as the array index
+// so the stored order is always dense (tabs.ts's replaceTabs). Every record is validated up front
 // (P2 R2), the same envelope List() enforces on read: unlike List, which must tolerate legacy
 // rows already on disk by dropping and logging, Save is the boundary where bad data should be
 // refused outright rather than silently written and then vanish on the next restore.
-func (r *TabsRepo) Save(records []model.TabRecord) error {
+//
+// Scoping the DELETE by window_key is F6's fix: this used to be `DELETE FROM tabs` with no
+// scope at all, so whichever window saved last erased every other open window's tabs outright —
+// reproduced against a real two-client `-tags server` binary before this fix existed (P8 §1.3(c)).
+func (r *TabsRepo) Save(windowKey string, records []model.TabRecord) error {
 	for i, rec := range records {
 		if err := rec.Validate(); err != nil {
 			return fmt.Errorf("repos/tabs: record %d: %w", i, err)
@@ -87,13 +93,13 @@ func (r *TabsRepo) Save(records []model.TabRecord) error {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	if _, err := tx.Exec(`DELETE FROM tabs`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM tabs WHERE window_key = ?`, windowKey); err != nil {
 		return fmt.Errorf("repos/tabs: clear: %w", err)
 	}
 	for i, rec := range records {
 		if _, err := tx.Exec(
-			`INSERT INTO tabs (id, connection_id, path, kind, state_json, "order", active) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			rec.ID, rec.ConnectionID, rec.Path, rec.Kind, string(rec.State), i, rec.Active,
+			`INSERT INTO tabs (id, connection_id, path, kind, state_json, "order", active, window_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			rec.ID, rec.ConnectionID, rec.Path, rec.Kind, string(rec.State), i, rec.Active, windowKey,
 		); err != nil {
 			return fmt.Errorf("repos/tabs: insert %s: %w", rec.ID, err)
 		}

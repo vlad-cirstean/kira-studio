@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -47,6 +48,21 @@ func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 		return nil, fmt.Errorf("repos/windows: rows: %w", err)
 	}
 	return out, nil
+}
+
+// Exists reports whether key names a live `windows` row — the check bridge.TabsService uses to
+// reject an unrecognised window key with a real E_BAD_REQUEST rather than letting a bad key
+// surface as a raw FOREIGN KEY constraint failure from TabsRepo.Save's insert.
+func (r *WindowsRepo) Exists(key string) (bool, error) {
+	var one int
+	err := r.DB.QueryRow(`SELECT 1 FROM windows WHERE key = ?`, key).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("repos/windows: exists %s: %w", key, err)
+	}
+	return true, nil
 }
 
 // Create inserts a new window record. The caller mints the key (D2: a UUID the shell owns).
