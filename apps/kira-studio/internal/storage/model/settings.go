@@ -32,7 +32,7 @@ type Settings struct {
 func DefaultSettings() Settings {
 	return Settings{
 		Appearance: AppearanceSettings{
-			FontFamily: `"JetBrains Mono", "DejaVu Sans Mono", monospace`,
+			FontFamily: "Menlo, monospace",
 			FontSize:   12,
 			RowDensity: "comfortable",
 			WordWrap:   true,

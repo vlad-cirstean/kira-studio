@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "@vscode/codicons/dist/codicon.css";
-@import "./fonts.css";
 @import "./tokens.css";
 @import "./primitives.css";
 
