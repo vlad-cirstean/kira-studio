@@ -2,6 +2,7 @@ package adapterhost
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
@@ -12,16 +13,23 @@ import (
 
 // dataFakeAdapter is a fuller test double than host_test.go's fakeAdapter: every method the
 // dispatcher can reach is overridable, so a test can assert both what was called and how many
-// times.
+// times. readCalls is atomic (P2 R1: a concurrency test now calls Read() from many goroutines at
+// once against one shared fake).
 type dataFakeAdapter struct {
 	adapters.Adapter
-	readCalls int
+	readCalls atomic.Int64
 	readFn    func() (page.Page, error)
+	// readCtxFn, when set, is used instead of readFn — for a test that needs to observe the ctx
+	// Read() was actually called with (P2 R1: session cancellation propagation).
+	readCtxFn func(ctx context.Context) (page.Page, error)
 	mutateFn  func() (model.MutationResult, error)
 }
 
 func (a *dataFakeAdapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	a.readCalls++
+	a.readCalls.Add(1)
+	if a.readCtxFn != nil {
+		return a.readCtxFn(ctx)
+	}
 	return a.readFn()
 }
 func (a *dataFakeAdapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
@@ -64,8 +72,8 @@ func TestDispatcher_Read_CacheAsideDiscipline(t *testing.T) {
 	if resp1.Source != "server" {
 		t.Errorf("first Read source = %q, want server", resp1.Source)
 	}
-	if fake.readCalls != 1 {
-		t.Fatalf("adapter.Read calls = %d, want 1", fake.readCalls)
+	if fake.readCalls.Load() != 1 {
+		t.Fatalf("adapter.Read calls = %d, want 1", fake.readCalls.Load())
 	}
 	<-events // op:start
 	<-events // op:end
@@ -77,8 +85,8 @@ func TestDispatcher_Read_CacheAsideDiscipline(t *testing.T) {
 	if resp2.Source != "cache" {
 		t.Errorf("second Read source = %q, want cache", resp2.Source)
 	}
-	if fake.readCalls != 1 {
-		t.Errorf("adapter.Read calls after cache hit = %d, want still 1", fake.readCalls)
+	if fake.readCalls.Load() != 1 {
+		t.Errorf("adapter.Read calls after cache hit = %d, want still 1", fake.readCalls.Load())
 	}
 	select {
 	case e := <-events:

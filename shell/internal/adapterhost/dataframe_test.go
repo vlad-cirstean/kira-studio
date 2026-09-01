@@ -85,8 +85,8 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 	if resp["kind"] != "res" || resp["id"] != float64(1) || resp["ok"] != true {
 		t.Fatalf("resp = %+v, want a res/1/ok:true frame", resp)
 	}
-	if fake.readCalls != 1 {
-		t.Errorf("adapter.Read calls = %d, want 1", fake.readCalls)
+	if fake.readCalls.Load() != 1 {
+		t.Errorf("adapter.Read calls = %d, want 1", fake.readCalls.Load())
 	}
 }
 

@@ -24,11 +24,12 @@ const StreamName = "engine"
 // ServeEngineStream runs for the life of one connection and returns when the renderer's side
 // closes (page reload, window close, app shutdown). After P58a M4 this is a data-plane server, not
 // a byte forwarder (P58 D3): router.AttachStream gives this session its own single writer (A18),
-// and every inbound frame is handed to router.HandleDataFrame, which decides — per connection kind
-// — whether to answer it in-process or forward it to the Node engine child unchanged.
-// HandleDataFrame runs on its own goroutine per frame so a slow read never serialises behind it;
-// responses are correlated by id, so out-of-order completion is already the renderer's own
-// contract (port.ts's pending map).
+// and every inbound frame is handed to router.HandleDataFrameAsync, which decides — per connection
+// kind — whether to answer it in-process or forward it to the Node engine child unchanged.
+// HandleDataFrameAsync runs the frame on its own goroutine so a slow read never serialises behind
+// it, bounded to a fixed number of concurrent ops per session (P2 R1: a burst of frames used to
+// spawn goroutines without limit); responses are correlated by id, so out-of-order completion is
+// already the renderer's own contract (port.ts's pending map).
 func ServeEngineStream(router *adapterhost.Router, conn StreamSession) {
 	session, detach := router.AttachStream(conn)
 	defer detach()
@@ -37,6 +38,6 @@ func ServeEngineStream(router *adapterhost.Router, conn StreamSession) {
 		if err != nil {
 			return
 		}
-		go router.HandleDataFrame(session, frame)
+		router.HandleDataFrameAsync(session, frame)
 	}
 }

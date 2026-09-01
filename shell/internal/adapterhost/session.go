@@ -1,6 +1,7 @@
 package adapterhost
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync"
@@ -33,6 +34,13 @@ const (
 	// this constant. A pathological Go-produced page can approach it (MaxPageSize 10 000 rows,
 	// MaxCellBytes 64 KiB, base64 inflating by 1.33x, §4.10) — this is the check that catches it.
 	maxDataFrameBytes = 64 << 20
+
+	// sessionMaxInFlightOps bounds HandleDataFrameAsync's own goroutine-per-frame (P2 R1): without
+	// a cap, a burst of frames — a renderer bug looping, or just many rapid UI actions arriving
+	// faster than the driver can answer them — spawns unbounded goroutines, each holding open a
+	// driver call. Matches sessionQueueFrames' own order of magnitude: answering more ops than that
+	// concurrently would just queue their responses behind writeLoop's own bound anyway.
+	sessionMaxInFlightOps = 64
 )
 
 // Session is A18: one writer goroutine per attached renderer connection, owning a bounded queue
@@ -47,12 +55,48 @@ type Session struct {
 	queuedBytes atomic.Int64
 	done        chan struct{}
 	closeOnce   sync.Once
+
+	// ctx/cancel back handleDataOp's own per-op context (P2 R1): it used to be
+	// context.Background(), so an op outlived its session indefinitely — a renderer reload/close
+	// abandons the pending request client-side, but nothing ever told the adapter call itself to
+	// stop. Close cancels ctx, so a session going away actually unblocks whatever op is still
+	// running against it (a well-behaved adapter observes ctx and returns; CancelOp's explicit,
+	// opID-addressed path is unaffected — RunOp derives its own context from this one either way).
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// inFlight is HandleDataFrameAsync's own concurrency semaphore — see sessionMaxInFlightOps.
+	inFlight chan struct{}
 }
 
 func newSession(conn StreamSession) *Session {
-	s := &Session{conn: conn, queue: make(chan []byte, sessionQueueFrames), done: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Session{
+		conn:     conn,
+		queue:    make(chan []byte, sessionQueueFrames),
+		done:     make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
+		inFlight: make(chan struct{}, sessionMaxInFlightOps),
+	}
 	go s.writeLoop()
 	return s
+}
+
+// acquireSlot blocks until an in-flight op slot is free, or the session closes — whichever comes
+// first. Returns false in the latter case, in which case there is no slot to release.
+func (s *Session) acquireSlot() bool {
+	select {
+	case s.inFlight <- struct{}{}:
+		return true
+	case <-s.done:
+		return false
+	}
+}
+
+// releaseSlot must be called exactly once for every acquireSlot call that returned true.
+func (s *Session) releaseSlot() {
+	<-s.inFlight
 }
 
 func (s *Session) writeLoop() {
@@ -118,7 +162,11 @@ func (s *Session) enqueue(frame []byte) error {
 	}
 }
 
-// Close stops this session's writer goroutine. Idempotent.
+// Close stops this session's writer goroutine and cancels every op still running against it
+// (ctx, above). Idempotent.
 func (s *Session) Close() {
-	s.closeOnce.Do(func() { close(s.done) })
+	s.closeOnce.Do(func() {
+		close(s.done)
+		s.cancel()
+	})
 }

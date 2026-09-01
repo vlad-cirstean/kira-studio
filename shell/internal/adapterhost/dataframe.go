@@ -1,7 +1,6 @@
 package adapterhost
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -93,6 +92,21 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	r.handleDataOp(session, probe.Op, probe.ID, probe.Payload)
 }
 
+// HandleDataFrameAsync is ServeEngineStream's own per-frame dispatch: HandleDataFrame runs on its
+// own goroutine so a slow op never serialises behind it, but bounded (P2 R1) — it blocks until a
+// concurrency slot is free (or the session closes) before spawning, so a burst of frames can't grow
+// goroutines/driver work without bound. Returns immediately (without spawning) once the session has
+// closed, matching every other session-scoped operation's own no-op-after-close contract.
+func (r *Router) HandleDataFrameAsync(session *Session, frame []byte) {
+	if !session.acquireSlot() {
+		return
+	}
+	go func() {
+		defer session.releaseSlot()
+		r.HandleDataFrame(session, frame)
+	}()
+}
+
 // pingPayload is port.ts's PingPayload (src/shared/protocol/port.ts:18-22), byte-compatible with
 // what rpc.ts's own ping handler used to return — state/engine.ts and StatusBar.vue read it
 // unchanged (P58f D11).
@@ -115,7 +129,10 @@ func decodeAndValidate[T interface{ Validate() error }](payload json.RawMessage,
 }
 
 func (r *Router) handleDataOp(session *Session, op string, id int, payload json.RawMessage) {
-	ctx := context.Background()
+	// P2 R1: session.ctx, not context.Background() — an op derived from Background() has no way
+	// to be bounded by anything but an explicit ops:cancel RPC, so it outlives its own session
+	// (and the now-gone renderer request that started it) indefinitely once the session closes.
+	ctx := session.ctx
 	switch op {
 	case "data:read":
 		var req ReadRequestWire
