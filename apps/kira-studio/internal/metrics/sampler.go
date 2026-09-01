@@ -157,6 +157,14 @@ func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logic
 	}
 }
 
+// procEntry is one listProcesses result: a pid paired with its executable path. Kept
+// platform-independent so listProcesses.go/processlist_other.go's darwin/other split is only about
+// *how* the process table is enumerated — AppProcessSet's own matching loop below never changes.
+type procEntry struct {
+	pid int32
+	exe string
+}
+
 // AppProcessSet finds this app's own process set: pids matching anchorNeedles directly (this
 // app's own executable, which lives under a bundle path unique to this app), plus pids matching
 // helperNeedles (e.g. "com.apple.WebKit" for WKWebView's XPC helpers) that are actually this app's
@@ -182,23 +190,26 @@ func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logic
 // exact same process-to-executable-path facts over and over. One scan, checked against every
 // needle per process, produces the identical result for a small, fixed syscall cost instead of one
 // that scales with the needle count).
+//
+// listProcesses is platform-selected (processlist_darwin.go's proc_listpids+proc_pidpath, or
+// processlist_other.go's gopsutil process.Processes()+Exe() — P7 F8): the matching rule below is
+// unaffected by which one supplied procEntry's pid/exe pairs.
 func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
-	procs, err := process.Processes()
+	entries, err := listProcesses()
 	if err != nil {
 		return nil, err
 	}
 
 	var anchors, helpers []int32
-	for _, p := range procs {
-		exe, err := p.Exe()
-		if err != nil || exe == "" {
+	for _, e := range entries {
+		if e.exe == "" {
 			continue
 		}
 		switch {
-		case containsAny(exe, anchorNeedles):
-			anchors = append(anchors, p.Pid)
-		case containsAny(exe, helperNeedles):
-			helpers = append(helpers, p.Pid)
+		case containsAny(e.exe, anchorNeedles):
+			anchors = append(anchors, e.pid)
+		case containsAny(e.exe, helperNeedles):
+			helpers = append(helpers, e.pid)
 		}
 	}
 
