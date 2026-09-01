@@ -2,7 +2,7 @@ import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connectio
 import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { connectConnection, connectionRecord, connectionsState } from '../../state/connections';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
@@ -44,8 +44,19 @@ export function groupParentPath(path: string): string {
 }
 
 // key: `${connectionId}|${encodedPath}` — '' encodes the connection's own root.
+//
+// P2 R1: `children` is nested as its own shallowReactive rather than the plain object literal it
+// used to be. treeState as a whole stays a deep reactive() — expanded/loading are Sets mutated in
+// place (.add()/.delete()/.clear()), which only stay tracked under deep reactivity — but the only
+// two writers of `children` (loadChildren below, dropConnectionState) always replace or delete a
+// whole rowKey entry, never mutate a cached TreeNode's own fields. A big schema or a Redis
+// namespace can cache thousands of TreeNode objects (and their badges arrays) here; deep-wrapping
+// every one of them in a reactivity Proxy bought nothing no writer ever used. Vue's reactive() get
+// trap recognizes an already-reactive nested value (via its RAW flag) and returns it as-is instead
+// of re-wrapping it, so nesting a shallowReactive object inside this outer reactive() works without
+// double-proxying.
 export const treeState = reactive({
-  children: {} as Record<string, TreeNode[]>,
+  children: shallowReactive({} as Record<string, TreeNode[]>),
   expanded: new Set<string>(),
   loading: new Set<string>(),
   errors: {} as Record<string, string>,
@@ -424,10 +435,35 @@ function buildRows(
   return anyMatch;
 }
 
+// P2 R1: buildRows/buildNodeRow recurse over every currently-cached node for every connection —
+// for a large expanded schema or key-browser namespace, that's a full traversal of thousands of
+// nodes on every single keystroke SearchBox.vue/ProjectPanel.vue write into treeState.search
+// directly (so the input itself stays instantly responsive). debouncedQuery only updates
+// SEARCH_DEBOUNCE_MS after typing settles, and searchResult (plus TreeRow.vue's own highlight,
+// via activeSearchQuery below) reads that instead, so a fast typist causes one recompute per pause
+// rather than one per character.
+const SEARCH_DEBOUNCE_MS = 150;
+const debouncedQuery = ref('');
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => treeState.search,
+  (value) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      debouncedQuery.value = value.trim().toLowerCase();
+    }, SEARCH_DEBOUNCE_MS);
+  },
+);
+
+// TreeRow.vue's highlightParts() needs the exact query that produced row.matched, not the live
+// (undebounced) treeState.search — otherwise the highlighted substring can briefly disagree with
+// why a row is even showing as matched.
+export const activeSearchQuery = computed(() => debouncedQuery.value);
+
 const searchResult = computed(() => {
   const rows: TreeRowVm[] = [];
   const stats: SearchStats = { incomplete: false };
-  const query = treeState.search.trim().toLowerCase();
+  const query = debouncedQuery.value;
 
   for (const conn of connectionsState.records) {
     const connKey = rowKey(conn.id, '');
