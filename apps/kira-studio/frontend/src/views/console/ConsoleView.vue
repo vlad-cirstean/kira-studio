@@ -326,7 +326,7 @@ const statusLine = computed(() => {
           v-if="canFormat"
           icon="indent"
           data-testid="console-format"
-          :disabled="!localDoc.trim()"
+          :disabled="!tab.state.text.trim()"
           v-tooltip="'Format the query text'"
           @click="onFormat"
         >
