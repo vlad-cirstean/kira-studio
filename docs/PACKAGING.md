@@ -217,10 +217,6 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 - **No DMG.** `darwin:package:dmg` exists in the Taskfile, but no `package.json` script calls it and
   the release workflow zips the `.app` instead. A deliberate scope decision: verifying a DMG pipeline
   needs real macOS, which was not available when the decision was made — not an oversight.
-- **The CI workflow updates are staged, not applied.** `.github/workflows/{ci,release}.yml` still hold
-  their pre-P57 Electron content; the intended files live in `docs/v1/plans/p58-pending-ci-workflows/`
-  with copy-and-commit steps, because the session that wrote them lacked GitHub's `workflow` OAuth
-  scope. Until someone applies them, everything in §7 describes intent, not what runs.
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
 - **`apps/kira-studio/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
@@ -246,13 +242,11 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 
 ## 7. CI, releases, and auto-update
 
-**Status:** the workflows described below are staged in
-`docs/v1/plans/p58-pending-ci-workflows/` (`ci.yml`, `release.yml`, plus a README with the two `cp`
-commands and the commit). `.github/workflows/` still contains the pre-P57 Electron versions, which
-reference deleted scripts. Applying them is the first pending job for anyone pushing with `workflow`
-scope (tracked as `AGENTS.md`'s "Known open items").
+**Status:** applied. `.github/workflows/{ci,release}.yml` now hold the content described below — the
+staging directory (`docs/v1/plans/p58-pending-ci-workflows/`) it waited in, through sessions whose
+GitHub token lacked the `workflow` OAuth scope, is gone. No CI run has exercised them yet.
 
-**Intended `ci.yml`** (push/PR to `main`, plus `workflow_dispatch`):
+**`ci.yml`** (push/PR to `main`, plus `workflow_dispatch`):
 
 | Job | Runner | What it does |
 |---|---|---|

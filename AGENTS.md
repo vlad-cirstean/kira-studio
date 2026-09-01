@@ -104,11 +104,7 @@ team works, and how to run things in whichever box a session happens to be on.
 
 ## Known open items
 
-- **CI workflows are still Electron-era.** `.github/workflows/*.yml` still reference `safeStorage`,
-  `test:e2e` and `test:db` — none of which exist any more — and have no Go/bindings steps at all.
-  The updated files are staged at `docs/v1/plans/p58-pending-ci-workflows/README.md`; apply them
-  once a session's GitHub push access carries the `workflow` OAuth scope (a session lacking it has
-  any commit touching `.github/workflows/*.yml` rejected by GitHub itself). Tracked as task #17.
+- _None._
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
