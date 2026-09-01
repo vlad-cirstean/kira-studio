@@ -26,7 +26,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Language | TypeScript 7 (native compiler) for `.ts`; **Go** for the shell | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
 | Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
-| UI | Vue 3 (`<script setup>`, Composition API) | |
+| UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
@@ -591,6 +591,16 @@ copy of it; and `views/shared/page/columns.ts`'s `columnHeaderTooltip`/`GUTTER_W
 `DEFAULT_COLUMN_WIDTH` are the one column-header tooltip and the one pair of layout constants
 behind the grid and the console's own tabular result, ending three different spellings of the same
 two numbers the two had drifted into.
+
+**The renderer runs Vue in VDOM mode, deliberately, not by default.** Vapor mode (Vue's
+compiled, no-virtual-DOM rendering) was evaluated against this tree in P6
+(`docs/v1.1/plans/P6-vue-vapor-mode.md`) and declined — not because it is new, but because this
+app's hot paths already sit outside the VDOM's per-binding diffing model via the
+no-reactivity-on-row-data invariant above (`:66-67`), so there is no rendering cost left for Vapor
+to remove; partial adoption would also ship both runtimes for one component, and the one global
+`v-tooltip` directive is an `ObjectDirective`, an interface Vapor's custom directives don't accept.
+A future Vue 3.6 upgrade keeps VDOM mode — see the plan's §6 for the conditions under which this
+should be re-evaluated.
 
 ## Process model
 
