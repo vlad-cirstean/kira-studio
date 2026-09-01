@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const opKindSchema = z.enum([
+export const opKindSchema = /*#__PURE__*/ z.enum([
   'connect',
   'disconnect',
   'children',
@@ -17,10 +17,10 @@ export const opKindSchema = z.enum([
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 
-export const opStatusSchema = z.enum(['running', 'ok', 'error', 'cancelled']);
+export const opStatusSchema = /*#__PURE__*/ z.enum(['running', 'ok', 'error', 'cancelled']);
 export type OpStatus = z.infer<typeof opStatusSchema>;
 
-export const opRecordSchema = z.object({
+export const opRecordSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   connectionId: z.string().nullable(),
   tabId: z.string().nullable(),

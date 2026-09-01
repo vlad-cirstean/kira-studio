@@ -5,11 +5,11 @@ import { nodeKindSchema } from './tree';
 // kind absent from both arrays is visible — including one fetched for the first time after this
 // was saved — and hiding a container never writes entries for what is beneath it (D13): the
 // renderer never walks into a row it does not render.
-export const treeVisibilitySchema = z.object({
-  hiddenKinds: z.array(nodeKindSchema),
+export const treeVisibilitySchema = /*#__PURE__*/ z.object({
+  hiddenKinds: /*#__PURE__*/ z.array(nodeKindSchema),
   /** Encoded node paths, relative to the connection — the same strings `TreeNode.path` and
    *  `rowKey()` already use. */
-  hiddenPaths: z.array(z.string()),
+  hiddenPaths: /*#__PURE__*/ z.array(z.string()),
 });
 export type TreeVisibility = z.infer<typeof treeVisibilitySchema>;
 

@@ -31,9 +31,9 @@ export function encodeKafkaStreamFilter(filter: KafkaStreamFilter): string | nul
   return isEmptyKafkaStreamFilter(filter) ? null : JSON.stringify(filter);
 }
 
-const kafkaStreamFilterSchema = z.object({
+const kafkaStreamFilterSchema = /*#__PURE__*/ z.object({
   offset: z.string().nullable(),
-  partitions: z.array(z.number().int()).default([]),
+  partitions: /*#__PURE__*/ z.array(z.number().int()).default([]),
   timestampMs: z.number().nullable(),
 });
 

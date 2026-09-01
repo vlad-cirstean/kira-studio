@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { sortSpecSchema } from './queries';
 import { pathTail } from './tree';
 
-export const tabKindSchema = z.enum([
+export const tabKindSchema = /*#__PURE__*/ z.enum([
   'data',
   'definition',
   'document',
@@ -27,17 +27,22 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'browse',
 ];
 
-const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
+const pageSizeSchema = /*#__PURE__*/ z.union([
+  z.literal(10),
+  z.literal(100),
+  z.literal(1000),
+  z.literal(10000),
+]);
 export type PageSize = z.infer<typeof pageSizeSchema>;
 
-export const dataTabStateSchema = z.object({
+export const dataTabStateSchema = /*#__PURE__*/ z.object({
   pageSize: pageSizeSchema,
   pageIndex: z.number().int().min(0), // what the pager shows; offset = pageIndex * pageSize
   filter: z.string().nullable(),
   sort: sortSpecSchema.nullable(),
-  projection: z.array(z.string()).nullable(),
-  columnWidths: z.record(z.string(), z.number()),
-  columnOrder: z.array(z.string()).nullable(),
+  projection: /*#__PURE__*/ z.array(z.string()).nullable(),
+  columnWidths: /*#__PURE__*/ z.record(z.string(), z.number()),
+  columnOrder: /*#__PURE__*/ z.array(z.string()).nullable(),
   scrollTop: z.number(),
   scrollLeft: z.number(),
 });
@@ -47,8 +52,8 @@ export type DataTabState = z.infer<typeof dataTabStateSchema>;
 // has worth remembering. `.default('structure')` keeps a tab saved under the old empty `{}` shape
 // (D4: "nothing to remember", true while there was only one pane) restorable, the same discipline
 // keyValueTabStateSchema's own `pageSize` comment records.
-export const definitionTabStateSchema = z.object({
-  pane: z.enum(['structure', 'source']).default('structure'),
+export const definitionTabStateSchema = /*#__PURE__*/ z.object({
+  pane: /*#__PURE__*/ z.enum(['structure', 'source']).default('structure'),
 });
 export type DefinitionTabState = z.infer<typeof definitionTabStateSchema>;
 
@@ -59,7 +64,7 @@ export type DefinitionTabState = z.infer<typeof definitionTabStateSchema>;
 // `.default(true)` only ever fires for an *absent* key, so a tab saved before this field existed
 // restores to the same "stack a new result per run" behavior a brand-new tab gets — the toggle is
 // opt-in to *replacing*, not opt-in to stacking (pressed/activated means "off").
-export const consoleTabStateSchema = z.object({
+export const consoleTabStateSchema = /*#__PURE__*/ z.object({
   text: z.string(),
   newResultSet: z.boolean().default(true),
 });
@@ -74,11 +79,11 @@ export type ConsoleTabState = z.infer<typeof consoleTabStateSchema>;
 // sort forces mongo/read.ts's skip/limit fallback (D6), which — unlike the `_id`-keyset
 // strategy — hands back no next/prev token, so goNext/goPrev must track the page position
 // themselves the same way the grid does, or paging past page one silently collapses back to it.
-export const documentTabStateSchema = z.object({
-  expanded: z.record(z.string(), z.boolean()),
+export const documentTabStateSchema = /*#__PURE__*/ z.object({
+  expanded: /*#__PURE__*/ z.record(z.string(), z.boolean()),
   search: z.string(),
   sort: sortSpecSchema.nullable().default(null),
-  projection: z.array(z.string()).nullable().default(null),
+  projection: /*#__PURE__*/ z.array(z.string()).nullable().default(null),
   pageSize: pageSizeSchema.default(100),
   pageIndex: z.number().int().min(0).default(0),
 });
@@ -91,7 +96,7 @@ export type DocumentTabState = z.infer<typeof documentTabStateSchema>;
 // it for every engine, so this is pure renderer state). Edits/deletes/inserts mutate immediately
 // (documents/mutations.ts's precedent, extended to keyvalue) rather than staging anything, so
 // there is still no edit/expand memory to persist beyond these two fields.
-export const keyValueTabStateSchema = z.object({
+export const keyValueTabStateSchema = /*#__PURE__*/ z.object({
   pageIndex: z.number().int().min(0),
   // `.default(100)` (unlike DataTabState's required field): a keyvalue tab saved before this
   // field existed has no `pageSize` in its stored JSON at all, and storage/repos/tabs.ts drops a
@@ -126,21 +131,21 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // `path`", so a freshly opened tab and one restored at its root parse to the same record —
 // `.default('')` keeps a tab saved before this field existed restorable, the same discipline
 // every other tab-state schema's own added field follows.
-export const browseTabStateSchema = z.object({
+export const browseTabStateSchema = /*#__PURE__*/ z.object({
   levelPath: z.string().default(''),
 });
 export type BrowseTabState = z.infer<typeof browseTabStateSchema>;
 
-export const streamTabStateSchema = z.object({
+export const streamTabStateSchema = /*#__PURE__*/ z.object({
   pageSize: pageSizeSchema.default(100),
   offsetFilter: z.string().nullable().default(null),
-  partitions: z.array(z.number().int()).default([]),
+  partitions: /*#__PURE__*/ z.array(z.number().int()).default([]),
   timestampFilter: z.string().nullable().default(null),
   // Item 4 (task #61): per-column pixel widths for the message table (key/timestamp/headers/
   // attrs), mirroring DataTabState's own field — `.default({})` for the same already-saved-tab
   // discipline as `partitions`/`pageSize`. The `body` column isn't resizable (it already fills
   // remaining space via `flex: 1`) and so is never a key here.
-  columnWidths: z.record(z.string(), z.number()).default({}),
+  columnWidths: /*#__PURE__*/ z.record(z.string(), z.number()).default({}),
 });
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
@@ -152,14 +157,38 @@ const tabRecordBase = {
   active: z.boolean(),
 };
 
-export const tabRecordSchema = z.discriminatedUnion('kind', [
-  z.object({ ...tabRecordBase, kind: z.literal('data'), state: dataTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('definition'), state: definitionTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('console'), state: consoleTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('document'), state: documentTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('keyvalue'), state: keyValueTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('stream'), state: streamTabStateSchema }),
-  z.object({ ...tabRecordBase, kind: z.literal('browse'), state: browseTabStateSchema }),
+export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
+  /*#__PURE__*/ z.object({ ...tabRecordBase, kind: z.literal('data'), state: dataTabStateSchema }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('definition'),
+    state: definitionTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('console'),
+    state: consoleTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('document'),
+    state: documentTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('keyvalue'),
+    state: keyValueTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('stream'),
+    state: streamTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('browse'),
+    state: browseTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;

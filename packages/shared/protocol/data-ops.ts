@@ -35,13 +35,18 @@ export type PageCursor =
   | { mode: 'after'; token: string }
   | { mode: 'before'; token: string };
 
-export const pageCursorSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('offset'), offset: z.number().int().min(0) }),
-  z.object({ mode: z.literal('after'), token: z.string() }),
-  z.object({ mode: z.literal('before'), token: z.string() }),
+export const pageCursorSchema = /*#__PURE__*/ z.discriminatedUnion('mode', [
+  /*#__PURE__*/ z.object({ mode: z.literal('offset'), offset: z.number().int().min(0) }),
+  /*#__PURE__*/ z.object({ mode: z.literal('after'), token: z.string() }),
+  /*#__PURE__*/ z.object({ mode: z.literal('before'), token: z.string() }),
 ]);
 
-const pageSizeSchema = z.union([z.literal(10), z.literal(100), z.literal(1000), z.literal(10000)]);
+const pageSizeSchema = /*#__PURE__*/ z.union([
+  z.literal(10),
+  z.literal(100),
+  z.literal(1000),
+  z.literal(10000),
+]);
 
 /** The wire form: `path` is the encoded string (P1 D6). engine/data.ts decodes it. */
 export interface ReadRequestWire {
@@ -56,12 +61,12 @@ export interface ReadRequestWire {
   cursor: PageCursor;
 }
 
-export const readRequestWireSchema = z.object({
+export const readRequestWireSchema = /*#__PURE__*/ z.object({
   opId: z.string(),
   tabId: z.string().nullable(),
   connectionId: z.string(),
   path: z.string(),
-  projection: z.array(z.string()).nullable(),
+  projection: /*#__PURE__*/ z.array(z.string()).nullable(),
   filter: z.string().max(4096).nullable(),
   sort: sortSpecSchema.nullable(),
   pageSize: pageSizeSchema,
@@ -78,7 +83,7 @@ export interface CountRequestWire {
   refresh?: boolean;
 }
 
-export const countRequestWireSchema = z.object({
+export const countRequestWireSchema = /*#__PURE__*/ z.object({
   opId: z.string(),
   tabId: z.string().nullable(),
   connectionId: z.string(),
@@ -96,10 +101,10 @@ export interface InvalidateRequestWire {
   scope?: 'all' | 'pages';
 }
 
-export const invalidateRequestWireSchema = z.object({
+export const invalidateRequestWireSchema = /*#__PURE__*/ z.object({
   connectionId: z.string(),
   path: z.string(),
-  scope: z.enum(['all', 'pages']).optional(),
+  scope: /*#__PURE__*/ z.enum(['all', 'pages']).optional(),
 });
 
 export interface ReadResponse {
@@ -121,10 +126,10 @@ export interface PreviewRequestWire {
   ops: MutationRowOp[];
 }
 
-export const previewRequestWireSchema = z.object({
+export const previewRequestWireSchema = /*#__PURE__*/ z.object({
   connectionId: z.string(),
   path: z.string(),
-  ops: z.array(mutationRowOpSchema),
+  ops: /*#__PURE__*/ z.array(mutationRowOpSchema),
 });
 
 export interface PreviewResponse {
@@ -139,12 +144,12 @@ export interface MutateRequestWire {
   ops: MutationRowOp[];
 }
 
-export const mutateRequestWireSchema = z.object({
+export const mutateRequestWireSchema = /*#__PURE__*/ z.object({
   opId: z.string(),
   tabId: z.string().nullable(),
   connectionId: z.string(),
   path: z.string(),
-  ops: z.array(mutationRowOpSchema),
+  ops: /*#__PURE__*/ z.array(mutationRowOpSchema),
 });
 
 export interface MutateResponse {
@@ -159,12 +164,12 @@ export interface ExecuteRequestWire {
   statements: string[];
 }
 
-export const executeRequestWireSchema = z.object({
+export const executeRequestWireSchema = /*#__PURE__*/ z.object({
   opId: z.string(),
   tabId: z.string().nullable(),
   connectionId: z.string(),
   path: z.string(),
-  statements: z.array(z.string()).min(1),
+  statements: /*#__PURE__*/ z.array(z.string()).min(1),
 });
 
 export interface ExecuteResponse {
@@ -179,7 +184,7 @@ export interface ObjectDownloadRequestWire {
   destPath: string;
 }
 
-export const objectDownloadRequestWireSchema = z.object({
+export const objectDownloadRequestWireSchema = /*#__PURE__*/ z.object({
   opId: z.string(),
   tabId: z.string().nullable(),
   connectionId: z.string(),
@@ -191,7 +196,7 @@ export interface ObjectDownloadResponse {
   bytes: number;
 }
 
-export const cacheStatsSchema = z.object({
+export const cacheStatsSchema = /*#__PURE__*/ z.object({
   l2Bytes: z.number(),
   l2BudgetBytes: z.number(),
   l2Entries: z.number(),

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { capsSchema } from '../caps';
 
-export const connectionKindSchema = z.enum([
+export const connectionKindSchema = /*#__PURE__*/ z.enum([
   'postgres',
   'mariadb',
   'mysql',
@@ -29,7 +29,7 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   kafka: 9092,
 };
 
-export const connectionColorSchema = z.enum([
+export const connectionColorSchema = /*#__PURE__*/ z.enum([
   'none',
   'red',
   'orange',
@@ -66,13 +66,13 @@ export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = [
   'grey',
 ];
 
-export const connectionModeSchema = z.enum(['fields', 'uri']);
+export const connectionModeSchema = /*#__PURE__*/ z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;
 
 // The plain object shape, with no refinement — kept separate so both connectionInputSchema
 // (which adds the fields/uri superRefine below) and connectionSummarySchema (which cannot
 // .omit() from a refined schema) can each build off it independently.
-const connectionFieldsSchema = z.object({
+const connectionFieldsSchema = /*#__PURE__*/ z.object({
   name: z.string().trim().min(1).max(120),
   kind: connectionKindSchema,
   color: connectionColorSchema,
@@ -84,7 +84,7 @@ const connectionFieldsSchema = z.object({
   username: z.string().nullable(),
   password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
   uri: z.string().nullable(),
-  options: z.record(z.string(), z.unknown()),
+  options: /*#__PURE__*/ z.record(z.string(), z.unknown()),
   // P11: optional shell command run before connect (e.g. a port-forward). A first-class column
   // rather than an options_json key — options round-trips through the connection URI and the
   // Copy URI menu item, and a shell command must never be settable by pasting a URI.
@@ -150,10 +150,15 @@ export const connectionSummarySchema = connectionFieldsSchema.omit({ password: t
 });
 export type ConnectionSummary = z.infer<typeof connectionSummarySchema>;
 
-export const connectionStatusSchema = z.enum(['disconnected', 'connecting', 'connected', 'error']);
+export const connectionStatusSchema = /*#__PURE__*/ z.enum([
+  'disconnected',
+  'connecting',
+  'connected',
+  'error',
+]);
 export type ConnectionStatus = z.infer<typeof connectionStatusSchema>;
 
-export const connectionStateSchema = z.object({
+export const connectionStateSchema = /*#__PURE__*/ z.object({
   connectionId: z.string(),
   status: connectionStatusSchema,
   serverVersion: z.string().nullable(),

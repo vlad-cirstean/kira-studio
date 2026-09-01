@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const windowBoundsSchema = z.object({
+export const windowBoundsSchema = /*#__PURE__*/ z.object({
   x: z.number(),
   y: z.number(),
   width: z.number(),
@@ -8,27 +8,27 @@ export const windowBoundsSchema = z.object({
 });
 export type WindowBounds = z.infer<typeof windowBoundsSchema>;
 
-const panelProjectSchema = z.object({ visible: z.boolean(), width: z.number() });
-const panelOperationsSchema = z.object({ visible: z.boolean(), height: z.number() });
+const panelProjectSchema = /*#__PURE__*/ z.object({ visible: z.boolean(), width: z.number() });
+const panelOperationsSchema = /*#__PURE__*/ z.object({ visible: z.boolean(), height: z.number() });
 // No `visible` field (unlike its project/operations siblings): the cell editor panel's
 // visibility is driven entirely by whether a cell is currently selected (session-only, never
 // persisted — see `state/cellSelection.ts`), not by a manual toggle. Height stays user-adjustable
 // and persisted like the other panels.
-const panelCellEditorSchema = z.object({ height: z.number() });
+const panelCellEditorSchema = /*#__PURE__*/ z.object({ height: z.number() });
 
-export const layoutSchema = z.object({
-  panel: z.object({
+export const layoutSchema = /*#__PURE__*/ z.object({
+  panel: /*#__PURE__*/ z.object({
     project: panelProjectSchema,
     operations: panelOperationsSchema,
     cellEditor: panelCellEditorSchema,
   }),
-  window: z.object({
+  window: /*#__PURE__*/ z.object({
     bounds: windowBoundsSchema.nullable(),
   }),
 });
 export type Layout = z.infer<typeof layoutSchema>;
 
-export const layoutPatchSchema = z.object({
+export const layoutPatchSchema = /*#__PURE__*/ z.object({
   panel: z
     .object({
       project: panelProjectSchema.partial().optional(),

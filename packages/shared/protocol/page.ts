@@ -4,7 +4,7 @@ export type { PageKind } from '../caps';
 
 export type TypeClass = 'number' | 'text' | 'boolean' | 'temporal' | 'binary' | 'json' | 'other';
 
-export const typeClassSchema = z.enum([
+export const typeClassSchema = /*#__PURE__*/ z.enum([
   'number',
   'text',
   'boolean',
@@ -28,7 +28,7 @@ export interface ColumnDescriptor {
   generated: boolean;
 }
 
-export const columnDescriptorSchema = z.object({
+export const columnDescriptorSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   dataType: z.string(),
   typeClass: typeClassSchema,
@@ -69,13 +69,13 @@ export interface PagePosition {
   strategy: 'keyset' | 'offset' | 'cursor' | 'offsetWindow' | 'batch';
 }
 
-export const pagePositionSchema = z.object({
+export const pagePositionSchema = /*#__PURE__*/ z.object({
   offset: z.number().int().nullable(),
   pageSize: z.number().int(),
   hasMore: z.boolean(),
   nextToken: z.string().nullable(),
   prevToken: z.string().nullable(),
-  strategy: z.enum(['keyset', 'offset', 'cursor', 'offsetWindow', 'batch']),
+  strategy: /*#__PURE__*/ z.enum(['keyset', 'offset', 'cursor', 'offsetWindow', 'batch']),
 });
 
 // P48 F23: a page that is the whole result — no offset, no continuation, nothing more to fetch.
@@ -565,9 +565,9 @@ export function createStreamPageBuilder(opts: {
  * The envelope-only schema (§4a): running Zod over every cell of a 600 000-cell page would
  * cost more than the query. Pair with `assertPageStructure` for the typed-array invariants.
  */
-export const tabularPageEnvelopeSchema = z.object({
+export const tabularPageEnvelopeSchema = /*#__PURE__*/ z.object({
   kind: z.literal('tabular'),
-  columns: z.array(columnDescriptorSchema),
+  columns: /*#__PURE__*/ z.array(columnDescriptorSchema),
   rowCount: z.number().int().min(0),
   position: pagePositionSchema,
   truncatedCells: z.number().int().min(0),
@@ -575,7 +575,7 @@ export const tabularPageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
-export const documentPageEnvelopeSchema = z.object({
+export const documentPageEnvelopeSchema = /*#__PURE__*/ z.object({
   kind: z.literal('document'),
   rowCount: z.number().int().min(0),
   position: pagePositionSchema,
@@ -583,9 +583,9 @@ export const documentPageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
-export const keyValuePageEnvelopeSchema = z.object({
+export const keyValuePageEnvelopeSchema = /*#__PURE__*/ z.object({
   kind: z.literal('keyvalue'),
-  redisType: z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream', 'object']),
+  redisType: /*#__PURE__*/ z.enum(['string', 'hash', 'list', 'set', 'zset', 'stream', 'object']),
   ttlMs: z.number().int().nullable(),
   memoryBytes: z.number().int().nullable(),
   rowCount: z.number().int().min(0),
@@ -594,7 +594,7 @@ export const keyValuePageEnvelopeSchema = z.object({
   fetchedAt: z.number(),
 });
 
-export const streamPageEnvelopeSchema = z.object({
+export const streamPageEnvelopeSchema = /*#__PURE__*/ z.object({
   kind: z.literal('stream'),
   rowCount: z.number().int().min(0),
   position: pagePositionSchema,
@@ -603,7 +603,7 @@ export const streamPageEnvelopeSchema = z.object({
   visibilityTimeoutSeconds: z.number().int().nullable(),
 });
 
-export const pageEnvelopeSchema = z.discriminatedUnion('kind', [
+export const pageEnvelopeSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
   tabularPageEnvelopeSchema,
   documentPageEnvelopeSchema,
   keyValuePageEnvelopeSchema,

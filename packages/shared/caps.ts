@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type PageKind = 'tabular' | 'document' | 'keyvalue' | 'stream';
-export const pageKindSchema = z.enum(['tabular', 'document', 'keyvalue', 'stream']);
+export const pageKindSchema = /*#__PURE__*/ z.enum(['tabular', 'document', 'keyvalue', 'stream']);
 
 export type PaginationStrategy =
   | 'keyset' // ordered by a unique key; LIMIT/OFFSET fallback when there is no key
@@ -10,7 +10,7 @@ export type PaginationStrategy =
   | 'token' // opaque continuation token (S3)
   | 'offsetWindow' // explicit begin/end offsets per partition (Kafka)
   | 'batch'; // receive-a-batch, no addressable position (SQS)
-export const paginationStrategySchema = z.enum([
+export const paginationStrategySchema = /*#__PURE__*/ z.enum([
   'keyset',
   'offset',
   'cursor',
@@ -80,7 +80,7 @@ export interface Caps {
 
 // Crosses the engine<->main process boundary on connect (P2's ConnectInfo.caps addition) and
 // main<->renderer over kira:connection:state — validated like anything else at a trust boundary.
-export const capsSchema = z.object({
+export const capsSchema = /*#__PURE__*/ z.object({
   tabular: z.boolean(),
   documents: z.boolean(),
   keyValue: z.boolean(),
