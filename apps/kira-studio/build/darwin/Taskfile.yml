@@ -158,6 +158,10 @@ tasks:
   create:app:bundle:
     summary: Creates an `.app` bundle
     cmds:
+      # From scratch every time: the steps below only ever copy *into* the bundle, so without
+      # this an earlier build's resources survive one that no longer produces them — which is how
+      # a deleted `Assets.car` kept overriding `icons.icns` and shipping the old icon.
+      - rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.app"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
@@ -183,6 +187,8 @@ tasks:
 
   run:
     cmds:
+      # Same rebuild-from-scratch reason as create:app:bundle above.
+      - rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources"
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources"

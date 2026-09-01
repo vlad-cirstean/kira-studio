@@ -46,8 +46,7 @@ apps/kira-studio/bin/Kira Studio.app/
     Info.plist                       CFBundleName/CFBundleExecutable "Kira Studio",
                                      CFBundleIdentifier com.kirathecat.kira-studio
     Resources/
-      icons.icns
-      Assets.car                     (copied only if build/darwin/Assets.car exists)
+      icons.icns                     the only icon the bundle carries; no Assets.car ships (§6)
     MacOS/
       Kira Studio                    the compiled Go binary — the literal filename, space included,
                                      must equal CFBundleExecutable or the bundle neither launches
@@ -91,7 +90,7 @@ than is being linked.
 | `darwin:package` | `deps: build`, then `create:app:bundle` |
 | `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
 | `darwin:build` → `build:docker` | off macOS only: cross-compiles in the `wails-cross` Docker image. Never exercised in this repo (§5) |
-| `create:app:bundle` | makes `Contents/{MacOS,Resources}`, copies `icons.icns`, `Assets.car` (if present), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere) |
+| `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere). The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
 
 `common:build:frontend` runs the same `bun run build` the checklist above already ran; Task's
 `sources`/`generates` up-to-date checking makes the second invocation a no-op against fresh output, so
@@ -219,26 +218,26 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   needs real macOS, which was not available when the decision was made — not an oversight.
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
-- **`apps/kira-studio/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
-  and `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
-  scaffolded default (a duplicate root `build/icon.png`/`build/icon.svg` copy of the same artwork
-  existed alongside it until P1's dependency/script/folder audit removed it as dead weight), and
-  `wails3 task common:generate:icons`
-  correctly regenerated `darwin/icons.icns` from the new artwork — this sandbox has no macOS
-  hardware, and `Assets.car` generation needs Apple's `actool`/Icon Composer toolchain
-  (`wails3 generate icons`'s `-iconcomposerinput`/`-macassetdir` flags), which does not exist on
-  Linux and silently produces nothing rather than failing loudly. The previous, Wails-icon-based
-  `Assets.car` was restored rather than left deleted, so the bundle still has *a* valid asset
-  catalog, but on a real macOS build `CFBundleIconName` (`darwin/Info.plist`) resolves against
-  `Assets.car` **before** `CFBundleIconFile` falls back to `icons.icns` — so until someone re-runs
-  `wails3 task common:generate:icons` on macOS, a packaged app still shows the old Wails icon
-  despite `icons.icns` itself being correct. `icon.json` was also simplified while making this
-  change: the scaffolded layer was tuned for a small monochrome glyph over an automatic gray
-  background (0.85 scale, forced near-white/gray recolor in dark/tinted appearances, a specular
-  highlight and translucency) — all wrong for a full-color, pre-composed 1024×1024 icon, so those
-  were replaced with a 1.0-scale, unrecolored, non-specular single layer. That JSON change is
-  unverified beyond `wails3 generate icons` accepting it (no way to render an `.icon` bundle without
-  macOS); whoever regenerates `Assets.car` on real hardware should eyeball the result.
+- **The bundle has no `Assets.car`, and the icon comes from `icons.icns` alone.** `appicon.png` and
+  `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
+  scaffolded default; `wails3 task common:generate:icons` regenerates `darwin/icons.icns` from that
+  artwork correctly. The asset catalog could not follow: building one needs Apple's `actool`
+  (`wails3 generate icons`'s `-iconcomposerinput`/`-macassetdir` flags), which ships with full Xcode
+  and not with the Command Line Tools, and which fails silently rather than loudly when absent. The
+  scaffolded, Wails-artwork `Assets.car` therefore sat in the repo unchanged — and won, because
+  `CFBundleIconName` resolves against `Assets.car` **before** `CFBundleIconFile` falls back to
+  `icons.icns`, so a packaged app showed the old Wails icon while `icons.icns` beside it was right.
+  Both the file and the `CFBundleIconName` key are now gone from `darwin/`, which leaves
+  `CFBundleIconFile` → `icons.icns` as the only path and ships the correct icon. Note `wails3 update
+  build-assets` adds that key back on its own whenever an `Assets.car` is present, so the two belong
+  together: reintroduce both or neither. `appicon.icon` is kept for whoever regenerates a catalog on
+  a machine with Xcode — the cost of going without one is that macOS composes no appearance
+  variants (dark, tinted) from the icon. `icon.json` was simplified when the artwork was swapped in:
+  the scaffolded layer was tuned for a small monochrome glyph over an automatic gray background
+  (0.85 scale, forced near-white/gray recolor in dark/tinted appearances, a specular highlight and
+  translucency) — all wrong for a full-color, pre-composed 1024×1024 icon, so those were replaced
+  with a 1.0-scale, unrecolored, non-specular single layer. That JSON is still unverified beyond
+  `wails3 generate icons` accepting it; whoever builds the catalog should eyeball the result.
 
 ## 7. CI, releases, and auto-update
 
