@@ -864,3 +864,125 @@ Current-state architecture reference: `docs/ARCHITECTURE.md`. The live phasing r
 phase: `docs/v1.1/SPEC.md` (see `docs/v1.1/README.md` for what that folder is and isn't). v1 shipped
 and is kept as history in `docs/v1/SPEC.md`/`docs/v1/README.md`; it is not the process pointer
 anymore.
+
+## P2 R1 (v1.1) implementation findings — code review, round 1
+
+Run per the "code review" process above: three Opus subagents in parallel against the tree P1 left
+behind (architecture/maintainability/security; functional correctness/business logic; performance/
+resource efficiency), each reporting findings only. No single findings document survives the
+round — each finding was fixed and committed one at a time (32 commits) as its own unit of work,
+so the commit log itself is the durable record; this section keeps only what's worth carrying
+into round 2 and beyond.
+
+**Security/correctness, the largest bucket:**
+
+- **The read-only connection guard was enforced in exactly zero of the four adapters whose `Caps`
+  advertise it** — Postgres, MySQL/MariaDB, SQLite and ClickHouse's `Execute` (console) path ran
+  whatever SQL a user typed regardless of the connection's `readOnly` flag; only `Mutate` checked
+  it. A connection marked read-only in the UI was never actually read-only from the console tab.
+- **An unrecognized `sslmode` value silently fell back to no TLS at all** rather than failing the
+  connection — a typo (`requrie`) downgraded a user's intended-encrypted connection to plaintext
+  with no error surfaced anywhere.
+- **Editing a binary column's cell corrupted the round-trip** — the value read back after a commit
+  didn't match what was written, a data-corrupting bug rather than a cosmetic one. **Editing a
+  Redis key's value dropped its TTL**, silently converting an expiring key into a permanent one.
+  **SQLite's cancel was a no-op while an op sat queued behind the pool's connection limit** — Stop
+  did nothing until the op actually started running, contradicting the cancel-is-real guarantee
+  this app documents for every adapter that advertises it.
+- **A dropped data-plane response frame hung its op forever**: the renderer's pending-request map
+  had no way to notice a frame that never arrived, so a single lost frame (a crash-and-reconnect
+  mid-flight, a bug in a new adapter) left that op's UI spinner running indefinitely with no
+  timeout and no way to cancel it from the affected tab.
+- **`tabId` was silently discarded in tree describe/definition ops**, so results occasionally
+  routed back to the wrong tab under concurrent tabs against the same connection.
+- **SQS's read path both auto-reloaded (violating this app's explicit-poll-only policy — real
+  consumers would have messages hidden from them by an unwanted background poll) and served a
+  repeated manual Poll from a stale cache**, defeating the very button meant to force a fresh read.
+- **Reconnecting to a connection left its L1 (metadata)/L2 (page)/L3 (count) caches stale** —
+  schema or data changes made on the server between disconnect and reconnect were invisible until
+  something else happened to evict the relevant cache entry.
+- **`respondError`'s bare `err.(*SomeType)` type assertion silently dropped the error code on any
+  error that wasn't exactly that concrete type** (a wrapped error, a different adapter's error
+  type), degrading a structured `{code, message}` failure to a generic one the renderer's
+  code-keyed UI (retry affordances, specific messaging) couldn't distinguish.
+- **Redis's set-view row numbering restarted from zero on every page** rather than continuing from
+  the previous page's last row number, and its stream-entry renderer lost field order and dropped
+  any non-string field value — both silent data-fidelity bugs in what the UI displayed, not crashes.
+- **ClickHouse's and MySQL/MariaDB's own identifier/literal-escaping and quoting helpers didn't
+  escape a literal backslash** — a value or identifier containing one could break out of its
+  quoting in the emitted SQL, the class of bug SQL-injection defenses exist to close.
+- **`shell.Attach`'s returned detach function was silently discarded by its one caller**, leaking a
+  window-event listener per attach — invisible in a single-window session, real in the multi-window
+  correctness P6 is scoped to fix properly.
+- **`EnableFileDrop: true` on the main window violated this app's own documented security posture**
+  (drag-and-drop file access from arbitrary web content is exactly the surface the app's threat
+  model says to keep closed) and had no `security_test.go` asserting the posture it claimed —
+  fixed alongside adding that test.
+
+**Performance/resource efficiency:**
+
+- **Every SQL adapter fully materialized `[][]*string` for a whole page before handing it to the
+  columnar page builder** — a redundant intermediate copy of every cell, on top of the columnar
+  buffers the builder was going to allocate anyway. Postgres additionally re-boxed every non-NULL
+  cell through an `interface{}` unnecessarily on top of that.
+- **The status-bar CPU% was an unlabeled, unnormalized per-core sum** — on an idle machine with
+  several logical cores it could read implausibly high or spike to values with no obvious meaning,
+  because nothing divided the raw sum by core count or damped a single-sample spike. Fixed
+  alongside the metrics sampler's process-table-scan cost (`AppProcessSet`, one scan for every
+  needle instead of one per needle — see `metrics/sampler.go`'s own comment) and a fail-open filter
+  so a XPC-helper misattribution degrades to over-counting rather than under-counting memory.
+- **Vue reactivity was the dominant frontend perf finding, appearing three separate times**: the
+  project tree's cached node cache was fully deep-reactive (every cached subtree re-tracked on
+  every mutation) with an undebounced search recomputing on every keystroke; the grid's per-cell
+  event handlers were inline call-expressions inside `v-for`, which Vue's compiler can never cache
+  (`cacheHandlers` requires no loop-scoped identifier in the handler expression), so every render
+  reallocated a closure per visible cell; and search-match state lived inside a deep-reactive
+  record with its index rebuilt as a string `Set` rather than a structure suited to the lookup.
+  The general lesson: **`shallowReactive` nested inside an outer `reactive()` call opts just that
+  one property out of deep tracking** (Vue's `reactive()` getter recognizes an already-reactive
+  value via its RAW flag and returns it unchanged) — the fix pattern used across all three.
+- **The grid re-measured every column's width on every resize `pointermove` event**, redoing a full
+  layout pass dozens of times over the course of a single drag instead of once at drag end.
+- **Console result pages accumulated unbounded per tab** — nothing ever evicted an old result page
+  when a console tab re-ran a statement, growing tab memory without bound over a long session.
+- **Data-plane ops ran on `context.Background()` with an unbounded goroutine spawned per inbound
+  frame** — an op had no way to be bounded by anything but an explicit cancel RPC (outliving its
+  own session if the renderer that started it was already gone), and a frame burst could grow
+  goroutines without limit. Fixed with a session-scoped `context.WithCancel` cancelled in
+  `Session.Close()` and a bounded semaphore (`sessionMaxInFlightOps`) acquired *before* spawning,
+  so backpressure actually reaches the read loop rather than just gating concurrent execution.
+- **`toTypedArray`'s base64 decode always ran the manual `atob()` + per-byte `charCodeAt` loop**,
+  even though every data-plane chunk (four typed arrays per `TextColumnChunk`) goes through it on
+  the hot read path; `Uint8Array.fromBase64` (TC39 Stage 4) decodes natively where the runtime has
+  it, with the same loop kept as a feature-detected fallback. Cross-toolchain caveat worth
+  remembering: express this kind of runtime-may-or-may-not-have-it type as a **local intersection
+  type**, never a `declare global` augmentation — this repo's two TypeScript distributions
+  (`vue-tsc`'s plain `typescript` package vs. `tsgo`'s bundled lib) disagree on whether the method
+  is already declared and whether it's required or optional, and a global augmentation's
+  required-vs-optional mismatch against a lib that already declares the member fails to compile
+  (`TS2386`) the moment both toolchains reach the same file.
+
+**Architecture/cleanup:**
+
+- **A `Router *Native` indirection layer and a stale package doc comment were dead leftovers** from
+  an earlier native-adapter migration step, past the point where the indirection was still needed.
+- **Two dead protocol modules** (`engine-ops.ts`, `ipc.ts`) **and a scatter of bridge validation
+  gaps** (a `Test` RPC that skipped its own `Validate`, an unchecked port-number overflow, missing
+  bare-ID guards) were both found and fixed in the same round as everything above — the boundary
+  between "architecture" and "correctness" findings blurred often enough in practice that they're
+  worth checking together, not as two separate passes.
+- **A low-severity cleanup batch closed out the round**: dead exported symbols with zero call sites
+  anywhere in the repo (confirmed by grep before deletion, not by a lint tool — see the next point)
+  plus two stale README claims (ClickHouse still described as the `@clickhouse/client` npm package
+  from before P58b M6.4 moved it to native Go; "engine memory cap" still listed under Settings →
+  Advanced, removed end-to-end in P58f D18).
+- **Dead exports are still invisible to this repo's tooling, the same finding P1 already made about
+  `abbreviateCount`** — `deadcode`/`knip` both produced long candidate lists dominated by false
+  positives (test-only helpers real callers only reach from `_test.go` files those tools' default
+  build excludes, Zod schemas used only via `z.infer`/`.parse()` that `knip` under-tracks). Every
+  genuine removal in this round was verified individually by reading the surrounding code and
+  grepping for the exact symbol name repo-wide, not by trusting either tool's raw output.
+
+No findings document was written for round 1 (round 2's Opus subagents will re-derive their own
+against the tree this round leaves, per the process above) — proceed straight to spawning round
+2's three-agent cycle against the current tree next.
