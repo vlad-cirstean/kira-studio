@@ -1,6 +1,10 @@
-// Package metrics is the Go analogue of Electron's app.getAppMetrics(): it sums RSS and CPU
+// Package metrics is the Go analogue of Electron's app.getAppMetrics(): it sums memory and CPU
 // across the app's whole process set on a timer (P52 §8.4), and it is also the instrument gate
-// G1 (§3.3) is measured with.
+// G1 (§3.3) is measured with. The memory figure is RSS everywhere except darwin, where it is
+// ri_phys_footprint (proc_pid_rusage(RUSAGE_INFO_V2)) — the figure Activity Monitor's own "Memory"
+// column shows, which excludes shared system pages RSS double-counts across this app's own
+// multi-process set (P7 F1/D2). cmd/g1measure, this package's own throwaway RSS-only measurement
+// tool, is unaffected — see its own header comment.
 //
 // The process set is not obvious and getting it wrong invalidates any measurement built on this
 // package: a native webview's helper processes (WebKitGTK's WebProcess/NetworkProcess on Linux,
@@ -17,12 +21,14 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// Sample mirrors packages/shared/protocol/ipc.ts's AppMetricsSample shape. CPUPercent is normalized to
-// the machine's whole capacity (0-100, occasionally a hair over from measurement jitter), not the
-// per-core-sum a tool like `top` reports per process (which can read e.g. 350% on a busy
-// quad-core machine) — StatusBar.vue renders it as a plain "N%" with no further context or
+// Sample mirrors packages/shared/protocol/events.ts's AppMetricsSample shape. CPUPercent is
+// normalized to the machine's whole capacity (0-100, occasionally a hair over from measurement
+// jitter), not the per-core-sum a tool like `top` reports per process (which can read e.g. 350% on
+// a busy quad-core machine) — StatusBar.vue renders it as a plain "N%" with no further context or
 // clamping (and reserves only 4 characters of layout width for it, "100%"), so a raw per-core-sum
-// would both mean the wrong thing to a reader and overflow that reserved width (P2 R1).
+// would both mean the wrong thing to a reader and overflow that reserved width (P2 R1). MemoryBytes
+// is RSS everywhere except darwin, where it is phys_footprint — see this package's own doc comment
+// (P7 D2).
 type Sample struct {
 	CPUPercent  float64 `json:"cpuPercent"`
 	MemoryBytes uint64  `json:"memoryBytes"`
@@ -308,6 +314,8 @@ func (c *CachedPIDs) revalidate() {
 // processCreateTime reads createTime off the same probe Sampler uses (rather than its own
 // NewProcess/CreateTime lookup), so CachedPIDs' idea of "the same process" and cpuState's can
 // never diverge — the create-time tag both use to detect pid reuse always comes from one place.
+// defaultProbe is platform-selected: probe_darwin.go (native, requires cgo) or probe_other.go
+// (gopsutil, every other build) — see D3.
 func processCreateTime(pid int32) (int64, bool) {
 	ps, ok := defaultProbe(pid)
 	if !ok {
@@ -316,12 +324,13 @@ func processCreateTime(pid int32) (int64, bool) {
 	return ps.createTime, true
 }
 
-// defaultProbe is today's gopsutil-based per-process probe: NewProcess (an existing-pid check),
-// MemoryInfo (RSS) and Times (cumulative CPU seconds), folded into one pass/fail result instead of
-// the memory and CPU reads failing independently as before the probe seam existed. A future darwin
-// probe replaces this with a single proc_pid_rusage syscall reading footprint instead of RSS;
-// every other platform keeps this implementation (D3).
-func defaultProbe(pid int32) (procSample, bool) {
+// gopsutilProbe is the gopsutil-based per-process probe: NewProcess (an existing-pid check),
+// MemoryInfo (RSS) and Times (cumulative CPU seconds), folded into one pass/fail result rather than
+// letting the memory and CPU reads fail independently. probe_other.go's defaultProbe is this
+// unchanged, on every platform without a native footprint syscall (or without cgo to reach the one
+// that exists); probe_darwin.go's EPERM fallback also calls gopsutilCreateTime below for its
+// identity tag, since struct proc_taskinfo has no start-time field of its own (D3).
+func gopsutilProbe(pid int32) (procSample, bool) {
 	p, err := process.NewProcess(pid)
 	if err != nil {
 		return procSample{}, false
@@ -339,4 +348,20 @@ func defaultProbe(pid int32) (procSample, bool) {
 		return procSample{}, false
 	}
 	return procSample{cpuSeconds: times.User + times.System, memBytes: mi.RSS, createTime: createTime}, true
+}
+
+// gopsutilCreateTime is process-creation-time alone (gopsutil's CreateTime, a sysctl kern.proc.pid
+// on darwin) — probe_darwin.go's EPERM-fallback identity tag, kept separate from gopsutilProbe so
+// that fallback isn't tied to gopsutil's own unchecked-return MemoryInfo/Times reads (the exact
+// pattern F2 flags as a bug) when all it actually needs is the creation timestamp.
+func gopsutilCreateTime(pid int32) (int64, bool) {
+	p, err := process.NewProcess(pid)
+	if err != nil {
+		return 0, false
+	}
+	ct, err := p.CreateTime()
+	if err != nil {
+		return 0, false
+	}
+	return ct, true
 }
