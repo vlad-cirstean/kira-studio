@@ -1241,6 +1241,17 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(pastedInsertInputs.nth(0)).toHaveValue('3');
   await expect(pastedInsertInputs.nth(1)).toHaveValue('3');
   await expect(pastedInsertInputs.nth(2)).toHaveValue('brand new row');
+
+  // P2 R2 regression: pasting again onto that same staged insert row (selected via its gutter,
+  // a 'row'-kind selection) must update the row already staged there, not append a second one.
+  await page.evaluate(() => navigator.clipboard.writeText('3\t3\tupdated brand new row'));
+  await pastedInsertRow.locator('.gutter-cell.inserted').click();
+  await grid.focus();
+  await page.keyboard.press('Control+v');
+  await expect(pastedInsertRow).toHaveCount(1);
+  await expect(pastedInsertInputs.nth(0)).toHaveValue('3');
+  await expect(pastedInsertInputs.nth(1)).toHaveValue('3');
+  await expect(pastedInsertInputs.nth(2)).toHaveValue('updated brand new row');
   await discardChanges(page);
 
   // =============================================================================================

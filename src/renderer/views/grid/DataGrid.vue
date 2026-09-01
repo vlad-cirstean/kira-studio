@@ -1450,7 +1450,8 @@ function onCopy(): void {
 
 // D13: TSV-if-tab-else-CSV, applied column-by-column from the selection's anchor across the
 // current display column order — existing rows become stageEdit calls, rows past the loaded
-// page become new pending inserts (one addInsertRow per pasted row, reused across its columns).
+// page become pending inserts (reusing one already staged at that row, else a fresh
+// addInsertRow — either way, reused across the pasted row's own columns; P2 R2).
 async function onPaste(): Promise<void> {
   if (!canEditTable.value) return;
   const sel = rt()?.selection;
@@ -1482,7 +1483,12 @@ async function onPaste(): Promise<void> {
     const isNewRow = row >= p.rowCount;
     let insertId = insertIds.get(row);
     if (isNewRow && insertId === undefined) {
-      insertId = addInsertRow(props.tabId, insertColumns);
+      // P2 R2: reuse the PendingInsert already staged at this display row (e.g. from an earlier
+      // paste, or Add Row) instead of always appending a fresh one — insertRows' identity is
+      // positional (pending.value.inserts[row - p.rowCount], see its own comment below), so a
+      // paste landing on an existing staged row must update it, not create a sibling.
+      insertId =
+        pending.value?.inserts[row - p.rowCount]?.id ?? addInsertRow(props.tabId, insertColumns);
       insertIds.set(row, insertId);
     }
     const cols = grid[ri];
