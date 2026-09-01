@@ -67,6 +67,17 @@ func (t *Ticker) Start() {
 
 func (t *Ticker) run() {
 	defer close(t.done)
+
+	// A priming sample establishes Sampler.prevAt/prevCPU before the loop's first real tick, so the
+	// first *emitted* sample differences against an Interval-old baseline instead of skipping the
+	// delta (prevAt.IsZero()) and reporting a placeholder 0% CPU no matter how busy the app actually
+	// is at startup (F4). The result itself is discarded — only the side effect matters — and a
+	// failure here is not fatal: the first real tick below recovers on its own, same as any other
+	// sample failure.
+	if _, err := t.sampler.Sample(); err != nil {
+		slog.Warn("priming sample failed", "scope", "metrics", "err", err)
+	}
+
 	ticker := time.NewTicker(t.interval)
 	defer ticker.Stop()
 	for {
