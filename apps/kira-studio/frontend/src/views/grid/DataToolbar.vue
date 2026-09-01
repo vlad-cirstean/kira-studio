@@ -2,6 +2,7 @@
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
+import { openGenerateDataDialog } from '../../state/fakeData';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import PagerControls from '../shared/page/PagerControls.vue';
@@ -57,6 +58,21 @@ const deleteRowTooltip = computed(() => {
   return 'This connection does not support deleting rows';
 });
 
+// P15 D1: a capability test (tabular + canInsert), not a kind check — a future adapter with real
+// columns and an insert path opts in for free. Deliberately narrower than isWritable/canInsert
+// alone: mongo/redis/kafka/sqs/s3 all have canInsert but no column set to generate against (F5).
+const canGenerateData = computed(
+  () =>
+    !!caps.value?.tabular &&
+    !!caps.value?.canInsert &&
+    !connectionRecord(props.tab.connectionId)?.readOnly,
+);
+const generateDataTooltip = computed(() => {
+  if (canGenerateData.value) return 'Generate data…';
+  if (connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
+  return 'This connection does not support generating rows';
+});
+
 function onFirst(): void {
   void goFirst(props.tab.id);
 }
@@ -80,6 +96,10 @@ function onPageSize(size: PageSize): void {
 }
 function onToggleSearch(): void {
   toggleSearchOpen(props.tab.id);
+}
+function onGenerateData(): void {
+  if (!canGenerateData.value) return;
+  openGenerateDataDialog(props.tab.id);
 }
 
 const columnsOpen = ref(false);
@@ -213,6 +233,13 @@ function onDeleteRow(): void {
       :disabled="!isWritable"
       v-tooltip="isWritable ? 'Add a row' : 'Connection is read-only'"
       @click="onAddRow"
+    />
+    <IconButton
+      icon="wand"
+      data-testid="toolbar-generate-data"
+      :disabled="!canGenerateData"
+      v-tooltip="generateDataTooltip"
+      @click="onGenerateData"
     />
     <IconButton
       icon="trash"

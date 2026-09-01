@@ -6,6 +6,7 @@ import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { togglePalette } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
+import { fakeDataDialogState } from './state/fakeData';
 import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
 import { uploadDialogState } from './state/objectStore';
 import { settingsOpen } from './state/settings';
@@ -13,6 +14,7 @@ import { activateNextTab, activatePrevTab, closeTab, tabsState } from './state/t
 import AppTooltip from './workbench/AppTooltip.vue';
 import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
+import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { initEngineState } from './workbench/state/engine';
 import { initTooltips } from './workbench/state/tooltip';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
@@ -57,6 +59,7 @@ onUnmounted(() => {
   <WorkbenchShell />
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
+  <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />
   <ContextMenu />
   <CommandPalette />

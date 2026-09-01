@@ -25,6 +25,9 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
   { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },
   { id: 'view.format', label: 'Format query', run: () => runCommand('view.format') },
+  // P15 D11: DataView.vue registers this only while a data tab is active and its connection
+  // allows it — a no-op elsewhere, same as every other view-scoped command above.
+  { id: 'data.generate', label: 'Generate data…', run: () => runCommand('data.generate') },
   { id: 'tab-next', label: 'Next tab', run: activateNextTab },
   { id: 'tab-prev', label: 'Previous tab', run: activatePrevTab },
   {

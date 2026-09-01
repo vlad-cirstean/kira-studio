@@ -4,6 +4,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord, connectionsState } from '../../state/connections';
+import { openGenerateDataDialog } from '../../state/fakeData';
 import { connColorVar } from '../../theme/connColor';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -117,6 +118,13 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+// P15 D1/D11: the palette's own gate — mirrors DataToolbar.vue's canGenerateData exactly, since
+// the palette entry has no disabled-button affordance to lean on.
+function onGenerateData(): void {
+  if (!caps.value?.tabular || !caps.value?.canInsert || connRecord.value?.readOnly) return;
+  openGenerateDataDialog(props.tab.id);
+}
+
 let unregisterCommands: Array<() => void> = [];
 
 onMounted(() => {
@@ -133,6 +141,7 @@ onMounted(() => {
     // button had, item 4's first pass) — the keyboard-shortcut/command-palette path needs the
     // same reconnect-or-refresh semantics as the visible button, not a second, unguarded one.
     registerCommand('view.refresh', () => onRefresh()),
+    registerCommand('data.generate', onGenerateData),
   ];
 });
 
