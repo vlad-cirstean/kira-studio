@@ -23,6 +23,7 @@ type dataFakeAdapter struct {
 	// Read() was actually called with (P2 R1: session cancellation propagation).
 	readCtxFn func(ctx context.Context) (page.Page, error)
 	mutateFn  func() (model.MutationResult, error)
+	previewFn func() ([]string, error)
 }
 
 func (a *dataFakeAdapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
@@ -34,6 +35,9 @@ func (a *dataFakeAdapter) Read(ctx context.Context, req adapters.ReadRequest, op
 }
 func (a *dataFakeAdapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	return a.mutateFn()
+}
+func (a *dataFakeAdapter) Preview(plan model.MutationPlan) ([]string, error) {
+	return a.previewFn()
 }
 func newDispatcher() (*Dispatcher, *Host) {
 	cache := enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil)

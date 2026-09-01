@@ -3,7 +3,9 @@ package adapterhost
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -75,6 +77,23 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 		// Matches stdio-main.ts's own "dropped an unparseable frame" / kind-check no-op.
 		return
 	}
+
+	// P2 R2: host.go's safeRun (P58 D16) only wraps a call already routed through Host.RunOp — but
+	// Dispatcher.Preview deliberately never goes through RunOp (it must not appear in the op log,
+	// data.go's own doc comment on Preview), and several other paths here (Invalidate, the cache
+	// fast paths around Read/Count, every RunOp result's own `any` type assertion) never do either.
+	// Each of those runs on this frame's own goroutine (HandleDataFrameAsync), so an unrecovered
+	// panic here previously took the whole process down instead of failing just this one request.
+	// This mirrors safeRun's own contract (recover, log, answer with E_INTERNAL) at the one point
+	// that actually covers every op dispatched from a frame, known-request-id included.
+	defer func() {
+		if rec := recover(); rec != nil {
+			if r.deps.Log != nil {
+				r.deps.Log("error", fmt.Sprintf("data frame panic: %v\n%s", rec, debug.Stack()))
+			}
+			r.respondError(session, probe.ID, adapters.New(adapters.ErrorCode("E_INTERNAL"), fmt.Sprintf("internal error: %v", rec), nil))
+		}
+	}()
 
 	switch probe.Op {
 	case "ping":

@@ -111,6 +111,52 @@ func TestHandleDataFrame_NoLiveAdapter_RespondsWithError(t *testing.T) {
 	}
 }
 
+// P2 R2: Dispatcher.Preview deliberately never goes through Host.RunOp (it must not appear in the
+// op log), so it never gets RunOp's own safeRun recover() boundary — and neither does Invalidate,
+// the cache fast paths, or a wrong type assertion on a RunOp result, all of which also run on this
+// frame's own goroutine outside RunOp. HandleDataFrame's own recover (dataframe.go) is what has to
+// catch a panic anywhere in this dispatch instead: a panicking adapter must turn into an ordinary
+// E_INTERNAL error response for this one request, not take the whole process down.
+func TestHandleDataFrame_PreviewPanics_RespondsWithErrorInsteadOfCrashing(t *testing.T) {
+	r := newTestRouter()
+
+	fake := &dataFakeAdapter{previewFn: func() ([]string, error) {
+		panic("boom")
+	}}
+	adapters.SetLiveAdapter("conn-preview-panic", fake)
+	defer adapters.DeleteLiveAdapter("conn-preview-panic")
+
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	frame := mustFrame(t, map[string]any{
+		"kind": "req", "id": 3, "op": "data:preview",
+		"payload": map[string]any{
+			"connectionId": "conn-preview-panic", "path": "database:app/table:t", "ops": []any{},
+		},
+	})
+	r.HandleDataFrame(session, frame)
+
+	resp := readSent(t, conn)
+	if resp["kind"] != "res" || resp["id"] != float64(3) || resp["ok"] != false {
+		t.Fatalf("resp = %+v, want a res/3/ok:false frame", resp)
+	}
+	errObj, _ := resp["error"].(map[string]any)
+	if errObj == nil || errObj["code"] != "E_INTERNAL" {
+		t.Fatalf("resp error = %+v, want code E_INTERNAL", resp["error"])
+	}
+
+	// The panic must not have taken the session (or process) down — a follow-up request on the
+	// same session still gets served normally.
+	frame2 := mustFrame(t, map[string]any{"kind": "req", "id": 4, "op": "ping"})
+	r.HandleDataFrame(session, frame2)
+	resp2 := readSent(t, conn)
+	if resp2["kind"] != "res" || resp2["id"] != float64(4) || resp2["ok"] != true {
+		t.Fatalf("resp2 = %+v, want the session still alive and answering ping", resp2)
+	}
+}
+
 // ping is answered locally — the engine is this process now (P58f D11) — with the same
 // PingPayload shape rpc.ts's ping handler used to return.
 func TestHandleDataFrame_Ping_AnsweredLocally(t *testing.T) {
