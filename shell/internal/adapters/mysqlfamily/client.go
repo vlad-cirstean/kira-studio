@@ -34,6 +34,14 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 	mc.ParseTime = false
 	mc.MultiStatements = false
 	mc.AllowNativePasswords = true
+	// P2 R2: without CLIENT_FOUND_ROWS, MySQL/MariaDB report "rows changed" from an UPDATE, not
+	// "rows matched" — so editing a cell back to the value it already had returns affectedRows=0,
+	// which mutate()'s AssertAffectedExactlyOne(kind, 0) then rejects as a failed update, rolling
+	// back the whole batch even though the row was found and the statement succeeded. Postgres and
+	// SQLite both report rows matched natively; this flag is what makes MySQL/MariaDB consistent
+	// with them (the old TS client got this for free — the mariadb connector's own foundRows option
+	// defaults to true).
+	mc.ClientFoundRows = true
 	// B23: the Go analogue of connectAttributes: { program_name: 'kira-studio' }.
 	mc.ConnectionAttributes = "program_name:kira-studio"
 	mc.Timeout = connectTimeout

@@ -415,6 +415,32 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P2 R2: without CLIENT_FOUND_ROWS, MySQL/MariaDB report an UPDATE's "rows changed" count, not
+	// "rows matched" — setting a column back to the value it already holds affects 0 rows on the
+	// wire, which AssertAffectedExactlyOne then rejected as a failed update. Two mutates to the same
+	// value, back to back: the second must land exactly like the first, not roll back as if the row
+	// were never found.
+	t.Run("mutate: update setting a column to its own current value still reports affectedRows=1", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		plan := model.MutationPlan{
+			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Ops: []model.MutationRowOp{{
+				Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("2")}},
+				Changes: model.RowValues{{Name: "name", Value: strp("Globex Noop")}},
+			}},
+		}
+		if _, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-13-noop-setup")); err != nil {
+			t.Fatalf("Mutate (setup): %v", err)
+		}
+		result, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-13-noop"))
+		if err != nil {
+			t.Fatalf("Mutate (no-op update): %v", err)
+		}
+		if result.AffectedRows != 1 {
+			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+		}
+	})
+
 	t.Run("mutate: unknown column is E_NOT_FOUND", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)
 		plan := model.MutationPlan{
