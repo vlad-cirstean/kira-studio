@@ -18,6 +18,7 @@
     "tests/e2e-real/**/*.ts",
     "tests/ui/**/*.ts",
     "../../packages/db-fixtures/support/**/*.ts",
-    "tests/ipc/**/*.ts"
+    "tests/ipc/**/*.ts",
+    "tests/support/**/*.ts"
   ]
 }

@@ -91,7 +91,7 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   await expect(orderItemsRow).toBeVisible();
   await orderItemsRow.dblclick();
 
-  // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's reviveChunks —
+  // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's decodeFrame —
   // real rows from 0001_seed.sql, not a canned fixture.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });

@@ -27,21 +27,22 @@
  */
 export interface FakeSocket extends EventTarget {
   readyState: number;
+  binaryType: string;
   onopen: (() => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
   onclose: (() => void) | null;
   onerror: (() => void) | null;
   send(value: unknown): void;
   close(): void;
-  /** Every value passed to `send`, in order — what the test asserts requests against. Under the
-   *  real `JSONStream` (tests/ui/), this is the already-stringified JSON frame (`stream.js` wraps
-   *  `send` before this socket ever sees it); under `tests/unit/`'s fully-mocked `JSONStream`
-   *  (`wailsRuntime.ts`), it is the raw request object port.ts passed in. */
+  /** Every value passed to `send`, in order — what the test asserts requests against. Requests
+   *  stay JSON text (P11 D3), and port.ts itself calls `JSON.stringify` before `send` now (it used
+   *  to rely on `JSONStream` doing that), so this is always the already-stringified JSON frame,
+   *  real `Stream` or this fake alike. */
   sent: unknown[];
   /** Test control: moves to OPEN and fires `onopen`. */
   __open(): void;
-  /** Test control: delivers a decoded frame as if it arrived from Go. */
-  __message(data: unknown): void;
+  /** Test control: delivers a raw FlatBuffers frame as if it arrived from Go. */
+  __message(data: ArrayBuffer): void;
   /** Test control: moves to CLOSED and fires `onclose`. */
   __close(): void;
 }
@@ -70,6 +71,7 @@ function defineHandlerProperty(target: EventTarget, type: string): void {
 
 class FakeSocketImpl extends EventTarget {
   readyState = CONNECTING;
+  binaryType = 'arraybuffer';
   sent: unknown[] = [];
   declare onopen: (() => void) | null;
   declare onmessage: ((ev: MessageEvent) => void) | null;
@@ -96,7 +98,7 @@ class FakeSocketImpl extends EventTarget {
     this.dispatchEvent(new Event('open'));
   }
 
-  __message(data: unknown): void {
+  __message(data: ArrayBuffer): void {
     this.dispatchEvent(new MessageEvent('message', { data }));
   }
 

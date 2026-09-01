@@ -32,7 +32,9 @@ const (
 
 	// maxDataFrameBytes mirrors Wails' own streamMaxFrameBytes, same as enginehost's own copy of
 	// this constant. A pathological Go-produced page can approach it (MaxPageSize 10 000 rows,
-	// MaxCellBytes 64 KiB, base64 inflating by 1.33x, §4.10) — this is the check that catches it.
+	// MaxCellBytes 64 KiB, §4.10) — this is the check that catches it. The FlatBuffers wire format
+	// (P11) carries raw bytes with no base64 inflation, so this budget is more headroom than it
+	// used to be, not less.
 	maxDataFrameBytes = 64 << 20
 
 	// sessionMaxInFlightOps bounds HandleDataFrameAsync's own goroutine-per-frame (P2 R1): without

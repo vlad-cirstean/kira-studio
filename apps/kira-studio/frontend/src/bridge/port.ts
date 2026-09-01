@@ -1,3 +1,4 @@
+import { decodeFrame } from '@shared/protocol/frame';
 import type { PortEvent, PortRequest, PortResponse } from '@shared/protocol/port';
 // tsconfig.web.json maps this specifier onto @wailsio/runtime's real types (D8) and resolves it
 // cleanly; tests/unit/tsconfig.json has no such mapping (a "paths" entry there breaks Bun's own
@@ -9,7 +10,7 @@ import type { PortEvent, PortRequest, PortResponse } from '@shared/protocol/port
 // "unused" under the project where this import already resolves fine.
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
-import { JSONStream } from '/wails/runtime.js';
+import { Stream } from '/wails/runtime.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -27,7 +28,11 @@ const eventListeners = new Map<string, Set<(payload: unknown) => void>>();
 // older page generation's session itself (stream.ts's WailsSocket._closed + the poll loop it
 // aborts), which is what retires src/main/index.ts's own `generation` counter — nothing here
 // re-implements it.
-const socket = JSONStream('engine');
+const socket = Stream('engine');
+// P11 F4: WailsSocket wraps the payload in a Blob if binaryType === 'blob'. It defaults to
+// 'arraybuffer', but this is set explicitly anyway — one line that removes a silent-Blob failure
+// mode across three socket implementations (WailsSocket, native WebSocket, the test mock).
+socket.binaryType = 'arraybuffer';
 
 let closed = false;
 
@@ -50,95 +55,9 @@ export const ready = new Promise<void>((resolve, reject) => {
 // error `initEngineState`'s own catch is about to report.
 void ready.catch(() => {});
 
-// P57 finding, discovered by C1's own boot proof (§5.7): `TextColumnChunk` (protocol/page.ts) is
-// four exactly-sized TypedArrays, a shape the old `MessagePort`'s structured clone carried across
-// verbatim. JSONStream's transport does not — `src/engine/stdio-main.ts` (untouched by P57, §0.2)
-// JSON.stringifies every frame, including data ones, and `JSON.stringify` on a Uint8Array/
-// Uint32Array serializes it as a plain object keyed "0","1","2",... (TypedArrays are not
-// `Array.isArray`), so `JSON.parse` hands back `{0:1,1:2,...}`, not a real typed array — every
-// data-view read failed downstream with "chunk.data is not a Uint8Array" (protocol/page.ts's own
-// assertChunkStructure) until this revived it. Recognised by the four field names together, since
-// every page kind (tabular/document/key-value/object-store) reuses the exact same chunk shape
-// under different key names (`data`, `ids`/`bodies`, `fields`/`values`, `keys`/`headers`/...).
-function isChunkLike(
-  v: unknown,
-): v is { data: unknown; offsets: unknown; nulls: unknown; truncated: unknown } {
-  return (
-    typeof v === 'object' &&
-    v !== null &&
-    !Array.isArray(v) &&
-    'data' in v &&
-    'offsets' in v &&
-    'nulls' in v &&
-    'truncated' in v
-  );
-}
-
-// P2 R1: Uint8Array.fromBase64 (TC39 "Uint8Array to/from base64", Stage 4) decodes natively —
-// no intermediate atob() binary string, no per-byte charCodeAt loop copying it into a second
-// buffer. A local intersection type, not a `declare global` augmentation: tsgo's bundled
-// lib.esnext.typedarrays.d.ts (tests/unit/tsconfig.json, tsconfig.node.json) already declares it
-// as a required member, while vue-tsc's plain typescript package (tsconfig.web.json — what
-// actually type-checks this file) has no type for it at all; a global augmentation's required-vs-
-// optional mismatch against the former fails to compile, where a local cast conflicts with
-// neither. Feature-detected at runtime either way: a webview without it still gets the exact same
-// atob()-based decode as before, so this can only ever be as fast, never differently correct.
-type Uint8ArrayWithFromBase64 = typeof Uint8Array & {
-  fromBase64?(base64: string): Uint8Array<ArrayBuffer>;
-};
-
-function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
-  const ctor = Uint8Array as Uint8ArrayWithFromBase64;
-  if (ctor.fromBase64) return ctor.fromBase64(base64);
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-// A9: every chunk's four buffers cross the wire as base64 of their exact little-endian bytes
-// (P58 D5, P58f D8) rather than JSON.stringify's index-keyed object — decoded straight into the
-// typed array's backing buffer, no per-element round trip.
-function toTypedArray<T>(v: unknown, ctor: { new (buffer: ArrayBuffer): T }): T {
-  return new ctor(decodeBase64(v as string).buffer);
-}
-
-export function reviveChunks(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(reviveChunks);
-  if (value && typeof value === 'object') {
-    if (isChunkLike(value)) {
-      return {
-        data: toTypedArray(value.data, Uint8Array),
-        offsets: toTypedArray(value.offsets, Uint32Array),
-        nulls: toTypedArray(value.nulls, Uint8Array),
-        truncated: toTypedArray(value.truncated, Uint32Array),
-      };
-    }
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = reviveChunks(v);
-    return out;
-  }
-  return value;
-}
-
-// P2 R2: reviveChunks throws on a malformed chunk (bad base64, an offsets/truncated buffer whose
-// byte length isn't a multiple of 4 for Uint32Array, ...) — genuinely reachable on a corrupt or
-// truncated frame, not just a defensive check. socket.onmessage (below) calls this synchronously
-// from DOM event dispatch, which swallows a listener's throw into an uncaught-error report rather
-// than routing it anywhere a promise could see it. Without a try/catch here, that throw happened
-// *after* the pending entry and its timeout were already cleared (so nothing could ever reject
-// it either) — the request's promise then never resolves or rejects, and the caller hangs forever
-// instead of seeing an error.
 function handleMessage(message: PortResponse | PortEvent): void {
   if (message.kind === 'evt') {
-    // No pending promise is tied to an event — the only correct move on a bad payload is to drop
-    // this one event, the same way an unparseable frame is dropped elsewhere on this path.
-    try {
-      const payload = reviveChunks(message.payload);
-      for (const cb of eventListeners.get(message.topic) ?? []) cb(payload);
-    } catch {
-      // Dropped: a malformed event payload has no pending request to report it to.
-    }
+    for (const cb of eventListeners.get(message.topic) ?? []) cb(message.payload);
     return;
   }
   const req = pending.get(message.id);
@@ -146,11 +65,7 @@ function handleMessage(message: PortResponse | PortEvent): void {
   pending.delete(message.id);
   if (req.timer) clearTimeout(req.timer);
   if (message.ok) {
-    try {
-      req.resolve(reviveChunks(message.payload));
-    } catch (e) {
-      req.reject(e instanceof Error ? e : new Error(String(e)));
-    }
+    req.resolve(message.payload);
   } else {
     const err: Error & { code?: string } = new Error(message.error.message);
     err.code = message.error.code;
@@ -160,10 +75,20 @@ function handleMessage(message: PortResponse | PortEvent): void {
 
 socket.onopen = () => resolveReady();
 
+// P11: decodeFrame throws on a corrupt or truncated frame (a mismatched "KIF1" file identifier,
+// a missing required field) — genuinely reachable, not just a defensive check. This callback runs
+// synchronously from DOM event dispatch, which swallows a listener's throw into an uncaught-error
+// report rather than routing it anywhere a promise could see it, so the try/catch here (P2 R2's
+// same fix, now around decodeFrame instead of reviveChunks) is what keeps a bad frame from
+// leaving some pending request hanging forever. A frame that fails to decode has no reliably
+// extractable id to reject a specific request with either, so it is dropped — the same move
+// dataframe.go's own probe-decode makes on an unparseable frame.
 socket.onmessage = (ev: MessageEvent<unknown>) => {
-  // JSONStream decodes for us — ev.data is the parsed frame, and a frame that is not valid JSON
-  // raised `error` and never reached here (P57 D2).
-  handleMessage(ev.data as PortResponse | PortEvent);
+  try {
+    handleMessage(decodeFrame(new Uint8Array(ev.data as ArrayBuffer)));
+  } catch {
+    // Dropped.
+  }
 };
 
 socket.onclose = () => {
@@ -215,7 +140,7 @@ export function request(
     // schedule, which is the behaviour today's null-port rejection approximates.
     ready.then(
       () => {
-        if (!closed) socket.send(req);
+        if (!closed) socket.send(JSON.stringify(req));
       },
       (err) => {
         pending.delete(id);

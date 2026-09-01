@@ -7,9 +7,12 @@ import (
 	"testing"
 	"time"
 
+	flatbuffers "github.com/google/flatbuffers/go"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page/wire"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -18,6 +21,8 @@ func newTestRouter() *Router {
 	return NewRouter(deps, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
 }
 
+// mustFrame builds a renderer -> Go request frame, which stays JSON text (P11 D3) — only the
+// response/event side (readSentFrame below) is FlatBuffers.
 func mustFrame(t *testing.T, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -27,31 +32,41 @@ func mustFrame(t *testing.T, v any) []byte {
 	return b
 }
 
-func readSent(t *testing.T, conn *fakeConn) map[string]any {
+func readSentFrame(t *testing.T, conn *fakeConn) *wire.Frame {
 	t.Helper()
-	return readSentWithin(t, conn, time.Second)
+	return readSentFrameWithin(t, conn, time.Second)
 }
 
-func readSentWithin(t *testing.T, conn *fakeConn, timeout time.Duration) map[string]any {
+func readSentFrameWithin(t *testing.T, conn *fakeConn, timeout time.Duration) *wire.Frame {
 	t.Helper()
 	select {
 	case frame := <-conn.sent:
-		var out map[string]any
-		if err := json.Unmarshal(frame, &out); err != nil {
-			t.Fatalf("unmarshal sent frame: %v", err)
+		if !wire.FrameBufferHasIdentifier(frame) {
+			t.Fatalf("sent frame is missing the %q file identifier", wire.FrameIdentifier)
 		}
-		return out
+		return wire.GetRootAsFrame(frame, 0)
 	case <-time.After(timeout):
 		t.Fatalf("no frame was sent to the session within %s", timeout)
 		return nil
 	}
 }
 
+// payloadTable extracts frame's union payload as a table pos'd at the concrete type payloadType
+// says it is — Init it into the matching generated struct (wire.PingPayload, wire.CacheStats, ...).
+func payloadTable(t *testing.T, frame *wire.Frame) flatbuffers.Table {
+	t.Helper()
+	var tab flatbuffers.Table
+	if !frame.Payload(&tab) {
+		t.Fatalf("frame has no payload table")
+	}
+	return tab
+}
+
 func assertNothingSent(t *testing.T, conn *fakeConn) {
 	t.Helper()
 	select {
 	case frame := <-conn.sent:
-		t.Fatalf("expected no frame, got %s", frame)
+		t.Fatalf("expected no frame, got %x", frame)
 	case <-time.After(50 * time.Millisecond):
 	}
 }
@@ -62,7 +77,7 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 	r := newTestRouter()
 
 	fake := &dataFakeAdapter{readFn: func() (page.Page, error) {
-		return page.TabularPage{RowCount: 1, ByteSize: 5}, nil
+		return page.TabularPage{RowCount: 1, ByteSize: 5, Position: page.UnpagedPosition(1)}, nil
 	}}
 	adapters.SetLiveAdapter("conn-1", fake)
 	defer adapters.DeleteLiveAdapter("conn-1")
@@ -81,9 +96,9 @@ func TestHandleDataFrame_NativeRead_RespondsLocally(t *testing.T) {
 	})
 	r.HandleDataFrame(session, frame)
 
-	resp := readSent(t, conn)
-	if resp["kind"] != "res" || resp["id"] != float64(1) || resp["ok"] != true {
-		t.Fatalf("resp = %+v, want a res/1/ok:true frame", resp)
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 1 || !resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/1/ok:true frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
 	if fake.readCalls.Load() != 1 {
 		t.Errorf("adapter.Read calls = %d, want 1", fake.readCalls.Load())
@@ -105,9 +120,9 @@ func TestHandleDataFrame_NoLiveAdapter_RespondsWithError(t *testing.T) {
 	})
 	r.HandleDataFrame(session, frame)
 
-	resp := readSent(t, conn)
-	if resp["kind"] != "res" || resp["id"] != float64(2) || resp["ok"] != false {
-		t.Fatalf("resp = %+v, want a res/2/ok:false frame", resp)
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 2 || resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/2/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
 }
 
@@ -138,22 +153,22 @@ func TestHandleDataFrame_PreviewPanics_RespondsWithErrorInsteadOfCrashing(t *tes
 	})
 	r.HandleDataFrame(session, frame)
 
-	resp := readSent(t, conn)
-	if resp["kind"] != "res" || resp["id"] != float64(3) || resp["ok"] != false {
-		t.Fatalf("resp = %+v, want a res/3/ok:false frame", resp)
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 3 || resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/3/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
-	errObj, _ := resp["error"].(map[string]any)
-	if errObj == nil || errObj["code"] != "E_INTERNAL" {
-		t.Fatalf("resp error = %+v, want code E_INTERNAL", resp["error"])
+	errObj := resp.Error(nil)
+	if errObj == nil || string(errObj.Code()) != "E_INTERNAL" {
+		t.Fatalf("resp error = %+v, want code E_INTERNAL", errObj)
 	}
 
 	// The panic must not have taken the session (or process) down — a follow-up request on the
 	// same session still gets served normally.
 	frame2 := mustFrame(t, map[string]any{"kind": "req", "id": 4, "op": "ping"})
 	r.HandleDataFrame(session, frame2)
-	resp2 := readSent(t, conn)
-	if resp2["kind"] != "res" || resp2["id"] != float64(4) || resp2["ok"] != true {
-		t.Fatalf("resp2 = %+v, want the session still alive and answering ping", resp2)
+	resp2 := readSentFrame(t, conn)
+	if resp2.Kind() != wire.FrameKindres || resp2.Id() != 4 || !resp2.Ok() {
+		t.Fatalf("resp2 = kind:%v id:%d ok:%v, want the session still alive and answering ping", resp2.Kind(), resp2.Id(), resp2.Ok())
 	}
 }
 
@@ -166,22 +181,24 @@ func TestHandleDataFrame_Ping_AnsweredLocally(t *testing.T) {
 	defer detach()
 
 	r.HandleDataFrame(session, mustFrame(t, map[string]any{"kind": "req", "id": 3, "op": "ping"}))
-	resp := readSent(t, conn)
-	if resp["kind"] != "res" || resp["id"] != float64(3) || resp["ok"] != true {
-		t.Fatalf("resp = %+v, want a res/3/ok:true frame", resp)
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 3 || !resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/3/ok:true frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
-	payload, ok := resp["payload"].(map[string]any)
-	if !ok {
-		t.Fatalf("resp.payload = %+v, want an object", resp["payload"])
+	if resp.PayloadType() != wire.PayloadPingPayload {
+		t.Fatalf("resp.payloadType = %v, want PingPayload", resp.PayloadType())
 	}
-	if payload["pong"] != true {
-		t.Errorf("payload.pong = %v, want true", payload["pong"])
+	var ping wire.PingPayload
+	tab := payloadTable(t, resp)
+	ping.Init(tab.Bytes, tab.Pos)
+	if !ping.Pong() {
+		t.Errorf("payload.pong = %v, want true", ping.Pong())
 	}
-	if pid, ok := payload["enginePid"].(float64); !ok || int(pid) != os.Getpid() {
-		t.Errorf("payload.enginePid = %v, want %d", payload["enginePid"], os.Getpid())
+	if int(ping.EnginePid()) != os.Getpid() {
+		t.Errorf("payload.enginePid = %v, want %d", ping.EnginePid(), os.Getpid())
 	}
-	if at, ok := payload["at"].(float64); !ok || at <= 0 {
-		t.Errorf("payload.at = %v, want a positive unix-millis timestamp", payload["at"])
+	if ping.At() <= 0 {
+		t.Errorf("payload.at = %v, want a positive unix-millis timestamp", ping.At())
 	}
 }
 
@@ -218,16 +235,18 @@ func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
 
 	// The cache's own emit is throttled to at most 1 Hz (scheduleEmitLocked); give it real margin
 	// past that so this isn't a race against the cache's own timer.
-	evt := readSentWithin(t, conn, 3*time.Second)
-	if evt["kind"] != "evt" || evt["topic"] != "cache:stats" {
-		t.Fatalf("evt = %+v, want a cache:stats event frame", evt)
+	evt := readSentFrameWithin(t, conn, 3*time.Second)
+	if evt.Kind() != wire.FrameKindevt || string(evt.Topic()) != "cache:stats" {
+		t.Fatalf("evt = kind:%v topic:%q, want a cache:stats event frame", evt.Kind(), evt.Topic())
 	}
-	payload, ok := evt["payload"].(map[string]any)
-	if !ok {
-		t.Fatalf("evt payload = %+v, want a CacheStats object", evt["payload"])
+	if evt.PayloadType() != wire.PayloadCacheStats {
+		t.Fatalf("evt.payloadType = %v, want CacheStats", evt.PayloadType())
 	}
-	if payload["l2Entries"] != float64(1) {
-		t.Errorf("l2Entries = %v, want 1", payload["l2Entries"])
+	var stats wire.CacheStats
+	tab := payloadTable(t, evt)
+	stats.Init(tab.Bytes, tab.Pos)
+	if stats.L2Entries() != 1 {
+		t.Errorf("l2Entries = %v, want 1", stats.L2Entries())
 	}
 
 	detach()
@@ -246,10 +265,10 @@ func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
 	defer detach()
 
 	huge := strings.Repeat("a", maxResponsePayloadBytes+1024)
-	r.respond(session, 9, huge, nil)
+	r.respond(session, 9, PreviewResponse{Statements: []string{huge}}, nil)
 
-	resp := readSent(t, conn)
-	if resp["kind"] != "res" || resp["id"] != float64(9) || resp["ok"] != false {
-		t.Fatalf("resp = %+v, want a res/9/ok:false frame", resp)
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 9 || resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/9/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
 }

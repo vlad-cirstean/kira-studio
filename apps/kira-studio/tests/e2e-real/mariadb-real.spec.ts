@@ -97,7 +97,7 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await expect(orderItemsRow).toBeVisible();
 
   // Step 8: a real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's own
-  // reviveChunks — real rows from 0002_mariadb_seed.sql, not a canned fixture. This is exactly the
+  // decodeFrame — real rows from 0002_mariadb_seed.sql, not a canned fixture. This is exactly the
   // step that caught P58a's own toTypedArray bug for Postgres.
   await orderItemsRow.dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();

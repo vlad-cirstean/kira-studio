@@ -23,9 +23,9 @@ import { createFakeSocket, type FakeSocket } from './fakeSocket';
 // Most specs never touch any of this: they override `data`'s or `control`'s own methods above
 // the transport (view-state.spec.ts's `(data as any).read = ...`), so `Call`/`Events` only need
 // to exist as real named exports, never actually get invoked, and don't need to do anything
-// useful. bridge-port.spec.ts is the one spec that drives the JSONStream transport directly; it
+// useful. bridge-port.spec.ts is the one spec that drives the Stream transport directly; it
 // calls `setSocketFactory` before its own dynamic `import('.../bridge/port')` to swap in a fake
-// it can open/close/message from the test body. port.ts's `const socket = JSONStream('engine')`
+// it can open/close/message from the test body. port.ts's `const socket = Stream('engine')`
 // runs once, ever, for the whole test process (module caching) — whichever factory is installed
 // at that moment is what every spec's cached copy of port.ts holds afterwards, which is harmless
 // for every spec except bridge-port.spec.ts, the one spec that actually exercises it.
@@ -35,7 +35,7 @@ export function setSocketFactory(f: (name: string) => FakeSocket): void {
   factory = f;
 }
 
-export function JSONStream(name: string): FakeSocket {
+export function Stream(name: string): FakeSocket {
   return factory(name);
 }
 
@@ -77,4 +77,4 @@ const Events = {
   On: (): (() => void) => () => {},
 };
 
-mock.module('/wails/runtime.js', () => ({ JSONStream, Call, Events }));
+mock.module('/wails/runtime.js', () => ({ Stream, Call, Events }));

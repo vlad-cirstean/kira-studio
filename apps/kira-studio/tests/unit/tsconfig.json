@@ -19,5 +19,5 @@
       ]
     }
   },
-  "include": ["**/*.ts", "../../frontend/src/env.d.ts"]
+  "include": ["**/*.ts", "../../frontend/src/env.d.ts", "../support/**/*.ts"]
 }

@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
+import { DATA_OP } from '@shared/protocol/data-ops';
 import {
   createDocumentPageBuilder,
   createKeyValuePageBuilder,
   createStreamPageBuilder,
   createTabularPageBuilder,
   pageByteSize,
-  type TextColumnChunk,
   type Page as WirePage,
 } from '@shared/protocol/page';
 import type { LogicalPage, LogicalPortResponse, PortSnapshot } from '../../ipc/support/types';
+import { type EncodedFrame, encodeFrame, type FramePayload } from '../../support/encodeFrame';
 
 export interface SeenPortRequest {
   op: string;
@@ -23,15 +24,23 @@ export interface MockStreamHandle {
   ops(): Promise<SeenPortRequest[]>;
 }
 
+interface EncodedFrameJSON {
+  base64: string;
+  idOffset: number;
+}
+
 /** What the injected browser script actually needs per snapshot: the request-matching key
- *  (`op`/`payload`) plus an already-encoded response, so the browser has nothing left to build
- *  (P11 C2 — moved here from `mockStreamBrowser.js` so page construction can go through the real
- *  `@shared/protocol/page` builders instead of a hand-rolled offsets loop, P50 D6). */
+ *  (`op`/`payload`) plus an already-encoded frame, so the browser has nothing left to build
+ *  (P11 C2/C3 — moved here from `mockStreamBrowser.js` so page construction and wire encoding go
+ *  through the real `@shared/protocol/page` builders and the generated FlatBuffers code, P50 D6). */
 interface PreparedPortSnapshot {
   op: string;
   payload: unknown;
-  wireResponse?: unknown;
-  error?: { code: string; message: string };
+  /** Always a `res` frame — `ok:true` wrapping the logical response, or `ok:false` wrapping
+   *  `error` — built with `id: 0` and `forceDefaults: true` so `idOffset` names a real byte
+   *  position to patch a request's actual id into (mockStreamBrowser.js has no FlatBuffers
+   *  knowledge of its own). */
+  frame: EncodedFrameJSON;
   delayMs?: number;
 }
 
@@ -39,42 +48,8 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
 }
 
-// page.Uint32LE.MarshalJSON's contract (internal/page/chunk.go): base64 of the little-endian
-// bytes of a Uint32Array, not of decimal digits — a Uint32Array's buffer is little-endian on
-// every platform this app targets.
-function toWireChunk(chunk: TextColumnChunk) {
-  return {
-    data: toBase64(chunk.data),
-    offsets: toBase64(
-      new Uint8Array(chunk.offsets.buffer, chunk.offsets.byteOffset, chunk.offsets.byteLength),
-    ),
-    nulls: toBase64(chunk.nulls),
-    truncated: toBase64(
-      new Uint8Array(
-        chunk.truncated.buffer,
-        chunk.truncated.byteOffset,
-        chunk.truncated.byteLength,
-      ),
-    ),
-  };
-}
-
-function toWirePage(page: WirePage): unknown {
-  if (page.kind === 'tabular') return { ...page, chunks: page.chunks.map(toWireChunk) };
-  if (page.kind === 'document') {
-    return { ...page, ids: toWireChunk(page.ids), bodies: toWireChunk(page.bodies) };
-  }
-  if (page.kind === 'keyvalue') {
-    return { ...page, fields: toWireChunk(page.fields), values: toWireChunk(page.values) };
-  }
-  return {
-    ...page,
-    keys: toWireChunk(page.keys),
-    headers: toWireChunk(page.headers),
-    attrs: toWireChunk(page.attrs),
-    timestamps: toWireChunk(page.timestamps),
-    bodies: toWireChunk(page.bodies),
-  };
+function toJSON({ bytes, idOffset }: EncodedFrame): EncodedFrameJSON {
+  return { base64: toBase64(bytes), idOffset };
 }
 
 function buildPage(logical: LogicalPage): WirePage {
@@ -123,12 +98,13 @@ function buildPage(logical: LogicalPage): WirePage {
   return builder.finish(logical.position);
 }
 
-function buildResponsePayload(response: LogicalPortResponse): unknown {
+function buildFramePayload(response: LogicalPortResponse): FramePayload {
   if (response.kind === 'read') {
-    return { page: toWirePage(buildPage(response.page)), source: response.source };
+    return { type: 'read', page: buildPage(response.page), source: response.source };
   }
   if (response.kind === 'count') {
     return {
+      type: 'count',
       value: response.value,
       exact: response.exact,
       at: Date.now(),
@@ -136,23 +112,64 @@ function buildResponsePayload(response: LogicalPortResponse): unknown {
       source: response.source,
     };
   }
-  if (response.kind === 'mutate') return { affectedRows: response.affectedRows };
-  if (response.kind === 'preview') return { statements: response.statements };
+  if (response.kind === 'mutate') return { type: 'mutate', affectedRows: response.affectedRows };
+  if (response.kind === 'preview') return { type: 'preview', statements: response.statements };
   if (response.kind === 'execute') {
-    return { pages: response.pages.map((p) => toWirePage(buildPage(p))) };
+    return { type: 'execute', pages: response.pages.map(buildPage) };
   }
-  return {};
+  return { type: 'empty' };
 }
 
 function prepareSnapshot(snap: PortSnapshot): PreparedPortSnapshot {
+  const frame = snap.error
+    ? encodeFrame({ kind: 'res', id: 0, ok: false, error: snap.error, forceDefaults: true })
+    : encodeFrame({
+        kind: 'res',
+        id: 0,
+        ok: true,
+        payload: snap.response ? buildFramePayload(snap.response) : { type: 'empty' },
+        forceDefaults: true,
+      });
   return {
     op: snap.op,
     payload: snap.payload,
-    wireResponse: snap.response ? buildResponsePayload(snap.response) : undefined,
-    error: snap.error,
+    frame: toJSON(frame),
     delayMs: snap.delayMs,
   };
 }
+
+// Answers workbench/state/engine.ts's initEngineState ping — no spec's fixture array carries a
+// 'ping' entry (types.ts's own doc comment: PortSnapshot.op is "a value from
+// shared/protocol/data-ops.ts's DATA_OP map", and ping isn't one), so this is built once here
+// rather than duplicated per spec.
+const PING_FRAME = toJSON(
+  encodeFrame({
+    kind: 'res',
+    id: 0,
+    ok: true,
+    payload: { type: 'ping', enginePid: 1, at: 0 },
+    forceDefaults: true,
+  }),
+);
+
+// One E_FIXTURE_MISS frame per DATA_OP value, so a miss still names its op — mirrors the plain
+// object mockStreamBrowser.js used to build inline before FlatBuffers replaced the JSON wire
+// format (P11 C3): that file has no encoding knowledge left, so every frame it can send must
+// already exist.
+const MISS_FRAMES: Record<string, EncodedFrameJSON> = Object.fromEntries(
+  Object.values(DATA_OP).map((op) => [
+    op,
+    toJSON(
+      encodeFrame({
+        kind: 'res',
+        id: 0,
+        ok: false,
+        error: { message: `no fixture snapshot for ${op}`, code: 'E_FIXTURE_MISS' },
+        forceDefaults: true,
+      }),
+    ),
+  ]),
+);
 
 // Read once, not per call: `installMockStream` runs at least once per test. `bun run format`
 // (biome) reformats mockStreamBrowser.js like any other tracked file, including appending a
@@ -169,24 +186,29 @@ const BROWSER_SCRIPT = readFileSync(resolve(__dirname, 'mockStreamBrowser.js'), 
  * inside `Stream(name)` if it exists, in preference to opening a real connection
  * (`stream.js`: *"Server builds install a factory returning a real WebSocket… both objects present
  * the same interface, so nothing above this line cares which it is"*). `bridge/port.ts` calls
- * `JSONStream('engine')` at its own module scope, so this must be installed via
- * `page.addInitScript` — before any page script runs, on every navigation — never `page.evaluate`,
- * which would race the app's own module graph.
+ * `Stream('engine')` at its own module scope, so this must be installed via `page.addInitScript` —
+ * before any page script runs, on every navigation — never `page.evaluate`, which would race the
+ * app's own module graph.
  *
- * Every snapshot's response is pre-built here, through the real `@shared/protocol/page` builders,
- * and shipped to the browser already encoded (P11 C2) — `mockStreamBrowser.js` just forwards
- * `wireResponse` verbatim and has no page-construction logic of its own. The socket shim itself
- * still lives in `mockStreamBrowser.js`, a plain, uncompiled JS file injected as a **string**, not
- * `page.addInitScript(fn, arg)` — see that file's own doc comment for why a typed function does
- * not survive the round trip here (a `keepNames` artefact common to every esbuild-based TS loader
- * this repo's tooling runs under).
+ * Every snapshot's response is pre-built here, through the real `@shared/protocol/page` builders
+ * and the generated FlatBuffers encoders (`encodeFrame`), and shipped to the browser as a
+ * `{base64, idOffset}` template — `mockStreamBrowser.js` decodes it, clones it per request and
+ * patches in the request's real id at `idOffset`, and has no page-construction or FlatBuffers
+ * knowledge of its own. The socket shim itself still lives in `mockStreamBrowser.js`, a plain,
+ * uncompiled JS file injected as a **string**, not `page.addInitScript(fn, arg)` — see that file's
+ * own doc comment for why a typed function does not survive the round trip here (a `keepNames`
+ * artefact common to every esbuild-based TS loader this repo's tooling runs under).
  */
 export async function installMockStream(
   page: Page,
   snapshots: readonly PortSnapshot[],
 ): Promise<MockStreamHandle> {
-  const prepared = snapshots.map(prepareSnapshot);
-  await page.addInitScript(`(${BROWSER_SCRIPT})(${JSON.stringify(prepared)});`);
+  const init = {
+    snapshots: snapshots.map(prepareSnapshot),
+    ping: PING_FRAME,
+    miss: MISS_FRAMES,
+  };
+  await page.addInitScript(`(${BROWSER_SCRIPT})(${JSON.stringify(init)});`);
 
   return {
     ops: () =>

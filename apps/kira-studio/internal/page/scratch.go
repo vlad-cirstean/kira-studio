@@ -1,7 +1,6 @@
 package page
 
 import (
-	"encoding/binary"
 	"unicode/utf8"
 )
 
@@ -82,12 +81,12 @@ func (s *columnScratch) appendValue(value *string, row int, maxBytes int) bool {
 
 func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 	nulls := make([]byte, bitsetBytes(rowCount))
-	offsets := make([]byte, (rowCount+1)*4)
+	offsets := make([]uint32, rowCount+1)
 	data := make([]byte, s.used)
-	// Explicitly non-nil (make always returns non-nil, even at zero length): encoding/json marshals
-	// a nil []byte as `null` but a non-nil empty one as `""`, and port.ts's toTypedArray hands that
-	// straight to Uint8Array.fromBase64 — `null` there is a decode failure on the frame path (P4 D6).
-	truncated := make([]byte, 0, len(s.truncatedRows)*4)
+	// Explicitly non-nil (make always returns non-nil, even at zero length): the FlatBuffers
+	// `truncated` vector is (required) and must always be written, even at length zero — an
+	// omitted field decodes as `null` on the TypeScript side, not an empty array (P11 schema note).
+	truncated := make([]uint32, 0, len(s.truncatedRows))
 
 	cursor := 0
 	for newRow := 0; newRow < rowCount; newRow++ {
@@ -102,12 +101,12 @@ func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 			copy(data[cursor:], s.buffer[start:end])
 		}
 		cursor += length
-		binary.LittleEndian.PutUint32(offsets[(newRow+1)*4:], uint32(cursor))
+		offsets[newRow+1] = uint32(cursor)
 		if s.isNullRow[oldRow] {
 			nulls[newRow>>3] |= 1 << (newRow & 7)
 		}
 		if _, ok := s.truncatedRows[oldRow]; ok {
-			truncated = binary.LittleEndian.AppendUint32(truncated, uint32(newRow))
+			truncated = append(truncated, uint32(newRow))
 		}
 	}
 	// truncatedRows iterates the map above in newRow order already (the loop runs newRow

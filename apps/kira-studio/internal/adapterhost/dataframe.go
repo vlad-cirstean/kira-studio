@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
-	"strconv"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -16,26 +15,8 @@ import (
 // This file is bridge/stream.go's real subject after M4 (§4.10): the data plane stops being a
 // byte forwarder and becomes a server. A frame from the renderer is parsed just enough to decide
 // routing (op, and for a connection-scoped op, its connectionId) — never fully, and never at all
-// for a frame the router only relays.
-
-type wireError struct {
-	Message string `json:"message"`
-	Code    string `json:"code,omitempty"`
-}
-
-type wireResponse struct {
-	Kind    string     `json:"kind"`
-	ID      int        `json:"id"`
-	OK      bool       `json:"ok"`
-	Payload any        `json:"payload,omitempty"`
-	Error   *wireError `json:"error,omitempty"`
-}
-
-type wireEvent struct {
-	Kind    string `json:"kind"`
-	Topic   string `json:"topic"`
-	Payload any    `json:"payload"`
-}
+// for a frame the router only relays. Requests arrive as JSON text (P11 D3); responses, errors and
+// events leave through frame.go as FlatBuffers frames.
 
 // AttachStream makes conn the current renderer connection: a Session (A18's single writer)
 // subscribed to the Go cache's own stats-changed notifications (D12), which is what feeds the
@@ -55,7 +36,7 @@ func (r *Router) AttachStream(conn StreamSession) (session *Session, detach func
 // pushCacheStats emits an unsolicited cache:stats event frame — the exact shape port.ts's
 // handleMessage dispatches on and data.onCacheStats consumes.
 func (r *Router) pushCacheStats(session *Session, stats enginecache.CacheStats) {
-	body, err := json.Marshal(wireEvent{Kind: "evt", Topic: "cache:stats", Payload: stats})
+	body, err := encodeEvent("cache:stats", stats)
 	if err != nil {
 		return
 	}
@@ -214,22 +195,43 @@ func (r *Router) handleDataOp(session *Session, op string, id int, payload json.
 	}
 }
 
-// maxResponsePayloadBytes leaves generous room for wireResponse's own envelope (kind/id/ok) below
+// maxResponsePayloadBytes leaves generous room for the frame's own envelope (kind/id/ok) below
 // session.go's hard maxDataFrameBytes cap — resp is checked against this before ever reaching the
 // queue, so a payload that would be silently unrepresentable there is turned into an error response
 // instead of a frame that can never be delivered (P2 R1: a dropped response has no other way to
 // ever settle its pending request, per enqueueResponse's own doc comment).
 const maxResponsePayloadBytes = maxDataFrameBytes - 4096
 
+// internalErrorFrame is respondError's answer for the vanishingly unlikely case that encodeError
+// itself panics (the flatbuffers builder's own internal limits) — built once, with id 0, so the
+// fallback path cannot also fail. Replaces the hand-written JSON literal the base64 wire format
+// used for the same purpose.
+var internalErrorFrame []byte
+
+func init() {
+	internalErrorFrame = encodeError(0, "internal error", "")
+}
+
+// safeEncodeError calls encodeError, substituting internalErrorFrame if it panics — still must not
+// leave id's pending request unanswered forever.
+func safeEncodeError(id int, message, code string) (body []byte) {
+	defer func() {
+		if recover() != nil {
+			body = internalErrorFrame
+		}
+	}()
+	return encodeError(id, message, code)
+}
+
 func (r *Router) respond(session *Session, id int, payload any, err error) {
 	if err != nil {
 		r.respondError(session, id, err)
 		return
 	}
-	body, encErr := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: payload})
+	body, encErr := encodeResponse(id, payload)
 	if encErr != nil {
 		r.deps.Log("error", "failed to encode a response frame: "+encErr.Error())
-		r.respondError(session, id, adapters.New(adapters.CodeQuery, "failed to encode the response", nil))
+		r.respondError(session, id, adapters.New(adapters.ErrorCode("E_INTERNAL"), "failed to encode the response", nil))
 		return
 	}
 	if len(body) > maxResponsePayloadBytes {
@@ -246,19 +248,13 @@ func (r *Router) respondError(session *Session, id int, err error) {
 	if errors.As(err, &ae) {
 		code = string(ae.Code)
 	}
-	body, encErr := json.Marshal(wireResponse{Kind: "res", ID: id, OK: false, Error: &wireError{Message: err.Error(), Code: code}})
-	if encErr != nil {
-		// Vanishingly unlikely (every field here is a plain string/int) but still must not leave
-		// id's pending request unanswered forever — a hardcoded literal needs no encoder at all.
-		body = []byte(`{"kind":"res","id":` + strconv.Itoa(id) + `,"ok":false,"error":{"message":"internal error"}}`)
-	}
-	session.enqueueResponse(body)
+	session.enqueueResponse(safeEncodeError(id, err.Error(), code))
 }
 
 func (r *Router) respondCacheStats(session *Session, id int) {
-	body, err := json.Marshal(wireResponse{Kind: "res", ID: id, OK: true, Payload: r.cache.Stats()})
+	body, err := encodeResponse(id, r.cache.Stats())
 	if err != nil {
-		r.respondError(session, id, adapters.New(adapters.CodeQuery, "failed to encode the response", nil))
+		r.respondError(session, id, adapters.New(adapters.ErrorCode("E_INTERNAL"), "failed to encode the response", nil))
 		return
 	}
 	session.enqueueResponse(body)

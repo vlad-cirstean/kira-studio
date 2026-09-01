@@ -90,7 +90,7 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await expect(orderItemsRow).toBeVisible();
   await orderItemsRow.dblclick();
 
-  // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's reviveChunks.
+  // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's decodeFrame.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
   const firstIdCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
