@@ -11,66 +11,23 @@ tasks:
       - go mod tidy
 
   install:frontend:deps:
-    summary: Install frontend dependencies
+    summary: Install workspace dependencies (Bun workspace root — one lockfile for every app)
     run: once
-    cmds:
-      - task: install:frontend:deps:{{.PACKAGE_MANAGER}}
-
-  install:frontend:deps:npm:
-    dir: frontend
-    sources:
-      - package.json
-      - package-lock.json
-    generates:
-      - node_modules
-    preconditions:
-      - sh: npm version
-        msg: "Looks like npm isn't installed. Npm is part of the Node installer: https://nodejs.org/en/download/"
-    cmds:
-      - npm install
-
-  install:frontend:deps:bun:
-    dir: frontend
+    dir: '{{.WORKSPACE_ROOT}}'
     sources:
       - package.json
       - bun.lock
-      - bun.lockb
+      - apps/*/frontend/package.json
     generates:
       - node_modules
     preconditions:
       - sh: bun --version
-        msg: "bun not found"
+        msg: "bun not found — install it from https://bun.sh"
     cmds:
       - bun install
 
-  install:frontend:deps:pnpm:
-    dir: frontend
-    sources:
-      - package.json
-      - pnpm-lock.yaml
-    generates:
-      - node_modules
-    preconditions:
-      - sh: pnpm --version
-        msg: "pnpm not found"
-    cmds:
-      - pnpm install
-
-  install:frontend:deps:yarn:
-    dir: frontend
-    sources:
-      - package.json
-      - yarn.lock
-    status:
-      - test -d node_modules || test -f .pnp.cjs
-    preconditions:
-      - sh: yarn --version
-        msg: "yarn not found"
-    cmds:
-      - yarn install
-
   build:frontend:
-    label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
+    label: build:frontend (DEV={{.DEV}})
     summary: Build the frontend project
     # darwin:build:universal runs its per-arch builds as parallel deps, each of
     # which depends on this task. Without run:once the two executions race:
@@ -82,6 +39,7 @@ tasks:
     sources:
       - "**/*"
       - exclude: node_modules/**/*
+      - exclude: dist/**/*
     generates:
       - dist/**/*
     deps:
@@ -93,48 +51,17 @@ tasks:
           OBFUSCATED:
             ref: .OBFUSCATED
     cmds:
-      - task: frontend:run
-        vars:
-          SCRIPT: '{{if eq .DEV "true"}}build:dev{{else}}build{{end}}'
+      - bun run {{if eq .DEV "true"}}build:dev{{else}}build{{end}}
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
 
-  frontend:run:
-    summary: Run a frontend script with selected runner
-    cmds:
-      - task: frontend:run:{{.PACKAGE_MANAGER}}
-        vars:
-          SCRIPT: "{{.SCRIPT}}"
-    vars:
-      SCRIPT: "{{.SCRIPT}}"
-
-  frontend:run:npm:
+  dev:frontend:
+    summary: Runs the frontend dev server (Vite) for `wails3 dev`
     dir: frontend
+    deps:
+      - task: install:frontend:deps
     cmds:
-      - npm run {{.SCRIPT}} -q
-    vars:
-      SCRIPT: "{{.SCRIPT}}"
-
-  frontend:run:yarn:
-    dir: frontend
-    cmds:
-      - yarn {{.SCRIPT}}
-    vars:
-      SCRIPT: "{{.SCRIPT}}"
-
-  frontend:run:pnpm:
-    dir: frontend
-    cmds:
-      - pnpm run {{.SCRIPT}}
-    vars:
-      SCRIPT: "{{.SCRIPT}}"
-
-  frontend:run:bun:
-    dir: frontend
-    cmds:
-      - bun run {{.SCRIPT}}
-    vars:
-      SCRIPT: "{{.SCRIPT}}"
+      - bun run dev --port {{.VITE_PORT}} --strictPort
 
   generate:bindings:
     summary: Generates bindings for the frontend
@@ -151,7 +78,7 @@ tasks:
     generates:
       - frontend/bindings/**/*
     cmds:
-      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
+      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -b -names -ts -i
 
   generate:icons:
     summary: Generates the Mac `.icns` from an image; `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file. `-windowsfilename` has no off switch in the CLI itself (always writes one), so it's redirected into `.task/unused-icon.ico` — a macOS-only app has no `build/windows/` to write it into.
@@ -165,33 +92,6 @@ tasks:
     cmds:
       - mkdir -p .task
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename .task/unused-icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
-
-  dev:frontend:
-    summary: Runs the frontend in development mode
-    deps:
-      - task: install:frontend:deps
-    cmds:
-      - task: frontend:dev:{{.PACKAGE_MANAGER}}
-
-  frontend:dev:npm:
-    dir: frontend
-    cmds:
-      - npm run dev -- --port {{.VITE_PORT}} --strictPort
-
-  frontend:dev:yarn:
-    dir: frontend
-    cmds:
-      - yarn dev --port {{.VITE_PORT}} --strictPort
-
-  frontend:dev:pnpm:
-    dir: frontend
-    cmds:
-      - pnpm dev --port {{.VITE_PORT}} --strictPort
-
-  frontend:dev:bun:
-    dir: frontend
-    cmds:
-      - bun run dev --port {{.VITE_PORT}} --strictPort
 
   update:build-assets:
     summary: Updates the build assets

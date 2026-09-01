@@ -61,5 +61,5 @@ fi
 
 if [ ! -d "$ROOT_DIR/apps/kira-studio/frontend/bindings" ]; then
   echo "wails-dev-setup: generating Wails bindings (apps/kira-studio/frontend/bindings is gitignored)"
-  (cd "$ROOT_DIR/apps/kira-studio" && wails3 generate bindings -b -i -ts -names)
+  (cd "$ROOT_DIR/apps/kira-studio" && wails3 generate bindings -clean=true -b -names -ts -i)
 fi

@@ -11,7 +11,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "predev": "sh scripts/wails-dev-setup.sh",
-    "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'bun run build && cd apps/kira-studio && wails3 task dev'",
+    "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "build": "cd apps/kira-studio/frontend && bun run build",
     "lint": "biome check .",
     "format": "biome check --write .",

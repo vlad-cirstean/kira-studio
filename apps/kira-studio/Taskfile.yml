@@ -3,8 +3,11 @@ version: '3'
 vars:
   APP_NAME: "Kira Studio"
   BIN_DIR: "bin"
-  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  # This repository has exactly one package manager (docs/ARCHITECTURE.md's Stack table).
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "bun"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # The Bun workspace root: one lockfile, one node_modules, for every app and package.
+  WORKSPACE_ROOT: '{{.ROOT_DIR}}/../..'
 
 includes:
   common: ./build/Taskfile.yml
