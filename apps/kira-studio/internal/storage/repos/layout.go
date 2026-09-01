@@ -21,18 +21,12 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
-func (r *LayoutRepo) GetAll() (model.Layout, error) {
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if r.selectAll != nil {
-		rows, err = r.selectAll.Query()
-	} else {
-		rows, err = r.DB.Query(layoutSelectAllSQL)
-	}
-	if err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: query: %w", err)
+// scanAll reads every stored leaf from whatever rows/err a query against either the top-level DB
+// (GetAll's own fast path) or a live transaction (Set's fix below) produced — factored out so
+// both callers build the same model.Layout from the same rows shape.
+func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, error) {
+	if queryErr != nil {
+		return model.Layout{}, fmt.Errorf("repos/layout: query: %w", queryErr)
 	}
 	defer rows.Close()
 
@@ -57,10 +51,36 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	return result, nil
 }
 
+func (r *LayoutRepo) GetAll() (model.Layout, error) {
+	if r.selectAll != nil {
+		return r.scanAll(r.selectAll.Query())
+	}
+	return r.scanAll(r.DB.Query(layoutSelectAllSQL))
+}
+
 // Set writes all six leaves every time (unlike SettingsRepo.Set's patched-leaves-only write —
 // P53 §4.5 deliberately keeps the two repos different), mirroring layout.ts's flatten(merged).
+//
+// The read that feeds the merge runs inside this same transaction (P8 C7/F7's fix), not before
+// Begin() the way it used to: two concurrent Set calls patching disjoint leaves would otherwise
+// each compute their merge from a pre-write snapshot, and the loser's upsert of all six leaves
+// would silently overwrite the winner's — measured at 109 lost patches out of 200 rounds against
+// the pre-fix code (P8 plan §1.3(d)). storage/db.go's SetMaxOpenConns(1) means Begin() here holds
+// the database's one connection exclusively until Commit/Rollback, so no other Set's read or
+// write can land between this one's own read and write.
 func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
-	current, err := r.GetAll()
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.Layout{}, fmt.Errorf("repos/layout: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var current model.Layout
+	if r.selectAll != nil {
+		current, err = r.scanAll(tx.Stmt(r.selectAll).Query())
+	} else {
+		current, err = r.scanAll(tx.Query(layoutSelectAllSQL))
+	}
 	if err != nil {
 		return model.Layout{}, err
 	}
@@ -86,12 +106,6 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 			merged.Panel.CellEditor.Height = *p.CellEditor.Height
 		}
 	}
-
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
 
 	leaves := []struct {
 		key   string

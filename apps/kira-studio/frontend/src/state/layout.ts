@@ -9,9 +9,23 @@ export const layoutState = reactive<Layout>(structuredClone(defaultLayout));
 let pendingPatch: LayoutPatch = {};
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 
+// applyRemote assigns a layout straight into local state with no re-emit back to control.layoutSet
+// — the same shape state/settings.ts's own applySettings/onSettingsChanged uses. It is what makes
+// panel layout genuinely app-wide (P8 D3/F7's second half) rather than merely silent: before this,
+// window A resizing the project panel left every other window showing the old width until relaunch.
+function applyRemote(layout: Layout): void {
+  Object.assign(layoutState.panel.project, layout.panel.project);
+  Object.assign(layoutState.panel.operations, layout.panel.operations);
+  Object.assign(layoutState.panel.cellEditor, layout.panel.cellEditor);
+}
+
+let unsubscribeChanged: (() => void) | null = null;
+
 export async function hydrateLayout(): Promise<void> {
-  const layout = await control.layoutGetAll();
-  Object.assign(layoutState, layout);
+  applyRemote(await control.layoutGetAll());
+
+  unsubscribeChanged?.();
+  unsubscribeChanged = control.onLayoutChanged(applyRemote);
 }
 
 function mergePatch(a: LayoutPatch, b: LayoutPatch): LayoutPatch {

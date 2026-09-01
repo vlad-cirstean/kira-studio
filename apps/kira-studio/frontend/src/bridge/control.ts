@@ -106,6 +106,7 @@ export const control = {
   layoutGetAll: (): Promise<Layout> => unwrap(LayoutService.GetAll()).then((r) => trust<Layout>(r)),
   layoutSet: (patch: LayoutPatch): Promise<Layout> =>
     unwrap(LayoutService.Set({ patch })).then((r) => trust<Layout>(r)),
+  onLayoutChanged: (cb: (layout: Layout) => void): (() => void) => on(CHANNEL.layoutChanged, cb),
   engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
   onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
   onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),

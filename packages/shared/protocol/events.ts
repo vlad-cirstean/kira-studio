@@ -21,6 +21,7 @@ export const CHANNEL = {
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
   settingsChanged: 'kira:settings:changed',
+  layoutChanged: 'kira:layout:changed',
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
 } as const;

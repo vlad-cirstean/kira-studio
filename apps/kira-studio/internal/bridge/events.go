@@ -28,6 +28,7 @@ const (
 	ChannelMetadataInvalidated    = "kira:connection:metadataInvalidated"
 	ChannelConnectionsChanged     = "kira:connections:changed"
 	ChannelSettingsChanged        = "kira:settings:changed"
+	ChannelLayoutChanged          = "kira:layout:changed"
 	ChannelOpUpdate               = "kira:op:update"
 	ChannelAppMetrics             = "kira:app:metrics"
 )
