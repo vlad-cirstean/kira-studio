@@ -108,6 +108,7 @@ function dataTypeFor(name: string): string {
 // renderer is exactly how "datetime" and "longtext" both fell through to no colour at all; this
 // can't drift the same way because it never re-parses anything the server didn't already decide.
 function colorForColumn(name: string): string {
+  if (!settingsState.appearance.rowColoring) return '';
   const typeClass = columnByName.value.get(name)?.typeClass;
   return typeClass ? typeClassColor(typeClass) : '';
 }

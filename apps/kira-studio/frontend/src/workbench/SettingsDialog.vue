@@ -72,6 +72,10 @@ function onWordWrapChange(e: Event): void {
   void patchSettings({ appearance: { wordWrap: (e.target as HTMLInputElement).checked } });
 }
 
+function onRowColoringChange(e: Event): void {
+  void patchSettings({ appearance: { rowColoring: (e.target as HTMLInputElement).checked } });
+}
+
 const rowPreviewHeight = computed(() =>
   settingsState.appearance.rowDensity === 'compact' ? 22 : 28,
 );
@@ -241,6 +245,20 @@ async function onClearCaches(): Promise<void> {
               <span class="helper-text"
                 >Long lines wrap instead of scrolling — the query console, the Mongo console and
                 the cell editor.</span
+              >
+            </label>
+
+            <label class="field checkbox">
+              <input
+                :checked="settingsState.appearance.rowColoring"
+                type="checkbox"
+                data-testid="settings-row-coloring"
+                @change="onRowColoringChange"
+              />
+              <span>Row colouring</span>
+              <span class="helper-text"
+                >Colour grid values by their column's data type. Off renders every row in the
+                plain text colour.</span
               >
             </label>
           </template>
