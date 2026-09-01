@@ -9,7 +9,7 @@ workbench across ten database engines.
 
 - **Beta — v1 is in development.** Expect bugs and breaking changes between builds. See
   [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
-- **macOS 13+, Apple Silicon (`arm64`) only. Dark mode only.**
+- **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1. One consequence: because each new build is unsigned, macOS treats it as a different
   application for Keychain ACL purposes, so the first launch after installing a new build may show
@@ -97,7 +97,7 @@ A couple of things worth knowing up front:
 
 ## Requirements
 
-- macOS 13 or later, Apple Silicon (`arm64`).
+- macOS 14 or later, Apple Silicon (`arm64`).
 - [Go](https://go.dev) 1.25+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`, pinned version
   read from `go.mod` by `scripts/wails-dev-setup.sh`) — the app is a native Go binary; every
   database adapter runs in-process in Go, no sidecar runtime.

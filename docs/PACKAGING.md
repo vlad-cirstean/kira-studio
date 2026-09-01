@@ -76,17 +76,20 @@ runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packagin
 
 **`apps/kira-studio/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
-`0.0.0`, `CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `12.0.0`. Note the floor: the plist and
-the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*` flags say macOS 12, while SPEC.md §3 and the README
-scope the product at macOS 13+. The stricter product claim stands; the plist is simply Wails' default
-and has not been narrowed.
+`0.0.0`, `CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `14.0.0`. That floor is hand-narrowed
+from Wails' template default of `12.0.0`, and matches the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*`
+flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`, so a
+`wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
+The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
+`-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
+than is being linked.
 
 **`apps/kira-studio/Taskfile.yml` + `apps/kira-studio/build/darwin/Taskfile.yml`** — the task graph `bun run package` drives:
 
 | Task | What it does |
 |---|---|
 | `darwin:package` | `deps: build`, then `create:app:bundle` |
-| `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=12.0` |
+| `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
 | `darwin:build` → `build:docker` | off macOS only: cross-compiles in the `wails-cross` Docker image. Never exercised in this repo (§5) |
 | `create:app:bundle` | makes `Contents/{MacOS,Resources}`, copies `icons.icns`, `Assets.car` (if present), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere) |
 
@@ -141,7 +144,7 @@ Not verifiable off macOS (needs a human on real hardware — see §4): code sign
 quarantine behavior, launching the app at all, `~/.kira-studio/` creation, cold-start timing, packaged
 RSS, and the `.app` size.
 
-## 4. Human checklist (run on macOS 13+ arm64)
+## 4. Human checklist (run on macOS 14+ arm64)
 
 Every item is a pass/fail a human should record here after running it for real. Items 1–3 and 10 are
 also checked automatically on macOS by the `package-smoke` job in the intended `ci.yml` (§7) — but this
