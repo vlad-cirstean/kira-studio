@@ -217,6 +217,10 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	var rowCount int
 	var probedExtra bool
 	var firstRow, lastRow []any
+	// cells is pure AppendRow scratch — unlike row (retained below via firstRow/lastRow), AppendRow
+	// copies every cell into the builder's own scratch buffers synchronously and never keeps cells
+	// itself, so one allocation for the whole page is enough instead of one per row (P2 R2, #95).
+	cells := make([]*string, len(projectedColumns))
 	err = streamArrayQuery(ctx, conn, query, params, op, true, func(row []any) error {
 		rowCount++
 		if rowCount > req.PageSize {
@@ -224,7 +228,6 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 			return nil
 		}
 
-		cells := make([]*string, len(projectedColumns))
 		for i := range cells {
 			cells[i] = toCellText(row[i])
 		}

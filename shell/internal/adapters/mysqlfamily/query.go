@@ -64,13 +64,17 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query s
 			dbTypes[i] = t.DatabaseTypeName()
 		}
 
+		// raw/dest are pure scan scratch: rows.Scan fills raw in place, and cellText copies every
+		// non-nil cell into a new Go string this same iteration, so neither needs to outlive it —
+		// one allocation of each for the whole query instead of one pair per row (P2 R2, task #95).
+		raw := make([]sql.RawBytes, len(types))
+		dest := make([]any, len(types))
+		for i := range raw {
+			dest[i] = &raw[i]
+		}
+
 		var out [][]*string
 		for rows.Next() {
-			raw := make([]sql.RawBytes, len(types))
-			dest := make([]any, len(types))
-			for i := range raw {
-				dest[i] = &raw[i]
-			}
 			if err := rows.Scan(dest...); err != nil {
 				return nil, mapError(err)
 			}
@@ -119,12 +123,14 @@ func streamArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, quer
 			dbTypes[i] = t.DatabaseTypeName()
 		}
 
+		// raw/dest are pure scan scratch — see runArrayQuery's identical comment above.
+		raw := make([]sql.RawBytes, len(types))
+		dest := make([]any, len(types))
+		for i := range raw {
+			dest[i] = &raw[i]
+		}
+
 		for rows.Next() {
-			raw := make([]sql.RawBytes, len(types))
-			dest := make([]any, len(types))
-			for i := range raw {
-				dest[i] = &raw[i]
-			}
 			if err := rows.Scan(dest...); err != nil {
 				return struct{}{}, mapError(err)
 			}

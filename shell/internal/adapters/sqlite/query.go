@@ -161,13 +161,22 @@ func runRows(ctx context.Context, conn *sql.Conn, sqlText string, params []any, 
 // int64 is already exact, so there is no equivalent to node:sqlite's ERR_OUT_OF_RANGE to avoid.
 func runArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params []any, op *adapters.OpCtx, logParams bool) ([][]any, error) {
 	var out [][]any
+	// The column count is fixed for the life of rows — rows.Columns() itself allocates a fresh
+	// []string every call, so calling it once (P2 R2, task #95) instead of on every row cuts one
+	// allocation the row count never actually needs.
+	var numCols int
+	var gotCols bool
 	err := runRows(ctx, conn, sqlText, params, op, logParams, func(rows *sql.Rows) error {
-		cols, err := rows.Columns()
-		if err != nil {
-			return err
+		if !gotCols {
+			cols, err := rows.Columns()
+			if err != nil {
+				return err
+			}
+			numCols = len(cols)
+			gotCols = true
 		}
-		vals := make([]any, len(cols))
-		dest := make([]any, len(cols))
+		vals := make([]any, numCols)
+		dest := make([]any, numCols)
 		for i := range vals {
 			dest[i] = &vals[i]
 		}
@@ -185,13 +194,20 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params [
 // [][]any only to be transposed into the page builder immediately after. runArrayQuery itself
 // stays as the array-returning shape countRows wants.
 func streamArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params []any, op *adapters.OpCtx, logParams bool, onRow func(row []any) error) error {
+	// See runArrayQuery's identical comment above: the column count never changes mid-query.
+	var numCols int
+	var gotCols bool
 	return runRows(ctx, conn, sqlText, params, op, logParams, func(rows *sql.Rows) error {
-		cols, err := rows.Columns()
-		if err != nil {
-			return err
+		if !gotCols {
+			cols, err := rows.Columns()
+			if err != nil {
+				return err
+			}
+			numCols = len(cols)
+			gotCols = true
 		}
-		vals := make([]any, len(cols))
-		dest := make([]any, len(cols))
+		vals := make([]any, numCols)
+		dest := make([]any, numCols)
 		for i := range vals {
 			dest[i] = &vals[i]
 		}
