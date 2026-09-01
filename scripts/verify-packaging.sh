@@ -9,8 +9,8 @@
 #
 # Static checks (S1, S2, S5) always run — S3/S4 were electron-builder.yml checks removed in the
 # P57 rewrite; the numbering was never closed up, and check IDs stay as-is since docs/PACKAGING.md
-# cross-references them. Artifact checks (A1, A3, N2 over the .app; A4, N3 over the .dmg P10 ships)
-# run only when that artifact exists; otherwise they print "skipped" and pass.
+# cross-references them. Artifact checks (A1, A3, A5, N2 over the .app; A4, N3 over the .dmg P10
+# ships) run only when that artifact exists; otherwise they print "skipped" and pass.
 #
 # Every check runs before the script exits, so one run reports everything wrong, not just the
 # first failure.
@@ -52,7 +52,7 @@ DMG="apps/kira-studio/bin/Kira Studio.dmg"
 
 # --- Artifact checks (only if the bundle exists) -----------------------------------------------
 if [ ! -d "$APP" ]; then
-  note "skipped A1/A3/N2 — \"$APP\" not present (run 'bun run package' first)"
+  note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package' first)"
 else
   # A1: ad-hoc signature (P58f: back to the single-target check — no vendored node binary, no
   # nested executable, left to sign independently before the whole bundle is deep-signed).
@@ -80,6 +80,19 @@ else
     fi
   else
     note "skipped A3 — PlistBuddy not available on this runner"
+  fi
+
+  # A5: the bundle reports the version build/config.yml holds — the single source both the -ldflags
+  # stamp on the binary and create:app:bundle's PlistBuddy step read. A mismatch means a bundle was
+  # assembled around a stale plist, or the stamp silently did not run (its PlistBuddy guard).
+  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+    WANT_VERSION="$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' apps/kira-studio/build/config.yml | head -1)"
+    GOT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$GOT_VERSION" != "$WANT_VERSION" ]; then
+      fail "wrong bundle version" "CFBundleShortVersionString is '$GOT_VERSION', expected '$WANT_VERSION' (apps/kira-studio/build/config.yml's info.version)"
+    fi
+  else
+    note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------

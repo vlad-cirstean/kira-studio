@@ -27,17 +27,17 @@ jobs:
           go-version-file: go.mod
       - run: bun install --frozen-lockfile
 
-      - name: Set package.json version from the release tag
+      # The one place a build reads a version (apps/kira-studio/Taskfile.yml's APP_VERSION): from
+      # here it is linked into the binary and stamped into the bundle's Info.plist, and
+      # verify:packaging asserts the packaged bundle came out carrying exactly this string.
+      - name: Set the app version from the release tag
         run: |
           set -eu
           TAG="${GITHUB_REF_NAME#v}"
-          node -e "
-            const fs = require('node:fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = process.argv[1];
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          " "$TAG"
-          echo "package.json version set to $TAG (from tag $GITHUB_REF_NAME)"
+          CONFIG=apps/kira-studio/build/config.yml
+          perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
+          test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
+          echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
 
       - name: Generate Wails bindings (P57 D8/D13)
         run: |

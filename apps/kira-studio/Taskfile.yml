@@ -8,6 +8,19 @@ vars:
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # The Bun workspace root: one lockfile, one node_modules, for every app and package.
   WORKSPACE_ROOT: '{{.ROOT_DIR}}/../..'
+  # The app's version. `build/config.yml`'s `info.version` is the single source — it is where Wails
+  # already puts an app's version, and what `common:update:build-assets` writes into a regenerated
+  # Info.plist — and release.yml writes the git tag into it before packaging. Every build stamps
+  # whatever it says into the binary (VERSION_VAR below, via `-ldflags -X`) and into the bundle's
+  # own Info.plist (create:app:bundle), so the app, the plist and this file cannot disagree.
+  # The root package.json's `version` is npm metadata for a private, unpublished workspace; nothing
+  # reads it, and it is deliberately not this.
+  APP_VERSION:
+    sh: |
+      v=$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "{{.ROOT_DIR}}/build/config.yml" | head -1)
+      [ -n "$v" ] || v=0.0.0-unknown
+      printf '%s' "$v"
+  VERSION_VAR: 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo.Version'
 
 includes:
   common: ./build/Taskfile.yml

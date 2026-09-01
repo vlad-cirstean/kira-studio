@@ -43,7 +43,10 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.OUTPUT}}"'
     vars:
-      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
+      # `-X {{.VERSION_VAR}}` is what makes internal/buildinfo report a real version instead of its
+      # development literal; it is in both branches so a dev build and a packaged one agree about
+      # what they are.
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l" -ldflags="-X {{.VERSION_VAR}}={{.APP_VERSION}}"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s -X {{.VERSION_VAR}}={{.APP_VERSION}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
@@ -174,6 +177,19 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      # The checked-in Info.plist keeps Wails' scaffolded 0.0.0 — it is a generated file
+      # (`common:update:build-assets`) and would lose a hand-edit anyway. The bundle's *copy* is
+      # stamped instead, from the same APP_VERSION the binary was linked with, so what macOS reports
+      # (Finder's Get Info, the version column) and what the app reports about itself agree.
+      - |
+        if [ -x /usr/libexec/PlistBuddy ]; then
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleShortVersionString {{.APP_VERSION}}" \
+            -c "Set :CFBundleVersion {{.APP_VERSION}}" \
+            "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+        else
+          echo "create:app:bundle: no PlistBuddy on $(uname -s) — Info.plist keeps its checked-in version, not {{.APP_VERSION}}" >&2
+        fi
       - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
 
   codesign:adhoc:

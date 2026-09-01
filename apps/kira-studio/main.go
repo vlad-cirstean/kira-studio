@@ -24,6 +24,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
@@ -177,8 +178,12 @@ func main() {
 	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second)
 
 	app := application.New(application.Options{
-		Name:        "Kira Studio",
-		Description: "A visual database client for macOS",
+		Name: "Kira Studio",
+		// The macOS About item is `application.About` in internal/shell/menutemplate.go, and Wails
+		// renders that role with its own dialog — Name, this Description and the icon, with no
+		// version field of its own (pkg/application/menu_manager.go's ShowAbout). So the version
+		// goes in the description, which is the only string that dialog will show.
+		Description: "A visual database client for macOS\n\nVersion " + buildinfo.Version,
 		Services: []application.Service{
 			application.NewService(&bridge.AppService{Deps: deps}),
 			application.NewService(&bridge.SettingsService{Deps: deps}),

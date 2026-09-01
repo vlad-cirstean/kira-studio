@@ -71,20 +71,43 @@ runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packagin
 
 - `info.productName: "Kira Studio"`, `info.productIdentifier: "com.kirathecat.kira-studio"` (P57 D11:
   the Wails build is the only build now, so P51/P52's deliberately-distinct `…-shell` identifier is
-  gone), `info.companyName`, `info.version: "0.0.0"`.
+  gone), `info.companyName`, and `info.version` — **the app's version, and the only place one is
+  defined** (see "Where the version comes from" below).
 - `dev_mode` drives `wails3 dev`: watched extensions, ignore lists, and the three dev commands.
 - Editing `info` requires `wails3 task common:update:build-assets` to regenerate the assets, which
   overwrites hand edits under `build/` — so `Info.plist` below is regenerated, not hand-maintained.
 
 **`apps/kira-studio/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
-`0.0.0`, `CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `14.0.0`. That floor is hand-narrowed
+`0.0.0` (the scaffolded value; the *bundle's* copy is stamped at packaging time, below),
+`CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `14.0.0`. That floor is hand-narrowed
 from Wails' template default of `12.0.0`, and matches the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*`
 flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
+
+### Where the version comes from
+
+`build/config.yml`'s `info.version` is the single source, and everything else is stamped from it at
+build time:
+
+| Consumer | How it gets there |
+|---|---|
+| The Go binary | `apps/kira-studio/Taskfile.yml`'s `APP_VERSION` reads `config.yml`; `BUILD_FLAGS` links it in with `-ldflags "-X …/internal/buildinfo.Version=<version>"`, in both the dev and production branches |
+| The About dialog | `main.go`'s `application.Options.Description`. The macOS About item is the `application.About` role (`internal/shell/menutemplate.go`), which Wails renders with its own dialog — name, description, icon, and **no version field of its own** — so the version rides in the description |
+| `AppService.Info()`'s `appVersion` | reads the same `buildinfo.Version`. Nothing in the renderer calls it today; it is API surface, not a display path |
+| `Contents/Info.plist` (`CFBundleShortVersionString`, `CFBundleVersion`) — what Finder's Get Info and the version column read | `create:app:bundle` runs PlistBuddy over the bundle's *copy* after `cp`. The checked-in plist keeps its scaffolded `0.0.0`: it is a generated file, and a hand-edit there would not survive `common:update:build-assets` anyway |
+
+An unlinked build — `go run`, `go test`, `go build ./...` by hand — reports `internal/buildinfo`'s own
+literal, `0.0.0-dev`, which is how you can tell one from a real build. `verify-packaging.sh`'s **A5**
+asserts the packaged bundle's `CFBundleShortVersionString` equals `config.yml`'s `info.version`, so a
+bundle assembled around a stale plist, or one where the PlistBuddy step silently skipped (its guard is
+`-x /usr/libexec/PlistBuddy`, absent off macOS), fails the check rather than shipping quietly.
+
+The root `package.json`'s `version` is **not** it — that is npm metadata for a private, unpublished
+workspace root, and nothing in the app or the build reads it.
 
 **`apps/kira-studio/Taskfile.yml` + `apps/kira-studio/build/darwin/Taskfile.yml`** — the task graph `bun run package` drives:
 
@@ -298,8 +321,10 @@ actually exercises it.
 
 **Cutting a release** (`release.yml`, on tags matching `v*.*.*`):
 
-1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes `package.json`'s `version` from the
-   tag itself — no pre-tag version-bump commit is needed.
+1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes the tag (minus its `v`) into
+   `build/config.yml`'s `info.version` in its own checkout — no pre-tag version-bump commit is
+   needed — and from there it reaches the binary, the About dialog and the bundle's `Info.plist`
+   (see "Where the version comes from"). It asserts the write landed before building.
 2. It generates bindings, runs `lint`/`typecheck`, then `bun run package` unmodified.
 3. It copies the already-signed `apps/kira-studio/bin/Kira Studio.dmg` to
    `kira-studio-macos-arm64.dmg` (the platform-qualified asset name — the image itself is built and

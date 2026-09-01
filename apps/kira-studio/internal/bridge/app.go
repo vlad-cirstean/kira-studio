@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
@@ -24,11 +25,9 @@ type AppService struct {
 	Deps appcore.Deps
 }
 
-const appVersion = "0.0.0" // matches apps/kira-studio/build/config.yml's info.version.
-
 func (s *AppService) Info() (AppInfo, error) {
 	return AppInfo{
-		AppVersion: appVersion,
+		AppVersion: buildinfo.Version,
 		Go:         runtime.Version(),
 		Wails:      "v3.0.0-beta.15",
 		KiraHome:   config.KiraHome(),
