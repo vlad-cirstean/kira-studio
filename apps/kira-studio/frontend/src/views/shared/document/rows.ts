@@ -181,6 +181,26 @@ export function resetRows(tabId: string): void {
   rowsVersion.n++;
 }
 
+/** P5 C3/F4: prunes `parseCache` to the visible window (widened by VirtualList's own overscan —
+ *  already folded into the caller's `start`/`end`, `DocumentView.vue`'s `onVisibleRange`). The
+ *  O(rowCount) parse pass a page's initial load needs — VirtualList's own exact-height math needs
+ *  every *expanded* row's line count, and every document defaults to expanded (P27 D2) — no
+ *  longer stays retained for the whole page once the window has moved past a row.
+ *
+ *  `expandedPaths` is pruned too, but only for a row whose set is *empty* — a row the user
+ *  actually drilled a nested field into keeps its expansion memory regardless of scroll position,
+ *  so expanding a document, scrolling far away and scrolling back still shows it expanded. */
+export function pruneRows(scope: string, start: number, end: number): void {
+  const entry = tabRows.get(scope);
+  if (!entry) return;
+  for (const row of entry.parseCache.keys()) {
+    if (row < start || row >= end) entry.parseCache.delete(row);
+  }
+  for (const [row, paths] of entry.expandedPaths) {
+    if ((row < start || row >= end) && paths.size === 0) entry.expandedPaths.delete(row);
+  }
+}
+
 /** P43 iter2 F23/D32: releases everything this module holds for one scope — a closed document
  *  tab, or a closed console result set whose key nothing can ever match again (state.ts's own
  *  `nextSeq`). Distinct from `resetRows` above, which keeps the entry because the same scope is
@@ -195,6 +215,31 @@ export function dropRows(scope: string): void {
 }
 
 registerTabRuntimeCleanup(dropRows);
+
+function countNodes(node: DocNode): number {
+  let n = 1;
+  for (const child of node.children) n += countNodes(child);
+  return n;
+}
+
+/** Playwright-only (main.ts's `window.__kiraRetention`, C1) — F4's own subject: `parseCache`'s
+ *  row count and the total `DocNode` count across every cached tree, neither of which
+ *  `totalRetainedBytes()` (page store's own `byteSize` sum) can see. */
+export function retentionSnapshot(): {
+  tabScopes: number;
+  parseCacheRows: number;
+  docNodeCount: number;
+} {
+  let parseCacheRows = 0;
+  let docNodeCount = 0;
+  for (const entry of tabRows.values()) {
+    parseCacheRows += entry.parseCache.size;
+    for (const parsed of entry.parseCache.values()) {
+      if (parsed.root) docNodeCount += countNodes(parsed.root);
+    }
+  }
+  return { tabScopes: tabRows.size, parseCacheRows, docNodeCount };
+}
 
 const HEAD_H = 26; // --kira-h-md
 const LINE_H = 18; // --kira-h-xs, OperationsPanel's own row height
@@ -212,17 +257,21 @@ const EDITING_H = 220; // the fixed editor panel height (unchanged from the pre-
  * below, for `resetRows`), and one circular edge is enough. `hasSearchPreview` is the same kind
  * of caller-supplied flag (P31 D20): DocumentView.vue's own documents/search.ts-derived state, adding
  * one line's worth of height for the collapsed row's `<mark>`-highlighted preview line.
+ *
+ * P5 C2/F4: `editingRow` is a page-row index, not a document id — the caller already knows which
+ * row it started editing (it's the one the Edit click came from), so this never has to decode a
+ * row's id purely to answer "is this the one being edited". Combined with `isExpanded`, a
+ * collapsed, unedited, non-preview row — the common case for every row outside the rendered
+ * window — returns `HEAD_H` with no `documentRow` and no `parseRow` call at all.
  */
 export function rowHeight(
   tabId: string,
   row: number,
-  editingId: string | null,
+  editingRow: number | null,
   isExpanded: boolean,
   hasSearchPreview = false,
 ): number {
-  const doc = documentRow(tabId, row);
-  if (!doc) return HEAD_H;
-  if (doc.id === editingId) return HEAD_H + EDITING_H;
+  if (row === editingRow) return HEAD_H + EDITING_H;
   if (!isExpanded) return hasSearchPreview ? HEAD_H + LINE_H : HEAD_H;
   const parsed = parseRow(tabId, row);
   if (!parsed?.root) return HEAD_H + EDITING_H;

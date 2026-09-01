@@ -31,10 +31,11 @@ import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { deleteSqsMessage } from './mutations';
-import { getPage, pageVersion, streamRow } from './page';
+import { getPage, pageVersion, setVisibleWindow, streamRow } from './page';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
@@ -460,6 +461,20 @@ function onCloseSearch(): void {
   setSearchOpen(props.tab.id, false);
 }
 
+// P5 C3/F5: this view never reported a visible window before — page.ts's decode cache (five
+// subkeys per row: key/headers/attrs/timestamp/body, F5's own most expensive per-cell shape) never
+// pruned, growing monotonically for the tab's lifetime. Mirrors KeyValueView.vue's own
+// onVisibleRangeIndices exactly, resolving `rowIndices`' (possibly filtered) positions back to
+// real page rows the same way.
+function onVisibleRangeIndices(range: { start: number; end: number }): void {
+  const list = rowIndices.value;
+  const from = list[range.start];
+  const to = list[Math.max(range.start, range.end - 1)];
+  if (from === undefined || to === undefined) return;
+  setVisibleRows(props.tab.id, from, to + 1);
+  setVisibleWindow(props.tab.id, from, to + 1);
+}
+
 // Item 4: per-column resize for the four fixed-width columns (mirrors DataGrid.vue's own
 // resize-handle pattern) — the `body` column stays `flex: 1` and is never resizable. Defaults
 // match the previous hardcoded inline widths exactly, so a tab that never resized anything renders
@@ -857,7 +872,13 @@ onUnmounted(() => {
             </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
-          <VirtualList ref="listRef" class="tbody-scroll" :items="rowIndices" :row-height="rowHeight">
+          <VirtualList
+            ref="listRef"
+            class="tbody-scroll"
+            :items="rowIndices"
+            :row-height="rowHeight"
+            @visible-range="onVisibleRangeIndices"
+          >
             <template #default="{ item: i }">
               <div
                 class="stream-row"

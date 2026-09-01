@@ -274,6 +274,22 @@ export function pageByteSize(page: TabularPage): number {
   return total;
 }
 
+/** P5 C1/F8: every TextColumnChunk a page carries, regardless of kind — one page-kind-agnostic
+ *  way to enumerate them, for the retention probe's own "distinct retained frame buffers" figure
+ *  (main.ts's `__kiraRetention`) and for `frame.ts`'s per-page buffer copy (C7). */
+export function pageChunks(page: Page): TextColumnChunk[] {
+  switch (page.kind) {
+    case 'tabular':
+      return page.chunks;
+    case 'document':
+      return [page.ids, page.bodies];
+    case 'keyvalue':
+      return [page.fields, page.values];
+    case 'stream':
+      return [page.keys, page.headers, page.attrs, page.timestamps, page.bodies];
+  }
+}
+
 /**
  * Accumulates one column's rows into growable scratch and only copies into exactly-sized
  * buffers at `finish()` (D4's corollary: a view over an oversized buffer clones the slack).

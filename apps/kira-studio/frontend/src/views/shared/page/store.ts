@@ -49,6 +49,35 @@ export interface PageStore<P extends { rowCount: number; byteSize: number }> {
   setVisibleWindow(scope: string, startRow: number, endRow: number): void;
 }
 
+/** P5 C1: one page store's internals, read-only — what `retentionEntries` below reports for a
+ *  single scope (a tab id, or a console result key). `decodeCacheChars` sums the decoded string
+ *  lengths `cached()` has memoized; `page` is handed back whole so a caller that knows its own
+ *  concrete page kind (a page module, or main.ts's `__kiraRetention`) can read `byteSize` or walk
+ *  its chunks without this generic module needing to know either. */
+export interface RetentionEntry<P> {
+  page: P;
+  decodeCacheRows: number;
+  decodeCacheChars: number;
+  viewCacheRows: number;
+}
+
+// P5 C1: keyed by the store object itself, not exposed on `PageStore<P>` — the interface every
+// view module already imports `cached`/`cachedView`/`setVisibleWindow` through stays exactly as
+// wide as it always was, so ordinary view code reaching for `store.<something>` can never stumble
+// onto a probe-only accessor. Only `retentionEntries` below (and, transitively, each page module's
+// own one-line re-export of it) ever looks this up.
+const retentionSources = new WeakMap<object, () => RetentionEntry<unknown>[]>();
+
+/** Playwright-only (main.ts's `window.__kiraRetention`, C1): a page store's per-scope internals —
+ *  the decode/view caches `totalRetainedBytes()` cannot see, since that sums `page.byteSize` only
+ *  (F2's own finding: the app's retention accounting is blind to the largest thing it retains). */
+export function retentionEntries<P extends { rowCount: number; byteSize: number }>(
+  store: PageStore<P>,
+): RetentionEntry<P>[] {
+  const source = retentionSources.get(store as object);
+  return (source?.() ?? []) as RetentionEntry<P>[];
+}
+
 export function createPageStore<P extends { rowCount: number; byteSize: number }>(opts?: {
   onSet?(scope: string): void;
 }): PageStore<P> {
@@ -56,7 +85,7 @@ export function createPageStore<P extends { rowCount: number; byteSize: number }
   const decoder = new TextDecoder();
   const pageVersion = reactive({ n: 0 });
 
-  return {
+  const store: PageStore<P> = {
     pageVersion,
 
     bumpPageVersion() {
@@ -148,4 +177,23 @@ export function createPageStore<P extends { rowCount: number; byteSize: number }
       entry.windowEnd = endRow;
     },
   };
+
+  retentionSources.set(store, () => {
+    const out: RetentionEntry<P>[] = [];
+    for (const entry of pages.values()) {
+      let decodeCacheChars = 0;
+      for (const rowCache of entry.decodeCache.values()) {
+        for (const text of rowCache.values()) decodeCacheChars += text.length;
+      }
+      out.push({
+        page: entry.page,
+        decodeCacheRows: entry.decodeCache.size,
+        decodeCacheChars,
+        viewCacheRows: entry.viewCache.size,
+      });
+    }
+    return out as RetentionEntry<unknown>[];
+  });
+
+  return store;
 }

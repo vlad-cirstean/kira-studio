@@ -42,7 +42,7 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
-import { getPage, keyValueRow, pageVersion } from './page';
+import { getPage, keyValueRow, pageVersion, setVisibleWindow } from './page';
 import { type Match, matchedRows, pageSearchApi, searchState } from './search';
 import {
   goNext,
@@ -540,12 +540,17 @@ function onGoToMatch(match: Match): void {
 // P49 F7/D5: closes the hole keyvalue/search.ts's own runSearch doc comment named — until this
 // view virtualized its rows, nothing ever reported a visible window, so a find's priority scan
 // always started from row 0 with no on-screen rows to prioritize first.
+//
+// P5 C3/F5: the same bounds also prune page.ts's decode cache (`setVisibleWindow`, mirrors
+// grid/console) — already widened by VirtualList's own overscan, so a fling never prunes a row
+// about to be re-rendered.
 function onVisibleRangeIndices(range: { start: number; end: number }): void {
   const list = rowIndices.value;
   const from = list[range.start];
   const to = list[Math.max(range.start, range.end - 1)];
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tab.id, from, to + 1);
+  setVisibleWindow(props.tab.id, from, to + 1);
 }
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per row.

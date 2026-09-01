@@ -1,5 +1,5 @@
 import { cellByteLength, cellText, isNull, isTruncated, type Page } from '@shared/protocol/page';
-import { createPageStore } from '../shared/page/store';
+import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
 // The console's own page store (P5.5), widened in P8 to hold either page kind — a console
 // result can be tabular (SQL) or document (Mongo shell), unlike `views/grid/page.ts`'s store,
@@ -25,6 +25,10 @@ export const totalRetainedBytes = store.totalRetainedBytes;
 /** Called by ConsoleResultGrid.vue on scroll (from the same bounds its own search-priority report
  *  already computes, P42 D39 — see `visibleRows.ts`'s own handoff note). */
 export const setVisibleWindow = store.setVisibleWindow;
+/** Playwright-only (main.ts's `window.__kiraRetention`, C1). */
+export function pageStoreEntries(): RetentionEntry<Page>[] {
+  return retentionEntries(store);
+}
 
 export interface CellView {
   text: string;

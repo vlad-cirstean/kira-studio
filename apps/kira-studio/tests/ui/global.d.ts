@@ -11,6 +11,10 @@ declare global {
     __kiraRetainedBytes?: () => number;
     /** Playwright-only hook (apps/kira-studio/frontend/src/main.ts, D6) — the tree's live connection ids. */
     __kiraTreeConnectionIds?: () => string[];
+    /** Playwright-only hook (apps/kira-studio/frontend/src/main.ts, P5 C1) — the renderer-retention
+     *  probe. Left untyped (`unknown`) here — this file is a separate TS program from
+     *  frontend/src's own, and leaks.spec.ts only ever compares it whole with `toEqual`. */
+    __kiraRetention?: () => unknown;
   }
 }
 

@@ -107,6 +107,14 @@ async function retainedBytes(page: Page): Promise<number> {
   return page.evaluate(() => window.__kiraRetainedBytes?.() ?? -1);
 }
 
+// P5 C1: the retention probe — asserted for exact-baseline equality the same way retainedBytes()
+// above is, but over the structures that hook cannot see (decode/view caches, the document parse
+// cache, per-tab search matches, distinct retained frame buffers). `toEqual` on the whole object
+// is deliberate: any one field drifting from baseline is a genuine regression.
+async function retention(page: Page): Promise<unknown> {
+  return page.evaluate(() => window.__kiraRetention?.() ?? null);
+}
+
 async function waitForGrid(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect
@@ -277,6 +285,7 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
   // stores this file's own `__kiraRetainedBytes` sums; a definition tab retains none of them but
   // must still close cleanly alongside the other two.
   const baseline1 = await retainedBytes(page);
+  const retentionBaseline1 = await retention(page);
 
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   await waitForGrid(page);
@@ -295,9 +304,11 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
 
   await closeAllTabs(page);
   expect(await retainedBytes(page)).toBe(baseline1);
+  expect(await retention(page)).toEqual(retentionBaseline1);
 
   // --- scenario 2: runtime records are released (F4) -------------------------------------------
   const baseline2 = await retainedBytes(page);
+  const retentionBaseline2 = await retention(page);
   for (let i = 0; i < 20; i++) {
     await openRowMenu(page, ORDER_ITEMS_PATH);
     await page.click('[data-testid="menu-item-open-data-new-tab"]');
@@ -306,6 +317,7 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(20);
   await closeAllTabs(page);
   expect(await retainedBytes(page)).toBe(baseline2);
+  expect(await retention(page)).toEqual(retentionBaseline2);
 
   // A freshly re-opened tab starts from a default runtime: no stale count, nothing counted yet.
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();

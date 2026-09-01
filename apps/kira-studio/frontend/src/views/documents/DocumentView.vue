@@ -24,6 +24,7 @@ import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
 import {
   type DocumentRowView,
+  pruneRows,
   registerDocumentRows,
   rowHeight,
   rowsVersion,
@@ -45,7 +46,7 @@ import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
-import { documentRow, fieldNamesOnPage, pageVersion } from './page';
+import { documentRow, fieldNamesOnPage, pageVersion, setVisibleWindow } from './page';
 import {
   searchState as docSearchState,
   type Match,
@@ -260,6 +261,10 @@ function onCloseSearch(): void {
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
 
 const editingId = ref<string | null>(null);
+// P5 C2: tracked alongside `editingId` by row index, not just by id — rows.ts's own `rowHeight`
+// compares against this directly (below), so the height pass never has to decode a row's id
+// purely to ask "is this the one being edited".
+const editingRow = ref<number | null>(null);
 // The row currently being edited seeds from toShellText(body) — the shell-literal spelling, not
 // the raw canonical-EJSON wire text — so editing reads the same ObjectId(…)/ISODate(…) form the
 // collapsed row and the tree already show (D14/D29).
@@ -269,10 +274,12 @@ const editBuffer = useEditBuffer({
   beautifier: () => beautifyShellText,
 });
 
-// D23: the list's v-for iterates this — plain per-row view objects, not an index range resolved
-// by a function. Carries the raw body alongside documentRows.ts's own DocumentRowView (whose
-// `root` is a parsed tree, not text) since Edit/context-menu/cell-editor-publish still need the
-// literal EJSON string.
+// P5 C2/F4: the list's v-for now iterates plain page-row indices, not per-row view objects — a
+// document row is resolved (id/body decoded, body parsed into a DocNode tree) through `rowAt`
+// below, only for the row actually being rendered, mirroring KeyValueView.vue's/StreamView.vue's
+// own `rowIndices`/`rowAt` pattern (which never had this problem, §2 F4). Previously `rows` called
+// `documentRow`/`rowView` for *every* row on the page on every load — +15.56 MB of permanently
+// cached parse trees for a 5 000-document page, none of it visible.
 interface DocumentRowEntry {
   view: DocumentRowView;
   body: string;
@@ -281,30 +288,52 @@ interface DocumentRowEntry {
 // P31 D17/D18: the same "hide non-matching rows" toggle grid/keyvalue/stream share (P24 D2).
 const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
 
-const rows = computed<DocumentRowEntry[]>(() => {
+const rows = computed<number[]>(() => {
   void pageVersion.n;
-  const indices = displayRows.value ?? Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
-  const out: DocumentRowEntry[] = [];
-  for (const i of indices) {
-    const doc = documentRow(props.tab.id, i);
-    const view = rowView(props.tab.id, i);
-    if (!doc || !view) continue;
-    out.push({ view, body: doc.body });
-  }
-  return out;
+  return displayRows.value ?? Array.from({ length: rt.value?.rowCount ?? 0 }, (_, i) => i);
 });
 
+/** Resolves one page row for rendering — id/body decode plus the body's own parsed tree, both
+ *  memoized by page.ts/rows.ts's own caches (C3 prunes them to the visible window), so repeat
+ *  calls for the same row within one render are cheap Map lookups, not a re-decode/re-parse. */
+function rowAt(row: number): DocumentRowEntry | null {
+  const doc = documentRow(props.tab.id, row);
+  const view = rowView(props.tab.id, row);
+  if (!doc || !view) return null;
+  return { view, body: doc.body };
+}
+
+/** Expand all/Collapse all and the row context menu's own "every id on this page" (menu.ts's
+ *  `allIds`) need every row's `_id` — a decode, not `rowAt`'s own parse — over whichever index
+ *  list is current (the full page, or the filtered subset while a find's filter toggle is on,
+ *  matching `rows`' own scope exactly). */
+function idsOf(indices: readonly number[]): string[] {
+  const out: string[] = [];
+  for (const i of indices) {
+    const doc = documentRow(props.tab.id, i);
+    if (doc) out.push(doc.id);
+  }
+  return out;
+}
+
 // P42 D39: VirtualList reports positions *within* `rows` (§ above) — while filtering, that array
-// is a non-contiguous subset of page-row indices, so the reported bounds are resolved back to
-// real page rows through each end's own `view.index` rather than assumed to equal it. `rows` is
-// itself always ascending (matchedRows' own ascending-de-duplicated contract), so the first and
-// last entries of the slice are its min/max.
+// is a non-contiguous subset of page-row indices, so the reported bounds are the page rows
+// themselves now that `rows` holds plain row numbers (no `.view.index` indirection left to
+// resolve). `rows` is itself always ascending (matchedRows' own ascending-de-duplicated
+// contract), so the first and last entries of the slice are its min/max.
+//
+// P5 C3/F5: the same bounds also prune the decode cache (page.ts's own `setVisibleWindow`, mirrors
+// grid/console) and rows.ts's `parseCache` (`pruneRows`) — both already widened by VirtualList's
+// own overscan (VirtualList.vue's `visible-range` emit includes it), so a fling never prunes a row
+// about to be re-rendered.
 function onVisibleRange(range: { start: number; end: number }): void {
   const list = rows.value;
-  const from = list[range.start]?.view.index;
-  const to = list[Math.max(range.start, range.end - 1)]?.view.index;
+  const from = list[range.start];
+  const to = list[Math.max(range.start, range.end - 1)];
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tab.id, from, to + 1);
+  setVisibleWindow(props.tab.id, from, to + 1);
+  pruneRows(props.tab.id, from, to + 1);
 }
 
 // P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
@@ -355,17 +384,22 @@ function previewSegments(row: number, body: string): PreviewSegment[] {
 // One height per row, in `rows`' own order — VirtualList's `rowHeights` prop (P27 D18/D20).
 // Depends on `rowsVersion` too: a nested-path toggle inside DocumentTree.vue changes a row's
 // visible line count without changing `rows` itself (id/fieldCount/byteLabel/root are unaffected).
+//
+// P5 C2/F4: `documentRow` here is a decode only (id, to resolve the persisted-by-id expansion
+// flag) — `rowHeight` (rows.ts) itself no longer decodes or parses anything for a collapsed,
+// unedited, non-preview row, which is the common case for every row outside the rendered window.
 const rowHeights = computed<number[]>(() => {
   void pageVersion.n;
   void rowsVersion.n;
-  return rows.value.map((r) => {
-    const expanded = isDocumentExpanded(props.tab.id, r.view.id);
+  return rows.value.map((row) => {
+    const id = documentRow(props.tab.id, row)?.id ?? null;
+    const expanded = id !== null && isDocumentExpanded(props.tab.id, id);
     return rowHeight(
       props.tab.id,
-      r.view.index,
-      editingId.value,
+      row,
+      editingRow.value,
       expanded,
-      !expanded && isSearchMatch(r.view.index),
+      !expanded && isSearchMatch(row),
     );
   });
 });
@@ -382,19 +416,21 @@ function onGoToMatch(match: Match): void {
   if (!view) return;
   if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
   void nextTick(() => {
-    const index = rows.value.findIndex((r) => r.view.index === row);
+    const index = rows.value.indexOf(row);
     if (index >= 0) virtualListRef.value?.scrollToIndex(index);
   });
 }
 
-function startEdit(id: string, body: string): void {
+function startEdit(row: number, id: string, body: string): void {
   if (!editGate.value.editable) return;
+  editingRow.value = row;
   editingId.value = id;
   editOriginal.value = toShellText(body);
   editBuffer.reseed();
 }
 
 function cancelEdit(): void {
+  editingRow.value = null;
   editingId.value = null;
 }
 
@@ -404,18 +440,28 @@ async function commitEdit(): Promise<void> {
   try {
     await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
     setActionError(props.tab.id, null);
+    editingRow.value = null;
     editingId.value = null;
   } catch (err) {
     setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
 }
 
-function onRowContextMenu(e: MouseEvent, id: string, body: string): void {
+function onRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
-  const ids = rows.value.map((r) => r.view.id);
+  const entry = rowAt(row);
+  if (!entry) return;
+  const ids = idsOf(rows.value);
   openContextMenu(
     e,
-    rowMenu(props.tab.id, id, body, ids, () => startEdit(id, body), editGate.value),
+    rowMenu(
+      props.tab.id,
+      entry.view.id,
+      entry.body,
+      ids,
+      () => startEdit(row, entry.view.id, entry.body),
+      editGate.value,
+    ),
   );
 }
 
@@ -439,19 +485,11 @@ function onRefresh(): void {
 }
 
 function onExpandAll(): void {
-  setAllExpanded(
-    props.tab.id,
-    rows.value.map((r) => r.view.id),
-    true,
-  );
+  setAllExpanded(props.tab.id, idsOf(rows.value), true);
 }
 
 function onCollapseAll(): void {
-  setAllExpanded(
-    props.tab.id,
-    rows.value.map((r) => r.view.id),
-    false,
-  );
+  setAllExpanded(props.tab.id, idsOf(rows.value), false);
 }
 
 function onRowClick(i: number): void {
@@ -722,6 +760,11 @@ onUnmounted(() => {
           :row-heights="rowHeights"
           @visible-range="onVisibleRange"
         >
+          <!-- P5 C2: `item` is now a plain page-row number — `rowAt` (script above) resolves it
+               (id/body decode, body parse) only for the row VirtualList is actually rendering.
+               Guarded by `v-if="rowAt(item)"` (never false for a row VirtualList hands back; page
+               rows in range always resolve) so `rowAt(item)!` below can carry a definite,
+               non-null DocumentRowView into DocumentRow's own required `view` prop. -->
           <template #default="{ item, index }">
             <!-- P43 iter3 F31a: onRowClick only sets the row's own highlight (state.ts's
                  selectRow) — this view mounts no cell editor dock to publish a selection into
@@ -731,36 +774,37 @@ onUnmounted(() => {
                  the row you just acted on is never wrong), so their own handlers stop propagation
                  rather than double-firing selectRow with the same index. -->
             <DocumentRow
+              v-if="rowAt(item)"
               data-testid="document-row"
               :style="{ height: `${rowHeights[index]}px` }"
-              @contextmenu="onRowContextMenu($event, item.view.id, item.body)"
-              :view="item.view"
+              @contextmenu="onRowContextMenu($event, item)"
+              :view="rowAt(item)!.view"
               :scope="tab.id"
-              :expanded="isDocumentExpanded(tab.id, item.view.id)"
+              :expanded="isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
               :selected="rt?.selectedRow === index"
-              :search-match="isSearchMatch(item.view.index)"
-              :search-match-current="isCurrentSearchMatch(item.view.index)"
-              @toggle="toggleExpanded(tab.id, item.view.id)"
+              :search-match="isSearchMatch(item)"
+              :search-match-current="isCurrentSearchMatch(item)"
+              @toggle="toggleExpanded(tab.id, rowAt(item)!.view.id)"
               @select="onRowClick(index)"
             >
               <template #actions>
                 <span class="doc-head-spacer"></span>
                 <div class="doc-row-actions">
-                  <span v-if="editingId === item.view.id" class="p-chip warn">editing</span>
+                  <span v-if="editingRow === item" class="p-chip warn">editing</span>
                   <IconButton
                     icon="edit"
-                    :active="editingId === item.view.id"
+                    :active="editingRow === item"
                     data-testid="document-edit"
                     :disabled="!editGate.editable"
                     v-tooltip="editGate.editable ? 'Edit' : editGate.label"
-                    @click.stop="startEdit(item.view.id, item.body)"
+                    @click.stop="startEdit(item, rowAt(item)!.view.id, rowAt(item)!.body)"
                   />
                   <IconButton
                     icon="trash"
                     data-testid="document-delete"
                     :disabled="!caps?.canDelete"
                     v-tooltip="caps?.canDelete ? 'Delete' : 'Connection does not support delete'"
-                    @click.stop="onDeleteRow(item.view.id)"
+                    @click.stop="onDeleteRow(rowAt(item)!.view.id)"
                   />
                 </div>
               </template>
@@ -771,23 +815,23 @@ onUnmounted(() => {
                      against, so it cannot disagree with the offsets. Only while collapsed: an
                      expanded document's own body is out of scope (§6). -->
                 <div
-                  v-if="isSearchMatch(item.view.index) && !isDocumentExpanded(tab.id, item.view.id)"
+                  v-if="isSearchMatch(item) && !isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
                   class="doc-preview-match"
                   data-testid="document-search-preview"
                 >
-                  <template v-for="(seg, si) in previewSegments(item.view.index, item.body)" :key="si">
+                  <template v-for="(seg, si) in previewSegments(item, rowAt(item)!.body)" :key="si">
                     <mark v-if="seg.matched">{{ seg.text }}</mark>
                     <template v-else>{{ seg.text }}</template>
                   </template>
                 </div>
                 <div
-                  v-if="isDocumentExpanded(tab.id, item.view.id)"
+                  v-if="isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
                   class="doc-body"
                   data-testid="document-body"
                 >
                   <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
-                  <template v-if="editingId === item.view.id">
+                  <template v-if="editingRow === item">
                     <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
                     <div class="edit-actions">
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
@@ -801,14 +845,14 @@ onUnmounted(() => {
                     </div>
                   </template>
                   <DocumentTree
-                    v-else-if="item.view.root"
+                    v-else-if="rowAt(item)!.view.root"
                     :tab-id="tab.id"
-                    :row="item.view.index"
-                    @toggle-path="(path) => togglePath(tab.id, item.view.index, path)"
+                    :row="item"
+                    @toggle-path="(path) => togglePath(tab.id, item, path)"
                   />
                   <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
                        object) falls back to raw text rather than a tree that has nothing to walk. -->
-                  <CodeMirrorHost v-else :doc="item.body" language="json" :read-only="true" />
+                  <CodeMirrorHost v-else :doc="rowAt(item)!.body" language="json" :read-only="true" />
                 </div>
               </template>
             </DocumentRow>

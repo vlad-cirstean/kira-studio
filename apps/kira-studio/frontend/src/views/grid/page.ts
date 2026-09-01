@@ -1,5 +1,5 @@
 import { cellText, isNull, isTruncated, type TabularPage } from '@shared/protocol/page';
-import { createPageStore } from '../shared/page/store';
+import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
 // P48 F19: rebuilt on the shared factory — the two-level decode cache and P29 D7's visible-window
 // pruning this file grew on its own now live in views/shared/page/store.ts, shared with
@@ -12,6 +12,10 @@ export const getPage = store.getPage;
 export const drop = store.drop;
 export const totalRetainedBytes = store.totalRetainedBytes;
 export const setVisibleWindow = store.setVisibleWindow;
+/** Playwright-only (main.ts's `window.__kiraRetention`, C1). */
+export function pageStoreEntries(): RetentionEntry<TabularPage>[] {
+  return retentionEntries(store);
+}
 
 export interface CellView {
   text: string;

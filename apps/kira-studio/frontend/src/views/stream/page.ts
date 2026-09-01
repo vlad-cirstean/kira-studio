@@ -1,5 +1,5 @@
 import { cellText, isNull, isTruncated, type StreamPage } from '@shared/protocol/page';
-import { createPageStore } from '../shared/page/store';
+import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
 const store = createPageStore<StreamPage>();
 
@@ -8,6 +8,11 @@ export const setPage = store.setPage;
 export const getPage = store.getPage;
 export const drop = store.drop;
 export const totalRetainedBytes = store.totalRetainedBytes;
+export const setVisibleWindow = store.setVisibleWindow;
+/** Playwright-only (main.ts's `window.__kiraRetention`, C1). */
+export function pageStoreEntries(): RetentionEntry<StreamPage>[] {
+  return retentionEntries(store);
+}
 
 export interface StreamRow {
   key: string | null;

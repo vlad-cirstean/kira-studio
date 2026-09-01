@@ -1,4 +1,5 @@
 import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
+import { pageChunks } from '@shared/protocol/page';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { data } from './bridge/data';
@@ -11,12 +12,107 @@ import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { hydrateSettings } from './state/settings';
-import { totalRetainedBytes as consoleRetainedBytes } from './views/console/resultPages';
-import { totalRetainedBytes as documentRetainedBytes } from './views/documents/page';
-import { totalRetainedBytes } from './views/grid/page';
-import { totalRetainedBytes as keyValueRetainedBytes } from './views/keyvalue/page';
-import { totalRetainedBytes as streamRetainedBytes } from './views/stream/page';
+import {
+  pageStoreEntries as consolePageStoreEntries,
+  totalRetainedBytes as consoleRetainedBytes,
+} from './views/console/resultPages';
+import { searchState as consoleSearchState } from './views/console/search';
+import {
+  pageStoreEntries as documentPageStoreEntries,
+  totalRetainedBytes as documentRetainedBytes,
+} from './views/documents/page';
+import { searchState as documentSearchState } from './views/documents/search';
+import { pageStoreEntries as gridPageStoreEntries, totalRetainedBytes } from './views/grid/page';
+import { searchState as gridSearchState } from './views/grid/search';
+import {
+  pageStoreEntries as keyValuePageStoreEntries,
+  totalRetainedBytes as keyValueRetainedBytes,
+} from './views/keyvalue/page';
+import { searchState as keyValueSearchState } from './views/keyvalue/search';
+import { retentionSnapshot as documentRowsRetention } from './views/shared/document/rows';
+import {
+  pageStoreEntries as streamPageStoreEntries,
+  totalRetainedBytes as streamRetainedBytes,
+} from './views/stream/page';
+import { searchState as streamSearchState } from './views/stream/search';
 import { vTooltip } from './workbench/state/tooltip';
+
+/** P5 C1: what `window.__kiraRetention` reports for one of the five page stores — the decode/view
+ *  caches `__kiraRetainedBytes` cannot see, since that sums `page.byteSize` only (F2). */
+interface KiraRetentionStoreStats {
+  entries: number;
+  pageBytes: number;
+  decodeCacheRows: number;
+  decodeCacheChars: number;
+  viewCacheRows: number;
+}
+
+interface KiraRetentionSnapshot {
+  stores: {
+    grid: KiraRetentionStoreStats;
+    documents: KiraRetentionStoreStats;
+    keyvalue: KiraRetentionStoreStats;
+    stream: KiraRetentionStoreStats;
+    console: KiraRetentionStoreStats;
+  };
+  documentRows: { tabScopes: number; parseCacheRows: number; docNodeCount: number };
+  searchMatches: {
+    grid: number;
+    documents: number;
+    keyvalue: number;
+    console: number;
+    stream: number;
+  };
+  /** F8/C7: distinct `chunk.data.buffer` identities across every page every store holds, and
+   *  their summed byte length — the one figure `totalRetainedBytes()` structurally cannot see,
+   *  since a multi-page ExecuteResponse frame shares one ArrayBuffer across every page it carried. */
+  frameBuffers: { count: number; bytes: number };
+}
+
+function storeStats<P extends { byteSize: number }>(
+  entries: readonly {
+    page: P;
+    decodeCacheRows: number;
+    decodeCacheChars: number;
+    viewCacheRows: number;
+  }[],
+): KiraRetentionStoreStats {
+  let pageBytes = 0;
+  let decodeCacheRows = 0;
+  let decodeCacheChars = 0;
+  let viewCacheRows = 0;
+  for (const e of entries) {
+    pageBytes += e.page.byteSize;
+    decodeCacheRows += e.decodeCacheRows;
+    decodeCacheChars += e.decodeCacheChars;
+    viewCacheRows += e.viewCacheRows;
+  }
+  return { entries: entries.length, pageBytes, decodeCacheRows, decodeCacheChars, viewCacheRows };
+}
+
+function sumMatches(state: Record<string, { matches: readonly unknown[] }>): number {
+  let n = 0;
+  for (const entry of Object.values(state)) n += entry.matches.length;
+  return n;
+}
+
+function frameBufferStats(allEntries: readonly { page: Parameters<typeof pageChunks>[0] }[]): {
+  count: number;
+  bytes: number;
+} {
+  const seen = new Set<ArrayBufferLike>();
+  let bytes = 0;
+  for (const { page } of allEntries) {
+    for (const chunk of pageChunks(page)) {
+      const buf = chunk.data.buffer;
+      if (!seen.has(buf)) {
+        seen.add(buf);
+        bytes += buf.byteLength;
+      }
+    }
+  }
+  return { count: seen.size, bytes };
+}
 
 declare global {
   interface Window {
@@ -44,6 +140,14 @@ declare global {
      * scroll-response budget can measure the app's actual work independent of display refresh rate.
      */
     __kiraGridScrollWorkStart?: (t: number) => void;
+    /**
+     * Playwright-only hook (P5 C1, tests/ui/leaks.spec.ts) — the renderer-retention probe: the
+     * decode/view caches, the document parse cache, per-tab search matches and distinct retained
+     * frame buffers that `__kiraRetainedBytes` cannot see (F2's own finding — that hook sums
+     * `page.byteSize` only). Deterministic, engine-independent (no heap API) accounting for
+     * structures §2's findings (F4-F8) are about.
+     */
+    __kiraRetention?: () => KiraRetentionSnapshot;
   }
 }
 window.__kiraGridRetainedBytes = totalRetainedBytes;
@@ -53,6 +157,37 @@ window.__kiraRetainedBytes = () =>
   documentRetainedBytes() +
   keyValueRetainedBytes() +
   streamRetainedBytes();
+window.__kiraRetention = () => {
+  const gridEntries = gridPageStoreEntries();
+  const documentEntries = documentPageStoreEntries();
+  const keyValueEntries = keyValuePageStoreEntries();
+  const streamEntries = streamPageStoreEntries();
+  const consoleEntries = consolePageStoreEntries();
+  return {
+    stores: {
+      grid: storeStats(gridEntries),
+      documents: storeStats(documentEntries),
+      keyvalue: storeStats(keyValueEntries),
+      stream: storeStats(streamEntries),
+      console: storeStats(consoleEntries),
+    },
+    documentRows: documentRowsRetention(),
+    searchMatches: {
+      grid: sumMatches(gridSearchState),
+      documents: sumMatches(documentSearchState),
+      keyvalue: sumMatches(keyValueSearchState),
+      console: sumMatches(consoleSearchState),
+      stream: sumMatches(streamSearchState),
+    },
+    frameBuffers: frameBufferStats([
+      ...gridEntries,
+      ...documentEntries,
+      ...keyValueEntries,
+      ...streamEntries,
+      ...consoleEntries,
+    ]),
+  };
+};
 window.__kiraCount = data.count;
 window.__kiraCacheStats = data.cacheStats;
 window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
