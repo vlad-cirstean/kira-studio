@@ -28,6 +28,7 @@ import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
+import { datasetNumber } from '../shared/eventCoords';
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -166,6 +167,41 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
     hasPrimaryKey: true,
   };
   publishSelectedCell(selected);
+}
+
+// P2 R2 (task #98): same closure-per-render problem DataGrid.vue found first (P2 R1) — a template
+// handler that calls out with the v-for's `i` can never be cached by Vue's compiler (hasScopeRef),
+// so every visible row/cell got a fresh wrapper closure on every render, scroll included. These
+// recover `i` from the row's `data-row-index` (walking up from a cell to its ancestor `.stream-row`
+// where needed) so the template can bind stable, module-scope functions instead.
+function onRowClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onRowClick(i);
+}
+function onRowContextMenuFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i === null) return;
+  onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '');
+}
+function onKeyCellClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onCellClick(i, 'key', rowAt(i)?.key ?? null);
+}
+function onTimestampCellClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onCellClick(i, 'timestamp', rowAt(i)?.timestamp ?? null);
+}
+function onHeadersCellClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onCellClick(i, 'headers', rowAt(i)?.headers ?? null);
+}
+function onAttrsCellClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onCellClick(i, 'attrs', rowAt(i)?.attrs ?? null);
+}
+function onBodyCellClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
 }
 
 // P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
@@ -832,8 +868,8 @@ onUnmounted(() => {
                   'search-match': matchSet.has(i),
                   'search-match-current': currentMatchRow === i,
                 }"
-                @click="onRowClick(i)"
-                @contextmenu="onRowContextMenu($event, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '')"
+                @click="onRowClickFromEvent"
+                @contextmenu="onRowContextMenuFromEvent"
               >
                 <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
                 <div
@@ -841,7 +877,7 @@ onUnmounted(() => {
                   :class="cellClass({ isNull: rowAt(i)?.key === null })"
                   :style="{ width: `${widthFor('key')}px` }"
                   data-testid="stream-key"
-                  @click.stop="onCellClick(i, 'key', rowAt(i)?.key ?? null)"
+                  @click.stop="onKeyCellClickFromEvent"
                 >
                   {{ rowAt(i)?.key ?? '(none)' }}
                 </div>
@@ -849,7 +885,7 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('timestamp')}px` }"
                   data-testid="stream-timestamp"
-                  @click.stop="onCellClick(i, 'timestamp', rowAt(i)?.timestamp ?? null)"
+                  @click.stop="onTimestampCellClickFromEvent"
                 >
                   {{ rowAt(i)?.timestamp ?? '' }}
                 </div>
@@ -857,7 +893,7 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('headers')}px` }"
                   data-testid="stream-headers"
-                  @click.stop="onCellClick(i, 'headers', rowAt(i)?.headers ?? null)"
+                  @click.stop="onHeadersCellClickFromEvent"
                 >
                   {{ rowAt(i)?.headers }}
                 </div>
@@ -865,7 +901,7 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('attrs')}px` }"
                   data-testid="stream-attrs"
-                  @click.stop="onCellClick(i, 'attrs', rowAt(i)?.attrs ?? null)"
+                  @click.stop="onAttrsCellClickFromEvent"
                 >
                   {{ rowAt(i)?.attrs }}
                 </div>
@@ -873,7 +909,7 @@ onUnmounted(() => {
                   class="p-td msg-body"
                   style="flex: 1"
                   data-testid="stream-body"
-                  @click.stop="onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated)"
+                  @click.stop="onBodyCellClickFromEvent"
                 >
                   {{ rowAt(i)?.body }}
                   <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" v-tooltip="'body truncated'"

@@ -19,6 +19,7 @@ import {
   rowView,
   togglePath,
 } from '../shared/document/rows';
+import { datasetNumber } from '../shared/eventCoords';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -342,6 +343,25 @@ function selectKeyValueRow(row: number): void {
     hasPrimaryKey: false,
   });
 }
+
+// P2 R2 (task #98): same closure-per-render problem DataGrid.vue found first (P2 R1) — a template
+// handler that calls out with the v-for's row/column index can never be cached by Vue's compiler
+// (hasScopeRef), so every visible cell/row got a fresh wrapper closure on every render, scroll
+// included. These recover the indices from data-* attributes on the element the event actually
+// fired on instead, so the template can bind stable, module-scope functions. The document-row
+// branch below is left as-is: DocumentRow.vue's `toggle`/`select` emits carry no native Event
+// (defineEmits<{ toggle: []; select: [] }>()), so there is no currentTarget to read a data-*
+// attribute off without also changing that shared component's public contract (which
+// DocumentView.vue also depends on, outside this fix's scope).
+function selectTabularCellFromEvent(e: MouseEvent): void {
+  const r = datasetNumber(e.currentTarget, 'row');
+  const c = datasetNumber(e.currentTarget, 'colIndex');
+  if (r !== null && c !== null) selectTabularCell(r, c);
+}
+function selectKeyValueRowFromEvent(e: MouseEvent): void {
+  const r = datasetNumber(e.currentTarget, 'row');
+  if (r !== null) selectKeyValueRow(r);
+}
 </script>
 
 <template>
@@ -393,6 +413,7 @@ function selectKeyValueRow(row: number): void {
             class="cell p-td"
             data-testid="console-result-cell"
             :data-null="cellAt(r, c).isNull"
+            :data-col-index="c"
             :class="
               cellClass({
                 alignRight: alignmentFor(page.columns[c]) === 'right',
@@ -405,7 +426,7 @@ function selectKeyValueRow(row: number): void {
               left: `${GUTTER_WIDTH + offsets[c]}px`,
               width: `${offsets[c + 1] - offsets[c]}px`,
             }"
-            @click="selectTabularCell(r, c)"
+            @click="selectTabularCellFromEvent"
           >
             <template v-if="cellAt(r, c).isNull">
               <span class="cell-null">NULL</span>
@@ -478,7 +499,7 @@ function selectKeyValueRow(row: number): void {
           :data-row="r"
           :class="{ selected: isSelected(r, 0) }"
           :style="{ height: `${rowHeight}px` }"
-          @click="selectKeyValueRow(r)"
+          @click="selectKeyValueRowFromEvent"
         >
           <div
             class="cell kv-field"

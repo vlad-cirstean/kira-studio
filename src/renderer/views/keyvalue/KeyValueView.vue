@@ -33,6 +33,7 @@ import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import { datasetNumber } from '../shared/eventCoords';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
@@ -502,6 +503,21 @@ function onRowClick(i: number): void {
   publishSelectedCell(selected);
 }
 
+// P2 R2 (task #98): `@click="onRowClick(i)"` closes over the v-for's `i`, so Vue's compiler can
+// never cache the handler (hasScopeRef) — every row gets a fresh closure on every render, scroll
+// included. These recover `i` from `data-row` on the element the event actually fired on instead,
+// so the template can bind these two stable, module-scope functions directly.
+function onRowClickFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'row');
+  if (i !== null) onRowClick(i);
+}
+function onRowContextMenuFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.currentTarget, 'row');
+  if (i === null) return;
+  const row = rowAt(i);
+  if (row) onRowContextMenu(e, row.field, row.value);
+}
+
 // --- search: filters the already-loaded page only, never a new query (mirrors
 // views/grid/search.ts's discipline exactly — see keyvalue/search.ts). ------------------------------
 function onToggleSearch(): void {
@@ -880,8 +896,8 @@ onUnmounted(() => {
                 class="kv-row"
                 data-testid="keyvalue-row"
                 :data-row="i"
-                @click="onRowClick(i)"
-                @contextmenu="rowAt(i) && onRowContextMenu($event, rowAt(i)!.field, rowAt(i)!.value)"
+                @click="onRowClickFromEvent"
+                @contextmenu="onRowContextMenuFromEvent"
               >
                 <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
                 <div
