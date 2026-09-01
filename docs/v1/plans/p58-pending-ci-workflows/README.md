@@ -45,3 +45,9 @@ every `go-version-file: shell/go.mod` to `go.mod`, `(cd shell && wails3 generate
 `(cd apps/kira-studio && …)`, and both `APP="shell/bin/Kira Studio.app"` references (`ci.yml`'s
 package-smoke job, `release.yml`'s zip step) to `apps/kira-studio/bin/Kira Studio.app`. Also a
 correction, not a new generation.
+
+**Noted by v1.1 P11** (FlatBuffers data-plane wire format): the data plane's wire code is generated
+by `flatc`, but the generated Go/TypeScript output is committed to the repo (P11 D11), so whenever
+these staged workflows are applied they need no `flatc` install step. A future schema change
+(`packages/shared/protocol/page.fbs`) still needs `bun run generate:wire` run locally and a clean
+`git status --porcelain` afterward before it can be committed — that stays a local, not a CI, step.

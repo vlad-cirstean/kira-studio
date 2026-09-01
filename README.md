@@ -200,7 +200,7 @@ the Go suite under `apps/kira-studio/`. `packages/db-fixtures/` is a shared fixt
 Kira Studio is a native Wails (Go) app: one Go process handles windowing, IPC, SQLite storage, the
 op log and every database driver in-process — no sidecar, no second runtime. The Vue 3 frontend
 runs in the OS's own WebView (WKWebView on macOS). Control (connect, cancel, settings) flows
-through Wails' generated bindings; bulk result pages travel over a dedicated `JSONStream` data
+through Wails' generated bindings; bulk result pages travel over a dedicated binary FlatBuffers data
 plane — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Process model section for the
 diagram.
 

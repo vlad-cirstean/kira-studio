@@ -625,10 +625,11 @@ to HTTP calls against the local `/wails/runtime` endpoint driven by `/wails/runt
 (`@wailsio/runtime`). Every call is wrapped in one `unwrap()` that normalizes a Go-side error into
 the `{message, code}` shape the renderer already branched on. The **data plane** is a single named
 stream, `"engine"`, opened once per page load by `apps/kira-studio/frontend/src/bridge/port.ts` via
-`JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
+`Stream('engine')`, carrying binary FlatBuffers frames for bulk payloads (grid pages, tree
+results) — requests are still plain JSON text (P11 D3); only responses and events are binary.
 
-**The data plane is not a WebSocket, on the build that ships (P4 F2, F3).** `JSONStream`/`Stream`
-wrap Wails' own transport, and which transport that is depends on the build tag. A desktop build
+**The data plane is not a WebSocket, on the build that ships (P4 F2, F3).** `Stream`
+wraps Wails' own transport, and which transport that is depends on the build tag. A desktop build
 (what this app ships) has no local listener at all: the frontend holds open `GET
 /wails/stream/poll` (up to 20 s) until the Go side has a frame to deliver, and posts outbound
 frames to `POST /wails/stream/send` — both over the asset server's custom URI scheme, deliberately,
@@ -644,11 +645,12 @@ exactly once, in the process that owns the window — the old Electron-era invar
 a data-plane frame") could not survive Go adapters existing at all. `apps/kira-studio/internal/adapterhost/dataframe.go`'s
 `HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
 op, that connection's `connectionId` — to route it, then answers every op in-process by
-`adapterhost.Dispatcher`, its response `json.Marshal`ed directly with every chunk's four buffers
-base64-of-exact-LE-bytes (P58 D5). There is no other wire shape any more: `apps/kira-studio/frontend/src/bridge/port.ts`'s
-`reviveChunks`/`toTypedArray` decode only that one form (P58f D8 deleted the `JSON.stringify`
-index-keyed branch a Node-served connection used to produce, once every kind was native and nothing
-emitted it any more). `ping` is answered locally too — the engine *is* this process now (P58f D11),
+`adapterhost.Dispatcher`, its response encoded as one FlatBuffers `Frame` — a `"KIF1"`
+file-identified buffer whose `offsets`/`truncated` vectors are `[uint]` so
+`packages/shared/protocol/frame.ts`'s `decodeFrame` reads every chunk's four buffers as zero-copy
+typed-array views over the received bytes, not a base64 decode-and-copy (P11 D4, D5). There is no
+other wire shape any more for a response or event; requests (renderer → Go) still travel as plain
+JSON text (P11 D3). `ping` is answered locally too — the engine *is* this process now (P58f D11),
 so the status pill's pid is this process's own `os.Getpid()`, not a child's; `cache:stats`/`cache:clear`
 are answered locally as before, merging both caches' counters while reporting the configured budget
 once, not doubled (A16).
@@ -679,20 +681,26 @@ it. Inbound (renderer → Go) has no app-level queue at all: Wails' own limit (2
 answers **429** rather than blocking, deliberately, because the held poll request is this
 transport's scarce resource, not a buffer to grow.
 
-**The FE↔BE protocol decision (P4).** With efficiency and a possible future network split both in
-scope, P4 audited the two planes above and weighed them against gRPC, protobuf/FlatBuffers/Cap'n
-Proto, Arrow IPC and msgpack — and kept the current shape:
+**The FE↔BE protocol decision (P4, superseded on the data plane by P11).** With efficiency and a
+possible future network split both in scope, P4 audited the two planes above and weighed them
+against gRPC, protobuf/FlatBuffers/Cap'n Proto, Arrow IPC and msgpack — and, at the time, kept JSON
+on both planes. P11 revisited the data plane alone once the P4 §5 binary envelope's own numbers
+made a real candidate worth re-weighing, and adopted FlatBuffers:
 
-- **Format: unchanged.** JSON envelope on both planes; bulk columnar buffers as base64 of their
-  exact little-endian bytes. gRPC cannot run over the custom-URI-scheme transport this app ships on
-  (the socket it would need is the exact thing that transport exists to avoid); protobuf/FlatBuffers/
-  Cap'n Proto and msgpack decode the bulk payload by copying anyway (it is opaque `bytes` to them
-  too), so they'd add a second codegen system next to the bindings generator for no win on the one
-  cost that matters; Arrow IPC is the closest structural fit — `page.Chunk` is already Arrow's
-  `Utf8` layout — but needs four hand-built accommodations (inverted null polarity, `uint32` vs
-  `int32` offsets, no `truncated` slot, three of four page kinds not being tabular at all) plus a new
-  Arrow-JS dependency in the webview bundle, to recover a cost the encoder fix below already mostly
-  removed.
+- **Format: the control plane stays JSON; the data plane's responses and events are FlatBuffers.**
+  Requests (renderer → Go) are still plain JSON text — only the bulk-payload direction changed.
+  gRPC still cannot run over the custom-URI-scheme transport this app ships on (the socket it would
+  need is the exact thing that transport exists to avoid). Arrow IPC was the closest structural fit
+  — `page.Chunk` is already Arrow's `Utf8` layout — but it is self-describing and pays a 400+ byte
+  schema tax on *every independent frame* (this app's traffic has no stream to amortize that against,
+  one page per scroll/tab-switch), needs four hand-built accommodations (inverted null polarity,
+  `uint32` vs `int32` offsets, no `truncated` slot, three of four page kinds not being tabular at
+  all), and its JS package is 51.4 KB gzip in the webview bundle. FlatBuffers transmits no schema at
+  all — both ends already agree on layout via code generated from one `.fbs` — costs +0.01–1.7% over
+  raw buffer bytes at real page sizes (against Arrow's +6.6% at the default page size, worse at small
+  ones), and its JS runtime is 2.7 KB gzip, smaller than a single icon set. Cap'n Proto has comparable
+  wire overhead but no public untyped builder in its JS tooling and a thinner ecosystem. Full
+  measurements: `docs/v1.1/plans/P11-flatbuffers-data-plane.md` §2/§3.
 - **The measured cost was in the Go encoder, not the wire, and that part was fixed.** `internal/page`
   called a custom `MarshalJSON` per page and per offset array, then had `encoding/json` re-scan
   (`compact`) the bytes each one returned into the outer buffer — a cost paid on every page *view*,
@@ -701,24 +709,22 @@ Proto, Arrow IPC and msgpack — and kept the current shape:
   allocation dropping from 2.3–3.8x the frame size to 1.00x (`docs/PERF.md` §2.6).
 - **The network-split answer is a build tag, not a wire-format change.** `-tags server` (already
   exercised by `tests/e2e-real/`) turns the same `StreamSession`-shaped application code onto a real
-  `net.Listener`, with `JSONStream`/`Stream` becoming an actual on-the-wire WebSocket with no
+  `net.Listener`, with `Stream` becoming an actual on-the-wire WebSocket with no
   application change at all — the two-method `Send([]byte)`/`Receive() ([]byte, error)` seam already
   hides the transport from everything above it. What that build tag does *not* provide is
   authentication of any kind, and three flows still assume the Go side and the user are the same
   machine (`FilesService.ChooseSave`'s native dialog, the OS keychain in `internal/secrets`,
   `internal/preconnect`'s locally-supervised processes) — none of which a protocol choice fixes, and
   none of which gRPC would fix either.
-- **A binary successor envelope is specified but intentionally not built.** After the encoder fix,
-  what base64 still costs is ~25-33% of wire bytes (unrecovered by gzip — a fixed 4:3 alphabet
-  expansion of already-high-entropy bytes isn't redundancy a compressor finds) and a JavaScriptCore-
-  proxied 0.2–38 ms of frontend decode per page view, both scaling with frame size. A frame layout
-  replacing base64 buffers with byte-offset/length pairs into a raw payload section (so `port.ts`
-  gets a zero-copy typed-array view instead of a decode-and-copy) is fully specified for whenever it's
-  needed, but today's numbers don't clear the bar for building it now. Build it when any of: a
-  budget spec fails with frame decode implicated, a page kind or default size moves the typical frame
-  an order of magnitude, or an actual frontend/backend network split is undertaken (at which point
-  wire bytes stop being free). Full findings, the weighed alternatives, the frame layout, and the
-  measurements are `docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md`.
+- **P4's own §5 binary envelope proposal is superseded, not deferred.** That plan specified a
+  hand-built frame layout (byte-offset/length pairs into a raw payload section) for whenever base64's
+  ~25-33% wire cost and 0.2–38 ms of JavaScriptCore-proxied frontend decode per page view cleared a
+  stated bar, and declined to build it immediately. P11 built the zero-copy decode win that envelope
+  was for, using FlatBuffers instead of that hand-built layout — a generator-enforced alignment rule
+  beats a comment enforcing one, per the row-5-vs-row-3 comparison in P11's own §3 table — so there is
+  no remaining hand-built envelope left to build later. Full findings, the weighed alternatives, and
+  the measurements are `docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md` (historical) and
+  `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
 twelve bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
@@ -743,15 +749,18 @@ silently under-count. `AnchorNeedles` is `["Kira Studio"]` (P58f: no vendored No
 more), `HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide
 scan per 5 s tick.
 
-**The JSON-inflation regression named in earlier phases is fixed and measured, not merely claimed.**
-The old Node-engine-over-stdio hop `JSON.stringify`d every frame, control and data alike — a
-`TypedArray` has no native JSON form, so it serialized as an object keyed `"0","1",…`, which is why
-`reviveChunks` above exists at all. That correctness fix was never the problem; the wire and heap
+**The JSON-inflation regression named in earlier phases was fixed and measured in its time, not
+merely claimed — and has since been superseded, not merely improved on.** The old Node-engine-over-
+stdio hop `JSON.stringify`d every frame, control and data alike — a `TypedArray` has no native JSON
+form, so it serialized as an object keyed `"0","1",…`, which is why a `reviveChunks` decode step
+existed at all, back when it did. That correctness fix was never the problem; the wire and heap
 cost of getting there was. P58a M2 measured both paths on the same fixture
 (`docs/PERF.md` §2.5): the Node engine's index-keyed JSON inflated a chunk **10.872x** on the wire
-and **40.9x** in transient heap; Go's own base64 encoding (P58 D5) inflates it **1.334x** and
-**6.86x** respectively — a real cost (base64 is never free) but an order of magnitude smaller, and
-it is what every kind uses today, not an aspiration.
+and **40.9x** in transient heap; Go's own base64 encoding (P58 D5) inflated it **1.334x** and
+**6.86x** respectively — a real cost (base64 is never free) but an order of magnitude smaller. Base64
+is not what any kind uses today: P11 replaced it with a FlatBuffers frame decoded as zero-copy typed-
+array views, landing at +0.01–1.7% over raw buffer bytes with no transient heap copy on decode at all
+(`docs/PERF.md` §2.7).
 
 ## Renderer security surface
 
