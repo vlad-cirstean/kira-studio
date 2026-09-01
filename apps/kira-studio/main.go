@@ -184,7 +184,7 @@ func main() {
 			slog.Warn("close db", "scope", "shutdown", "err", err)
 		}
 	})
-	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second)
+	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
 
 	app := application.New(application.Options{
 		Name: "Kira Studio",
@@ -249,6 +249,11 @@ func main() {
 		windows.Add(rec.Key, win, detach)
 		shell.AttachCloseFlush(win, rec.Key, events, closeFlush)
 		win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
+			// A window that closes mid-quit-handshake without ever acking through the flush
+			// channel is removed from the pending set here rather than being waited out for the
+			// full timeout (C8) — a no-op when no quit is in flight, since Quitter.Flushed
+			// ignores a key it isn't currently waiting on.
+			quitter.Flushed(rec.Key)
 			if windows.RemoveAndCount(rec.Key) > 0 {
 				if err := repositories.Windows.Delete(rec.Key); err != nil {
 					slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)

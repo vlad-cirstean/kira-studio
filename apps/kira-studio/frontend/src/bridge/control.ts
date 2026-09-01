@@ -120,11 +120,12 @@ export const control = {
   onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
   onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),
   onViewRunAll: (cb: () => void): (() => void) => on(CHANNEL.viewRunAll, cb),
-  // Quit handshake: main holds `before-quit` until every window acks this, so a debounced save
-  // still pending when the user quits is never silently lost.
+  // Quit handshake: main holds `before-quit` until every window acks this (P8 C8: every window,
+  // not just the first to ack), so a debounced save still pending when the user quits is never
+  // silently lost.
   onFlushBeforeClose: (cb: () => void): (() => void) => on(CHANNEL.appFlushBeforeClose, cb),
   appFlushed: (): void => {
-    void LifecycleService.Flushed();
+    void LifecycleService.Flushed({ windowKey });
   },
   // Close-window handshake (P8 C6/F8): the single-window analogue of the quit handshake above —
   // this window's own close is held until it acks, or a 2s timeout on the Go side gives up.

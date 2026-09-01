@@ -63,6 +63,19 @@ func (r *WindowRegistry) Any() application.Window {
 	return nil
 }
 
+// Keys returns every currently registered window's key — Quitter's LiveWindowKeys seam (P8 C8):
+// which windows the quit handshake must wait for is decided at the moment quitting actually
+// starts, not fixed at construction time.
+func (r *WindowRegistry) Keys() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	keys := make([]string, 0, len(r.entries))
+	for k := range r.entries {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // RemoveAndCount unregisters key (a no-op if it was never registered, e.g. a duplicate close
 // event) and runs its detach, then reports how many windows remain registered — one atomic
 // operation so a window closing at the same instant as another can't race the decision D5 makes

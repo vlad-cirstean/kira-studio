@@ -64,8 +64,10 @@ func (o *order) snapshot() []string {
 
 // newTestQuitter wires a Quitter against the shared testApp (main_test.go) with counting,
 // OnceFunc-wrapped teardown halves — exactly the shape main.go is required to pass in — plus a
-// channel closed when teardown has run.
-func newTestQuitter(timeout time.Duration) (q *shell.Quitter, emitter *quitEmitter, ord *order, teardownDone chan struct{}) {
+// channel closed when teardown has run. keys is the live window set flushThenQuit seeds its
+// pending ack set from (P8 C8) — most tests here only ever had one window, so newTestQuitter1
+// below covers that shape without every existing call site having to spell out `[]string{"main"}`.
+func newTestQuitter(timeout time.Duration, keys []string) (q *shell.Quitter, emitter *quitEmitter, ord *order, teardownDone chan struct{}) {
 	emitter = &quitEmitter{}
 	events := bridge.NewEvents(emitter)
 	ord = &order{}
@@ -77,9 +79,15 @@ func newTestQuitter(timeout time.Duration) (q *shell.Quitter, emitter *quitEmitt
 		close(done)
 	})
 
-	q = shell.NewQuitter(events, beforeFlush, teardown, timeout)
+	q = shell.NewQuitter(events, beforeFlush, teardown, timeout, func() []string { return keys })
 	q.Attach(testApp)
 	return q, emitter, ord, done
+}
+
+// newTestQuitter1 is newTestQuitter with the single-window shape most of this file's existing
+// cases predate P8 and still only need.
+func newTestQuitter1(timeout time.Duration) (q *shell.Quitter, emitter *quitEmitter, ord *order, teardownDone chan struct{}) {
+	return newTestQuitter(timeout, []string{"main"})
 }
 
 func waitFor(t *testing.T, ch <-chan struct{}, within time.Duration, what string) {
@@ -95,7 +103,7 @@ func waitFor(t *testing.T, ch <-chan struct{}, within time.Duration, what string
 // the renderer's ack must short-circuit the timeout, and the two teardown halves must still run
 // in order.
 func TestFlushAckCompletesTeardown(t *testing.T) {
-	q, emitter, ord, done := newTestQuitter(200 * time.Millisecond)
+	q, emitter, ord, done := newTestQuitter1(200 * time.Millisecond)
 
 	start := time.Now()
 	q.ShouldQuit()
@@ -109,7 +117,7 @@ func TestFlushAckCompletesTeardown(t *testing.T) {
 		t.Fatalf("order before the ack = %v, want [beforeFlush]", got)
 	}
 
-	q.Flushed()
+	q.Flushed("main")
 	waitFor(t, done, time.Second, "teardown")
 	elapsed := time.Since(start)
 
@@ -129,7 +137,7 @@ func TestFlushTimeoutStillTearsDown(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
-	q, _, ord, done := newTestQuitter(30 * time.Millisecond)
+	q, _, ord, done := newTestQuitter1(30 * time.Millisecond)
 
 	start := time.Now()
 	q.ShouldQuit()
@@ -151,7 +159,7 @@ func TestFlushTimeoutStillTearsDown(t *testing.T) {
 // calls must all decline and start exactly one flush, and only the post-teardown pass may return
 // true. None of them may block — ShouldQuit runs on the same thread the ack arrives on (D2).
 func TestSecondShouldQuitReturnsTrue(t *testing.T) {
-	q, _, _, done := newTestQuitter(time.Second)
+	q, _, _, done := newTestQuitter1(time.Second)
 
 	// A burst of concurrent calls while the flush is in flight must all return false and start
 	// exactly one flush.
@@ -171,10 +179,74 @@ func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 		}
 	}
 
-	q.Flushed()
+	q.Flushed("main")
 	waitFor(t, done, time.Second, "teardown")
 
 	if !q.ShouldQuit() {
 		t.Error("ShouldQuit() after teardown = false, want true")
 	}
+}
+
+// TestQuitWaitsForEveryWindowAck is P8 D13.2's rule, restoring the pre-Go-port behaviour
+// (18fe7bb^:src/main/index.ts:47-60's Promise.all over every window): the handshake must not
+// release until every live window has acked, or the timeout fires regardless. This is exactly
+// the shape F3 named as a regression — with two windows, the old single sync.Once-closed channel
+// let the first window's ack release teardown while the second's own tabsSave was still in
+// flight, racing db.Close() against it.
+func TestQuitWaitsForEveryWindowAck(t *testing.T) {
+	t.Run("one ack does not release; both do", func(t *testing.T) {
+		q, emitter, _, done := newTestQuitter(time.Second, []string{"win-a", "win-b"})
+
+		q.ShouldQuit()
+
+		// flushThenQuit seeds the pending set before it emits the flush signal — wait for the
+		// signal (as TestFlushAckCompletesTeardown does) so an ack below can't race a nil/not-yet-
+		// populated pending set and get silently swallowed as "unknown key" before it was ever
+		// given the chance to be a known one.
+		deadline := time.Now().Add(time.Second)
+		for len(emitter.names()) == 0 && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+
+		q.Flushed("win-a")
+		select {
+		case <-done:
+			t.Fatal("teardown ran after only one of two windows acked")
+		case <-time.After(50 * time.Millisecond):
+			// correctly still waiting
+		}
+
+		// An unknown key (never live, or already removed) must stay a no-op — not release the
+		// wait and not panic.
+		q.Flushed("not-a-real-window")
+		select {
+		case <-done:
+			t.Fatal("teardown ran after an ack for an unregistered window key")
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		q.Flushed("win-b")
+		waitFor(t, done, time.Second, "teardown")
+	})
+
+	t.Run("timeout releases with one window still outstanding", func(t *testing.T) {
+		var logs bytes.Buffer
+		prev := slog.Default()
+		slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+		t.Cleanup(func() { slog.SetDefault(prev) })
+
+		q, emitter, _, done := newTestQuitter(30*time.Millisecond, []string{"win-a", "win-b"})
+
+		q.ShouldQuit()
+		deadline := time.Now().Add(time.Second)
+		for len(emitter.names()) == 0 && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		q.Flushed("win-a") // only one of two — the other must not block teardown forever
+		waitFor(t, done, time.Second, "teardown")
+
+		if !strings.Contains(logs.String(), "quit flush timed out") {
+			t.Errorf("log output = %q, want it to contain \"quit flush timed out\"", logs.String())
+		}
+	})
 }

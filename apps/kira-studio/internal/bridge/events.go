@@ -38,7 +38,9 @@ const (
 const ChannelEngineState = "kira:engine:state"
 
 // Sources are the five push producers P55 left as seams (P55 D15). Each is a one-method
-// interface so events_test.go can drive them without building a real service.
+// interface, small enough to drive with a plain recorder rather than a real service — there is
+// no dedicated events_test.go in this package (P56's own test-bar pruning removed it; this
+// comment used to still claim otherwise, corrected here per P8 C8).
 type Sources struct {
 	Connections interface {
 		OnStateChange(func(model.ConnectionState)) func()
