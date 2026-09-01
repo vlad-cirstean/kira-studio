@@ -572,6 +572,128 @@ numbers, even before this commit, did not clear that bar, and this commit closes
 the Go-side gap to that binary envelope on its own, with no protocol change, no frontend change, and
 no fixture regeneration.
 
+### 2.7 P11 — the FlatBuffers data-plane measurements
+
+**Status: measured, on this tree, after `feat(protocol)!: carry data-plane responses as
+FlatBuffers instead of JSON+base64`.** §2.6 measured the JSON+base64 encoder's own CPU/allocation
+cost, holding the wire format fixed. This section is the wire-format change itself: the same four
+fixtures, encoded through the real, current FlatBuffers pipeline
+(`internal/page.EncodePage` plus `adapterhost/frame.go`'s frame assembly) and decoded through the
+real, current `packages/shared/protocol/frame.ts`'s `decodeFrame`, against the same fixtures
+encoded and decoded through the pre-change JSON+base64 pipeline at the tip of C2 (commit
+`f1efaab`, immediately before the format switch). Full findings, the off-the-shelf alternatives
+weighed against these numbers, and the decision are
+`docs/v1.1/plans/P11-flatbuffers-data-plane.md`'s §2/§3/§4; this section is that plan's §8.4
+re-run, not a copy of its own back-of-envelope measurements.
+
+**Method.** Four fixtures — `100 × 12`, `1,000 × 12`, `10,000 × 12`, `10,000 × 40` — built through
+the real `internal/page` builder API (`NewTabularPageBuilder`/`AppendRow`/`Finish`, unchanged by
+the format switch, P11 D7): 12 text columns of 24-byte cells (40 columns of 64-byte cells for the
+wide case), 1 row in every 97 NULL in one column. The timed unit on the Go side is each codec's
+real production call — pre-change, `adapterhost/dataframe.go`'s exact `respond` expression,
+`json.Marshal(wireResponse{Kind:"res", ID, OK:true, Payload:ReadResponse{Page, Source}})`;
+post-change, the same frame assembly `adapterhost/frame.go`'s `encodeResponse` performs for a
+`ReadResponse` payload (`page.EncodePage` then `wire.ReadResponse`/`wire.Frame`, finished with the
+`"KIF1"` file identifier). Both `wireResponse` and `encodeResponse` are unexported, so each
+program reproduces the exact call shape inline rather than importing it — a verbatim copy of a few
+lines, the P58a M2 / §2.5 convention this section also follows: nothing here is committed to the
+repo. Allocation is `runtime.MemStats.TotalAlloc` delta, timed in a separate pass from wall-clock
+(interleaving `ReadMemStats` calls into the timed loop measurably inflates the smallest fixture).
+Each figure is the median of dozens-to-thousands of in-process repetitions — 500 down to 8 on the
+Go encode side for the same reason §2.6 gave (GC pressure at the largest fixture; the allocation
+pass at `10,000 × 40` cannot run hundreds of times in a reasonable session and still ran only 8),
+2,000 down to 50 on the frontend decode side, run under Bun/JavaScriptCore — **this is a proxy for
+the app's real WKWebView, not a claim that the two are identical**, repeating §2.6's own framing of
+that same instrument. Raw buffer bytes are each page's own `ByteSize` field, unchanged by the
+format (P11 D9) — the same number both codecs' overhead is measured against.
+
+**Wire bytes**, against §2.6's own before-numbers so this row is directly comparable to it (that
+section's JSON+base64 figures reproduce here within about 1.5%, the fixture-content/hardware/GC
+noise §2.6 already flagged as expected):
+
+| Fixture | Raw buffer bytes | Wire, before (JSON+base64) | Wire, after (FlatBuffers) | Change |
+|---|---|---|---|---|
+| 100 × 12 | 34,720 | 47,262 (§2.6: 46,558) | 35,000 | **-24.8%** |
+| 1,000 × 12 | 338,248 | 451,953 (§2.6: 448,081) | 338,528 | **-24.4%** |
+| 10,000 × 12 | 3,373,516 | 4,498,980 (§2.6: 4,462,372) | 3,373,784 | **-24.4%** |
+| 10,000 × 40 | 27,246,764 | 36,331,577 (§2.6: 35,985,413) | 27,247,144 | **-24.3%** |
+
+**Overhead vs raw buffer bytes** — the honest replacement for §2.5's single 1.334x, now one number
+per codec instead of one number for a format nothing else uses any more:
+
+| Fixture | Before (JSON+base64) | After (FlatBuffers) |
+|---|---|---|
+| 100 × 12 | 1.361x | **1.008x** |
+| 1,000 × 12 | 1.336x | **1.001x** |
+| 10,000 × 12 | 1.334x | **1.00008x** |
+| 10,000 × 40 | 1.333x | **1.00001x** |
+
+FlatBuffers' own per-frame overhead — the `"KIF1"` identifier, the `Frame`/`ReadResponse`/`Page`
+table wrappers, the `PagePosition`/`ColumnDescriptor` tables — is a fixed few hundred bytes that
+disappears into rounding at anything past the smallest fixture, landing within the range P11 F12's
+own untyped-builder approximation predicted (+1.7% at the default page size there, +0.8% measured
+here through the real schema on a slightly different fixture).
+
+**Go encode time and `TotalAlloc` delta**, same instrument as §2.6:
+
+| Fixture | Wire bytes, after | Before: time / alloc | After: time / alloc | Alloc/wire ratio, before → after |
+|---|---|---|---|---|
+| 100 × 12 | 35,000 | 41.3 µs / 48.2 KB | 52.9 µs / 221.9 KB | 1.045x → **6.49x** |
+| 1,000 × 12 | 338,528 | 382.8 µs / 448.2 KB | 953.1 µs / 1.74 MB | 1.016x → **5.39x** |
+| 10,000 × 12 | 3,373,784 | 3.96 ms / 4.30 MB | 5.89 ms / 13.44 MB | 1.002x → **4.18x** |
+| 10,000 × 40 | 27,247,144 | 36.95 ms / 34.66 MB | 63.35 ms / 102.63 MB | 1.000x → **3.95x** |
+
+**Frontend decode time**, Bun/JavaScriptCore — again, **a proxy for the app's real WKWebView, not
+a claim of equivalence**:
+
+| Fixture | Decode, before (JSON+base64) | Decode, after (FlatBuffers) | Speedup |
+|---|---|---|---|
+| 100 × 12 | 0.0650 ms | 0.0106 ms | 6x |
+| 1,000 × 12 | 1.1520 ms | 0.0082 ms | 140x |
+| 10,000 × 12 | 4.4493 ms | 0.0080 ms | 556x |
+| 10,000 × 40 | 41.4034 ms | 0.0363 ms | 1,141x |
+
+**The FlatBuffers builder's own copy cost is real, and it shows up as the encode row above, not as
+a free lunch.** `CreateByteVector` is one `memcpy` of `Data` (the buffer that dominates every
+fixture here) — cheap and unavoidable, the same shape of cost base64 encoding paid too. The
+`offsets`/`truncated` `[uint]` vectors (P11 D4) are a `PrependUint32` loop instead, one function
+call per element rather than one `memcpy` — for the widest fixture here, on the order of 400,000
+individual prepends across all 40 columns, which is where a meaningful share of the encode-time
+regression above comes from. Beyond that, `flatbuffers.NewBuilder(0)` — the exact call
+`adapterhost/frame.go` makes for every response — starts from a zero-length buffer and grows it by
+doubling (`growByteBuffer`'s `make` of the extension plus the `append` that relocates the whole
+buffer into a fresh backing array, both counted by `TotalAlloc`); a from-empty builder measurably
+pays several times its own final wire size in transient allocation before it ever produces its
+first byte of useful output — confirmed directly with an isolated `CreateByteVector`-only
+`NewBuilder(0)` construction across a range of sizes, independent of anything page- or
+frame-specific, giving ratios in the same 3-6x band the table above shows. This is why the
+allocation ratio in the table above *rises* rather than converges to 1.00x the way §2.6's
+JSON-encoder optimization did — the two codecs pay a structurally different kind of cost, and
+neither of these numbers is the prize this phase was taken for. Separately, `"KIF1"` as the frame's
+own file identifier (P11 D5) means `FinishedBytes()` goes straight to `Send` with no further
+framing step: a length-prefixed header design would have needed to write that header in front of
+the already-finished buffer, which — because FlatBuffers builds back-to-front and a header can't be
+prepended in place — would have forced a second copy of the entire frame, doubling the wide
+fixture's ~27 MB `memcpy` on every single response. That copy is what D5 avoids, and it is not
+visible in either of these two tables precisely because it never happens.
+
+**What this re-run confirms, and what is worth noting as a surprise.** The frontend decode win is
+the prize P11 was taken for, and it lands squarely in the range F15's own hand-built-envelope
+comparison predicted (0.03-0.14 ms) — the whole-frame decode pass genuinely disappears, 6x to
+over 1,000x faster depending on fixture size, because decoding a FlatBuffers frame is a handful of
+typed-array views over the already-received bytes rather than a `JSON.parse` plus a per-buffer
+base64 materialization. The wire-byte reduction (~24-25% at every size, converging toward zero
+absolute overhead as the fixture grows) matches F12's prediction just as closely. The one number
+that does *not* land where a reader might assume it would: **Go-side encode wall-clock time is
+slower after this change, not faster** — 1.3x to 2.5x slower across these four fixtures, driven by
+the allocation cost detailed above, not by anything algorithmically worse. This is not a surprise
+against what the P11 plan itself said going in — F15 explicitly called the remaining Go-side prize
+"real but modest" and stated plainly that "this phase is not primarily a Go-side CPU play" — but it
+is worth stating plainly here rather than leaving the encode row to be misread as a win to match
+the decode row. Nothing above changes L2's own accounting: `ChunkByteSize` still returns the
+identical number either format (§8.3's `byteSize` assertion, P11 D9), so this section's numbers are
+additive to §2.6's, not a replacement for the budget L2 already caches against.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
