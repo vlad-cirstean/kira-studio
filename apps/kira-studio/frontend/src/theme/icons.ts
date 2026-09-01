@@ -165,32 +165,30 @@ export function typeClassIcon(typeClass: TypeClass): string {
   return CATEGORY_ICON[categoryForTypeClass(typeClass)];
 }
 
-// Item 3 (regression pass, task batch P46-5): the four everyday scalar classes now reuse
-// CodeMirror's own VS Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the
-// exact hex values VS Code's own Dark Modern theme ships) instead of the connection-colour
-// picker's palette — the user asked for these to be "the exact same hues used in vscode", and
-// tokens.css already carries that palette verbatim for the editor surfaces. number/string/boolean
-// map onto the token VS Code itself gives that literal kind (a numeric literal, a string literal,
-// `true`/`false`/`null`'s keyword colour); there's no dedicated "date" token in any editor's
-// grammar, so datetime takes the one Dark Modern hue nothing else here claims (control-keyword
-// magenta) rather than reusing another class's colour and making the two indistinguishable.
-// json/array/binary/other stay the plain foreground colour, per the user's own scoping: a badge
-// only earns a colour when it is unambiguously one of the four everyday scalar classes.
-// Item (regression pass, task batch P46-7): uuid colours as string now, not a fifth uncoloured
-// class — checked against all four engines' own typeClassFor, not one of them (postgres, MySQL/
-// MariaDB, SQLite, ClickHouse's own explicit TEXT_TYPES) treats a UUID column as anything but
-// text; a live cross-check against MariaDB's own native UUID column confirmed the grid and cell
-// editor (both typeClass-driven, categoryForTypeClass below) already colour it that way — this
-// keeps the Structure pane's own string-guessing path from being the one place left disagreeing.
+// Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse CodeMirror's own VS
+// Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
+// Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user
+// asked for these to be "the exact same hues used in vscode", and tokens.css already carries that
+// palette verbatim for the editor surfaces. number/boolean map onto the token VS Code itself gives
+// that literal kind (a numeric literal, `true`/`false`/`null`'s keyword colour); there's no
+// dedicated "date" token in any editor's grammar, so datetime takes the one Dark Modern hue nothing
+// else here claims (control-keyword magenta) rather than reusing another class's colour and making
+// the two indistinguishable. json/array/binary/other stay the plain foreground colour, per the
+// user's own scoping: a badge only earns a colour when it is unambiguously one of the everyday
+// scalar classes.
+// Item (P9): string and uuid dropped their distinct colour and now render plain like every other
+// non-scalar class — the user asked that string-typed values no longer stand out by colour, and
+// uuid shares this exact token (P46-7's own fix, above) precisely so a plain-string change and a
+// still-tinted uuid never diverge again.
 const CATEGORY_COLOR: Record<ColumnTypeCategory, string> = {
   numeric: 'var(--kira-syntax-number)',
   boolean: 'var(--kira-syntax-keyword)',
   datetime: 'var(--kira-syntax-control)',
   json: 'var(--kira-fg)',
   array: 'var(--kira-fg)',
-  uuid: 'var(--kira-syntax-string)',
+  uuid: 'var(--kira-fg)',
   binary: 'var(--kira-fg)',
-  string: 'var(--kira-syntax-string)',
+  string: 'var(--kira-fg)',
   other: 'var(--kira-fg)',
 };
 
