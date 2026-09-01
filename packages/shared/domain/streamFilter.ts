@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 // P16's stream-view filter row (StreamView.vue): Kafka-only structured positioning knobs, carried
 // through ReadRequestWire's existing generic `filter: string | null` field (data-ops.ts) as a
 // JSON-encoded string — deliberately not a wire schema change, since that field already exists
@@ -29,17 +27,4 @@ export function isEmptyKafkaStreamFilter(filter: KafkaStreamFilter): boolean {
 /** `null` when every field is `null`/empty — mirrors P2's "a no-op filter is dropped" discipline. */
 export function encodeKafkaStreamFilter(filter: KafkaStreamFilter): string | null {
   return isEmptyKafkaStreamFilter(filter) ? null : JSON.stringify(filter);
-}
-
-const kafkaStreamFilterSchema = /*#__PURE__*/ z.object({
-  offset: z.string().nullable(),
-  partitions: /*#__PURE__*/ z.array(z.number().int()).default([]),
-  timestampMs: z.number().nullable(),
-});
-
-/** Throws (a plain `Error`, from `JSON.parse` or Zod) on malformed input — callers map that to
- *  `E_QUERY` rather than letting a malformed stream filter surface as an unhandled rejection. */
-export function parseKafkaStreamFilter(raw: string | null): KafkaStreamFilter {
-  if (raw === null) return { offset: null, partitions: [], timestampMs: null };
-  return kafkaStreamFilterSchema.parse(JSON.parse(raw));
 }
