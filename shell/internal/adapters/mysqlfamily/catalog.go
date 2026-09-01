@@ -287,22 +287,35 @@ func listReferencedBy(ctx context.Context, exec queryExec, database, table strin
 	}), nil
 }
 
-// groupForeignKeys folds a flat list of key-column rows into one ForeignKeyMeta per constraint
-// name, in first-seen order — shared by listForeignKeys/listReferencedBy's own mirror-image
-// column mapping (get picks which raw field plays which role).
+// groupForeignKeys folds a flat list of key-column rows into one ForeignKeyMeta per constraint,
+// in first-seen order — shared by listForeignKeys/listReferencedBy's own mirror-image column
+// mapping (get picks which raw field plays which role).
+//
+// P2 R2: grouped by (refDatabase, refTable, name), not name alone — a MySQL/MariaDB constraint
+// name is only required to be unique within its own schema, not across the whole server. For
+// listForeignKeys the query is already scoped to one (database, table), so refDatabase/refTable
+// (the *referenced* table) is constant across every row of a real constraint and this is a no-op
+// widening. For listReferencedBy, though, the query spans every database on the server (D17: any
+// table anywhere can reference this one) with refDatabase/refTable holding the *referencing*
+// table's own schema/table (see its own get closure) — there, two unrelated tables in different
+// databases reusing a common constraint name (e.g. "fk_customer_id") would otherwise fold into
+// one merged, cross-database-corrupted ForeignKeyMeta.
 func groupForeignKeys[R any](rows []R, get func(R) (name, col, refDatabase, refTable, refCol, onDelete, onUpdate string)) []model.ForeignKeyMeta {
 	order := []string{}
-	byName := map[string][]R{}
+	byKey := map[string][]R{}
+	nameOf := map[string]string{}
 	for _, r := range rows {
-		name, _, _, _, _, _, _ := get(r)
-		if _, ok := byName[name]; !ok {
-			order = append(order, name)
+		name, _, refDatabase, refTable, _, _, _ := get(r)
+		key := refDatabase + "\x00" + refTable + "\x00" + name
+		if _, ok := byKey[key]; !ok {
+			order = append(order, key)
+			nameOf[key] = name
 		}
-		byName[name] = append(byName[name], r)
+		byKey[key] = append(byKey[key], r)
 	}
 	metas := make([]model.ForeignKeyMeta, 0, len(order))
-	for _, name := range order {
-		group := byName[name]
+	for _, key := range order {
+		group := byKey[key]
 		columns := make([]string, len(group))
 		refColumns := make([]string, len(group))
 		var refDatabase, refTable, onDelete, onUpdate string
@@ -320,7 +333,7 @@ func groupForeignKeys[R any](rows []R, get func(R) (name, col, refDatabase, refT
 			onUpdatePtr = &v
 		}
 		metas = append(metas, model.ForeignKeyMeta{
-			Name: name, Columns: columns,
+			Name: nameOf[key], Columns: columns,
 			ReferencedPath: model.EncodePath([]model.PathSegment{
 				{Kind: "database", Name: refDatabase}, {Kind: "table", Name: refTable},
 			}),

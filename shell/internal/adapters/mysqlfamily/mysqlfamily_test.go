@@ -211,6 +211,86 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P2 R2: a MySQL/MariaDB constraint name only has to be unique within its own schema — two
+	// unrelated tables in two different databases legitimately reusing the same constraint name
+	// (a very plausible thing to do) must not be folded into one merged, corrupted entry. The
+	// grouping logic itself (groupForeignKeys) has its own unconditional, engine-independent
+	// white-box coverage in catalog_internal_test.go; this is the live, end-to-end reproduction.
+	if kind == "mariadb" {
+		t.Skip("MariaDB's information_schema.REFERENTIAL_CONSTRAINTS doesn't surface a row for a " +
+			"schema the connected user only holds a db-level wildcard GRANT SELECT on (confirmed via " +
+			"a standalone probe: KEY_COLUMN_USAGE sees kira_analytics fine, REFERENTIAL_CONSTRAINTS " +
+			"returns zero rows for it) — a separate, pre-existing MariaDB limitation unrelated to this " +
+			"fix, not reproducible under this fixture's own deliberately-restricted `kira` user")
+	}
+	t.Run("describe: referencedBy from two databases with a colliding constraint name are not merged", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		ctx := context.Background()
+
+		// A root connection, not sideDSN's own `kira` user: kira only ever holds GRANT SELECT on
+		// kira_analytics (seedMysqlExtras/seedMariadbExtras), deliberately no DDL rights there — the
+		// very scenario this bug lives in is an app user with read-only cross-database visibility.
+		host := ""
+		if cfg.Host != nil {
+			host = *cfg.Host
+		}
+		port := 3306
+		if cfg.Port != nil {
+			port = *cfg.Port
+		}
+		probeDB, err := sql.Open("mysql", testsupport.RootMysqlDSN(host, port, ""))
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probeDB.Close()
+
+		if _, err := probeDB.ExecContext(ctx,
+			"CREATE TABLE IF NOT EXISTS kira_test.fk_collision_a (id INT PRIMARY KEY, customer_id INT, "+
+				"CONSTRAINT fk_dup FOREIGN KEY (customer_id) REFERENCES kira_test.customers (id))",
+		); err != nil {
+			t.Fatalf("create fk_collision_a: %v", err)
+		}
+		defer probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS kira_test.fk_collision_a")
+
+		if _, err := probeDB.ExecContext(ctx,
+			"CREATE TABLE IF NOT EXISTS kira_analytics.fk_collision_b (id INT PRIMARY KEY, customer_id INT, "+
+				"CONSTRAINT fk_dup FOREIGN KEY (customer_id) REFERENCES kira_test.customers (id))",
+		); err != nil {
+			t.Fatalf("create fk_collision_b: %v", err)
+		}
+		defer probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS kira_analytics.fk_collision_b")
+
+		meta, err := a.Describe(ctx, nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")), adapters.NewOpCtx("op-91-referencedby"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+
+		aPath := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "kira_test"}, {Kind: "table", Name: "fk_collision_a"}})
+		bPath := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "kira_analytics"}, {Kind: "table", Name: "fk_collision_b"}})
+		var fromA, fromB *model.ForeignKeyMeta
+		for i := range meta.ReferencedBy {
+			fk := &meta.ReferencedBy[i]
+			if fk.Name != "fk_dup" {
+				continue
+			}
+			switch fk.ReferencedPath {
+			case aPath:
+				fromA = fk
+			case bPath:
+				fromB = fk
+			}
+		}
+		if fromA == nil || fromB == nil {
+			t.Fatalf("expected two separate fk_dup entries, one per database, got %+v", meta.ReferencedBy)
+		}
+		if len(fromA.ReferencedColumns) != 1 || fromA.ReferencedColumns[0] != "customer_id" {
+			t.Errorf("fk_collision_a entry ReferencedColumns = %v, want [customer_id] (not merged with fk_collision_b's)", fromA.ReferencedColumns)
+		}
+		if len(fromB.ReferencedColumns) != 1 || fromB.ReferencedColumns[0] != "customer_id" {
+			t.Errorf("fk_collision_b entry ReferencedColumns = %v, want [customer_id] (not merged with fk_collision_a's)", fromB.ReferencedColumns)
+		}
+	})
+
 	t.Run("row estimate on big_rows", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)
 		objects, err := a.Children(context.Background(), nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-6"))

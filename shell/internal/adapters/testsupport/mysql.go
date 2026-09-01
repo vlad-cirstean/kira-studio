@@ -118,6 +118,13 @@ func rootMysqlDSN(host string, port int, database string) string {
 	return cfg.FormatDSN()
 }
 
+// RootMysqlDSN is rootMysqlDSN, exported for tests that need DDL rights the connected `kira` user
+// deliberately lacks (P2 R2) — e.g. creating a probe table in kira_analytics, where kira only ever
+// holds the GRANT SELECT seedMysqlExtras gives it above.
+func RootMysqlDSN(host string, port int, database string) string {
+	return rootMysqlDSN(host, port, database)
+}
+
 // seedMysqlExtras is support/mysql.ts's own root-connection block: the second database (mirroring
 // MariaDB's kira_analytics, §6d) and the big_rows bulk insert. P34 D28: MySQL has no SEQUENCE
 // storage engine, so the 1,000,000-row insert uses the conventional numbers-table idiom instead —

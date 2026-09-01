@@ -119,6 +119,13 @@ func rootMariaDSN(host string, port int, database string) string {
 	return cfg.FormatDSN()
 }
 
+// RootMariaDSN is rootMariaDSN, exported for tests that need DDL rights the connected `kira` user
+// deliberately lacks (P2 R2) — e.g. creating a probe table in kira_analytics, where kira only ever
+// holds the GRANT SELECT seedMariadbExtras gives it below.
+func RootMariaDSN(host string, port int, database string) string {
+	return rootMariaDSN(host, port, database)
+}
+
 // seedMariadbExtras is support/mariadb.ts's own root-connection block: the second database
 // (mirroring Postgres's analytics schema — MariaDB has no schema level, §6d), the GRANT, and the
 // big_rows bulk insert via the SEQUENCE engine's own seq_1_to_N pseudo-table, then ANALYZE TABLE.
