@@ -13,12 +13,26 @@ export interface SearchQuery {
   regex: boolean;
 }
 
+export interface ScanResult<M> {
+  matches: M[];
+  /** The true, uncapped count — `matches.length` once `found <= MAX_SCAN_MATCHES`, `MAX_SCAN_MATCHES`
+   *  otherwise (D4/F6). */
+  found: number;
+}
+
 export interface SearchHandle<M> {
   cancel(): void;
-  done: Promise<M[]>;
+  done: Promise<ScanResult<M>>;
 }
 
 const CHUNK_ROWS = 2000;
+
+// P5 C4/F6: a find's match set had no cap — ~101 B retained per match (F6), 38.8 MB at 400 000
+// matches, 96.2 MB at a million, held until the find is cleared or the tab closes. 50 000 is
+// generous for anything a person actually navigates (Prev/Next through a highlight list) and
+// bounded for a machine — ~5 MB by F6's own per-match figure, two orders of magnitude past
+// realistic use.
+export const MAX_SCAN_MATCHES = 50_000;
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -61,33 +75,52 @@ export function eachMatch(
 // are therefore scanned twice, which is free next to a page of thousands. `onProgress`'s 4th
 // argument is the matches found so far — for the priority tick, that window's own matches only
 // (never folded into `matches` itself); for every tick after, `matches` itself, as a fresh
-// ascending slice. Omitting `opts` is byte-for-byte today's behaviour.
+// ascending slice. Omitting `opts` is byte-for-byte today's behaviour, modulo the cap below.
+//
+// P5 C4/F6: both passes append through `appendCapped`, which stops growing the returned array
+// once it holds `MAX_SCAN_MATCHES` (or `opts.cap`, tests only) but keeps counting — `found`
+// (the first `onProgress` argument, and `ScanResult.found`) is always the true, uncapped total, so
+// the toolbar can say "N of `<found>` (first `<matches.length>` shown)". Each row's own matches are
+// collected into a reused scratch buffer first and appended as one ascending run, so capping never
+// reorders a row's own matches relative to each other or to an earlier row's.
 export function runChunkedScan<M>(
   totalRows: number,
   scanRow: (row: number, pattern: RegExp, out: M[]) => void,
   q: SearchQuery,
   onProgress: (found: number, rowsScanned: number, totalRows: number, soFar: readonly M[]) => void,
-  opts?: { priority?: { from: number; to: number } },
+  opts?: { priority?: { from: number; to: number }; cap?: number },
 ): SearchHandle<M> {
   const pattern = compilePattern(q);
+  const cap = opts?.cap ?? MAX_SCAN_MATCHES;
   let cancelled = false;
   const matches: M[] = [];
+  let found = 0;
+  const rowBuf: M[] = [];
 
-  const done = new Promise<M[]>((resolve) => {
+  function appendCapped(into: M[], rowMatches: readonly M[]): void {
+    if (into === matches) found += rowMatches.length;
+    if (into.length >= cap) return;
+    const room = cap - into.length;
+    for (let i = 0; i < rowMatches.length && i < room; i++) into.push(rowMatches[i]);
+  }
+
+  const done = new Promise<ScanResult<M>>((resolve) => {
     function runMainPass(): void {
       let row = 0;
       function step(): void {
         if (cancelled) {
-          resolve(matches);
+          resolve({ matches, found });
           return;
         }
         const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
         for (; row < chunkEnd; row++) {
-          scanRow(row, pattern, matches);
+          rowBuf.length = 0;
+          scanRow(row, pattern, rowBuf);
+          appendCapped(matches, rowBuf);
         }
-        onProgress(matches.length, row, totalRows, matches);
+        onProgress(found, row, totalRows, matches);
         if (row < totalRows) requestAnimationFrame(step);
-        else resolve(matches);
+        else resolve({ matches, found });
       }
       requestAnimationFrame(step);
     }
@@ -98,12 +131,18 @@ export function runChunkedScan<M>(
     if (to > from) {
       requestAnimationFrame(() => {
         if (cancelled) {
-          resolve(matches);
+          resolve({ matches, found });
           return;
         }
         const priorityMatches: M[] = [];
-        for (let row = from; row < to; row++) scanRow(row, pattern, priorityMatches);
-        onProgress(priorityMatches.length, 0, totalRows, priorityMatches);
+        let priorityFound = 0;
+        for (let row = from; row < to; row++) {
+          rowBuf.length = 0;
+          scanRow(row, pattern, rowBuf);
+          priorityFound += rowBuf.length;
+          appendCapped(priorityMatches, rowBuf);
+        }
+        onProgress(priorityFound, 0, totalRows, priorityMatches);
         runMainPass();
       });
     } else {
@@ -122,7 +161,7 @@ export function runChunkedScan<M>(
 // P48 F9: grid/documents/keyvalue/console's search.ts each repeated this same four-line early-out
 // for "no page yet, or an empty query" — a scan that never starts.
 export function emptyScan<M>(): SearchHandle<M> {
-  return { cancel() {}, done: Promise.resolve([]) };
+  return { cancel() {}, done: Promise.resolve({ matches: [], found: 0 }) };
 }
 
 /** P48 F9: the tabular per-row scan body grid/search.ts and console/search.ts's tabular branch

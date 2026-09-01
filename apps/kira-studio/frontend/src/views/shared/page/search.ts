@@ -22,8 +22,9 @@ export interface PageSearchApi<M extends { row: number }> {
   /** P42 D38: `pending` is set on every partial (mid-scan) publication and absent on the
    *  completed one — the toolbar's own read of "has this scan actually finished" (matchedRows
    *  below returns null while it's set, so filtering never hides a row the scan hasn't reached
-   *  yet). */
-  searchState: Record<string, { matches: M[]; index: number; pending?: boolean }>;
+   *  yet). P5 C4/F6: `found` is the scan's true, uncapped match count — present whenever `matches`
+   *  is (mid-scan and completed alike), `undefined` only for a tab with no search state at all. */
+  searchState: Record<string, { matches: M[]; index: number; pending?: boolean; found?: number }>;
   matchedRows(tabId: string): number[] | null;
   pageVersion: { n: number };
   loadedRowCount(tabId: string): number;

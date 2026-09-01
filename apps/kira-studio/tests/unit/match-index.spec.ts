@@ -20,7 +20,7 @@ import { createMatchIndex, createPageSearch } from '../../frontend/src/views/sha
 describe('searchState reactivity (P2 R1)', () => {
   test('1. createPageSearch builds a shallow-reactive searchState, not a deep one', () => {
     const { searchState } = createPageSearch<{ row: number }>({
-      runSearch: () => ({ done: Promise.resolve([]), cancel: () => {} }),
+      runSearch: () => ({ done: Promise.resolve({ matches: [], found: 0 }), cancel: () => {} }),
       pageVersion: { n: 0 },
       loadedRowCount: () => 0,
     });
@@ -29,7 +29,7 @@ describe('searchState reactivity (P2 R1)', () => {
 
   test("2. a whole-entry replacement (every real writer's own pattern) is still reactive", () => {
     const { searchState } = createPageSearch<{ row: number }>({
-      runSearch: () => ({ done: Promise.resolve([]), cancel: () => {} }),
+      runSearch: () => ({ done: Promise.resolve({ matches: [], found: 0 }), cancel: () => {} }),
       pageVersion: { n: 0 },
       loadedRowCount: () => 0,
     });

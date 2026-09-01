@@ -105,7 +105,7 @@ function startSearch(autoScroll = true): void {
         // at the same match as `soFar` grows underneath it.
         const previousIndex = props.api.searchState[props.tabId]?.index ?? -1;
         const index = rowsScanned === 0 ? -1 : previousIndex;
-        props.api.searchState[props.tabId] = { matches: [...soFar], index, pending: true };
+        props.api.searchState[props.tabId] = { matches: [...soFar], index, pending: true, found };
       },
     );
   } catch (err) {
@@ -120,9 +120,9 @@ function startSearch(autoScroll = true): void {
   // thrown regex error above. Without a priority window (keyvalue's own search passes none,
   // F36a), the first main-pass tick's `rowsScanned` is never 0, so nothing above would otherwise
   // reset `previousIndex` away from whatever the *previous, completed* query left it at.
-  props.api.searchState[props.tabId] = { matches: [], index: -1, pending: true };
+  props.api.searchState[props.tabId] = { matches: [], index: -1, pending: true, found: 0 };
   handle = thisHandle;
-  thisHandle.done.then((matches) => {
+  thisHandle.done.then(({ matches, found }) => {
     if (handle !== thisHandle) return;
     scanning.value = false;
     // P43 iter3 D41/F36: a match the user navigated to mid-scan (D34) survives the scan
@@ -136,7 +136,7 @@ function startSearch(autoScroll = true): void {
     const navigatedIndex = props.api.searchState[props.tabId]?.index ?? -1;
     const navigated = navigatedIndex >= 0 && navigatedIndex < matches.length;
     const index = navigated ? navigatedIndex : matches.length > 0 ? 0 : -1;
-    props.api.searchState[props.tabId] = { matches, index };
+    props.api.searchState[props.tabId] = { matches, index, found };
     if (autoScroll && !navigated && matches.length > 0) emit('goToMatch', matches[0]);
   });
 }
@@ -297,7 +297,17 @@ onUnmounted(() => {
       <span class="p-sm muted search-count" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">
-          <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
+          <b class="mono">{{ entry.index + 1 }}</b> of
+          <b class="mono">{{ (entry.found ?? entry.matches.length).toLocaleString() }}</b>
+          <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
+               a user cannot act on the un-shown remainder, so this says plainly that only the
+               first N are on offer for Prev/Next/highlight. -->
+          <span
+            v-if="entry.found !== undefined && entry.found > entry.matches.length"
+            :data-testid="`${testidPrefix}search-capped`"
+          >
+            (first {{ entry.matches.length.toLocaleString() }} shown)
+          </span>
         </template>
         <template v-else>0 of 0</template>
       </span>
