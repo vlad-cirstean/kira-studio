@@ -80,12 +80,22 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 	return connConfig, nil
 }
 
+// connEntry pairs one database's *pgx.Conn with the mutex that serializes every use of it (P2 R2):
+// pgx.Conn is not safe for concurrent use by multiple goroutines, but nothing above this package
+// serializes ops against the same Adapter — adapterhost dispatches each inbound frame on its own
+// goroutine (bounded only by the session's own in-flight cap), so two Reads on two tabs, or a Read
+// racing a Mutate, can and do reach the same *pgx.Conn concurrently without this lock.
+type connEntry struct {
+	conn *pgx.Conn
+	mu   sync.Mutex
+}
+
 // ConnSet is client.ts's ClientSet — misleadingly-named "Pool" avoided on purpose (D14): one
 // *pgx.Conn per (connection, database), never a pool, because pg_cancel_backend needs a known
 // backend pid and a pool does not reliably tell you which backend ran your query.
 //
 // The same race client.ts's own get() has is left unfixed here rather than "improved": two
-// concurrent Get calls for the same not-yet-open database can both miss the cache and both dial,
+// concurrent get calls for the same not-yet-open database can both miss the cache and both dial,
 // with the second overwriting the first in the map (leaking the first connection) — client.ts has
 // exactly this race too (JS's single-threaded interleaving around the await makes it just as
 // possible there), so this is a faithful port of an existing, accepted behaviour, not a new gap.
@@ -94,18 +104,19 @@ type ConnSet struct {
 	log func(level, message string)
 
 	mu    sync.Mutex
-	conns map[string]*pgx.Conn
+	conns map[string]*connEntry
 	lru   []string
 }
 
 // NewConnSet constructs a ConnSet for cfg.
 func NewConnSet(cfg model.ResolvedConnectionConfig, log func(level, message string)) *ConnSet {
-	return &ConnSet{cfg: cfg, log: log, conns: make(map[string]*pgx.Conn)}
+	return &ConnSet{cfg: cfg, log: log, conns: make(map[string]*connEntry)}
 }
 
-// Get returns the connection for database (empty string means the primary), opening one if none
-// exists yet and evicting the least-recently-used non-primary connection first if the set is full.
-func (s *ConnSet) Get(ctx context.Context, database string) (*pgx.Conn, error) {
+// get returns the entry for database (empty string means the primary), opening a connection for it
+// if none exists yet and evicting the least-recently-used non-primary connection first if the set is
+// full.
+func (s *ConnSet) get(ctx context.Context, database string) (*connEntry, error) {
 	key := database
 	if key == "" {
 		key = primaryKey
@@ -142,16 +153,32 @@ func (s *ConnSet) Get(ctx context.Context, database string) (*pgx.Conn, error) {
 		}
 	}
 
+	entry := &connEntry{conn: conn}
 	s.mu.Lock()
-	s.conns[key] = conn
+	s.conns[key] = entry
 	s.touchLocked(key)
 	s.mu.Unlock()
-	return conn, nil
+	return entry, nil
 }
 
-// Primary returns the primary (no explicit database override) connection.
-func (s *ConnSet) Primary(ctx context.Context) (*pgx.Conn, error) {
-	return s.Get(ctx, "")
+// Acquire returns database's connection (empty string means the primary) together with a release
+// func that must be called exactly once, however the caller's own use of conn ends — it holds the
+// per-connection lock get's own doc comment describes, for the caller's own entire op, not just one
+// statement: a mutate's BEGIN…COMMIT or a console "run all" must keep any concurrent op off this
+// same conn for its whole duration, not just between individual statements, or a racing Read could
+// execute inside the open transaction (P2 R2).
+func (s *ConnSet) Acquire(ctx context.Context, database string) (*pgx.Conn, func(), error) {
+	entry, err := s.get(ctx, database)
+	if err != nil {
+		return nil, nil, err
+	}
+	entry.mu.Lock()
+	return entry.conn, entry.mu.Unlock, nil
+}
+
+// Primary acquires the primary (no explicit database override) connection.
+func (s *ConnSet) Primary(ctx context.Context) (*pgx.Conn, func(), error) {
+	return s.Acquire(ctx, "")
 }
 
 func (s *ConnSet) touchLocked(key string) {
@@ -166,7 +193,9 @@ func (s *ConnSet) touchLocked(key string) {
 
 // evictLRULocked evicts the least-recently-used non-primary connection to make room — a user
 // expanding twenty databases should not open twenty backends. A no-op if every open connection is
-// the primary (never evicted).
+// the primary (never evicted). Takes the victim's own lock before closing it (P2 R2): without this,
+// evicting to open a 9th database could close a conn out from under an op that is still mid-flight
+// on it.
 func (s *ConnSet) evictLRULocked(ctx context.Context) {
 	var victimKey string
 	for _, k := range s.lru {
@@ -187,22 +216,27 @@ func (s *ConnSet) evictLRULocked(ctx context.Context) {
 		}
 	}
 	if victim != nil {
-		_ = victim.Close(ctx)
+		victim.mu.Lock()
+		defer victim.mu.Unlock()
+		_ = victim.conn.Close(ctx)
 	}
 }
 
-// CloseAll closes every open connection.
+// CloseAll closes every open connection, taking each one's own lock first (P2 R2 — see
+// evictLRULocked's own comment).
 func (s *ConnSet) CloseAll(ctx context.Context) {
 	s.mu.Lock()
-	all := make([]*pgx.Conn, 0, len(s.conns))
-	for _, c := range s.conns {
-		all = append(all, c)
+	all := make([]*connEntry, 0, len(s.conns))
+	for _, e := range s.conns {
+		all = append(all, e)
 	}
-	s.conns = make(map[string]*pgx.Conn)
+	s.conns = make(map[string]*connEntry)
 	s.lru = nil
 	s.mu.Unlock()
 
-	for _, c := range all {
-		_ = c.Close(ctx)
+	for _, e := range all {
+		e.mu.Lock()
+		_ = e.conn.Close(ctx)
+		e.mu.Unlock()
 	}
 }

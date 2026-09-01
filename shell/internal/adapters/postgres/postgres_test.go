@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -611,6 +613,68 @@ func TestPostgres_MutateUpdate(t *testing.T) {
 	}
 	if result.AffectedRows != 1 {
 		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+}
+
+// P2 R2: pgx.Conn is not safe for concurrent use, but nothing above the adapter serializes ops
+// against the same connection — adapterhost dispatches every inbound frame on its own goroutine.
+// Two goroutines hammering one Adapter with real Reads and Mutates is exactly the scenario
+// ConnSet.Acquire's own per-connection lock exists to serialize; `go test -race` (this repo's own
+// bar for concurrency fixes, not plain `go test`) is what actually proves it, the same way P58d/P58e
+// prove their own concurrency fixes — a passing functional assertion alone wouldn't catch a data
+// race that merely got lucky this run.
+func TestPostgres_ConcurrentOpsOnOneConnectionAreSerialized(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	tablePath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "customers"))
+	const goroutines = 8
+	const rounds = 20
+
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines*rounds)
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for r := 0; r < rounds; r++ {
+				opID := "op-concurrent-" + strconv.Itoa(g) + "-" + strconv.Itoa(r)
+				if r%2 == 0 {
+					plan := model.MutationPlan{
+						Path: tablePath,
+						Ops: []model.MutationRowOp{{
+							Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("2")}},
+							Changes: model.RowValues{{Name: "name", Value: strp("Globex " + strconv.Itoa(g) + "-" + strconv.Itoa(r))}},
+						}},
+					}
+					result, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx(opID))
+					if err != nil {
+						errs <- err
+						continue
+					}
+					if result.AffectedRows != 1 {
+						errs <- errors.New("mutate: AffectedRows = " + strconv.Itoa(result.AffectedRows) + ", want 1")
+					}
+					continue
+				}
+				p, err := a.Read(context.Background(), adapters.ReadRequest{
+					Path: tablePath, Projection: []string{"id", "name"}, PageSize: 10,
+					Filter: strp("id = 1"), Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+				}, adapters.NewOpCtx(opID))
+				if err != nil {
+					errs <- err
+					continue
+				}
+				tp := p.(page.TabularPage)
+				if tp.RowCount != 1 {
+					errs <- errors.New("read: RowCount = " + strconv.Itoa(tp.RowCount) + ", want 1")
+				}
+			}
+		}(g)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent op failed: %v", err)
 	}
 }
 

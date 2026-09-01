@@ -51,11 +51,12 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	a.connSet = connSet
 	a.cfg = &cfg
 
-	conn, err := connSet.Primary(ctx)
+	conn, release, err := connSet.Primary(ctx)
 	if err != nil {
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, err
 	}
+	defer release()
 
 	var serverVersion, database, encoding string
 	found := false
@@ -102,12 +103,15 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func (a *Adapter) requireClient(ctx context.Context, database string) (*pgx.Conn, error) {
+// requireClient returns database's connection together with a release func that must be called
+// exactly once — it holds the per-connection lock ConnSet.Acquire's own doc comment describes for
+// as long as the caller keeps conn (P2 R2).
+func (a *Adapter) requireClient(ctx context.Context, database string) (*pgx.Conn, func(), error) {
 	connSet, err := adapters.RequireConnected(a.connSet)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return connSet.Get(ctx, database)
+	return connSet.Acquire(ctx, database)
 }
 
 // Children is index.ts's children.
@@ -115,10 +119,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	segments := path.Segments
 
 	if len(segments) == 0 {
-		conn, err := a.requireClient(ctx, "")
+		conn, release, err := a.requireClient(ctx, "")
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
+		defer release()
 		nodes, err := listDatabases(ctx, execFor(conn, op, a.trackerFor(op.OpID)), a.primaryDatabase)
 		if err != nil {
 			return adapters.TreeChildren{}, err
@@ -130,10 +135,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	if databaseSegment.Kind != "database" {
 		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+databaseSegment.Kind, nil)
 	}
-	conn, err := a.requireClient(ctx, databaseSegment.Name)
+	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
+	defer release()
 	exec := execFor(conn, op, a.trackerFor(op.OpID))
 
 	if len(segments) == 1 {
@@ -188,10 +194,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 		return model.ObjectMeta{}, err
 	}
 
-	conn, err := a.requireClient(ctx, databaseSegment.Name)
+	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
+	defer release()
 	exec := execFor(conn, op, a.trackerFor(op.OpID))
 
 	info, err := getRelationInfo(ctx, exec, schemaSegment.Name, objectSegment.Name)
@@ -257,10 +264,11 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 		return model.ObjectDefinition{}, adapters.Unsupported("postgres", "definition for "+objectSegment.Kind)
 	}
 
-	conn, err := a.requireClient(ctx, databaseSegment.Name)
+	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	defer release()
 	exec := execFor(conn, op, a.trackerFor(op.OpID))
 	return buildDefinition(ctx, exec, path.Segments, schemaSegment.Name, objectSegment.Kind, objectSegment.Name)
 }
@@ -280,10 +288,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	conn, err := a.requireClient(ctx, databaseSegment.Name)
+	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	target, err := getReadTarget(ctx, execFor(conn, op, a.trackerFor(op.OpID)), schemaSegment.Name, objectSegment.Name)
 	if err != nil {
 		return nil, err
@@ -304,10 +313,11 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	conn, err := a.requireClient(ctx, databaseSegment.Name)
+	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	defer release()
 	target := QualifiedName{Schema: schemaSegment.Name, Relation: objectSegment.Name}
 	return countRows(ctx, conn, op, a.trackerFor(op.OpID), target, req.Filter)
 }
@@ -322,10 +332,11 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if len(plan.Path.Segments) == 0 || plan.Path.Segments[0].Kind != "database" {
 		return model.MutationResult{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind", nil)
 	}
-	conn, err := a.requireClient(ctx, plan.Path.Segments[0].Name)
+	conn, release, err := a.requireClient(ctx, plan.Path.Segments[0].Name)
 	if err != nil {
 		return model.MutationResult{}, err
 	}
+	defer release()
 	return mutate(ctx, conn, op, a.trackerFor(op.OpID), a.readOnly, plan)
 }
 
@@ -335,10 +346,11 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		database = req.Path.Segments[0].Name
 	}
-	conn, err := a.requireClient(ctx, database)
+	conn, release, err := a.requireClient(ctx, database)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	return execute(ctx, conn, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
 }
 
