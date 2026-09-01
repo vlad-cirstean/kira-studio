@@ -177,8 +177,57 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     }
   });
 
+  // P2 R2: reviveChunks throws on a malformed chunk (bad base64, a buffer whose byte length isn't
+  // a multiple of the typed array's element size, ...) — genuinely reachable on a corrupt or
+  // truncated frame. Before this fix, that throw happened after the pending entry (and its
+  // timeout) were already deleted, from inside DOM event dispatch, which swallows it — the
+  // request's promise then never settled at all. This chunk's offsets buffer is 3 bytes (not a
+  // multiple of 4), which trips `new Uint32Array(buffer)`'s own RangeError deterministically,
+  // regardless of which base64 decode path toTypedArray takes.
+  test('8. a malformed chunk in a response rejects the request instead of hanging forever', async () => {
+    const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+    const p = request('read');
+    await flush();
+    const sent = socket.sent.at(-1) as SentRequest;
+    socket.__message({
+      kind: 'res',
+      id: sent.id,
+      ok: true,
+      payload: {
+        data: toBase64(new Uint8Array([1, 2])),
+        offsets: toBase64(new Uint8Array([1, 2, 3])),
+        nulls: toBase64(new Uint8Array([0])),
+        truncated: toBase64(new Uint8Array(0)),
+      },
+    });
+    await expect(p).rejects.toThrow();
+  });
+
+  // The 'evt' branch has the same hazard, but there is no pending promise to reject for an event —
+  // the only correct move is to drop the one malformed event rather than let the throw propagate
+  // (which would abort the fan-out to every *other* subscriber on the topic too).
+  test('9. a malformed chunk in an event payload drops just that event', () => {
+    const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+    const seen: unknown[] = [];
+    const off = onPortEvent('bad-event', (p) => seen.push(p));
+    expect(() => {
+      socket.__message({
+        kind: 'evt',
+        topic: 'bad-event',
+        payload: {
+          data: toBase64(new Uint8Array([1, 2])),
+          offsets: toBase64(new Uint8Array([1, 2, 3])),
+          nulls: toBase64(new Uint8Array([0])),
+          truncated: toBase64(new Uint8Array(0)),
+        },
+      });
+    }).not.toThrow();
+    expect(seen).toEqual([]);
+    off();
+  });
+
   // Terminal: closing the stream is not reversible in this module, so this runs last.
-  test('8. close rejects every pending request, and later requests reject immediately', async () => {
+  test('10. close rejects every pending request, and later requests reject immediately', async () => {
     const pending = request('during-close');
     await flush();
     socket.__close();

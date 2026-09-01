@@ -121,10 +121,24 @@ export function reviveChunks(value: unknown): unknown {
   return value;
 }
 
+// P2 R2: reviveChunks throws on a malformed chunk (bad base64, an offsets/truncated buffer whose
+// byte length isn't a multiple of 4 for Uint32Array, ...) — genuinely reachable on a corrupt or
+// truncated frame, not just a defensive check. socket.onmessage (below) calls this synchronously
+// from DOM event dispatch, which swallows a listener's throw into an uncaught-error report rather
+// than routing it anywhere a promise could see it. Without a try/catch here, that throw happened
+// *after* the pending entry and its timeout were already cleared (so nothing could ever reject
+// it either) — the request's promise then never resolves or rejects, and the caller hangs forever
+// instead of seeing an error.
 function handleMessage(message: PortResponse | PortEvent): void {
   if (message.kind === 'evt') {
-    const payload = reviveChunks(message.payload);
-    for (const cb of eventListeners.get(message.topic) ?? []) cb(payload);
+    // No pending promise is tied to an event — the only correct move on a bad payload is to drop
+    // this one event, the same way an unparseable frame is dropped elsewhere on this path.
+    try {
+      const payload = reviveChunks(message.payload);
+      for (const cb of eventListeners.get(message.topic) ?? []) cb(payload);
+    } catch {
+      // Dropped: a malformed event payload has no pending request to report it to.
+    }
     return;
   }
   const req = pending.get(message.id);
@@ -132,7 +146,11 @@ function handleMessage(message: PortResponse | PortEvent): void {
   pending.delete(message.id);
   if (req.timer) clearTimeout(req.timer);
   if (message.ok) {
-    req.resolve(reviveChunks(message.payload));
+    try {
+      req.resolve(reviveChunks(message.payload));
+    } catch (e) {
+      req.reject(e instanceof Error ? e : new Error(String(e)));
+    }
   } else {
     const err: Error & { code?: string } = new Error(message.error.message);
     err.code = message.error.code;
