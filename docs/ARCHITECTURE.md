@@ -435,6 +435,19 @@ back to obfuscation under a hardcoded compile-time key (the same threat model an
 as Chromium's `basic_text`, whose backend name is kept); without it, secret storage is unavailable
 and a write carrying a password is refused rather than silently stored in the clear.
 
+Decrypting a stored credential for **display** — the connection edit dialog's password field —
+is gated separately from every other use of it (P14): pressing *Show password* is what triggers
+the reveal, not opening the dialog, and the backend (`internal/localauth`) confirms the device
+owner before it will decrypt, via macOS's own `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`
+(Touch ID with the account password as its own fallback). A successful confirmation grants a
+5-minute, process-wide, non-persisted grace window, so re-opening the same or a different
+connection's edit dialog shortly after doesn't re-prompt — but each window still requires its own
+explicit *Show password* press (§ below). Where OS authentication genuinely isn't available (Linux,
+a Mac with neither biometry nor a login password), the app falls back to its existing in-app
+`confirmDialog()` instead, which grants that one reveal without recording a grace. `Connect`,
+`Test`, and `Duplicate` all continue to use the stored secret unprompted, exactly as before — this
+gate is about turning a secret into visible text, not about using it.
+
 ```
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
@@ -791,7 +804,10 @@ where it does:
 - **App-wide:** connections and their live state, settings, the op log, all three cache tiers, the
   metrics readout, the keychain, pre-connect supervision, and panel layout — each a property of the
   one process and the one database (this section's own "One process for all connections"), so a
-  per-window copy would be invented divergence, not a fix.
+  per-window copy would be invented divergence, not a fix. The local-authentication grace grant
+  (P14) sits on this side of the line too — it authenticates the machine's owner, not a workbench —
+  but the *action* it gates stays per-window: each window's edit dialog still requires its own
+  explicit *Show password* press, which just succeeds without a prompt while a grant is live.
 
 **The window key travels as `?window=<key>` on the frontend URL**, not through an async runtime
 call: the shell mints a UUID per window (`internal/storage/model.WindowRecord`) and builds

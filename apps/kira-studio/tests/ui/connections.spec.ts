@@ -318,12 +318,15 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="menu-item-edit"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
 
-  // P2 R2: the fixture above stubs connectionsReveal(URI_CONNECTION.id) to answer 'secretpw', but
-  // opening a URI-mode connection for edit must not load that plaintext secret into the draft —
-  // there is no password input to show it in while `mode === 'uri'` (the URI text is the only
-  // thing this dialog exposes there), so quietly carrying it along just left it unclearable and
-  // still shipped on every later save/test. Flipping to fields mode is the only way to see what
-  // the draft's password field actually holds — it must be empty, not the revealed secret.
+  // P2 R2: opening a URI-mode connection for edit must not load a plaintext secret into the
+  // draft — there is no password input to show it in while `mode === 'uri'` (the URI text is the
+  // only thing this dialog exposes there). Flipping to fields mode is the only way to see what
+  // the draft's password field actually holds — it must be empty, not a revealed secret.
+  //
+  // P14 D1: this now holds for both modes, for a stronger reason than P2 R2's own — the dialog no
+  // longer reveals anything at all on open, fields or URI, so the CONTROL fixture's own
+  // connectionsReveal snapshots above (for both URI_CONNECTION and TEST_PG_GREEN) go uncalled by
+  // this spec now; that is expected, not a gap, since nothing here presses the eye button.
   await page.click('[data-testid="mode-fields"]');
   await expect(page.locator('[data-testid="connection-password"]')).toHaveValue('');
   await page.click('[data-testid="connection-cancel"]');

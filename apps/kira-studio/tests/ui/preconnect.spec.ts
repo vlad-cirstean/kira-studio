@@ -65,11 +65,8 @@ const CONTROL: ControlSnapshot[] = [
     },
     response: CREATED,
   },
-  {
-    channel: IPC.connectionsReveal,
-    args: { id: CREATED.id },
-    response: { password: null, error: null },
-  },
+  // No connectionsReveal snapshot for CREATED's edit-reopens below — P14 D1 stopped fetching the
+  // secret just to open the dialog.
   {
     channel: IPC.connectionsUpdate,
     args: {

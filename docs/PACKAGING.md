@@ -157,6 +157,17 @@ exactly what ad-hoc signing defers, so the first launch after installing a new b
 permanently for that build. Expected, and the honest cost of deferring signing — not worth working
 around with a bundled private key.
 
+**Whether ad-hoc signing affects `LAContext.evaluatePolicy` too is an open question (P14 F7 item
+1), not yet answered.** The credential-reveal confirmation gate (`internal/localauth`) calls
+`LAContext.evaluatePolicy(.deviceOwnerAuthentication)` to confirm the device owner before
+decrypting a saved password for display; whether an ad-hoc-signed bundle is allowed to present that
+prompt at all has not been confirmed on real hardware. If it turns out not to be, the app is still
+correct — it falls back to the existing in-app confirmation dialog (`confirmDialog()`) exactly as
+it does on Linux — but "macOS Touch ID confirmation" would then be a Developer-ID-signing-only
+capability until this app is properly signed. §6.3 of
+`docs/v1.1/plans/P14-credential-reveal-confirmation.md` is where the answer, once observed on a
+real Mac, gets recorded.
+
 ## 3. Verification checklist — results from this environment
 
 This environment is **Linux, with no macOS, no `codesign`, and no `/usr/libexec/PlistBuddy`**. Nothing

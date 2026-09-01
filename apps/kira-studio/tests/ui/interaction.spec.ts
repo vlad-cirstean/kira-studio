@@ -338,12 +338,9 @@ const CONTROL: ControlSnapshot[] = [
     args: { connectionId: CONNECTION_ID, path: EMPLOYEES_PATH, refresh: false, tabId: null },
     response: { meta: EMPLOYEES_META, source: 'server' },
   },
-  // P21 tree shortcuts: F2 rename reveals the secret first (D9), Ctrl/Cmd+D duplicates.
-  {
-    channel: IPC.connectionsReveal,
-    args: { id: CONNECTION_ID },
-    response: { password: null, error: null },
-  },
+  // P21 tree shortcuts: F2 rename opens the edit dialog, Ctrl/Cmd+D duplicates. No
+  // connectionsReveal snapshot here any more — P14 D1 stopped fetching the secret just to open
+  // the dialog, so a stale mock for that call would be dead weight, not real coverage.
   { channel: IPC.connectionsDuplicate, args: { id: CONNECTION_ID }, response: DUPLICATE_SUMMARY },
 ];
 
