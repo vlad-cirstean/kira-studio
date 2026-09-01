@@ -28,8 +28,18 @@ export const CHANNEL = {
  *  for the status bar, not a per-process breakdown. No generated binding carries this shape: it
  *  is emitted (`kira:app:metrics`), never returned from a bound call, so it has no home in any
  *  service's models.ts and stays hand-written here instead (formerly ipc.ts's own type). Mirrors
- *  `apps/kira-studio/internal/metrics.Sample`'s JSON tags. */
+ *  `apps/kira-studio/internal/metrics.Sample`'s JSON tags.
+ *
+ *  cpuPercent is normalized to the machine's whole capacity (0-100), not the per-core-sum macOS's
+ *  own Activity Monitor shows in its per-process "% CPU" column (which reads up to `logicalCPUs`
+ *  times higher for the same load) — StatusBar.vue's tooltip states this explicitly since it's the
+ *  exact cross-check a user is likely to make. memoryBytes is RSS everywhere except darwin, where
+ *  it is phys_footprint — Activity Monitor's own "Memory" column, not its "Real Memory" one (P7
+ *  F1/D2). logicalCPUs and processCount exist so the tooltip can say what cpuPercent is a
+ *  percentage *of* and how many processes memoryBytes covers (P7 F6/D6). */
 export interface AppMetricsSample {
   cpuPercent: number;
   memoryBytes: number;
+  logicalCPUs: number;
+  processCount: number;
 }

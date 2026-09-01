@@ -28,10 +28,15 @@ import (
 // clamping (and reserves only 4 characters of layout width for it, "100%"), so a raw per-core-sum
 // would both mean the wrong thing to a reader and overflow that reserved width (P2 R1). MemoryBytes
 // is RSS everywhere except darwin, where it is phys_footprint — see this package's own doc comment
-// (P7 D2).
+// (P7 D2). LogicalCPUs and ProcessCount exist so a renderer can state what CPUPercent is a
+// percentage *of* and how many processes MemoryBytes covers, rather than leaving a reader to take
+// either figure on faith (P7 F6, D6) — ProcessCount is the number of pids that actually answered
+// the probe this tick (the ones MemoryBytes is summed over), not the number discovered.
 type Sample struct {
-	CPUPercent  float64 `json:"cpuPercent"`
-	MemoryBytes uint64  `json:"memoryBytes"`
+	CPUPercent   float64 `json:"cpuPercent"`
+	MemoryBytes  uint64  `json:"memoryBytes"`
+	LogicalCPUs  int     `json:"logicalCPUs"`
+	ProcessCount int     `json:"processCount"`
 }
 
 // cpuState is one pid's cumulative CPU time, tagged with the OS process-creation time it was read
@@ -87,6 +92,7 @@ func (s *Sampler) Sample() (Sample, error) {
 	}
 
 	var totalMem uint64
+	var processCount int
 	cpuNow := make(map[int32]cpuState, len(ids))
 	for _, pid := range ids {
 		ps, ok := s.probe(pid)
@@ -97,6 +103,7 @@ func (s *Sampler) Sample() (Sample, error) {
 			continue
 		}
 		totalMem += ps.memBytes
+		processCount++
 		cpuNow[pid] = cpuState{time: ps.cpuSeconds, createTime: ps.createTime}
 	}
 
@@ -108,7 +115,12 @@ func (s *Sampler) Sample() (Sample, error) {
 	s.prevCPU = cpuNow
 	s.prevAt = now
 
-	return Sample{CPUPercent: cpuPercent, MemoryBytes: totalMem}, nil
+	return Sample{
+		CPUPercent:   cpuPercent,
+		MemoryBytes:  totalMem,
+		LogicalCPUs:  s.logicalCPUs,
+		ProcessCount: processCount,
+	}, nil
 }
 
 // cpuDeltaPercent is Sample's own delta math, pulled out as a pure function so the pid-reuse
