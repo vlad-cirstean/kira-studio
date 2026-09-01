@@ -68,7 +68,7 @@
 >
 > **What is *not* being claimed:** that Vapor is bad, that it will not be right for this app later,
 > or that anything here is a permanent verdict. §6 states the exact conditions under which this
-> should be re-opened, and §5's D7 hands P13 a specific instruction so the decision is not
+> should be re-opened, and §5's D7 hands P19 a specific instruction so the decision is not
 > accidentally reversed by a version bump.
 
 ---
@@ -102,7 +102,7 @@ Two facts from earlier phases matter here and both survive:
 ### 0.3 Not in this phase
 
 - **Any adoption of Vapor mode, whole or partial.** That is the finding, not an omission (§5 D1).
-- **Bumping `vue` to 3.6.x.** Version bumps are P13's row by name. §5 D7 tells P13 what to do when
+- **Bumping `vue` to 3.6.x.** Version bumps are P19's row by name. §5 D7 tells P19 what to do when
   it gets there; P6 changes no pin.
 - **Porting `v-tooltip` to Vapor's directive interface**, fixing `CellEditorView.vue`'s non-null
   assumption, or any other change whose only motivation is Vapor. Nothing here is a bug under the
@@ -405,7 +405,7 @@ timings from this box are not, and none are quoted as a result.**
 | `vue@3.6.0-rc.6`, VDOM | 1 056.12 kB | 335.60 kB |
 
 Clean build, no errors, no source or config change. So the 3.6 upgrade *itself* is uneventful for this app —
-which is what makes P13's instruction in D7 a narrow one rather than a warning about 3.6 generally.
+which is what makes P19's instruction in D7 a narrow one rather than a warning about 3.6 generally.
 
 ### E2 — `features.vapor: true` compiles all 72 SFCs, and then the app does not mount
 
@@ -539,7 +539,7 @@ Stated explicitly so a later pass does not re-derive them. Each was read or run,
 | **D4** | **Record the four concrete blockers by name** — the `ObjectDirective` (F6), the four `$el` template refs (F7), the interop-ordering assumption in `CellEditorView.vue` (E4), and the negative bundle delta (E5) — **as the checklist any future re-evaluation starts from.** | §6 needs a starting point that is not "read the whole tree again". These four are what a future Vapor attempt has to answer first, and three of them were only found by running the app. |
 | **D5** | **Do not "fix" anything in service of a mode the app does not use.** `v-tooltip` stays an `ObjectDirective`; the four `$el` refs stay; `vite.config.ts:11` stays `vue()` with no `features` block. | `AGENTS.md`: scope left out of a phase is left out entirely, not half-implemented. Every one of those changes is a no-op-or-worse under the renderer that ships, and a half-ported directive is exactly the kind of "ready for later" debt that is never collected. |
 | **D6** | **`CellEditorView.vue`'s non-null assumption is handed to P12 (code review) by name, not fixed here.** The finding: `CellEditorDock.vue:17,21` gates on `v-if="cell"` while `CellEditorView.vue:46,49,87` assumes `props.cell` is non-null; the guarantee is the parent's render ordering, which is not a guarantee the child states or the types check. | It is genuinely latent — it cannot fire under VDOM, so there is no bug to fix in P6's scope, and P6 must not smuggle a defensive rewrite of a shared view into a docs phase. But it is exactly the kind of implicit-invariant finding P12's correctness round exists to catch, and it should not be lost with this document. |
-| **D7** | **P13 (dependency bump) bumps `vue` to 3.6.x when it is stable, and must leave the renderer in VDOM mode**: no `features.vapor` in `vite.config.ts`, no `vapor` attribute in any SFC, `main.ts:205` stays `createApp(...)`. E1 shows the 3.6 upgrade itself is uneventful for this app; `@vitejs/plugin-vue@6.0.8` needs no bump for it (peer `^3.2.25` admits 3.6.0). | P13's row says "bump every dependency … to the latest available stable release". Vue 3.6 will be that. Vapor is 100% opt-in and stays off — this decision must not be reversed as a side effect of a version bump, which is precisely how an unexamined assumption gets re-created in the opposite direction. |
+| **D7** | **P19 (dependency bump) bumps `vue` to 3.6.x when it is stable, and must leave the renderer in VDOM mode**: no `features.vapor` in `vite.config.ts`, no `vapor` attribute in any SFC, `main.ts:205` stays `createApp(...)`. E1 shows the 3.6 upgrade itself is uneventful for this app; `@vitejs/plugin-vue@6.0.8` needs no bump for it (peer `^3.2.25` admits 3.6.0). | P19's row says "bump every dependency … to the latest available stable release". Vue 3.6 will be that. Vapor is 100% opt-in and stays off — this decision must not be reversed as a side effect of a version bump, which is precisely how an unexamined assumption gets re-created in the opposite direction. |
 | **D8** | **Land exactly one change for this phase: the decision, recorded in `docs/ARCHITECTURE.md`.** No code, no config, no comment in `vite.config.ts`. | `AGENTS.md`: app facts live in `docs/ARCHITECTURE.md`, and "the renderer is VDOM-mode Vue, deliberately" is an app fact a future session would otherwise re-derive from scratch — this document plus §6's trigger is the durable record, and one line in the authoritative file is what points at it. A code comment would be a comment about something the code does not do, which is the kind `AGENTS.md` says not to write. |
 
 ---
@@ -574,7 +574,7 @@ than on the port itself.
 
 **There is nothing here for a Sonnet implementer beyond one docs commit.** That is the honest
 outcome of the phase, not an under-specification: D1-D3 decline adoption, D5 forbids preparatory
-changes, and D6/D7 are instructions carried forward to P12 and P13 rather than work for P6.
+changes, and D6/D7 are instructions carried forward to P12 and P19 rather than work for P6.
 
 ### C1 — `docs: record the renderer's VDOM-mode decision (P6)`
 
@@ -632,7 +632,7 @@ whatever the branch's normal gate already runs.
 - [ ] The bundle claim measured in both directions — E5 (app: +15.6 kB whole / +67.9 kB partial;
       micro-app: −34.6 kB, proving the saving is real but swamped here).
 - [ ] A decision stated with its reason and its expiry conditions — D1-D3, §6.
-- [ ] Findings that outlive the phase handed to their owners by name — D6 → P12, D7 → P13.
+- [ ] Findings that outlive the phase handed to their owners by name — D6 → P12, D7 → P19.
 - [ ] Exactly one commit of work identified (C1), and the reason there is not more stated
       explicitly (§7).
 
@@ -645,7 +645,7 @@ whatever the branch's normal gate already runs.
   `v-if` provides — and are there other parent-gated children in this tree with the same shape?
   (`ReconnectGate` consumers and the per-view `CellEditorDock` mounts are the obvious places to
   look.)
-- **OQ-2 → P13.** Bump `vue` to 3.6.x once stable, VDOM mode retained (D7). E1 measured the 3.6
+- **OQ-2 → P19.** Bump `vue` to 3.6.x once stable, VDOM mode retained (D7). E1 measured the 3.6
   upgrade at +4.6 kB raw / +1.4 kB gzip with no source change; expect the real bump to be
   uneventful, and treat anything larger as a finding worth recording.
 - **OQ-3 → whoever revisits.** §6's four conditions. In particular, E5's numbers are a property of
