@@ -90,9 +90,41 @@ func encodePayload(b *flatbuffers.Builder, payload any) (flatbuffers.UOffsetT, w
 	}
 }
 
+// estimateFrameSize returns a starting buffer size for payload, close enough to the final wire
+// size that flatbuffers.NewBuilder rarely has to grow-and-copy its backing buffer before the frame
+// is done. docs/PERF.md §2.7 traced a meaningful share of the Go-side encode regression to
+// NewBuilder(0) starting from empty and doubling repeatedly up to the final size, paying a full
+// copy of the buffer on every doubling. Page payloads dominate frame size, so only those get a
+// size-aware estimate (page.Page.Size() is the same measured ByteSize the byteSize-preservation
+// invariant checks); every other payload is small and fixed enough that a modest constant skips
+// the first few doublings just as well.
+func estimateFrameSize(payload any) int {
+	switch v := payload.(type) {
+	case ReadResponse:
+		return pageSizeEstimate(v.Page.Size())
+	case ExecuteResponse:
+		total := 0
+		for _, p := range v.Pages {
+			total += p.Size()
+		}
+		return pageSizeEstimate(total)
+	default:
+		return 256
+	}
+}
+
+// pageSizeEstimate pads a page's own measured byte size with room for the FlatBuffers table/
+// vtable overhead around it — a few hundred fixed bytes plus a small fraction of the payload,
+// converging toward zero at real page sizes (docs/PERF.md §2.7's own wire-overhead numbers).
+// Deliberately approximate: an undershoot just costs one grow-and-copy pass, same as before this
+// existed; this only needs to land close enough to skip most of them, not be exact.
+func pageSizeEstimate(rawBytes int) int {
+	return rawBytes + rawBytes/16 + 512
+}
+
 // encodeResponse builds a `res` frame answering id with payload.
 func encodeResponse(id int, payload any) ([]byte, error) {
-	b := flatbuffers.NewBuilder(0)
+	b := flatbuffers.NewBuilder(estimateFrameSize(payload))
 	payloadOff, payloadType, err := encodePayload(b, payload)
 	if err != nil {
 		return nil, err
@@ -136,7 +168,7 @@ func encodeError(id int, message, code string) []byte {
 
 // encodeEvent builds an `evt` frame — pushCacheStats's only caller.
 func encodeEvent(topic string, payload any) ([]byte, error) {
-	b := flatbuffers.NewBuilder(0)
+	b := flatbuffers.NewBuilder(estimateFrameSize(payload))
 	payloadOff, payloadType, err := encodePayload(b, payload)
 	if err != nil {
 		return nil, err

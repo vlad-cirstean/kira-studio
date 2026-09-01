@@ -694,6 +694,52 @@ the decode row. Nothing above changes L2's own accounting: `ChunkByteSize` still
 identical number either format (§8.3's `byteSize` assertion, P11 D9), so this section's numbers are
 additive to §2.6's, not a replacement for the budget L2 already caches against.
 
+### 2.8 — the Go-side encode regression, fixed
+
+§2.7 traced the regression to two things and stopped short of fixing either. Both turned out
+fixable without touching the wire format at all — same bytes on the wire, same §8.3 correctness
+proof re-run and passing (12 fixtures, including a new 500-row wide one to stress the vector path
+harder than P11's own set did), only how the Go side builds the buffer changed:
+
+1. **`adapterhost/frame.go`'s builder is now sized from `page.Page.Size()`** (the same measured
+   `ByteSize` the byteSize-preservation invariant checks) instead of `flatbuffers.NewBuilder(0)`.
+   §2.7 identified this as the dominant cost — a from-empty builder growing by doubling, copying
+   its entire backing array on every doubling — and isolating it confirms that diagnosis exactly:
+   pre-sizing alone, with the old per-element vector loop still in place, already recovers the
+   *entire* allocation regression.
+2. **`internal/page/encode.go`'s `createUint32Vector` now bulk-copies** `offsets`/`truncated`
+   instead of one `PrependUint32` call per element (~400,000 calls at the widest fixture). The Go
+   FlatBuffers runtime has a bulk `CreateByteVector([]byte)` but nothing equivalent for `[]uint32`;
+   on a little-endian host (every platform this app ships or is built on) a `[]uint32`'s own memory
+   layout is already byte-identical to the wire format's little-endian vector layout, so the fast
+   path reinterprets it as `[]byte` via `unsafe.Slice`, reuses `CreateByteVector`'s single-copy
+   `Prep`+`copy`, and patches the byte-count length prefix it wrote into the element count the wire
+   format actually expects. Guarded by a runtime little-endian check with the old per-element loop
+   as a correctness fallback, not a build tag. Isolating this alone (no pre-sizing) shows it
+   contributes nothing to allocation — the doubling happens the same number of times either way —
+   but does meaningfully cut wall-clock time on its own by removing the per-element call overhead.
+
+**Combined result**, same fixtures, same methodology as §2.7 (median of repetitions, separate
+timing/allocation passes):
+
+| Fixture | §2.7 time / alloc-ratio | §2.8 time / alloc-ratio | Time speedup |
+|---|---|---|---|
+| 100 × 12 | 52.9 µs / 6.49x | 6.5 µs / **1.18x** | 8.1x |
+| 1,000 × 12 | 953.1 µs / 5.39x | 49.9 µs / **1.07x** | 19.1x |
+| 10,000 × 12 | 5.89 ms / 4.18x | 685 µs / **1.06x** | 8.6x |
+| 10,000 × 40 | 63.35 ms / 3.95x | 7.09 ms / **1.06x** | 8.9x |
+
+This is not just a smaller regression — it clears the original §2.6 JSON+base64 baseline outright,
+on both axes that baseline was measured on. Against §2.6's own numbers (41.3 µs/1.045x, 382.8
+µs/1.016x, 3.96 ms/1.002x, 36.95 ms/1.000x), the fixed FlatBuffers encoder is now **5.2-7.7x faster**
+in wall-clock time at every fixture size, with an allocation ratio (1.06-1.18x) in the same band as
+JSON's own (1.00-1.05x) rather than 4-6.5x above it. Combined with §2.7's wire-byte and frontend-
+decode numbers (both unaffected by this section — the wire format didn't change), there is no
+remaining axis on which the pre-P11 JSON+base64 codec beats the current one. §2.7's own framing —
+"this phase is not primarily a Go-side CPU play" — was right about F15's original C3 scope; this
+follow-up closes the one number that stayed a genuine regression rather than leaving it as accepted
+cost.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64

@@ -1,12 +1,23 @@
 package page
 
 import (
+	"encoding/binary"
 	"fmt"
+	"unsafe"
 
 	flatbuffers "github.com/google/flatbuffers/go"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page/wire"
 )
+
+// hostIsLittleEndian is evaluated once at init. Every platform this app ships or is built on
+// (macOS/Linux on amd64 or arm64) is little-endian; createUint32Vector's fast path only applies
+// when this holds, so a hypothetical big-endian host stays correct via the slow path rather than
+// silently miswriting the vector.
+var hostIsLittleEndian = func() bool {
+	var x uint16 = 1
+	return *(*byte)(unsafe.Pointer(&x)) == 1
+}()
 
 // EncodePage writes p into b and returns the offset of the wire.Page table wrapping it. Callers
 // must not have a table open on b — building is inner-to-outer, so every Chunk, string,
@@ -178,7 +189,28 @@ func encodePagePosition(b *flatbuffers.Builder, p PagePosition) flatbuffers.UOff
 
 // createUint32Vector writes v as a FlatBuffers [uint] vector — 4-byte aligned by construction,
 // which is what lets the generated TypeScript hand back a zero-copy Uint32Array view (P11 D4).
+//
+// docs/PERF.md §2.7 traced part of the Go-side encode regression to this vector: the generated
+// Go runtime has a bulk CreateByteVector for []byte but nothing equivalent for []uint32, so the
+// original implementation went through one PrependUint32 call per element (~400,000 calls at the
+// widest §2.7 fixture). On a little-endian host, v's own memory layout is already byte-identical
+// to the wire format's little-endian uint32 vector (confirmed against encode.go's WriteUint32,
+// which always writes least-significant-byte first regardless of host), so the fast path
+// reinterprets v as a []byte with unsafe.Slice and reuses CreateByteVector's own single-copy
+// Prep+copy — then patches CreateByteVector's length prefix, which counts bytes, into an element
+// count, since the wire format's vector length is "how many uint32s" not "how many bytes".
 func createUint32Vector(b *flatbuffers.Builder, v []uint32) flatbuffers.UOffsetT {
+	if !hostIsLittleEndian || len(v) == 0 {
+		return createUint32VectorSlow(b, v)
+	}
+	raw := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*4)
+	off := b.CreateByteVector(raw)
+	pos := len(b.Bytes) - int(off)
+	binary.LittleEndian.PutUint32(b.Bytes[pos:], uint32(len(v)))
+	return off
+}
+
+func createUint32VectorSlow(b *flatbuffers.Builder, v []uint32) flatbuffers.UOffsetT {
 	b.StartVector(4, len(v), 4)
 	for i := len(v) - 1; i >= 0; i-- {
 		b.PrependUint32(v[i])
