@@ -22,6 +22,7 @@ import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
+import { canFormatConsole, formatConsoleText } from './format';
 import { consoleLintSource } from './lint';
 import { getPage } from './resultPages';
 import { type Match, pageSearchApi } from './search';
@@ -85,6 +86,11 @@ const lintSource = computed(() => consoleLintSource(connectionKind.value));
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
+// D9: the console runtime has no actionError field (rt.status === 'error' means the last *run*
+// failed, F11) — a format failure is a client-side text operation with nowhere else to go, so it
+// gets its own component-local strip instead of a runtime-shape change.
+const formatError = ref<string | null>(null);
+const canFormat = computed(() => canFormatConsole(connectionKind.value));
 // Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
 // doesn't read as a type-only use of the CodeMirrorHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
@@ -110,6 +116,7 @@ let lastEmitted = props.tab.state.text;
 function onDocChange(text: string): void {
   lastEmitted = text;
   setText(props.tab.id, text);
+  formatError.value = null;
 }
 
 watch(
@@ -154,6 +161,20 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+function onFormat(): void {
+  const kind = connectionKind.value;
+  if (!kind || !canFormat.value) return;
+  void (async () => {
+    const result = await formatConsoleText(kind, props.tab.state.text);
+    if (result.ok) {
+      formatError.value = null;
+      setText(props.tab.id, result.text);
+    } else {
+      formatError.value = result.reason ?? 'could not format this query';
+    }
+  })();
+}
+
 // --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
 // KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
 function onToggleSearch(): void {
@@ -190,6 +211,7 @@ onMounted(() => {
   unregisterCommands = [
     registerCommand('view.run', runStatement),
     registerCommand('view.run-all', runAll),
+    registerCommand('view.format', onFormat),
     registerCommand('view.find', onToggleSearch),
   ];
 });
@@ -300,6 +322,16 @@ const statusLine = computed(() => {
         >
           Run all
         </AppButton>
+        <AppButton
+          v-if="canFormat"
+          icon="indent"
+          data-testid="console-format"
+          :disabled="!localDoc.trim()"
+          v-tooltip="'Format the query text'"
+          @click="onFormat"
+        >
+          Format
+        </AppButton>
         <div class="sep"></div>
         <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
@@ -349,6 +381,9 @@ const statusLine = computed(() => {
       <template #strips>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
           {{ rt.error.message }}
+        </MessageStrip>
+        <MessageStrip v-if="formatError" tone="err" data-testid="console-format-error">
+          {{ formatError }}
         </MessageStrip>
       </template>
 
