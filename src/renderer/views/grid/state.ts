@@ -88,7 +88,18 @@ async function loadMeta(tabId: string): Promise<void> {
   }
 }
 
-export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
+// P2 R2 (task #93): `revertPageIndexOnFailure`, when given, is the pageIndex the tab was showing
+// before its caller optimistically advanced it for this load — goNext/goPrev/goFirst/goLast/
+// goToPage and the filter/sort/projection/pageSize setters below all patch pageIndex to the new
+// page *before* the (possibly failing) request completes, on the assumption it will land. A
+// failed or cancelled load never calls setPage (the comment below explains why: the previously
+// rendered page must stay on screen), so without this the pager would show the new page number
+// while the grid still renders the old page's rows.
+export async function load(
+  tabId: string,
+  cursor?: PageCursor,
+  revertPageIndexOnFailure?: number,
+): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
@@ -140,7 +151,14 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     // A stop button that blanks the grid is worse than the query the user stopped — the
     // previously rendered page stays exactly as it was. Disconnected: same entry point as a
     // restored tab, one component, two ways in.
+    const superseded = rt.opId !== opId;
     applyLoadFailure(rt, opId, err, tabId);
+    // A newer load has already taken over pageIndex (and this one's own optimistic patch is
+    // ancient history by comparison) — reverting here would stomp on state this failure has
+    // nothing to do with.
+    if (!superseded && revertPageIndexOnFailure !== undefined) {
+      patchDataTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+    }
   }
 }
 
@@ -202,8 +220,9 @@ export function stop(tabId: string): void {
 }
 
 export async function goFirst(tabId: string): Promise<void> {
+  const prevIndex = findDataTab(tabId)?.state.pageIndex;
   patchDataTabState(tabId, { pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // D7's cursor choice: prefer the token when one is available, falling back to offset — the
@@ -212,24 +231,26 @@ export async function goNext(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const nextIndex = tab.state.pageIndex + 1;
+  const prevIndex = tab.state.pageIndex;
+  const nextIndex = prevIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
     : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
   patchDataTabState(tabId, { pageIndex: nextIndex });
-  await load(tabId, cursor);
+  await load(tabId, cursor, prevIndex);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const prevIndex = Math.max(0, tab.state.pageIndex - 1);
+  const prevIndex = tab.state.pageIndex;
+  const targetIndex = Math.max(0, prevIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
-  patchDataTabState(tabId, { pageIndex: prevIndex });
-  await load(tabId, cursor);
+    : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
+  patchDataTabState(tabId, { pageIndex: targetIndex });
+  await load(tabId, cursor, prevIndex);
 }
 
 // Requires a count and is offset (pageCount-1)*pageSize (§8c) — the toolbar disables ⏭ until
@@ -238,18 +259,20 @@ export async function goLast(tabId: string): Promise<void> {
   const tab = findDataTab(tabId);
   const rt = runtime[tabId];
   if (!tab || !rt?.count) return;
+  const prevIndex = tab.state.pageIndex;
   const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
   const lastIndex = pageCount - 1;
   patchDataTabState(tabId, { pageIndex: lastIndex });
-  await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize });
+  await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize }, prevIndex);
 }
 
 export async function goToPage(tabId: string, n: number): Promise<void> {
   const tab = findDataTab(tabId);
   if (!tab) return;
+  const prevIndex = tab.state.pageIndex;
   const index = Math.max(0, n);
   patchDataTabState(tabId, { pageIndex: index });
-  await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize });
+  await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize }, prevIndex);
 }
 
 // Every state-changing control resets paging to page 0 (§8.5) — page 40 at 100 rows is not
@@ -264,15 +287,17 @@ export async function setPageSize(
   tabId: string,
   pageSize: DataTabState['pageSize'],
 ): Promise<void> {
+  const prevIndex = findDataTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDataTabState(tabId, { pageSize, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 export async function setProjection(tabId: string, projection: string[] | null): Promise<void> {
+  const prevIndex = findDataTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDataTabState(tabId, { projection, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 export async function setFilter(tabId: string, filter: string | null): Promise<void> {
@@ -282,17 +307,19 @@ export async function setFilter(tabId: string, filter: string | null): Promise<v
   // still let ⏭ page past the end. Clearing it (not staling it) returns the pager to "page N" with
   // no total, exactly what an un-counted state already looks like. Projection/sort setters below
   // don't do this: neither changes which rows match.
+  const prevIndex = findDataTab(tabId)?.state.pageIndex;
   const rt = ensureRuntime(tabId);
   rt.count = null;
   rt.countOpId = null;
   patchDataTabState(tabId, { filter, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 export async function setSort(tabId: string, sort: SortSpec | null): Promise<void> {
+  const prevIndex = findDataTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDataTabState(tabId, { sort, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // Purely a display concern (which page.columns index each display column reads from) — unlike

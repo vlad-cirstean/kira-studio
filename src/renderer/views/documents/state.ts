@@ -65,7 +65,15 @@ registerTabRuntimeCleanup((tabId) => {
 /** P43 F6/D7: written by DocumentView.vue's own catches around commitCreate/commitEdit/deleteDocument. */
 export { setActionError };
 
-export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
+// P2 R2 (task #93): mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
+// given, is the pageIndex this tab was showing before its caller optimistically advanced it. A
+// failed or cancelled load never calls setPage, so without this the pager would show the new page
+// number while the grid still renders the old page's rows.
+export async function load(
+  tabId: string,
+  cursor?: PageCursor,
+  revertPageIndexOnFailure?: number,
+): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
@@ -105,7 +113,11 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.nextToken = response.page.position.nextToken;
     rt.prevToken = response.page.position.prevToken;
   } catch (err) {
+    const superseded = rt.opId !== opId;
     applyLoadFailure(rt, opId, err, tabId);
+    if (!superseded && revertPageIndexOnFailure !== undefined) {
+      patchDocumentTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+    }
   }
 }
 
@@ -157,32 +169,35 @@ export async function goNext(tabId: string): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const nextIndex = tab.state.pageIndex + 1;
+  const prevIndex = tab.state.pageIndex;
+  const nextIndex = prevIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
     : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
   patchDocumentTabState(tabId, { pageIndex: nextIndex });
-  await load(tabId, cursor);
+  await load(tabId, cursor, prevIndex);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const prevIndex = Math.max(0, tab.state.pageIndex - 1);
+  const prevIndex = tab.state.pageIndex;
+  const targetIndex = Math.max(0, prevIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
-  patchDocumentTabState(tabId, { pageIndex: prevIndex });
-  await load(tabId, cursor);
+    : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
+  patchDocumentTabState(tabId, { pageIndex: targetIndex });
+  await load(tabId, cursor, prevIndex);
 }
 
 // First/last/jump — mirrors views/grid/state.ts's own goFirst/goLast/goToPage exactly. Mongo
 // supports an arbitrary skip()/limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's
 // per-partition offsets), so a page-N jump is just as meaningful here as it is for SQL.
 export async function goFirst(tabId: string): Promise<void> {
+  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
   patchDocumentTabState(tabId, { pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // Requires a count, same as the grid's own goLast — the toolbar disables the Last-page button
@@ -191,18 +206,20 @@ export async function goLast(tabId: string): Promise<void> {
   const tab = findDocumentTab(tabId);
   const rt = runtime[tabId];
   if (!tab || !rt?.count) return;
+  const prevIndex = tab.state.pageIndex;
   const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
   const lastIndex = pageCount - 1;
   patchDocumentTabState(tabId, { pageIndex: lastIndex });
-  await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize });
+  await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize }, prevIndex);
 }
 
 export async function goToPage(tabId: string, n: number): Promise<void> {
   const tab = findDocumentTab(tabId);
   if (!tab) return;
+  const prevIndex = tab.state.pageIndex;
   const index = Math.max(0, n);
   patchDocumentTabState(tabId, { pageIndex: index });
-  await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize });
+  await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize }, prevIndex);
 }
 
 // P43 F8/D11: mirrors views/grid/state.ts's own resetTokens exactly — a keyset token is only
@@ -218,6 +235,7 @@ function resetTokens(tabId: string): void {
 }
 
 export function setSearch(tabId: string, text: string): void {
+  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   // P43 F7/D10: same reasoning as views/grid/state.ts's setFilter — a count taken under the
   // previous search text answers a different question, not a drifted answer to this one.
@@ -225,7 +243,7 @@ export function setSearch(tabId: string, text: string): void {
   rt.count = null;
   rt.countOpId = null;
   patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
-  void load(tabId);
+  void load(tabId, undefined, prevIndex);
 }
 
 // Mirrors views/grid/state.ts's setProjection/setSort/setPageSize — each resets `pageIndex` to 0
@@ -235,21 +253,24 @@ export function setSearch(tabId: string, text: string): void {
 // read.ts's D6 keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
 // goNext/goPrev (above) use to compute that offset.
 export function setProjection(tabId: string, projection: string[] | null): void {
+  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDocumentTabState(tabId, { projection, pageIndex: 0 });
-  void load(tabId);
+  void load(tabId, undefined, prevIndex);
 }
 
 export function setSort(tabId: string, sort: SortSpec | null): void {
+  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDocumentTabState(tabId, { sort, pageIndex: 0 });
-  void load(tabId);
+  void load(tabId, undefined, prevIndex);
 }
 
 export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize']): void {
+  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   patchDocumentTabState(tabId, { pageSize, pageIndex: 0 });
-  void load(tabId);
+  void load(tabId, undefined, prevIndex);
 }
 
 // P43 F3/D4: the clicked row's own highlight — this view has no cell editor dock to publish a

@@ -61,7 +61,15 @@ registerTabRuntimeCleanup((tabId) => {
  *  per-tab field every other immediate-mutation view uses. */
 export { setActionError };
 
-export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
+// P2 R2 (task #93): mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
+// given, is the pageIndex this tab was showing before its caller optimistically advanced it. A
+// failed or cancelled load never calls setPage, so without this the pager would show the new page
+// number while the grid still renders the old page's rows.
+export async function load(
+  tabId: string,
+  cursor?: PageCursor,
+  revertPageIndexOnFailure?: number,
+): Promise<void> {
   const tab = findKeyValueTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
@@ -113,7 +121,11 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     rt.nextToken = response.page.position.nextToken;
     rt.prevToken = response.page.position.prevToken;
   } catch (err) {
+    const superseded = rt.opId !== opId;
     applyLoadFailure(rt, opId, err, tabId);
+    if (!superseded && revertPageIndexOnFailure !== undefined) {
+      patchKeyValueTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+    }
   }
 }
 
@@ -160,24 +172,26 @@ export async function goNext(tabId: string): Promise<void> {
   const tab = findKeyValueTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const nextIndex = tab.state.pageIndex + 1;
+  const prevIndex = tab.state.pageIndex;
+  const nextIndex = prevIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
     : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
   patchKeyValueTabState(tabId, { pageIndex: nextIndex });
-  await load(tabId, cursor);
+  await load(tabId, cursor, prevIndex);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
   const tab = findKeyValueTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
-  const prevIndex = Math.max(0, tab.state.pageIndex - 1);
+  const prevIndex = tab.state.pageIndex;
+  const targetIndex = Math.max(0, prevIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: prevIndex * tab.state.pageSize };
-  patchKeyValueTabState(tabId, { pageIndex: prevIndex });
-  await load(tabId, cursor);
+    : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
+  patchKeyValueTabState(tabId, { pageIndex: targetIndex });
+  await load(tabId, cursor, prevIndex);
 }
 
 // Mirrors grid/state.ts's setPageSize: resets to the first page and clears whatever cursor
@@ -187,11 +201,12 @@ export async function setPageSize(
   tabId: string,
   pageSize: KeyValueTabState['pageSize'],
 ): Promise<void> {
+  const prevIndex = findKeyValueTab(tabId)?.state.pageIndex;
   const rt = ensureRuntime(tabId);
   rt.nextToken = null;
   rt.prevToken = null;
   patchKeyValueTabState(tabId, { pageSize, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 });
+  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // D5/D6: project/ no longer imports this module directly — it reaches reload through

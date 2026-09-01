@@ -17,14 +17,23 @@ import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
 
 const { control } = await import('../../src/renderer/bridge/control');
 const { data } = await import('../../src/renderer/bridge/data');
-const { openBrowseTab, openKeyValueTab, findKeyValueTab } = await import(
+const { openBrowseTab, openKeyValueTab, openDataTab, findKeyValueTab, findDataTab } = await import(
   '../../src/renderer/state/tabs'
 );
 const { load: loadBrowse, runtime: browseRuntime } = await import(
   '../../src/renderer/views/browse/state'
 );
-const { load: loadKeyValue } = await import('../../src/renderer/views/keyvalue/state');
+const {
+  load: loadKeyValue,
+  goNext: keyValueGoNext,
+  runtime: keyValueRuntime,
+} = await import('../../src/renderer/views/keyvalue/state');
 const { setPage } = await import('../../src/renderer/views/keyvalue/page');
+const {
+  goNext: gridGoNext,
+  goPrev: gridGoPrev,
+  runtime: gridRuntime,
+} = await import('../../src/renderer/views/grid/state');
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -170,5 +179,90 @@ describe('views/keyvalue/state.ts — cursor-strategy reload fallback (P44 F47, 
 
     expect(capturedCursor).toEqual({ mode: 'offset', offset: 2 * tab.state.pageSize });
     expect(findKeyValueTab(id)?.state.pageIndex).toBe(2);
+  });
+});
+
+// P2 R2 (task #93): goNext/goPrev/etc. patch pageIndex to the new page *before* the load that
+// fetches it settles — a failed or cancelled load never calls setPage, so the grid keeps
+// rendering the old page's rows while the pager, left un-reverted, claimed a page that was never
+// actually fetched.
+describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled load (P2 R2, task #93)', () => {
+  test('6. goNext reverts pageIndex to the previous page when the load fails', async () => {
+    const { id } = openDataTab('conn6', 'public.orders', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+    (data as any).read = () =>
+      Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
+
+    await gridGoNext(id);
+
+    expect(findDataTab(id)?.state.pageIndex).toBe(0);
+    expect(gridRuntime[id]?.status).toBe('error');
+  });
+
+  test('7. goNext reverts pageIndex to the previous page when the load is cancelled', async () => {
+    const { id } = openDataTab('conn7', 'public.orders', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+    (data as any).read = () =>
+      Promise.reject(Object.assign(new Error('cancelled'), { code: 'E_CANCELLED' }));
+
+    await gridGoNext(id);
+
+    expect(findDataTab(id)?.state.pageIndex).toBe(0);
+    expect(gridRuntime[id]?.status).toBe('cancelled');
+  });
+
+  test('8. goPrev reverts pageIndex to the previous page when the load fails', async () => {
+    const { id } = openDataTab('conn8', 'public.orders', { newTab: true });
+    const tab = findDataTab(id);
+    if (!tab) throw new Error('expected the tab to exist');
+    tab.state.pageIndex = 3;
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+    (data as any).read = () =>
+      Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
+
+    await gridGoPrev(id);
+
+    expect(findDataTab(id)?.state.pageIndex).toBe(3);
+  });
+
+  test("9. a superseded (stale) load's failure does not revert a pageIndex a newer load already advanced", async () => {
+    const { id } = openDataTab('conn9', 'public.orders', { newTab: true });
+    const first = deferred<{ page: unknown; source: string }>();
+    const second = deferred<{ page: unknown; source: string }>();
+    const reads: Array<typeof first> = [first, second];
+    let call = 0;
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+    (data as any).read = () => reads[call++]?.promise;
+
+    const older = gridGoNext(id); // page 0 -> 1, opId A
+    expect(findDataTab(id)?.state.pageIndex).toBe(1);
+    const newer = gridGoNext(id); // page 1 -> 2, opId B (supersedes A)
+    expect(findDataTab(id)?.state.pageIndex).toBe(2);
+
+    // A's request fails after B has already taken over — its failure must not stomp on B's
+    // optimistic pageIndex, and reverting to "1" (the index *before A's own* advance) would be
+    // exactly that stomp.
+    first.reject(Object.assign(new Error('stale failure'), { code: 'E_QUERY' }));
+    await older;
+    expect(findDataTab(id)?.state.pageIndex).toBe(2);
+
+    // B itself now fails — being the current op, it must revert to its own previous index (1).
+    second.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
+    await newer;
+    expect(findDataTab(id)?.state.pageIndex).toBe(1);
+  });
+});
+
+describe('views/keyvalue/state.ts — pageIndex reverts on a failed load (P2 R2, task #93)', () => {
+  test('10. goNext reverts pageIndex to the previous page when the load fails', async () => {
+    const { id } = openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+    (data as any).read = () =>
+      Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
+
+    await keyValueGoNext(id);
+
+    expect(findKeyValueTab(id)?.state.pageIndex).toBe(0);
+    expect(keyValueRuntime[id]?.status).toBe('error');
   });
 });
