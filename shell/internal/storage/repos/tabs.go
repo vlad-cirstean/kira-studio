@@ -45,7 +45,7 @@ func (r *TabsRepo) List() ([]model.TabRecord, error) {
 		if err := rows.Scan(&id, &connectionID, &path, &kind, &stateJSON, &order, &active); err != nil {
 			return nil, fmt.Errorf("repos/tabs: scan: %w", err)
 		}
-		if !isJSONObject([]byte(stateJSON)) {
+		if !model.IsJSONObject([]byte(stateJSON)) {
 			slog.Warn("dropping tab row: state_json is not a JSON object", "scope", "storage/tabs", "id", id)
 			continue
 		}
@@ -70,8 +70,17 @@ func (r *TabsRepo) List() ([]model.TabRecord, error) {
 }
 
 // Save replaces the whole tab set in one transaction, rewriting `order` as the array index so
-// the stored order is always dense (tabs.ts's replaceTabs).
+// the stored order is always dense (tabs.ts's replaceTabs). Every record is validated up front
+// (P2 R2), the same envelope List() enforces on read: unlike List, which must tolerate legacy
+// rows already on disk by dropping and logging, Save is the boundary where bad data should be
+// refused outright rather than silently written and then vanish on the next restore.
 func (r *TabsRepo) Save(records []model.TabRecord) error {
+	for i, rec := range records {
+		if err := rec.Validate(); err != nil {
+			return fmt.Errorf("repos/tabs: record %d: %w", i, err)
+		}
+	}
+
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("repos/tabs: begin: %w", err)
@@ -93,15 +102,4 @@ func (r *TabsRepo) Save(records []model.TabRecord) error {
 		return fmt.Errorf("repos/tabs: commit: %w", err)
 	}
 	return nil
-}
-
-// isJSONObject reports whether raw is valid JSON whose top-level value is an object — tabs.ts's
-// row.state must round-trip a Record<...>-shaped state, never a bare array or scalar.
-func isJSONObject(raw []byte) bool {
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return false
-	}
-	_, ok := v.(map[string]any)
-	return ok
 }
