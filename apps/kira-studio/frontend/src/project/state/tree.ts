@@ -291,6 +291,7 @@ export function knownConnectionIds(): Set<string> {
 
 let unsubscribeInvalidated: (() => void) | null = null;
 let unsubscribeConnectionsChanged: (() => void) | null = null;
+let unsubscribeConnectionState: (() => void) | null = null;
 
 export function initTreeSync(): void {
   unsubscribeInvalidated?.();
@@ -304,6 +305,23 @@ export function initTreeSync(): void {
     for (const id of knownConnectionIds()) {
       if (!liveIds.has(id)) dropConnectionState(id);
     }
+  });
+
+  // P5 D6/F9: a disconnected connection's tree copy is neither authoritative nor reused — L1
+  // metadata is persisted server-side and refreshed on every reconnect regardless
+  // (docs/ARCHITECTURE.md's Caching section) — so it is released the same way a deleted
+  // connection's is (dropConnectionState, unchanged), just on a different signal. Reached through
+  // control's own onConnectionState broadcast rather than by reaching into
+  // state/connections.ts's disconnectConnection() directly (:249-251's own reasoning for why
+  // dropConnectionState is driven off a canonical push, not a specific action function): this way
+  // covers every path that can produce the transition — an explicit Disconnect click, main
+  // reporting a lost connection — not just the renderer's own button. `connecting`/`error` are
+  // deliberately left alone: a reconnect attempt in flight, or one that failed and might be
+  // retried, is not "the user disconnected" — dropping the tree there would collapse/re-fetch a
+  // still-expanded tree out from under a transient state.
+  unsubscribeConnectionState?.();
+  unsubscribeConnectionState = control.onConnectionState((state) => {
+    if (state.status === 'disconnected') dropConnectionState(state.connectionId);
   });
 }
 
