@@ -498,6 +498,68 @@ func TestPostgres_ReadOnlyConnectionCannotWrite(t *testing.T) {
 	}
 }
 
+// P2 R2: client.go's own SET default_transaction_read_only=on only governs the *next*
+// transaction, not the current one — a console statement can flip it back (or, on Postgres
+// specifically, use SET TRANSACTION READ WRITE to flip the current transaction's own mode) and
+// have a later statement in the same batch run writable. Confirmed against a real server before
+// fixing this: this exact statement sequence deleted every row. execute() now wraps the whole
+// batch in BEGIN READ ONLY and rejects any statement containing "READ WRITE" outright.
+func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	roCfg := fixture.Config
+	roCfg.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), roCfg, adapters.NewOpCtx("op-ro-connect")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer a.Disconnect(context.Background())
+
+	// Targets order_items rather than customers: customers is referenced by orders' own FK, so a
+	// DELETE against it fails with a foreign-key error regardless of read-only enforcement — a
+	// false pass that doesn't actually exercise the guard. order_items has no dependents, so a
+	// DELETE against it only fails if the read-only guard itself is doing its job.
+	before, err := a.Count(context.Background(), adapters.CountRequest{
+		Path: nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "order_items")),
+	}, adapters.NewOpCtx("op-ro-count-before"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+
+	attempts := [][]string{
+		{"SET default_transaction_read_only = off", "DELETE FROM app.order_items"},
+		{"SET TRANSACTION READ WRITE", "DELETE FROM app.order_items"},
+		{"COMMIT", "BEGIN", "DELETE FROM app.order_items"},
+	}
+	for _, statements := range attempts {
+		_, err := a.Execute(context.Background(), model.ConsoleRequest{
+			Path:       nodePath(fixture, seg("database", "kira_test")),
+			Statements: statements,
+		}, adapters.NewOpCtx("op-ro-escape"))
+		if err == nil {
+			t.Fatalf("Execute(%v) succeeded on a read-only connection, want an error", statements)
+		}
+	}
+
+	after, err := a.Count(context.Background(), adapters.CountRequest{
+		Path: nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "order_items")),
+	}, adapters.NewOpCtx("op-ro-count-after"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if after.Value != before.Value {
+		t.Fatalf("order_items row count = %d after read-only Execute attempts, want unchanged %d", after.Value, before.Value)
+	}
+
+	// The wrapping transaction must actually end after each attempt — a genuine, ordinary
+	// statement on the same connection right after must still work.
+	if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path:       nodePath(fixture, seg("database", "kira_test")),
+		Statements: []string{"SELECT 1"},
+	}, adapters.NewOpCtx("op-ro-still-usable")); err != nil {
+		t.Fatalf("Execute(SELECT 1) after failed escape attempts: %v", err)
+	}
+}
+
 // 21. preview: exact text, never executes.
 func TestPostgres_PreviewNeverExecutes(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

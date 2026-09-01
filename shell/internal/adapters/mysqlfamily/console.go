@@ -3,10 +3,16 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/page"
 )
+
+// endTransactionTimeout bounds the START TRANSACTION READ ONLY wrap's own cleanup COMMIT (P2 R2):
+// it must run even when the op's own ctx is already cancelled (Stop pressed mid-batch), since
+// skipping it would leave this connection's next op running inside a stale open transaction.
+const endTransactionTimeout = 5 * time.Second
 
 // numberDBTypes/temporalDBTypes are console.ts's own NUMBER_TYPES/TEMPORAL_TYPES, spelled in
 // go-sql-driver's own DatabaseTypeName() vocabulary (fields.go's typeDatabaseName) rather than the
@@ -130,12 +136,36 @@ func buildPage(rows [][]*string, dbTypes, names []string) page.TabularPage {
 	return builder.Finish(page.UnpagedPosition(len(rows)))
 }
 
-// execute is console.ts's execute.
-func execute(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, statements []string) ([]page.Page, error) {
+// execute is console.ts's execute. readOnly closes the gap client.go's own
+// SET SESSION TRANSACTION READ ONLY leaves open (P2 R2): that session default only governs
+// transactions not yet started, so a statement in this batch could flip it back for whatever
+// runs after. Wrapping the batch in an explicit START TRANSACTION READ ONLY is a hard server-side
+// backstop here — confirmed against a real server that, unlike Postgres, MariaDB/MySQL refuse
+// outright ("Transaction characteristics can't be changed while a transaction is in progress") to
+// let any statement flip an already-open transaction's own read-only mode, so no additional
+// per-statement rejection is strictly required on this dialect; AssertNoTransactionEscalation
+// still runs for consistency with postgres and as a cheap first line of defense.
+func execute(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
+	if readOnly {
+		if err := adapters.AssertNoTransactionEscalation(statements); err != nil {
+			return nil, err
+		}
+	}
 	op.SetCommand(joinSemicolons(statements))
+
+	if readOnly {
+		if _, err := conn.ExecContext(ctx, "START TRANSACTION READ ONLY"); err != nil {
+			return nil, mapError(err)
+		}
+		defer func() {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+			defer cancel()
+			_, _ = conn.ExecContext(cleanupCtx, "COMMIT")
+		}()
+	}
 
 	pages := make([]page.Page, len(statements))
 	for i, stmt := range statements {

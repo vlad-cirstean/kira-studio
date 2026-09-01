@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"regexp"
 )
 
 // ErrorCode is the Go analogue of errors.ts's AdapterErrorCode — a closed set, verbatim from
@@ -65,6 +66,37 @@ func NoQueryConsole(kind string) error {
 func AssertWritable(readOnly bool) error {
 	if readOnly {
 		return New(CodeUnsupported, "connection is read-only", nil)
+	}
+	return nil
+}
+
+var (
+	sqlLineComment  = regexp.MustCompile(`--[^\n]*`)
+	sqlBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	sqlReadWrite    = regexp.MustCompile(`(?i)READ\s+WRITE`)
+)
+
+// AssertNoTransactionEscalation is a console-Execute-only backstop for postgres/mysqlfamily (P2
+// R2): both enforce a read-only connection by setting a *session default*
+// (default_transaction_read_only / SESSION TRANSACTION READ ONLY) at connect time and wrapping
+// each Execute() batch in an explicit read-only transaction, neither of which a statement inside
+// that same transaction can be trusted not to try to escape — verified against real servers that
+// a bare `SET TRANSACTION READ WRITE` (postgres) mid-transaction actually does flip an
+// already-open read-only transaction to writable, where every other angle tried (SET
+// default_transaction_read_only=off, SET SESSION TRANSACTION READ WRITE, COMMIT;BEGIN;) does not
+// escape the wrapping transaction on either server. "READ WRITE" has no legitimate reason to
+// appear in a read-only console session, so any statement containing it (after stripping SQL
+// comments, since a comment can sit between the two words) is rejected outright rather than run.
+// Comments are replaced with a single space, not deleted outright: confirmed against a real
+// server that `READ/*x*/WRITE` parses identically to `READ WRITE` (a comment is lexical
+// whitespace to the SQL parser), so deleting it outright would collapse the two keywords together
+// and slip past the \s+ in sqlReadWrite below.
+func AssertNoTransactionEscalation(statements []string) error {
+	for _, stmt := range statements {
+		stripped := sqlBlockComment.ReplaceAllString(sqlLineComment.ReplaceAllString(stmt, " "), " ")
+		if sqlReadWrite.MatchString(stripped) {
+			return New(CodeUnsupported, "connection is read-only", nil)
+		}
 	}
 	return nil
 }

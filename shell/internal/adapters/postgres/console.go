@@ -2,12 +2,18 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/page"
 )
+
+// endTransactionTimeout bounds the BEGIN READ ONLY wrap's own cleanup COMMIT (P2 R2): it must run
+// even when the op's own ctx is already cancelled (Stop pressed mid-batch), since skipping it
+// would leave this connection's next op running inside a stale, likely-aborted transaction.
+const endTransactionTimeout = 5 * time.Second
 
 // rawField is console.ts's RawField.
 type rawField struct {
@@ -146,12 +152,40 @@ func parseUint32(s string) (uint32, error) {
 	return uint32(n), nil
 }
 
-// execute is console.ts's execute.
-func execute(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, statements []string) ([]page.Page, error) {
+// execute is console.ts's execute. readOnly closes the gap client.go's own
+// SET default_transaction_read_only=on leaves open (P2 R2): that session default only governs
+// transactions *not yet started*, so a statement in this very batch could otherwise flip the
+// session's default (or, on Postgres specifically, the current transaction's own read-write mode
+// via SET TRANSACTION READ WRITE) and have every following statement in the batch run writable.
+// Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle actually
+// tried against a real server except that one specific statement, which
+// AssertNoTransactionEscalation rejects outright before anything runs.
+func execute(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
+	if readOnly {
+		if err := adapters.AssertNoTransactionEscalation(statements); err != nil {
+			return nil, err
+		}
+	}
 	op.SetCommand(joinSemicolons(statements))
+
+	if readOnly {
+		if _, err := conn.Exec(ctx, "BEGIN READ ONLY"); err != nil {
+			return nil, mapError(err)
+		}
+		defer func() {
+			// Detached from ctx: an op cancelled mid-batch must still end this transaction, or the
+			// pinned connection is left inside it (aborted or not) for whatever op runs next. Safe to
+			// call unconditionally regardless of the loop's own outcome — issuing COMMIT against an
+			// already-aborted transaction is itself how Postgres ends one (confirmed empirically: the
+			// server reports back a ROLLBACK command tag, not an error).
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+			defer cancel()
+			_, _ = conn.Exec(cleanupCtx, "COMMIT")
+		}()
+	}
 
 	results := make([]rawResult, 0, len(statements))
 	for _, sql := range statements {

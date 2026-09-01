@@ -322,7 +322,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	return execute(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), req.Statements)
+	return execute(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.

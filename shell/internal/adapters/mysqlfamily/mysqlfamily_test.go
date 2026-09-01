@@ -500,6 +500,65 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P2 R2: client.go's own SET SESSION TRANSACTION READ ONLY only governs transactions not yet
+	// started, so a console statement could flip it back for whatever ran after it in the same
+	// batch. execute() now wraps the whole batch in START TRANSACTION READ ONLY, which — confirmed
+	// against a real server — MariaDB/MySQL refuse to let any statement lift mid-transaction
+	// ("Transaction characteristics can't be changed while a transaction is in progress").
+	//
+	// Targets order_items rather than customers: customers is referenced by orders' own FK, so a
+	// DELETE against it fails with a foreign-key error regardless of read-only enforcement — a
+	// false pass that doesn't actually exercise the guard. order_items has no dependents, so a
+	// DELETE against it only fails if the read-only guard itself is doing its job.
+	t.Run("read-only connection execute cannot escape read-only transaction", func(t *testing.T) {
+		ro := cfg
+		ro.ReadOnly = true
+		a := newAdapter(t, kind)
+		if _, err := a.Connect(context.Background(), ro, adapters.NewOpCtx("op-ro-connect")); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		defer a.Disconnect(context.Background())
+
+		before, err := a.Count(context.Background(), adapters.CountRequest{
+			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")),
+		}, adapters.NewOpCtx("op-ro-count-before"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+
+		attempts := [][]string{
+			{"SET SESSION TRANSACTION READ WRITE", "DELETE FROM order_items"},
+			{"SET TRANSACTION READ WRITE", "DELETE FROM order_items"},
+			{"COMMIT", "START TRANSACTION", "DELETE FROM order_items"},
+		}
+		for _, statements := range attempts {
+			_, err := a.Execute(context.Background(), model.ConsoleRequest{
+				Path:       nodePath(cfg.ID, seg("database", "kira_test")),
+				Statements: statements,
+			}, adapters.NewOpCtx("op-ro-escape"))
+			if err == nil {
+				t.Fatalf("Execute(%v) succeeded on a read-only connection, want an error", statements)
+			}
+		}
+
+		after, err := a.Count(context.Background(), adapters.CountRequest{
+			Path: nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")),
+		}, adapters.NewOpCtx("op-ro-count-after"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+		if after.Value != before.Value {
+			t.Fatalf("order_items row count = %d after read-only Execute attempts, want unchanged %d", after.Value, before.Value)
+		}
+
+		if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+			Path:       nodePath(cfg.ID, seg("database", "kira_test")),
+			Statements: []string{"SELECT 1"},
+		}, adapters.NewOpCtx("op-ro-still-usable")); err != nil {
+			t.Fatalf("Execute(SELECT 1) after failed escape attempts: %v", err)
+		}
+	})
+
 	t.Run("execute: one page per statement", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)
 		pages, err := a.Execute(context.Background(), model.ConsoleRequest{
