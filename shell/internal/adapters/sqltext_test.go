@@ -17,6 +17,10 @@ func col(name string, position int, isPrimaryKey bool) model.ColumnMeta {
 	return model.ColumnMeta{Name: name, Position: position, DataType: "int4", Nullable: false, IsPrimaryKey: isPrimaryKey}
 }
 
+func nullableCol(name string, position int) model.ColumnMeta {
+	return model.ColumnMeta{Name: name, Position: position, DataType: "int4", Nullable: true, IsPrimaryKey: false}
+}
+
 func testColumns() []model.ColumnMeta {
 	return []model.ColumnMeta{col("id", 0, true), col("name", 1, false), col("created_at", 2, false)}
 }
@@ -94,6 +98,65 @@ func TestComputeEffectiveOrder_TiebreakerAppendedDeduped(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.KeysetColumns, []string{"name", "id"}) {
 		t.Errorf("got keyset columns %v", got.KeysetColumns)
+	}
+}
+
+// P2 R2 (task #89): a requested sort column that is nullable disqualifies keyset pagination even
+// though a tiebreaker is present — `(col, pk) > (val, pk)` is SQL-UNKNOWN wherever col IS NULL, so
+// a naive grant here would either silently drop every NULL row from all keyset pages forever, or
+// hard-fail a page whose boundary row has a NULL sort value. D7 only required the tiebreaker
+// itself to be non-nullable; it never checked the user's own requested sort columns.
+func TestComputeEffectiveOrder_NullableSortColumnDisqualifiesKeyset(t *testing.T) {
+	columns := []model.ColumnMeta{col("id", 0, true), nullableCol("name", 1), col("created_at", 2, false)}
+	sort := structuredSort(model.SortTerm{Column: "name", Direction: "asc"})
+	got, err := ComputeEffectiveOrder(sort, columns, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.KeysetEligible {
+		t.Error("expected KeysetEligible = false for a nullable sort column")
+	}
+	if len(got.KeysetColumns) != 0 {
+		t.Errorf("expected no keyset columns, got %v", got.KeysetColumns)
+	}
+	want := []OrderTerm{{Column: "name", Direction: "asc"}}
+	if !reflect.DeepEqual(got.Terms, want) {
+		t.Errorf("got terms %v, want %v", got.Terms, want)
+	}
+	if got.KeysetDirection != "asc" {
+		t.Errorf("got direction %q, want asc", got.KeysetDirection)
+	}
+}
+
+// a primary-key column whose own Nullable bit is (mistakenly, per SQLite's own pragma quirk for a
+// bare `INTEGER PRIMARY KEY`) set true is exempted — sorting by the primary key, the single most
+// common sort column in the whole catalog, must stay keyset-eligible.
+func TestComputeEffectiveOrder_NullablePrimaryKeySortColumnStillEligible(t *testing.T) {
+	pk := nullableCol("id", 0)
+	pk.IsPrimaryKey = true
+	columns := []model.ColumnMeta{pk, col("name", 1, false), col("created_at", 2, false)}
+	sort := structuredSort(model.SortTerm{Column: "id", Direction: "asc"})
+	got, err := ComputeEffectiveOrder(sort, columns, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.KeysetEligible {
+		t.Fatal("expected KeysetEligible = true when the nullable-per-metadata sort column is the primary key")
+	}
+}
+
+// a nullable tiebreaker column itself (not a requested sort term) is unaffected by this check —
+// AssertKeysetSupported / the caller's own tiebreaker selection is responsible for only ever
+// naming a non-nullable column (D7); this guards the requested sort terms only.
+func TestComputeEffectiveOrder_NullableNonSortColumnStillEligible(t *testing.T) {
+	columns := []model.ColumnMeta{col("id", 0, true), col("name", 1, false), nullableCol("bio", 2)}
+	sort := structuredSort(model.SortTerm{Column: "name", Direction: "asc"})
+	got, err := ComputeEffectiveOrder(sort, columns, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.KeysetEligible {
+		t.Fatal("expected KeysetEligible = true when the unrelated nullable column isn't in the sort")
 	}
 }
 

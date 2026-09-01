@@ -424,6 +424,33 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 	}
 }
 
+// P2 R2 (task #89): sorting by a nullable column must never be granted keyset pagination, even
+// when a non-nullable tiebreaker (id) is available — customers.region_id has no NOT NULL
+// constraint (tests/db/fixtures/0001_seed.sql), so a naive grant here would risk either dropping
+// any future NULL-region customer from every keyset page forever, or hard-failing a page whose
+// boundary row has a NULL region_id. Falling back to offset pagination sidesteps both failure
+// modes; RowCount must still see every customer, not just the ones with a non-NULL region_id.
+func TestPostgres_ReadSortByNullableColumnFallsBackToOffset(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	tablePath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "customers"))
+	sort := &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "region_id", Direction: "asc"}}}
+
+	p, err := a.Read(context.Background(), adapters.ReadRequest{
+		Path: tablePath, Sort: sort, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-13-nullable-sort"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	tp := p.(page.TabularPage)
+	if tp.Position.Strategy != "offset" {
+		t.Errorf("Position.Strategy = %q, want offset (region_id is nullable)", tp.Position.Strategy)
+	}
+	if tp.RowCount != 2 {
+		t.Errorf("RowCount = %d, want 2 (no row dropped by a bad keyset comparison)", tp.RowCount)
+	}
+}
+
 // 14. read: projection
 func TestPostgres_ReadProjection(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

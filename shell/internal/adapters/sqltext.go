@@ -265,13 +265,13 @@ func ComputeEffectiveOrder(sort_ *model.SortSpec, columns []model.ColumnMeta, ti
 			requestedTerms = append(requestedTerms, OrderTerm{Column: t.Column, Direction: t.Direction})
 		}
 	}
+	columnByName := make(map[string]model.ColumnMeta, len(columns))
+	for _, c := range columns {
+		columnByName[c.Name] = c
+	}
 	if len(requestedTerms) > 0 {
-		byName := make(map[string]struct{}, len(columns))
-		for _, c := range columns {
-			byName[c.Name] = struct{}{}
-		}
 		for _, t := range requestedTerms {
-			if _, ok := byName[t.Column]; !ok {
+			if _, ok := columnByName[t.Column]; !ok {
 				return EffectiveOrder{}, New(CodeNotFound, "unknown column in sort: "+t.Column, nil)
 			}
 		}
@@ -294,6 +294,29 @@ func ComputeEffectiveOrder(sort_ *model.SortSpec, columns []model.ColumnMeta, ti
 
 	if tiebreaker == nil {
 		return EffectiveOrder{Terms: requestedTerms, KeysetDirection: direction}, nil
+	}
+
+	// P2 R2 (task #89): a NULL value in a requested sort column breaks keyset comparison —
+	// `(col, pk) > (val, pk)` is SQL-UNKNOWN wherever col IS NULL, so NULL rows are silently
+	// excluded from every keyset page forever, or (if a page-boundary row itself has NULL) the
+	// cursor build hard-fails with "keyset tiebreaker column was NULL". D7 only requires the
+	// tiebreaker column to be non-nullable; it never checked the user's own requested sort
+	// columns. Falling back to the same non-keyset-eligible shape the no-tiebreaker branch above
+	// already returns keeps every downstream consumer (AssertKeysetSupported, the offset-strategy
+	// fallback, the renderer's D7 rule) working unchanged — they already handle "not eligible".
+	//
+	// A primary-key column is exempted even when its own Nullable bit is set: SQLite's
+	// `pragma_table_xinfo` reports notnull=0 for a bare `INTEGER PRIMARY KEY` column (the rowid
+	// alias) whenever the DDL doesn't spell out an explicit NOT NULL, even though SQLite itself
+	// guarantees that column can never actually hold NULL — inserting NULL into it is exactly what
+	// assigns a fresh rowid. Postgres/MySQL/MariaDB already report every primary-key column as
+	// NOT NULL, so this exemption is a no-op for them; without it, sorting by the single most
+	// common column in the whole catalog (the primary key) would wrongly lose keyset pagination on
+	// SQLite alone.
+	for _, t := range requestedTerms {
+		if col, ok := columnByName[t.Column]; ok && col.Nullable && !col.IsPrimaryKey {
+			return EffectiveOrder{Terms: requestedTerms, KeysetDirection: direction}, nil
+		}
 	}
 
 	already := make(map[string]struct{}, len(requestedTerms))
