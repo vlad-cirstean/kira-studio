@@ -771,13 +771,37 @@ Storage), `internal/adapterhost/` (the router, session and data-plane server des
 op-log event type and its two topics, relocated here from the deleted `internal/enginehost` — P58f
 D9), and `internal/metrics/`.
 
-**App-wide CPU/RSS metrics** (`internal/metrics/`, the Go analogue of Electron's
+**App-wide CPU/footprint metrics** (`internal/metrics/`, the Go analogue of Electron's
 `app.getAppMetrics()`) find this app's process set by **executable-path substring match, not a
 pid-tree walk** — a native webview's helpers (WKWebView's `com.apple.WebKit.*`, WebKitGTK's
 WebProcess/NetworkProcess) are not children of the shell in the ppid sense, so a tree walk would
 silently under-count. `AnchorNeedles` is `["Kira Studio"]` (P58f: no vendored Node child needle any
-more), `HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one system-wide
-scan per 5 s tick.
+more), `HelperNeedles` is `["com.apple.WebKit", "webkitgtk", "bwrap"]`, matched in one full
+process-table scan per 60 s (`CachedPIDs`, revalidated cheaply on every 5 s tick in between — not a
+full scan per tick). On darwin the memory figure is `ri_phys_footprint`, read via one
+`proc_pid_rusage(pid, RUSAGE_INFO_V2, …)` syscall per pid per tick — the same field, from the same
+API, Activity Monitor's own "Memory" column reads, not `pti_resident_size` ("Real Memory"/RSS, what
+this figure was before P7): each of this app's own processes maps the dyld shared cache and (for
+the WebKit helpers) the WebKit framework text, so summing RSS across the process set counts those
+shared pages once per process, while footprint is a per-task ledger that doesn't. Every other
+platform sums RSS, unchanged.
+
+**Two different, both-correct CPU conventions, and this app picks the normalized one.** Activity
+Monitor itself shows both: its per-process **"% CPU" column is an unnormalized per-core sum**
+(0…100×N, so a process pinning two cores of an 8-core Mac reads 200%), while its **CPU-load pane
+graphs the normalized figure** (0…100, a share of the machine's whole capacity). The status bar
+follows the second convention — matching the CPU-load pane, not the per-process column — because a
+one-number readout in a 4-character slot answers "how much of this Mac is the app using", and its
+tooltip states this explicitly (`StatusBar.vue`) since a user comparing against the per-process
+column will otherwise see a figure up to `logicalCPUs` times smaller and reasonably conclude the
+status bar is wrong.
+
+**Neither convention accounts for core frequency or Apple silicon's P/E asymmetry.** A normalized
+percentage is a share of total core-*seconds*, not a share of compute capability: four E cores at
+1 GHz and four P cores at 4.5 GHz can both read "400%" for very different amounts of actual work.
+Activity Monitor has the same limitation, so matching its own accounting is still the right call —
+this is a property of the underlying `% CPU`/`ri_user_time` accounting itself, not a bug this app's
+readout could fix by reading something else.
 
 **The JSON-inflation regression named in earlier phases was fixed and measured in its time, not
 merely claimed — and has since been superseded, not merely improved on.** The old Node-engine-over-
