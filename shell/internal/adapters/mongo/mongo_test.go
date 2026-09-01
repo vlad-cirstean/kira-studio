@@ -377,6 +377,55 @@ func TestMongo_Read_Filter(t *testing.T) {
 	}
 }
 
+// P2 R2 (task #94): a scalar _id filter (a single-document lookup) combined with a keyset
+// pagination token used to be silently dropped — read.go's old merge only recognized an existing
+// _id value shaped as an operator document, so a bare scalar failed that type assertion and the
+// keyset boundary condition overwrote it outright. A hand-minted token (matching the fingerprint
+// readPage itself computes from path/filter/sort/pageSize) exercises the exact request shape a
+// client legitimately resuming keyset pagination alongside a scalar _id filter would send, without
+// depending on the current UI's own token-reset behavior to ever construct one. widget-9's _id
+// sorts past widget-4 (the keyset boundary chosen below): if the scalar filter survives the merge,
+// only widget-9 comes back; if it was dropped, every widget past the boundary would match instead.
+func TestMongo_Read_KeysetWithScalarIDFilter(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	a := connectedAdapter(t, fixture)
+	path := nodePath(fixture, seg("database", testsupport.MongoDatabase), seg("collection", "widgets"))
+
+	filter := `{ _id: ObjectId("000000000000000000000009") }`
+	fingerprint := adapters.RequestFingerprint(struct {
+		Path     string          `json:"path"`
+		Filter   *string         `json:"filter"`
+		Sort     *model.SortSpec `json:"sort"`
+		PageSize int             `json:"pageSize"`
+	}{"widgets", &filter, nil, 10})
+	boundary, err := bson.ObjectIDFromHex("000000000000000000000004") // widget-4
+	if err != nil {
+		t.Fatalf("ObjectIDFromHex: %v", err)
+	}
+	boundaryText, err := mongoadapter.IDText(boundary)
+	if err != nil {
+		t.Fatalf("IDText: %v", err)
+	}
+	token := adapters.EncodePageToken([]string{boundaryText}, fingerprint)
+
+	req := adapters.ReadRequest{
+		Path: path, Filter: &filter, PageSize: 10,
+		Cursor: model.PageCursor{Mode: "after", Token: token},
+	}
+	p, err := a.Read(context.Background(), req, adapters.NewOpCtx("op-13"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	docPage := p.(page.DocumentPage)
+	if docPage.RowCount != 1 {
+		t.Fatalf("RowCount = %d, want 1 (the scalar _id filter must survive the keyset merge)", docPage.RowCount)
+	}
+	body := docBodyAt(t, docPage, 0)
+	if body == nil || !strings.Contains(*body, `"name":"widget-9"`) {
+		t.Errorf("row body = %v, want widget-9", derefStr(body))
+	}
+}
+
 // count: estimate (no filter) vs exact (filtered)
 func TestMongo_Count(t *testing.T) {
 	fixture := testsupport.StartMongo(t)

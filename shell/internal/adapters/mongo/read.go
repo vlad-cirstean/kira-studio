@@ -115,12 +115,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 		if scanDirection == -1 {
 			cmpOp = "$lt"
 		}
-		existingID, _ := lookupField(baseFilter, "_id")
-		idCond := bson.D{{Key: cmpOp, Value: boundaryID}}
-		if existingD, ok := existingID.(bson.D); ok {
-			idCond = append(append(bson.D{}, existingD...), idCond...)
-		}
-		filter = setField(baseFilter, "_id", idCond)
+		filter = mergeKeysetIDCondition(baseFilter, cmpOp, boundaryID)
 	}
 
 	limit, err := adapters.SafeInt(req.PageSize+1, "page size") // D24's +1 probe, mirroring the SQL adapters
@@ -284,6 +279,23 @@ func lookupField(d bson.D, key string) (any, bool) {
 		}
 	}
 	return nil, false
+}
+
+// mergeKeysetIDCondition combines the keyset boundary condition ($gt/$lt boundaryID) for _id with
+// whatever _id constraint the caller's own filter already carries. P2 R2 (task #94): the previous
+// version only handled an existing operator document (e.g. {"_id": {"$in": [...]}}) — it type-
+// asserted the existing value as bson.D and merged its operators in, but a scalar _id (a
+// single-document lookup, e.g. {"_id": ObjectId("...")}) failed that assertion and was silently
+// discarded when setField then overwrote the _id key outright. Wrapping in $and instead of trying
+// to fold both into one _id document handles either shape without dropping anything, and also
+// avoids two conflicting keys under the same _id document if the filter's own operator document
+// already used the same comparison operator the keyset boundary needs.
+func mergeKeysetIDCondition(baseFilter bson.D, cmpOp string, boundaryID any) bson.D {
+	if _, hasExistingID := lookupField(baseFilter, "_id"); !hasExistingID {
+		return setField(baseFilter, "_id", bson.D{{Key: cmpOp, Value: boundaryID}})
+	}
+	idCond := bson.D{{Key: "_id", Value: bson.D{{Key: cmpOp, Value: boundaryID}}}}
+	return bson.D{{Key: "$and", Value: bson.A{baseFilter, idCond}}}
 }
 
 // setField returns a copy of d with key set to value, appended if absent.
