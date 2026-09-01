@@ -1098,6 +1098,41 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
     ['tenant 1 / entity 1', 'tenant 2 / entity 1'].sort(),
   );
 
+  // =============================================================================================
+  // P2 R1: the same [0,1,2] row range as above, but built by a real mousedown -> mouseenter ->
+  // mouseup drag across the gutter instead of shift-click. DataGrid.vue's onGutterMouseDown/
+  // onGutterMouseEnter used to close over rowVm.row via a template call expression; they now read
+  // it back off the row's own data-row attribute instead — a wrong attribute name here would fail
+  // silently (no range ever forms) rather than throwing, so this is real coverage for that
+  // rebinding, not just the click-based row selection already exercised above.
+  // =============================================================================================
+  await gutterCell(page, 0).hover();
+  await page.mouse.down();
+  await gutterCell(page, 1).hover();
+  await gutterCell(page, 2).hover();
+  await page.mouse.up();
+  await rightClick(gutterCell(page, 1)); // inside the dragged-out [0,1,2] range -> acts on all 3
+  await openSubmenu(page, 'copy-rows');
+  await page.click('[data-testid="menu-item-copy-rows-tsv"]');
+  const draggedRowsTsv = await clipboardText(page);
+  expect(draggedRowsTsv.split('\n')).toHaveLength(3);
+  expect(draggedRowsTsv).toContain('tenant 1 / entity 1');
+  expect(draggedRowsTsv).toContain('tenant 1 / entity 2');
+  expect(draggedRowsTsv).toContain('tenant 2 / entity 1');
+
+  // Same drag gesture over grid cells instead of the gutter (onCellMouseDown/onCellMouseEnter) —
+  // a same-column, multi-row drag keeps the resulting .selected count unambiguous: exactly one
+  // cell per row.
+  await gridCell(page, 0, 'name').hover();
+  await page.mouse.down();
+  await gridCell(page, 1, 'name').hover();
+  await gridCell(page, 2, 'name').hover();
+  await page.mouse.up();
+  await expect(page.locator('[data-testid="grid-cell"].selected')).toHaveCount(3);
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/selected/);
+  await expect(gridCell(page, 1, 'name')).toHaveClass(/selected/);
+  await expect(gridCell(page, 2, 'name')).toHaveClass(/selected/);
+
   // D6: Duplicate row(s) — non-PK columns copied, PK columns left blank.
   await gutterCell(page, 0).click();
   await rightClick(gutterCell(page, 0));

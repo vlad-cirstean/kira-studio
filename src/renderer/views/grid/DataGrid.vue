@@ -846,6 +846,105 @@ function extendFromPoint(x: number, y: number): void {
   extendSelectionTo(row, col);
 }
 
+// P2 R1: every per-cell/per-row/per-header-column template handler below reads its row/col back
+// off the element's own data-row/data-col-index/data-column attributes instead of closing over the
+// v-for loop variable — the same trick extendFromPoint above already uses. A call expression that
+// closes over a loop variable (`@click="onCellClick(rowVm.row, cellVm.col, $event)"`, what these
+// used to be) can never be cached by Vue's compiler (compiler-core's hasScopeRef bails out on any
+// v-for-scoped reference) and gets a brand-new wrapper closure allocated for every one of the
+// potentially hundreds of visible cells on every render this component does for any reason
+// (scroll included). A bound identifier (`@click="onCellClickFromEvent"`) is a stable reference
+// Vue passes straight through with no per-render allocation at all.
+function cellCoordsFromTarget(e: Event): { row: number; col: number } | null {
+  const el = e.currentTarget as HTMLElement | null;
+  if (!el) return null;
+  const row = Number(el.dataset.row);
+  const col = Number(el.dataset.colIndex);
+  return Number.isNaN(row) || Number.isNaN(col) ? null : { row, col };
+}
+
+function rowFromTarget(e: Event): number | null {
+  const el = e.currentTarget as HTMLElement | null;
+  if (!el) return null;
+  const row = Number(el.dataset.row);
+  return Number.isNaN(row) ? null : row;
+}
+
+function onCellMouseDownFromEvent(e: MouseEvent): void {
+  const c = cellCoordsFromTarget(e);
+  if (c) onCellMouseDown(c.row, c.col, e);
+}
+
+function onCellMouseEnterFromEvent(e: MouseEvent): void {
+  const c = cellCoordsFromTarget(e);
+  if (c) onCellMouseEnter(c.row, c.col);
+}
+
+function onCellClickFromEvent(e: MouseEvent): void {
+  const c = cellCoordsFromTarget(e);
+  if (c) onCellClick(c.row, c.col, e);
+}
+
+function onCellDblClickFromEvent(e: MouseEvent): void {
+  const c = cellCoordsFromTarget(e);
+  if (c) onCellDblClick(c.row, c.col);
+}
+
+function onCellContextMenuFromEvent(e: MouseEvent): void {
+  const c = cellCoordsFromTarget(e);
+  if (c) onCellContextMenu(c.row, c.col, e);
+}
+
+// The nav button sits inside .grid-cell, so its own currentTarget carries no row/col of its own
+// (only data-nav-kind) — closest() finds the ancestor cell that does, same as extendFromPoint.
+function onCellNavClickFromEvent(e: MouseEvent): void {
+  const btn = e.currentTarget as HTMLElement | null;
+  const cellEl = btn?.closest<HTMLElement>('.grid-cell[data-row]');
+  if (!cellEl) return;
+  const row = Number(cellEl.dataset.row);
+  const col = Number(cellEl.dataset.colIndex);
+  if (Number.isNaN(row) || Number.isNaN(col)) return;
+  onCellNavClick(row, col, e);
+}
+
+function onGutterMouseDownFromEvent(e: MouseEvent): void {
+  const row = rowFromTarget(e);
+  if (row !== null) onGutterMouseDown(row, e);
+}
+
+function onGutterMouseEnterFromEvent(e: MouseEvent): void {
+  const row = rowFromTarget(e);
+  if (row !== null) onGutterMouseEnter(row);
+}
+
+function onGutterClickFromEvent(e: MouseEvent): void {
+  const row = rowFromTarget(e);
+  if (row !== null) onGutterClick(row, e);
+}
+
+function onGutterContextMenuFromEvent(e: MouseEvent): void {
+  const row = rowFromTarget(e);
+  if (row !== null) onGutterContextMenu(row, e);
+}
+
+function onHeaderClickFromEvent(e: MouseEvent): void {
+  const el = e.currentTarget as HTMLElement | null;
+  const name = el?.dataset.column;
+  if (name) onHeaderClick(name);
+}
+
+function onHeaderContextMenuFromEvent(e: MouseEvent): void {
+  const el = e.currentTarget as HTMLElement | null;
+  const col = Number(el?.dataset.colIndex);
+  if (!Number.isNaN(col)) onHeaderContextMenu(col, e);
+}
+
+function onHeaderSelectClickFromEvent(e: MouseEvent): void {
+  const el = e.currentTarget as HTMLElement | null;
+  const col = Number(el?.dataset.colIndex);
+  if (!Number.isNaN(col)) onHeaderSelectClick(col, e);
+}
+
 function autoScrollTick(): void {
   if (!dragMode) {
     autoScrollRaf = 0;
@@ -1593,14 +1692,15 @@ defineExpose({ scrollCellIntoView });
           class="header-cell"
           data-testid="grid-header-cell"
           :data-column="columnOrder[c]"
+          :data-col-index="c"
           :data-sort="currentSortDirection(columnOrder[c]) ?? undefined"
           v-tooltip="headerTooltips.get(columnOrder[c])"
           :style="{
             left: `${GUTTER_WIDTH + offsets[c]}px`,
             width: `${offsets[c + 1] - offsets[c]}px`,
           }"
-          @click="onHeaderClick(columnOrder[c])"
-          @contextmenu.prevent="onHeaderContextMenu(c, $event)"
+          @click="onHeaderClickFromEvent"
+          @contextmenu.prevent="onHeaderContextMenuFromEvent"
         >
           <span class="header-label">{{ columnOrder[c] }}</span>
           <span
@@ -1628,7 +1728,8 @@ defineExpose({ scrollCellIntoView });
             class="header-select-zone"
             data-testid="grid-header-select"
             :data-column="columnOrder[c]"
-            @click.stop="onHeaderSelectClick(c, $event)"
+            :data-col-index="c"
+            @click.stop="onHeaderSelectClickFromEvent"
           />
           <span
             class="resize-handle"
@@ -1664,10 +1765,10 @@ defineExpose({ scrollCellIntoView });
           :data-row="rowVm.row"
           :class="{ dirty: rowVm.dirty, deleted: rowVm.deleted }"
           :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
-          @mousedown="onGutterMouseDown(rowVm.row, $event)"
-          @mouseenter="onGutterMouseEnter(rowVm.row)"
-          @click="onGutterClick(rowVm.row, $event)"
-          @contextmenu.prevent="onGutterContextMenu(rowVm.row, $event)"
+          @mousedown="onGutterMouseDownFromEvent"
+          @mouseenter="onGutterMouseEnterFromEvent"
+          @click="onGutterClickFromEvent"
+          @contextmenu.prevent="onGutterContextMenuFromEvent"
         >
           {{ rowVm.gutterNumber }}
         </div>
@@ -1687,11 +1788,11 @@ defineExpose({ scrollCellIntoView });
             scrollMarginTop: `${rowHeight}px`,
             color: cellVm.color || undefined,
           }"
-          @mousedown="onCellMouseDown(rowVm.row, cellVm.col, $event)"
-          @mouseenter="onCellMouseEnter(rowVm.row, cellVm.col)"
-          @click="onCellClick(rowVm.row, cellVm.col, $event)"
-          @dblclick="onCellDblClick(rowVm.row, cellVm.col)"
-          @contextmenu.prevent="onCellContextMenu(rowVm.row, cellVm.col, $event)"
+          @mousedown="onCellMouseDownFromEvent"
+          @mouseenter="onCellMouseEnterFromEvent"
+          @click="onCellClickFromEvent"
+          @dblclick="onCellDblClickFromEvent"
+          @contextmenu.prevent="onCellContextMenuFromEvent"
         >
           <input
             v-if="cellVm.editing"
@@ -1723,7 +1824,7 @@ defineExpose({ scrollCellIntoView });
             data-testid="cell-nav-button"
             :data-nav-kind="cellVm.navKind"
             :aria-label="cellVm.navKind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
-            @click.stop="onCellNavClick(rowVm.row, cellVm.col, $event)"
+            @click.stop="onCellNavClickFromEvent"
           >
             <CodiconIcon :name="cellVm.navKind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
           </button>
