@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,6 +45,29 @@ var (
 	cellAt       = testsupport.CellAt
 	strp         = testsupport.Strp
 )
+
+// flippingCtx reports ctx.Err() as nil for the first `after` calls, then as context.Canceled for
+// every call after that — Done() always returns nil (never fires), so RunWithAbortRace's own
+// select (abort.go) never treats a call through this ctx as cancelled mid-flight; only the
+// synchronous CheckNotStarted-style pre-checks (query.go's runCommand) ever observe the flip. This
+// lets a test force a cancellation to land at an exact, deterministic point in mutate()'s own
+// sequence of CheckNotStarted-gated calls (the catalog lookup inside getReadTarget, then START
+// TRANSACTION, then each compiled row op, then COMMIT) without any sleep or goroutine race — which
+// of those calls is "START TRANSACTION" isn't part of this package's exported surface, so a test
+// sweeps every plausible index instead of hardcoding one.
+type flippingCtx struct {
+	context.Context
+	calls *int32
+	after int32
+}
+
+func (c flippingCtx) Err() error {
+	if atomic.AddInt32(c.calls, 1) > c.after {
+		return context.Canceled
+	}
+	return nil
+}
+func (c flippingCtx) Done() <-chan struct{} { return nil }
 
 func nodePath(connectionID string, segments ...model.PathSegment) model.NodePath {
 	return testsupport.NodePath(connectionID, segments...)
@@ -404,6 +428,97 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeNotFound {
 			t.Fatalf("got %v, want E_NOT_FOUND", err)
+		}
+	})
+
+	// P2 R2: a cancellation landing between START TRANSACTION and COMMIT left neither COMMIT nor
+	// the compensating ROLLBACK ever reaching the server — both are gated by the same
+	// CheckNotStarted check COMMIT itself is, so an already-observed-as-cancelled ctx short-
+	// circuits ROLLBACK exactly like it does COMMIT. Because this adapter's *sql.Conn is pinned
+	// for its whole lifetime (SetMaxOpenConns(1)), the server session was then left inside that
+	// still-open transaction indefinitely: the next Mutate's own START TRANSACTION landed inside
+	// it, so its COMMIT silently committed the earlier cancelled write too — worse than a hang.
+	// flippingCtx sweeps every plausible cancellation point and, for whichever ones actually
+	// trigger (an error from Mutate), proves the transaction was really rolled back: a clean
+	// follow-up Mutate on a different row must succeed quickly and must not also commit the
+	// earlier row's cancelled change.
+	t.Run("mutate: a cancellation between START TRANSACTION and COMMIT does not leak an open transaction", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		tablePath := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items"))
+
+		readQuantity := func(id string) string {
+			t.Helper()
+			p, err := a.Read(context.Background(), adapters.ReadRequest{
+				Path: tablePath, Projection: []string{"quantity"}, PageSize: 10,
+				Filter: strp("id = " + id), Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+			}, adapters.NewOpCtx("op-15-verify-"+id))
+			if err != nil {
+				t.Fatalf("Read(id=%s): %v", id, err)
+			}
+			got := cellAt(t, p.(page.TabularPage), 0, 0)
+			if got == nil {
+				t.Fatalf("Read(id=%s): no row", id)
+			}
+			return *got
+		}
+		baseline := readQuantity("1")
+
+		for after := int32(1); after <= 12; after++ {
+			plan := model.MutationPlan{
+				Path: tablePath,
+				Ops: []model.MutationRowOp{
+					{Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}}, Changes: model.RowValues{{Name: "quantity", Value: strp("77")}}},
+				},
+			}
+			var calls int32
+			ctx := flippingCtx{Context: context.Background(), calls: &calls, after: after}
+			_, err := a.Mutate(ctx, plan, adapters.NewOpCtx("op-15-cancel"))
+			if err == nil {
+				// This `after` fell past every CheckNotStarted check mutate() makes (COMMIT
+				// included) — the mutate ran to completion normally. Reset row 1 and move on.
+				if got := readQuantity("1"); got != "77" {
+					t.Fatalf("after=%d: Mutate reported success but quantity = %s, want 77", after, got)
+				}
+				if _, err := a.Mutate(context.Background(), model.MutationPlan{
+					Path: tablePath,
+					Ops: []model.MutationRowOp{
+						{Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("1")}}, Changes: model.RowValues{{Name: "quantity", Value: strp(baseline)}}},
+					},
+				}, adapters.NewOpCtx("op-15-reset")); err != nil {
+					t.Fatalf("after=%d: reset Mutate: %v", after, err)
+				}
+				continue
+			}
+
+			// A cancellation landed somewhere at or before COMMIT. The load-bearing assertion: a
+			// completely unrelated follow-up Mutate, on a real ctx, must complete quickly rather
+			// than hang behind a stale open transaction on the pinned connection...
+			verifyCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err = a.Mutate(verifyCtx, model.MutationPlan{
+				Path: tablePath,
+				Ops: []model.MutationRowOp{
+					{Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("2")}}, Changes: model.RowValues{{Name: "quantity", Value: strp("55")}}},
+				},
+			}, adapters.NewOpCtx("op-15-followup"))
+			cancel()
+			if err != nil {
+				t.Fatalf("after=%d: follow-up Mutate on a different row: %v (the earlier cancellation left a stale open transaction)", after, err)
+			}
+			// ...and it must not silently commit row 1's own cancelled write along with it — proof
+			// the cancelled transaction was actually rolled back, not left dangling for this
+			// commit to close.
+			if got := readQuantity("1"); got != baseline {
+				t.Fatalf("after=%d: row 1 quantity = %s after a cancelled Mutate + unrelated follow-up, want unchanged %s (the cancelled write leaked into the follow-up's commit)", after, got, baseline)
+			}
+			// Restore row 2 for the next iteration.
+			if _, err := a.Mutate(context.Background(), model.MutationPlan{
+				Path: tablePath,
+				Ops: []model.MutationRowOp{
+					{Kind: "update", Key: model.RowValues{{Name: "id", Value: strp("2")}}, Changes: model.RowValues{{Name: "quantity", Value: strp("1")}}},
+				},
+			}, adapters.NewOpCtx("op-15-reset-2")); err != nil {
+				t.Fatalf("after=%d: reset row 2: %v", after, err)
+			}
 		}
 	})
 

@@ -142,23 +142,37 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	if _, err := execCommand("BEGIN", nil); err != nil {
 		return model.MutationResult{}, err
 	}
+	// P2 R2: the ad-hoc `_, _ = execCommand("ROLLBACK", nil)` this replaced ran ROLLBACK through
+	// execCommand/runCommand, which refuses on an already-cancelled ctx the same way COMMIT does
+	// (CheckNotStarted) — a cancellation mid-loop or racing the COMMIT call left neither COMMIT nor
+	// ROLLBACK ever reaching the server, and conn is pinned for this adapter's lifetime, so the next
+	// op on it ran inside that same stale, still-open transaction. Mirrors console.go's execute()
+	// cleanup: a detached, timeout-bounded ctx so this always reaches the server regardless of the
+	// caller's own ctx state.
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+		defer cancel()
+		_, _ = conn.Exec(cleanupCtx, "ROLLBACK")
+	}()
 	var affectedRows int64
 	for _, c := range compiled {
 		rowCount, err := execCommand(c.sql, c.params)
 		if err != nil {
-			_, _ = execCommand("ROLLBACK", nil)
 			return model.MutationResult{}, err
 		}
 		if err := adapters.AssertAffectedExactlyOne(c.kind, rowCount); err != nil {
-			_, _ = execCommand("ROLLBACK", nil)
 			return model.MutationResult{}, err
 		}
 		affectedRows += rowCount
 	}
 	if _, err := execCommand("COMMIT", nil); err != nil {
-		_, _ = execCommand("ROLLBACK", nil)
 		return model.MutationResult{}, err
 	}
+	committed = true
 	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
 }
 

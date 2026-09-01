@@ -405,6 +405,15 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P2 R2's "cancellation between BEGIN IMMEDIATE and COMMIT" regression test lives in
+	// mutate_internal_test.go (package sqlite), not here: runOnConn (B8) deliberately never lets
+	// Adapter.Mutate's own outer ctx reach mutate()'s internals — its work runs on an adapter-owned
+	// driverCtx, cancelled only by Adapter.Cancel or the goroutine's own completion (abort.go's
+	// RunWithAbortRace doc comment calls this sqlite's "opposite polarity" versus postgres/mysql).
+	// A black-box flippingCtx passed to a.Mutate here only races runOnConn's own "caller gave up"
+	// check — it never lands inside mutate()'s BEGIN IMMEDIATE/COMMIT sequence, so it cannot
+	// exercise the fix. Only a direct, same-package call to mutate() can.
+
 	// no_pk_rowid is a genuine no-PK rowid table already in the seed data — used directly rather
 	// than creating a throwaway probe table, unlike M6.2's own postgres/mysql-family suites (both
 	// of which had to build one because their own seeded "events"-shaped table had a real PK).

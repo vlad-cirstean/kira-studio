@@ -3,11 +3,20 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/kirathecat/kira-studio/shell/internal/adapters"
 	"github.com/kirathecat/kira-studio/shell/internal/page"
 	"github.com/kirathecat/kira-studio/shell/internal/storage/model"
 )
+
+// endTransactionTimeout bounds mutate's own cleanup ROLLBACK (P2 R2), mirroring postgres/console.go
+// and mysqlfamily/console.go's identically-named const: it must run even when the op's own ctx is
+// already cancelled (Stop pressed mid-batch, or the op's deadline expired), since database/sql's
+// ExecContext refuses outright on an already-done ctx without ever reaching the driver — skipping
+// this would leave the op's *sql.Conn (returned to runOnConn's pool, not closed) sitting inside a
+// stale, still-open BEGIN IMMEDIATE for whatever op the pool hands that conn to next.
+const endTransactionTimeout = 5 * time.Second
 
 // literalRenderer adapts sqlmutate.go's LiteralRenderer to the adapters.ValueRenderer shape
 // RenderRowOp expects — preview() never touches params, so this closure just ignores it.
@@ -127,22 +136,36 @@ func mutate(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, readOnly bo
 	if err := execLiteral(ctx, conn, "BEGIN IMMEDIATE"); err != nil {
 		return model.MutationResult{}, err
 	}
+	// P2 R2: the ad-hoc `_ = execLiteral(ctx, conn, "ROLLBACK")` this replaced ran on the same ctx as
+	// everything else — database/sql's ExecContext refuses outright on an already-cancelled ctx
+	// without ever reaching the driver, so a cancellation mid-loop or racing COMMIT left neither
+	// COMMIT nor ROLLBACK ever executed. conn is then returned to runOnConn's pool (not closed) still
+	// inside that BEGIN IMMEDIATE, so the next op to get this conn back finds it already in a
+	// transaction. A detached, timeout-bounded ctx (mirrors postgres/mysqlfamily console.go's own
+	// cleanup) guarantees this always runs regardless of the caller's own ctx state.
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+		defer cancel()
+		_ = execLiteral(cleanupCtx, conn, "ROLLBACK")
+	}()
 	var affectedRows int64
 	for _, c := range compiled {
 		n, err := runCommand(ctx, conn, c.sql, c.params, op, true)
 		if err != nil {
-			_ = execLiteral(ctx, conn, "ROLLBACK") // best-effort, mirrors the other SQL adapters
 			return model.MutationResult{}, err
 		}
 		if err := adapters.AssertAffectedExactlyOne(c.kind, n); err != nil {
-			_ = execLiteral(ctx, conn, "ROLLBACK")
 			return model.MutationResult{}, err
 		}
 		affectedRows += n
 	}
 	if err := execLiteral(ctx, conn, "COMMIT"); err != nil {
-		_ = execLiteral(ctx, conn, "ROLLBACK")
 		return model.MutationResult{}, err
 	}
+	committed = true
 	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
 }
