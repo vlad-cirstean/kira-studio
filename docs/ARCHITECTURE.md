@@ -503,6 +503,18 @@ removed by user request as unwanted background work rather than kept as an opt-o
 **Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
 *Clear caches* action.
 
+**A fourth, renderer-side tier, deliberately unbudgeted (P5).** The three tiers above are all
+Go-side and byte-budgeted (L2's own `> budget/2` refusal rule). The renderer keeps its own copy —
+five page stores (`views/shared/page/store.ts`, one per page kind, §"UI architecture" below) each
+holding one loaded page per open tab, plus `views/shared/document/rows.ts`'s parsed-tree cache for
+document bodies — released on tab close, and now (P5 C3) pruned to the rendered window as a tab
+scrolls, in all five stores rather than the two (grid, console) that had it before. It has **no
+byte budget of any kind**, which is a deliberate consequence of an earlier decision (`docs/PERF.md`
+§2.2's lever L-B: evicting a cold tab's page was declined twice, on the stated trade of RAM for the
+≤ 50 ms cached-tab-switch interaction budget) — not an oversight P5 left unfixed. Ten tabs of large
+pages is real, uncapped renderer memory; `docs/v1.1/plans/P5-ram-usage.md` §8 OQ-2 hands the actual
+follow-up (surfacing this figure next to the status bar's own cache size, not eviction) to P7.
+
 ## UI architecture
 
 Distilled facts about how the workbench is put together — not a restatement of `docs/v1/SPEC.md`
@@ -568,7 +580,9 @@ per-tab runtime store (`createRuntimeStore`) owns `setActionError`/`toggleSearch
 `load()` except Browse (which supersedes by `loadSeq`, not `opId`, and has no `E_CANCELLED`
 branch — a genuinely different shape, not a missed adoption); `views/shared/page/store.ts` is the
 one two-level page-cache implementation behind all five page modules (grid, documents, keyvalue,
-stream, console); `views/shared/immediateMutation.ts` is the one write body behind documents/
+stream, console), and (P5 C3) its visible-window pruning is now wired into the view side of all
+five, not just grid's and console's — documents also prunes `views/shared/document/rows.ts`'s own
+parsed-tree cache to the same window; `views/shared/immediateMutation.ts` is the one write body behind documents/
 keyvalue/stream's ten immediate-mutation functions; `views/shared/page/Pager.vue` is the one pager
 behind both the SQL grid and the document list (previously two independently-maintained
 prev/next/count implementations); `views/shared/document/DocumentRow.vue` is the one Mongo
