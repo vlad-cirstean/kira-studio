@@ -963,6 +963,90 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 	}
 }
 
+// P15 C5: the fake-data generator's own batch scale (docs/v1.1/plans/P15-fake-data-generator.md) —
+// this belongs under AGENTS.md's conformance-suite exemption, not the general unit-test bar,
+// because nothing else exercises a multi-row insert plan at anything beyond
+// TestPostgres_MutateRowCountConflictRollsBack's two-op scale.
+func TestPostgres_MutateBulkInsertPlanCommitsAtomically(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	tablePath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "customers"))
+
+	// The container is memoized across this whole file (TestMain), so the 200 rows this test
+	// inserts must not outlive it — TestPostgres_ExecuteOnePagePerStatement's own RowCount == 2
+	// assertion depends on `customers` being back at its seeded size.
+	t.Cleanup(func() {
+		probe, err := pgx.Connect(context.Background(), fixture.URI)
+		if err != nil {
+			t.Logf("cleanup probe connect: %v", err)
+			return
+		}
+		defer probe.Close(context.Background())
+		if _, err := probe.Exec(context.Background(),
+			"DELETE FROM app.customers WHERE name LIKE 'Fixture Customer %' OR name LIKE 'Should Roll Back %'",
+		); err != nil {
+			t.Logf("cleanup delete: %v", err)
+		}
+	})
+
+	countCustomers := func(label string) int64 {
+		t.Helper()
+		result, err := a.Count(context.Background(), adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-29-count-"+label))
+		if err != nil {
+			t.Fatalf("Count(%s): %v", label, err)
+		}
+		return result.Value
+	}
+	before := countCustomers("before")
+
+	// A 200-op insert plan omitting `id` (a serial PK) entirely — the proof that D4 rule 2's "skip
+	// the serial PK" produces a plan a real server actually accepts, in one transaction
+	// (Caps.Transactions == true for postgres, F2/F3).
+	const rowCount = 200
+	ops := make([]model.MutationRowOp, rowCount)
+	for i := 0; i < rowCount; i++ {
+		ops[i] = model.MutationRowOp{
+			Kind:   "insert",
+			Values: model.RowValues{{Name: "name", Value: strp("Fixture Customer " + strconv.Itoa(i))}},
+		}
+	}
+	result, err := a.Mutate(context.Background(), model.MutationPlan{Path: tablePath, Ops: ops}, adapters.NewOpCtx("op-29-insert"))
+	if err != nil {
+		t.Fatalf("Mutate: %v", err)
+	}
+	if result.AffectedRows != rowCount {
+		t.Errorf("AffectedRows = %d, want %d", result.AffectedRows, rowCount)
+	}
+	afterInsert := countCustomers("after-insert")
+	if afterInsert != before+int64(rowCount) {
+		t.Errorf("Count after insert = %d, want %d", afterInsert, before+int64(rowCount))
+	}
+
+	// A second 200-op plan whose 150th op names an unknown column — F3's transactional half, at
+	// batch scale: the whole plan must be rejected, leaving the row count exactly as it was.
+	badOps := make([]model.MutationRowOp, rowCount)
+	for i := 0; i < rowCount; i++ {
+		if i == 149 {
+			badOps[i] = model.MutationRowOp{
+				Kind:   "insert",
+				Values: model.RowValues{{Name: "no_such_column", Value: strp("x")}},
+			}
+			continue
+		}
+		badOps[i] = model.MutationRowOp{
+			Kind:   "insert",
+			Values: model.RowValues{{Name: "name", Value: strp("Should Roll Back " + strconv.Itoa(i))}},
+		}
+	}
+	if _, err := a.Mutate(context.Background(), model.MutationPlan{Path: tablePath, Ops: badOps}, adapters.NewOpCtx("op-29-insert-bad")); err == nil {
+		t.Fatal("expected an error for the unknown column")
+	}
+	afterFailure := countCustomers("after-failure")
+	if afterFailure != afterInsert {
+		t.Errorf("Count after failed batch = %d, want unchanged at %d (rollback failed)", afterFailure, afterInsert)
+	}
+}
+
 // 28. execute: one page per statement, including a non-row-returning one.
 func TestPostgres_ExecuteOnePagePerStatement(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
