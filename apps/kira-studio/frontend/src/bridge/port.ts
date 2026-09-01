@@ -78,11 +78,11 @@ socket.onopen = () => resolveReady();
 // P11: decodeFrame throws on a corrupt or truncated frame (a mismatched "KIF1" file identifier,
 // a missing required field) — genuinely reachable, not just a defensive check. This callback runs
 // synchronously from DOM event dispatch, which swallows a listener's throw into an uncaught-error
-// report rather than routing it anywhere a promise could see it, so the try/catch here (P2 R2's
-// same fix, now around decodeFrame instead of reviveChunks) is what keeps a bad frame from
-// leaving some pending request hanging forever. A frame that fails to decode has no reliably
-// extractable id to reject a specific request with either, so it is dropped — the same move
-// dataframe.go's own probe-decode makes on an unparseable frame.
+// report rather than routing it anywhere a promise could see it, so the try/catch here (the same
+// shape as P2 R2's fix for the pre-P11 decoder) is what keeps a bad frame from leaving some
+// pending request hanging forever. A frame that fails to decode has no reliably extractable id to
+// reject a specific request with either, so it is dropped — the same move dataframe.go's own
+// probe-decode makes on an unparseable frame.
 socket.onmessage = (ev: MessageEvent<unknown>) => {
   try {
     handleMessage(decodeFrame(new Uint8Array(ev.data as ArrayBuffer)));

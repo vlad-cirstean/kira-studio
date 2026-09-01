@@ -9,7 +9,7 @@ import { IPC } from './ipcChannels';
 
 // The real Wails runtime, served under /wails/ so the app's own `import ... from
 // '/wails/runtime.js'` (control.ts, port.ts, every generated binding) loads real
-// Call/Events/Stream/JSONStream logic in the browser — not a hand-rolled stand-in of it.
+// Call/Events/Stream logic in the browser — not a hand-rolled stand-in of it.
 //
 // This is NOT `node_modules/@wailsio/runtime/dist/index.js` — that package is the *unbundled* ESM
 // source (a dozen files, each `import`ing its siblings by relative path), meant to be bundled

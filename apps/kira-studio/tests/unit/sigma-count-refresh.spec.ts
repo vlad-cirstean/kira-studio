@@ -6,7 +6,7 @@
 // entry until it fell out of cache entirely. This file pins the fix across all three.
 //
 // Filename note: importing state/tabs.ts here pulls in bridge/control.ts, which (like bridge/
-// data.ts) reaches bridge/port.ts's module-scope `JSONStream('engine')` singleton call — the same
+// data.ts) reaches bridge/port.ts's module-scope `Stream('engine')` singleton call — the same
 // shared-module-registry hazard wailsRuntime.ts's own comment documents for bridge-port.spec.ts.
 // Several candidate names for this file (view-state-count-refresh.spec.ts, count-refresh.spec.ts)
 // were empirically found to perturb bun test's file-loading order enough to make bridge-port.

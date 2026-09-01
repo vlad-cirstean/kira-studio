@@ -97,7 +97,7 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await expect(firstIdCell).toHaveText('1');
 
   // P56's own named symptom ("engine connecting" forever) turning `ok` is the single clearest
-  // signal the whole stack — bridge/port.ts's JSONStream, the Go stream, the vendored Node
+  // signal the whole stack — bridge/port.ts's Stream, the Go stream, the vendored Node
   // engine — is really wired, not stubbed (P57-e2e-revisit.md §3.3).
   await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
     timeout: 15_000,

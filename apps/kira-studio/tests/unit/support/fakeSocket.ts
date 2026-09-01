@@ -1,5 +1,5 @@
 /**
- * A controllable stand-in for the `JSONSocket` `JSONStream("engine")` returns
+ * A controllable stand-in for the socket `Stream("engine")` returns
  * (`@wailsio/runtime`'s `stream.js`), used directly here by `bridge-port.spec.ts` and reused
  * (P57 §5.4: "shared, not duplicated") by `tests/ui/support/mockStream.ts`'s
  * `window._wails.streamFactory` injection. Deliberately dependency-free — no imports beyond
@@ -7,13 +7,13 @@
  * `tests/ipc/support/mockPort.ts`'s `page.evaluate` closures already have to be.
  *
  * A real `EventTarget`, not a plain object with bare `on*` fields: here in `tests/unit/`, port.ts
- * never reaches the real `JSONStream` at all (`wailsRuntime.ts` mocks the whole module), so a bare
+ * never reaches the real `Stream` at all (`wailsRuntime.ts` mocks the whole module), so a bare
  * object would be enough — but `tests/ui/support/mockStream.ts` hands this same factory's socket
- * to the *real* `@wailsio/runtime`'s `JSONStream`, whose non-`WailsSocket` branch immediately does
+ * to the *real* `@wailsio/runtime`'s `Stream`, whose non-`WailsSocket` branch immediately does
  * `native.addEventListener.bind(native)` and later redefines `onmessage` itself via
- * `Object.defineProperty` (stream.js's own JSONStream — the "native WebSocket" path, taken for
+ * `Object.defineProperty` (stream.js's own `Stream` — the "native WebSocket" path, taken for
  * anything that isn't `instanceof WailsSocket`). A plain `{onopen: null, ...}` object throws there
- * (`addEventListener is not a function`) the moment `JSONStream` wraps it — this class exists so
+ * (`addEventListener is not a function`) the moment `Stream` wraps it — this class exists so
  * one fake satisfies both call sites, mirroring the real `WailsSocket`'s own
  * `defineHandlerProperty` pattern (a getter/setter that also threads through `addEventListener`)
  * for `onopen`/`onmessage`/`onclose`/`onerror`.
@@ -36,8 +36,8 @@ export interface FakeSocket extends EventTarget {
   close(): void;
   /** Every value passed to `send`, in order — what the test asserts requests against. Requests
    *  stay JSON text (P11 D3), and port.ts itself calls `JSON.stringify` before `send` now (it used
-   *  to rely on `JSONStream` doing that), so this is always the already-stringified JSON frame,
-   *  real `Stream` or this fake alike. */
+   *  to rely on the pre-P11 JSON-wrapping stream helper doing that), so this is always the
+   *  already-stringified JSON frame, real `Stream` or this fake alike. */
   sent: unknown[];
   /** Test control: moves to OPEN and fires `onopen`. */
   __open(): void;
@@ -53,7 +53,7 @@ const CLOSED = 3;
 
 // Mirrors stream.js's own `defineHandlerProperty`: an `on<type>` accessor that registers through
 // `addEventListener` rather than holding a bare field, so a listener attached either way (direct
-// assignment, as port.ts does; `addEventListener`, as the real JSONStream's wrapping does) is
+// assignment, as port.ts does; `addEventListener`, as the real `Stream`'s wrapping does) is
 // visible through both.
 function defineHandlerProperty(target: EventTarget, type: string): void {
   let current: EventListener | null = null;
