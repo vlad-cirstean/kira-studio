@@ -74,14 +74,33 @@ function isChunkLike(
   );
 }
 
+// P2 R1: Uint8Array.fromBase64 (TC39 "Uint8Array to/from base64", Stage 4) decodes natively —
+// no intermediate atob() binary string, no per-byte charCodeAt loop copying it into a second
+// buffer. A local intersection type, not a `declare global` augmentation: tsgo's bundled
+// lib.esnext.typedarrays.d.ts (tests/unit/tsconfig.json, tsconfig.node.json) already declares it
+// as a required member, while vue-tsc's plain typescript package (tsconfig.web.json — what
+// actually type-checks this file) has no type for it at all; a global augmentation's required-vs-
+// optional mismatch against the former fails to compile, where a local cast conflicts with
+// neither. Feature-detected at runtime either way: a webview without it still gets the exact same
+// atob()-based decode as before, so this can only ever be as fast, never differently correct.
+type Uint8ArrayWithFromBase64 = typeof Uint8Array & {
+  fromBase64?(base64: string): Uint8Array<ArrayBuffer>;
+};
+
+function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
+  const ctor = Uint8Array as Uint8ArrayWithFromBase64;
+  if (ctor.fromBase64) return ctor.fromBase64(base64);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 // A9: every chunk's four buffers cross the wire as base64 of their exact little-endian bytes
 // (P58 D5, P58f D8) rather than JSON.stringify's index-keyed object — decoded straight into the
 // typed array's backing buffer, no per-element round trip.
 function toTypedArray<T>(v: unknown, ctor: { new (buffer: ArrayBuffer): T }): T {
-  const binary = atob(v as string);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new ctor(bytes.buffer);
+  return new ctor(decodeBase64(v as string).buffer);
 }
 
 export function reviveChunks(value: unknown): unknown {

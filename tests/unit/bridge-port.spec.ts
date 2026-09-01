@@ -10,7 +10,9 @@ import { setSocketFactory } from './support/wailsRuntime';
 const socket: FakeSocket = createFakeSocket();
 setSocketFactory(() => socket);
 
-const { ready, request, onPortEvent } = await import('../../src/renderer/bridge/port');
+const { ready, request, onPortEvent, reviveChunks } = await import(
+  '../../src/renderer/bridge/port'
+);
 
 // request() gates its send on `ready` via a .then() registered synchronously but resolved on a
 // later microtask; awaiting `ready` itself is not enough to guarantee that .then has *also* run,
@@ -140,8 +142,43 @@ describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)',
     expect(chunk.truncated.length).toBe(0);
   });
 
+  // P2 R1: toTypedArray's decode has two paths — Uint8Array.fromBase64 where the runtime has it
+  // (Bun does, exercised by every other test in this file already), and the original atob()+
+  // charCodeAt loop as a fallback for a webview that doesn't. This test is the only one that
+  // actually drives that fallback: it removes fromBase64 for its own duration so the loop is what
+  // runs, proving the two paths decode to the exact same bytes rather than just trusting the
+  // fallback code compiles.
+  test('7. base64 decode falls back to the atob() loop when Uint8Array.fromBase64 is unavailable', () => {
+    const original = Uint8Array.fromBase64;
+    // biome-ignore lint/suspicious/noExplicitAny: simulating a webview without this TC39 method
+    (Uint8Array as any).fromBase64 = undefined;
+    try {
+      const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+      const chunk = {
+        data: toBase64(new Uint8Array([10, 20, 30])),
+        offsets: toBase64(new Uint8Array(new Uint32Array([0, 3]).buffer)),
+        nulls: toBase64(new Uint8Array([1])),
+        truncated: toBase64(new Uint8Array(0)),
+      };
+      const revived = reviveChunks(chunk) as {
+        data: Uint8Array;
+        offsets: Uint32Array;
+        nulls: Uint8Array;
+        truncated: Uint32Array;
+      };
+      expect(revived.data).toBeInstanceOf(Uint8Array);
+      expect(Array.from(revived.data)).toEqual([10, 20, 30]);
+      expect(revived.offsets).toBeInstanceOf(Uint32Array);
+      expect(Array.from(revived.offsets)).toEqual([0, 3]);
+      expect(Array.from(revived.nulls)).toEqual([1]);
+      expect(revived.truncated.length).toBe(0);
+    } finally {
+      Uint8Array.fromBase64 = original;
+    }
+  });
+
   // Terminal: closing the stream is not reversible in this module, so this runs last.
-  test('7. close rejects every pending request, and later requests reject immediately', async () => {
+  test('8. close rejects every pending request, and later requests reject immediately', async () => {
     const pending = request('during-close');
     await flush();
     socket.__close();
