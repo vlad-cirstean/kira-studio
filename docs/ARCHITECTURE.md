@@ -742,10 +742,10 @@ repo's CI runs.
 
 ## Testing
 
-Five suites, under `tests/`: `unit/`, `db/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite in
-`shell/` (`bun run test:go`). `ipc/` is the odd one out — it is two suites in one directory, a
-`node:test` backend half and a Playwright frontend half per adapter, sharing one fixture module by
-design (P50, below).
+Four suites, under `tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite in
+`shell/` (`bun run test:go`). `tests/db/` is a shared fixture corpus, not a suite of its own (see
+below). `ipc/` is the odd one out among the four — it is two suites in one directory, a Go backend
+half and a Playwright frontend half per adapter, sharing one fixture module by design (P50, below).
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real

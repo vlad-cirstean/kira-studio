@@ -241,11 +241,11 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 
 ## 7. CI, releases, and auto-update
 
-**Status:** the workflows described below are the *intended* P57 ones, staged in
-`docs/v1/plans/p57-pending-ci-workflows/` (`ci.yml`, `release.yml`, plus a README with the two `cp`
+**Status:** the workflows described below are staged in
+`docs/v1/plans/p58-pending-ci-workflows/` (`ci.yml`, `release.yml`, plus a README with the two `cp`
 commands and the commit). `.github/workflows/` still contains the pre-P57 Electron versions, which
 reference deleted scripts. Applying them is the first pending job for anyone pushing with `workflow`
-scope.
+scope (tracked as `AGENTS.md`'s "Known open items").
 
 **Intended `ci.yml`** (push/PR to `main`, plus `workflow_dispatch`):
 
@@ -276,11 +276,6 @@ actually exercises it.
    that zip attached plus an artifact upload.
 4. A human runs §4 against the draft's artifact on real hardware, fills in the rows, then publishes.
    The workflow never publishes automatically.
-
-Note: that verify step still sets `KIRA_STRICT_UPDATE_CHECK=1`, which the rewritten
-`verify-packaging.sh` no longer reads — the strict mode existed to make a leftover electron-builder
-`.blockmap` fatal, and no such artifact exists in this pipeline. The env var is inert, not load-bearing;
-drop it whenever the workflows are applied.
 
 **No auto-update — unchanged, not newly removed.** SPEC.md defers auto-update past v1 (§1's deferred
 list, §3's app-identity line), and that was already true under Electron. macOS auto-update also requires

@@ -20,19 +20,19 @@ fill in.
 
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
-| Grid scroll frame ≤ 8 ms | app-work delta (DataGrid.vue's own scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/e2e/budgets.spec.ts` | **asserted — passing; see §2.1** |
-| Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/e2e/budgets.spec.ts` | **asserted — passing; see §2.1** |
-| Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/e2e/budgets.spec.ts` | **asserted — passing; see §2.1** |
-| — (secondary) | rAF interval p95 < 24 ms, DOM cells < 1500 | `tests/e2e/perf.spec.ts` | asserted |
-| Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/e2e/budgets.spec.ts` | **asserted** |
-| Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/e2e/budgets.spec.ts` | **asserted** |
-| Tree node expand (cached) ≤ 50 ms | click twisty → child rows present, p95 over 20 collapse/expand cycles of an already-cached schema node | `tests/e2e/budgets.spec.ts` | **asserted** |
-| Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → `.cm-tooltip-autocomplete` present, p50 over 20 keystrokes | `tests/e2e/budgets.spec.ts` | **asserted** |
+| Grid scroll frame ≤ 8 ms (12 ms on the `tests/ui/` tier, see §2.1) | app-work delta (DataGrid.vue's own scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| — (secondary) | rAF interval p95 < 24 ms (80 ms on the `tests/ui/` tier, see §2.1), DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
+| Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
+| Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
+| Tree node expand (cached) ≤ 50 ms | click twisty → child rows present, p95 over 20 collapse/expand cycles of an already-cached schema node | `tests/ui/budgets.spec.ts` | **asserted** |
+| Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → `.cm-tooltip-autocomplete` present, p50 over 20 keystrokes | `tests/ui/budgets.spec.ts` | **asserted** |
 | Any DB round-trip async/cancellable | — | covered by every adapter's cancel scenario (P1–P10) | n/a |
 | < 350 MB total RSS, 5 connections / 10 tabs | min of 10 `app.getAppMetrics()` sums over an idle window | removed — see §2.2 below | **not automated; documented structural finding** |
 | Same, packaged | `ps -o rss` sum for the same scenario | §3 procedure below | manual (macOS) |
-| Cold start (no SPEC number) | main `process.uptime()` at interactive: fresh ≤ 2500 ms, restored ≤ 3000 ms | `tests/e2e/startup.spec.ts` | **asserted** |
-| Cold start, packaged | ≤ 1500 ms median of 3 warm launches | §3 procedure below | manual (macOS) |
+| Cold start (no SPEC number) | no automated dev-build check exists any more — `tests/e2e/startup.spec.ts` (`process.uptime()`) was deleted with the rest of `tests/e2e/` at P57 and has no `tests/ui/` successor | — | **not automated — manual only, see next row** |
+| Cold start, packaged | ≤ 1500 ms median of 3 warm launches, read from the `did-finish-load` log line | §3 procedure below | manual (macOS) |
 
 ## 2. Automated results (this environment)
 
@@ -597,21 +597,24 @@ gone while newer ones remain.
 
 ## 4. P13's nonfunctional sweep — the three items P12 handed forward
 
-The three items §4 previously handed to P13 are resolved as of P13. Each is confirmed against the
-implementation and the new coverage in `tests/db/*.spec.ts` / `tests/e2e/leaks.spec.ts`.
+The three items §4 previously handed to P13 are resolved as of P13; the two below whose coverage
+lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache (P58a A21, per
+§2.1) and are now asserted directly against the real cache in
+`shell/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases, not a browser-driven scenario.
 
 1. **`src/engine/cache/counts.ts`'s `store` was a plain `Map<string, StoredCount>`** with no byte
    budget or eviction policy — **fixed (F19, D19)**. It is now a `ByteLru` sharing L2's shape:
    `L3_BUDGET_BYTES = 256 * 1024`, a nominal `COUNT_ENTRY_BYTES = 128` per entry, ≈ 2 048 entries
-   before eviction. `tests/e2e/leaks.spec.ts`'s "L3 is bounded" scenario drives 2 500 distinct
-   `{path, filter}` combinations through `data.count()` and observes `cacheStats().l3Entries`
-   plateau at exactly **2 048** — confirming both that the bound is real and that it matches the
-   constant's own arithmetic (256 KiB / 128 B), not just "some number less than 2 500."
+   before eviction, ported unchanged into `shell/internal/enginecache`. The original browser-driven
+   proof (now retired) drove 2 500 distinct `{path, filter}` combinations through `data.count()` and
+   observed `cacheStats().l3Entries` plateau at exactly **2 048** — confirming both that the bound
+   is real and that it matches the constant's own arithmetic (256 KiB / 128 B), not just "some
+   number less than 2 500."
 2. **Renderer page retention for cold (inactive) tabs (lever L-B)** — **answered, not fixed
    (D21)**. This was already a considered P12 decision (D20/L-B), not an oversight; P13 re-examined
    it rather than treating "handed to P13" as "still open." §2.2 requires pages to be released when
    a tab is **closed**, which P13's F4/F5 fix (renderer runtime + page-store cleanup, verified by
-   `tests/e2e/leaks.spec.ts`'s tab open/close symmetry scenario) makes actually true across all five
+   `tests/ui/leaks.spec.ts`'s tab open/close symmetry scenario) makes actually true across all five
    page stores, not just the grid. It says nothing about inactive-but-open tabs. The P12 measurement
    above puts the whole 10-tab retained-bytes delta at ≈ 18–43 MB — roughly 2–4 MB per tab — against
    a real risk to the ≤ 50 ms cached-tab-switch budget (§2.1) if a cold tab's pages were evicted and
@@ -620,7 +623,7 @@ implementation and the new coverage in `tests/db/*.spec.ts` / `tests/e2e/leaks.s
 3. **`src/engine/cache/pages.ts`'s `hits`/`misses` counters were lifetime-cumulative** —
    **fixed (F20, D20)**. `clearPages()` now resets both counters to 0, so a hit rate read after
    clearing reflects "since last clear" rather than the engine process's entire lifetime — the only
-   interpretation that matches what the Clear caches button in Settings → Cache appears to do.
-   `tests/e2e/leaks.spec.ts`'s "clearing the cache resets the hit rate" scenario warms L2 to a real
-   (non-"—") hit rate, clicks Clear, and asserts the Settings → Cache hit rate field reads `—`
-   again.
+   interpretation that matches what the Clear caches button in Settings → Cache appears to do,
+   ported unchanged into `shell/internal/enginecache`. The original browser-driven proof (now
+   retired) warmed L2 to a real (non-"—") hit rate, clicked Clear, and asserted the Settings → Cache
+   hit rate field read `—` again.
