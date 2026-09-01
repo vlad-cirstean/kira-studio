@@ -198,6 +198,7 @@ func main() {
 			application.NewService(&bridge.SettingsService{Deps: deps}),
 			application.NewService(&bridge.LayoutService{Deps: deps}),
 			application.NewService(&bridge.TabsService{Deps: deps}),
+			application.NewService(&bridge.WindowsService{Deps: deps}),
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
 			application.NewService(&bridge.TreeService{Deps: deps}),
 			application.NewService(&bridge.EngineService{Deps: deps}),

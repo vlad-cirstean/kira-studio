@@ -2,6 +2,7 @@ import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protoc
 import { pageChunks } from '@shared/protocol/page';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
 import { initAppMetrics } from './state/appMetrics';
@@ -195,6 +196,10 @@ window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
 async function bootstrap(): Promise<void> {
   initCacheStats();
   initAppMetrics();
+  // Must complete before anything window-scoped below (hydrateTabs, in particular) — P8 D2:
+  // always a no-op on the native shell, the only registration a `-tags server` browser tab ever
+  // gets otherwise.
+  await control.windowsEnsure();
   await Promise.all([
     hydrateLayout(),
     hydrateSettings(),

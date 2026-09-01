@@ -87,6 +87,53 @@ func (r *WindowsRepo) Create(rec model.WindowRecord) error {
 	return nil
 }
 
+// EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
+// row already present, with no stored bounds — idempotent, and a no-op when the row is already
+// there.
+//
+// On the native shell every window's row already exists by the time this could ever be called:
+// main.go's own openWindow/openNewWindow/reopenWindow always call Create before the window's URL
+// (and therefore the renderer that would ask) exists at all (D2). A `-tags server` build has no
+// such shell — nothing native ever creates a window, so a browser tab pointed at an arbitrary
+// `?window=<key>` (tests/e2e-real's multiwindow-real.spec.ts, or a developer's own tab) is the
+// only thing that ever tells the backend that key exists, and TabsService's own checkWindow
+// rejects an unregistered key outright rather than silently writing orphan rows (C4) — so the
+// renderer calls WindowsService.Ensure once at boot, before it asks for anything window-scoped,
+// and this is what that becomes on the Go side. Runs inside one transaction (matching LayoutRepo.Set's
+// C7 fix) so two concurrent Ensure calls for the same brand-new key can't both observe "absent"
+// and then race each other's INSERT.
+func (r *WindowsRepo) EnsureExists(key string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/windows: ensure begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var exists bool
+	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM windows WHERE key = ?)`, key).Scan(&exists); err != nil {
+		return fmt.Errorf("repos/windows: ensure exists %s: %w", key, err)
+	}
+	if !exists {
+		var maxOrder sql.NullInt64
+		if err := tx.QueryRow(`SELECT MAX("order") FROM windows`).Scan(&maxOrder); err != nil {
+			return fmt.Errorf("repos/windows: ensure max order: %w", err)
+		}
+		order := 0
+		if maxOrder.Valid {
+			order = int(maxOrder.Int64) + 1
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, NULL)`, key, order,
+		); err != nil {
+			return fmt.Errorf("repos/windows: ensure insert %s: %w", key, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/windows: ensure commit: %w", err)
+	}
+	return nil
+}
+
 // SetBounds persists one window's rectangle — the per-window analogue of the single
 // `window.bounds` leaf LayoutRepo used to own for every window there had ever been (F5).
 func (r *WindowsRepo) SetBounds(key string, b model.WindowBounds) error {

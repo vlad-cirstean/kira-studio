@@ -11,6 +11,7 @@ import * as QueriesService from '@bindings/queriesservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
+import * as WindowsService from '@bindings/windowsservice.js';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -245,6 +246,13 @@ export const control = {
 
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),
+
+  // windowsEnsure registers this page's own windowKey with a `windows` row if it doesn't already
+  // have one — always a no-op on the native shell (main.go's own window-creation paths already
+  // created it before this page's URL ever loaded, D2), and the only thing that ever does on a
+  // `-tags server` build, which has no shell managing window creation at all. bootstrap() in
+  // main.ts awaits this before hydrateTabs() (or anything else window-scoped) runs.
+  windowsEnsure: (): Promise<void> => unwrap(WindowsService.Ensure({ windowKey })),
 
   // Both scoped to this page's own workbench (P8 D2/F6) — windowKey is read once, synchronously,
   // at module load (state/window.ts), before hydrateTabs() ever calls tabsList().
