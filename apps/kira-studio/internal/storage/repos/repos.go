@@ -12,6 +12,7 @@ type Repos struct {
 	Settings      *SettingsRepo
 	Layout        *LayoutRepo
 	Tabs          *TabsRepo
+	Windows       *WindowsRepo
 	Connections   *ConnectionsRepo
 	Ops           *OpsRepo
 	Filters       *FiltersRepo
@@ -50,6 +51,7 @@ func New(db *sql.DB) (*Repos, error) {
 		Settings:      &SettingsRepo{DB: db, selectAll: settingsSelectAll},
 		Layout:        &LayoutRepo{DB: db, selectAll: layoutSelectAll},
 		Tabs:          &TabsRepo{DB: db, selectAll: tabsSelectAll},
+		Windows:       &WindowsRepo{DB: db},
 		Connections:   &ConnectionsRepo{DB: db},
 		Ops:           &OpsRepo{DB: db, insert: opsInsert, update: opsUpdate},
 		Filters:       &FiltersRepo{DB: db},

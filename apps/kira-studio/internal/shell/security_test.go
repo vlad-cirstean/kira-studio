@@ -54,7 +54,7 @@ func TestOptions_FileDropDisabled(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = r.Close() })
 
-	opts := shell.Options(shell.WindowDeps{Layout: r.Layout, StartedAt: time.Now()}, shell.Harden(), "kira://app/")
+	opts := shell.Options(shell.WindowDeps{Windows: r.Windows, StartedAt: time.Now()}, shell.Harden(), "kira://app/")
 
 	if opts.EnableFileDrop {
 		t.Error("EnableFileDrop = true, want false (§1.6: no data-file-drop-target consumer exists)")

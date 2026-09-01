@@ -223,7 +223,7 @@ func main() {
 
 	shell.RegisterEngineStream(app, router)
 
-	windowDeps := shell.WindowDeps{Layout: repositories.Layout, StartedAt: startedAt}
+	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
 	newWindow := func() {
 		if detachWindow != nil {
 			detachWindow()

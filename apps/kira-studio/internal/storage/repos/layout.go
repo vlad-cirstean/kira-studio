@@ -54,7 +54,6 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
 	leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
 	leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
-	leaf(stored, "window.bounds", &result.Window.Bounds)
 	return result, nil
 }
 
@@ -87,9 +86,6 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 			merged.Panel.CellEditor.Height = *p.CellEditor.Height
 		}
 	}
-	if w := patch.Window; w != nil && w.Bounds != nil {
-		merged.Window.Bounds = w.Bounds
-	}
 
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -106,7 +102,6 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 		{"panel.operations.visible", merged.Panel.Operations.Visible},
 		{"panel.operations.height", merged.Panel.Operations.Height},
 		{"panel.cellEditor.height", merged.Panel.CellEditor.Height},
-		{"window.bounds", merged.Window.Bounds},
 	}
 	for _, l := range leaves {
 		encoded, err := json.Marshal(l.value)

@@ -21,7 +21,6 @@ function mergePatch(a: LayoutPatch, b: LayoutPatch): LayoutPatch {
       operations: { ...a.panel?.operations, ...b.panel?.operations },
       cellEditor: { ...a.panel?.cellEditor, ...b.panel?.cellEditor },
     },
-    window: { ...a.window, ...b.window },
   };
 }
 
@@ -29,7 +28,6 @@ function applyLocal(patch: LayoutPatch): void {
   Object.assign(layoutState.panel.project, patch.panel?.project);
   Object.assign(layoutState.panel.operations, patch.panel?.operations);
   Object.assign(layoutState.panel.cellEditor, patch.panel?.cellEditor);
-  Object.assign(layoutState.window, patch.window);
 }
 
 function patchLayout(patch: LayoutPatch): void {

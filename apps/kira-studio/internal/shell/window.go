@@ -13,14 +13,19 @@ import (
 
 const boundsDebounce = 300 * time.Millisecond
 
+// mainWindowKey is the one window record this app manages until C2/C3 give every window its own
+// minted key (D2) — kept as a named constant here rather than a bare literal so the seam is
+// visible at the one call site that still hardcodes it.
+const mainWindowKey = "main"
+
 // WindowDeps is Options/Attach's dependencies.
 type WindowDeps struct {
-	Layout    *repos.LayoutRepo
+	Windows   *repos.WindowsRepo
 	StartedAt time.Time
 }
 
-// Options builds the main window's options: the stored rectangle if window.ts ever persisted
-// one, Wails' own defaults otherwise. There is no exact analogue of Electron's
+// Options builds the main window's options: the stored rectangle if one has ever been
+// persisted, Wails' own defaults otherwise. There is no exact analogue of Electron's
 // show:false/ready-to-show pattern here — WindowRuntimeReady fires only after the frontend has
 // already loaded — a deliberate small divergence, not hidden (§1's window.ts read).
 func Options(d WindowDeps, sec SecurityOptions, url string) application.WebviewWindowOptions {
@@ -37,14 +42,20 @@ func Options(d WindowDeps, sec SecurityOptions, url string) application.WebviewW
 		Mac:              application.MacWindow{WebviewPreferences: sec.Webview},
 	}
 
-	layout, err := d.Layout.GetAll()
-	if err == nil && layout.Window.Bounds != nil {
-		b := layout.Window.Bounds
-		opts.Width = int(b.Width)
-		opts.Height = int(b.Height)
-		opts.X = int(b.X)
-		opts.Y = int(b.Y)
-		opts.InitialPosition = application.WindowXY
+	records, err := d.Windows.List()
+	if err == nil {
+		for _, rec := range records {
+			if rec.Key != mainWindowKey || rec.Bounds == nil {
+				continue
+			}
+			b := rec.Bounds
+			opts.Width = int(b.Width)
+			opts.Height = int(b.Height)
+			opts.X = int(b.X)
+			opts.Y = int(b.Y)
+			opts.InitialPosition = application.WindowXY
+			break
+		}
 	}
 	return opts
 }
@@ -73,7 +84,7 @@ func Attach(win *application.WebviewWindow, d WindowDeps) (detach func()) {
 
 	persist := func() {
 		bounds := boundsFromRect(win.Bounds())
-		if _, err := d.Layout.Set(model.LayoutPatch{Window: &model.WindowPatch{Bounds: &bounds}}); err != nil {
+		if err := d.Windows.SetBounds(mainWindowKey, bounds); err != nil {
 			slog.Warn("persist window bounds failed", "scope", "window", "err", err)
 		}
 	}

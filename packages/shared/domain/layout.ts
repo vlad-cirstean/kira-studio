@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-export const windowBoundsSchema = /*#__PURE__*/ z.object({
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-});
-export type WindowBounds = z.infer<typeof windowBoundsSchema>;
-
 const panelProjectSchema = /*#__PURE__*/ z.object({ visible: z.boolean(), width: z.number() });
 const panelOperationsSchema = /*#__PURE__*/ z.object({ visible: z.boolean(), height: z.number() });
 // No `visible` field (unlike its project/operations siblings): the cell editor panel's
@@ -22,9 +14,6 @@ export const layoutSchema = /*#__PURE__*/ z.object({
     operations: panelOperationsSchema,
     cellEditor: panelCellEditorSchema,
   }),
-  window: /*#__PURE__*/ z.object({
-    bounds: windowBoundsSchema.nullable(),
-  }),
 });
 export type Layout = z.infer<typeof layoutSchema>;
 
@@ -36,11 +25,6 @@ export const layoutPatchSchema = /*#__PURE__*/ z.object({
       cellEditor: panelCellEditorSchema.partial().optional(),
     })
     .optional(),
-  window: z
-    .object({
-      bounds: windowBoundsSchema.nullable().optional(),
-    })
-    .optional(),
 });
 export type LayoutPatch = z.infer<typeof layoutPatchSchema>;
 
@@ -49,8 +33,5 @@ export const defaultLayout: Layout = {
     project: { visible: true, width: 260 },
     operations: { visible: false, height: 200 },
     cellEditor: { height: 180 },
-  },
-  window: {
-    bounds: null,
   },
 };
