@@ -49,5 +49,6 @@ var Shortcuts = map[string]Chord{
 	"tab.next":                   {Key: "Tab", Ctrl: true},
 	"tab.prev":                   {Key: "Tab", Ctrl: true, Shift: true},
 	"tab.close":                  {Key: "W", CmdOrCtrl: true},
+	"window.new":                 {Key: "N", CmdOrCtrl: true, Shift: true},
 	"window.close":               {Key: "W", CmdOrCtrl: true, Shift: true},
 }

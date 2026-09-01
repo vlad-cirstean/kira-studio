@@ -34,6 +34,7 @@ export const SHORTCUTS = {
   'tab.next': { chord: { key: 'Tab', ctrl: true }, global: true },
   'tab.prev': { chord: { key: 'Tab', ctrl: true, shift: true }, global: true },
   'tab.close': { chord: { key: 'W', cmdOrCtrl: true }, global: true },
+  'window.new': { chord: { key: 'N', cmdOrCtrl: true, shift: true }, global: true },
   'window.close': { chord: { key: 'W', cmdOrCtrl: true, shift: true }, global: true },
 
   'grid.copy': { chord: { key: 'C', cmdOrCtrl: true }, global: false },

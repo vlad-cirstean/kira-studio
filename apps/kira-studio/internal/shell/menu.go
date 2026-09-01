@@ -5,12 +5,15 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// MenuDeps is BuildMenu's dependencies.
+// MenuDeps is BuildMenu's dependencies. NewWindow (P8 D8) is deliberately not routed through
+// Events like the other Window-section items: it is an ItemNewWindow, whose action runs in Go
+// and never travels through the renderer (§0.4's "renderer opens no window").
 type MenuDeps struct {
-	AppName string
-	IsDev   bool
-	Events  *bridge.Events
-	Quit    func() // Quitter.RequestQuit
+	AppName   string
+	IsDev     bool
+	Events    *bridge.Events
+	Quit      func() // Quitter.RequestQuit
+	NewWindow func()
 }
 
 // BuildMenu renders the template. It must be called after application.New, because Wails' own
@@ -61,6 +64,14 @@ func buildItem(sub *application.Menu, item Item, d MenuDeps) {
 		}
 		quitItem.OnClick(func(*application.Context) { d.Quit() })
 		addItem(sub, quitItem)
+
+	case ItemNewWindow:
+		newWindowItem := application.NewMenuItem(item.Label)
+		if item.Accelerator != "" {
+			newWindowItem.SetAccelerator(item.Accelerator)
+		}
+		newWindowItem.OnClick(func(*application.Context) { d.NewWindow() })
+		addItem(sub, newWindowItem)
 	}
 }
 

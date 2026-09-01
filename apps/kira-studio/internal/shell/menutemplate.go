@@ -14,6 +14,7 @@ const (
 	ItemRole               // a Wails role, optionally re-accelerated
 	ItemEmit               // a custom item emitting Channel
 	ItemQuit               // the custom, role-free Quit item (§1.3)
+	ItemNewWindow          // opens a second window (P8 D8) — handled in Go, not a renderer emit (§0.4)
 )
 
 // Item.Role is application.Role, so this file is not literally Wails-free — but Role is a bare
@@ -94,6 +95,8 @@ func BuildTemplate(appName string, isDev bool) []Section {
 			{Kind: ItemEmit, Label: "Next Tab", Accelerator: Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
 			{Kind: ItemEmit, Label: "Previous Tab", Accelerator: Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
 			{Kind: ItemEmit, Label: "Close Tab", Accelerator: Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
+			{Kind: ItemSeparator},
+			{Kind: ItemNewWindow, Label: "New Window", Accelerator: Shortcuts["window.new"].Accelerator()},
 			{Kind: ItemSeparator},
 			{Kind: ItemRole, Role: application.Minimise},
 			{Kind: ItemRole, Role: application.Zoom},

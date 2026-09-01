@@ -62,3 +62,22 @@ func (r *WindowRegistry) Any() application.Window {
 	}
 	return nil
 }
+
+// RemoveAndCount unregisters key (a no-op if it was never registered, e.g. a duplicate close
+// event) and runs its detach, then reports how many windows remain registered — one atomic
+// operation so a window closing at the same instant as another can't race the decision D5 makes
+// from the result: only the close that empties the registry keeps that window's `windows` row
+// (so a later Dock click restores the same workbench); every other close deletes its row.
+func (r *WindowRegistry) RemoveAndCount(key string) (remaining int) {
+	r.mu.Lock()
+	e, ok := r.entries[key]
+	if ok {
+		delete(r.entries, key)
+	}
+	remaining = len(r.entries)
+	r.mu.Unlock()
+	if ok {
+		e.detach()
+	}
+	return remaining
+}

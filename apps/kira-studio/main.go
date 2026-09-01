@@ -10,18 +10,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mariadb"
-	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mysql"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/clickhouse"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mariadb"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mongo"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mysql"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/postgres"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/redis"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/s3"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqlite"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
-	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
@@ -39,6 +40,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
+	// package for the rest of the function, exactly where openWindow's WindowClosing listener
+	// needs it.
+	wailsevents "github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Any files in frontend/dist are embedded into the binary — built by `bun run build` from
@@ -225,36 +230,99 @@ func main() {
 		return windows.Any()
 	})
 
-	isDev := app.Env.Info().Debug
-	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
-		AppName: "Kira Studio", IsDev: isDev, Events: events, Quit: quitter.RequestQuit,
-	}))
-
 	shell.RegisterEngineStream(app, router)
 
 	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
-	// openMainWindow (re)opens the sole "main" workbench C1's migration seeds — C3 replaces this
-	// with a real multi-window open path; for now the app still opens exactly one window, just
-	// through the per-window registry rather than a pair of package-level vars.
-	openMainWindow := func() {
-		records, err := repositories.Windows.List()
-		if err != nil {
-			log.Fatalf("kira-studio-shell: list windows: %v", err)
-		}
-		rec := model.WindowRecord{Key: "main", Order: 0}
-		for _, r := range records {
-			if r.Key == rec.Key {
-				rec = r
-				break
-			}
-		}
+
+	// openWindow opens one workbench from an already-persisted record and registers it — the one
+	// path every window (startup, reopen, "New Window") ultimately goes through. Its own
+	// WindowClosing listener implements D5: delete the row only if another window remains open,
+	// so closing the last window leaves it behind for the next Dock click or relaunch to restore.
+	openWindow := func(rec model.WindowRecord) {
 		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec))
 		detach := shell.Attach(win, windowDeps, rec.Key)
 		windows.Add(rec.Key, win, detach)
+		win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
+			if windows.RemoveAndCount(rec.Key) > 0 {
+				if err := repositories.Windows.Delete(rec.Key); err != nil {
+					slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
+				}
+			}
+		})
 	}
-	shell.AttachReopen(app, openMainWindow)
 
-	openMainWindow()
+	// openNewWindow is the *New Window* (⇧⌘N) menu command (D8): a fresh workbench, ordered after
+	// every existing one, cascaded from whichever window is currently focused (D10).
+	openNewWindow := func() {
+		records, err := repositories.Windows.List()
+		if err != nil {
+			slog.Error("list windows", "scope", "window", "err", err)
+			return
+		}
+		order := 0
+		for _, r := range records {
+			if r.Order >= order {
+				order = r.Order + 1
+			}
+		}
+		rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: shell.CascadeFrom(app.Window.Current())}
+		if err := repositories.Windows.Create(rec); err != nil {
+			slog.Error("create window", "scope", "window", "err", err)
+			return
+		}
+		openWindow(rec)
+	}
+
+	// reopenWindow is the Dock-reopen path (shell.AttachReopen only calls this when zero windows
+	// are live): bring back the highest-order stored workbench, or mint a fresh "main" one if
+	// every window row was somehow deleted (D5).
+	reopenWindow := func() {
+		records, err := repositories.Windows.List()
+		if err != nil {
+			slog.Error("list windows for reopen", "scope", "window", "err", err)
+			return
+		}
+		if len(records) == 0 {
+			rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
+			if err := repositories.Windows.Create(rec); err != nil {
+				slog.Error("create window for reopen", "scope", "window", "err", err)
+				return
+			}
+			openWindow(rec)
+			return
+		}
+		best := records[0]
+		for _, r := range records[1:] {
+			if r.Order > best.Order {
+				best = r
+			}
+		}
+		openWindow(best)
+	}
+	shell.AttachReopen(app, reopenWindow)
+
+	isDev := app.Env.Info().Debug
+	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
+		AppName: "Kira Studio", IsDev: isDev, Events: events, Quit: quitter.RequestQuit, NewWindow: openNewWindow,
+	}))
+
+	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
+	// a fresh database), in order — the first time this app has ever been able to open more than
+	// one.
+	records, err := repositories.Windows.List()
+	if err != nil {
+		log.Fatalf("kira-studio-shell: list windows: %v", err)
+	}
+	if len(records) == 0 {
+		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
+		if err := repositories.Windows.Create(rec); err != nil {
+			log.Fatalf("kira-studio-shell: create window: %v", err)
+		}
+		records = []model.WindowRecord{rec}
+	}
+	for _, rec := range records {
+		openWindow(rec)
+	}
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

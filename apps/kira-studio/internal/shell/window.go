@@ -106,3 +106,43 @@ func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach fu
 		db.cancel()
 	}
 }
+
+// cascadeStep is the classic one-title-bar-step offset a freshly opened window gets from the
+// window it cascades from (D10) — large enough that the new window is unmistakably a second
+// window, not a resize glitch on the first.
+const cascadeStep = 24
+
+// CascadeFrom computes a fresh window's rectangle from an existing one (D10: a new workbench
+// with no stored rectangle of its own inherits the focused window's size, offset by one
+// title-bar step, wrapped back to the screen's work-area origin rather than left to drift off
+// it). Returns nil when there is no window to cascade from (the very first window, or a Linux
+// build where Current() never resolves one — Options' own defaults take over in that case).
+func CascadeFrom(from application.Window) *model.WindowBounds {
+	if from == nil {
+		return nil
+	}
+	b := from.Bounds()
+	var work *application.Rect
+	if screen, err := from.GetScreen(); err == nil && screen != nil {
+		work = &screen.WorkArea
+	}
+	return cascadeRect(b, work)
+}
+
+// cascadeRect is CascadeFrom's pure arithmetic, split out so the offset/wrap rule doesn't need a
+// live *application.WebviewWindow to reason about.
+func cascadeRect(from application.Rect, work *application.Rect) *model.WindowBounds {
+	x, y := from.X+cascadeStep, from.Y+cascadeStep
+	if work != nil {
+		if x+from.Width > work.X+work.Width || y+from.Height > work.Y+work.Height {
+			x, y = work.X, work.Y
+		}
+		if x < work.X {
+			x = work.X
+		}
+		if y < work.Y {
+			y = work.Y
+		}
+	}
+	return &model.WindowBounds{X: float64(x), Y: float64(y), Width: float64(from.Width), Height: float64(from.Height)}
+}
