@@ -14,20 +14,21 @@ every database adapter is served in-process by the Go binary itself.
 
 ## 1. Building locally
 
-Requires macOS arm64, Bun, Go (`go.mod`: 1.25.0), Xcode command-line tools, and the `wails3`
-CLI at the version `go.mod` pins (`v3.0.0-beta.15`) — `sh scripts/wails-dev-setup.sh` installs
-exactly that version, and is also wired as `predev`.
+Requires macOS arm64, Bun, Go (`go.mod`: 1.25.0), and Xcode command-line tools. Everything else —
+`bun install`, `go mod download`, and the `wails3` CLI at the version `go.mod` pins
+(`v3.0.0-beta.15`) — installs itself:
 
 ```sh
-bun install
-sh scripts/wails-dev-setup.sh   # wails3 CLI + generated bindings
-bun run build                   # vite build → apps/kira-studio/frontend/dist (embedded by apps/kira-studio/main.go)
-bun run package                 # wails3 task darwin:package, then scripts/sign-bundle.sh
+bun run package                 # installs everything first, then wails3 task darwin:package, then scripts/sign-bundle.sh
 ```
 
-`scripts/wails-dev-setup.sh` is idempotent and does only what is missing: it installs the pinned
-`wails3` and generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored,
-and `apps/kira-studio/frontend/src/bridge/*.ts` imports them, so `bun run build` fails without them).
+`bun run package` and `bun run dev` both run `bun run setup` first (wired as `prepackage`/`predev`),
+which is `scripts/install-deps.sh` (`bun install` + `go mod download`) followed by
+`scripts/wails-dev-setup.sh` (the pinned `wails3` CLI + generated bindings). Both scripts are
+idempotent and do only what is missing — `sh scripts/wails-dev-setup.sh` installs the pinned wails3
+and generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored, and
+`apps/kira-studio/frontend/src/bridge/*.ts` imports them, so `bun run build` fails without them). To
+run just the install step (e.g. to warm up a machine before writing code), use `bun run setup`.
 `apps/kira-studio/{bin,frontend/dist,frontend/bindings}` are gitignored (`apps/kira-studio/.gitignore`).
 
 Expected artifacts (nothing lands in `dist/` or `out/` any more):

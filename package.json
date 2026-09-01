@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
-    "predev": "sh scripts/wails-dev-setup.sh",
+    "setup": "sh scripts/install-deps.sh && sh scripts/wails-dev-setup.sh",
+    "predev": "bun run setup",
     "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "build": "cd apps/kira-studio/frontend && bun run build",
     "lint": "biome check .",
@@ -22,6 +23,7 @@
     "test:ui": "bun run build && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui",
     "test:ipc:fe": "bun run build && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit",
+    "prepackage": "bun run setup",
     "package": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package && sh ../../scripts/sign-bundle.sh'",
     "verify:packaging": "sh scripts/verify-packaging.sh",
     "test:go": "go test ./..."

@@ -114,9 +114,13 @@ There's no release yet, so installing means building it yourself:
 ```sh
 git clone <repo-url>
 cd kira-studio
-bun install
 bun run package
 ```
+
+`bun run package` (like `bun run dev` below) installs everything it needs on its own first —
+the Bun workspace, the Go module, and the pinned `wails3` CLI — so a fresh clone needs nothing
+run beforehand. To do that install step on its own (e.g. to warm up a machine before writing
+code), run `bun run setup`.
 
 The built, signed (ad-hoc) app lands at `apps/kira-studio/bin/Kira Studio.app` — nothing is
 written to `dist/`.
@@ -134,13 +138,13 @@ verification checklist.
 ## Development
 
 ```sh
-bun install
-bun run dev        # builds the frontend, then `wails3 task dev` — native window, HMR
+bun run dev        # installs everything needed, then `wails3 task dev` — native window, HMR
 ```
 
 | Script | What it does |
 |---|---|
-| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `scripts/wails-dev-setup.sh` first — checks the pinned `wails3` version and generated bindings; the Wails task itself drives the frontend build via `common:build:frontend`) |
+| `bun run setup` | `scripts/install-deps.sh` (`bun install` + `go mod download`) then `scripts/wails-dev-setup.sh` (installs the pinned `wails3` CLI and generates bindings if missing). Runs automatically as `predev`/`prepackage`; call it directly to install without building or running anything. |
+| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `bun run setup` first; the Wails task itself drives the frontend build via `common:build:frontend`) |
 | `bun run build` | Production Vue build into `apps/kira-studio/frontend/dist` |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
@@ -152,7 +156,7 @@ bun run dev        # builds the frontend, then `wails3 task dev` — native wind
 | `bun run test:ui` | Builds, then runs Playwright (WebKit) against the built bundle with both wire planes mocked |
 | `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
 | `bun run test:go` | The Go test suite (`go test ./...`) |
-| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `apps/kira-studio/bin/Kira Studio.app` |
+| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `apps/kira-studio/bin/Kira Studio.app` (`prepackage` runs `bun run setup` first, same as `dev`) |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
 **App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
