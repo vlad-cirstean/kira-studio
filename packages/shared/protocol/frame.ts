@@ -39,6 +39,42 @@ function decodeChunk(c: wire.Chunk): TextColumnChunk {
   return { data, offsets, nulls, truncated };
 }
 
+// P5 C7/F8: decodeChunk's four arrays are views over the *whole received frame's* ArrayBuffer
+// (P11 D4/D5's own zero-copy design) — holding one page's chunk therefore pins every byte of the
+// frame it arrived in, siblings included. `.slice()` on a typed array copies into its own,
+// exactly-sized buffer. Used only by the ExecuteResponse branch below, only when a frame carried
+// more than one page — the case P11 OQ-1 named, where one page surviving console/state.ts's own
+// releaseResult/evictOldestResults keeps every other page's bytes alive too, invisibly to
+// totalRetainedBytes() (which sums page.byteSize, unaffected by sharing).
+function copyChunk(c: TextColumnChunk): TextColumnChunk {
+  return {
+    data: c.data.slice(),
+    offsets: c.offsets.slice(),
+    nulls: c.nulls.slice(),
+    truncated: c.truncated.slice(),
+  };
+}
+
+function copyPageBuffers(page: Page): Page {
+  switch (page.kind) {
+    case 'tabular':
+      return { ...page, chunks: page.chunks.map(copyChunk) };
+    case 'document':
+      return { ...page, ids: copyChunk(page.ids), bodies: copyChunk(page.bodies) };
+    case 'keyvalue':
+      return { ...page, fields: copyChunk(page.fields), values: copyChunk(page.values) };
+    case 'stream':
+      return {
+        ...page,
+        keys: copyChunk(page.keys),
+        headers: copyChunk(page.headers),
+        attrs: copyChunk(page.attrs),
+        timestamps: copyChunk(page.timestamps),
+        bodies: copyChunk(page.bodies),
+      };
+  }
+}
+
 function decodeColumnDescriptor(c: wire.ColumnDescriptor): ColumnDescriptor {
   const name = c.name();
   const dataType = c.dataType();
@@ -308,11 +344,15 @@ function decodePayload(frame: wire.Frame): unknown {
     case wire.Payload.ExecuteResponse: {
       const r: wire.ExecuteResponse | null = frame.payload(new wire.ExecuteResponse());
       if (!r) throw new Error('frame: ExecuteResponse payload is missing');
+      // C7/F8: only a multi-page frame can pin a sibling page's bytes by sharing its buffer — a
+      // single-page execute (the common case) stays zero-copy, byte-for-byte what P11 shipped.
+      const copyBuffers = r.pagesLength() > 1;
       const pages: Page[] = [];
       for (let i = 0; i < r.pagesLength(); i++) {
         const p = r.pages(i);
         if (!p) throw new Error('frame: ExecuteResponse.pages is missing an entry');
-        pages.push(decodePage(p));
+        const page = decodePage(p);
+        pages.push(copyBuffers ? copyPageBuffers(page) : page);
       }
       const executeResponse: ExecuteResponse = { pages };
       return executeResponse;
