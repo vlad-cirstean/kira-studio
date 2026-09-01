@@ -57,6 +57,7 @@
     "mariadb": "3.5.3",
     "pg": "8.23.0",
     "simple-icons": "16.28.0",
+    "sql-formatter": "15.8.2",
     "tailwindcss": "4.3.3",
     "testcontainers": "12.1.0",
     "typescript": "5.9.3",
