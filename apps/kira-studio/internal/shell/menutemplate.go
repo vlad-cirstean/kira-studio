@@ -79,6 +79,7 @@ func BuildTemplate(appName string, isDev bool) []Section {
 		{Kind: ItemEmit, Label: "Refresh", Accelerator: Shortcuts["view.refresh"].Accelerator(), Channel: bridge.ChannelViewRefresh},
 		{Kind: ItemEmit, Label: "Run Statement", Accelerator: Shortcuts["view.run"].Accelerator(), Channel: bridge.ChannelViewRun},
 		{Kind: ItemEmit, Label: "Run All", Accelerator: Shortcuts["view.runAll"].Accelerator(), Channel: bridge.ChannelViewRunAll},
+		{Kind: ItemEmit, Label: "Format", Accelerator: Shortcuts["view.format"].Accelerator(), Channel: bridge.ChannelViewFormat},
 	}
 	if isDev {
 		viewItems = append(viewItems,

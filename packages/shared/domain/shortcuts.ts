@@ -31,6 +31,9 @@ export const SHORTCUTS = {
   'view.refresh': { chord: { key: 'F5' }, global: true },
   'view.run': { chord: { key: 'Return', cmdOrCtrl: true }, global: true },
   'view.runAll': { chord: { key: 'Return', cmdOrCtrl: true, shift: true }, global: true },
+  // P13 D7: VS Code's own Format Document chord — ⌥⇧F on macOS — so it's the one a user already
+  // has in their fingers.
+  'view.format': { chord: { key: 'F', shift: true, alt: true }, global: true },
   'tab.next': { chord: { key: 'Tab', ctrl: true }, global: true },
   'tab.prev': { chord: { key: 'Tab', ctrl: true, shift: true }, global: true },
   'tab.close': { chord: { key: 'W', cmdOrCtrl: true }, global: true },

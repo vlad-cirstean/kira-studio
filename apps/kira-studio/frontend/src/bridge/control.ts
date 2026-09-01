@@ -121,6 +121,7 @@ export const control = {
   onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
   onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),
   onViewRunAll: (cb: () => void): (() => void) => on(CHANNEL.viewRunAll, cb),
+  onViewFormat: (cb: () => void): (() => void) => on(CHANNEL.viewFormat, cb),
   // Quit handshake: main holds `before-quit` until every window acks this (P8 C8: every window,
   // not just the first to ack), so a debounced save still pending when the user quits is never
   // silently lost.

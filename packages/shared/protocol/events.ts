@@ -15,6 +15,7 @@ export const CHANNEL = {
   viewRefresh: 'kira:menu:view-refresh',
   viewRun: 'kira:menu:view-run',
   viewRunAll: 'kira:menu:view-run-all',
+  viewFormat: 'kira:menu:view-format',
   appFlushBeforeClose: 'kira:app:flush-before-close',
   windowFlushBeforeClose: 'kira:window:flush-before-close',
   connectionState: 'kira:connection:state',

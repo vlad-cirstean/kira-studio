@@ -46,6 +46,7 @@ var Shortcuts = map[string]Chord{
 	"view.refresh":               {Key: "F5"},
 	"view.run":                   {Key: "Return", CmdOrCtrl: true},
 	"view.runAll":                {Key: "Return", CmdOrCtrl: true, Shift: true},
+	"view.format":                {Key: "F", Shift: true, Alt: true},
 	"tab.next":                   {Key: "Tab", Ctrl: true},
 	"tab.prev":                   {Key: "Tab", Ctrl: true, Shift: true},
 	"tab.close":                  {Key: "W", CmdOrCtrl: true},

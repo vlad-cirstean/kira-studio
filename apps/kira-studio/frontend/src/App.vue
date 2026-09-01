@@ -43,6 +43,7 @@ onMounted(() => {
     control.onViewRefresh(() => runCommand('view.refresh')),
     control.onViewRun(() => runCommand('view.run')),
     control.onViewRunAll(() => runCommand('view.run-all')),
+    control.onViewFormat(() => runCommand('view.format')),
   ];
 });
 

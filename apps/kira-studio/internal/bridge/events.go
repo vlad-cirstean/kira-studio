@@ -22,6 +22,7 @@ const (
 	ChannelViewRefresh            = "kira:menu:view-refresh"
 	ChannelViewRun                = "kira:menu:view-run"
 	ChannelViewRunAll             = "kira:menu:view-run-all"
+	ChannelViewFormat             = "kira:menu:view-format"
 	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
 	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
 	ChannelConnectionState        = "kira:connection:state"

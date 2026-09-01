@@ -24,6 +24,7 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
   { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },
+  { id: 'view.format', label: 'Format query', run: () => runCommand('view.format') },
   { id: 'tab-next', label: 'Next tab', run: activateNextTab },
   { id: 'tab-prev', label: 'Previous tab', run: activatePrevTab },
   {
