@@ -95,3 +95,53 @@ func TestSession_EnqueueResponse_BlocksInsteadOfDroppingUntilRoomOrClose(t *test
 		t.Fatal("enqueueResponse never returned after the session closed")
 	}
 }
+
+// P2 R2 (task #97): enqueueResponse must block once the queue's byte budget (sessionQueueBytes,
+// 32 MiB) is exhausted, not only once its frame-count budget (sessionQueueFrames, 64) is — a
+// handful of large data-plane pages can hit the byte budget while leaving the channel's frame
+// slots mostly empty, and the bug this guards against let enqueueResponse push straight past that
+// exhausted byte budget because it only ever selected against the channel itself.
+func TestSession_EnqueueResponse_BlocksOnByteBudgetEvenWithFrameSlotsFree(t *testing.T) {
+	conn := &blockingConn{}
+	s := newSession(conn)
+
+	// Get the writer's one permanent pull out of the way first (blockingConn.Send never returns),
+	// the same seed-then-sleep pattern the test above uses, so it can't race with the two frames
+	// below and silently free byte budget out from under this test.
+	if err := s.enqueue([]byte("seed")); err != nil {
+		t.Fatalf("setup: seed enqueue: %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	// Two 16 MiB frames reach exactly the 32 MiB byte budget while leaving 62 of 64 frame slots
+	// free — the frame-count budget alone would wave this straight through.
+	half := make([]byte, sessionQueueBytes/2)
+	if err := s.enqueue(half); err != nil {
+		t.Fatalf("setup: enqueue half 1: %v", err)
+	}
+	if err := s.enqueue(half); err != nil {
+		t.Fatalf("setup: enqueue half 2: %v", err)
+	}
+	if got := s.queuedBytes.Load(); got != sessionQueueBytes {
+		t.Fatalf("setup: queuedBytes = %d, want exactly sessionQueueBytes (%d)", got, sessionQueueBytes)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		s.enqueueResponse([]byte("response"))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("enqueueResponse returned immediately with the byte budget exhausted but frame slots free")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	s.Close()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("enqueueResponse never returned after the session closed")
+	}
+}

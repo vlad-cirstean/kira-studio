@@ -53,6 +53,7 @@ type Session struct {
 
 	queue       chan []byte
 	queuedBytes atomic.Int64
+	roomFreed   chan struct{}
 	done        chan struct{}
 	closeOnce   sync.Once
 
@@ -72,12 +73,13 @@ type Session struct {
 func newSession(conn StreamSession) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
-		conn:     conn,
-		queue:    make(chan []byte, sessionQueueFrames),
-		done:     make(chan struct{}),
-		ctx:      ctx,
-		cancel:   cancel,
-		inFlight: make(chan struct{}, sessionMaxInFlightOps),
+		conn:      conn,
+		queue:     make(chan []byte, sessionQueueFrames),
+		roomFreed: make(chan struct{}, 1),
+		done:      make(chan struct{}),
+		ctx:       ctx,
+		cancel:    cancel,
+		inFlight:  make(chan struct{}, sessionMaxInFlightOps),
 	}
 	go s.writeLoop()
 	return s
@@ -107,6 +109,13 @@ func (s *Session) writeLoop() {
 				return
 			}
 			s.queuedBytes.Add(-int64(len(frame)))
+			// Non-blocking: enqueueResponse's own wait loop below only ever needs the most recent
+			// signal, and a writeLoop that blocked here waiting for a slow waiter to notice would
+			// itself become the bottleneck it exists to avoid.
+			select {
+			case s.roomFreed <- struct{}{}:
+			default:
+			}
 			if err := s.conn.Send(frame); err != nil {
 				s.Close()
 				return
@@ -136,11 +145,32 @@ func (s *Session) enqueueLocal(frame []byte) {
 // HandleDataFrame already runs on its own goroutine per inbound frame — this never serialises
 // behind the next Receive()), unblocking either once the writer drains the queue or once the
 // session closes, at which point port.ts's own onclose already rejects every pending request.
+//
+// P2 R2 (task #97): "room in the queue" used to mean only the channel's own sessionQueueFrames
+// (64) capacity — a burst of large data-plane pages, each well under maxDataFrameBytes on its
+// own, could sit in the queue simultaneously with nothing checking their combined size against
+// sessionQueueBytes (32 MiB) at all, since the byte counter was updated but never consulted here.
+// The wait loop below mirrors enqueue's own check (current queuedBytes against the budget, not
+// queuedBytes-plus-this-frame — a single frame up to maxDataFrameBytes must still get through
+// while the queue is otherwise empty, rather than deadlocking against a budget smaller than the
+// frame itself) before attempting the channel send, parking on roomFreed in between attempts
+// instead of busy-polling.
 func (s *Session) enqueueResponse(frame []byte) {
-	select {
-	case s.queue <- frame:
-		s.queuedBytes.Add(int64(len(frame)))
-	case <-s.done:
+	for {
+		if s.queuedBytes.Load() < sessionQueueBytes {
+			select {
+			case s.queue <- frame:
+				s.queuedBytes.Add(int64(len(frame)))
+				return
+			case <-s.done:
+				return
+			}
+		}
+		select {
+		case <-s.roomFreed:
+		case <-s.done:
+			return
+		}
 	}
 }
 
