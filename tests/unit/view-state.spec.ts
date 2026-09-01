@@ -15,25 +15,25 @@ import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
 
-const { control } = await import('../../src/renderer/bridge/control');
-const { data } = await import('../../src/renderer/bridge/data');
+const { control } = await import('../../apps/kira-studio/frontend/src/bridge/control');
+const { data } = await import('../../apps/kira-studio/frontend/src/bridge/data');
 const { openBrowseTab, openKeyValueTab, openDataTab, findKeyValueTab, findDataTab } = await import(
-  '../../src/renderer/state/tabs'
+  '../../apps/kira-studio/frontend/src/state/tabs'
 );
 const { load: loadBrowse, runtime: browseRuntime } = await import(
-  '../../src/renderer/views/browse/state'
+  '../../apps/kira-studio/frontend/src/views/browse/state'
 );
 const {
   load: loadKeyValue,
   goNext: keyValueGoNext,
   runtime: keyValueRuntime,
-} = await import('../../src/renderer/views/keyvalue/state');
-const { setPage } = await import('../../src/renderer/views/keyvalue/page');
+} = await import('../../apps/kira-studio/frontend/src/views/keyvalue/state');
+const { setPage } = await import('../../apps/kira-studio/frontend/src/views/keyvalue/page');
 const {
   goNext: gridGoNext,
   goPrev: gridGoPrev,
   runtime: gridRuntime,
-} = await import('../../src/renderer/views/grid/state');
+} = await import('../../apps/kira-studio/frontend/src/views/grid/state');
 
 function deferred<T>(): {
   promise: Promise<T>;

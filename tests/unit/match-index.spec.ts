@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { effect, isShallow } from 'vue';
-import { createMatchIndex, createPageSearch } from '../../src/renderer/views/shared/page/search';
+import {
+  createMatchIndex,
+  createPageSearch,
+} from '../../apps/kira-studio/frontend/src/views/shared/page/search';
 
 // P2 R1 regression: two related fixes to shared/page/search.ts (and SearchToolbar.vue's own
 // goNext/goPrev, which this file can't reach directly since it's a .vue SFC — covered by their own

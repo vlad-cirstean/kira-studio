@@ -9,9 +9,9 @@
 import { describe, expect, test } from 'bun:test';
 import { createDocumentPageBuilder, unpagedPosition } from '@shared/protocol/page';
 
-const documentsPage = await import('../../src/renderer/views/documents/page');
+const documentsPage = await import('../../apps/kira-studio/frontend/src/views/documents/page');
 const { registerDocumentRows, rowView, unregisterDocumentRows, resetRows } = await import(
-  '../../src/renderer/views/shared/document/rows'
+  '../../apps/kira-studio/frontend/src/views/shared/document/rows'
 );
 
 describe('document byteLabel (P2 R2 #99)', () => {

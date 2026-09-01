@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { anchoredPosition } from '../../src/renderer/theme/anchoredPosition';
+import { anchoredPosition } from '../../apps/kira-studio/frontend/src/theme/anchoredPosition';
 
 const viewport = { width: 1000, height: 800 };
 

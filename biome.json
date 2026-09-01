@@ -62,7 +62,7 @@
       }
     },
     {
-      "includes": ["src/renderer/views/**"],
+      "includes": ["apps/kira-studio/frontend/src/views/**"],
       "linter": {
         "rules": {
           "style": {
@@ -101,7 +101,7 @@
       }
     },
     {
-      "includes": ["src/renderer/project/**"],
+      "includes": ["apps/kira-studio/frontend/src/project/**"],
       "linter": {
         "rules": {
           "style": {

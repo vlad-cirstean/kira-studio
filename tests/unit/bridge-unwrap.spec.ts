@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { resetCallFactory, setCallFactory } from './support/wailsRuntime';
 
-const { control, unwrap } = await import('../../src/renderer/bridge/control');
+const { control, unwrap } = await import('../../apps/kira-studio/frontend/src/bridge/control');
 
 afterAll(() => {
   resetCallFactory();
@@ -13,7 +13,7 @@ function callErrorLike(message: string, cause?: unknown): Promise<never> {
   return Promise.reject(err);
 }
 
-describe('src/renderer/bridge/control.ts — unwrap (P57 D5)', () => {
+describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', () => {
   test('1. a structured cause is preferred over the message string', async () => {
     await expect(
       unwrap(

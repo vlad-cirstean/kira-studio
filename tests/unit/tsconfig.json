@@ -19,5 +19,5 @@
       ]
     }
   },
-  "include": ["**/*.ts", "../../src/renderer/env.d.ts"]
+  "include": ["**/*.ts", "../../apps/kira-studio/frontend/src/env.d.ts"]
 }

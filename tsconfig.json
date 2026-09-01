@@ -13,7 +13,7 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.node.json" },
-    { "path": "./tsconfig.web.json" },
+    { "path": "./apps/kira-studio/frontend/tsconfig.json" },
     { "path": "./tests/unit/tsconfig.json" }
   ]
 }

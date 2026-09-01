@@ -15,7 +15,7 @@ import {
   eachMatch,
   runChunkedScan,
   type SearchQuery,
-} from '../../src/renderer/views/shared/page/scan';
+} from '../../apps/kira-studio/frontend/src/views/shared/page/scan';
 
 interface RowMatch {
   row: number;

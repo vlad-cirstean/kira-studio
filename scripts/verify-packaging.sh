@@ -32,9 +32,9 @@ if grep -qE '"(electron-updater|update-electron-app)"' package.json; then
   fail "updater dependency present" "package.json references electron-updater/update-electron-app; SPEC.md §1/§3 defer auto-update past v1"
 fi
 
-# --- S2: no updater code in src/ -----------------------------------------------------------
-if grep -rnE "autoUpdater|electron-updater" src/ >/dev/null 2>&1; then
-  fail "updater code present" "src/ references autoUpdater or electron-updater"
+# --- S2: no updater code in apps/ or packages/ ---------------------------------------------
+if grep -rnE "autoUpdater|electron-updater" apps/ packages/ >/dev/null 2>&1; then
+  fail "updater code present" "apps/ or packages/ references autoUpdater or electron-updater"
 fi
 
 # --- S5: the packaging script cannot publish ---------------------------------------------------

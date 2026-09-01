@@ -5,16 +5,19 @@
   "author": "Vlad Cirstean",
   "license": "MIT",
   "private": true,
+  "workspaces": [
+    "apps/*/frontend"
+  ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "predev": "sh scripts/wails-dev-setup.sh",
     "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'bun run build && cd apps/kira-studio && wails3 task dev'",
-    "build": "vite build",
+    "build": "cd apps/kira-studio/frontend && bun run build",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "bun run typecheck:node && bun run typecheck:web && bun run typecheck:unit",
     "typecheck:node": "tsgo --noEmit -p tsconfig.node.json",
-    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
+    "typecheck:web": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p tests/unit/tsconfig.json",
     "test:ui": "bun run build && playwright test --project=ui",
     "test:ipc:fe": "bun run build && playwright test --project=ipc-frontend",

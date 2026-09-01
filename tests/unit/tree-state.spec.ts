@@ -21,7 +21,9 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import { effect, isShallow } from 'vue';
 
-const { treeState, activeSearchQuery } = await import('../../src/renderer/project/state/tree');
+const { treeState, activeSearchQuery } = await import(
+  '../../apps/kira-studio/frontend/src/project/state/tree'
+);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

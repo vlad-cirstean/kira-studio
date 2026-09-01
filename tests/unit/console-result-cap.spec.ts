@@ -12,10 +12,10 @@ import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
 
-const { data } = await import('../../src/renderer/bridge/data');
-const { openConsoleTab } = await import('../../src/renderer/state/tabs');
-const { run, runtime } = await import('../../src/renderer/views/console/state');
-const { getPage } = await import('../../src/renderer/views/console/resultPages');
+const { data } = await import('../../apps/kira-studio/frontend/src/bridge/data');
+const { openConsoleTab } = await import('../../apps/kira-studio/frontend/src/state/tabs');
+const { run, runtime } = await import('../../apps/kira-studio/frontend/src/views/console/state');
+const { getPage } = await import('../../apps/kira-studio/frontend/src/views/console/resultPages');
 
 // A minimal fake — state.ts's run() only reads page.kind and page.rowCount, never anything
 // shape-specific to a real tabular/document page.

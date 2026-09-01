@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { columnOffsets, columnRangeExtractor } from '../../src/renderer/views/shared/page/columns';
+import {
+  columnOffsets,
+  columnRangeExtractor,
+} from '../../apps/kira-studio/frontend/src/views/shared/page/columns';
 
 // 10 columns, 100px each -> offsets = [0, 100, 200, ..., 1000].
 const uniformOrder = Array.from({ length: 10 }, (_, i) => `c${i}`);

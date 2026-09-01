@@ -11,7 +11,7 @@ const socket: FakeSocket = createFakeSocket();
 setSocketFactory(() => socket);
 
 const { ready, request, onPortEvent, reviveChunks } = await import(
-  '../../src/renderer/bridge/port'
+  '../../apps/kira-studio/frontend/src/bridge/port'
 );
 
 // request() gates its send on `ready` via a .then() registered synchronously but resolved on a
@@ -29,7 +29,7 @@ interface SentRequest {
   payload: unknown;
 }
 
-describe('src/renderer/bridge/port.ts — the JSONStream transport (P57 D2/D3)', () => {
+describe('apps/kira-studio/frontend/src/bridge/port.ts — the JSONStream transport (P57 D2/D3)', () => {
   test('1. a request issued before the stream opens is not sent until it does', async () => {
     const p = request('ping');
     expect(socket.sent).toHaveLength(0); // CONNECTING: send() would throw on the real socket

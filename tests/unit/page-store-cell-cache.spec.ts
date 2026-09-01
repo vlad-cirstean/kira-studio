@@ -12,8 +12,10 @@ import {
   unpagedPosition,
 } from '@shared/protocol/page';
 
-const { createPageStore } = await import('../../src/renderer/views/shared/page/store');
-const gridPage = await import('../../src/renderer/views/grid/page');
+const { createPageStore } = await import(
+  '../../apps/kira-studio/frontend/src/views/shared/page/store'
+);
+const gridPage = await import('../../apps/kira-studio/frontend/src/views/grid/page');
 
 describe('page store cachedView (P2 R2 #99)', () => {
   test('1. a repeat call for the same row/subKey returns the identical object, not a new one', () => {

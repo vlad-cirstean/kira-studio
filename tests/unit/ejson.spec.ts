@@ -12,7 +12,7 @@ import {
   parseDocument,
   parseIdLabel,
   toShellText,
-} from '../../src/renderer/views/shared/document/ejson';
+} from '../../apps/kira-studio/frontend/src/views/shared/document/ejson';
 
 describe('toShellText — every BSON wrapper detectWrapper() recognises', () => {
   test('ObjectId', () => {

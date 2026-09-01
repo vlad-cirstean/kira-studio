@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "paths": {
+      "@shared/*": ["../../../src/shared/*"],
+      "@bindings/*": [
+        "./bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
+      ],
+      "@bindings-internal/*": [
+        "./bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/*"
+      ],
+      "/wails/runtime.js": ["../../../node_modules/@wailsio/runtime/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../../../src/shared/**/*.ts"]
+}

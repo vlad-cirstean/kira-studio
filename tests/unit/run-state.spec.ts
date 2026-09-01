@@ -10,8 +10,8 @@ import type { OpRecord } from '../../src/shared/domain/ops';
 // is hoisted and would run before this file's own code has a chance to set `globalThis.window`.
 import './support/window';
 
-const { opsState } = await import('../../src/renderer/state/ops');
-const { useRunState } = await import('../../src/renderer/state/runState');
+const { opsState } = await import('../../apps/kira-studio/frontend/src/state/ops');
+const { useRunState } = await import('../../apps/kira-studio/frontend/src/state/runState');
 
 function record(partial: Partial<OpRecord> & Pick<OpRecord, 'id' | 'tabId' | 'status'>): OpRecord {
   return {

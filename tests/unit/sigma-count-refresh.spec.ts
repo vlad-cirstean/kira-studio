@@ -17,18 +17,18 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 
-const { data } = await import('../../src/renderer/bridge/data');
+const { data } = await import('../../apps/kira-studio/frontend/src/bridge/data');
 const { openDocumentTab, openKeyValueTab, openStreamTab } = await import(
-  '../../src/renderer/state/tabs'
+  '../../apps/kira-studio/frontend/src/state/tabs'
 );
 const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
-  '../../src/renderer/views/documents/state'
+  '../../apps/kira-studio/frontend/src/views/documents/state'
 );
 const { runCount: runKeyValueCount, runtime: keyValueRuntime } = await import(
-  '../../src/renderer/views/keyvalue/state'
+  '../../apps/kira-studio/frontend/src/views/keyvalue/state'
 );
 const { runCount: runStreamCount, runtime: streamRuntime } = await import(
-  '../../src/renderer/views/stream/state'
+  '../../apps/kira-studio/frontend/src/views/stream/state'
 );
 
 interface Case {
