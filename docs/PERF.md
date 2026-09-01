@@ -511,6 +511,67 @@ refusal rule has a real consequence worth knowing: at page size 10 000 rows on a
 single page can exceed 32 MB and is then never cached at all, regardless of how much budget
 headroom exists. The user's lever for this is the cache budget input in Settings → Cache.
 
+### 2.6 P4 — page-encode cost, and what the successor binary envelope would additionally buy
+
+**Status: measured, on this tree, before and after `perf(page): encode a page without the nested
+json.Marshal round trips`.** §2.5 measured base64's wire-size cost against raw bytes. This section
+measures a different cost on the same codec: the CPU and allocation `internal/page`'s own encoder
+spent getting there — `encoding/json` calling each page's `MarshalJSON` and `Uint32LE`'s
+`MarshalJSON`, then re-scanning (`compact`) the bytes each one returned into the outer buffer — and
+what removing those two round trips bought, byte-for-byte identically. Full findings, the off-the-
+shelf alternatives weighed against these numbers, and the recommendation are
+`docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md`'s F10-F21 and §4; this section is that plan's
+§8.4 re-run, not a copy of its own measurements.
+
+**Method.** Four fixtures — the two configurable page sizes, the maximum page size, and a wide
+worst case — built through a verbatim copy of the real `internal/page` codec (`internal/` cannot be
+imported outside the module, so a copy is the only way to measure it from a throwaway program; this
+is the P58a M2 / §2.5 convention, and nothing here is committed to the repo). The timed unit is the
+real production call, `json.Marshal(wireResponse{Kind:"res", ID, OK:true, Payload:
+ReadResponse{Page, Source}})` — `adapterhost/dataframe.go`'s exact `respond` expression, not a bare
+chunk. Allocation is `runtime.MemStats.TotalAlloc` delta. Each figure below is the median of
+dozens-to-hundreds of in-process repetitions (300 for the smallest fixture down to 5 for the
+largest, chosen so the total run time per fixture stays in the same ballpark) rather than three
+separate process launches — a noisier instrument at the largest fixture (GC pressure varies run to
+run) but a steadier one at the smallest, and the allocation ratio is stable either way.
+
+| Fixture | Wire bytes | Before | After | Speedup | Alloc/wire ratio, before → after |
+|---|---|---|---|---|---|
+| 100 × 12 | 46,558 | 332 µs / 114.0 KB | 38 µs / 50.0 KB | 8.7x | 2.45x → 1.07x |
+| 1,000 × 12 | 448,081 | 3.46 ms / 1.13 MB | 0.37 ms / 0.45 MB | 9.5x | 2.53x → 1.01x |
+| 10,000 × 12 | 4,462,372 | 32.0 ms / 11.9 MB | 4.38 ms / 4.83 MB | 7.3x | 2.67x → 1.08x |
+| 10,000 × 40 | 35,985,413 | 448 ms / 113.1 MB | 30.7 ms / 36.0 MB | 14.6x | 3.14x → 1.00x |
+
+**Every wire-byte count is identical before and after** — the measurement program asserts this
+directly (a wire-byte mismatch would abort the run rather than print a row) — confirming across all
+four fixtures what the P4 plan's own §8.3 proved on eight edge cases (each of the four page kinds,
+an empty result set, a NULL-only column, and — the one case that fails silently rather than loudly
+if fudged — a page with no truncated rows at all, since a nil `[]byte` marshals as `null` where a
+non-nil empty one marshals as `""`, and `port.ts`'s `toTypedArray` hands that straight to
+`Uint8Array.fromBase64`). The wall-clock speedup (7-15x here; the P4 plan's own run on different
+hardware saw 6-12x) is not the number to lean on given GC noise at the larger sizes; the allocation
+ratio is the steady result, converging from paying 2.4-3.1x the frame's own size in transient
+allocation down to almost exactly 1.00x — one buffer, no intermediate copies.
+
+**What base64 itself still costs, and what a binary envelope would additionally buy — unaffected by
+this change, so not re-measured here.** This commit does not touch a single byte on the wire, so
+the P4 plan's own wire-size, gzip, and frontend-decode measurements (its F12 and F13) carry over
+unchanged: base64 inflates the wire by **1.33-1.36x** over raw bytes and that inflation **survives
+gzip at roughly the same ratio** (a fixed 4:3 alphabet expansion of already-high-entropy bytes is
+not redundancy a compressor finds), and the frontend's decode pass — `TextDecoder.decode` →
+`JSON.parse` → `reviveChunks`'s base64-to-typed-array materialization — costs **0.2-38 ms per page
+view** under a JavaScriptCore proxy for the app's real WKWebView, scaling with frame size because
+every buffer of every column is copied into a fresh typed array before the first cell is read. A
+binary envelope replacing that copy with a zero-copy view over the received bytes would remove that
+whole pass (down to 0.02-0.14 ms in the same plan's measurement) and the 25-33% of wire bytes base64
+adds — genuine remaining costs this commit does not touch. The P4 plan's recommendation (§4, R5) is
+to specify that envelope now (§5) and build it only when one of three named triggers fires — a
+budget regression with frame decode implicated, a page-kind or default-size change that moves the
+typical frame an order of magnitude, or an actual frontend/backend network split — because today's
+numbers, even before this commit, did not clear that bar, and this commit closes roughly 85-90% of
+the Go-side gap to that binary envelope on its own, with no protocol change, no frontend change, and
+no fixture regeneration.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
