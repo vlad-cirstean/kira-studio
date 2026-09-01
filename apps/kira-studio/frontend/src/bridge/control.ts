@@ -40,6 +40,7 @@ import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Events } from '/wails/runtime.js';
+import { windowKey } from '../state/window';
 
 // P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
 // ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object
@@ -236,9 +237,11 @@ export const control = {
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),
 
+  // Both scoped to this page's own workbench (P8 D2/F6) — windowKey is read once, synchronously,
+  // at module load (state/window.ts), before hydrateTabs() ever calls tabsList().
   tabsList: (): Promise<TabRecord[]> =>
-    unwrap(TabsService.List()).then((r) => trust<TabRecord[]>(r ?? [])),
-  tabsSave: (tabs: TabRecord[]): Promise<void> => unwrap(TabsService.Save({ tabs })),
+    unwrap(TabsService.List({ windowKey })).then((r) => trust<TabRecord[]>(r ?? [])),
+  tabsSave: (tabs: TabRecord[]): Promise<void> => unwrap(TabsService.Save({ windowKey, tabs })),
 
   // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
   // `any` in the bindings) rather than the domain's real discriminated union — Go has no sum
