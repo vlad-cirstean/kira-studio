@@ -754,24 +754,55 @@ launch the signed bundle the way `docs/PERF.md` §2.4's methodology note describ
 
 ## 8. Acceptance checklist
 
-- [ ] `Sample.MemoryBytes` is `phys_footprint` on darwin, RSS elsewhere, and both are documented.
-- [ ] Every `proc_pid_rusage`/`proc_pidinfo` return value the app depends on is checked, and a
+- [x] `Sample.MemoryBytes` is `phys_footprint` on darwin, RSS elsewhere, and both are documented.
+- [x] Every `proc_pid_rusage`/`proc_pidinfo` return value the app depends on is checked, and a
       failed read drops that pid for the tick instead of contributing a zero (F2, D7).
-- [ ] A per-pid CPU delta cannot be negative and a sample cannot leave `[0, 100]`; a raw value
+- [x] A per-pid CPU delta cannot be negative and a sample cannot leave `[0, 100]`; a raw value
       above the sanity threshold is logged, not silently rounded (F3).
-- [ ] The first emitted sample carries a real CPU delta (F4).
-- [ ] One `proc_pid_rusage` per pid per tick replaces the previous ~6 syscalls (F7).
-- [ ] A full rescan is one `proc_listpids` plus one `proc_pidpath` per pid, one reused buffer (F8).
-- [ ] The tooltip states the convention, the core count and the process count; the reading shows a
+- [x] The first emitted sample carries a real CPU delta (F4).
+- [x] One `proc_pid_rusage` per pid per tick replaces the previous ~6 syscalls (F7).
+- [x] A full rescan is one `proc_listpids` plus one `proc_pidpath` per pid, one reused buffer (F8).
+- [x] The tooltip states the convention, the core count and the process count; the reading shows a
       decimal below 10% (F6, D6).
-- [ ] `CGO_ENABLED=0 GOOS=darwin go vet ./apps/kira-studio/internal/metrics/` succeeds (D5).
-- [ ] `docs/ARCHITECTURE.md`'s metrics paragraph, `StatusBar.vue`'s header comment and
+- [x] `CGO_ENABLED=0 GOOS=darwin go vet ./apps/kira-studio/internal/metrics/` succeeds (D5) —
+      verified from the implementing sandbox: fails before C2/D5, succeeds after.
+- [x] `docs/ARCHITECTURE.md`'s metrics paragraph, `StatusBar.vue`'s header comment and
       `AppMetricsSample`'s doc comment are all true again (F9).
-- [ ] Exactly two new tests exist (C1's rules, C6's calibration), each with the comment naming the
+- [x] Exactly two new tests exist (C1's rules, C6's calibration), each with the comment naming the
       rule it guards; nothing else gained a test.
-- [ ] §7.1 is green.
+- [x] §7.1's Go/Linux-compilable rows are green; the frontend row is green modulo two pre-existing
+      sandbox timing tripwires unrelated to this phase (see below). The e2e-real row was not run
+      this pass (see below) — low risk given this phase's changes are additive-only to the wire
+      shape, but genuinely unexercised, so this line item is not claimed as fully green.
 - [ ] §7.2 has been run by a human and C8 records the result — **or** the phase closes with §7.2
-      named as an open item and C8 unwritten.
+      named as an open item and C8 unwritten. **Closing this way**: C1-C7 and D1-D7 all landed
+      (see the commit log — `git log --oneline` for `P7 C1` through `P7 C7`); §7.2 has not been run
+      on real macOS hardware in this implementing pass (a Linux sandbox, no macOS toolchain, §1.4),
+      so C8 is deliberately unwritten and every number in §2.1-§2.4 that is not cited to a source
+      remains a projection, not a measurement. **A human with macOS hardware must still run §7.2
+      before this phase is considered fully closed** — in particular C6's calibration test
+      (`go test ./apps/kira-studio/internal/metrics/...` on the Mac) settles OQ-1, and item 3's
+      `footprint -p`/Activity Monitor cross-check is the only way to confirm F1's fix actually
+      closes the gap `docs/PERF.md` §2.4 measured. Once that run happens, write C8 into
+      `docs/PERF.md` with its real results and check this item off.
+
+**§7.1, as run from this implementing sandbox:**
+
+| Check | Result |
+|---|---|
+| `go build/vet/test ./apps/kira-studio/internal/metrics/...` | green |
+| `go build/vet/test ./apps/kira-studio/internal/...` | green |
+| `CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build/vet ./apps/kira-studio/internal/metrics/` | green (D5) |
+| `bunx biome check .` / `bun run typecheck` (web, tests, unit) | green |
+| `bun run test:ui` (Playwright, headless Chromium, no display) | 36/38 green — 2 failures, both pre-existing sandbox scroll/frame-timing tripwires (`budgets.spec.ts`, `perf.spec.ts`) unrelated to this phase (no test in the suite exercises `appMetrics`/`StatusBar.vue`'s CPU/memory readout); each failing assertion's own in-file comment already names this sandbox's timing noise as an expected source of flakiness |
+| `node node_modules/.bin/playwright test --project=e2e-real` | **not run this pass** — `wails3`/bindings setup was not (re-)done in this implementing session; this phase's changes are additive-only to `AppMetricsSample`'s JSON shape (two new fields, nothing removed or renamed) and Go-side logic is covered by the metrics package's own unit tests above, so the risk this specific suite would catch something the others didn't is low, but it genuinely was not exercised |
+
+What §7.1 itself says none of this proves: anything in `probe_darwin.go`, `processlist_darwin.go`
+or C6's calibration test — none of it has been compiled by anything, anywhere, in this pass. Every
+darwin-specific field name, struct layout and calling convention was cross-checked against Apple's
+own xnu header sources (`sys/resource.h`, `sys/proc_info.h`, `libproc.h`/`libproc.c`) rather than
+assumed, which is the strongest verification available without the hardware — but it is not the
+same thing as a real compile, let alone a real run.
 
 ---
 
