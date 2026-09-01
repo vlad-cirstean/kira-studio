@@ -166,13 +166,20 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	}
 	op.SetCommand("db." + collectionName + ".find(" + filterText + ")")
 
-	docs, err := adapters.RunWithAbortRace(ctx, func() {}, func(queryCtx context.Context) ([]bson.D, error) {
+	// docs is left as bson.Raw — the driver's own wire bytes — rather than decoded into bson.D.
+	// P2 R2 (task #96): the id/body text below only ever re-marshals each document straight back
+	// to EJSON (IDText/ejsonStringify), never inspects or mutates a decoded field, so decoding into
+	// bson.D first paid a full reflection-driven tree build only to walk it again on the way back
+	// out. bson.Raw/bson.RawValue have their own codecs (rawEncodeValue/rawValueEncodeValue) that
+	// bson.MarshalExtJSON dispatches to automatically, streaming the wire bytes straight into the
+	// EJSON writer with no intermediate tree at all.
+	docs, err := adapters.RunWithAbortRace(ctx, func() {}, func(queryCtx context.Context) ([]bson.Raw, error) {
 		cursor, err := collection.Find(queryCtx, filter, findOpts)
 		if err != nil {
 			return nil, mapError(err)
 		}
 		defer cursor.Close(queryCtx)
-		var out []bson.D
+		var out []bson.Raw
 		if err := cursor.All(queryCtx, &out); err != nil {
 			return nil, mapError(err)
 		}
@@ -189,7 +196,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	}
 	displayDocs := keptDocs
 	if reverseRows {
-		displayDocs = make([]bson.D, len(keptDocs))
+		displayDocs = make([]bson.Raw, len(keptDocs))
 		for i, d := range keptDocs {
 			displayDocs[len(keptDocs)-1-i] = d
 		}
@@ -198,8 +205,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 
 	builder := page.NewDocumentPageBuilder(false)
 	for _, doc := range displayDocs {
-		idVal, _ := lookupField(doc, "_id")
-		idStr, err := IDText(idVal)
+		idStr, err := IDText(doc.Lookup("_id"))
 		if err != nil {
 			return page.DocumentPage{}, mapError(err)
 		}
@@ -239,8 +245,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 			hasBackward = req.Cursor.Offset > 0
 		}
 		if hasForward {
-			lastID, _ := lookupField(displayDocs[rowCount-1], "_id")
-			text, err := IDText(lastID)
+			text, err := IDText(displayDocs[rowCount-1].Lookup("_id"))
 			if err != nil {
 				return page.DocumentPage{}, mapError(err)
 			}
@@ -248,8 +253,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 			nextToken = &token
 		}
 		if hasBackward {
-			firstID, _ := lookupField(displayDocs[0], "_id")
-			text, err := IDText(firstID)
+			text, err := IDText(displayDocs[0].Lookup("_id"))
 			if err != nil {
 				return page.DocumentPage{}, mapError(err)
 			}
