@@ -1,7 +1,6 @@
 package page
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -73,33 +72,22 @@ func nowEpochMs() int64 {
 	return time.Now().UnixMilli()
 }
 
-// TabularPage mirrors page.ts's TabularPage.
+// TabularPage mirrors page.ts's TabularPage. Kind is declared first so the emitted field order —
+// and therefore the byte sequence — matches what the deleted MarshalJSON produced (P4 D6).
 type TabularPage struct {
-	Columns        []ColumnDescriptor
-	RowCount       int
-	Chunks         []Chunk // index-aligned with Columns
-	Position       PagePosition
-	TruncatedCells int
-	ByteSize       int // measured, not estimated — what L2 budgets against
-	FetchedAt      int64
+	Kind           PageKind           `json:"kind"`
+	Columns        []ColumnDescriptor `json:"columns"`
+	RowCount       int                `json:"rowCount"`
+	Chunks         []Chunk            `json:"chunks"` // index-aligned with Columns
+	Position       PagePosition       `json:"position"`
+	TruncatedCells int                `json:"truncatedCells"`
+	ByteSize       int                `json:"byteSize"` // measured, not estimated — what L2 budgets against
+	FetchedAt      int64              `json:"fetchedAt"`
 }
 
 func (TabularPage) PageKind() PageKind { return PageKindTabular }
 func (p TabularPage) Size() int        { return p.ByteSize }
 func (p TabularPage) Rows() int        { return p.RowCount }
-
-func (p TabularPage) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind           string             `json:"kind"`
-		Columns        []ColumnDescriptor `json:"columns"`
-		RowCount       int                `json:"rowCount"`
-		Chunks         []Chunk            `json:"chunks"`
-		Position       PagePosition       `json:"position"`
-		TruncatedCells int                `json:"truncatedCells"`
-		ByteSize       int                `json:"byteSize"`
-		FetchedAt      int64              `json:"fetchedAt"`
-	}{"tabular", p.Columns, p.RowCount, p.Chunks, p.Position, p.TruncatedCells, p.ByteSize, p.FetchedAt})
-}
 
 // columnEnvelopeBytesFor mirrors page.ts's pageByteSize UTF-16-length estimate: JS .length counts
 // UTF-16 code units, which equals len([]rune(s)) for the entire BMP and differs only for
@@ -162,6 +150,7 @@ func (b *TabularPageBuilder) Finish(position PagePosition) TabularPage {
 		chunks[i] = s.finish(b.rowCount, b.reversed)
 	}
 	p := TabularPage{
+		Kind:           PageKindTabular,
 		Columns:        b.columns,
 		RowCount:       b.rowCount,
 		Chunks:         chunks,
@@ -173,31 +162,21 @@ func (b *TabularPageBuilder) Finish(position PagePosition) TabularPage {
 	return p
 }
 
-// DocumentPage mirrors page.ts's DocumentPage.
+// DocumentPage mirrors page.ts's DocumentPage. Kind is declared first so the emitted field order —
+// and therefore the byte sequence — matches what the deleted MarshalJSON produced (P4 D6).
 type DocumentPage struct {
-	Position  PagePosition
-	IDs       Chunk
-	Bodies    Chunk
-	RowCount  int
-	ByteSize  int
-	FetchedAt int64
+	Kind      PageKind     `json:"kind"`
+	Position  PagePosition `json:"position"`
+	IDs       Chunk        `json:"ids"`
+	Bodies    Chunk        `json:"bodies"`
+	RowCount  int          `json:"rowCount"`
+	ByteSize  int          `json:"byteSize"`
+	FetchedAt int64        `json:"fetchedAt"`
 }
 
 func (DocumentPage) PageKind() PageKind { return PageKindDocument }
 func (p DocumentPage) Size() int        { return p.ByteSize }
 func (p DocumentPage) Rows() int        { return p.RowCount }
-
-func (p DocumentPage) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind      string       `json:"kind"`
-		Position  PagePosition `json:"position"`
-		IDs       Chunk        `json:"ids"`
-		Bodies    Chunk        `json:"bodies"`
-		RowCount  int          `json:"rowCount"`
-		ByteSize  int          `json:"byteSize"`
-		FetchedAt int64        `json:"fetchedAt"`
-	}{"document", p.Position, p.IDs, p.Bodies, p.RowCount, p.ByteSize, p.FetchedAt})
-}
 
 // DocumentPageBuilder mirrors page.ts's DocumentPageBuilder.
 type DocumentPageBuilder struct {
@@ -228,42 +207,29 @@ func (b *DocumentPageBuilder) Finish(position PagePosition) DocumentPage {
 	ids := b.ids.finish(b.rowCount, false)
 	bodies := b.bodies.finish(b.rowCount, false)
 	return DocumentPage{
-		Position: position, IDs: ids, Bodies: bodies, RowCount: b.rowCount,
+		Kind: PageKindDocument, Position: position, IDs: ids, Bodies: bodies, RowCount: b.rowCount,
 		ByteSize: ChunkByteSize(ids) + ChunkByteSize(bodies), FetchedAt: nowEpochMs(),
 	}
 }
 
-// KeyValuePage mirrors page.ts's KeyValuePage.
+// KeyValuePage mirrors page.ts's KeyValuePage. Kind is declared first so the emitted field order —
+// and therefore the byte sequence — matches what the deleted MarshalJSON produced (P4 D6).
 type KeyValuePage struct {
-	Position    PagePosition
-	RedisType   string // "string" | "hash" | "list" | "set" | "zset" | "stream" | "object"
-	TTLMs       *int64
-	MemoryBytes *int64
-	Fields      Chunk
-	Values      Chunk
-	RowCount    int
-	ByteSize    int
-	FetchedAt   int64
+	Kind        PageKind     `json:"kind"`
+	Position    PagePosition `json:"position"`
+	RedisType   string       `json:"redisType"` // "string" | "hash" | "list" | "set" | "zset" | "stream" | "object"
+	TTLMs       *int64       `json:"ttlMs"`
+	MemoryBytes *int64       `json:"memoryBytes"`
+	Fields      Chunk        `json:"fields"`
+	Values      Chunk        `json:"values"`
+	RowCount    int          `json:"rowCount"`
+	ByteSize    int          `json:"byteSize"`
+	FetchedAt   int64        `json:"fetchedAt"`
 }
 
 func (KeyValuePage) PageKind() PageKind { return PageKindKeyValue }
 func (p KeyValuePage) Size() int        { return p.ByteSize }
 func (p KeyValuePage) Rows() int        { return p.RowCount }
-
-func (p KeyValuePage) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind        string       `json:"kind"`
-		Position    PagePosition `json:"position"`
-		RedisType   string       `json:"redisType"`
-		TTLMs       *int64       `json:"ttlMs"`
-		MemoryBytes *int64       `json:"memoryBytes"`
-		Fields      Chunk        `json:"fields"`
-		Values      Chunk        `json:"values"`
-		RowCount    int          `json:"rowCount"`
-		ByteSize    int          `json:"byteSize"`
-		FetchedAt   int64        `json:"fetchedAt"`
-	}{"keyvalue", p.Position, p.RedisType, p.TTLMs, p.MemoryBytes, p.Fields, p.Values, p.RowCount, p.ByteSize, p.FetchedAt})
-}
 
 // KeyValuePageBuilder mirrors page.ts's KeyValuePageBuilder.
 type KeyValuePageBuilder struct {
@@ -299,45 +265,31 @@ func (b *KeyValuePageBuilder) Finish(position PagePosition) KeyValuePage {
 	fields := b.fields.finish(b.rowCount, false)
 	values := b.values.finish(b.rowCount, false)
 	return KeyValuePage{
-		Position: position, RedisType: b.redisType, TTLMs: b.ttlMs, MemoryBytes: b.memoryBytes,
+		Kind: PageKindKeyValue, Position: position, RedisType: b.redisType, TTLMs: b.ttlMs, MemoryBytes: b.memoryBytes,
 		Fields: fields, Values: values, RowCount: b.rowCount,
 		ByteSize: ChunkByteSize(fields) + ChunkByteSize(values), FetchedAt: nowEpochMs(),
 	}
 }
 
-// StreamPage mirrors page.ts's StreamPage.
+// StreamPage mirrors page.ts's StreamPage. Kind is declared first so the emitted field order — and
+// therefore the byte sequence — matches what the deleted MarshalJSON produced (P4 D6).
 type StreamPage struct {
-	Position                 PagePosition
-	Keys                     Chunk
-	Headers                  Chunk
-	Attrs                    Chunk
-	Timestamps               Chunk
-	Bodies                   Chunk
-	RowCount                 int
-	ByteSize                 int
-	FetchedAt                int64
-	VisibilityTimeoutSeconds *int
+	Kind                     PageKind     `json:"kind"`
+	Position                 PagePosition `json:"position"`
+	Keys                     Chunk        `json:"keys"`
+	Headers                  Chunk        `json:"headers"`
+	Attrs                    Chunk        `json:"attrs"`
+	Timestamps               Chunk        `json:"timestamps"`
+	Bodies                   Chunk        `json:"bodies"`
+	RowCount                 int          `json:"rowCount"`
+	ByteSize                 int          `json:"byteSize"`
+	FetchedAt                int64        `json:"fetchedAt"`
+	VisibilityTimeoutSeconds *int         `json:"visibilityTimeoutSeconds"`
 }
 
 func (StreamPage) PageKind() PageKind { return PageKindStream }
 func (p StreamPage) Size() int        { return p.ByteSize }
 func (p StreamPage) Rows() int        { return p.RowCount }
-
-func (p StreamPage) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind                     string       `json:"kind"`
-		Position                 PagePosition `json:"position"`
-		Keys                     Chunk        `json:"keys"`
-		Headers                  Chunk        `json:"headers"`
-		Attrs                    Chunk        `json:"attrs"`
-		Timestamps               Chunk        `json:"timestamps"`
-		Bodies                   Chunk        `json:"bodies"`
-		RowCount                 int          `json:"rowCount"`
-		ByteSize                 int          `json:"byteSize"`
-		FetchedAt                int64        `json:"fetchedAt"`
-		VisibilityTimeoutSeconds *int         `json:"visibilityTimeoutSeconds"`
-	}{"stream", p.Position, p.Keys, p.Headers, p.Attrs, p.Timestamps, p.Bodies, p.RowCount, p.ByteSize, p.FetchedAt, p.VisibilityTimeoutSeconds})
-}
 
 // StreamRow is one row pushed into a StreamPageBuilder.
 type StreamRow struct {
@@ -384,7 +336,7 @@ func (b *StreamPageBuilder) Finish(position PagePosition) StreamPage {
 	timestamps := b.timestamps.finish(b.rowCount, false)
 	bodies := b.bodies.finish(b.rowCount, false)
 	return StreamPage{
-		Position: position, Keys: keys, Headers: headers, Attrs: attrs, Timestamps: timestamps,
+		Kind: PageKindStream, Position: position, Keys: keys, Headers: headers, Attrs: attrs, Timestamps: timestamps,
 		Bodies: bodies, RowCount: b.rowCount,
 		ByteSize: ChunkByteSize(keys) + ChunkByteSize(headers) + ChunkByteSize(attrs) +
 			ChunkByteSize(timestamps) + ChunkByteSize(bodies),

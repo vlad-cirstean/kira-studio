@@ -8,10 +8,7 @@
 package page
 
 import (
-	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
-	"fmt"
 )
 
 // Constants, from page.ts:175-197.
@@ -29,42 +26,6 @@ const (
 	columnEnvelopeBytes = 64
 )
 
-// Uint32LE marshals as base64 of its exact little-endian bytes, so all four of a chunk's buffers
-// decode through one renderer-side function (reviveChunks' toTypedArray, P58 D5/A9). Go's default
-// []uint32 encoding is a JSON number array (~7 bytes per 4-byte value) — this type exists so
-// Offsets/Truncated get the same base64 treatment []byte gets automatically.
-type Uint32LE []uint32
-
-func (v Uint32LE) MarshalJSON() ([]byte, error) {
-	buf := make([]byte, len(v)*4)
-	for i, x := range v {
-		binary.LittleEndian.PutUint32(buf[i*4:], x)
-	}
-	return json.Marshal(buf)
-}
-
-// UnmarshalJSON exists so the Go test tier can round-trip a page through JSON and compare — it is
-// never used in production, where Go only ever encodes.
-func (v *Uint32LE) UnmarshalJSON(b []byte) error {
-	var encoded string
-	if err := json.Unmarshal(b, &encoded); err != nil {
-		return fmt.Errorf("page: Uint32LE: %w", err)
-	}
-	raw, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return fmt.Errorf("page: Uint32LE: %w", err)
-	}
-	if len(raw)%4 != 0 {
-		return fmt.Errorf("page: Uint32LE: %d bytes is not a multiple of 4", len(raw))
-	}
-	out := make(Uint32LE, len(raw)/4)
-	for i := range out {
-		out[i] = binary.LittleEndian.Uint32(raw[i*4:])
-	}
-	*v = out
-	return nil
-}
-
 // Chunk is the Go analogue of page.ts's TextColumnChunk. Three exactly-sized buffers and no
 // per-row object:
 //
@@ -74,11 +35,18 @@ func (v *Uint32LE) UnmarshalJSON(b []byte) error {
 // A NULL row has Offsets[i] == Offsets[i+1]; an empty string does too, which is why the bitset is
 // the only thing that distinguishes them — every value reaching a builder is a *string all the way
 // from the driver's row scan, never a bare "" standing in for NULL.
+//
+// Offsets and Truncated hold their values pre-encoded as exact little-endian bytes (rowCount+1 and
+// len(truncated) uint32s respectively) rather than as []uint32 — encoding/json base64-encodes a
+// []byte directly with no Marshaler round trip, which is the entire point (P4 D6): Go's default
+// []uint32 encoding is a JSON number array anyway, so a typed wrapper with its own MarshalJSON was
+// the only way to get the same base64 treatment Data/Nulls get for free, and that wrapper was the
+// dominant cost (P4 F11). CellText below reads a value back out with binary.LittleEndian.
 type Chunk struct {
-	Data      []byte   `json:"data"`
-	Offsets   Uint32LE `json:"offsets"`
-	Nulls     []byte   `json:"nulls"`
-	Truncated Uint32LE `json:"truncated"`
+	Data      []byte `json:"data"`
+	Offsets   []byte `json:"offsets"`
+	Nulls     []byte `json:"nulls"`
+	Truncated []byte `json:"truncated"`
 }
 
 func bitsetBytes(rowCount int) int {
@@ -92,10 +60,12 @@ func IsNull(chunk Chunk, row int) bool {
 
 // CellText decodes row's text out of chunk.
 func CellText(chunk Chunk, row int) string {
-	return string(chunk.Data[chunk.Offsets[row]:chunk.Offsets[row+1]])
+	start := binary.LittleEndian.Uint32(chunk.Offsets[row*4:])
+	end := binary.LittleEndian.Uint32(chunk.Offsets[(row+1)*4:])
+	return string(chunk.Data[start:end])
 }
 
 // ChunkByteSize is the real, measured byte cost of chunk — what L2 budgets against.
 func ChunkByteSize(chunk Chunk) int {
-	return len(chunk.Data) + len(chunk.Offsets)*4 + len(chunk.Nulls) + len(chunk.Truncated)*4
+	return len(chunk.Data) + len(chunk.Offsets) + len(chunk.Nulls) + len(chunk.Truncated)
 }

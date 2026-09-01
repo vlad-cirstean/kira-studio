@@ -1,6 +1,9 @@
 package page
 
-import "unicode/utf8"
+import (
+	"encoding/binary"
+	"unicode/utf8"
+)
 
 // columnScratch accumulates one column's rows into growable scratch and only copies into
 // exactly-sized buffers at finish() — page.ts's ColumnScratch, field for field. reverse ordering is
@@ -79,9 +82,12 @@ func (s *columnScratch) appendValue(value *string, row int, maxBytes int) bool {
 
 func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 	nulls := make([]byte, bitsetBytes(rowCount))
-	offsets := make(Uint32LE, rowCount+1)
+	offsets := make([]byte, (rowCount+1)*4)
 	data := make([]byte, s.used)
-	var truncated []uint32
+	// Explicitly non-nil (make always returns non-nil, even at zero length): encoding/json marshals
+	// a nil []byte as `null` but a non-nil empty one as `""`, and port.ts's toTypedArray hands that
+	// straight to Uint8Array.fromBase64 — `null` there is a decode failure on the frame path (P4 D6).
+	truncated := make([]byte, 0, len(s.truncatedRows)*4)
 
 	cursor := 0
 	for newRow := 0; newRow < rowCount; newRow++ {
@@ -96,15 +102,15 @@ func (s *columnScratch) finish(rowCount int, reversed bool) Chunk {
 			copy(data[cursor:], s.buffer[start:end])
 		}
 		cursor += length
-		offsets[newRow+1] = uint32(cursor)
+		binary.LittleEndian.PutUint32(offsets[(newRow+1)*4:], uint32(cursor))
 		if s.isNullRow[oldRow] {
 			nulls[newRow>>3] |= 1 << (newRow & 7)
 		}
 		if _, ok := s.truncatedRows[oldRow]; ok {
-			truncated = append(truncated, uint32(newRow))
+			truncated = binary.LittleEndian.AppendUint32(truncated, uint32(newRow))
 		}
 	}
 	// truncatedRows iterates the map above in newRow order already (the loop runs newRow
 	// ascending), so the result is already sorted — no separate sort needed.
-	return Chunk{Data: data, Offsets: offsets, Nulls: nulls, Truncated: Uint32LE(truncated)}
+	return Chunk{Data: data, Offsets: offsets, Nulls: nulls, Truncated: truncated}
 }
