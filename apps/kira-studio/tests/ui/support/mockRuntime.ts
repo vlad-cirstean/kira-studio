@@ -66,6 +66,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   filtersReplace: 'FiltersService.Replace',
   opsRecent: 'OpsService.Recent',
   opsCancel: 'OpsService.Cancel',
+  windowsEnsure: 'WindowsService.Ensure',
   tabsList: 'TabsService.List',
   tabsSave: 'TabsService.Save',
   queriesList: 'QueriesService.List',
@@ -108,6 +109,10 @@ const FQN_TO_CHANNEL: Readonly<Record<string, string>> = Object.freeze(
 //   - `filtersList`: `project/state/tree.ts` calls it once for every connection the instant it
 //     reaches `connected` (tree.ts:118) — "no filters yet" for a connection never seen before,
 //     `EMPTY_VISIBILITY` (`shared/domain/tree-filter.ts`) made explicit.
+//   - `windowsEnsure` (P8): `main.ts`'s `bootstrap()` awaits this once, before hydrateTabs() or
+//     anything else window-scoped runs — always a no-op on the real native shell (the window's own
+//     `windows` row already exists by the time its URL loads), so there is nothing meaningful to
+//     snapshot. Void.
 //   - `tabsSave`: `state/tabs.ts` debounce-persists on every tab mutation (typing in a console
 //     tab, opening/closing a tab, …) with a tab array keyed by a fresh UUID every test run —
 //     never a value any committed fixture could match on args, so it cannot be captured even in
@@ -143,6 +148,7 @@ const EMPTY_OBJECT_META = {
 };
 const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.filtersList]: JSON.stringify({ hiddenKinds: [], hiddenPaths: [] }),
+  [IPC.windowsEnsure]: 'null',
   [IPC.tabsSave]: 'null',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
   [IPC.settingsSet]: JSON.stringify(defaultSettings),

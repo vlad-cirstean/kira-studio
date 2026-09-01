@@ -54,6 +54,8 @@ export const IPC = {
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
 
+  windowsEnsure: 'kira:windows:ensure',
+
   tabsList: 'kira:tabs:list',
   tabsSave: 'kira:tabs:save',
 

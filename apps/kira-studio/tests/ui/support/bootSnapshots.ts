@@ -18,6 +18,10 @@ const KEYCHAIN_AVAILABLE: SecretStorageStatus = {
  * no connections, no ops, no tabs. This is what a fresh `KIRA_HOME` gave every `tests/e2e/` spec
  * for free before P57; here it is one array every `tests/ui/` spec's `relaunch()` starts from.
  *
+ * `windowsEnsure` (P8) runs sequentially *before* this `Promise.all`, not inside it — always a
+ * no-op void call here (`mockRuntime.ts`'s own `WILDCARD_DEFAULTS`, not listed in this array,
+ * the same way `tabsSave`/`filtersList` aren't).
+ *
  * `engineStatus` is deliberately absent — nothing in the renderer ever calls it (the status pill
  * reads `workbench/state/engine.ts`'s data-plane `ping`, not a control-plane channel), so it has
  * no `CHANNEL_TO_FQN` entry and needs none here.
