@@ -646,7 +646,13 @@ TypeScript bindings under `apps/kira-studio/frontend/bindings/…/internal/bridg
 `wails3 generate bindings -b -i -ts -names`), which `apps/kira-studio/frontend/src/bridge/control.ts` calls as plain
 typed async functions — `AppService.Info()`, `ConnectionsService.List()` — resolving under the hood
 to HTTP calls against the local `/wails/runtime` endpoint driven by `/wails/runtime.js`
-(`@wailsio/runtime`). Every call is wrapped in one `unwrap()` that normalizes a Go-side error into
+(`@wailsio/runtime`). That specifier is a literal URL the app itself answers — Wails serves its own
+runtime bundle there — not a package the build resolves, so `vite.config.ts` marks `/wails/*`
+external. Vite's dev server still has to resolve it at transform time, which is what
+`apps/kira-studio/frontend/wails/runtime.js` is for: a file at exactly that path under the Vite root, so the
+rewritten import URL stays `/wails/runtime.js` and `wails3 dev`'s asset server (which answers
+`/wails/*` itself and proxies only the rest to Vite) keeps serving the real bundle. Every call is
+wrapped in one `unwrap()` that normalizes a Go-side error into
 the `{message, code}` shape the renderer already branched on. The **data plane** is a single named
 stream, `"engine"`, opened once per page load by `apps/kira-studio/frontend/src/bridge/port.ts` via
 `Stream('engine')`, carrying binary FlatBuffers frames for bulk payloads (grid pages, tree
