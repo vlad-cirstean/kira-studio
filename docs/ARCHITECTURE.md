@@ -25,7 +25,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Shell | **Wails v3** (`v3.0.0-beta.15`), Go | native title bar, macOS 14+, `arm64` only |
 | Language | TypeScript 7 (native compiler) for `.ts`; **Go** for the shell | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. One dynamically-imported chunk as of P13: the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()`, so the ~38 KB gzip dependency is fetched on the first Format press instead of costing every launch |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
