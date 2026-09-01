@@ -7,7 +7,7 @@
 package ipcfixture
 
 // The six IPC channels every committed fixture needs (P58f §4.3(a)) — grepped verbatim from
-// src/shared/protocol/ipc.ts's IPC map, never inferred from the TypeScript identifier (AGENTS.md's
+// packages/shared/protocol/ipc.ts's IPC map, never inferred from the TypeScript identifier (AGENTS.md's
 // P52-P56 finding: ENGINE_OP.configureCache is 'cache:configure', not 'engine:configure-cache').
 const (
 	channelConnectionsList    = "kira:connections:list"
@@ -20,7 +20,7 @@ const (
 	channelOpsCancel          = "kira:ops:cancel"
 )
 
-// The two DATA_OP values every committed fixture needs, from src/shared/protocol/data-ops.ts's
+// The two DATA_OP values every committed fixture needs, from packages/shared/protocol/data-ops.ts's
 // DATA_OP map — same discipline as the channel constants above.
 const (
 	dataOpRead       = "data:read"

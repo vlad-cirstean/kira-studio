@@ -16,7 +16,7 @@ type StreamSession interface {
 }
 
 // StreamName is the one named stream (P52 §7.2). The renderer's replacement for
-// src/renderer/bridge/port.ts opens it once per page load; Wails supersedes an older generation's
+// apps/kira-studio/frontend/src/bridge/port.ts opens it once per page load; Wails supersedes an older generation's
 // session automatically (stream.go:747-800), which is what retires index.ts's own `generation`
 // counter.
 const StreamName = "engine"

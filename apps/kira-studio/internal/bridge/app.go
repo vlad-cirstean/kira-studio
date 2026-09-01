@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
-// AppInfo replaces src/shared/protocol/ipc.ts's AppInfo.electron/.chrome fields with go/wails —
+// AppInfo replaces packages/shared/protocol/ipc.ts's AppInfo.electron/.chrome fields with go/wails —
 // there is no Chromium or Electron version to report under Wails (P52 §4.2), and no Node version
 // either now that there is no vendored runtime to report on (P58f D11). Nothing in the current
 // renderer reads AppInfo's fields (grepped for P52; re-checked for P58f — control.appInfo has zero

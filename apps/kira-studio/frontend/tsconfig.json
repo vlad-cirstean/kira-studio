@@ -10,7 +10,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "paths": {
-      "@shared/*": ["../../../src/shared/*"],
+      "@shared/*": ["../../../packages/shared/*"],
       "@bindings/*": [
         "./bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
       ],
@@ -20,5 +20,5 @@
       "/wails/runtime.js": ["../../../node_modules/@wailsio/runtime/types/index.d.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "../../../src/shared/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "../../../packages/shared/**/*.ts"]
 }

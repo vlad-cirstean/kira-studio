@@ -12,7 +12,7 @@ type SortTerm struct {
 	Direction string `json:"direction"` // "asc" | "desc"
 }
 
-// SortSpec is src/shared/domain/queries.ts's discriminated union (sortSpecSchema). The custom
+// SortSpec is packages/shared/domain/queries.ts's discriminated union (sortSpecSchema). The custom
 // codec is what keeps the two arms honest: marshalling never emits the other arm's key, and
 // unmarshalling rejects a value that carries neither (or a malformed one).
 type SortSpec struct {

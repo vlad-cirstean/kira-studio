@@ -32,7 +32,7 @@ type partitionWindow struct {
 	End       int64 `json:"end"` // frozen high watermark for this browse — never re-fetched mid-browse (P10 D6/D7)
 }
 
-// kafkaStreamFilter mirrors src/shared/domain/streamFilter.ts's KafkaStreamFilter wire shape.
+// kafkaStreamFilter mirrors packages/shared/domain/streamFilter.ts's KafkaStreamFilter wire shape.
 type kafkaStreamFilter struct {
 	Offset      *string `json:"offset"`
 	Partitions  []int32 `json:"partitions"`

@@ -28,7 +28,7 @@ type Settings struct {
 	Advanced   AdvancedSettings   `json:"advanced"`
 }
 
-// DefaultSettings mirrors src/shared/domain/settings.ts's defaultSettings verbatim.
+// DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
 func DefaultSettings() Settings {
 	return Settings{
 		Appearance: AppearanceSettings{

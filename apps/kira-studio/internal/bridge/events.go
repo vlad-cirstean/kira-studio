@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// Channel holds today's exact IPC channel strings (src/shared/protocol/ipc.ts's IPC const), which
+// Channel holds today's exact IPC channel strings (packages/shared/protocol/ipc.ts's IPC const), which
 // are the Wails event names verbatim (P52 §7.1) — the renderer's subscribe mechanism changes, the
 // wire name does not.
 const (
@@ -32,7 +32,7 @@ const (
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
-// src/main sends it and nothing in src/renderer subscribes to it (P56 D5). P57 deletes it.
+// src/main sends it and nothing in apps/kira-studio/frontend/src subscribes to it (P56 D5). P57 deletes it.
 const ChannelEngineState = "kira:engine:state"
 
 // Sources are the five push producers P55 left as seams (P55 D15). Each is a one-method

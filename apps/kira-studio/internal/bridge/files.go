@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 )
 
-// The four wire shapes, byte for byte src/shared/protocol/ipc.ts:133-149's.
+// The four wire shapes, byte for byte packages/shared/protocol/ipc.ts:133-149's.
 type FilesChooseSaveArgs struct {
 	DefaultName string `json:"defaultName"`
 }

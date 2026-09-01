@@ -8,7 +8,7 @@
 // (SqlStatement.start/.end index the *original* source, per the type's own doc comment) is not
 // otherwise checked anywhere.
 import { describe, expect, test } from 'bun:test';
-import { splitSqlStatements, statementAtCursor } from '../../src/shared/domain/sql-split';
+import { splitSqlStatements, statementAtCursor } from '../../packages/shared/domain/sql-split';
 
 describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
   test('1. a semicolon inside a single-quoted literal is not a boundary', () => {

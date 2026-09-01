@@ -1,6 +1,6 @@
 package model
 
-// OpRecord mirrors src/shared/domain/ops.ts's opRecordSchema.
+// OpRecord mirrors packages/shared/domain/ops.ts's opRecordSchema.
 type OpRecord struct {
 	ID           string  `json:"id"`
 	ConnectionID *string `json:"connectionId"`

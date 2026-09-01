@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 )
 
-// EngineStatus mirrors src/shared/protocol/ipc.ts's EngineStatus.
+// EngineStatus mirrors packages/shared/protocol/ipc.ts's EngineStatus.
 type EngineStatus struct {
 	Alive bool `json:"alive"`
 	PID   *int `json:"pid"`

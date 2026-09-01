@@ -1,7 +1,7 @@
 package model
 
 // ConnectionFields is the shape both ConnectionsRepo.Insert/Update accept and ConnectionSummary
-// embeds — src/shared/domain/connection.ts's connectionFieldsSchema, minus `password` (D9: no
+// embeds — packages/shared/domain/connection.ts's connectionFieldsSchema, minus `password` (D9: no
 // password field anywhere in this package, enforced by the type itself, same as the TS build's
 // `.omit({password: true})`).
 type ConnectionFields struct {
@@ -20,7 +20,7 @@ type ConnectionFields struct {
 	PreconnectSidecar bool           `json:"preconnectSidecar"`
 }
 
-// ConnectionSummary mirrors src/shared/domain/connection.ts's connectionSummarySchema.
+// ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.
 // ConnectionFields is embedded (not nested) so its fields JSON-inline into this struct's own
 // object, matching the TS schema's flat shape.
 type ConnectionSummary struct {
@@ -31,7 +31,7 @@ type ConnectionSummary struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
-// ConnectionState mirrors src/shared/domain/connection.ts's connectionStateSchema. It is kept
+// ConnectionState mirrors packages/shared/domain/connection.ts's connectionStateSchema. It is kept
 // in-memory by the connections service (not read from a table) — listed here only as the shared
 // wire type the repo's callers also use.
 type ConnectionState struct {

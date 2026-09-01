@@ -40,7 +40,7 @@ import (
 )
 
 // Any files in frontend/dist are embedded into the binary — built by `bun run build` from
-// the real src/renderer (P52 §2.3), not by this scaffold's own removed demo frontend project.
+// the real apps/kira-studio/frontend/src (P52 §2.3), not by this scaffold's own removed demo frontend project.
 //
 //go:embed all:frontend/dist
 var assets embed.FS

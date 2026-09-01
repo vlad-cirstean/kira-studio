@@ -34,7 +34,7 @@ type Layout struct {
 	Window LayoutWindow `json:"window"`
 }
 
-// DefaultLayout mirrors src/shared/domain/layout.ts's defaultLayout verbatim.
+// DefaultLayout mirrors packages/shared/domain/layout.ts's defaultLayout verbatim.
 func DefaultLayout() Layout {
 	var l Layout
 	l.Panel.Project = PanelProject{Visible: true, Width: 260}

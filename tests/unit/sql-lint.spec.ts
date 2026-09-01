@@ -4,7 +4,7 @@
 // escaped character, or the scanner runs past the literal's true end and misreports it as
 // unterminated (and any parenthesis inside the "swallowed" tail as unbalanced).
 import { describe, expect, test } from 'bun:test';
-import { lintSql } from '../../src/shared/domain/sql-lint';
+import { lintSql } from '../../packages/shared/domain/sql-lint';
 
 describe('lintSql — backslash escaping is dialect-conditional (P2 R2, task #92)', () => {
   test('MySQL/MariaDB/ClickHouse: backslashEscapes true treats \\ as an escape inside a literal', () => {

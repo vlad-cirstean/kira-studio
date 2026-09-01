@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// TabRecord's `State` stays raw JSON here — src/shared/domain/tabs.ts's per-kind discriminated
+// TabRecord's `State` stays raw JSON here — packages/shared/domain/tabs.ts's per-kind discriminated
 // union (data/definition/console/document/keyvalue/stream/browse) is renderer-side validation
 // logic, not storage shape (D3). Go validates only the envelope it owns: kind is in
 // RenderableTabKinds and State parses as a JSON object; per-kind shape and forward-compatible

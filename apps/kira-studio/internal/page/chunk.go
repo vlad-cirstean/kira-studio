@@ -1,4 +1,4 @@
-// Package page is the Go analogue of src/shared/protocol/page.ts: the columnar TextColumnChunk
+// Package page is the Go analogue of packages/shared/protocol/page.ts: the columnar TextColumnChunk
 // codec, the four page-kind builders, and the byte-size accounting the L2 cache budgets against.
 //
 // Bulk data crosses the wire as base64 (P58 D5) rather than the Node engine's index-keyed JSON

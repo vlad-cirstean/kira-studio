@@ -4,7 +4,7 @@
 // SecretStorageStatus probe/reason strings the connection dialog already renders.
 package secrets
 
-// Backend values mirror src/shared/domain/secrets.ts's secretStorageStatusSchema.
+// Backend values mirror packages/shared/domain/secrets.ts's secretStorageStatusSchema.
 const (
 	BackendKeychain    = "keychain"
 	BackendBasicText   = "basic_text"

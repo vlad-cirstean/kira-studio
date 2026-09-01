@@ -126,7 +126,7 @@ func (r *Router) HandleDataFrameAsync(session *Session, frame []byte) {
 	}()
 }
 
-// pingPayload is port.ts's PingPayload (src/shared/protocol/port.ts:18-22), byte-compatible with
+// pingPayload is port.ts's PingPayload (packages/shared/protocol/port.ts:18-22), byte-compatible with
 // what rpc.ts's own ping handler used to return — state/engine.ts and StatusBar.vue read it
 // unchanged (P58f D11).
 type pingPayload struct {

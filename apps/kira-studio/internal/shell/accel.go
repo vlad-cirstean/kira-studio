@@ -2,7 +2,7 @@ package shell
 
 import "strings"
 
-// Chord is the Go port of src/shared/domain/shortcuts.ts's chord shape, for the 13 `global: true`
+// Chord is the Go port of packages/shared/domain/shortcuts.ts's chord shape, for the 13 `global: true`
 // bindings menu.ts consumes. Only the modifier vocabulary differs: Wails' parseAccelerator
 // (keys.go:182-217) accepts "Ctrl", never "Control", and SetAccelerator silently drops an
 // accelerator it cannot parse (menuitem.go:275-287) — so a verbatim port would leave Next/Previous
@@ -34,7 +34,7 @@ func (c Chord) Accelerator() string {
 	return strings.Join(parts, "+")
 }
 
-// Shortcuts mirrors SHORTCUTS' `global: true` rows by id (src/shared/domain/shortcuts.ts:25-37),
+// Shortcuts mirrors SHORTCUTS' `global: true` rows by id (packages/shared/domain/shortcuts.ts:25-37),
 // so the table can be diffed against the TS by name.
 var Shortcuts = map[string]Chord{
 	"app.settings":               {Key: ",", CmdOrCtrl: true},

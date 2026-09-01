@@ -24,7 +24,7 @@ type Event struct {
 }
 
 // Event topics this package's consume loop switches on, mirroring ENGINE_EVENT.opStart/opEnd
-// (src/shared/protocol/engine-ops.ts:21-25). There is no EventEngineDown any more (P58f D9):
+// (packages/shared/protocol/engine-ops.ts:21-25). There is no EventEngineDown any more (P58f D9):
 // adapterhost.Host, the only producer left, never published one — that was enginehost.Host's own
 // synthetic topic for a Node child exiting — and reconciliation now runs whenever the event
 // channel closes for any reason, orderly shutdown included, rather than waiting for a topic that

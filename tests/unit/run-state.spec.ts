@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { OpRecord } from '../../src/shared/domain/ops';
+import type { OpRecord } from '../../packages/shared/domain/ops';
 
 // P43 iter3 D37: state/runState.ts is a plain computed() over state/ops.ts's reactive() store —
 // no container, no Electron main process, nothing DOM-shaped read by either module. Vue's

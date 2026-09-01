@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "paths": {
-      "@shared/*": ["./src/shared/*"],
+      "@shared/*": ["./packages/shared/*"],
       "@bindings/*": [
         "./apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
       ],

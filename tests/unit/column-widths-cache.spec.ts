@@ -3,7 +3,7 @@ import {
   initialWidths,
   resetMeasureCtx,
 } from '../../apps/kira-studio/frontend/src/views/shared/page/columns';
-import { createTabularPageBuilder, unpagedPosition } from '../../src/shared/protocol/page';
+import { createTabularPageBuilder, unpagedPosition } from '../../packages/shared/protocol/page';
 
 // P2 R1 regression: DataGrid.vue's `widths` computed depends on the tab's stored columnWidths, so
 // every pointermove of a column-resize drag used to re-run initialWidths' canvas-measurement pass

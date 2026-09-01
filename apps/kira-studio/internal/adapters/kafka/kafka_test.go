@@ -785,7 +785,7 @@ func TestKafka_Read_BrowseCommitsNoOffsets(t *testing.T) {
 
 // 19. a timestamp filter still seeks (D20). Learns each seeded message's real timestamp rather
 // than assuming a hand-picked value falls between two of them, and seeks via a hand-built
-// KafkaStreamFilter JSON string (src/shared/domain/streamFilter.ts's own wire shape:
+// KafkaStreamFilter JSON string (packages/shared/domain/streamFilter.ts's own wire shape:
 // {"offset":null,"partitions":[],"timestampMs":N}) — the same field ReadRequest.Filter already
 // carries for every adapter.
 func TestKafka_Read_TimestampFilterSeeks(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// Sample mirrors src/shared/protocol/ipc.ts's AppMetricsSample shape. CPUPercent is normalized to
+// Sample mirrors packages/shared/protocol/ipc.ts's AppMetricsSample shape. CPUPercent is normalized to
 // the machine's whole capacity (0-100, occasionally a hair over from measurement jitter), not the
 // per-core-sum a tool like `top` reports per process (which can read e.g. 350% on a busy
 // quad-core machine) — StatusBar.vue renders it as a plain "N%" with no further context or

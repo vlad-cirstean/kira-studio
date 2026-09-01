@@ -81,7 +81,7 @@ Kafka has no auth — in Kira Studio's connection dialog, Fields mode with host 
 
 SQS and S3 both always need a real region plus an endpoint override to redirect the AWS SDK at
 LocalStack instead of real AWS, so they only work in URI mode (`options.endpoint`, set via the
-URI's query string — see `src/shared/domain/uri.ts`):
+URI's query string — see `packages/shared/domain/uri.ts`):
 
 ```sh
 sqs://test:test@us-east-1?endpoint=http://localhost:4566

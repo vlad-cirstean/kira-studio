@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P33 D2/F10's sentinels, mirrored from src/shared/domain/object-store.ts — edit, delete and
+// P33 D2/F10's sentinels, mirrored from packages/shared/domain/object-store.ts — edit, delete and
 // upload ride the existing mutate() path with the same sentinel-through-RowValues technique
 // redis/mutate.go established.
 const (

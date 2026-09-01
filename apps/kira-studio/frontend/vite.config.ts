@@ -19,7 +19,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@shared': fileURLToPath(new URL('../../../src/shared', import.meta.url)),
+      '@shared': fileURLToPath(new URL('../../../packages/shared', import.meta.url)),
       '@bindings': fileURLToPath(
         new URL(
           './bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge',

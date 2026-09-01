@@ -94,7 +94,7 @@ func (s *ConnectionsService) States() ([]model.ConnectionState, error) {
 	return s.Deps.Connections.States(), nil
 }
 
-// SecretStorageStatus mirrors src/shared/domain/secrets.ts's secretStorageStatusSchema.
+// SecretStorageStatus mirrors packages/shared/domain/secrets.ts's secretStorageStatusSchema.
 type SecretStorageStatus struct {
 	Available        bool    `json:"available"`
 	Backend          string  `json:"backend"`
