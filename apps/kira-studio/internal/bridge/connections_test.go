@@ -53,7 +53,7 @@ func TestConnectionsServiceRejectsBareID(t *testing.T) {
 		assertBadRequest(t, err)
 	})
 	t.Run("Reveal never errors, but still reports a bare id rather than reaching Deps.Connections", func(t *testing.T) {
-		result := svc.Reveal(bridge.ConnectionsIDArgs{ID: ""})
+		result := svc.Reveal(bridge.ConnectionsRevealArgs{ID: ""})
 		if result.Error == nil {
 			t.Fatal("Reveal(bare id).Error = nil, want a message")
 		}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	idgen "github.com/kirathecat/kira-studio/apps/kira-studio/internal/id"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
@@ -56,10 +57,32 @@ type TestResult struct {
 	Error         *string `json:"error,omitempty"`
 }
 
-// RevealResult mirrors reveal()'s never-throws contract (P25 D9).
+// RevealResult mirrors reveal()'s never-throws contract (P25 D9). Outcome is P14 D6's own
+// discriminant — revealed | cancelled | confirmation-required | error — the renderer switches on
+// it rather than inferring the case from which of Password/Error is set.
 type RevealResult struct {
 	Password *string `json:"password"`
 	Error    *string `json:"error"`
+	Outcome  string  `json:"outcome"`
+}
+
+const (
+	revealOutcomeRevealed             = "revealed"
+	revealOutcomeCancelled            = "cancelled"
+	revealOutcomeConfirmationRequired = "confirmation-required"
+	revealOutcomeError                = "error"
+)
+
+// revealReason is LAContext.evaluatePolicy's localizedReason (P14 D11) — macOS prefixes it with
+// "Kira Studio is trying to …" inside its own sheet, so this reads as a sentence fragment, not a
+// standalone label.
+const revealReason = "reveal a saved connection password."
+
+// Authorizer is P14's reveal gate (internal/localauth.Authorizer satisfies this) — an interface
+// here, not the concrete type, so tests can inject a fake outcome sequence without a real clock or
+// OS-auth probe wired through.
+type Authorizer interface {
+	Authorize(reason string, confirmed bool) (localauth.Outcome, error)
 }
 
 // Deps is everything the service needs from the rest of the app.
@@ -68,6 +91,7 @@ type Deps struct {
 	Secrets    *repos.SecretsRepo
 	Metadata   *repos.MetadataCacheRepo
 	Cipher     *secrets.Cipher
+	Auth       Authorizer
 	Backend    Backend
 	Preconnect *preconnect.Supervisor
 }
@@ -342,16 +366,35 @@ func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 }
 
 // Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
-// call, so an undecryptable stored secret must not become an unhandled failure.
-func (s *Service) Reveal(id string) RevealResult {
+// call, so an undecryptable stored secret — or a failed/declined authentication — must not become
+// an unhandled failure, only a RevealResult whose Outcome names what happened.
+//
+// P14 D6: confirmed is honoured only when the gate itself reports OS authentication unavailable —
+// Authorizer.Authorize enforces that (it ignores confirmed whenever it can actually evaluate), so
+// this method never has to re-check which branch produced a grant.
+func (s *Service) Reveal(id string, confirmed bool) RevealResult {
+	outcome, err := s.deps.Auth.Authorize(revealReason, confirmed)
+	if err != nil {
+		msg := errorMessage(err)
+		slog.Warn(fmt.Sprintf("local authentication errored before reveal of %s: %s", id, msg), "scope", "connections")
+		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
+	}
+	switch outcome {
+	case localauth.Cancelled:
+		// D11: the user cancelled on purpose — no message, that would be nagging.
+		return RevealResult{Outcome: revealOutcomeCancelled}
+	case localauth.Unavailable:
+		return RevealResult{Outcome: revealOutcomeConfirmationRequired}
+	}
+
 	password, err := s.deps.Secrets.Get(id)
 	if err != nil {
 		msg := errorMessage(err)
 		slog.Warn(fmt.Sprintf("secret reveal failed for %s: %s", id, msg), "scope", "connections")
-		return RevealResult{Password: nil, Error: &msg}
+		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
 	}
 	slog.Info(fmt.Sprintf("secret revealed for %s", id), "scope", "connections")
-	return RevealResult{Password: password, Error: nil}
+	return RevealResult{Outcome: revealOutcomeRevealed, Password: password}
 }
 
 // Test never errors: a test run is never armed and never leaves a process behind, however it
@@ -359,7 +402,21 @@ func (s *Service) Reveal(id string) RevealResult {
 // Validate() Create/Update do (P2 R1: this was the one Input-accepting entry point that skipped
 // it) — without that, an out-of-range Port reaches postgres/client.go's `uint16(*cfg.Port)`
 // unchecked and silently wraps around to a different, in-range port instead of being rejected.
-func (s *Service) Test(in Input) TestResult {
+//
+// P14 D3: existingID is the dialog's editingId, optional. Since D1 stopped pre-filling the draft's
+// password on open, testing an existing connection the user hasn't retyped credentials for would
+// otherwise probe with no password at all — resolving the stored secret here, server-side, fixes
+// that properly for both fields and URI mode (URI mode already had this exact gap before P14, for
+// the same reason: an unchanged draft carries `password: null`). Not gated (D2): Test uses the
+// secret without displaying it, the same footing as Connect. A missing or undecryptable secret
+// here is not fatal — resolveFromInput/Backend.Test below still run and report failure the normal
+// way, exactly as an actually-wrong password would.
+func (s *Service) Test(in Input, existingID string) TestResult {
+	if in.Password == nil && existingID != "" {
+		if pw, err := s.deps.Secrets.Get(existingID); err == nil {
+			in.Password = pw
+		}
+	}
 	if err := in.Validate(); err != nil {
 		msg := errorMessage(err)
 		return TestResult{OK: false, Error: &msg}

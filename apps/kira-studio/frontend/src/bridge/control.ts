@@ -155,20 +155,30 @@ export const control = {
   connectionsDelete: (id: string): Promise<void> => unwrap(ConnectionsService.Remove({ id })),
   connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.Reorder({ ids })).then((r) => trust<ConnectionSummary[]>(r ?? [])),
-  connectionsReveal: (id: string): Promise<{ password: string | null; error: string | null }> =>
-    unwrap(ConnectionsService.Reveal({ id })),
+  // P14 D6: outcome is one of revealed | cancelled | confirmation-required | error — confirmed is
+  // honoured by the backend only on the confirmation-required path (a Mac where LocalAuthentication
+  // works ignores it entirely).
+  connectionsReveal: (
+    id: string,
+    confirmed: boolean,
+  ): Promise<{ password: string | null; error: string | null; outcome: string }> =>
+    unwrap(ConnectionsService.Reveal({ id, confirmed })),
   // The generated TestResult's serverVersion/error are `string | null | undefined`; the pre-P57
   // shape was `string | undefined` only (no null) — normalized here rather than pushed onto
   // ConnectionDialog.vue, which assigns straight into its own `?: string` reactive state.
+  // P14 D3: id is the dialog's editingId (empty for a brand-new connection) — the backend fills in
+  // the stored secret server-side when the draft carries none, so Test on an existing connection
+  // whose password field was never revealed still probes with the real credential.
   connectionsTest: (
     input: ConnectionInput,
+    id: string,
   ): Promise<{
     ok: boolean;
     serverVersion?: string;
     error?: string;
   }> =>
     unwrap<Awaited<ReturnType<typeof ConnectionsService.Test>>>(
-      ConnectionsService.Test(input),
+      ConnectionsService.Test({ input, id }),
     ).then((r) => ({
       ok: r.ok,
       serverVersion: r.serverVersion ?? undefined,

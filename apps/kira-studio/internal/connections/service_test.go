@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
@@ -71,14 +72,49 @@ func (b *fakeBackend) lastConnectConfig() model.ResolvedConnectionConfig {
 	return b.lastConfig
 }
 
+// fakeAuthorizer replaces the real internal/localauth.Authorizer (P14): a canned outcome/error per
+// call, with the (reason, confirmed) arguments it was actually called with recorded, so a test can
+// both drive Reveal's response and assert the gate saw what it should have. Defaults to Granted —
+// harmless for every test that doesn't itself exercise Reveal.
+type fakeAuthorizer struct {
+	mu            sync.Mutex
+	outcome       localauth.Outcome
+	err           error
+	calls         int
+	lastConfirmed bool
+}
+
+func newFakeAuthorizer() *fakeAuthorizer { return &fakeAuthorizer{outcome: localauth.Granted} }
+
+func (f *fakeAuthorizer) Authorize(reason string, confirmed bool) (localauth.Outcome, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.lastConfirmed = confirmed
+	return f.outcome, f.err
+}
+
+func (f *fakeAuthorizer) setOutcome(outcome localauth.Outcome, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.outcome, f.err = outcome, err
+}
+
+func (f *fakeAuthorizer) callCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
 // harness wires a real SQLite db (through the real migrations), a real available cipher (the
-// Linux KIRA_INSECURE_SECRETS fallback), a fakeBackend, and a real preconnect supervisor behind
-// one connections.Service.
+// Linux KIRA_INSECURE_SECRETS fallback), a fakeBackend, a fakeAuthorizer, and a real preconnect
+// supervisor behind one connections.Service.
 type harness struct {
 	svc     *connections.Service
 	repos   *repos.Repos
 	secrets *repos.SecretsRepo
 	backend *fakeBackend
+	auth    *fakeAuthorizer
 }
 
 func newHarness(t *testing.T) *harness {
@@ -105,15 +141,16 @@ func newHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	pre := preconnect.New()
 	backend := newFakeBackend()
+	auth := newFakeAuthorizer()
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Backend: backend, Preconnect: pre,
+		Cipher: cipher, Auth: auth, Backend: backend, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
 
-	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend}
+	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend, auth: auth}
 }
 
 // fieldsInput returns a valid, connectable fields-mode Input for name. Kind is "kafka", any real,
@@ -154,15 +191,16 @@ func newUnavailableCipherHarness(t *testing.T) *harness {
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	pre := preconnect.New()
 	backend := newFakeBackend()
+	auth := newFakeAuthorizer()
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Backend: backend, Preconnect: pre,
+		Cipher: cipher, Auth: auth, Backend: backend, Preconnect: pre,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
 
-	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend}
+	return &harness{svc: svc, repos: r, secrets: secretsRepo, backend: backend, auth: auth}
 }
 
 // serviceWithUnavailableCipher builds a second Service over h's own db/repos, but with a cipher
@@ -467,7 +505,7 @@ func TestTestValidatesInputBeforeProbing(t *testing.T) {
 	badPort := 70000 // out of range; uint16(70000) would silently become 4464
 	in.Port = &badPort
 
-	result := h.svc.Test(in)
+	result := h.svc.Test(in, "")
 
 	if result.OK {
 		t.Fatal("Test(port: 70000).OK = true, want a validation failure")

@@ -58,20 +58,40 @@ func (s *ConnectionsService) Reorder(args ConnectionsReorderArgs) ([]model.Conne
 	return s.Deps.Connections.Reorder(args.IDs)
 }
 
-// Reveal never errors (P25 D9) — an undecryptable secret comes back as a RevealResult carrying
-// its own Error field, not a rejected call. A bare id is reported the same way, rather than as a
-// rejected call, for consistency with that rule.
-func (s *ConnectionsService) Reveal(args ConnectionsIDArgs) connections.RevealResult {
+// ConnectionsRevealArgs is Reveal's own args struct (P14 D6) — it leaves the shared
+// ConnectionsIDArgs above, whose own comment scopes it to methods "that need nothing but a
+// connection id", which is no longer true here.
+type ConnectionsRevealArgs struct {
+	ID string `json:"id"`
+	// Confirmed is honoured ONLY when the backend has itself determined OS authentication is
+	// unavailable (P14 D6) — on a machine where LocalAuthentication works, this field cannot
+	// influence the result; internal/connections.Service.Reveal's own Authorizer call enforces
+	// that, not this method.
+	Confirmed bool `json:"confirmed"`
+}
+
+// Reveal never errors (P25 D9) — an undecryptable secret, a declined prompt, or a required
+// confirmation all come back as a RevealResult carrying its own Outcome, not a rejected call. A
+// bare id is reported the same way, rather than as a rejected call, for consistency with that
+// rule.
+func (s *ConnectionsService) Reveal(args ConnectionsRevealArgs) connections.RevealResult {
 	if args.ID == "" {
 		msg := "id is required"
-		return connections.RevealResult{Password: nil, Error: &msg}
+		return connections.RevealResult{Outcome: "error", Error: &msg}
 	}
-	return s.Deps.Connections.Reveal(args.ID)
+	return s.Deps.Connections.Reveal(args.ID, args.Confirmed)
+}
+
+// ConnectionsTestArgs carries the dialog's own editingId alongside the draft (P14 D3) — nil/empty
+// for a brand-new connection, which behaves exactly as it always has.
+type ConnectionsTestArgs struct {
+	Input connections.Input `json:"input"`
+	ID    string            `json:"id"`
 }
 
 // Test never errors, for the same reason: failure is reported inside TestResult.
-func (s *ConnectionsService) Test(input connections.Input) connections.TestResult {
-	return s.Deps.Connections.Test(input)
+func (s *ConnectionsService) Test(args ConnectionsTestArgs) connections.TestResult {
+	return s.Deps.Connections.Test(args.Input, args.ID)
 }
 
 func (s *ConnectionsService) Connect(args ConnectionsIDArgs) (model.ConnectionState, error) {

@@ -85,11 +85,9 @@ func main() {
 	}
 
 	cipher := secrets.New()
-	// P14 C2: constructed beside the cipher so its own startup log records OS-authentication
-	// availability the same way cipher's Status does — wired into connections.Deps in a later
-	// commit (P14 C4), once Service.Reveal is ready to consult it.
+	// P14: constructed beside the cipher so its own startup log records OS-authentication
+	// availability the same way cipher's Status does.
 	authorizer := localauth.New(time.Now, localauth.Evaluate, localauth.Available)
-	_ = authorizer
 
 	repositories, err := repos.New(db.DB)
 	if err != nil {
@@ -127,7 +125,7 @@ func main() {
 	preconnectSupervisor := preconnect.New()
 	connectionsSvc := connections.New(connections.Deps{
 		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
-		Cipher: cipher, Backend: router, Preconnect: preconnectSupervisor,
+		Cipher: cipher, Auth: authorizer, Backend: router, Preconnect: preconnectSupervisor,
 	})
 	connectionsSvc.Start()
 	deps.Connections = connectionsSvc
