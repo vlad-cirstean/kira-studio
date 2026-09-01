@@ -51,8 +51,7 @@ connection points at a file (Fields mode's Database file field) rather than a ho
 there is no addressable row to update or delete, so `canUpdate`/`canDelete` stay permanently
 `false` (the same structural reason Kafka's own write flags do) and only `+ row` inserts. Pagination
 is offset-only for the same reason: no unique key exists to build a keyset cursor on. Uses
-`@clickhouse/client` (npm), the app's first added dependency since the Kafka client migration —
-pure JS, no native build step.
+`github.com/ClickHouse/clickhouse-go/v2` — a native Go adapter, no sidecar (P58b M6.4).
 
 A couple of things worth knowing up front:
 
@@ -94,8 +93,7 @@ A couple of things worth knowing up front:
   `⌘B` project panel, `⌘J` operations panel, `⇧⌘P` palette, `⌘F` find, `F5` refresh, `⌘↩` run
   statement, `⇧⌘↩` run all, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close tab, `⇧⌘W` close window.
 - **Settings** — Appearance (font family/size, row density), Data (default page size, prefetch,
-  count-on-open), Cache (L2 byte budget, hit rate, clear caches), Advanced (engine memory cap,
-  op-log retention).
+  count-on-open), Cache (L2 byte budget, hit rate, clear caches), Advanced (op-log retention).
 
 ## Requirements
 

@@ -109,41 +109,6 @@ func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logic
 	return deltaSum * 100 / float64(logicalCPUs)
 }
 
-// MatchingPIDs finds every running process whose executable path contains needle — the "match on
-// the bundle, not the pid tree" rule P52 §3.3/§8.4 both call for — plus any explicitly known
-// extra pids (e.g. the engine child, which is a direct child but costs nothing to include
-// explicitly too). Exported for a single-needle caller; AppProcessSet below does its own combined
-// scan rather than calling this once per needle (see its own comment for why).
-func MatchingPIDs(needle string, extra ...int32) ([]int32, error) {
-	procs, err := process.Processes()
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[int32]bool, len(extra))
-	out := make([]int32, 0, len(extra))
-	for _, pid := range extra {
-		if !seen[pid] {
-			seen[pid] = true
-			out = append(out, pid)
-		}
-	}
-	for _, p := range procs {
-		exe, err := p.Exe()
-		if err != nil || exe == "" {
-			continue
-		}
-		if !strings.Contains(exe, needle) {
-			continue
-		}
-		pid := p.Pid
-		if !seen[pid] {
-			seen[pid] = true
-			out = append(out, pid)
-		}
-	}
-	return out, nil
-}
-
 // AppProcessSet finds this app's own process set: pids matching anchorNeedles directly (this
 // app's own executable, which lives under a bundle path unique to this app), plus pids matching
 // helperNeedles (e.g. "com.apple.WebKit" for WKWebView's XPC helpers) that are actually this app's

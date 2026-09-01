@@ -21,9 +21,6 @@ export const sortSpecSchema = z.discriminatedUnion('kind', [
 ]);
 export type SortSpec = z.infer<typeof sortSpecSchema>;
 
-export const savedQueryKindSchema = z.enum(['filter', 'console']);
-export type SavedQueryKind = z.infer<typeof savedQueryKindSchema>;
-
 export const filterBodySchema = z.object({
   where: z.string().nullable(),
   orderBy: sortSpecSchema.nullable(),

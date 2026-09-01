@@ -17,10 +17,6 @@ type emitter struct {
 	app *application.App
 }
 
-func NewEmitter(app *application.App) appcore.Emitter {
-	return &emitter{app: app}
-}
-
 func (e *emitter) Emit(name string, data any) {
 	if e.app == nil {
 		return
@@ -45,10 +41,6 @@ func NewDeferredEmitter() (e appcore.Emitter, attach func(*application.App)) {
 type dialogs struct {
 	app    *application.App
 	window func() application.Window
-}
-
-func NewDialogs(app *application.App, window func() application.Window) bridge.Dialogs {
-	return &dialogs{app: app, window: window}
 }
 
 func (d *dialogs) SaveFile(req bridge.SaveFileRequest) (string, error) {

@@ -29,7 +29,6 @@ func New(code, message string) *Error { return &Error{Code: code, Message: messa
 
 func Internal(message string) *Error   { return New("E_INTERNAL", message) }
 func BadRequest(message string) *Error { return New("E_BAD_REQUEST", message) }
-func EngineDown() *Error               { return New("E_ENGINE_DOWN", "the engine process is not running") }
 
 // Disconnected mirrors tree-service.ts:77's exact message (P55 D11 — this constructor had zero
 // callers before P55, so the message correction is free).

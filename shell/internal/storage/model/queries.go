@@ -121,9 +121,6 @@ type FilterHistoryEntry struct {
 	UsedAt       string    `json:"usedAt"`
 }
 
-// ValidSavedQueryKind mirrors queries.ts's savedQueryKindSchema.
-func ValidSavedQueryKind(v string) bool { return v == "filter" || v == "console" }
-
 // ValidSavedQueryName mirrors queries.ts's savedQueryBase name field: trimmed, 1..120 chars.
 func ValidSavedQueryName(name string) error {
 	trimmed := strings.TrimSpace(name)

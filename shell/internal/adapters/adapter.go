@@ -141,9 +141,6 @@ type OpCtx struct {
 	mu      sync.Mutex
 	command string
 	rows    *int
-
-	recordCommands bool
-	commands       []string
 }
 
 // NewOpCtx constructs an OpCtx for opID.
@@ -151,21 +148,11 @@ func NewOpCtx(opID string) *OpCtx {
 	return &OpCtx{OpID: opID}
 }
 
-// NewRecordingOpCtx is the Go analogue of tests/db/postgres.spec.ts's makeCtx() recording variant
-// (test-only): it keeps every SetCommand call in a slice so a test can assert how many round trips
-// an operation issued.
-func NewRecordingOpCtx(opID string) *OpCtx {
-	return &OpCtx{OpID: opID, recordCommands: true}
-}
-
 // SetCommand records the exact statement about to run (Adapter rule 3).
 func (c *OpCtx) SetCommand(text string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.command = text
-	if c.recordCommands {
-		c.commands = append(c.commands, text)
-	}
 }
 
 // SetRows records the number of rows an operation touched, for the op-log.
@@ -187,14 +174,4 @@ func (c *OpCtx) Rows() *int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.rows
-}
-
-// Commands returns every command recorded so far, in order. Only populated when constructed via
-// NewRecordingOpCtx; otherwise always empty.
-func (c *OpCtx) Commands() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]string, len(c.commands))
-	copy(out, c.commands)
-	return out
 }

@@ -95,19 +95,6 @@ func CellText(chunk Chunk, row int) string {
 	return string(chunk.Data[chunk.Offsets[row]:chunk.Offsets[row+1]])
 }
 
-// IsTruncated reports whether row's text was cut at MaxCellBytes.
-func IsTruncated(chunk Chunk, row int) bool {
-	for _, r := range chunk.Truncated {
-		if int(r) == row {
-			return true
-		}
-		if int(r) > row {
-			break // Truncated is sorted ascending
-		}
-	}
-	return false
-}
-
 // ChunkByteSize is the real, measured byte cost of chunk — what L2 budgets against.
 func ChunkByteSize(chunk Chunk) int {
 	return len(chunk.Data) + len(chunk.Offsets)*4 + len(chunk.Nulls) + len(chunk.Truncated)*4
