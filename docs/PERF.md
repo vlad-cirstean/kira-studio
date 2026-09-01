@@ -740,6 +740,113 @@ remaining axis on which the pre-P11 JSON+base64 codec beats the current one. §2
 follow-up closes the one number that stayed a genuine regression rather than leaving it as accepted
 cost.
 
+### 2.9 P5: the renderer's own memory
+
+**Status: measured, on the finished tree (all of C1-C7 landed, C8's two gates resolved).** §2.1-2.8
+measure interaction latency and the data-plane wire/decode/encode path; nothing before this section
+measures what the renderer's own JS heap retains once a page has arrived. Full findings (F1-F10),
+the decisions (D1-D11) and the implementation order are
+`docs/v1.1/plans/P5-ram-usage.md` — this section is that plan's own §6.3/§6.4 re-run on the tree
+that plan's own implementation produced, not a copy of its numbers (every figure below was
+re-measured this session; none is carried over from the plan doc).
+
+**Method — same as F1's, restated because it matters every time this number is quoted.** No macOS
+hardware here (§2.3/§2.4 already established WebKitGTK isn't a stand-in for WKWebView), and
+`tests/ui`'s own WebKit tier has no `performance.memory`/CDP heap domain. Every megabyte figure
+below is the real production bundle (`bun run build`), booted in **Chromium** against `tests/ui`'s
+own mock fixtures (browser-agnostic — a temporary Playwright config, `browserName: 'chromium'`,
+deleted after each run, nothing measurement-only committed), heap read via `HeapProfiler.enable` →
+`HeapProfiler.collectGarbage` x2 → `Runtime.getHeapUsage`. **This is V8, not the JavaScriptCore the
+app ships on** — a proxy for the app's own allocations against the app's own real code, not a claim
+of equivalence with a packaged build. The renderer-retention probe (`window.__kiraRetention`, C1)
+is the deterministic, engine-independent cross-check for the same claims — it counts structures
+directly (Map sizes), not bytes an engine chooses to report, so it is quoted alongside the heap
+number wherever the two measure the same thing.
+
+**F2's own baseline, re-run** (same fixtures, same method; the boot-heap absolute is not
+comparable session-to-session — a different Chromium build/host each run, F1's own caveat — the
+deltas are what matters and are compared to F2 directly):
+
+| Scenario | Heap delta (Chromium/V8) | F2's original delta |
+|---|---|---|
+| + connect, expand two tree levels | +1.14 MB | +0.50 MB |
+| + a 10 000 x 12 tabular console result | **+2.49 MB** | +2.51 MB |
+| + that grid scrolled end to end | **-0.03 MB** (noise — flat) | +0.35 MB |
+| Mongo document tab, 100 docs | **+1.29 MB** (49.2x wire) | +1.64 MB (40.7x wire) |
+| Mongo document tab, 1 000 docs | **+3.19 MB** (12.0x wire) | +4.23 MB (10.4x wire) |
+| Mongo document tab, 5 000 docs | **+10.62 MB** (8.0x wire) | +15.56 MB (7.6x wire) |
+
+The grid/console row is the control this whole phase was measured against, and it lands within
+noise of F2's own number both ways — expected, since C1-C7 touch none of its code path. The
+document-tab row is the headline: **-21% at 100 docs, -25% at 1 000, -32% at 5 000** — the gap
+widens with page size because C3's pruning caps retained rows at the rendered window regardless of
+how many more rows the page holds, so the fixed cost (the window) becomes a shrinking fraction of a
+bigger page while the eliminated cost (the rest of the page) grows with it.
+
+**The probe, on the same scenario, showing what the heap number cannot.** A synthetic 100-document
+page, no scroll: `parseCacheRows`/`decodeCacheRows` sit at **100** (the whole page) immediately
+after load — VirtualList's own exact-height math needs every *expanded* row's line count to build
+its offset table, and every document defaults to expanded (P27 D2), so the first pass is a genuine,
+unavoidable O(rowCount) walk (C2's own reasoning for why `fieldNamesOnPage` still walks the whole
+page too, just without retaining a parse tree while doing it). The very next `visible-range` event
+(VirtualList's own `immediate: true` watch — fires on mount, no scroll needed) prunes both back to
+**18** (the rendered window plus overscan) via C3's `setVisibleWindow`/`pruneRows`, and scrolling to
+the bottom of the page leaves them at 18 again, never re-growing. This is the number F4 said the
+app's own accounting is blind to (`__kiraRetainedBytes()` sums `page.byteSize` only) — it now has
+an answer.
+
+**C4 (find cap):** unchanged from F6's own per-match figure (~101 B/match) — the fix is the cap
+itself, not a different cost per match. 50 000 matches is ~5 MB by that figure, a fixed ceiling
+instead of the 38.8 MB (400 000 matches) / 96.2 MB (a million) F6 measured with none.
+
+**C5 (schema tree-shaking), bundle size, real A/B on this tree:** the production JS chunk went
+from **1,052,840 B / 334.51 KB gzip** (C1-C4 landed, before the `/*#__PURE__*/` pass) to
+**1,050,930 B / 333.97 KB gzip** after — **-1,910 B (-0.18%)**. Smaller than F7's own zod-aliased-
+to-a-stub A/B estimate (70,103 B): that measurement removed the whole zod runtime plus every schema
+wholesale, which a pure annotation on unused declarations alone cannot recover once Rollup traces
+the real dependency graph — several of the 135 schemas turn out reachable from something real, not
+only the two `safeParse` call sites F7 audited by hand. The `decodePath`/`pathTail` Set lookup
+(replacing `nodeKindSchema.safeParse` on a render path) is not separately measured in bundle bytes
+— it is a CPU-time fix (F7's own 1 443 ns/call figure), not a retention one.
+
+**C7 (multi-page frame sharing), the exact P11 OQ-1 shape, before and after, this session:** a
+two-statement `Run all` (two 3 000-row pages, one frame) followed by "Close other results".
+*Before* this fix: `__kiraRetention().frameBuffers` = `{count: 1, bytes: 31,256}` (the whole frame)
+both immediately after `Run all` and after closing one of the two results — **closing a result
+freed nothing**, confirming OQ-1's prediction exactly. *After*: `{count: 2, bytes: 6,000}` right
+after `Run all` (each page already owns its buffer) falling to `{count: 1, bytes: 3,000}` once the
+other result is closed — freeing exactly that page's own share.
+
+**C8's two gated measurements, and the verdicts.**
+
+1. **D8 (CodeMirror async chunk): declined — no split landed.** CodeMirror + Lezer is 407,469 bytes
+   (38.9%) of the single JS chunk (F3), but `AutocompleteField.vue` — the permanent filter-row
+   AutocompleteField every data-tab kind (grid/documents/keyvalue/stream) mounts unconditionally —
+   confirmed to mount a live `CodeMirrorHost` the instant the *first* data tab opens: booting to
+   nothing-open costs 4.74 MB, expanding the tree costs +1.13 MB more (5.87 MB, still nothing that
+   uses CodeMirror), and opening one ordinary grid tab — the single most common first action in any
+   real session — costs +1.02 MB more (6.89 MB), with two live `.cm-editor` instances confirmed
+   present in the DOM at that point (the WHERE and ORDER BY boxes). Splitting the chunk would move
+   that ~1 MB (not 407 KB — bundle size and parsed/retained heap are not 1:1) from before first
+   paint to the first tab open, which happens within seconds of launch in essentially every real
+   session. This phase measures *retained* memory (§0.1), not boot latency — a code the user is
+   about to load anyway staying loaded is not a retention win, and P6 (Vapor mode) is explicitly
+   this repo's owner for boot-time/parse-time concerns, not P5.
+2. **D9 (`sessionQueueBytes`/`sessionMaxInFlightOps`): declined — no change.** Instrumented
+   `Session.queuedBytes`' peak directly (a temporary, uncommitted `go test` inside
+   `internal/adapterhost`, not `tests/e2e-real` — the package's own unit-level mechanics are the
+   real code path `handleDataOp`/`enqueueResponse` run, and reaching it this way avoided the
+   `-tags server` binary + real WebSocket round trip for a number the package test already answers
+   directly) under the worst case the system's own other constants allow: `sessionMaxInFlightOps`
+   (64) concurrent responses, each a real 10 000-row page's own measured wire size
+   (3,715,570 B, F4), against a writer whose `conn.Send` is deliberately slower than production so
+   frames genuinely pile up. **Peak: 35.4 MiB**, against the 32 MiB `sessionQueueBytes` budget —
+   reached and briefly exceeded (`enqueueResponse`'s own "a single frame must still get through"
+   rule lets one more frame in past the ceiling), not a ceiling nothing approaches. That is the
+   budget working as designed, not evidence it should move either direction — D9's own bar
+   ("change the constant only if the peak justifies it") is not cleared by a peak that confirms the
+   existing number rather than contradicting it.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
