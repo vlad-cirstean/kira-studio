@@ -8,7 +8,6 @@
   "files": {
     "includes": [
       "**",
-      "!out",
       "!dist",
       "!test-results",
       "!playwright-report",
