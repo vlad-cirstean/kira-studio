@@ -591,7 +591,8 @@ all app state, and now every database driver too.
            │
            │  control: generated Wails bindings
            │           (HTTP to /wails/runtime)
-           │  data:    one "engine" WebSocket stream
+           │  data:    one "engine" stream — a held poll/send pair on
+           │           desktop, a real WebSocket only in a -tags server build
            │
 ┌──────────┴───────────┐
 │  Go shell (Wails v3) │  window, menus, SQLite, settings, op log, keychain,
@@ -626,6 +627,18 @@ the `{message, code}` shape the renderer already branched on. The **data plane**
 stream, `"engine"`, opened once per page load by `apps/kira-studio/frontend/src/bridge/port.ts` via
 `JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
 
+**The data plane is not a WebSocket, on the build that ships (P4 F2, F3).** `JSONStream`/`Stream`
+wrap Wails' own transport, and which transport that is depends on the build tag. A desktop build
+(what this app ships) has no local listener at all: the frontend holds open `GET
+/wails/stream/poll` (up to 20 s) until the Go side has a frame to deliver, and posts outbound
+frames to `POST /wails/stream/send` — both over the asset server's custom URI scheme, deliberately,
+so that no local TCP port is open for another process on the machine to reach. `WailsSocket` wraps
+that poll/send pair in the same `readyState`/`onmessage`/`send()` shape a `WebSocket` has, which is
+why the frontend code reads as if it were talking to one — but a real, on-the-wire `WebSocket` only
+exists in a `-tags server` build (`apps/kira-studio/tests/e2e-real/` builds with that tag; the
+packaged app does not), where the identical application code runs unchanged over a real
+`net.Listener` instead.
+
 **The data plane is a server, not a byte forwarder (P58 D3).** Bulk data is produced and encoded
 exactly once, in the process that owns the window — the old Electron-era invariant ("Go never reads
 a data-plane frame") could not survive Go adapters existing at all. `apps/kira-studio/internal/adapterhost/dataframe.go`'s
@@ -644,15 +657,68 @@ once, not doubled (A16).
 and the one goroutine draining it into the renderer's `Send`, so exactly one goroutine ever calls
 the renderer connection's blocking `Send`. There is only one producer now — the router's own
 locally-produced responses — where P58a–P58e had two (the deleted Node engine's own data frames were
-the other, fanned together by the now-deleted `internal/enginebackend`, P58f D9). A full queue just
-drops the frame — the renderer's own pending request then times out exactly as if the process had
-died, which `port.ts` already handles — there is no OS pipe left to push back through, so the old
-retry-with-backoff that paused the engine's stdout read loop has no successor and needs none. Wails'
-own `application.StreamConn` bounds sit underneath all of this: `Send` blocks and `TrySend` is the
-non-blocking `ErrStreamFull`-returning variant, per-connection limits are 8 MiB **and** 256 frames,
-and any single frame over 64 MiB (`streamMaxFrameBytes`) is rejected outright, enforced Go-side too
-by `adapterhost.Session`'s own `maxDataFrameBytes`, which drops an oversized frame with a named log
-line rather than corrupting the stream.
+the other, fanned together by the now-deleted `internal/enginebackend`, P58f D9). A full queue never
+drops a response frame — `enqueueResponse` blocks for room instead (P2 R1 task #51, P2 R2 task #97),
+since a dropped response could never settle its pending request, which has no client-side timeout of
+its own. Only `enqueueLocal`'s unsolicited events (`cache:stats`) drop on a full queue, because the
+next one supersedes it. There is no OS pipe left to push back through, so the old retry-with-backoff
+that paused the engine's stdout read loop has no successor and needs none.
+
+**Backpressure is app-level and transport-level, stacked, and which one actually binds differs by
+case (P4 F5).** For a single oversized response, the app-level check fires first: `dataframe.go`'s
+`respond` refuses a payload over `maxDataFrameBytes - 4096` with a visible error before the frame is
+even built, strictly inside Wails' own matching hard cap (`streamMaxFrameBytes`, 64 MiB, which would
+otherwise reject it outright at the transport). For sustained throughput, it runs the other way:
+`adapterhost.Session`'s 32 MiB/64-frame queue sits **in front of** Wails' smaller 8 MiB/256-frame
+per-connection window, so it is the *transport-level* bound that actually saturates first when the
+frontend isn't draining fast enough — the drain goroutine's `Send` call blocks against Wails' window,
+which stalls the queue's own draining and only then, as the queue backs up toward its own 32 MiB/64
+frames, does the app-level bound engage and block the producer (`enqueueResponse`). The app's larger
+queue is the shock absorber in front of the smaller transport window, not a tighter gate ahead of
+it. Inbound (renderer → Go) has no app-level queue at all: Wails' own limit (256 frames / 8 MiB)
+answers **429** rather than blocking, deliberately, because the held poll request is this
+transport's scarce resource, not a buffer to grow.
+
+**The FE↔BE protocol decision (P4).** With efficiency and a possible future network split both in
+scope, P4 audited the two planes above and weighed them against gRPC, protobuf/FlatBuffers/Cap'n
+Proto, Arrow IPC and msgpack — and kept the current shape:
+
+- **Format: unchanged.** JSON envelope on both planes; bulk columnar buffers as base64 of their
+  exact little-endian bytes. gRPC cannot run over the custom-URI-scheme transport this app ships on
+  (the socket it would need is the exact thing that transport exists to avoid); protobuf/FlatBuffers/
+  Cap'n Proto and msgpack decode the bulk payload by copying anyway (it is opaque `bytes` to them
+  too), so they'd add a second codegen system next to the bindings generator for no win on the one
+  cost that matters; Arrow IPC is the closest structural fit — `page.Chunk` is already Arrow's
+  `Utf8` layout — but needs four hand-built accommodations (inverted null polarity, `uint32` vs
+  `int32` offsets, no `truncated` slot, three of four page kinds not being tabular at all) plus a new
+  Arrow-JS dependency in the webview bundle, to recover a cost the encoder fix below already mostly
+  removed.
+- **The measured cost was in the Go encoder, not the wire, and that part was fixed.** `internal/page`
+  called a custom `MarshalJSON` per page and per offset array, then had `encoding/json` re-scan
+  (`compact`) the bytes each one returned into the outer buffer — a cost paid on every page *view*,
+  including cache hits. Removing both `Marshaler` boundaries (plain struct tags, `[]byte` fields
+  marshaled natively) is byte-for-byte identical on the wire and 6–15x faster to encode, with
+  allocation dropping from 2.3–3.8x the frame size to 1.00x (`docs/PERF.md` §2.6).
+- **The network-split answer is a build tag, not a wire-format change.** `-tags server` (already
+  exercised by `tests/e2e-real/`) turns the same `StreamSession`-shaped application code onto a real
+  `net.Listener`, with `JSONStream`/`Stream` becoming an actual on-the-wire WebSocket with no
+  application change at all — the two-method `Send([]byte)`/`Receive() ([]byte, error)` seam already
+  hides the transport from everything above it. What that build tag does *not* provide is
+  authentication of any kind, and three flows still assume the Go side and the user are the same
+  machine (`FilesService.ChooseSave`'s native dialog, the OS keychain in `internal/secrets`,
+  `internal/preconnect`'s locally-supervised processes) — none of which a protocol choice fixes, and
+  none of which gRPC would fix either.
+- **A binary successor envelope is specified but intentionally not built.** After the encoder fix,
+  what base64 still costs is ~25-33% of wire bytes (unrecovered by gzip — a fixed 4:3 alphabet
+  expansion of already-high-entropy bytes isn't redundancy a compressor finds) and a JavaScriptCore-
+  proxied 0.2–38 ms of frontend decode per page view, both scaling with frame size. A frame layout
+  replacing base64 buffers with byte-offset/length pairs into a raw payload section (so `port.ts`
+  gets a zero-copy typed-array view instead of a decode-and-copy) is fully specified for whenever it's
+  needed, but today's numbers don't clear the bar for building it now. Build it when any of: a
+  budget spec fails with frame decode implicated, a page kind or default size moves the typical frame
+  an order of magnitude, or an actual frontend/backend network split is undertaken (at which point
+  wire bytes stop being free). Full findings, the weighed alternatives, the frame layout, and the
+  measurements are `docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md`.
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
 twelve bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
