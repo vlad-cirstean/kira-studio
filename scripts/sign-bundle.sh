@@ -4,16 +4,16 @@
 # Kafka included, is served in-process by native Go since P58e/P58f. One deep sign over the whole
 # bundle is all that is left.
 #
-# Paths are shell/build/darwin/Taskfile.yml's create:app:bundle output layout, not P52's — that
+# Paths are apps/kira-studio/build/darwin/Taskfile.yml's create:app:bundle output layout, not P52's — that
 # plan explicitly warned its own paths were written from an earlier session and would need
 # re-verifying against a real packaged bundle rather than copied. macOS only.
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-APP="$ROOT_DIR/shell/bin/Kira Studio.app"
+APP="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.app"
 
 if [ ! -d "$APP" ]; then
-  echo "sign-bundle.sh: \"$APP\" not found — run 'bun run package' (or 'cd shell && wails3 task darwin:package') first" >&2
+  echo "sign-bundle.sh: \"$APP\" not found — run 'bun run package' (or 'cd apps/kira-studio && wails3 task darwin:package') first" >&2
   exit 1
 fi
 

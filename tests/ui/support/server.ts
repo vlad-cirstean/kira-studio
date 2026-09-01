@@ -2,10 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 
-// Built by `bun run build` (vite.config.ts → shell/frontend/dist), the exact bytes the real
-// Wails bundle embeds (P52 shell/main.go's `//go:embed all:frontend/dist`) — this tier serves the
+// Built by `bun run build` (vite.config.ts → apps/kira-studio/frontend/dist), the exact bytes the
+// real Wails bundle embeds (P52 main.go's `//go:embed all:frontend/dist`) — this tier serves the
 // same static output a packaged app does, just over plain HTTP instead of Wails' own AssetServer.
-const DIST_DIR = resolve(__dirname, '../../../shell/frontend/dist');
+const DIST_DIR = resolve(__dirname, '../../../apps/kira-studio/frontend/dist');
 
 const MIME: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8',
@@ -25,7 +25,7 @@ export interface UiServer {
 }
 
 /**
- * A static HTTP server over `shell/frontend/dist`, one per worker (P57 §4.10) — the tests/ui/
+ * A static HTTP server over `apps/kira-studio/frontend/dist`, one per worker (P57 §4.10) — the tests/ui/
  * counterpart to `_electron.launch()`. It serves `index.html` for `/` and every built asset, and
  * deliberately serves nothing under `/wails/`: those requests are either intercepted by
  * `mockRuntime.ts` (the runtime's own `*.js` files, and the one RPC endpoint bound calls POST to)

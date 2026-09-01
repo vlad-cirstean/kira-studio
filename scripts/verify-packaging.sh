@@ -44,7 +44,7 @@ case "$PACKAGE_SCRIPT" in
   *) fail "package script changed" "package.json's 'package' script no longer runs 'wails3 task darwin:package' — this check needs updating along with it" ;;
 esac
 
-APP="shell/bin/Kira Studio.app"
+APP="apps/kira-studio/bin/Kira Studio.app"
 
 # --- Artifact checks (only if the bundle exists) -----------------------------------------------
 if [ ! -d "$APP" ]; then

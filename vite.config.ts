@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
-// Builds the real src/renderer to shell/frontend/dist, which shell/main.go embeds via
+// Builds the real src/renderer to apps/kira-studio/frontend/dist, which main.go embeds via
 // `//go:embed all:frontend/dist`. src/renderer/bridge/{control,port}.ts now talk to the generated
 // Wails bindings and the `engine` Stream directly (P57) — no injected shim, and no build-time HTML
 // transform, stand between them and the real webview.
@@ -20,16 +20,16 @@ export default defineConfig({
       // packages (connections/, tree/, storage/model/) whose model types those services return.
       '@bindings': resolve(
         __dirname,
-        'shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/bridge',
+        'apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge',
       ),
       '@bindings-internal': resolve(
         __dirname,
-        'shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal',
+        'apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal',
       ),
     },
   },
   build: {
-    outDir: resolve(__dirname, 'shell/frontend/dist'),
+    outDir: resolve(__dirname, 'apps/kira-studio/frontend/dist'),
     emptyOutDir: true,
     rollupOptions: {
       // Generated bindings (`wails3 generate bindings -b`) import "/wails/runtime.js" — a path

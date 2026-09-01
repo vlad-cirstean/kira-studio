@@ -1,7 +1,7 @@
 #!/bin/sh
 # wails-dev-setup.sh — wired as `predev` (P57 M7: this is the only build now, so the `:wails`
 # suffix retired with the Electron one it used to disambiguate from). `bun run dev` (`bun run
-# build && cd shell && wails3 task dev`) is not self-contained: the `wails3` CLI is a Go binary
+# build && cd apps/kira-studio && wails3 task dev`) is not self-contained: the `wails3` CLI is a Go binary
 # bun/npm can't fetch, and the generated bindings `bun run build` needs are gitignored and don't
 # exist in a fresh clone. This script checks each of those and does only the ones actually
 # missing, so a fresh clone's first `bun run dev` just works and a warm one stays fast. P58f: there
@@ -16,11 +16,11 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-# Pinned in shell/go.mod, not `@latest`: a stale `@latest` install has resolved to a newer beta
-# than the runtime library shell/go.mod pins, silently skewing the bindings generator against it.
-PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' "$ROOT_DIR/shell/go.mod" | awk '{print $2}')"
+# Pinned in go.mod, not `@latest`: a stale `@latest` install has resolved to a newer beta
+# than the runtime library go.mod pins, silently skewing the bindings generator against it.
+PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' "$ROOT_DIR/go.mod" | awk '{print $2}')"
 if [ -z "$PINNED_VERSION" ]; then
-  echo "wails-dev-setup: could not read the wails/v3 version from shell/go.mod" >&2
+  echo "wails-dev-setup: could not read the wails/v3 version from go.mod" >&2
   exit 1
 fi
 
@@ -39,7 +39,7 @@ fi
 
 if [ "$INSTALLED_VERSION" != "$PINNED_VERSION" ]; then
   if [ -n "$INSTALLED_VERSION" ]; then
-    echo "wails-dev-setup: wails3 $INSTALLED_VERSION is installed but shell/go.mod pins $PINNED_VERSION — reinstalling the pinned version"
+    echo "wails-dev-setup: wails3 $INSTALLED_VERSION is installed but go.mod pins $PINNED_VERSION — reinstalling the pinned version"
   else
     echo "wails-dev-setup: wails3 not found — installing $PINNED_VERSION"
   fi
@@ -59,7 +59,7 @@ if [ "$INSTALLED_VERSION" != "$PINNED_VERSION" ]; then
   esac
 fi
 
-if [ ! -d "$ROOT_DIR/shell/frontend/bindings" ]; then
-  echo "wails-dev-setup: generating Wails bindings (shell/frontend/bindings is gitignored)"
-  (cd "$ROOT_DIR/shell" && wails3 generate bindings -b -i -ts -names)
+if [ ! -d "$ROOT_DIR/apps/kira-studio/frontend/bindings" ]; then
+  echo "wails-dev-setup: generating Wails bindings (apps/kira-studio/frontend/bindings is gitignored)"
+  (cd "$ROOT_DIR/apps/kira-studio" && wails3 generate bindings -b -i -ts -names)
 fi

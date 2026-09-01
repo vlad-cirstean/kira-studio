@@ -21,19 +21,19 @@ import { IPC } from './ipcChannels';
 // … from "./runtime.js"` resolves, relative to its own URL `/wails/calls.js`, to the exact same
 // `/wails/runtime.js` path the *app* imports for the aggregate bundle, but needs the low-level
 // dist/runtime.js file instead — two different files, one URL, unresolvable by aliasing alone).
-// `go list` resolves the on-disk path for whatever version shell/go.mod actually pins, rather than
+// `go list` resolves the on-disk path for whatever version go.mod actually pins, rather than
 // hand-writing a GOPATH-shaped path that would silently go stale on a version bump.
 const WAILS_MODULE_DIR = execFileSync(
   'go',
   ['list', '-m', '-f', '{{.Dir}}', 'github.com/wailsapp/wails/v3'],
-  { cwd: resolve(__dirname, '../../../shell'), encoding: 'utf8' },
+  { cwd: resolve(__dirname, '../../../apps/kira-studio'), encoding: 'utf8' },
 ).trim();
 const WAILS_RUNTIME_JS = resolve(WAILS_MODULE_DIR, 'internal/assetserver/bundledassets/runtime.js');
 
-const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/shell/internal/bridge';
+const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 
 // One line per request/response channel — the FQN half of each pair, read off the generated
-// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' shell/frontend/bindings/.../bridge/*.ts`),
+// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' apps/kira-studio/frontend/bindings/.../bridge/*.ts`),
 // not retyped from memory. `connectionsDelete`'s Go-side name is `Remove`, not `Delete` (P57
 // §1.9) — the one place key and value genuinely disagree.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
@@ -190,7 +190,7 @@ function canonical(value: unknown): string {
 }
 
 function runtimeErrorBody(code: string, message: string): string {
-  // The exact shape shell/internal/bridge/transport_http.go's httpError writes for a bound
+  // The exact shape apps/kira-studio/internal/bridge/transport_http.go's httpError writes for a bound
   // method's error (P57 §1.6/D5): `.message` is ipcerr.Error's own JSON encoding, `.cause` is
   // that same {code, message} as a real object. control.ts's `unwrap` reads `.cause` first, so a
   // fixture miss surfaces as a diagnosable `E_FIXTURE_MISS`, not a raw network failure.

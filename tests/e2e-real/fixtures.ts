@@ -12,9 +12,9 @@ import { test as base, type Page } from '@playwright/test';
 // engine, a real database adapter, reached over plain HTTP/WebSocket (§1/§3).
 
 const ROOT_DIR = resolve(__dirname, '../..');
-const SHELL_DIR = resolve(ROOT_DIR, 'shell');
+const SHELL_DIR = resolve(ROOT_DIR, 'apps/kira-studio');
 const SERVER_BINARY = resolve(SHELL_DIR, 'bin/kira-server-test');
-// Serializes the actual prerequisite-build filesystem writes (shell/frontend/dist, the compiled
+// Serializes the actual prerequisite-build filesystem writes (apps/kira-studio/frontend/dist, the compiled
 // binary) across worker *processes* — the in-module memo below only dedupes within one process.
 // Two `e2e-real` workers building at once would otherwise race on the same output paths.
 const LOCK_PATH = resolve(ROOT_DIR, '.e2e-real-build.lock');
@@ -47,7 +47,7 @@ async function acquireBuildLock(): Promise<() => Promise<void>> {
 
 // Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/wails-dev-setup.sh`
 // (pinned wails3, generated bindings — no vendored Node runtime or bundled engine to check for
-// since P58f) plus `bun run build` (shell/frontend/dist, which main.go's `//go:embed
+// since P58f) plus `bun run build` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
 // all:frontend/dist` picks up), then the one step those scripts don't do — `go build -tags
 // server`. Memoized per worker process so a spec file with multiple tests builds once, not once
 // per test.
@@ -61,7 +61,7 @@ function buildPrerequisites(): Promise<void> {
       execFileSync('sh', ['scripts/wails-dev-setup.sh'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       // `build:wails` (a separate `vite.wails.config.ts`) was folded into the main `vite build`
       // once P57 removed Electron — this repo's own `vite.config.ts` already outputs straight to
-      // `shell/frontend/dist`, main.go's `//go:embed` target.
+      // `apps/kira-studio/frontend/dist`, main.go's `//go:embed` target.
       execFileSync('bun', ['run', 'build'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       await mkdir(resolve(SHELL_DIR, 'bin'), { recursive: true });
       execFileSync('go', ['build', '-tags', 'server', '-o', SERVER_BINARY, '.'], {

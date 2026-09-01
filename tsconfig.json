@@ -3,10 +3,10 @@
     "paths": {
       "@shared/*": ["./src/shared/*"],
       "@bindings/*": [
-        "./shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/bridge/*"
+        "./apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
       ],
       "@bindings-internal/*": [
-        "./shell/frontend/bindings/github.com/kirathecat/kira-studio/shell/internal/*"
+        "./apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/*"
       ]
     }
   },
