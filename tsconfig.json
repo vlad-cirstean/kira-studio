@@ -1,19 +1,4 @@
 {
-  "compilerOptions": {
-    "paths": {
-      "@shared/*": ["./packages/shared/*"],
-      "@bindings/*": [
-        "./apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
-      ],
-      "@bindings-internal/*": [
-        "./apps/kira-studio/frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/*"
-      ]
-    }
-  },
   "files": [],
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "./apps/kira-studio/frontend/tsconfig.json" },
-    { "path": "./tests/unit/tsconfig.json" }
-  ]
+  "references": [{ "path": "./apps/kira-studio" }]
 }

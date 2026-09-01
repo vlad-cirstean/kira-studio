@@ -49,7 +49,7 @@ func marshalIndentNoEscape(v any, prefix, indent string) ([]byte, error) {
 // FixturePathFor is capture.ts's fixturePathFor, rooted at repoRoot instead of process.cwd() (this
 // package has no equivalent convention — every _test.go file passes its own adapter name).
 func FixturePathFor(repoRoot, adapterName string) string {
-	return filepath.Join(repoRoot, "tests", "ipc", adapterName, adapterName+".fixture.ts")
+	return filepath.Join(repoRoot, "apps", "kira-studio", "tests", "ipc", adapterName, adapterName+".fixture.ts")
 }
 
 // WriteFixtureModule is capture.ts's writeFixtureModule: the same header, the same two `export
