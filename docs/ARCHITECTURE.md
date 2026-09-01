@@ -81,7 +81,10 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 - The renderer loads no remote content, opens no window, and navigates nowhere but its own base
   URL. Under Electron this was enforced by the shell as well as true of the code; under Wails only
   the second half still holds — the renderer contains no such call, but there is no navigation
-  policy left to stop one (see Renderer security surface, below).
+  policy left to stop one (see Renderer security surface, below). The *shell* can open a second
+  window — *Window → New Window*, ⇧⌘N (P8) — but only from a Go-side menu command, never from a
+  renderer-initiated call: `JavaScriptCanOpenWindowsAutomatically: Disabled` (Renderer security
+  surface, below) is unchanged, and the renderer never calls `window.open` or its own equivalent.
 
 ## Adapter contract
 
@@ -445,8 +448,10 @@ filter_history(id, connection_id, path, where_text, order_by_json, used_at)
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
        command, error)                                  -- rotated, capped
-ui_layout(key, value)                                   -- panel sizes, visibility
-tabs(id, connection_id, path, kind, state_json, order, active)  -- session restore
+ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
+windows(key, order, bounds_json)                        -- one row per workbench (P8)
+tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
+                                                       -- window_key ON DELETE CASCADE into windows
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -461,7 +466,9 @@ carry an `advanced.engineMemoryCapMb` row from before P58f M10 removed the setti
 (D18, with it the `--max-old-space-size` flag it fed) — there is no migration to delete it, since a
 schema-version bump for one inert leaf row was judged not worth the migration-ordering risk. Nothing
 reads that key any more; the row is harmless and is recorded here so nobody rediscovers it later
-wondering what still consumes it.
+wondering what still consumes it. The same judgement applies to `ui_layout`'s own `window.bounds`
+leaf: P8's `0002_p8_windows.sql` seeds the first `windows` row from it and then leaves the
+now-inert leaf row in place rather than deleting it.
 
 S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
 repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
@@ -757,9 +764,11 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
-twelve bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
-`LayoutService`, `TabsService`, `ConnectionsService`, `TreeService`, `EngineService`, `OpsService`,
-`FiltersService`, `FilesService`, `QueriesService`, `LifecycleService`. `EngineService.Status()` has
+thirteen bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
+`LayoutService`, `TabsService`, `WindowsService` (P8: a page's own boot-time window registration,
+see Process model's multi-window subsection below), `ConnectionsService`, `TreeService`,
+`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`,
+`LifecycleService`. `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
 no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
@@ -770,6 +779,51 @@ Storage), `internal/adapterhost/` (the router, session and data-plane server des
 `internal/adapters/` (every engine's own package, see Adapter contract), `internal/oplog/` (the
 op-log event type and its two topics, relocated here from the deleted `internal/enginehost` — P58f
 D9), and `internal/metrics/`.
+
+**Multi-window: per window, or app-wide (P8).** The app has always had exactly one window in
+practice — there was no code path to a second one in either the Electron or the Wails shell — but
+Wails' own window manager (`internal/shell`) supports any number, and P8 is the phase that made a
+second window both reachable (*Window → New Window*, ⇧⌘N) and correct. The line, and why it sits
+where it does:
+
+- **Per window:** the tab set and active tab (`tabs.window_key`), and the window's own rectangle
+  (`windows.bounds_json`) — both properties of *this workbench*, meaningless shared.
+- **App-wide:** connections and their live state, settings, the op log, all three cache tiers, the
+  metrics readout, the keychain, pre-connect supervision, and panel layout — each a property of the
+  one process and the one database (this section's own "One process for all connections"), so a
+  per-window copy would be invented divergence, not a fix.
+
+**The window key travels as `?window=<key>` on the frontend URL**, not through an async runtime
+call: the shell mints a UUID per window (`internal/storage/model.WindowRecord`) and builds
+`WebviewWindowOptions{URL: "/?window=" + key, Name: key}`, so `frontend/src/state/window.ts` can
+read it **synchronously**, at module load, with `new URLSearchParams(location.search).get('window')`
+— before `hydrateTabs()` (or anything else window-scoped) ever runs. Absent or unrecognised falls
+back to the key `"main"`, which is what `tests/ui`'s static file server and `tests/e2e-real`'s plain
+Chromium tab both see with no `?window=` of their own, and what a `-tags server` build's own lack of
+a native shell means every window key needs a registration path for anyway
+(`bridge.WindowsService.Ensure`, called once at renderer boot — always a no-op on the native shell,
+since `main.go`'s own window-creation paths already create a window's `windows` row before that
+window's URL ever loads).
+
+**A window's `windows` row survives its own closing, unless another window is still open.** Closing
+one of several open windows deletes that row (cascading its tabs via
+`tabs.window_key ... ON DELETE CASCADE`) — the user closed that workbench, its tabs should not
+reappear. Closing the *last* window leaves the row in place: `ApplicationShouldTerminateAfterLastWindowClosed:
+false` (P56) keeps the app running, and the next Dock click or relaunch reopens the same workbench,
+tabs included, exactly as a single-window session always has.
+
+**Menu commands go to the focused window; state changes still broadcast to every window.** Wails'
+own event transport fans every `app.Event.Emit` out to all windows — correct for a connection-state
+change or a settings update, wrong for a menu command, which Electron always sent to
+`BrowserWindow.getFocusedWindow()` only. `appcore.Emitter` has three delivery shapes over the same
+`DispatchWailsEvent` primitive: `Emit` (broadcast — the six state-change channels, and the quit
+handshake's own flush-before-close signal, which every window must answer), `EmitTo(windowKey, …)`
+(exactly one window by key — the per-window close-flush handshake), and `EmitFocused` (exactly the
+key/focused window — the menu's twelve signal channels, `bridge.Events.Signal`'s successor to
+`sendToFocusedWindow`). Getting this split wrong the other way (broadcasting a menu command) was a
+real regression the Wails port introduced and P8 fixed: Cmd+W used to close a tab in every open
+window at once, and a menu-driven Run could execute a console statement in a window the user wasn't
+looking at.
 
 **App-wide CPU/footprint metrics** (`internal/metrics/`, the Go analogue of Electron's
 `app.getAppMetrics()`) find this app's process set by **executable-path substring match, not a
