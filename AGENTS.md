@@ -4,49 +4,54 @@ Facts about the app itself — driver choices, protocol constraints, capability 
 live in `docs/ARCHITECTURE.md`, not here. This file is process and environment only: how this
 team works, and how to run things in whichever box a session happens to be on.
 
-**Opus plans, Sonnet implements.**
+**Opus plans, a Sonnet subagent implements — this session only orchestrates.**
 
-- The **main session runs on Sonnet**. It implements directly — it does not delegate
-  implementation to subagents.
+- The **main session runs on Sonnet, and it orchestrates only** — it does not implement, edit code,
+  or fix findings directly. Its job is to spawn the right subagents in the right order, carry
+  context between them, and track progress; the actual writing happens in a subagent every time.
 - Each phase (see `docs/v1.1/SPEC.md`'s phasing table) gets an Opus-authored plan
   committed under `docs/v1.1/plans/` before any implementation starts. Produce this by spawning an
-  **Opus subagent** (`Agent` tool, `model: "opus"`) whose job is only to write that plan; the
-  main Sonnet session then implements it.
+  **Opus subagent** (`Agent` tool, `model: "opus"`) whose job is only to write that plan.
 - If a phase's plan is missing from `docs/v1.1/plans/`, do not implement from the spec directly —
   get the Opus plan written and committed first.
-- Do not spawn implementation subagents (Sonnet or otherwise) for the core sequential work.
-  Phases build on each other, so the main session needs continuity of what was decided and why;
-  a fresh subagent starts cold and has to re-derive that context, which is the expensive path.
-  Subagents are fine for genuinely independent, parallelizable, or throwaway research (e.g.
-  "how does the `pg` driver handle cancellation?") — not for writing the phase's code.
+- **Once the Opus plan lands, spawn a Sonnet subagent** (`Agent` tool, `model: "sonnet"`) to
+  implement it. Default to **one sequential subagent for the whole phase**, not several — a fresh
+  subagent starts cold, so the orchestrating session's prompt to it must carry the plan and
+  whatever prior-phase context it needs to pick up with continuity, rather than assuming it
+  remembers anything. **Use multiple subagents in parallel only when the plan's own work is
+  genuinely independent and parallelizable** (e.g. several unrelated adapters, or research/fixes
+  that don't touch the same files or depend on each other's output) — never split a single
+  continuous, order-dependent piece of work across subagents just to run it concurrently.
 - **The loop per phase:** check for a plan → spawn an Opus subagent to write one if missing →
-  Sonnet implements the whole phase. Phases are done one at a time, in order — do not parallelize
-  or batch multiple phases together.
+  spawn a Sonnet subagent (or several, only if the work is genuinely parallelizable) to implement
+  the whole phase, and wait for it to finish before moving on. Phases are done one at a time, in
+  order — do not parallelize or batch multiple phases together.
 - **A phase asked for in multiple passes/iterations/rounds means repeat that whole loop that many
   times**, not run it once and call the extra passes optional. Each pass is its own
-  Opus-research-then-Sonnet-fix cycle, in order, each one written and implemented against the
-  *current* state of the tree (i.e. on top of everything the previous pass already landed) —
-  never against the pre-phase state, and never batched into one plan up front. Give each pass's
-  plan its own file under `docs/v1.1/plans/` (e.g. a phase's plan plus `-iter2`/`-iter3` suffixes) so
-  the history of what each round found and fixed stays legible on its own. The point of more than
-  one pass is that later rounds find what earlier rounds missed or newly created — an Opus session
-  planning pass N should actually re-read the current source rather than trust pass N-1's own
-  target-tree/summary prose, and should say plainly when a pass turns up nothing real rather than
-  manufacturing a finding to fill it.
+  Opus-plans-then-Sonnet-subagent-implements cycle, in order, each one written and implemented
+  against the *current* state of the tree (i.e. on top of everything the previous pass already
+  landed) — never against the pre-phase state, and never batched into one plan up front. Give each
+  pass's plan its own file under `docs/v1.1/plans/` (e.g. a phase's plan plus `-iter2`/`-iter3`
+  suffixes) so the history of what each round found and fixed stays legible on its own. The point
+  of more than one pass is that later rounds find what earlier rounds missed or newly created — an
+  Opus session planning pass N should actually re-read the current source rather than trust pass
+  N-1's own target-tree/summary prose, and should say plainly when a pass turns up nothing real
+  rather than manufacturing a finding to fill it.
 - **A "code review"** — run once a phase (or a batch of phases) is otherwise complete, on request —
   means spawning **three Opus subagents in parallel**, each analyzing the current tree against one
   dimension: (1) overall architecture and structure, maintainability, clean code, and security;
   (2) functional correctness and business logic; (3) performance and resource efficiency. Each
-  agent only reports findings — it does not fix anything. The main Sonnet session then fixes every
-  finding directly, the same "Opus plans/reviews, Sonnet implements" split as everywhere else in
-  this file. Once every finding from that round is fixed, **repeat the whole three-agent cycle
-  again** — a fresh round against the now-changed tree, not a one-shot — for as many rounds as
-  asked for; this is the same "multiple passes" rule two bullets up, applied to review instead of
-  implementation. A round that turns up nothing real should say so plainly rather than manufacture
-  a finding to fill it. No findings document survives a round once it's fixed — each finding is
-  fixed and committed one at a time, so the commit log is the durable record; carry forward only
-  a genuinely still-open item (see "Known open items" below), never a running narrative of what
-  each round found.
+  agent only reports findings — it does not fix anything. The orchestrating session then spawns a
+  Sonnet subagent to fix every finding — one sequential subagent by default, since findings usually
+  land in overlapping files, and parallel subagents only for a batch of findings genuinely isolated
+  from each other. Once every finding from that round is fixed, **repeat the whole three-agent
+  cycle again** — a fresh round against the now-changed tree, not a one-shot — for as many rounds
+  as asked for; this is the same "multiple passes" rule two bullets up, applied to review instead
+  of implementation. A round that turns up nothing real should say so plainly rather than
+  manufacture a finding to fill it. No findings document survives a round once it's fixed — each
+  finding is fixed and committed one at a time, so the commit log is the durable record; carry
+  forward only a genuinely still-open item (see "Known open items" below), never a running
+  narrative of what each round found.
 - No per-phase PRs. One feature branch for all of v1.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`,
   no skipped validation to make something demo. Scope left out of a phase is left out entirely,
