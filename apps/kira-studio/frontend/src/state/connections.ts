@@ -97,25 +97,18 @@ export function openCreateDialog(): void {
   };
 }
 
-// D9: editing calls reveal() once and puts the secret in the draft's password field; if the
-// user never touches it, the draft still carries the real value here but the field renders
-// masked (ConnectionDialog.vue) and the plain three-state convention on save is unaffected —
-// the dialog always sends the *current* password value, never a sentinel for "unchanged". A
-// decrypt failure (a restored kira.sqlite from another machine, a reset login keychain) opens
-// the dialog anyway, with an empty password field and `error` set instead of throwing — the
-// caller here has no try/catch of its own, so a throw would silently no-op the Edit menu item.
-//
-// P2 R2: for a URI-mode connection, the revealed secret is deliberately left out of the draft.
-// ConnectionDialog.vue renders no password input while `mode === 'uri'` (the URI text is the only
-// thing the user can see or edit there, and D7 already strips any password out of it for
-// display), so putting the plaintext secret in `draft.password` regardless of mode just left it
-// sitting in memory with no way to clear it, still shipped verbatim on every later save/test even
-// after the user retyped the URI for an entirely different host. Fields mode still needs it: it
-// is the field the user actually sees and edits there.
-export async function openEditDialog(id: string): Promise<void> {
+// P14 D1: editing no longer reveals anything on open — the dialog used to call reveal() here and
+// put the plaintext straight into `draft.password` (P25 D9's old contract), but that secret was
+// then sitting in the DOM the whole time the dialog was open, whether or not the user ever asked
+// to see it (the eye toggle was just `type="password"` vs `type="text"` over a value already
+// there — no real confirmation gated it at all). The draft now opens with `password: null`, which
+// Update's three-state convention already treats as "unchanged" (service.go:253) — exactly what
+// URI mode has done since P2 R2, extended here to fields mode too. ConnectionDialog.vue's own
+// `onReveal()` is what actually fetches the secret now, gated behind local authentication
+// (internal/localauth), only when the user presses "Show password".
+export function openEditDialog(id: string): void {
   const summary = connectionRecord(id);
   if (!summary) return;
-  const { password, error } = await control.connectionsReveal(id);
   const {
     id: _id,
     sortOrder: _sortOrder,
@@ -127,8 +120,8 @@ export async function openEditDialog(id: string): Promise<void> {
     open: true,
     mode: 'edit',
     editingId: id,
-    draft: { ...fields, password: fields.mode === 'fields' ? password : null },
-    error,
+    draft: { ...fields, password: null },
+    error: null,
   };
 }
 

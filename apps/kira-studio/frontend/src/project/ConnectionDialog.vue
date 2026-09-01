@@ -10,6 +10,7 @@ import {
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
+import { confirmDialog } from '../state/confirmDialog';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
@@ -79,6 +80,11 @@ const step = ref<'engine' | 'details'>(isEdit.value ? 'details' : 'engine');
 const engineSearch = ref('');
 
 const showPassword = ref(false);
+// P14 D1: a brand-new connection has no stored secret to reveal at all — whatever's typed is
+// already "revealed" in the only sense that applies, so the eye button is a free toggle from the
+// start. Editing an existing connection starts un-revealed; pressing the eye is what fetches the
+// real secret, gated behind local authentication (onReveal, below).
+const revealed = ref(!isEdit.value);
 const uriNote = ref('');
 const testState = ref<{ status: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({
   status: 'idle',
@@ -187,10 +193,66 @@ async function onTest(): Promise<void> {
   const d = draft.value;
   if (!d) return;
   testState.value = { status: 'testing' };
-  const result = await control.connectionsTest(d);
+  // P14 D3: editingId (empty for a brand-new connection) lets the backend fill in the stored
+  // secret when the draft carries none, so testing an existing connection whose password was
+  // never revealed still probes with the real credential rather than none at all.
+  const result = await control.connectionsTest(d, connectionsState.dialog.editingId ?? '');
   testState.value = result.ok
     ? { status: 'ok', message: result.serverVersion }
     : { status: 'error', message: result.error };
+}
+
+// P14 D6: the backend decides, this just renders what comes back. requestReveal recurses exactly
+// once, for the confirmation-required -> user confirms -> re-ask-with-confirmed:true path; every
+// other outcome is terminal.
+async function requestReveal(id: string, confirmed: boolean): Promise<void> {
+  const result = await control.connectionsReveal(id, confirmed);
+  switch (result.outcome) {
+    case 'revealed':
+      if (draft.value) draft.value.password = result.password;
+      revealed.value = true;
+      showPassword.value = true;
+      return;
+    case 'cancelled':
+      // D11: the user cancelled the OS prompt on purpose — nothing to show for it.
+      return;
+    case 'confirmation-required': {
+      const name = draft.value?.name || 'this connection';
+      const ok = await confirmDialog(
+        `Show the saved password for "${name}"? It will be displayed in plain text.`,
+        { danger: false },
+      );
+      if (ok) await requestReveal(id, true);
+      return;
+    }
+    default:
+      connectionsState.dialog.error = result.error ?? 'Could not reveal the saved password.';
+  }
+}
+
+function onReveal(): void {
+  const id = connectionsState.dialog.editingId;
+  if (!id) return;
+  void requestReveal(id, false);
+}
+
+// Not yet revealed: the eye button is the reveal action itself (gated in Go). Once revealed (or
+// for a brand-new connection, which was never gated to begin with), it's a free client-side mask
+// toggle — no second round trip, no second prompt (F8/D5).
+function onEyeClick(): void {
+  if (revealed.value) {
+    showPassword.value = !showPassword.value;
+  } else {
+    onReveal();
+  }
+}
+
+// A password typed directly (without ever pressing the eye) must not later be clobbered by a
+// deferred reveal fetch — once the user has edited the field themselves, `revealed` means "the
+// eye is a plain toggle from here on", the same as if they had pressed it.
+function onPasswordInput(value: string): void {
+  if (draft.value) draft.value.password = value;
+  revealed.value = true;
 }
 
 async function onSave(): Promise<void> {
@@ -446,15 +508,16 @@ const preconnectText = computed({
                     :model-value="draft.password ?? ''"
                     :type="showPassword ? 'text' : 'password'"
                     size="md"
+                    :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
                     data-testid="connection-password"
-                    @update:model-value="draft.password = $event"
+                    @update:model-value="onPasswordInput"
                   />
                 </div>
                 <IconButton
                   :icon="showPassword ? 'eye-closed' : 'eye'"
                   v-tooltip="showPassword ? 'Hide password' : 'Show password'"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                  @click="showPassword = !showPassword"
+                  @click="onEyeClick"
                 />
               </div>
             </div>
