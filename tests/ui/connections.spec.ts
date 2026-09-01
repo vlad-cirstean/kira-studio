@@ -317,6 +317,15 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await uriConnRow.click({ button: 'right' });
   await page.click('[data-testid="menu-item-edit"]');
   await expect(page.locator('[data-testid="mode-uri"]')).toHaveClass(/active/);
+
+  // P2 R2: the fixture above stubs connectionsReveal(URI_CONNECTION.id) to answer 'secretpw', but
+  // opening a URI-mode connection for edit must not load that plaintext secret into the draft —
+  // there is no password input to show it in while `mode === 'uri'` (the URI text is the only
+  // thing this dialog exposes there), so quietly carrying it along just left it unclearable and
+  // still shipped on every later save/test. Flipping to fields mode is the only way to see what
+  // the draft's password field actually holds — it must be empty, not the revealed secret.
+  await page.click('[data-testid="mode-fields"]');
+  await expect(page.locator('[data-testid="connection-password"]')).toHaveValue('');
   await page.click('[data-testid="connection-cancel"]');
 
   // --- color change via the dialog and via the context menu, both apply -------------------

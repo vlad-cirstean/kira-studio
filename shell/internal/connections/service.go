@@ -210,7 +210,13 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 	if in.Mode == "uri" && uri != nil && *uri != "" {
 		stripped, pw := stripURIPassword(*uri)
 		uri = &stripped
-		password = pw
+		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
+		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
+		// ever showing it back to the user) says nothing about the password, so in.Password's own
+		// three-state value (nil/""/replace) must stand, not be silently discarded in its favor.
+		if pw != nil {
+			password = pw
+		}
 	}
 
 	// P25 D6: validate the secret can be encrypted before writing anything — a failure here
@@ -249,7 +255,15 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	if in.Mode == "uri" && uri != nil && *uri != "" {
 		stripped, pw := stripURIPassword(*uri)
 		uri = &stripped
-		password = pw
+		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
+		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
+		// ever showing it back to the user) says nothing about the password, so in.Password's own
+		// three-state value (nil/""/replace) must stand. The old unconditional override silently
+		// discarded an explicit "" clear the moment the URI itself had no password to report,
+		// which is every URI-mode save that doesn't retype credentials by hand.
+		if pw != nil {
+			password = pw
+		}
 	}
 
 	// P25 D6: the row already exists, so — unlike Create — the secret can be written first; a

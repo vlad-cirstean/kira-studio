@@ -287,6 +287,72 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	}
 }
 
+// TestUriModeUpdateHonorsExplicitPasswordClear pins P2 R2's fix: a URI-mode Update whose typed URI
+// carries no password of its own (the normal shape — D7 always strips one out before ever showing
+// it back to the user) must still honor an explicit "" clear signal in in.Password, rather than
+// silently discarding it in favor of "unchanged" just because the URI itself said nothing. Without
+// the fix, the only way this scenario arises in the real dialog (toggle to fields mode, clear the
+// password there, toggle back to URI mode, save) always left the old secret in place.
+func TestUriModeUpdateHonorsExplicitPasswordClear(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, connections.Input{
+		ConnectionFields: model.ConnectionFields{
+			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
+			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
+		},
+	})
+
+	cleared := strPtr("")
+	if _, err := h.svc.Update(created.ID, connections.Input{
+		ConnectionFields: model.ConnectionFields{
+			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
+			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{},
+		},
+		Password: cleared,
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	secret, err := h.secrets.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Secrets.Get: %v", err)
+	}
+	if secret != nil {
+		t.Fatalf("secret = %v, want nil (cleared)", *secret)
+	}
+}
+
+// TestUriModeUpdateWithNoPasswordSignalLeavesSecretUnchanged is the companion case: a URI-mode
+// Update whose URI has no password and whose in.Password is nil (never touched — the ordinary
+// shape of an edit that doesn't concern itself with credentials at all) must still leave the
+// existing secret alone.
+func TestUriModeUpdateWithNoPasswordSignalLeavesSecretUnchanged(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, connections.Input{
+		ConnectionFields: model.ConnectionFields{
+			Name: "uri-untouched", Kind: "kafka", Color: "blue", Mode: "uri",
+			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
+		},
+	})
+
+	if _, err := h.svc.Update(created.ID, connections.Input{
+		ConnectionFields: model.ConnectionFields{
+			Name: "uri-untouched-renamed", Kind: "kafka", Color: "blue", Mode: "uri",
+			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{},
+		},
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	secret, err := h.secrets.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Secrets.Get: %v", err)
+	}
+	if secret == nil || *secret != "p" {
+		t.Fatalf("secret = %v, want unchanged p", secret)
+	}
+}
+
 // TestCreateValidatesSecretBeforeWriting covers half of the deliberately asymmetric write
 // ordering: Create must prove the secret can be encrypted BEFORE inserting, so an unavailable
 // cipher leaves no half-written row behind.

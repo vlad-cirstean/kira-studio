@@ -104,6 +104,14 @@ export function openCreateDialog(): void {
 // decrypt failure (a restored kira.sqlite from another machine, a reset login keychain) opens
 // the dialog anyway, with an empty password field and `error` set instead of throwing — the
 // caller here has no try/catch of its own, so a throw would silently no-op the Edit menu item.
+//
+// P2 R2: for a URI-mode connection, the revealed secret is deliberately left out of the draft.
+// ConnectionDialog.vue renders no password input while `mode === 'uri'` (the URI text is the only
+// thing the user can see or edit there, and D7 already strips any password out of it for
+// display), so putting the plaintext secret in `draft.password` regardless of mode just left it
+// sitting in memory with no way to clear it, still shipped verbatim on every later save/test even
+// after the user retyped the URI for an entirely different host. Fields mode still needs it: it
+// is the field the user actually sees and edits there.
 export async function openEditDialog(id: string): Promise<void> {
   const summary = connectionRecord(id);
   if (!summary) return;
@@ -119,7 +127,7 @@ export async function openEditDialog(id: string): Promise<void> {
     open: true,
     mode: 'edit',
     editingId: id,
-    draft: { ...fields, password },
+    draft: { ...fields, password: fields.mode === 'fields' ? password : null },
     error,
   };
 }

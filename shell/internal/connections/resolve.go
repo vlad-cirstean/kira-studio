@@ -55,8 +55,18 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 // is keyed on "test".
 func resolveFromInput(in Input) resolved {
 	uri := in.URI
+	password := in.Password
 	if uri != nil {
-		injected := injectURIPassword(*uri, in.Password)
+		// P2 R2: a password typed directly into the URI's own userinfo is the freshest signal of
+		// what the user actually wants tested — mirrors Create/Update's own rule below. Without
+		// this, retyping the whole URI for a different host with its own new inline credentials
+		// still silently tested with in.Password, a stale echo of whatever this connection's
+		// secret happened to be before the edit (nil for a brand-new draft, so this only bit an
+		// edit in progress).
+		if _, pw := stripURIPassword(*uri); pw != nil {
+			password = pw
+		}
+		injected := injectURIPassword(*uri, password)
 		uri = &injected
 	}
 	return resolved{
@@ -65,7 +75,7 @@ func resolveFromInput(in Input) resolved {
 			ReadOnly: in.ReadOnly, Host: in.Host, Port: in.Port, Database: in.Database,
 			Username: in.Username, URI: uri, Options: in.Options,
 			SortOrder: 0, CreatedAt: "", UpdatedAt: "",
-			Password: in.Password,
+			Password: password,
 		},
 		preconnect:        in.Preconnect,
 		preconnectSidecar: in.PreconnectSidecar,
