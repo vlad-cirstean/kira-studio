@@ -73,47 +73,49 @@ func TestCpuDeltaPercent_ZeroLogicalCPUs_ReturnsZero(t *testing.T) {
 	}
 }
 
-// C1/F3 regression: a single non-monotonic per-pid reading (a backwards-going cumulative counter —
-// a bad probe read, not a real CPU-time decrease) must be clamped to 0 for that pid rather than
-// subtracted from the total, or one bad pid could mask another pid's genuine usage.
-func TestCpuDeltaPercent_BackwardsCounter_ClampedNotSubtracted(t *testing.T) {
-	prev := map[int32]cpuState{
-		100: {time: 10.0, createTime: 5000}, // this pid's next reading goes backwards
-		200: {time: 0.0, createTime: 6000},  // this pid gains a genuine 1s of CPU time
-	}
-	cur := map[int32]cpuState{
-		100: {time: 8.0, createTime: 5000},
-		200: {time: 1.0, createTime: 6000},
-	}
-	got := cpuDeltaPercent(prev, cur, 1.0, 4)
-	if got != 25 {
-		t.Errorf("cpuDeltaPercent = %v, want 25 (pid 100's backwards delta clamped to 0, pid 200's genuine 1s / 4 cores = 25%%)", got)
-	}
-}
+// C1's own clamp/monotonicity rules (P7 plan §6, C1) — the one test this phase's refactor earns
+// per AGENTS.md's bar, since each subtest below guards a rule nothing else in the package checks:
+// a per-pid delta cannot go negative and drag down another pid's genuine usage, a pid recovering
+// from a probe failure cannot manufacture a lifetime-sized spike out of a stale baseline it no
+// longer has, and the normalized result can never leave the range StatusBar.vue renders unclamped.
+func TestCpuDeltaPercent_ClampingRules(t *testing.T) {
+	t.Run("BackwardsCounterClampedNotSubtracted", func(t *testing.T) {
+		// pid 100's next reading goes backwards (a bad probe read, not a real CPU-time decrease);
+		// pid 200 gains a genuine 1s of CPU time in the same window. The backwards delta must clamp
+		// to 0 for pid 100 rather than being subtracted from the total, or one bad pid could mask
+		// another pid's genuine usage.
+		prev := map[int32]cpuState{100: {time: 10.0, createTime: 5000}, 200: {time: 0.0, createTime: 6000}}
+		cur := map[int32]cpuState{100: {time: 8.0, createTime: 5000}, 200: {time: 1.0, createTime: 6000}}
+		got := cpuDeltaPercent(prev, cur, 1.0, 4)
+		if got != 25 {
+			t.Errorf("cpuDeltaPercent = %v, want 25 (pid 100's backwards delta clamped to 0, pid 200's genuine 1s / 4 cores = 25%%)", got)
+		}
+	})
 
-// C1/D7 regression: a pid whose probe failed last tick is dropped from Sample's cpuNow entirely
-// (see Sample's probe loop), so it is missing from prev here exactly like a brand-new pid — it
-// must not be differenced against a stale cumulative reading from before the failure, which would
-// read as that pid's entire lifetime CPU usage compressed into one sample window.
-func TestCpuDeltaPercent_RecoveredAfterProbeFailure_NoStaleBaselineSpike(t *testing.T) {
-	prev := map[int32]cpuState{} // dropped last tick when its probe failed
-	cur := map[int32]cpuState{100: {time: 300.0, createTime: 7000}}
-	got := cpuDeltaPercent(prev, cur, 1.0, 1)
-	if got != 0 {
-		t.Errorf("cpuDeltaPercent = %v, want 0 (a recovered pid has no prior sample to delta against, same as a genuinely new pid)", got)
-	}
-}
+	t.Run("RecoveredAfterProbeFailureNoStaleBaselineSpike", func(t *testing.T) {
+		// A pid whose probe failed last tick is dropped from Sample's cpuNow entirely (see Sample's
+		// probe loop), so it is missing from prev here exactly like a brand-new pid — it must not be
+		// differenced against a stale cumulative reading from before the failure, which would read
+		// as that pid's entire lifetime CPU usage compressed into one sample window.
+		prev := map[int32]cpuState{} // dropped last tick when its probe failed
+		cur := map[int32]cpuState{100: {time: 300.0, createTime: 7000}}
+		got := cpuDeltaPercent(prev, cur, 1.0, 1)
+		if got != 0 {
+			t.Errorf("cpuDeltaPercent = %v, want 0 (a recovered pid has no prior sample to delta against, same as a genuinely new pid)", got)
+		}
+	})
 
-// C1/F3 regression: the normalized result must never leave [0, 100] even when the raw per-core-sum
-// is far outside it (a stale-baseline spike, or several busy cores) — StatusBar.vue renders it
-// unclamped into a fixed-width slot.
-func TestCpuDeltaPercent_ExtremeRawValue_ClampedTo100(t *testing.T) {
-	prev := map[int32]cpuState{100: {time: 0, createTime: 1}}
-	cur := map[int32]cpuState{100: {time: 1000.0, createTime: 1}}
-	got := cpuDeltaPercent(prev, cur, 1.0, 1)
-	if got != 100 {
-		t.Errorf("cpuDeltaPercent = %v, want 100 (clamped, not left at the raw 100000%%)", got)
-	}
+	t.Run("ExtremeRawValueClampedTo100", func(t *testing.T) {
+		// The normalized result must never leave [0, 100] even when the raw per-core-sum is far
+		// outside it (a stale-baseline spike, or several busy cores) — StatusBar.vue renders it
+		// unclamped into a fixed-width slot.
+		prev := map[int32]cpuState{100: {time: 0, createTime: 1}}
+		cur := map[int32]cpuState{100: {time: 1000.0, createTime: 1}}
+		got := cpuDeltaPercent(prev, cur, 1.0, 1)
+		if got != 100 {
+			t.Errorf("cpuDeltaPercent = %v, want 100 (clamped, not left at the raw 100000%%)", got)
+		}
+	})
 }
 
 // includeHelper is AppProcessSet's own inclusion rule, pulled out pure so both the tracked
