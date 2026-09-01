@@ -19,7 +19,7 @@ Requires macOS arm64, Bun, Go (`go.mod`: 1.25.0), and Xcode command-line tools. 
 (`v3.0.0-beta.15`) — installs itself:
 
 ```sh
-bun run package                 # installs everything first, then wails3 task darwin:package, then scripts/sign-bundle.sh
+bun run package                 # installs everything first, then wails3 task darwin:package:dmg, then scripts/sign-bundle.sh
 ```
 
 `bun run package` and `bun run dev` both run `bun run setup` first (wired as `prepackage`/`predev`),
@@ -33,10 +33,13 @@ run just the install step (e.g. to warm up a machine before writing code), use `
 
 Expected artifacts (nothing lands in `dist/` or `out/` any more):
 
-- `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle.
+- `apps/kira-studio/bin/Kira Studio.dmg` — **the shipped artifact** (P10): the styled, ad-hoc-signed
+  disk image holding the app and an `/Applications` shortcut to drag it onto.
+- `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle the image is built
+  from. Still produced, and still what you run locally; it is simply no longer what ships.
 - `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
 
-No `.dmg` and no `.zip` are produced locally; the release workflow zips the `.app` itself (§7).
+No `.zip` is produced anywhere any more — the release workflow uploads the `.dmg` (§7).
 
 **Bundle layout** (`apps/kira-studio/build/darwin/Taskfile.yml`'s `create:app:bundle`):
 
@@ -87,7 +90,9 @@ than is being linked.
 
 | Task | What it does |
 |---|---|
-| `darwin:package` | `deps: build`, then `create:app:bundle` |
+| `darwin:package:dmg` | what `bun run package` invokes: `deps: package`, then `create:dmg` |
+| `create:dmg` | `wails3 tool package --format dmg` over the built `.app` — background `darwin/dmg-background.png`, volume icon *and* file icon `darwin/icons.icns`, window 540×380. The tool adds the `/Applications` symlink and places the two icons itself. macOS only (`platforms: [darwin]`) |
+| `darwin:package` | `deps: build`, then `create:app:bundle`. Still callable on its own when all you want is the bundle |
 | `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
 | `darwin:build` → `build:docker` | off macOS only: cross-compiles in the `wails-cross` Docker image. Never exercised in this repo (§5) |
 | `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere). The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
@@ -110,10 +115,16 @@ calls that used to precede the deep sign are gone with them. `create:app:bundle`
 `codesign --force --deep --sign -`; `sign-bundle.sh` re-signs and then *verifies* — redundant but
 harmless, and it is the script a human or CI actually invokes.
 
-**Deliberately present in the Taskfile but not wired into any `package.json` script:**
-`darwin:package:dmg` (`wails3 tool package --format dmg`), `darwin:sign` and `darwin:sign:notarize`
-(`wails3 tool sign [--notarize]`, Developer ID), and `darwin:build:universal`/`package:universal`.
-Signing/notarization are deferred past v1 by SPEC.md §3; the DMG is a scope decision (§6).
+The `.dmg` is signed there too, and the order is what makes that work: `create:app:bundle` signs the
+bundle *before* `create:dmg` copies it into the image, so the copy inside is already signed and
+`sign-bundle.sh`'s later re-sign of the outer `.app` — which cannot reach inside a built image — does
+not need to. The image itself gets a plain `codesign --force --sign -`; `--deep` is deliberately
+absent, since a disk image is a flat file with no bundle tree to recurse into.
+
+**Deliberately present in the Taskfile but not wired into any `package.json` script:** `darwin:sign`
+and `darwin:sign:notarize` (`wails3 tool sign [--notarize]`, Developer ID) and
+`darwin:build:universal`/`package:universal`. Signing/notarization are deferred past v1 by
+SPEC.md §3; the app is arm64-only, so a universal binary has nothing to be universal across.
 
 **Keychain consequence of ad-hoc signing.** Credentials are encrypted under an AES-256-GCM key held in
 a macOS Keychain generic-password item (`apps/kira-studio/internal/secrets/keyring_darwin.go`, service
@@ -127,7 +138,9 @@ around with a bundled private key.
 
 This environment is **Linux, with no macOS, no `codesign`, and no `/usr/libexec/PlistBuddy`**. Nothing
 below is a claim about a real packaged bundle; the layout in §1 is read from `create:app:bundle`, not
-observed in one.
+observed in one. It is kept as the record of *that* environment: P10 later ran the packaging on real
+macOS arm64 hardware, and what that run observed is recorded in §4's own items, not by rewriting the
+table below.
 
 | Check | Result |
 |---|---|
@@ -145,15 +158,20 @@ RSS, and the `.app` size.
 
 ## 4. Human checklist (run on macOS 14+ arm64)
 
-Every item is a pass/fail a human should record here after running it for real. Items 1–3 and 10 are
-also checked automatically on macOS by the `package-smoke` job in the intended `ci.yml` (§7) — but this
-list is only updated from an *observed* run, never from expectation.
+Every item is a pass/fail a human should record here after running it for real. Items 1–3, 10 and 11
+are also checked automatically on macOS by the `package-smoke` job in `ci.yml` (§7) — but this list is
+only updated from an *observed* run, never from expectation. The items marked **pass (P10)** were
+observed on macOS 26.5.2 arm64 while wiring up the DMG; everything still marked *not yet run* needs a
+human to launch the packaged app and use it.
 
-1. `bun run package` completes and `sign-bundle.sh` prints `signed and verified`. — *not yet run*
+1. `bun run package` completes and `sign-bundle.sh` prints `signed and verified`. — **pass**
+   (P10, macOS 26.5.2 arm64): printed twice, once for the `.app` and once for the `.dmg`.
 2. `codesign -dv --verbose=2 "apps/kira-studio/bin/Kira Studio.app"` reports `Signature=adhoc`. There is no
-   nested vendored Node binary to check separately any more (P58f M10). — *not yet run*
+   nested vendored Node binary to check separately any more (P58f M10). — **pass** (P10):
+   `Signature=adhoc`, `Identifier=com.kirathecat.kira-studio`, `TeamIdentifier=not set`.
 3. `bun run verify:packaging` passes against the real bundle — i.e. A1/A3/N2 actually execute
-   instead of reporting "skipped". — *not yet run*
+   instead of reporting "skipped". — **pass** (P10): all checks passed with both artifacts present,
+   so A1/A3/N2 and P10's own A4/N3 all executed.
 4. Launching the app shows the workbench with the engine status dot green — "the engine" is this
    process itself now (P58f D11), so there is no vendored runtime for a missing-file check to name;
    a launch failure here is an ordinary Go panic/crash, not a missing-sidecar error. — *not yet run*
@@ -174,7 +192,14 @@ list is only updated from an *observed* run, never from expectation.
    process's baseline RSS to add on top of the webview and shell any more. —
    *not yet run, see `docs/PERF.md` §3, whose recorded numbers still predate this bundle*
 10. Record the `.app` on-disk size (`du -sh`, lever L-D, budget ≤ 300 MB) — expect a large drop from
-    any pre-P58f measurement, now that the ~126 MB vendored `runtime/` tree is gone. — *not yet run*
+    any pre-P58f measurement, now that the ~126 MB vendored `runtime/` tree is gone. — **pass**
+    (P10): **42 MB** for the `.app`, **16 MB** for the compressed `.dmg` around it, against a
+    300 MB budget.
+11. The disk image installs the way it looks like it should (P10): it mounts, holds `Kira Studio.app`
+    beside an `/Applications` symlink, and carries the app's own icon as both its Finder icon and its
+    volume icon. — **partial**: mount, contents, both icons and `Signature=adhoc` on the image were
+    verified from the shell; the drag-onto-Applications gesture and how the window *looks* when
+    Finder opens it — background, icon placement — still want a human's eyes.
 
 ## 5. Off-macOS: what this environment could actually check
 
@@ -213,9 +238,16 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 - **Ad-hoc signature only** (identity `-`). The build is not distributable outside the machine that
   built it, and SPEC.md §3 defers signing/notarization past v1. `wails3 tool sign [--notarize]` is
   available via `darwin:sign`/`darwin:sign:notarize` but is wired into nothing.
-- **No DMG.** `darwin:package:dmg` exists in the Taskfile, but no `package.json` script calls it and
-  the release workflow zips the `.app` instead. A deliberate scope decision: verifying a DMG pipeline
-  needs real macOS, which was not available when the decision was made — not an oversight.
+- **The DMG is what ships (P10).** `bun run package` runs `darwin:package:dmg`, so a build produces
+  the `.app` *and* the styled image around it, and `scripts/sign-bundle.sh` ad-hoc signs both. The
+  window is 540×380 with the app at 28% and the `/Applications` shortcut at 72% of its width
+  (positions come from `wails3 tool package` itself, not from anything in this repo); the volume
+  icon and the image's own Finder icon are both `darwin/icons.icns`, and `darwin/dmg-background.png`
+  is a flat gradient in the app icon's own palette with an arrow between the two icon positions.
+  The scaffolded `dmg-file-icon.icns`/`.png` were Wails-branded drive artwork and were deleted with
+  the same reasoning as `Assets.car`. What is still deferred is Developer ID signing and
+  notarization, which SPEC.md §3 puts past v1 — an ad-hoc-signed image is still Gatekeeper-blocked
+  on first launch (§4's checklist covers the workaround).
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
 - **The bundle has no `Assets.car`, and the icon comes from `icons.icns` alone.** `appicon.png` and
@@ -269,9 +301,10 @@ actually exercises it.
 1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes `package.json`'s `version` from the
    tag itself — no pre-tag version-bump commit is needed.
 2. It generates bindings, runs `lint`/`typecheck`, then `bun run package` unmodified.
-3. It zips the ad-hoc-signed bundle with `ditto -c -k --keepParent "apps/kira-studio/bin/Kira Studio.app"
-   kira-studio-macos-arm64.zip`, re-runs `verify:packaging`, and opens a **draft** GitHub Release with
-   that zip attached plus an artifact upload.
+3. It copies the already-signed `apps/kira-studio/bin/Kira Studio.dmg` to
+   `kira-studio-macos-arm64.dmg` (the platform-qualified asset name — the image itself is built and
+   signed by step 2's `bun run package`, not here), re-runs `verify:packaging`, and opens a **draft**
+   GitHub Release with that disk image attached plus an artifact upload.
 4. A human runs §4 against the draft's artifact on real hardware, fills in the rows, then publishes.
    The workflow never publishes automatically.
 

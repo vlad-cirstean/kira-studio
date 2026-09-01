@@ -122,8 +122,9 @@ the Bun workspace, the Go module, and the pinned `wails3` CLI — so a fresh clo
 run beforehand. To do that install step on its own (e.g. to warm up a machine before writing
 code), run `bun run setup`.
 
-The built, signed (ad-hoc) app lands at `apps/kira-studio/bin/Kira Studio.app` — nothing is
-written to `dist/`.
+The built, signed (ad-hoc) app lands at `apps/kira-studio/bin/Kira Studio.app`, and the disk image
+that ships it — the app plus an `/Applications` shortcut to drag it onto — at
+`apps/kira-studio/bin/Kira Studio.dmg`. Nothing is written to `dist/`.
 
 Since the build is unsigned (ad-hoc), the first launch needs a Gatekeeper workaround:
 right-click → Open, or:
@@ -156,7 +157,7 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | `bun run test:ui` | Builds, then runs Playwright (WebKit) against the built bundle with both wire planes mocked |
 | `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
 | `bun run test:go` | The Go test suite (`go test ./...`) |
-| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `apps/kira-studio/bin/Kira Studio.app` (`prepackage` runs `bun run setup` first, same as `dev`) |
+| `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`) |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
 **App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`

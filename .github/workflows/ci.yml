@@ -107,13 +107,22 @@ jobs:
           go-version-file: go.mod
       - run: bun install --frozen-lockfile
       - run: bun run package
-      - name: Assert packaged bundle (docs/PACKAGING.md §4) — no runtime/ tree as of P58f M10
+      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4)
         run: |
           set -eu
           APP="apps/kira-studio/bin/Kira Studio.app"
+          DMG="apps/kira-studio/bin/Kira Studio.dmg"
           test -d "$APP"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
             = 'com.kirathecat.kira-studio'
           codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
-          du -sh "$APP"
+          # P10 ships the .dmg, so the smoke job opens the real thing: the image mounts, the app
+          # is inside it, and so is the /Applications shortcut the install gesture needs.
+          test -f "$DMG"
+          codesign -dv --verbose=2 "$DMG" 2>&1 | grep -q 'Signature=adhoc'
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/kira-dmg "$DMG"
+          test -d "/tmp/kira-dmg/Kira Studio.app"
+          test -L "/tmp/kira-dmg/Applications"
+          hdiutil detach /tmp/kira-dmg
+          du -sh "$APP" "$DMG"
       - run: bun run verify:packaging

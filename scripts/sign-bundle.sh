@@ -11,9 +11,10 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 APP="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.app"
+DMG="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.dmg"
 
 if [ ! -d "$APP" ]; then
-  echo "sign-bundle.sh: \"$APP\" not found — run 'bun run package' (or 'cd apps/kira-studio && wails3 task darwin:package') first" >&2
+  echo "sign-bundle.sh: \"$APP\" not found — run 'bun run package' (or 'cd apps/kira-studio && wails3 task darwin:package:dmg') first" >&2
   exit 1
 fi
 
@@ -26,3 +27,16 @@ codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 echo "sign-bundle.sh: signed and verified \"$APP\""
+
+# P10: the shipped artifact is the .dmg, so it carries a signature of its own. The copy of the
+# .app *inside* it is already signed — `create:app:bundle` runs `codesign:adhoc` before
+# `create:dmg` copies the bundle in — and re-signing the outer .app above cannot reach that copy,
+# which is why the order matters and why this signs the image rather than rebuilding it. A disk
+# image is a flat file: `--deep` has nothing to recurse into, so it is deliberately absent here.
+if [ -f "$DMG" ]; then
+  codesign --force --sign - "$DMG"
+  codesign --verify --strict "$DMG"
+  echo "sign-bundle.sh: signed and verified \"$DMG\""
+else
+  echo "sign-bundle.sh: no \"$DMG\" to sign — 'wails3 task darwin:package' builds only the .app; 'darwin:package:dmg' builds both" >&2
+fi

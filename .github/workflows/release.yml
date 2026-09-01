@@ -52,8 +52,10 @@ jobs:
 
       - run: bun run package
 
-      - name: Zip the signed app bundle for distribution
-        run: ditto -c -k --keepParent "apps/kira-studio/bin/Kira Studio.app" "kira-studio-macos-arm64.zip"
+      # P10: `bun run package` already produced and signed the .dmg — this only gives it the
+      # platform-qualified name the release asset carries.
+      - name: Name the signed disk image for distribution
+        run: cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
 
       - name: Verify packaging
         run: bun run verify:packaging
@@ -63,6 +65,8 @@ jobs:
           cat > release-notes.md <<'EOF'
           Unsigned (ad-hoc), local, arm64-only macOS build — macOS 14+. See docs/PACKAGING.md
           and README.md for details.
+
+          Open the disk image and drag Kira Studio onto the Applications shortcut inside it.
 
           Since this build is unsigned, macOS Gatekeeper will block the first launch. Either
           right-click the app and choose Open, or run:
@@ -79,10 +83,10 @@ jobs:
             --draft \
             --title "Kira Studio $GITHUB_REF_NAME" \
             --notes-file release-notes.md \
-            kira-studio-macos-arm64.zip
+            kira-studio-macos-arm64.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: kira-studio-macos-arm64
-          path: kira-studio-macos-arm64.zip
+          path: kira-studio-macos-arm64.dmg
           retention-days: 14
