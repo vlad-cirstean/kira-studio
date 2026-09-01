@@ -115,17 +115,37 @@ export function resultPageKey(tabId: string, seq: number): string {
   return `${tabId}:result:${seq}`;
 }
 
+/** Releases everything a result set retains outside its own `{key, rowCount}` record: its page
+ *  (resultPages.ts), its document-row parse cache, and its expanded-doc-id entries. Every place
+ *  that removes a result from `rt.results` — a full clear, a strip ×, closeOthers/closeToTheRight,
+ *  and evictOldestResults below — goes through this one release path. */
+function releaseResult(rt: ConsoleViewRuntime, result: ConsoleResult): void {
+  dropPage(result.key);
+  unregisterDocumentRows(result.key);
+  dropRows(result.key);
+  pruneExpandedDocIds(rt, result.key);
+}
+
 function dropResults(tabId: string): void {
   const rt = runtime[tabId];
   if (!rt) return;
-  for (const result of rt.results) {
-    dropPage(result.key);
-    unregisterDocumentRows(result.key);
-    dropRows(result.key);
-    pruneExpandedDocIds(rt, result.key);
-  }
+  for (const result of rt.results) releaseResult(rt, result);
   rt.results = [];
   rt.activeKey = null;
+}
+
+// P2 R1: append mode (the default, D6 below) never otherwise frees an old result's page — nothing
+// short of the user's own close/close-others action or closing the tab did before this. A session
+// of many small runs in one left-open tab would retain every one of their full decoded pages
+// forever. `protectedCount` is always the run that just completed: only *earlier* runs' results are
+// ever evicted here, however many statements the new run itself produced.
+const MAX_RESULTS_PER_TAB = 50;
+
+function evictOldestResults(rt: ConsoleViewRuntime, protectedCount: number): void {
+  const maxEvictable = rt.results.length - protectedCount;
+  const overflow = Math.min(maxEvictable, rt.results.length - MAX_RESULTS_PER_TAB);
+  if (overflow <= 0) return;
+  for (const result of rt.results.splice(0, overflow)) releaseResult(rt, result);
 }
 
 /** The strip's ×  (P40 D5) — drops the result's page (so the retained-byte guard, F21, sees it
@@ -136,10 +156,7 @@ export function closeResult(tabId: string, key: string): void {
   if (!rt) return;
   const index = rt.results.findIndex((r) => r.key === key);
   if (index === -1) return;
-  dropPage(key);
-  unregisterDocumentRows(key);
-  dropRows(key);
-  pruneExpandedDocIds(rt, key);
+  releaseResult(rt, rt.results[index]);
   rt.results.splice(index, 1);
   if (rt.activeKey === key) {
     rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
@@ -155,12 +172,7 @@ export function closeOtherResults(tabId: string, key: string): void {
   const keep = rt.results.find((r) => r.key === key);
   if (!keep) return;
   for (const result of rt.results) {
-    if (result.key !== key) {
-      dropPage(result.key);
-      unregisterDocumentRows(result.key);
-      dropRows(result.key);
-      pruneExpandedDocIds(rt, result.key);
-    }
+    if (result.key !== key) releaseResult(rt, result);
   }
   rt.results = [keep];
   rt.activeKey = key;
@@ -172,12 +184,7 @@ export function closeResultsToTheRight(tabId: string, key: string): void {
   const index = rt.results.findIndex((r) => r.key === key);
   if (index === -1) return;
   const dropped = rt.results.slice(index + 1);
-  for (const result of dropped) {
-    dropPage(result.key);
-    unregisterDocumentRows(result.key);
-    dropRows(result.key);
-    pruneExpandedDocIds(rt, result.key);
-  }
+  for (const result of dropped) releaseResult(rt, result);
   rt.results = rt.results.slice(0, index + 1);
   if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;
 }
@@ -245,6 +252,7 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       return { key, rowCount: page.rowCount };
     });
     rt.results.push(...newResults);
+    evictOldestResults(rt, newResults.length);
     rt.activeKey = newResults[0]?.key ?? rt.activeKey;
     rt.status = 'idle';
     rt.opId = null;
