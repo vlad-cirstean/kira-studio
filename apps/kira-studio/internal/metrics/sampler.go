@@ -9,6 +9,7 @@
 package metrics
 
 import (
+	"log/slog"
 	"runtime"
 	"strings"
 	"time"
@@ -37,21 +38,40 @@ type cpuState struct {
 	createTime int64
 }
 
+// procSample is one probe's answer for a single pid: the process-identity tag (createTime, same
+// role as cpuState's) plus the two readings Sample needs from it. Sampler.probe is the seam every
+// platform's syscalls sit behind, so Sample itself, cpuDeltaPercent and CachedPIDs never call an
+// OS API directly — see probe_darwin.go/probe_other.go (D3).
+type procSample struct {
+	cpuSeconds float64
+	memBytes   uint64
+	createTime int64
+}
+
+// cpuSanityThresholdPercent is cpuDeltaPercent's own sanity bound: a normalized reading above this
+// before clamping means an accounting bug (a stale-baseline spike, a bad probe read), not
+// measurement jitter, and is worth a log line even though the emitted sample still gets clamped to
+// a displayable range (F3).
+const cpuSanityThresholdPercent = 110
+
 // Sampler keeps the previous CPU-time sample so CPUPercent reports a live delta (matching
 // today's cpu.percentCPUUsage semantics) rather than gopsutil's own cumulative-since-start
 // figure, normalized by the machine's own logical core count so it lands in the same 0-100 range
 // regardless of how many cores the process set is spread across (P2 R1).
 type Sampler struct {
 	pids        func() ([]int32, error)
+	probe       func(pid int32) (procSample, bool)
 	prevCPU     map[int32]cpuState
 	prevAt      time.Time
 	logicalCPUs int
 }
 
 // NewSampler takes a pid-discovery function so the caller decides how the process set is found —
-// see Sum below for the bundle-matching implementation this app actually uses.
+// see Sum below for the bundle-matching implementation this app actually uses. The per-process
+// probe itself is always defaultProbe (platform-selected, see probe_darwin.go/probe_other.go) —
+// there is no production caller that needs a different one, so it is not part of this signature.
 func NewSampler(pids func() ([]int32, error)) *Sampler {
-	return &Sampler{pids: pids, prevCPU: map[int32]cpuState{}, logicalCPUs: runtime.NumCPU()}
+	return &Sampler{pids: pids, probe: defaultProbe, prevCPU: map[int32]cpuState{}, logicalCPUs: runtime.NumCPU()}
 }
 
 func (s *Sampler) Sample() (Sample, error) {
@@ -60,21 +80,18 @@ func (s *Sampler) Sample() (Sample, error) {
 		return Sample{}, err
 	}
 
-	var totalRSS uint64
+	var totalMem uint64
 	cpuNow := make(map[int32]cpuState, len(ids))
 	for _, pid := range ids {
-		p, err := process.NewProcess(pid)
-		if err != nil {
-			continue // exited between discovery and sampling — not this process's problem.
+		ps, ok := s.probe(pid)
+		if !ok {
+			// A failed probe drops this pid from both readings for the tick rather than
+			// contributing a zero: cpuState.time is cumulative, so a zero fed into next tick's
+			// delta would read as this pid's entire lifetime CPU usage in one window (F2, D7).
+			continue
 		}
-		if mi, err := p.MemoryInfo(); err == nil && mi != nil {
-			totalRSS += mi.RSS
-		}
-		times, timesErr := p.Times()
-		createTime, createErr := p.CreateTime()
-		if timesErr == nil && createErr == nil {
-			cpuNow[pid] = cpuState{time: times.User + times.System, createTime: createTime}
-		}
+		totalMem += ps.memBytes
+		cpuNow[pid] = cpuState{time: ps.cpuSeconds, createTime: ps.createTime}
 	}
 
 	now := time.Now()
@@ -85,28 +102,53 @@ func (s *Sampler) Sample() (Sample, error) {
 	s.prevCPU = cpuNow
 	s.prevAt = now
 
-	return Sample{CPUPercent: cpuPercent, MemoryBytes: totalRSS}, nil
+	return Sample{CPUPercent: cpuPercent, MemoryBytes: totalMem}, nil
 }
 
 // cpuDeltaPercent is Sample's own delta math, pulled out as a pure function so the pid-reuse
 // guard and the core-count normalization are both unit-testable without a real OS process: a pid
 // only contributes if it named the same process (matching createTime) in both snapshots — a pid
-// missing from prev (a genuinely new process) or whose createTime changed (an exited process's
-// pid reused by an unrelated new one) contributes nothing for this tick, rather than a delta
-// computed against a stranger's cumulative CPU time. The raw per-core-sum (which alone can exceed
-// 100 on a machine with more than one logical core fully busy) is then divided by logicalCPUs so
-// the result lands in the same 0-100 range StatusBar.vue's plain "N%" reading assumes (P2 R1).
+// missing from prev (a genuinely new process, including one whose probe failed last tick — see
+// Sample's D7 handling above) or whose createTime changed (an exited process's pid reused by an
+// unrelated new one) contributes nothing for this tick, rather than a delta computed against a
+// stranger's cumulative CPU time. A per-pid delta that goes backwards (a non-monotonic read) is
+// clamped to 0 rather than subtracted from the other pids' genuine usage, and the normalized
+// result is clamped to [0, 100] — a raw value above cpuSanityThresholdPercent is logged once with
+// the pids that produced it, since that means an accounting bug worth seeing rather than jitter to
+// round away silently (F3).
 func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logicalCPUs int) float64 {
 	if elapsedSeconds <= 0 || logicalCPUs <= 0 {
 		return 0
 	}
 	var deltaSum float64
+	var contributors []int32
 	for pid, c := range cur {
-		if p, ok := prev[pid]; ok && p.createTime == c.createTime {
-			deltaSum += (c.time - p.time) / elapsedSeconds
+		p, ok := prev[pid]
+		if !ok || p.createTime != c.createTime {
+			continue
+		}
+		delta := (c.time - p.time) / elapsedSeconds
+		if delta < 0 {
+			delta = 0
+		}
+		deltaSum += delta
+		if delta > 0 {
+			contributors = append(contributors, pid)
 		}
 	}
-	return deltaSum * 100 / float64(logicalCPUs)
+
+	raw := deltaSum * 100 / float64(logicalCPUs)
+	if raw > cpuSanityThresholdPercent {
+		slog.Warn("cpu sample exceeded sanity threshold, clamping", "scope", "metrics", "percent", raw, "pids", contributors)
+	}
+	switch {
+	case raw < 0:
+		return 0
+	case raw > 100:
+		return 100
+	default:
+		return raw
+	}
 }
 
 // AppProcessSet finds this app's own process set: pids matching anchorNeedles directly (this
@@ -263,14 +305,38 @@ func (c *CachedPIDs) revalidate() {
 	}
 }
 
+// processCreateTime reads createTime off the same probe Sampler uses (rather than its own
+// NewProcess/CreateTime lookup), so CachedPIDs' idea of "the same process" and cpuState's can
+// never diverge — the create-time tag both use to detect pid reuse always comes from one place.
 func processCreateTime(pid int32) (int64, bool) {
+	ps, ok := defaultProbe(pid)
+	if !ok {
+		return 0, false
+	}
+	return ps.createTime, true
+}
+
+// defaultProbe is today's gopsutil-based per-process probe: NewProcess (an existing-pid check),
+// MemoryInfo (RSS) and Times (cumulative CPU seconds), folded into one pass/fail result instead of
+// the memory and CPU reads failing independently as before the probe seam existed. A future darwin
+// probe replaces this with a single proc_pid_rusage syscall reading footprint instead of RSS;
+// every other platform keeps this implementation (D3).
+func defaultProbe(pid int32) (procSample, bool) {
 	p, err := process.NewProcess(pid)
 	if err != nil {
-		return 0, false
+		return procSample{}, false
 	}
-	ct, err := p.CreateTime()
+	mi, err := p.MemoryInfo()
+	if err != nil || mi == nil {
+		return procSample{}, false
+	}
+	times, err := p.Times()
 	if err != nil {
-		return 0, false
+		return procSample{}, false
 	}
-	return ct, true
+	createTime, err := p.CreateTime()
+	if err != nil {
+		return procSample{}, false
+	}
+	return procSample{cpuSeconds: times.User + times.System, memBytes: mi.RSS, createTime: createTime}, true
 }
