@@ -26,7 +26,8 @@
     "prepackage": "bun run setup",
     "package": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package && sh ../../scripts/sign-bundle.sh'",
     "verify:packaging": "sh scripts/verify-packaging.sh",
-    "test:go": "go test ./..."
+    "test:go": "go test ./...",
+    "generate:wire": "sh scripts/generate-wire.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
@@ -64,6 +65,7 @@
     "vue-tsc": "3.3.11"
   },
   "dependencies": {
+    "flatbuffers": "25.9.23",
     "zod": "4.4.3"
   }
 }

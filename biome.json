@@ -13,7 +13,9 @@
       "!playwright-report",
       "!node_modules",
       "!docs/design",
-      "!.claude"
+      "!.claude",
+      "!packages/shared/protocol/wire.ts",
+      "!packages/shared/protocol/wire"
     ]
   },
   "formatter": {

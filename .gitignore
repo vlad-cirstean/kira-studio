@@ -161,3 +161,7 @@ docs/design/*/[a-z]*-design-system.html
 # regenerated on demand (P35 D36); the other seven engines' demo data lives
 # in containers instead, so this is the one on-disk artifact of the set.
 scripts/demo-dbs/sqlite/*.sqlite
+
+# flatc compiler, fetched on demand by scripts/generate-wire.sh (P11 D12) — the code it
+# generates is committed, the compiler itself is not.
+.tools/
