@@ -23,11 +23,11 @@ const (
 )
 
 type connectFields struct {
-	host     string
-	port     int
-	username string
-	password string
-	tls      bool
+	host      string
+	port      int
+	username  string
+	password  string
+	tlsConfig *tls.Config // nil means no TLS
 }
 
 // resolveFields is client.ts's resolveFields.
@@ -71,11 +71,13 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 		port = 6379
 	}
 
-	tlsEnabled := false
+	var tlsConfig *tls.Config
 	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
 		switch sslmode {
-		case "require", "prefer", "verify-full":
-			tlsEnabled = true
+		case "require", "prefer":
+			tlsConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
+		case "verify-full":
+			tlsConfig = &tls.Config{ServerName: host}
 		default:
 			// An unrecognized sslmode must fail loudly rather than silently fall back to a
 			// plaintext connection — a typo here would otherwise send credentials and data
@@ -91,7 +93,7 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 		}
 	}
 
-	return connectFields{host: host, port: port, username: username, password: password, tls: tlsEnabled}, defaultDbIndex, nil
+	return connectFields{host: host, port: port, username: username, password: password, tlsConfig: tlsConfig}, defaultDbIndex, nil
 }
 
 // dbConnectionSet mirrors client.ts's DbConnectionSet exactly, keyed by logical db index instead
@@ -142,8 +144,8 @@ func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client
 		// generic per-type readers are written against the RESP2 array shape.
 		Protocol: 2,
 	}
-	if s.fields.tls {
-		opts.TLSConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized: false
+	if s.fields.tlsConfig != nil {
+		opts.TLSConfig = s.fields.tlsConfig
 	}
 	client := goredis.NewClient(opts)
 	if err := client.Ping(ctx).Err(); err != nil {
