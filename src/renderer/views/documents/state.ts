@@ -129,6 +129,8 @@ export async function runCount(tabId: string): Promise<void> {
       connectionId: tab.connectionId,
       path: tab.path,
       filter: tab.state.search.trim() === '' ? null : tab.state.search,
+      // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
+      refresh: rt.count?.stale === true,
     });
     // A filter change since this count started already cleared rt.count/countOpId (setSearch) —
     // an answer to the previous filter landing now would resurrect a total for the wrong query.

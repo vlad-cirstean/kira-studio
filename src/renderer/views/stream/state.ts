@@ -145,6 +145,8 @@ export async function runCount(tabId: string): Promise<void> {
       connectionId: tab.connectionId,
       path: tab.path,
       filter: null,
+      // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
+      refresh: rt.count?.stale === true,
     });
     // A Refresh since this count started already stamped a newer countOpId — an answer to the
     // previous request landing now would resurrect a stale total.
