@@ -17,7 +17,7 @@
     "playwright.config.ts",
     "tests/e2e-real/**/*.ts",
     "tests/ui/**/*.ts",
-    "../../tests/db/support/**/*.ts",
+    "../../packages/db-fixtures/support/**/*.ts",
     "tests/ipc/**/*.ts"
   ]
 }

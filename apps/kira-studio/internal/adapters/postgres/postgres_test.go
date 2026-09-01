@@ -35,7 +35,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// Ported from tests/db/postgres.spec.ts (§9.1), case by case where practical — the spec's own
+// Ported from packages/db-fixtures/postgres.spec.ts (§9.1), case by case where practical — the spec's own
 // numbering is kept in each test's name so the two can be diffed. Not every one of the 34 TS
 // cases has a Go twin; the ones ported are the load-bearing behaviours D12's own "adapter-first-
 // test-first" rule exists to protect: connect/disconnect lifecycle, the catalog->tree mapping,
@@ -426,7 +426,7 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 
 // P2 R2 (task #89): sorting by a nullable column must never be granted keyset pagination, even
 // when a non-nullable tiebreaker (id) is available — customers.region_id has no NOT NULL
-// constraint (tests/db/fixtures/0001_seed.sql), so a naive grant here would risk either dropping
+// constraint (packages/db-fixtures/fixtures/0001_seed.sql), so a naive grant here would risk either dropping
 // any future NULL-region customer from every keyset page forever, or hard-failing a page whose
 // boundary row has a NULL region_id. Falling back to offset pagination sidesteps both failure
 // modes; RowCount must still see every customer, not just the ones with a non-NULL region_id.

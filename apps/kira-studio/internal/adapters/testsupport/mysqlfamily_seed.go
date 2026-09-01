@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// seedMysqlFamilyDatabase runs seedSQL (one of the repo's own tests/db/fixtures/*.sql files,
+// seedMysqlFamilyDatabase runs seedSQL (one of the repo's own packages/db-fixtures/fixtures/*.sql files,
 // unmodified — D12) against dsn, shared by StartMariadb/StartMysql. MultiStatements=true (already
 // set on dsn's own Config, mariadb.go's/mysql.go's) lets the whole seed file run as one Exec call,
 // the same way Postgres's simple protocol runs a semicolon-separated body in one message.

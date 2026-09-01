@@ -9,7 +9,7 @@ import (
 // RowValues is domain/mutations.ts's rowValuesSchema (Record<string, string | null>), kept as an
 // order-preserving slice rather than a Go map (P58a A4): sql-mutate.ts's renderRowOp emits columns
 // in the wire's own key order, and a preview/mutate statement's column order is asserted verbatim
-// by tests/db/postgres.spec.ts test 21. A map would randomise that order on every run.
+// by packages/db-fixtures/postgres.spec.ts test 21. A map would randomise that order on every run.
 type RowValues []RowValue
 
 // RowValue is one entry of a RowValues, preserving its position in the original JSON object.

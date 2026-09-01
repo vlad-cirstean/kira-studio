@@ -3,5 +3,8 @@
 export {
   DOCKER_UNAVAILABLE_MESSAGE,
   isDockerAvailable,
-} from '../../../../../tests/db/support/docker';
-export { type MariaFixture, startMariadb } from '../../../../../tests/db/support/mariadb';
+} from '../../../../../packages/db-fixtures/support/docker';
+export {
+  type MariaFixture,
+  startMariadb,
+} from '../../../../../packages/db-fixtures/support/mariadb';

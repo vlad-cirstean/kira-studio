@@ -14,7 +14,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// LocalStackImage mirrors tests/db/support/{sqs,s3}.ts's own IMAGE — already namespaced (no
+// LocalStackImage mirrors packages/db-fixtures/support/{sqs,s3}.ts's own IMAGE — already namespaced (no
 // library/ prefix), per AGENTS.md's Docker section.
 const (
 	LocalStackImage           = "localstack/localstack:3"

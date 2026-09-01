@@ -16,7 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// tests/db/support/mongo.ts's own constants, ported verbatim (C21) — this Go seeder re-expresses
+// packages/db-fixtures/support/mongo.ts's own constants, ported verbatim (C21) — this Go seeder re-expresses
 // that TS function rather than reading a shared fixture file, since Mongo has no .sql-file seeding
 // path.
 const (

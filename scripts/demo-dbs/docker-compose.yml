@@ -116,7 +116,7 @@ services:
 
   # localhost:9092 (no auth, PLAINTEXT)
   # Single-node KRaft broker (no ZooKeeper) — same image/mode as @testcontainers/kafka's harness
-  # (tests/db/support/kafka.ts, P10's D15): apache/kafka's listener never opens under a plain
+  # (packages/db-fixtures/support/kafka.ts, P10's D15): apache/kafka's listener never opens under a plain
   # Compose bootstrap either, so this stays on confluentinc/cp-kafka.
   kafka:
     image: confluentinc/cp-kafka:7.6.1
@@ -153,7 +153,7 @@ services:
 
   # sqs://test:test@us-east-1?endpoint=http://localhost:4566 (LocalStack's fixed dummy keys) —
   # one LocalStack instance serves both SQS and S3 (P17), same image/mode as
-  # @testcontainers/localstack's own harnesses (tests/db/support/sqs.ts, tests/db/support/s3.ts).
+  # @testcontainers/localstack's own harnesses (packages/db-fixtures/support/sqs.ts, packages/db-fixtures/support/s3.ts).
   sqs:
     image: localstack/localstack:3
     container_name: kira-sqs

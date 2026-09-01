@@ -3,7 +3,7 @@
 --
 -- A port of ../mariadb/init.sql, not a copy: every table, column, index and comment below is
 -- byte-for-byte parallel to that file except the one construct MySQL doesn't have — a native UUID
--- column type (P34 F13) — stood in for with CHAR(36), same as tests/db/fixtures/0008_mysql_seed.sql.
+-- column type (P34 F13) — stood in for with CHAR(36), same as packages/db-fixtures/fixtures/0008_mysql_seed.sql.
 
 SET NAMES utf8mb4;
 

@@ -1,4 +1,4 @@
-// Ported from tests/db/sqs.spec.ts, case by case where practical — the spec's own numbering is
+// Ported from packages/db-fixtures/sqs.spec.ts, case by case where practical — the spec's own numbering is
 // kept in each test's name so the two can be diffed. §5.3 of docs/v1/plans/P58d-sqs-s3.md names
 // the cases that carry the most weight: opening the definition must not receive a message
 // (scenario 6), the headers cell matches P58d D8's hand encoder byte-for-byte (new), a second read

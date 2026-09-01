@@ -38,7 +38,7 @@ func ContainsName(names []string, want string) bool {
 }
 
 // CellAt reads one cell of a TabularPage as *string (nil for SQL NULL) — the Go analogue of
-// tests/db/support/page.ts's cellAt/isNull pair.
+// packages/db-fixtures/support/page.ts's cellAt/isNull pair.
 func CellAt(t *testing.T, p page.TabularPage, col, row int) *string {
 	t.Helper()
 	chunk := p.Chunks[col]

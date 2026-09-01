@@ -45,7 +45,7 @@ func TestCache_L3BoundedAtExactly2048Entries(t *testing.T) {
 }
 
 // InvalidateAfterMutation's asymmetry (§7, P43 F12/D17) is not exercised by the ported TypeScript
-// unit spec (it is presumably covered indirectly by a higher-level tests/db/ mutate case), but it
+// unit spec (it is presumably covered indirectly by a higher-level packages/db-fixtures/ mutate case), but it
 // is one of the four behaviours P58a §4.7 explicitly flags as looking like a bug without its reason
 // attached, so it gets its own direct Go coverage: a local mutation must drop the target's pages
 // outright but only mark its counts stale, never drop them — DropTarget is the one that drops both.

@@ -1,4 +1,4 @@
-// Package sqlite_test is the Go analogue of tests/db/sqlite.spec.ts. Not every one of the spec's
+// Package sqlite_test is the Go analogue of packages/db-fixtures/sqlite.spec.ts. Not every one of the spec's
 // 43 scenarios has a Go twin — the ones ported are the load-bearing behaviours P58 D12's own
 // "adapter-first-test-first" rule exists to protect, plus the four new/changed cases §5.4 of
 // docs/v1/plans/P58b-mysql-sqlite-clickhouse.md calls out (B7's value-follows-the-value codec, the

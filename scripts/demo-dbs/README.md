@@ -11,11 +11,11 @@ The tenth engine, SQLite, needs no container at all (P35 D36) — the artefact a
 needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
 `node:sqlite` module the app's own adapter reads it with. See its own section below.
 
-Kafka uses the same image/mode as the `@testcontainers/kafka` harness `tests/db/support/kafka.ts`
+Kafka uses the same image/mode as the `@testcontainers/kafka` harness `packages/db-fixtures/support/kafka.ts`
 provides (confluentinc/cp-kafka in KRaft mode) — re-exported by `tests/e2e-real/support/kafka.ts`
 for that tier's Playwright specs. SQS and S3 share one
 LocalStack container (`SERVICES=sqs,s3`), same as `@testcontainers/localstack`'s own harnesses —
-see `tests/db/support/sqs.ts` and `tests/db/support/s3.ts`.
+see `packages/db-fixtures/support/sqs.ts` and `packages/db-fixtures/support/s3.ts`.
 
 ## Requirements
 

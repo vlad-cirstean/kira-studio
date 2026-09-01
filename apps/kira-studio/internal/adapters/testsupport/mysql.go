@@ -77,7 +77,7 @@ func startMysql() (*MysqlFixture, error) {
 	}
 	portNum := int(port.Num())
 
-	seedPath := filepath.Join(repoRoot(), "tests", "db", "fixtures", "0008_mysql_seed.sql")
+	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0008_mysql_seed.sql")
 	seedSQL, err := os.ReadFile(seedPath)
 	if err != nil {
 		return nil, err

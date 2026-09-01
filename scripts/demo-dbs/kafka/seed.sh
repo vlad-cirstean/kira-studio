@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kira Studio — Kafka demo seed. Runs *inside* the kira-kafka container (docker exec -i ... < this
 # file), using the kafka-* CLI tools the confluentinc/cp-kafka image ships on PATH. The `orders`/
-# `empty-topic`/consumer-group shape mirrors tests/db/fixtures/0005_kafka_seed.ts (kept small there
+# `empty-topic`/consumer-group shape mirrors packages/db-fixtures/fixtures/0005_kafka_seed.ts (kept small there
 # for test speed); `large-topic` is demo-only, at the same ~20k scale as the relational seeds'
 # `orders` table. No Node/kafkajs dependency either way.
 set -euo pipefail

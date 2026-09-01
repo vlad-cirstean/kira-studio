@@ -91,7 +91,7 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		// P58e E14: franz-go's idempotent producing defaults on where librdkafka's defaults off.
 		// Idempotency needs an InitProducerId round trip, which hangs rather than failing on a
 		// single-broker cluster whose transaction.state.log.replication.factor is Kafka's default
-		// of 3 (tests/db/support/kafka.ts's own scar). Matching librdkafka's default is the
+		// of 3 (packages/db-fixtures/support/kafka.ts's own scar). Matching librdkafka's default is the
 		// conservative, behaviour-preserving choice — kept regardless of what a test container
 		// (which sets the replication factor to 1) would show (KF-4(e)).
 		kgo.DisableIdempotentWrite(),

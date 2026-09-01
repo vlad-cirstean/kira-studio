@@ -24,7 +24,7 @@ const (
 )
 
 const (
-	// kafkaImage mirrors tests/db/support/kafka.ts's own IMAGE (P32 D25) — already namespaced (no
+	// kafkaImage mirrors packages/db-fixtures/support/kafka.ts's own IMAGE (P32 D25) — already namespaced (no
 	// library/ prefix), per AGENTS.md's Docker section.
 	kafkaImage = "confluentinc/cp-kafka:8.0.7"
 	// kafkaPublicPort is the module's own exposed PLAINTEXT listener (kafka.go's publicPort,
@@ -173,7 +173,7 @@ func seedKafka(ctx context.Context, admin *kadm.Client, client *kgo.Client) erro
 
 // CreateTopic creates a fresh, dedicated topic for one producing test (P58e E27) — orders and
 // empty-topic stay read-only fixtures, so scenarios asserting their message counts never depend
-// on test execution order the way tests/db/kafka.spec.ts's own top-to-bottom bun:test run did.
+// on test execution order the way packages/db-fixtures/kafka.spec.ts's own top-to-bottom bun:test run did.
 func CreateTopic(t *testing.T, f *KafkaFixture, name string) {
 	t.Helper()
 	if _, err := f.Admin.CreateTopics(context.Background(), 1, 1, nil, name); err != nil {

@@ -1,4 +1,4 @@
-// Package clickhouse_test is the Go analogue of tests/db/clickhouse.spec.ts. Not every one of the
+// Package clickhouse_test is the Go analogue of packages/db-fixtures/clickhouse.spec.ts. Not every one of the
 // spec's 47 scenarios has a Go twin — the ones ported are the load-bearing behaviours P58 D12's own
 // "adapter-first-test-first" rule exists to protect, plus the three §5.5 names as carrying the most
 // weight for judging B11 (wide types, big integers, NULL-vs-"null"-vs-NaN).

@@ -1,4 +1,4 @@
-// Package testsupport is the Go analogue of tests/db/support/*.ts (A19): the Docker gate, real
+// Package testsupport is the Go analogue of packages/db-fixtures/support/*.ts (A19): the Docker gate, real
 // container startup, and seed-SQL loading each adapter's own acceptance spec needs. One container
 // per test binary, started lazily on first call and reused by every later call in the same
 // process — a fresh container per test would make the suite unusable (§11b).
@@ -20,7 +20,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// DockerUnavailableMessage mirrors tests/db/support/docker.ts's own DOCKER_UNAVAILABLE_MESSAGE,
+// DockerUnavailableMessage mirrors packages/db-fixtures/support/docker.ts's own DOCKER_UNAVAILABLE_MESSAGE,
 // re-pointed at this environment's own startup procedure (AGENTS.md's Docker section) rather than
 // Colima's, since this is the Go test tier, not the dev machine's.
 const DockerUnavailableMessage = "Docker daemon unreachable — see AGENTS.md's Docker section for " +
@@ -113,7 +113,7 @@ func startPostgres() (*PgFixture, error) {
 	}
 	uri := "postgres://postgres:" + password + "@" + host + ":" + port.Port() + "/" + database
 
-	seedPath := filepath.Join(repoRoot(), "tests", "db", "fixtures", "0001_seed.sql")
+	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0001_seed.sql")
 	seedSQL, err := os.ReadFile(seedPath)
 	if err != nil {
 		return nil, err

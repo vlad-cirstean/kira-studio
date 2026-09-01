@@ -90,7 +90,7 @@ func TestFixture_MariaDB(t *testing.T) {
 	if dbChildrenFirst.Source != "server" {
 		t.Fatalf("db children (first) source = %q, want server", dbChildrenFirst.Source)
 	}
-	// The cache-hit transition is not itself part of the committed fixture (tests/db/ structurally
+	// The cache-hit transition is not itself part of the committed fixture (packages/db-fixtures/ structurally
 	// cannot reach it either, F2) — probed directly against tree.Service, not through the Recorder
 	// (which would otherwise append a second, uncommitted treeChildren snapshot).
 	dbChildrenSecond, err := app.Tree.Children(cfg.ID, dbNode.Path, false)

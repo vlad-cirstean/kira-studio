@@ -1,4 +1,4 @@
-// Ported from tests/db/s3.spec.ts, case by case where practical — the spec's own numbering is kept
+// Ported from packages/db-fixtures/s3.spec.ts, case by case where practical — the spec's own numbering is kept
 // in each test's name so the two can be diffed. §5.4 of docs/v1/plans/P58d-sqs-s3.md names the
 // cases that carry the most weight: the four download scenarios (25-28, the only automated
 // coverage of the temp-file-then-rename contract), a new mid-stream cancellation case extending

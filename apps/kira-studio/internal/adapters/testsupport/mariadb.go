@@ -82,7 +82,7 @@ func startMariadb() (*MariaFixture, error) {
 	}
 	portNum := int(port.Num())
 
-	seedPath := filepath.Join(repoRoot(), "tests", "db", "fixtures", "0002_mariadb_seed.sql")
+	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0002_mariadb_seed.sql")
 	seedSQL, err := os.ReadFile(seedPath)
 	if err != nil {
 		return nil, err

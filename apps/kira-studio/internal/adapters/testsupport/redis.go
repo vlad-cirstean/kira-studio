@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// tests/db/support/redis.ts's own constants, ported verbatim (C21).
+// packages/db-fixtures/support/redis.ts's own constants, ported verbatim (C21).
 const (
 	RedisImage            = "redis:7"
 	RedisPassword         = "kira"

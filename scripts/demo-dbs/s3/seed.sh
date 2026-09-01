@@ -2,13 +2,13 @@
 # Kira Studio — S3 demo seed. Runs *inside* the kira-sqs (LocalStack) container (docker exec -i
 # ... < this file), using the `awslocal` CLI the localstack image ships on PATH — the same one
 # container sqs/seed.sh uses, since docker-compose.yml's SERVICES lists both. Mirrors
-# tests/db/fixtures/0007_s3_seed.ts's shape (bucket/prefix/object layout) without an AWS SDK
+# packages/db-fixtures/fixtures/0007_s3_seed.ts's shape (bucket/prefix/object layout) without an AWS SDK
 # dependency.
 #
 # P33: grown from 3 objects in 2 buckets to a full size/type ladder plus a >1000-object prefix —
 # every state the phase introduces (bounded preview, bounded edit, binary refusal, the
 # ListObjectsV2 continuation loop) needs to be reachable by hand from this seed, not just from
-# tests/db/. `mb` calls are idempotent (`|| true`); re-running overwrites objects in place.
+# packages/db-fixtures/. `mb` calls are idempotent (`|| true`); re-running overwrites objects in place.
 set -euo pipefail
 
 awslocal s3 mb s3://kira-demo-bucket >/dev/null || true

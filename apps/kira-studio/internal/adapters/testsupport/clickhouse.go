@@ -84,7 +84,7 @@ func startClickHouse() (*ClickHouseFixture, error) {
 	}
 	baseURL := fmt.Sprintf("http://%s:%s", host, port.Port())
 
-	seedPath := filepath.Join(repoRoot(), "tests", "db", "fixtures", "0010_clickhouse_seed.sql")
+	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0010_clickhouse_seed.sql")
 	seedSQL, err := os.ReadFile(seedPath)
 	if err != nil {
 		return nil, err

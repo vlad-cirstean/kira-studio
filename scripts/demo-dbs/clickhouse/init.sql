@@ -159,7 +159,7 @@ CREATE TABLE reviews (
 
 -- ---------------------------------------------------------------------------
 -- order_summary — a view, and a materialized view, so the tree's Views/Materialized views
--- folders both have something in this demo too (mirrors tests/db/fixtures/0010's own pair).
+-- folders both have something in this demo too (mirrors packages/db-fixtures/fixtures/0010's own pair).
 -- ---------------------------------------------------------------------------
 CREATE VIEW order_summary AS
     SELECT o.id AS order_id, o.customer_id, count(oi.id) AS item_count, sum(oi.line_total) AS total

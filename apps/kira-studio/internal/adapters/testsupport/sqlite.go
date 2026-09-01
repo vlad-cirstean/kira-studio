@@ -52,7 +52,7 @@ func startSqlite() (*SqliteFixture, error) {
 	}
 	path := filepath.Join(dir, sqliteDatabaseFile)
 
-	seedPath := filepath.Join(repoRoot(), "tests", "db", "fixtures", "0009_sqlite_seed.sql")
+	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0009_sqlite_seed.sql")
 	seedSQL, err := os.ReadFile(seedPath)
 	if err != nil {
 		return nil, err

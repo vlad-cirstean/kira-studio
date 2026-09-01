@@ -1,4 +1,4 @@
-// Package mysqlfamily_test is the Go analogue of tests/db/{mariadb,mysql}.spec.ts: the two specs
+// Package mysqlfamily_test is the Go analogue of packages/db-fixtures/{mariadb,mysql}.spec.ts: the two specs
 // are ~90% the same file, so this is one shared suite function (runFamilySuite) plus two thin
 // drivers (TestMariaDB/TestMySQL), in one package so one TestMain stops both containers
 // (docs/v1/plans/P58b-mysql-sqlite-clickhouse.md §5.3). Not every one of the two specs' ~30
@@ -130,7 +130,7 @@ func TestMySQL(t *testing.T) {
 
 var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
 
-// runFamilySuite is the ~27 scenarios tests/db/mariadb.spec.ts and tests/db/mysql.spec.ts share.
+// runFamilySuite is the ~27 scenarios packages/db-fixtures/mariadb.spec.ts and packages/db-fixtures/mysql.spec.ts share.
 func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfig, versionRE *regexp.Regexp) {
 	t.Run("connect/disconnect, real server version", func(t *testing.T) {
 		a := newAdapter(t, kind)
