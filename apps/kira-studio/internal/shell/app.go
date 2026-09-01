@@ -39,6 +39,23 @@ func (e *emitter) EmitTo(windowKey string, name string, data any) {
 	win.DispatchWailsEvent(&application.CustomEvent{Name: name, Data: data})
 }
 
+// EmitFocused delivers to whichever window is currently key/focused (P8 D6/C9) — the successor to
+// Electron's own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8). Current() resolves
+// the real key window on darwin via [NSApp keyWindow] ?? [NSApp mainWindow]
+// (application_darwin.go); on a build with no window (or this sandbox's Linux fallback with
+// nothing focused) it returns nil, and there is nothing to deliver to, so this is a silent no-op —
+// the same "no live target" shape EmitTo already has, not a broadcast fallback.
+func (e *emitter) EmitFocused(name string, data any) {
+	if e.app == nil {
+		return
+	}
+	win := e.app.Window.Current()
+	if win == nil {
+		return
+	}
+	win.DispatchWailsEvent(&application.CustomEvent{Name: name, Data: data})
+}
+
 // NewDeferredEmitter builds an appcore.Emitter usable before application.New has returned an
 // *App to emit through — §4.11's ordering knot: both appcore.Deps.Events (read by
 // SettingsService.Set, built into the Services list passed to New) and the Quitter's

@@ -25,9 +25,17 @@ func (e *quitEmitter) Emit(name string, _ any) {
 	e.events = append(e.events, name)
 }
 
-// EmitTo satisfies appcore.Emitter's second method (P8 C6/D6) — no quit_test.go case drives it
-// directly, so it just records like Emit does, keeping the package compiling with one double.
+// EmitTo and EmitFocused satisfy appcore.Emitter's other two methods (P8 C6/C9/D6) — no
+// quit_test.go case drives either directly (Quitter only ever calls Broadcast, C9's
+// deliberately-still-Emit path), so they just record like Emit does, keeping the package
+// compiling with one double.
 func (e *quitEmitter) EmitTo(_ string, name string, _ any) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.events = append(e.events, name)
+}
+
+func (e *quitEmitter) EmitFocused(name string, _ any) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.events = append(e.events, name)

@@ -127,7 +127,9 @@ func (q *Quitter) flushThenQuit() {
 		q.release()
 	}
 
-	q.events.Signal(bridge.ChannelFlushBeforeClose)
+	// Broadcast (not Signal, P8 C9): every window must flush before quitting, not only the
+	// focused one — Signal's focused-only delivery is for menu commands, not this handshake.
+	q.events.Broadcast(bridge.ChannelFlushBeforeClose)
 	select {
 	case <-q.flushed:
 	case <-time.After(q.timeout):

@@ -94,17 +94,31 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 	}
 }
 
-// Signal emits a payload-free channel (D6: nil, not {}) — Electron's sendToFocusedWindow(channel)
-// sends no payload and preload's onSignal discards arguments (src/preload/index.ts:35-39). The
-// menu and the quit handshake are its only callers.
+// Signal emits a payload-free channel (D6: nil, not {}) to the focused window only — Electron's
+// own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8; preload's onSignal discards
+// arguments, src/preload/index.ts:35-39). The menu's twelve signal channels are its only caller
+// (P8 C9): a background window no longer reacts to a command aimed at whichever window the user
+// was actually looking at — Cmd+W closing a tab in every open window, or Cmd+Return running a
+// console statement in a window the user never touched, were the concrete symptoms (F2).
+//
+// This is the split C9 exists for: Broadcast below (the quit handshake's own trigger) and the six
+// state-change broadcasts in Attach/SettingsChanged/LayoutService.Set all stay on Emit — every
+// window genuinely needs those, unlike a menu command.
 func (ev *Events) Signal(channel string) {
-	ev.emit.Emit(channel, nil)
+	ev.emit.EmitFocused(channel, nil)
 }
 
-// SignalTo is Signal's single-window analogue (P8 C6/D6's EmitTo): the per-window close-flush
-// handshake's own trigger, delivered to exactly one window rather than broadcast.
+// SignalTo is Signal's single-window analogue, aimed by key rather than by focus (P8 C6/D6's
+// EmitTo): the per-window close-flush handshake's own trigger.
 func (ev *Events) SignalTo(windowKey, channel string) {
 	ev.emit.EmitTo(windowKey, channel, nil)
+}
+
+// Broadcast emits a payload-free channel to every window — the quit handshake's own trigger
+// (ChannelFlushBeforeClose): every window genuinely must flush before quitting, not only the
+// focused one, so this deliberately does not go through Signal's focused-only delivery.
+func (ev *Events) Broadcast(channel string) {
+	ev.emit.Emit(channel, nil)
 }
 
 // SettingsChanged broadcasts the merged settings unconditionally — SettingsService.Set's own

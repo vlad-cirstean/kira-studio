@@ -16,10 +16,14 @@ import (
 // package, so no bridge file has to import Wails. Deps carries the bare interface, not a
 // *bridge.Events, since bridge already imports appcore — a *bridge.Events field here would be an
 // import cycle. EmitTo (P8 C6) delivers to exactly one window by key — the mechanism the
-// per-window close-flush handshake builds on, and (from C9) the focused-window menu signals too.
+// per-window close-flush handshake builds on. EmitFocused (P8 C9/D6) delivers to whichever window
+// is currently key/focused, the successor to Electron's own sendToFocusedWindow — the menu's
+// twelve signal channels use it so a background window no longer reacts to a command the user
+// aimed at the window they were actually looking at.
 type Emitter interface {
 	Emit(name string, data any)
 	EmitTo(windowKey string, name string, data any)
+	EmitFocused(name string, data any)
 }
 
 // Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
