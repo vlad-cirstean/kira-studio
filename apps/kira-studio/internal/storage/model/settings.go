@@ -3,10 +3,11 @@ package model
 import "fmt"
 
 type AppearanceSettings struct {
-	FontFamily string `json:"fontFamily"`
-	FontSize   int    `json:"fontSize"`
-	RowDensity string `json:"rowDensity"`
-	WordWrap   bool   `json:"wordWrap"`
+	FontFamily  string `json:"fontFamily"`
+	FontSize    int    `json:"fontSize"`
+	RowDensity  string `json:"rowDensity"`
+	WordWrap    bool   `json:"wordWrap"`
+	RowColoring bool   `json:"rowColoring"`
 }
 
 type DataSettings struct {
@@ -32,10 +33,11 @@ type Settings struct {
 func DefaultSettings() Settings {
 	return Settings{
 		Appearance: AppearanceSettings{
-			FontFamily: "Menlo, monospace",
-			FontSize:   12,
-			RowDensity: "comfortable",
-			WordWrap:   true,
+			FontFamily:  "Menlo, monospace",
+			FontSize:    12,
+			RowDensity:  "comfortable",
+			WordWrap:    true,
+			RowColoring: true,
 		},
 		Data:  DataSettings{DefaultPageSize: 100},
 		Cache: CacheSettings{L2BudgetMb: 64},
@@ -49,10 +51,11 @@ func DefaultSettings() Settings {
 // per-section patch shapes — every leaf is optional, present only when the caller means to
 // change it (D15: SettingsRepo.Set writes only the leaves actually patched).
 type AppearancePatch struct {
-	FontFamily *string `json:"fontFamily,omitempty"`
-	FontSize   *int    `json:"fontSize,omitempty"`
-	RowDensity *string `json:"rowDensity,omitempty"`
-	WordWrap   *bool   `json:"wordWrap,omitempty"`
+	FontFamily  *string `json:"fontFamily,omitempty"`
+	FontSize    *int    `json:"fontSize,omitempty"`
+	RowDensity  *string `json:"rowDensity,omitempty"`
+	WordWrap    *bool   `json:"wordWrap,omitempty"`
+	RowColoring *bool   `json:"rowColoring,omitempty"`
 }
 
 type DataPatch struct {

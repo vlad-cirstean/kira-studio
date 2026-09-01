@@ -55,6 +55,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leafValid(stored, "appearance.fontSize", &result.Appearance.FontSize, alwaysValid[int])
 	leafValid(stored, "appearance.rowDensity", &result.Appearance.RowDensity, model.ValidRowDensity)
 	leaf(stored, "appearance.wordWrap", &result.Appearance.WordWrap)
+	leaf(stored, "appearance.rowColoring", &result.Appearance.RowColoring)
 	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
 	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
 	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
@@ -92,6 +93,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if a.WordWrap != nil {
 			if err := upsertSettingsLeaf(tx, "appearance.wordWrap", *a.WordWrap); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.RowColoring != nil {
+			if err := upsertSettingsLeaf(tx, "appearance.rowColoring", *a.RowColoring); err != nil {
 				return model.Settings{}, err
 			}
 		}

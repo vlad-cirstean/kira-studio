@@ -12,6 +12,9 @@ export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   // (CodeMirrorHost.vue's own unconditional EditorView.lineWrapping, F11), so a settings row
   // saved before this field existed parses and behaves identically.
   wordWrap: z.boolean().default(true),
+  // P9: colour grid cell text by the column's data type. `.default(true)` keeps a pre-P9 stored
+  // shape parsing to today's behavior (colouring on).
+  rowColoring: z.boolean().default(true),
 });
 export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 
@@ -61,6 +64,7 @@ export const defaultSettings: Settings = {
     fontSize: 12,
     rowDensity: 'comfortable',
     wordWrap: true,
+    rowColoring: true,
   },
   data: {
     defaultPageSize: 100,
