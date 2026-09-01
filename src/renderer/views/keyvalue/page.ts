@@ -18,9 +18,12 @@ export interface KeyValueRow {
 export function keyValueRow(tabId: string, row: number): KeyValueRow | null {
   const page = getPage(tabId);
   if (!page || row < 0 || row >= page.rowCount) return null;
-  const field =
-    store.cached(tabId, row, 'field', (decoder) => cellText(page.fields, row, decoder)) ?? '';
-  const value =
-    store.cached(tabId, row, 'value', (decoder) => cellText(page.values, row, decoder)) ?? '';
-  return { field, value, isTruncated: isTruncated(page.values, row) };
+  // P2 R2 (task #99): see grid/page.ts's cell() for why this is wrapped in cachedView.
+  return store.cachedView(tabId, row, 'row', () => ({
+    field:
+      store.cached(tabId, row, 'field', (decoder) => cellText(page.fields, row, decoder)) ?? '',
+    value:
+      store.cached(tabId, row, 'value', (decoder) => cellText(page.values, row, decoder)) ?? '',
+    isTruncated: isTruncated(page.values, row),
+  }));
 }

@@ -236,6 +236,15 @@ export function cellText(chunk: TextColumnChunk, row: number, decoder: TextDecod
   return decoder.decode(chunk.data.subarray(chunk.offsets[row], chunk.offsets[row + 1]));
 }
 
+// P2 R2 (task #99): the raw UTF-8 byte length of row i's value, straight from the offsets this
+// chunk already carries — for a caller that only wants a byte count (a "1.2 KB" badge), not the
+// decoded text. Equal to `new TextEncoder().encode(cellText(chunk, row, decoder)).length` for any
+// valid UTF-8 payload (decode-then-reencode round-trips exact byte length), without the decode and
+// the redundant reencode a naive caller would otherwise do to get there.
+export function cellByteLength(chunk: TextColumnChunk, row: number): number {
+  return chunk.offsets[row + 1] - chunk.offsets[row];
+}
+
 export function isTruncated(chunk: TextColumnChunk, row: number): boolean {
   return binarySearch(chunk.truncated, row) >= 0;
 }

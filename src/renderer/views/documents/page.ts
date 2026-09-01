@@ -1,4 +1,4 @@
-import { cellText, type DocumentPage, isTruncated } from '@shared/protocol/page';
+import { cellByteLength, cellText, type DocumentPage, isTruncated } from '@shared/protocol/page';
 import { resetRows, rowView } from '../shared/document/rows';
 import { createPageStore } from '../shared/page/store';
 
@@ -16,15 +16,21 @@ export interface DocumentRow {
   id: string;
   body: string;
   isTruncated: boolean;
+  bodyByteLength: number;
 }
 
 export function documentRow(tabId: string, row: number): DocumentRow | null {
   const page = getPage(tabId);
   if (!page || row < 0 || row >= page.rowCount) return null;
-  const id = store.cached(tabId, row, 'id', (decoder) => cellText(page.ids, row, decoder)) ?? '';
-  const body =
-    store.cached(tabId, row, 'body', (decoder) => cellText(page.bodies, row, decoder)) ?? '';
-  return { id, body, isTruncated: isTruncated(page.bodies, row) };
+  // P2 R2 (task #99): see grid/page.ts's cell() for why this is wrapped in cachedView.
+  return store.cachedView(tabId, row, 'row', () => ({
+    id: store.cached(tabId, row, 'id', (decoder) => cellText(page.ids, row, decoder)) ?? '',
+    body: store.cached(tabId, row, 'body', (decoder) => cellText(page.bodies, row, decoder)) ?? '',
+    isTruncated: isTruncated(page.bodies, row),
+    // Straight from the wire's own offsets — see cellByteLength's own doc comment for why this is
+    // preferred over TextEncoder().encode(body).length (views/shared/document/rows.ts's byteLabel).
+    bodyByteLength: cellByteLength(page.bodies, row),
+  }));
 }
 
 // The projection picker's candidate list (ProjectionMenu.vue) and its toolbar badge

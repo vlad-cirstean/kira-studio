@@ -13,7 +13,9 @@ import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejso
 // import views/documents/* (biome.json's views/<kind>/* rule). A registered source replaces it:
 // the view that owns a scope (a document tab's id, or a console result's key) registers where its
 // rows come from, and every function below still just calls the same-shaped local documentRow().
-type RowSource = (row: number) => { id: string; body: string; isTruncated?: boolean } | null;
+type RowSource = (
+  row: number,
+) => { id: string; body: string; isTruncated?: boolean; bodyByteLength: number } | null;
 const rowSources = new Map<string, RowSource>();
 
 /** Where `scope`'s rows come from — the document tab registers documents/page.ts's own
@@ -30,10 +32,15 @@ export function unregisterDocumentRows(scope: string): void {
 function documentRow(
   tabId: string,
   row: number,
-): { id: string; body: string; isTruncated: boolean } | null {
+): { id: string; body: string; isTruncated: boolean; bodyByteLength: number } | null {
   const result = rowSources.get(tabId)?.(row);
   return result
-    ? { id: result.id, body: result.body, isTruncated: result.isTruncated ?? false }
+    ? {
+        id: result.id,
+        body: result.body,
+        isTruncated: result.isTruncated ?? false,
+        bodyByteLength: result.bodyByteLength,
+      }
     : null;
 }
 
@@ -72,7 +79,6 @@ interface TabRows {
 }
 
 const tabRows = new Map<string, TabRows>();
-const byteEncoder = new TextEncoder();
 
 /** The only reactive thing in this module — bumped on every parse-cache/expansion-set change. */
 export const rowsVersion = reactive({ n: 0 });
@@ -97,7 +103,10 @@ function parseRow(tabId: string, row: number): Parsed | null {
     root: parseDocument(doc.body),
     idLabel: idLabel.text,
     idType: idLabel.bsonType,
-    byteLabel: formatBytes(byteEncoder.encode(doc.body).length),
+    // P2 R2 (task #99): bodyByteLength comes straight from the wire's own chunk offsets (the
+    // RowSource's own doc comment) — this used to re-encode the already-decoded `doc.body` string
+    // back to UTF-8 with a fresh TextEncoder just to read its byte length.
+    byteLabel: formatBytes(doc.bodyByteLength),
   };
   entry.parseCache.set(row, parsed);
   return parsed;

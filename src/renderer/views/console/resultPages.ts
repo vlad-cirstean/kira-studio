@@ -1,4 +1,4 @@
-import { cellText, isNull, isTruncated, type Page } from '@shared/protocol/page';
+import { cellByteLength, cellText, isNull, isTruncated, type Page } from '@shared/protocol/page';
 import { createPageStore } from '../shared/page/store';
 
 // The console's own page store (P5.5), widened in P8 to hold either page kind — a console
@@ -32,16 +32,22 @@ export interface CellView {
   truncated: boolean;
 }
 
+// P2 R2 (task #99): see grid/page.ts's own copy of this constant for why.
+const NULL_CELL: CellView = Object.freeze({ text: '', isNull: true, truncated: false });
+
 /** Tabular-only, same contract as `views/grid/page.ts`'s `cell()`. */
 export function cell(key: string, row: number, col: number): CellView {
   const page = getPage(key);
-  if (page?.kind !== 'tabular') return { text: '', isNull: true, truncated: false };
+  if (page?.kind !== 'tabular') return NULL_CELL;
   const chunk = page.chunks[col];
-  if (!chunk) return { text: '', isNull: true, truncated: false };
-  if (isNull(chunk, row)) return { text: '', isNull: true, truncated: false };
+  if (!chunk) return NULL_CELL;
+  if (isNull(chunk, row)) return NULL_CELL;
 
-  const text = store.cached(key, row, String(col), (d) => cellText(chunk, row, d));
-  return { text, isNull: false, truncated: isTruncated(chunk, row) };
+  return store.cachedView(key, row, String(col), () => ({
+    text: store.cached(key, row, String(col), (d) => cellText(chunk, row, d)),
+    isNull: false,
+    truncated: isTruncated(chunk, row),
+  }));
 }
 
 /** Document-only: one document's id/body text, decoded from a DocumentPage's chunks. Mirrors
@@ -51,19 +57,23 @@ export function cell(key: string, row: number, col: number): CellView {
 export function documentRow(
   key: string,
   row: number,
-): { id: string; body: string; isTruncated: boolean } | null {
+): { id: string; body: string; isTruncated: boolean; bodyByteLength: number } | null {
   const page = getPage(key);
   if (page?.kind !== 'document') return null;
-  const id = store.cached(key, row, 'id', (d) => cellText(page.ids, row, d));
-  const body = store.cached(key, row, 'body', (d) => cellText(page.bodies, row, d));
-  return { id, body, isTruncated: isTruncated(page.bodies, row) };
+  return store.cachedView(key, row, 'row', () => ({
+    id: store.cached(key, row, 'id', (d) => cellText(page.ids, row, d)),
+    body: store.cached(key, row, 'body', (d) => cellText(page.bodies, row, d)),
+    isTruncated: isTruncated(page.bodies, row),
+    bodyByteLength: cellByteLength(page.bodies, row),
+  }));
 }
 
 /** Key/value-only: one field/value pair, decoded from a KeyValuePage's chunks. */
 export function keyValueRow(key: string, row: number): { field: string; value: string } | null {
   const page = getPage(key);
   if (page?.kind !== 'keyvalue') return null;
-  const field = store.cached(key, row, 'field', (d) => cellText(page.fields, row, d));
-  const value = store.cached(key, row, 'value', (d) => cellText(page.values, row, d));
-  return { field, value };
+  return store.cachedView(key, row, 'row', () => ({
+    field: store.cached(key, row, 'field', (d) => cellText(page.fields, row, d)),
+    value: store.cached(key, row, 'value', (d) => cellText(page.values, row, d)),
+  }));
 }

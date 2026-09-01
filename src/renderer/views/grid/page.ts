@@ -19,13 +19,20 @@ export interface CellView {
   truncated: boolean;
 }
 
+// P2 R2 (task #99): shared across every NULL/missing-column return below so those paths don't
+// each allocate their own throwaway object — same object every time, safe since callers only read.
+const NULL_CELL: CellView = Object.freeze({ text: '', isNull: true, truncated: false });
+
 export function cell(tabId: string, row: number, col: number): CellView {
   const page = getPage(tabId);
-  if (!page) return { text: '', isNull: true, truncated: false };
+  if (!page) return NULL_CELL;
   const chunk = page.chunks[col];
-  if (!chunk) return { text: '', isNull: true, truncated: false };
-  if (isNull(chunk, row)) return { text: '', isNull: true, truncated: false };
+  if (!chunk) return NULL_CELL;
+  if (isNull(chunk, row)) return NULL_CELL;
 
-  const text = store.cached(tabId, row, String(col), (decoder) => cellText(chunk, row, decoder));
-  return { text, isNull: false, truncated: isTruncated(chunk, row) };
+  return store.cachedView(tabId, row, String(col), () => ({
+    text: store.cached(tabId, row, String(col), (decoder) => cellText(chunk, row, decoder)),
+    isNull: false,
+    truncated: isTruncated(chunk, row),
+  }));
 }

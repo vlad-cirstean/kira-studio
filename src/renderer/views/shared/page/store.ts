@@ -8,6 +8,7 @@ import { reactive } from 'vue';
 interface Entry<P> {
   page: P;
   decodeCache: Map<number, Map<string, string>>;
+  viewCache: Map<number, Map<string, unknown>>;
   windowStart: number;
   windowEnd: number;
 }
@@ -31,6 +32,17 @@ export interface PageStore<P extends { rowCount: number; byteSize: number }> {
     subKey: string,
     decode: (decoder: TextDecoder) => string,
   ): string;
+  /** P2 R2 (task #99): every page/*.ts row/cell accessor built above `cached`'s memoized text
+   *  (grid/page.ts's `cell()`, console/resultPages.ts's `cell()`/`documentRow()`/`keyValueRow()`,
+   *  documents/page.ts's `documentRow()`, keyvalue/page.ts's `keyValueRow()`, stream/page.ts's
+   *  `streamRow()`) still allocated a fresh return object on *every* call, even though the decoded
+   *  text underneath was already cached — and some of those accessors (`cellAt` in
+   *  DataGrid.vue/ConsoleResultGrid.vue in particular) get called several times per cell per
+   *  render straight from a template. This memoizes the accessor's own built object the same way
+   *  `cached` memoizes decoded text, so a repeat call for the same row/subKey returns the identical
+   *  object reference instead of a new one. Shares `cached`'s row-level invalidation story
+   *  (setPage/drop/setVisibleWindow) via its own parallel per-row map. */
+  cachedView<V>(scope: string, row: number, subKey: string, build: () => V): V;
   /** Prunes the decode cache to the visible row window (P29 D7) instead of clearing it outright,
    *  so a fling doesn't re-decode a window that mostly overlaps the last one. A no-op for a scope
    *  that never calls this — the cache simply never prunes. */
@@ -55,7 +67,13 @@ export function createPageStore<P extends { rowCount: number; byteSize: number }
       // A tripwire: any code that tries to mutate this fails loudly in dev instead of silently
       // diverging from `byteSize`.
       Object.freeze(page);
-      pages.set(scope, { page, decodeCache: new Map(), windowStart: 0, windowEnd: 0 });
+      pages.set(scope, {
+        page,
+        decodeCache: new Map(),
+        viewCache: new Map(),
+        windowStart: 0,
+        windowEnd: 0,
+      });
       pageVersion.n++;
       opts?.onSet?.(scope);
     },
@@ -102,12 +120,29 @@ export function createPageStore<P extends { rowCount: number; byteSize: number }
       return value;
     },
 
+    cachedView<V>(scope: string, row: number, subKey: string, build: () => V): V {
+      const entry = pages.get(scope);
+      if (!entry) return build();
+      let rowCache = entry.viewCache.get(row);
+      if (!rowCache) {
+        rowCache = new Map();
+        entry.viewCache.set(row, rowCache);
+      }
+      if (rowCache.has(subKey)) return rowCache.get(subKey) as V;
+      const value = build();
+      rowCache.set(subKey, value);
+      return value;
+    },
+
     setVisibleWindow(scope, startRow, endRow) {
       const entry = pages.get(scope);
       if (!entry) return;
       if (entry.windowStart === startRow && entry.windowEnd === endRow) return;
       for (const row of entry.decodeCache.keys()) {
         if (row < startRow || row >= endRow) entry.decodeCache.delete(row);
+      }
+      for (const row of entry.viewCache.keys()) {
+        if (row < startRow || row >= endRow) entry.viewCache.delete(row);
       }
       entry.windowStart = startRow;
       entry.windowEnd = endRow;
