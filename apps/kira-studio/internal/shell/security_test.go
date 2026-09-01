@@ -2,11 +2,9 @@ package shell_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -40,21 +38,7 @@ func TestHarden_DenyByDefaultPosture(t *testing.T) {
 // widen the webview's OS-level attack surface for a feature nothing uses. Regression test for the
 // P2 R1 finding where this had drifted to true.
 func TestOptions_FileDropDisabled(t *testing.T) {
-	t.Setenv("KIRA_HOME", t.TempDir())
-
-	db, err := storage.Open()
-	if err != nil {
-		t.Fatalf("storage.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	r, err := repos.New(db.DB)
-	if err != nil {
-		t.Fatalf("repos.New: %v", err)
-	}
-	t.Cleanup(func() { _ = r.Close() })
-
-	opts := shell.Options(shell.WindowDeps{Windows: r.Windows, StartedAt: time.Now()}, shell.Harden(), "kira://app/")
+	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"})
 
 	if opts.EnableFileDrop {
 		t.Error("EnableFileDrop = true, want false (§1.6: no data-file-drop-target consumer exists)")

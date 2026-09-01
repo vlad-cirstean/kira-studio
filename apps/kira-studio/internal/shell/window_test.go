@@ -68,7 +68,7 @@ func boundsOf(t *testing.T, windows *repos.WindowsRepo) *model.WindowBounds {
 // window, so TestAttach_DetachStopsPersisting's negative assertion means what it claims.
 func TestAttach_PersistsResizeAfterDebounce(t *testing.T) {
 	win, windows := newAttachedWindow(t)
-	shell.Attach(win, shell.WindowDeps{Windows: windows, StartedAt: time.Now()})
+	shell.Attach(win, shell.WindowDeps{Windows: windows, StartedAt: time.Now()}, "main")
 
 	win.HandleWindowEvent(uint(events.Common.WindowDidResize))
 	time.Sleep(500 * time.Millisecond)
@@ -88,7 +88,7 @@ func TestAttach_PersistsResizeAfterDebounce(t *testing.T) {
 // that half directly — a WindowDidResize dispatched after detach() no longer calls Layout.Set.
 func TestAttach_DetachStopsPersisting(t *testing.T) {
 	win, windows := newAttachedWindow(t)
-	detach := shell.Attach(win, shell.WindowDeps{Windows: windows, StartedAt: time.Now()})
+	detach := shell.Attach(win, shell.WindowDeps{Windows: windows, StartedAt: time.Now()}, "main")
 
 	detach()
 

@@ -13,22 +13,20 @@ import (
 
 const boundsDebounce = 300 * time.Millisecond
 
-// mainWindowKey is the one window record this app manages until C2/C3 give every window its own
-// minted key (D2) — kept as a named constant here rather than a bare literal so the seam is
-// visible at the one call site that still hardcodes it.
-const mainWindowKey = "main"
-
-// WindowDeps is Options/Attach's dependencies.
+// WindowDeps is Attach's dependencies, shared across every window the app opens — only the key
+// passed to Attach varies per window (P8 C2).
 type WindowDeps struct {
 	Windows   *repos.WindowsRepo
 	StartedAt time.Time
 }
 
-// Options builds the main window's options: the stored rectangle if one has ever been
-// persisted, Wails' own defaults otherwise. There is no exact analogue of Electron's
+// Options builds one window's options from its own record (D11): the stored rectangle if it has
+// one, Wails' own size defaults otherwise, always at its own `/?window=<key>` URL and `Name`
+// (D2 — the shell mints the key and hands it to the renderer this way, since it must be readable
+// synchronously at boot, before hydrateTabs() runs). There is no exact analogue of Electron's
 // show:false/ready-to-show pattern here — WindowRuntimeReady fires only after the frontend has
 // already loaded — a deliberate small divergence, not hidden (§1's window.ts read).
-func Options(d WindowDeps, sec SecurityOptions, url string) application.WebviewWindowOptions {
+func Options(sec SecurityOptions, w model.WindowRecord) application.WebviewWindowOptions {
 	opts := application.WebviewWindowOptions{
 		Title:            "Kira Studio",
 		Width:            1280,
@@ -36,26 +34,20 @@ func Options(d WindowDeps, sec SecurityOptions, url string) application.WebviewW
 		MinWidth:         1024,
 		MinHeight:        640,
 		BackgroundColour: application.NewRGB(24, 24, 27),
-		URL:              url,
+		URL:              "/?window=" + w.Key,
+		Name:             w.Key,
 		Permissions:      sec.Permissions,
 		EnableFileDrop:   false,
 		Mac:              application.MacWindow{WebviewPreferences: sec.Webview},
 	}
 
-	records, err := d.Windows.List()
-	if err == nil {
-		for _, rec := range records {
-			if rec.Key != mainWindowKey || rec.Bounds == nil {
-				continue
-			}
-			b := rec.Bounds
-			opts.Width = int(b.Width)
-			opts.Height = int(b.Height)
-			opts.X = int(b.X)
-			opts.Y = int(b.Y)
-			opts.InitialPosition = application.WindowXY
-			break
-		}
+	if w.Bounds != nil {
+		b := w.Bounds
+		opts.Width = int(b.Width)
+		opts.Height = int(b.Height)
+		opts.X = int(b.X)
+		opts.Y = int(b.Y)
+		opts.InitialPosition = application.WindowXY
 	}
 	return opts
 }
@@ -73,19 +65,20 @@ func boundsFromRect(r application.Rect) model.WindowBounds {
 }
 
 // Attach wires resize/move persistence (debounced 300ms, matching window.ts's
-// BOUNDS_DEBOUNCE_MS) and the startup log line. The returned detach unsubscribes all four
-// window-event listeners and cancels any pending debounced write; call it once, from beforeFlush
-// (P2 R1: main.go used to discard it, so a resize/move landing during the shutdown flush-wait —
-// after beforeFlush but before teardown closes the DB — could still fire persist() against a
-// LayoutRepo whose *sql.DB teardown had already closed, racing the shutdown sequence this
-// listener has no other way to know is underway).
-func Attach(win *application.WebviewWindow, d WindowDeps) (detach func()) {
+// BOUNDS_DEBOUNCE_MS) for this one window's own `windows` row and the startup log line. The
+// returned detach unsubscribes all four window-event listeners and cancels any pending debounced
+// write; call it once per window, from beforeFlush (P2 R1: main.go used to discard it, so a
+// resize/move landing during the shutdown flush-wait — after beforeFlush but before teardown
+// closes the DB — could still fire persist() against a WindowsRepo whose *sql.DB teardown had
+// already closed, racing the shutdown sequence this listener has no other way to know is
+// underway) — and, per window, when that window closes (C3's WindowClosing listener).
+func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach func()) {
 	db := newDebouncer(boundsDebounce)
 
 	persist := func() {
 		bounds := boundsFromRect(win.Bounds())
-		if err := d.Windows.SetBounds(mainWindowKey, bounds); err != nil {
-			slog.Warn("persist window bounds failed", "scope", "window", "err", err)
+		if err := d.Windows.SetBounds(key, bounds); err != nil {
+			slog.Warn("persist window bounds failed", "scope", "window", "key", key, "err", err)
 		}
 	}
 

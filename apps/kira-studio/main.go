@@ -35,6 +35,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -150,19 +151,17 @@ func main() {
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker})
 
-	// detachWindow holds the current main window's shell.Attach cleanup, set by newWindow below and
-	// called from beforeFlush per shell.Attach's own doc comment (P2 R1: this used to be discarded
-	// entirely at the newWindow call site, so a resize/move landing during the shutdown flush-wait
-	// could still fire persist() against a LayoutRepo whose DB teardown had already closed it).
-	var detachWindow func()
+	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
+	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
+	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
+	// them, not just the most recently created (P2 R1's finding, generalised past one window).
+	windows := shell.NewWindowRegistry()
 
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
 	beforeFlush := sync.OnceFunc(func() {
 		metricsTicker.Stop()
-		if detachWindow != nil {
-			detachWindow()
-		}
+		windows.DetachAll()
 	})
 	teardown := sync.OnceFunc(func() {
 		eventsDetach()
@@ -213,8 +212,18 @@ func main() {
 	attachEmitter(app)
 	quitter.Attach(app)
 
-	var mainWindow *application.WebviewWindow
-	attachDialogs(app, func() application.Window { return mainWindow })
+	// The sheet a Save/Open dialog attaches to is the window that actually asked — Current()
+	// resolves the real key window on darwin ([NSApp keyWindow], application_darwin.go); the
+	// registry fallback only matters where Current() can't resolve one (this sandbox's Linux
+	// build, mid-startup before any window is focused) so a dialog call still has some live
+	// window to attach to rather than none (F4's second half — the single `mainWindow` var this
+	// replaces always attached to whichever window was created most recently, not the caller).
+	attachDialogs(app, func() application.Window {
+		if w := app.Window.Current(); w != nil {
+			return w
+		}
+		return windows.Any()
+	})
 
 	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
@@ -224,17 +233,28 @@ func main() {
 	shell.RegisterEngineStream(app, router)
 
 	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
-	newWindow := func() {
-		if detachWindow != nil {
-			detachWindow()
+	// openMainWindow (re)opens the sole "main" workbench C1's migration seeds — C3 replaces this
+	// with a real multi-window open path; for now the app still opens exactly one window, just
+	// through the per-window registry rather than a pair of package-level vars.
+	openMainWindow := func() {
+		records, err := repositories.Windows.List()
+		if err != nil {
+			log.Fatalf("kira-studio-shell: list windows: %v", err)
 		}
-		win := app.Window.NewWithOptions(shell.Options(windowDeps, shell.Harden(), "/"))
-		mainWindow = win
-		detachWindow = shell.Attach(win, windowDeps)
+		rec := model.WindowRecord{Key: "main", Order: 0}
+		for _, r := range records {
+			if r.Key == rec.Key {
+				rec = r
+				break
+			}
+		}
+		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec))
+		detach := shell.Attach(win, windowDeps, rec.Key)
+		windows.Add(rec.Key, win, detach)
 	}
-	shell.AttachReopen(app, newWindow)
+	shell.AttachReopen(app, openMainWindow)
 
-	newWindow()
+	openMainWindow()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
