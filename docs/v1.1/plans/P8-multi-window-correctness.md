@@ -923,26 +923,82 @@ Record the outcome in this plan's §7 checklist, the way P7's own closeout commi
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — `windows` table, `WindowRecord`, `WindowsRepo`; `window.bounds` removed from `ui_layout`'s
-      leaf set and from the shared `Layout` type.
-- [ ] C2 — per-window registry in `main.go`; `Options` takes a `WindowRecord`; dialogs attach to the
-      current window; `beforeFlush` detaches every window.
-- [ ] C3 — *New Window* (⇧⌘N) in the Window menu; startup opens one window per stored record;
-      reopen and close follow D5.
-- [ ] C4 — `tabs.window_key`; `TabsRepo`/`TabsService` scoped; bindings regenerated.
-- [ ] C5 — the renderer reads `?window=` synchronously and passes it on tabs list/save and the flush
-      ack.
-- [ ] C6 — per-window close flush, with the one-shot hook that does not loop against `Close()`.
-- [ ] C7 — `LayoutRepo.Set` merges inside its transaction; `kira:layout:changed` broadcast;
-      the concurrency test (D13.1).
-- [ ] C8 — per-window quit ack set under one 2 s cap; the handshake test (D13.2).
-- [ ] C9 — `EmitFocused`/`EmitTo`; `Signal` targets the focused window; the six state broadcasts
-      still broadcast.
-- [ ] C10 — `docs/ARCHITECTURE.md` records the per-window/app-wide split, the `windows` table, the
-      `?window=` key and the inert `window.bounds` orphan.
-- [ ] `multiwindow-real.spec.ts` added and passing (§6.2).
-- [ ] §6.1's full command set green.
-- [ ] §6.3's eleven manual steps run on a real Mac, with the result recorded here.
+- [x] C1 — `windows` table (`0002_p8_windows.sql`, via the standard create-copy-swap rebuild —
+      SQLite refuses `ALTER TABLE ADD COLUMN` combining a REFERENCES clause with a non-NULL
+      DEFAULT, confirmed against `modernc.org/sqlite` rather than assumed), `model.WindowRecord`,
+      `repos.WindowsRepo`; `window.bounds` removed from `ui_layout`'s leaf set and from the shared
+      `Layout`/`LayoutPatch` types (Go and `packages/shared/domain/layout.ts` both).
+- [x] C2 — `shell.WindowRegistry` (mutex-guarded key→{window,detach}) replaces the single
+      `detachWindow`/`mainWindow` pair; `Options` takes a `model.WindowRecord` (not `WindowDeps` —
+      a deliberate small deviation from the plan's literal signature, since `Options` no longer
+      needs any of `WindowDeps`'s fields once the record carries its own bounds); dialogs attach to
+      `app.Window.Current()` with a registry fallback; `beforeFlush` detaches every registered
+      window.
+- [x] C3 — *New Window* (⇧⌘N) in the Window menu (`ItemNewWindow`, `MenuDeps.NewWindow`); startup
+      opens one window per stored record; `openNewWindow`/`reopenWindow`/close all follow D5;
+      `shell.CascadeFrom` implements D10's offset-and-clamp-to-work-area placement.
+- [x] C4 — `tabs.window_key`; `TabsRepo.List/Save` and `bridge.TabsService.List/Save` scoped by it,
+      an unrecognised key rejected with `E_BAD_REQUEST`. Bindings regeneration deferred to C5 (see
+      that commit) rather than landing in C4 itself, so C4 stays Go-only and green on its own —
+      regenerating the bindings here, before `control.ts` passed a `windowKey`, would have left
+      C4's own frontend typecheck broken for one commit.
+- [x] C5 — `frontend/src/state/window.ts` reads `?window=` synchronously (guarded against
+      `tests/unit`'s missing `location` global, found by running the suite, not assumed);
+      `control.tabsList/tabsSave` pass it. `control.appFlushed()`'s own windowKey pass-through
+      moved to C8 (its dependency, `LifecycleService.Flushed(windowKey)`, didn't exist until then)
+      — another small, deliberate commit-boundary adjustment for the same "stay green" reason.
+- [x] C6 — `shell.AttachCloseFlush` + `CloseFlushCoordinator`: per-window close flush, with the
+      one-shot `flushing` guard that does not loop against `Close()`'s own WindowClosing re-emit.
+      Verified as far as this sandbox can go: a throwaway probe (written, run, deleted, §1.3's own
+      method) confirmed the hook cancels its first pass and lets a second pass through; the
+      handshake's own real `win.Close()` call cannot be exercised end to end here (no `app.Run()`
+      dispatcher — the same limitation `window_test.go` already documents).
+- [x] C7 — `LayoutRepo.Set` merges inside its own transaction (`tx.Stmt`/`tx.Query`, not a
+      pre-`Begin()` `GetAll()`); `LayoutService.Set` broadcasts `kira:layout:changed`;
+      `state/layout.ts` subscribes with no re-emit. `TestLayoutRepoSetSurvivesConcurrentDisjointPatches`
+      (D13.1) — verified against a real regression: 40/50 rounds lost with the fix reverted, 0/50
+      with it, `go test -race` clean.
+- [x] C8 — `Quitter`'s per-window pending-ack set (seeded from `WindowRegistry.Keys`), one 2 s cap;
+      `LifecycleService.Flushed`/`Flusher` take the window key. `TestQuitWaitsForEveryWindowAck`
+      (D13.2) — verified against a real regression the same way: injecting the pre-C8 "release on
+      any ack" behaviour back into `flushThenQuit` made it fail with the exact F3 symptom;
+      reverting restores a clean pass, `go test -race` clean.
+- [x] C9 — `EmitFocused` (menu signals) and `EmitTo` (C6's close-flush trigger) both added to
+      `appcore.Emitter`; `bridge.Events.Signal` now uses `EmitFocused`; a new `Events.Broadcast`
+      (still plain `Emit`) carries the quit handshake's own trigger and the six state-change
+      channels, since those still need every window, not just the focused one. No new test, per
+      the plan's own call — nothing here is observable without a real menu bar and two real
+      windows (§6.3 steps 3-4).
+- [x] C10 — `docs/ARCHITECTURE.md` records the per-window/app-wide split (D1), the `?window=` key
+      mechanism (D2), the `windows` table and D5's close rule, and the three-way
+      `Emit`/`EmitTo`/`EmitFocused` delivery split (D6) with the concrete pre-fix regression it
+      corrects.
+- [x] `multiwindow-real.spec.ts` added and passing (§6.2) — and it earned its keep immediately:
+      the first real run against the finished C1-C5 tree failed with `"unknown window: w-one"`, a
+      genuine gap the plan itself didn't anticipate (a `-tags server` build has no native shell
+      creating `windows` rows at all, so a browser tab's own `?window=` key had nowhere to
+      register). Fixed with `WindowsRepo.EnsureExists` + a new `bridge.WindowsService.Ensure`,
+      called once at renderer boot before anything window-scoped — always a no-op on the native
+      shell. Confirmed against both regressions it exists to catch (temporarily reverting C4's
+      `window_key` scoping reproduces F6's exact symptom; reverting the fix above reproduces the
+      "unknown window" gap), passes twice in a row, and `sqlite-real.spec.ts` shows no regression
+      alongside it.
+- [x] §6.1's full command set green: `go build`/`go vet`/`go test` (including `-race` over the
+      whole repo) for both the plain and `-tags server` builds; `bun run lint`/`typecheck`;
+      `bun run test:unit`; `bun run test:ui` (37/38 — the one failure, `budgets.spec.ts`, is
+      pre-existing cross-file-worker-contention flakiness this sandbox's own comment already
+      names, confirmed by passing cleanly at `--workers=1` in isolation, unrelated to any
+      window/tabs/layout/quit code); `bun run test:ipc:fe` (7/7 — this and `test:ui` both briefly
+      regressed mid-implementation when `bootstrap()` grew a pre-`Promise.all` `windowsEnsure()`
+      call `tests/ui/support/mockRuntime.ts` had no fixture entry for; fixed and reverified green,
+      see the `fix(tests/ui)` commit).
+- [ ] §6.3's eleven manual steps run on a real Mac, with the result recorded here. **Not run this
+      pass** — this sandbox is Linux, with no display, no AppKit, and no way to create a real
+      native window at all; every item in this checklist above states plainly what was actually
+      executed here versus read against the pinned Wails source. A human with macOS hardware still
+      needs to run §6.3 — most importantly steps 2 (two windows survive a real quit/relaunch with
+      no cross-contamination) and 3-4 (menu commands actually stay on the focused window) — before
+      this phase is fully closed.
 
 ---
 
