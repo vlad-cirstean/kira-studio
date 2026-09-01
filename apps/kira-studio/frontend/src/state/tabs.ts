@@ -124,17 +124,22 @@ function saveDebounced(): void {
 }
 
 // A pending debounced save is otherwise lost outright if the window closes before its timer
-// fires (e.g. a pager/filter/sort change right before quit): main holds `before-quit` until
-// every window acks this, so awaiting tabsSave here before acking is what actually makes the
-// wait worthwhile — `beforeunload` can't do this, since main tears the renderer down without
-// waiting for anything it starts there.
-control.onFlushBeforeClose(() => {
+// fires (e.g. a pager/filter/sort change right before quit, or before this window's own close —
+// P8 C6/F8 gives the latter the same protection the quit handshake already had): main (quit) or
+// this window's own WindowClosing hook (close) holds the corresponding event until the ack
+// below arrives, so awaiting tabsSave first is what actually makes either wait worthwhile —
+// `beforeunload` can't do this, since main tears the renderer down without waiting for anything
+// it starts there. One routine, two triggers, so the two handshakes can't drift out of sync.
+function flushPendingTabState(ack: () => void): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  void control.tabsSave(tabsState.tabs).finally(() => control.appFlushed());
-});
+  void control.tabsSave(tabsState.tabs).finally(ack);
+}
+
+control.onFlushBeforeClose(() => flushPendingTabState(control.appFlushed));
+control.onWindowFlushBeforeClose(() => flushPendingTabState(control.windowFlushed));
 
 // D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
 // are already gone server-side — a tab this store still holds for it is a row that can never be

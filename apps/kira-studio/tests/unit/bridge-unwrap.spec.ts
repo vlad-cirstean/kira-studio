@@ -52,14 +52,15 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
       }),
     );
 
-    // Event subscriptions (on*) and appFlushed (void, fire-and-forget) call no bound method and
+    // Event subscriptions (on*) and appFlushed/windowFlushed (void, fire-and-forget — P8 C6 added
+    // the second one, the close-handshake analogue of the quit one) call no bound method and
     // return no promise — everything else in `control` is a request/response call unwrap must
     // guard (§4.2 rule 1). Four placeholder arguments cover every method's arity; none of
     // control.ts's own wrapper bodies inspect argument shape before handing them to the binding.
     const checked: string[] = [];
     for (const [name, member] of Object.entries(control)) {
       if (typeof member !== 'function') continue;
-      if (name.startsWith('on') || name === 'appFlushed') continue;
+      if (name.startsWith('on') || name === 'appFlushed' || name === 'windowFlushed') continue;
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;
       checked.push(name);

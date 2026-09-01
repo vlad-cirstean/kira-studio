@@ -10,7 +10,8 @@ import (
 
 type noopEmitter struct{}
 
-func (noopEmitter) Emit(string, any) {}
+func (noopEmitter) Emit(string, any)           {}
+func (noopEmitter) EmitTo(string, string, any) {}
 
 func allMenuItems(m *application.Menu) []*application.MenuItem {
 	var out []*application.MenuItem

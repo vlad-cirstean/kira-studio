@@ -10,25 +10,26 @@ import (
 // are the Wails event names verbatim (P52 §7.1) — the renderer's subscribe mechanism changes, the
 // wire name does not.
 const (
-	ChannelOpenSettings          = "kira:open-settings"
-	ChannelNewConnection         = "kira:menu:new-connection"
-	ChannelToggleProjectPanel    = "kira:menu:toggle-project-panel"
-	ChannelToggleOperationsPanel = "kira:menu:toggle-operations-panel"
-	ChannelCommandPalette        = "kira:menu:command-palette"
-	ChannelTabNext               = "kira:menu:tab-next"
-	ChannelTabPrev               = "kira:menu:tab-prev"
-	ChannelTabClose              = "kira:menu:tab-close"
-	ChannelViewFind              = "kira:menu:view-find"
-	ChannelViewRefresh           = "kira:menu:view-refresh"
-	ChannelViewRun               = "kira:menu:view-run"
-	ChannelViewRunAll            = "kira:menu:view-run-all"
-	ChannelFlushBeforeClose      = "kira:app:flush-before-close"
-	ChannelConnectionState       = "kira:connection:state"
-	ChannelMetadataInvalidated   = "kira:connection:metadataInvalidated"
-	ChannelConnectionsChanged    = "kira:connections:changed"
-	ChannelSettingsChanged       = "kira:settings:changed"
-	ChannelOpUpdate              = "kira:op:update"
-	ChannelAppMetrics            = "kira:app:metrics"
+	ChannelOpenSettings           = "kira:open-settings"
+	ChannelNewConnection          = "kira:menu:new-connection"
+	ChannelToggleProjectPanel     = "kira:menu:toggle-project-panel"
+	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
+	ChannelCommandPalette         = "kira:menu:command-palette"
+	ChannelTabNext                = "kira:menu:tab-next"
+	ChannelTabPrev                = "kira:menu:tab-prev"
+	ChannelTabClose               = "kira:menu:tab-close"
+	ChannelViewFind               = "kira:menu:view-find"
+	ChannelViewRefresh            = "kira:menu:view-refresh"
+	ChannelViewRun                = "kira:menu:view-run"
+	ChannelViewRunAll             = "kira:menu:view-run-all"
+	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
+	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
+	ChannelConnectionState        = "kira:connection:state"
+	ChannelMetadataInvalidated    = "kira:connection:metadataInvalidated"
+	ChannelConnectionsChanged     = "kira:connections:changed"
+	ChannelSettingsChanged        = "kira:settings:changed"
+	ChannelOpUpdate               = "kira:op:update"
+	ChannelAppMetrics             = "kira:app:metrics"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
@@ -95,6 +96,12 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 // menu and the quit handshake are its only callers.
 func (ev *Events) Signal(channel string) {
 	ev.emit.Emit(channel, nil)
+}
+
+// SignalTo is Signal's single-window analogue (P8 C6/D6's EmitTo): the per-window close-flush
+// handshake's own trigger, delivered to exactly one window rather than broadcast.
+func (ev *Events) SignalTo(windowKey, channel string) {
+	ev.emit.EmitTo(windowKey, channel, nil)
 }
 
 // SettingsChanged broadcasts the merged settings unconditionally — SettingsService.Set's own

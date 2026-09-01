@@ -125,6 +125,13 @@ export const control = {
   appFlushed: (): void => {
     void LifecycleService.Flushed();
   },
+  // Close-window handshake (P8 C6/F8): the single-window analogue of the quit handshake above —
+  // this window's own close is held until it acks, or a 2s timeout on the Go side gives up.
+  onWindowFlushBeforeClose: (cb: () => void): (() => void) =>
+    on(CHANNEL.windowFlushBeforeClose, cb),
+  windowFlushed: (): void => {
+    void LifecycleService.WindowFlushed({ windowKey });
+  },
 
   filesChooseSave: (defaultName: string): Promise<WailsModels.FilesChooseSaveResult> =>
     unwrap(FilesService.ChooseSave({ defaultName })),

@@ -162,6 +162,11 @@ func main() {
 	// them, not just the most recently created (P2 R1's finding, generalised past one window).
 	windows := shell.NewWindowRegistry()
 
+	// closeFlush routes each window's own "flush before close" ack back to whichever
+	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
+	// the quit one below: at most one window is ever waiting at a time.
+	closeFlush := shell.NewCloseFlushCoordinator()
+
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
 	beforeFlush := sync.OnceFunc(func() {
@@ -200,7 +205,7 @@ func main() {
 			application.NewService(&bridge.FiltersService{Deps: deps}),
 			application.NewService(&bridge.FilesService{Dialogs: dialogs}),
 			application.NewService(&bridge.QueriesService{Deps: deps}),
-			application.NewService(&bridge.LifecycleService{Flusher: quitter}),
+			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(),
@@ -242,6 +247,7 @@ func main() {
 		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec))
 		detach := shell.Attach(win, windowDeps, rec.Key)
 		windows.Add(rec.Key, win, detach)
+		shell.AttachCloseFlush(win, rec.Key, events, closeFlush)
 		win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
 			if windows.RemoveAndCount(rec.Key) > 0 {
 				if err := repositories.Windows.Delete(rec.Key); err != nil {

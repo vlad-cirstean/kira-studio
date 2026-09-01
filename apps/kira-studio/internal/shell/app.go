@@ -24,6 +24,21 @@ func (e *emitter) Emit(name string, data any) {
 	e.app.Event.Emit(name, data)
 }
 
+// EmitTo delivers to exactly one window (P8 D6/C6) — the mechanism the per-window close-flush
+// handshake needs, since app.Event.Emit fans out to every window (transport_event_ipc.go). A key
+// naming no live window (already closed, or never existed) is a silent no-op, matching Emit's own
+// "no app yet" no-op above.
+func (e *emitter) EmitTo(windowKey string, name string, data any) {
+	if e.app == nil {
+		return
+	}
+	win, ok := e.app.Window.GetByName(windowKey)
+	if !ok {
+		return
+	}
+	win.DispatchWailsEvent(&application.CustomEvent{Name: name, Data: data})
+}
+
 // NewDeferredEmitter builds an appcore.Emitter usable before application.New has returned an
 // *App to emit through — §4.11's ordering knot: both appcore.Deps.Events (read by
 // SettingsService.Set, built into the Services list passed to New) and the Quitter's

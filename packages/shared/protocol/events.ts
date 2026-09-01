@@ -16,6 +16,7 @@ export const CHANNEL = {
   viewRun: 'kira:menu:view-run',
   viewRunAll: 'kira:menu:view-run-all',
   appFlushBeforeClose: 'kira:app:flush-before-close',
+  windowFlushBeforeClose: 'kira:window:flush-before-close',
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
