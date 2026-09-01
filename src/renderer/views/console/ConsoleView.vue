@@ -17,7 +17,7 @@ import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { wheelToHorizontal } from '../../wheelScroll';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { sqlDialectFor } from '../shared/sqlIdent';
+import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -129,7 +129,9 @@ async function ensureConnectedForRun(): Promise<void> {
 }
 
 function runStatement(): void {
-  const stmt = statementAtCursor(props.tab.state.text, cursorPos.value);
+  const stmt = statementAtCursor(props.tab.state.text, cursorPos.value, {
+    backslashEscapes: backslashEscapesFor(dialect.value),
+  });
   if (!stmt) return;
   void (async () => {
     await ensureConnectedForRun();
@@ -138,7 +140,9 @@ function runStatement(): void {
 }
 
 function runAll(): void {
-  const statements = splitSqlStatements(props.tab.state.text).map((s) => s.text);
+  const statements = splitSqlStatements(props.tab.state.text, {
+    backslashEscapes: backslashEscapesFor(dialect.value),
+  }).map((s) => s.text);
   if (statements.length === 0) return;
   void (async () => {
     await ensureConnectedForRun();

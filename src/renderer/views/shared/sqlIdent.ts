@@ -42,6 +42,20 @@ export function quoteIdent(dialect: SqlDialect | undefined, name: string): strin
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+// P2 R2: a backslash inside a standard SQL single-quoted string literal is just an ordinary
+// character — only MySQL/MariaDB (and ClickHouse, F27) treat it as an escape character by
+// default. sql-split.ts/sql-lint.ts's shared quote-scanning loop needs to know which regime it's
+// in, or a Postgres/SQLite literal ending in a literal backslash (e.g. `'foo\'`) gets its closing
+// quote mistaken for an escaped character and the scan runs on past the literal's real end.
+export const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
+
+/** true when `dialect`'s string literals treat a backslash as an escape character — undefined
+ *  (no SQL dialect, e.g. a Mongo/Redis console) keeps the pre-P2-R2 default of `true` since
+ *  nothing about that case was in scope for this fix. */
+export function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
+  return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
+}
+
 // A short, curated set of the reserved words most likely to collide with a real column name —
 // not exhaustive (a full per-dialect reserved-word list runs to hundreds of entries and shifts
 // with engine version); the same "curated, not exhaustive" call P18's own WHERE/ORDER BY

@@ -3,10 +3,11 @@ import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';
-import { sqlDialectFor } from '../shared/sqlIdent';
+import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
 
-function lintSqlConsole(text: string): ConsoleDiagnostic[] {
-  return lintSql(text);
+function lintSqlConsole(kind: ConnectionKind | undefined): (text: string) => ConsoleDiagnostic[] {
+  const backslashEscapes = backslashEscapesFor(sqlDialectFor(kind));
+  return (text) => lintSql(text, { backslashEscapes });
 }
 
 // db.<collection>.<method>(<args>) — engine/adapters/mongo/console.ts's own grammar (F4). Brackets
@@ -254,6 +255,6 @@ export function consoleLintSource(
 ): ((doc: string) => ConsoleDiagnostic[]) | undefined {
   if (kind === 'mongodb') return lintMongoConsole;
   if (kind === 'redis') return lintRedisConsole;
-  if (sqlDialectFor(kind)) return lintSqlConsole;
+  if (sqlDialectFor(kind)) return lintSqlConsole(kind);
   return undefined;
 }

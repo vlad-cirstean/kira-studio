@@ -11,7 +11,16 @@ export interface SqlStatement {
   end: number;
 }
 
-export function splitSqlStatements(source: string): SqlStatement[] {
+export interface SplitSqlOptions {
+  /** Whether a backslash escapes the next character inside a '...'/"..."/`...` run — true for
+   *  MySQL/MariaDB/ClickHouse, false for standard-SQL dialects (Postgres, SQLite) where a bare
+   *  backslash is not special and only a doubled quote escapes (P2 R2). Defaults to true, the
+   *  pre-P2-R2 universal behaviour, for any caller that doesn't know its dialect. */
+  backslashEscapes?: boolean;
+}
+
+export function splitSqlStatements(source: string, options?: SplitSqlOptions): SqlStatement[] {
+  const backslashEscapes = options?.backslashEscapes ?? true;
   const statements: SqlStatement[] = [];
   const n = source.length;
   let i = 0;
@@ -37,14 +46,13 @@ export function splitSqlStatements(source: string): SqlStatement[] {
       continue;
     }
     // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape (every SQL
-    // dialect here honours that), and a backslash also escapes the next character — harmless for
-    // Postgres, where a bare backslash in a plain '...' string is not special, and correct for
-    // MariaDB, where it is.
+    // dialect here honours that); a backslash escaping the next character too is dialect-specific
+    // (P2 R2) — see SplitSqlOptions.backslashEscapes's own doc comment.
     if (c === "'" || c === '"' || c === '`') {
       const quote = c;
       i++;
       while (i < n) {
-        if (source[i] === '\\') {
+        if (backslashEscapes && source[i] === '\\') {
           i += 2;
           continue;
         }
@@ -84,8 +92,12 @@ export function splitSqlStatements(source: string): SqlStatement[] {
 }
 
 /** The statement whose source range contains `cursor`, or the last statement past the end. */
-export function statementAtCursor(source: string, cursor: number): SqlStatement | null {
-  const statements = splitSqlStatements(source);
+export function statementAtCursor(
+  source: string,
+  cursor: number,
+  options?: SplitSqlOptions,
+): SqlStatement | null {
+  const statements = splitSqlStatements(source, options);
   for (const s of statements) {
     if (cursor >= s.start && cursor <= s.end) return s;
   }

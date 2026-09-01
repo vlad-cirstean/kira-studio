@@ -21,7 +21,24 @@ describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
     expect(stmts.map((s) => s.text)).toEqual([`SELECT 'it''s; still one'`, 'SELECT 2']);
   });
 
-  test('3. a backslash escapes the next character', () => {
+  test('3a. MySQL/MariaDB/ClickHouse: a backslash escapes the next character', () => {
+    const stmts = splitSqlStatements(`SELECT '\\'; still one'; SELECT 2`, {
+      backslashEscapes: true,
+    });
+    expect(stmts).toHaveLength(2);
+    expect(stmts[0]?.text).toBe(`SELECT '\\'; still one'`);
+  });
+
+  // P2 R2 (task #92): standard SQL has no backslash-escaping in a '...' literal — only a doubled
+  // quote escapes. A literal ending in a real backslash immediately before its closing quote
+  // (`'foo\'`) must not have that quote mistaken for an escaped character, or the scanner runs
+  // on past the literal's true end and mis-splits everything after it.
+  test('3b. Postgres/SQLite: a backslash is an ordinary character, not an escape', () => {
+    const stmts = splitSqlStatements(`SELECT 'foo\\'; SELECT 2`, { backslashEscapes: false });
+    expect(stmts.map((s) => s.text)).toEqual([`SELECT 'foo\\'`, 'SELECT 2']);
+  });
+
+  test('3c. splitSqlStatements defaults to backslashEscapes: true when no options are given', () => {
     const stmts = splitSqlStatements(`SELECT '\\'; still one'; SELECT 2`);
     expect(stmts).toHaveLength(2);
     expect(stmts[0]?.text).toBe(`SELECT '\\'; still one'`);

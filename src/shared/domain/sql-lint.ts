@@ -12,7 +12,15 @@ export interface LintIssue {
   message: string;
 }
 
-export function lintSql(source: string): LintIssue[] {
+export interface LintSqlOptions {
+  /** Whether a backslash escapes the next character inside a quoted run — see sql-split.ts's
+   *  SplitSqlOptions.backslashEscapes (P2 R2); mirrors it exactly since these two lexers share the
+   *  same quote-scanning rules. Defaults to true, the pre-P2-R2 universal behaviour. */
+  backslashEscapes?: boolean;
+}
+
+export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
+  const backslashEscapes = options?.backslashEscapes ?? true;
   const issues: LintIssue[] = [];
   const n = source.length;
   let i = 0;
@@ -54,15 +62,16 @@ export function lintSql(source: string): LintIssue[] {
       i += 2;
       continue;
     }
-    // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape, matching
-    // sql-split.ts's own handling.
+    // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape; a backslash
+    // escaping the next character too is dialect-specific (P2 R2), matching sql-split.ts's own
+    // handling — see LintSqlOptions.backslashEscapes's own doc comment.
     if (c === "'" || c === '"' || c === '`') {
       const quote = c;
       const start = i;
       i++;
       let closed = false;
       while (i < n) {
-        if (source[i] === '\\') {
+        if (backslashEscapes && source[i] === '\\') {
           i += 2;
           continue;
         }

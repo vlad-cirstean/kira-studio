@@ -18,7 +18,7 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { run as runConsole } from '../../views/console/state';
-import { sqlDialectFor } from '../../views/shared/sqlIdent';
+import { backslashEscapesFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 
 interface OpsListItem {
   key: string;
@@ -97,7 +97,9 @@ function opSqlDialect(record: OpRecord) {
 // produced the row.
 function onRerun(record: OpRecord): void {
   if (!record.connectionId || !record.command) return;
-  const statements = splitSqlStatements(record.command).map((s) => s.text);
+  const statements = splitSqlStatements(record.command, {
+    backslashEscapes: backslashEscapesFor(opSqlDialect(record)),
+  }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = openConsoleTab(record.connectionId, '');
   void runConsole(tabId, statements);
