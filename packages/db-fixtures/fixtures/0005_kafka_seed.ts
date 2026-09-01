@@ -105,7 +105,7 @@ export async function seedKafka(container: StartedTestContainer): Promise<void> 
   // Registers CONSUMER_GROUP in admin.listGroups() (P10's root-level "topics, consumer groups"
   // tree, kafka/catalog.ts's listGroups()) with committed offsets and no members —
   // --reset-offsets --to-earliest --execute against a group that has never existed creates exactly
-  // that state, which is what scenario 6 (tests/db/kafka.spec.ts) asserts.
+  // that state, which is what scenario 6 (packages/db-fixtures/kafka.spec.ts) asserts.
   await exec(container, [
     'kafka-consumer-groups',
     '--bootstrap-server',

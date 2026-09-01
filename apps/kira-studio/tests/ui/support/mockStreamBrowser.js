@@ -106,7 +106,7 @@
     };
   }
 
-  // Mirrors src/shared/protocol/page.ts's chunkByteSize/pageByteSize exactly (P57 M5 leaks/perf
+  // Mirrors packages/shared/protocol/page.ts's chunkByteSize/pageByteSize exactly (P57 M5 leaks/perf
   // port finding): the real engine computes `byteSize` once, embeds it in the page it sends, and
   // the browser trusts that number verbatim — nothing on the receiving end recomputes it. This
   // mock used to hardcode `byteSize: 0` regardless of how much data a page actually carried, which

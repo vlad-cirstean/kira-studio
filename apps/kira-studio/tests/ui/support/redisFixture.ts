@@ -11,7 +11,7 @@ import { IPC } from './ipcChannels';
 // Nothing beyond `connect` is needed: autocomplete.spec.ts's two Redis scenarios (command-name
 // completion, lint diagnostics) exercise `console/completion.ts`'s `redisCompletionSource()` and
 // `console/lint.ts`'s redis tokenizer, both pure client-side vocabulary/grammar with no backend
-// round trip at all (see src/renderer/views/console/completion.ts's own `REDIS_COMMANDS` — a
+// round trip at all (see apps/kira-studio/frontend/src/views/console/completion.ts's own `REDIS_COMMANDS` — a
 // curated constant, not fetched) — and neither scenario ever expands the tree (both open the
 // console straight from the connection root).
 

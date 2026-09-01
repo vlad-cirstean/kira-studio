@@ -4,9 +4,9 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 
-// Real captures against a real MariaDB container, seeded with tests/db/fixtures/0002_mariadb_seed.sql
+// Real captures against a real MariaDB container, seeded with packages/db-fixtures/fixtures/0002_mariadb_seed.sql
 // — via `node out/scripts/capture-tree.cjs mariadb --recipe-file ...` (scripts/capture-tree.ts, the
-// Postgres-only scripts/capture-postgres-tree.ts generalized to any tests/db/support/<adapter>.ts
+// Postgres-only scripts/capture-postgres-tree.ts generalized to any packages/db-fixtures/support/<adapter>.ts
 // fixture), not hand-written (P50 D5's discipline). Confirmed here: unlike Postgres (AGENTS.md's
 // Docker section, its own forListeningPorts() wait strategy hangs under `bun run` in this sandbox),
 // MariaDB's container (Wait.forHealthCheck() only, no forListeningPorts()) starts and this whole

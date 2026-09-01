@@ -72,7 +72,7 @@ func assertMatchesCommittedJSONFixture(t *testing.T, rec *Recorder, jsonFixtureP
 }
 
 // repoRootForWrite resolves the repository root from this package's own path
-// (shell/internal/ipcfixture), the same way every other repo-relative path this package needs
+// (apps/kira-studio/internal/ipcfixture), the same way every other repo-relative path this package needs
 // (write.go's FixturePathFor) is anchored — os.Getwd() during `go test` is always the package
 // directory, never the module root.
 func repoRootForWrite(t *testing.T) string {

@@ -24,7 +24,7 @@ type AppService struct {
 	Deps appcore.Deps
 }
 
-const appVersion = "0.0.0" // matches shell/build/config.yml's info.version.
+const appVersion = "0.0.0" // matches apps/kira-studio/build/config.yml's info.version.
 
 func (s *AppService) Info() (AppInfo, error) {
 	return AppInfo{

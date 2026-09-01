@@ -1,4 +1,4 @@
--- §9.1 dataset for tests/db/sqlite.spec.ts — a port of 0002_mariadb_seed.sql (plan D34), not a
+-- §9.1 dataset for packages/db-fixtures/sqlite.spec.ts — a port of 0002_mariadb_seed.sql (plan D34), not a
 -- copy: the same object graph so the same scenarios assert the same things, with every
 -- divergence a documented engine difference rather than a convenience.
 --   no CREATE SEQUENCE / FUNCTION / PROCEDURE  -> SQLite has none; their absence is asserted

@@ -1,4 +1,4 @@
--- §9.1 dataset for tests/db/postgres.spec.ts. Two schemas (so the tree has more than one to
+-- §9.1 dataset for packages/db-fixtures/postgres.spec.ts. Two schemas (so the tree has more than one to
 -- list): `app` carries the bulk of the object-kind and catalog-edge-case coverage, `analytics`
 -- exists purely so schema enumeration has something else to find.
 --

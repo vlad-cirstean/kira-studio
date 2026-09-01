@@ -10,8 +10,8 @@ import { IPC } from './support/ipcChannels';
 // plaintext-upgrade-on-relaunch and idempotent-re-encryption behavior across 2-3 real relaunches
 // each. None of that has an equivalent here: there is no disk and no second process
 // (tests/ui/fixtures.ts's own header comment), and the guarantee is now covered more precisely at
-// the layer that actually implements it — shell/internal/storage/repos/secrets_test.go's real
-// AES-256-GCM round trip and shell/internal/connections/service_test.go's
+// the layer that actually implements it — apps/kira-studio/internal/storage/repos/secrets_test.go's real
+// AES-256-GCM round trip and apps/kira-studio/internal/connections/service_test.go's
 // TestPasswordThreeStateConvention (AGENTS.md's P57 finding).
 //
 // What *is* pure UI and ports here: connectionsSecretsStatus()'s three backend shapes and

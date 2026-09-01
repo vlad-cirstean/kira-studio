@@ -9,7 +9,7 @@ import {
 
 // E1 (P57-e2e-revisit.md §6/§8) — the Docker-free anchor for the real-backend tier: a real SQLite
 // connection through the real dialog, through the real Go bridge, through the real vendored Node
-// engine, to a real file seeded from tests/db/fixtures/0009_sqlite_seed.sql, and back. This is a
+// engine, to a real file seeded from packages/db-fixtures/fixtures/0009_sqlite_seed.sql, and back. This is a
 // *wiring* proof, not a UI-fidelity one (D5) — everything about rendering/interaction (selection
 // edges, keyboard nav, the cell editor, sticky bands, virtualisation, word wrap) already has a
 // verified tests/ui/ port against a mock; this spec exists to prove the real bytes travel the

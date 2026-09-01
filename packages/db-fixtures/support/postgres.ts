@@ -104,7 +104,7 @@ const SCROLL_GRID_ROWS = 5_000;
 // P29 D14: neither the standard seed's `big_rows` (many rows, few columns) nor `wide_table` (few
 // rows, many columns) can show the scroll-render gap — this creates the wide-AND-tall shape P29's
 // own F5/F8 need, against whichever container `startPostgres()` handed back (never
-// `tests/db/fixtures/0001_seed.sql`, which every other suite's row counts/ordering already depend
+// `packages/db-fixtures/fixtures/0001_seed.sql`, which every other suite's row counts/ordering already depend
 // on staying unchanged). Moved here from `tests/e2e/support/pg.ts` (P57 M5: `tests/e2e/` retired)
 // — `scripts/capture-postgres-tree.ts`'s own `seedScrollGrid` step kind still needs it to
 // reproduce `tests/ui/budgets.spec.ts`/`perf.spec.ts`'s real `app.scroll_grid` captures.

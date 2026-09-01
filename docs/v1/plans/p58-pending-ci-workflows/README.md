@@ -12,7 +12,7 @@ are not even valid `package.json` scripts today. The `ci.yml`/`release.yml` stag
 P57 content any more either: they carry that generation's Wails/Go update *and* P58f M10's own
 follow-up (no `vendor-node.sh`, no `build:engine`, no `runtime/` tree in the packaged-bundle
 assertions, `db-unit-tests` renamed `container-tests` since its coverage moved to
-`shell/internal/adapters/*/*_test.go`) — see `docs/PACKAGING.md` §7 for the job-by-job reasoning
+`apps/kira-studio/internal/adapters/*/*_test.go`) — see `docs/PACKAGING.md` §7 for the job-by-job reasoning
 and `docs/v1/plans/P58f-cutover.md` D17 for why this phase revises rather than re-stages from
 scratch.
 
@@ -38,3 +38,10 @@ set `KIRA_STRICT_UPDATE_CHECK: '1'`, a variable `scripts/verify-packaging.sh` ha
 the P57 rewrite dropped its strict-mode branch along with the electron-builder checks. Removed the
 `env:` block and reworded the step name. This is a correction to the staged content, not a new
 generation of it — the "two generations behind" count above is unchanged.
+
+**Revised by v1.1 P3** (folder structure, scripts, and dependency-tooling cleanup): the Wails app
+moved from `shell/` to `apps/kira-studio/` and the Go module now lives at the repo root. Updated
+every `go-version-file: shell/go.mod` to `go.mod`, `(cd shell && wails3 generate bindings …)` to
+`(cd apps/kira-studio && …)`, and both `APP="shell/bin/Kira Studio.app"` references (`ci.yml`'s
+package-smoke job, `release.yml`'s zip step) to `apps/kira-studio/bin/Kira Studio.app`. Also a
+correction, not a new generation.

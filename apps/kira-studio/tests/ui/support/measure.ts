@@ -101,7 +101,7 @@ export interface ScrollResponseDeltas {
  * 120Hz cadence to synthesize.
  *
  * The work-only delta starts its clock at DataGrid.vue's own __kiraGridScrollWorkStart mark
- * (src/renderer/main.ts's Window augmentation; called from the top of onScroll's rAF callback,
+ * (apps/kira-studio/frontend/src/main.ts's Window augmentation; called from the top of onScroll's rAF callback,
  * after both scheduling hops have already resolved and neither app code path takes) instead of at
  * the synchronous property write, while keeping the same MutationObserver-based end signal. If no
  * mark ever arrives for a step (mark is only set once a test defines the hook, so this shouldn't

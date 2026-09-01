@@ -30,7 +30,7 @@ export async function sqliteAvailable(): Promise<boolean> {
 
 export const SQLITE_UNAVAILABLE_MESSAGE =
   'node:sqlite is unavailable in this runtime — Bun 1.4+ (or Electron/Node 22.5+) is required ' +
-  'to run tests/db/sqlite.spec.ts.';
+  'to run packages/db-fixtures/sqlite.spec.ts.';
 
 // One temp database per test process, same discipline as support/mariadb.ts (§11b) — though here
 // it buys nothing but the same memoization shape, since there is no container to reuse.

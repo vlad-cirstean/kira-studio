@@ -44,7 +44,7 @@ type ColumnTypeCategory =
 // Item (regression pass, task batch P46-7): this is a *fallback* guesser only — every one of
 // engine/adapters/{postgres,mysql-family,sqlite,clickhouse}/read.ts already has its own
 // authoritative typeClassFor(), used for real (cell-format eligibility) and exercised by
-// tests/db/*.spec.ts against a live server; wherever a ColumnDescriptor carrying that verdict is
+// packages/db-fixtures/*.spec.ts against a live server; wherever a ColumnDescriptor carrying that verdict is
 // already in hand (the grid, its header tooltip, the cell editor, a console result), typeClassFor
 // below reads it directly instead of re-deriving one from the raw type string here. The one
 // caller left without a ColumnDescriptor — ColumnsSection.vue's Structure tab, which only ever
@@ -121,7 +121,7 @@ function columnTypeCategory(dataType: string): ColumnTypeCategory {
 
 // Item (regression pass, task batch P46-7): the authoritative path — every one of
 // engine/adapters/{postgres,mysql-family,sqlite,clickhouse}/read.ts's own typeClassFor() already
-// answered this question server-side (exercised live by tests/db/*.spec.ts), so a ColumnDescriptor
+// answered this question server-side (exercised live by packages/db-fixtures/*.spec.ts), so a ColumnDescriptor
 // that already carries it should never be re-guessed from its own dataType string a second time,
 // independently, in the renderer — that second guess is exactly how "datetime" and "longtext"
 // both fell through to the wrong bucket above. binary/json both fold into the same uncoloured

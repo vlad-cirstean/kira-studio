@@ -73,9 +73,10 @@ team works, and how to run things in whichever box a session happens to be on.
   similar tests, delete. This applies going forward to new code, not only as a cleanup of what's
   already there.
 - **The adapter conformance suites are exempt from that bar, not an application of it.**
-  `shell/internal/adapters/{postgres,mysqlfamily,sqlite,clickhouse}/*_test.go` are the sole
-  successors to the deleted `tests/db/*.spec.ts` files, and nothing else exercises a Go adapter
-  capability by capability — `tests/e2e-real/` only spot-checks a scenario or two per kind. Keep
+  `apps/kira-studio/internal/adapters/{postgres,mysqlfamily,sqlite,clickhouse}/*_test.go` are the
+  sole successors to the deleted `packages/db-fixtures/*.spec.ts` files, and nothing else exercises a Go adapter
+  capability by capability — `apps/kira-studio/tests/e2e-real/` only spot-checks a scenario or two
+  per kind. Keep
   per-capability coverage there even where it reads like a CRUD round-trip; prune only genuine
   duplication (a case another subtest in the same file already asserts, a pass-through of shared
   `adapters/` logic that has its own test, a setup-only case with no assertion).
@@ -103,14 +104,8 @@ team works, and how to run things in whichever box a session happens to be on.
   The updated files are staged at `docs/v1/plans/p58-pending-ci-workflows/README.md`; apply them
   once a session's GitHub push access carries the `workflow` OAuth scope (a session lacking it has
   any commit touching `.github/workflows/*.yml` rejected by GitHub itself). Tracked as task #17.
-- **`shell/build/Taskfile.yml`'s `darwin:build`/`darwin:package` chain treats `shell/frontend/` as
-  its own npm project** (`install:frontend:deps` → `build:frontend` → `frontend:run`), but
-  `shell/frontend/` has no `package.json` — the app's one frontend builds from the repo root via
-  `vite build`. Unverified without real macOS hardware to run a real `bun run package` against:
-  check this first, rather than assuming `shell/frontend/dist` (already present from the root
-  build) makes the chain a no-op.
 
-## Docker (for `tests/db/`'s container fixtures, used directly by `tests/e2e-real/`)
+## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
 - **Claude Code on the web's Linux containers**: the `docker` CLI is preinstalled but the daemon
   isn't running, and there's no systemd (`PID 1` isn't systemd), so `systemctl start docker` does
@@ -122,7 +117,7 @@ team works, and how to run things in whichever box a session happens to be on.
 - **Docker Hub blob downloads are blocked here.** `production.cloudfront.docker.com` — the CDN every
   Hub blob download redirects to — 403s through the outbound proxy, as does `quay.io`, so a direct
   pull resolves the manifest and then can never fetch a layer. **`mirror.gcr.io` (Google's
-  read-through cache of Docker Hub) is not blocked.** `tests/db/support/*.ts` hardcode plain Hub
+  read-through cache of Docker Hub) is not blocked.** `packages/db-fixtures/support/*.ts` hardcode plain Hub
   names (`mariadb:11.4`, `clickhouse/clickhouse-server:26.3`, …), so pull the mirrored name once per
   session and re-tag it locally rather than editing any source file:
   ```
@@ -141,22 +136,23 @@ team works, and how to run things in whichever box a session happens to be on.
   run fine under plain Node with the identical image (confirmed fine on a real machine — a Bun-here
   quirk, not a real bug). Postgres is a confirmed instance: `@testcontainers/postgresql`'s default
   wait strategy passes its healthcheck and then `.start()` never resolves under `bun run`, while the
-  identical container/strategy/image resolves in ~2s under plain Node. The workaround `tests/e2e-real/`
-  itself uses (`support/postgres.ts`, `support/mariadb.ts`): invoke Playwright via its plain Node CLI
-  entrypoint (`node node_modules/.bin/playwright test --project=e2e-real`), never `bunx playwright
-  test`, so `tests/db/support/{postgres,mariadb}.ts`'s container start runs under real Node from the
-  first line. **As of P58f M10 there is no vendored Node runtime to bundle a script against any
-  more** — the old workaround for a *standalone* script needing a container from Bun (esbuild-bundle
-  it, run it under `shell/runtime/node/bin/node`, the way the now-deleted `scripts/run-ipc-backend.sh`
-  did) no longer applies, because that runtime is gone. `scripts/capture-postgres-tree.ts` and
-  `scripts/capture-tree.ts` — the manual tools built on that workaround, for capturing a real shape
-  into a `tests/ui/` fixture ("capture, don't hand-write", P50 D5) — are deleted with it (P58f D15),
-  and their replacement, a one-off-capture mode in `shell/internal/ipcfixture`'s Go generator, has not
-  actually been built: only the six committed per-adapter fixture generators exist (see `tests/ipc/`
-  below). Capturing a genuinely new `tests/ui/` shape today needs that one-off mode written first —
-  there is no drop-in tool for it right now.
+  identical container/strategy/image resolves in ~2s under plain Node. The workaround
+  `apps/kira-studio/tests/e2e-real/` itself uses (`support/postgres.ts`, `support/mariadb.ts`):
+  invoke Playwright via its plain Node CLI entrypoint (`node node_modules/.bin/playwright test
+  --project=e2e-real`), never `bunx playwright test`, so `packages/db-fixtures/support/{postgres,mariadb}.ts`'s
+  container start runs under real Node from the first line. **As of P58f M10 there is no vendored
+  Node runtime to bundle a script against any more** — the old workaround for a *standalone* script
+  needing a container from Bun (esbuild-bundle it, run it under `apps/kira-studio/runtime/node/bin/node`, the
+  way the now-deleted `scripts/run-ipc-backend.sh` did) no longer applies, because that runtime is
+  gone. `scripts/capture-postgres-tree.ts` and `scripts/capture-tree.ts` — the manual tools built on
+  that workaround, for capturing a real shape into a `tests/ui/` fixture ("capture, don't
+  hand-write", P50 D5) — are deleted with it (P58f D15), and their replacement, a one-off-capture
+  mode in `apps/kira-studio/internal/ipcfixture`'s Go generator, has not actually been built: only
+  the six committed per-adapter fixture generators exist (see `apps/kira-studio/tests/ipc/` below).
+  Capturing a genuinely new `tests/ui/` shape today needs that one-off mode written first — there is
+  no drop-in tool for it right now.
 
-## `tests/ipc/` — building and testing in this environment (P50, updated P57, backend moved to Go P58f)
+## `apps/kira-studio/tests/ipc/` — building and testing in this environment (P50, updated P57, backend moved to Go P58f)
 
 See `docs/ARCHITECTURE.md`'s Testing section for what this tier is and why its fixture is generated
 rather than hand-written. This section is only about running it here.
@@ -166,11 +162,11 @@ rather than hand-written. This section is only about running it here.
   headless Chromium against a static file server, the same way `tests/ui/` does.
 - **The backend half is Go now, not a bundled TypeScript spec (P58f D13)** — there is no
   `*.backend.spec.ts` file, no esbuild bundling step, and no vendored Node runtime involved at all.
-  `shell/internal/ipcfixture`'s per-adapter Go test (`clickhouse_test.go`, `kafka_test.go`,
+  `apps/kira-studio/internal/ipcfixture`'s per-adapter Go test (`clickhouse_test.go`, `kafka_test.go`,
   `mariadb_test.go`, `mysql_test.go`, `redis_test.go`, `sqs_test.go` — postgres and sqlite generate no
   fixture of their own, see `docs/ARCHITECTURE.md`) drives the real `adapterhost`/`adapters` stack
-  against a real container and writes `tests/ipc/<adapter>/<adapter>.fixture.ts`.
-- **Regenerating a fixture**: `cd shell && KIRA_IPC_FIXTURES=write go test ./internal/ipcfixture/...`
+  against a real container and writes `apps/kira-studio/tests/ipc/<adapter>/<adapter>.fixture.ts`.
+- **Regenerating a fixture**: `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...`
   writes each `<adapter>.fixture.ts` via `write.go`'s `mustMarshalNoEscape` (Go's `encoding/json`
   escapes HTML and sorts map keys by default, so the generator uses `SetEscapeHTML(false)` and typed
   structs, never maps); run `bunx biome check --write` on the written file afterward before
@@ -184,8 +180,9 @@ rather than hand-written. This section is only about running it here.
   key/offset, so the fixture sorts the captured page by key, and the consumer group's coordinator
   host:port is frozen the same way ClickHouse's `.inner_id.<uuid>` is.
 - **There is no one-off capture mode yet** (P58f D15's own gap — see the Docker section above):
-  `KIRA_IPC_FIXTURES=write` only regenerates the six fixtures already committed under `tests/ipc/`.
-  Capturing a fresh shape for a new `tests/ui/` fixture needs that mode written first.
+  `KIRA_IPC_FIXTURES=write` only regenerates the six fixtures already committed under
+  `apps/kira-studio/tests/ipc/`. Capturing a fresh shape for a new `tests/ui/` fixture needs that
+  mode written first.
 
 ## ClickHouse — testing in this environment (P36, its workaround resolved P58f)
 
@@ -197,10 +194,11 @@ See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design fac
   root (a plain `docker run` with no custom ulimits works fine), so a stock container never came up
   here. The fix was a small subclass clearing `this.hostConfig.Ulimits = []` —
   `tests/ipc/clickhouse/container.ts`'s `NoUlimitClickHouseContainer` — since `hostConfig` was
-  `protected` on testcontainers' `GenericContainer`. **Both that file and `tests/db/support/
-  clickhouse.ts` are deleted as of P58f M10**, and `shell/internal/adapters/testsupport/clickhouse.go`
-  (the sole surviving ClickHouse container fixture, used by both `shell/internal/adapters/clickhouse`
-  and `shell/internal/ipcfixture`) needs no equivalent at all: `testcontainers-go/modules/clickhouse`
+  `protected` on testcontainers' `GenericContainer`. **Both that file and `packages/db-fixtures/support/
+  clickhouse.ts` are deleted as of P58f M10**, and
+  `apps/kira-studio/internal/adapters/testsupport/clickhouse.go` (the sole surviving ClickHouse
+  container fixture, used by both `apps/kira-studio/internal/adapters/clickhouse` and
+  `apps/kira-studio/internal/ipcfixture`) needs no equivalent at all: `testcontainers-go/modules/clickhouse`
   does not hardcode a restrictive `Ulimits`, so this sandbox's own `ulimit -Hn` ceiling never becomes
   a problem on the Go side. If a future container image or module version reintroduces a similar
   ceiling, `testcontainers-go`'s own `WithHostConfigModifier` on the generic container option is the
@@ -208,17 +206,18 @@ See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design fac
 
 ## SQLite — testing in this environment (P35)
 
-- **`tests/db/sqlite.spec.ts` is gone (P58f M10, D1)** — its coverage lives in
-  `shell/internal/adapters/sqlite/*_test.go` now, run by `bun run test:go`, no Docker either:
-  `modernc.org/sqlite` (pure Go, no cgo) against a real `t.TempDir()` file. `tests/db/support/
-  sqlite.ts` survives regardless, since `tests/e2e-real/` still reads it directly.
-- **`tests/e2e-real/sqlite-real.spec.ts` runs unconditionally**, Docker-free by design — a real
-  `-tags server` Go binary, every adapter served in-process (no separate engine child as of P58f
-  M10), and a real temp-file database driven by a plain Playwright tab. Its only prerequisites are
-  `wails-dev-setup.sh` (pinned `wails3` + generated bindings) and `bun run build` (the frontend
-  bundle `shell/main.go`'s `//go:embed` picks up) — both memoized per worker process by
-  `tests/e2e-real/fixtures.ts`'s `buildPrerequisites()`, which also runs the one step those scripts
-  don't: `go build -tags server`.
+- **`packages/db-fixtures/sqlite.spec.ts` is gone (P58f M10, D1)** — its coverage lives in
+  `apps/kira-studio/internal/adapters/sqlite/*_test.go` now, run by `bun run test:go`, no Docker
+  either: `modernc.org/sqlite` (pure Go, no cgo) against a real `t.TempDir()` file.
+  `packages/db-fixtures/support/sqlite.ts` survives regardless, since
+  `apps/kira-studio/tests/e2e-real/` still reads it directly.
+- **`apps/kira-studio/tests/e2e-real/sqlite-real.spec.ts` runs unconditionally**, Docker-free by
+  design — a real `-tags server` Go binary, every adapter served in-process (no separate engine
+  child as of P58f M10), and a real temp-file database driven by a plain Playwright tab. Its only
+  prerequisites are `wails-dev-setup.sh` (pinned `wails3` + generated bindings) and `bun run build`
+  (the frontend bundle `apps/kira-studio/main.go`'s `//go:embed` picks up) — both memoized per
+  worker process by `apps/kira-studio/tests/e2e-real/fixtures.ts`'s `buildPrerequisites()`, which
+  also runs the one step those scripts don't: `go build -tags server`.
 
 ## Secrets / `KIRA_INSECURE_SECRETS` (P25, moved to Go in P52/P57)
 
@@ -227,13 +226,13 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
 - **There is no Linux keychain backend at all** (no `gnome-keyring`/`kwallet` probing), so on Claude
   Code's Linux web containers and any other Linux dev machine set `KIRA_INSECURE_SECRETS=1` before
   launching the app (`bun run dev`, the Go binary directly, or `t.Setenv("KIRA_INSECURE_SECRETS",
-  "1")` in a Go test) to opt into the Linux-only development fallback. `tests/e2e-real/`'s fixture
-  sets it for every real-backend test.
+  "1")` in a Go test) to opt into the Linux-only development fallback. `apps/kira-studio/tests/e2e-real/`'s
+  fixture sets it for every real-backend test.
 - Without it, Linux resolves to secret storage being **unavailable** — a password-bearing save fails
   visibly rather than silently falling back to plaintext. Deliberate, not a bug to work around.
 - **On macOS the variable is ignored outright** — the real Keychain is used and this can never
-  weaken it, even if the variable is accidentally left set. `tests/ui/secrets.spec.ts`'s "keychain
-  available" scenario is the guard that this stays true.
+  weaken it, even if the variable is accidentally left set. `apps/kira-studio/tests/ui/secrets.spec.ts`'s
+  "keychain available" scenario is the guard that this stays true.
 
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
@@ -242,7 +241,7 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   build needs GTK4 + WebKitGTK headers even though the product targets macOS; without them
   `go install` fails at `internal/operatingsystem` with a `pkg-config` error naming
   `gtk4`/`webkitgtk-6.0`), then `go install github.com/wailsapp/wails/v3/cmd/wails3@<the version
-  shell/go.mod pins>` and `export PATH=$PATH:$(go env GOPATH)/bin`. **Pin that version — never
+  go.mod pins>` and `export PATH=$PATH:$(go env GOPATH)/bin`. **Pin that version — never
   `@latest`**, which once resolved a beta ahead of `go.mod` and silently skewed the bindings
   generator against the runtime library.
 - **`wails.io`/`v3.wails.io` are 403-blocked** — on real macOS hardware too, so this is
@@ -252,14 +251,15 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   module source under `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of
   the docs site** — it is the real source for the exact pinned version, and it is how several
   findings below were confirmed rather than assumed.
-- **`go test ./internal/...` / `go build ./internal/...` need nothing but the Go toolchain** — the
-  product's own Go code is entirely cgo-free (`modernc.org/sqlite`, pure Go, for both the sqlite
-  adapter and the app's own storage). Only the root `main` package imports Wails and therefore needs
-  the GTK/WebKit headers, so prefer `./internal/...` for a fast loop.
-- **`wails3 generate bindings -b -i -ts` (run from `shell/`) must happen before any frontend build**,
-  not just before `go run .`: `shell/frontend/bindings/**` are real Vite import targets, so missing
-  ones fail the build with an unresolvable import rather than a stale-bindings surprise. Regenerate
-  whenever a bridge service's method set changes.
+- **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
+  nothing but the Go toolchain** — the product's own Go code is entirely cgo-free
+  (`modernc.org/sqlite`, pure Go, for both the sqlite adapter and the app's own storage). Only the
+  `apps/kira-studio` `main` package imports Wails and therefore needs the GTK/WebKit headers, so
+  prefer `./apps/kira-studio/internal/...` for a fast loop.
+- **`wails3 generate bindings -b -i -ts` (run from `apps/kira-studio/`) must happen before any
+  frontend build**, not just before `go run .`: `apps/kira-studio/frontend/bindings/**` are real
+  Vite import targets, so missing ones fail the build with an unresolvable import rather than a
+  stale-bindings surprise. Regenerate whenever a bridge service's method set changes.
 - **A first `wails3 task dev` build takes ~60s** (native compile, icon/binding generation, Vite cold
   start). Giving up after 15-25s looks exactly like a sandbox limitation and isn't.
 - **A background process started in one shell invocation cannot be signalled from a later, separate

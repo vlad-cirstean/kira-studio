@@ -5,7 +5,7 @@ See the [README](../README.md) for what the app is and how to run it.
 Kira Studio ships as an unsigned (ad-hoc), local, arm64-only macOS build in v1 — see SPEC.md §1/§3.
 
 Packaging is Wails v3's own [Task](https://taskfile.dev)-based pipeline (P57): config lives in
-`shell/build/config.yml`, the task graph in `shell/Taskfile.yml` and `shell/build/darwin/Taskfile.yml`,
+`apps/kira-studio/build/config.yml`, the task graph in `apps/kira-studio/Taskfile.yml` and `apps/kira-studio/build/darwin/Taskfile.yml`,
 and the entry points in the repo-root `package.json`'s `scripts` plus `scripts/sign-bundle.sh` and
 `scripts/verify-packaging.sh`. There is no `electron-builder.yml`, no asar, and no native-module ABI
 rebuild step — all deleted with Electron in P57 M7. **As of P58f M10, there is no vendored Node
@@ -14,33 +14,33 @@ every database adapter is served in-process by the Go binary itself.
 
 ## 1. Building locally
 
-Requires macOS arm64, Bun, Go (`shell/go.mod`: 1.25.0), Xcode command-line tools, and the `wails3`
-CLI at the version `shell/go.mod` pins (`v3.0.0-beta.15`) — `sh scripts/wails-dev-setup.sh` installs
+Requires macOS arm64, Bun, Go (`go.mod`: 1.25.0), Xcode command-line tools, and the `wails3`
+CLI at the version `go.mod` pins (`v3.0.0-beta.15`) — `sh scripts/wails-dev-setup.sh` installs
 exactly that version, and is also wired as `predev`.
 
 ```sh
 bun install
 sh scripts/wails-dev-setup.sh   # wails3 CLI + generated bindings
-bun run build                   # vite build → shell/frontend/dist (embedded by shell/main.go)
+bun run build                   # vite build → apps/kira-studio/frontend/dist (embedded by apps/kira-studio/main.go)
 bun run package                 # wails3 task darwin:package, then scripts/sign-bundle.sh
 ```
 
 `scripts/wails-dev-setup.sh` is idempotent and does only what is missing: it installs the pinned
 `wails3` and generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored,
-and `src/renderer/bridge/*.ts` imports them, so `bun run build` fails without them).
-`shell/{bin,frontend/dist,frontend/bindings}` are gitignored (`shell/.gitignore`).
+and `apps/kira-studio/frontend/src/bridge/*.ts` imports them, so `bun run build` fails without them).
+`apps/kira-studio/{bin,frontend/dist,frontend/bindings}` are gitignored (`apps/kira-studio/.gitignore`).
 
 Expected artifacts (nothing lands in `dist/` or `out/` any more):
 
-- `shell/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle.
-- `shell/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
+- `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle.
+- `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
 
 No `.dmg` and no `.zip` are produced locally; the release workflow zips the `.app` itself (§7).
 
-**Bundle layout** (`shell/build/darwin/Taskfile.yml`'s `create:app:bundle`):
+**Bundle layout** (`apps/kira-studio/build/darwin/Taskfile.yml`'s `create:app:bundle`):
 
 ```
-shell/bin/Kira Studio.app/
+apps/kira-studio/bin/Kira Studio.app/
   Contents/
     Info.plist                       CFBundleName/CFBundleExecutable "Kira Studio",
                                      CFBundleIdentifier com.kirathecat.kira-studio
@@ -57,13 +57,14 @@ There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is
 `create:app:bundle` used to assert `runtime/{node,engine}` existed and copy that tree in before
 signing; both the guard and the copy step are gone, since there is nothing left to vendor.
 
-**Dev loop:** `bun run dev` (`bun run build && cd shell && wails3 task dev`) launches a real native
-window with hot reload; `predev` runs `wails-dev-setup.sh` first. `wails3 task darwin:run` builds and
+**Dev loop:** `bun run dev` (`cd apps/kira-studio && wails3 task dev`) launches a real native window
+with hot reload — the Wails task's own dev-mode config drives the frontend build via
+`common:dev:frontend`; `predev` runs `wails-dev-setup.sh` first. `wails3 task darwin:run` builds and
 runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packaging.
 
 ## 2. Config summary
 
-**`shell/build/config.yml`** — the source Wails generates build assets from:
+**`apps/kira-studio/build/config.yml`** — the source Wails generates build assets from:
 
 - `info.productName: "Kira Studio"`, `info.productIdentifier: "com.kirathecat.kira-studio"` (P57 D11:
   the Wails build is the only build now, so P51/P52's deliberately-distinct `…-shell` identifier is
@@ -72,14 +73,14 @@ runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packagin
 - Editing `info` requires `wails3 task common:update:build-assets` to regenerate the assets, which
   overwrites hand edits under `build/` — so `Info.plist` below is regenerated, not hand-maintained.
 
-**`shell/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
+**`apps/kira-studio/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
 `0.0.0`, `CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `12.0.0`. Note the floor: the plist and
 the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*` flags say macOS 12, while SPEC.md §3 and the README
 scope the product at macOS 13+. The stricter product claim stands; the plist is simply Wails' default
 and has not been narrowed.
 
-**`shell/Taskfile.yml` + `shell/build/darwin/Taskfile.yml`** — the task graph `bun run package` drives:
+**`apps/kira-studio/Taskfile.yml` + `apps/kira-studio/build/darwin/Taskfile.yml`** — the task graph `bun run package` drives:
 
 | Task | What it does |
 |---|---|
@@ -112,7 +113,7 @@ harmless, and it is the script a human or CI actually invokes.
 Signing/notarization are deferred past v1 by SPEC.md §3; the DMG is a scope decision (§6).
 
 **Keychain consequence of ad-hoc signing.** Credentials are encrypted under an AES-256-GCM key held in
-a macOS Keychain generic-password item (`shell/internal/secrets/keyring_darwin.go`, service
+a macOS Keychain generic-password item (`apps/kira-studio/internal/secrets/keyring_darwin.go`, service
 "Kira Studio Secrets"). Keychain ACLs are keyed to a stable code-signing identity, which is
 exactly what ad-hoc signing defers, so the first launch after installing a new build may show one
 "Kira Studio wants to use your confidential information stored in…" prompt; **Always Allow** answers it
@@ -127,9 +128,9 @@ observed in one.
 
 | Check | Result |
 |---|---|
-| `bun run build` (vite → `shell/frontend/dist`) | **pass** — run here this session |
+| `bun run build` (vite → `apps/kira-studio/frontend/dist`) | **pass** — run here this session |
 | `bun run typecheck`, `bun run lint` | **pass** |
-| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; A1/A3/N2 correctly reported *skipped*, since no `shell/bin/Kira Studio.app` exists here |
+| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; A1/A3/N2 correctly reported *skipped*, since no `apps/kira-studio/bin/Kira Studio.app` exists here |
 | `wails3 task darwin:package` | **not run** — needs macOS (or the untested Docker cross-compile path, §5) |
 | `scripts/sign-bundle.sh` | **not run** — `codesign` is macOS-only and the script refuses to run off Darwin |
 | Real bundle contents, `Info.plist` values, ad-hoc signatures | **not verified** — no bundle was produced here |
@@ -146,7 +147,7 @@ also checked automatically on macOS by the `package-smoke` job in the intended `
 list is only updated from an *observed* run, never from expectation.
 
 1. `bun run package` completes and `sign-bundle.sh` prints `signed and verified`. — *not yet run*
-2. `codesign -dv --verbose=2 "shell/bin/Kira Studio.app"` reports `Signature=adhoc`. There is no
+2. `codesign -dv --verbose=2 "apps/kira-studio/bin/Kira Studio.app"` reports `Signature=adhoc`. There is no
    nested vendored Node binary to check separately any more (P58f M10). — *not yet run*
 3. `bun run verify:packaging` passes against the real bundle — i.e. A1/A3/N2 actually execute
    instead of reporting "skipped". — *not yet run*
@@ -218,7 +219,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   scope. Until someone applies them, everything in §7 describes intent, not what runs.
 - **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
   hardware should fill in those rows.
-- **`shell/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
+- **`apps/kira-studio/build/darwin/Assets.car` is stale relative to the real Kira icon artwork.** `appicon.png`
   and `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
   scaffolded default (a duplicate root `build/icon.png`/`build/icon.svg` copy of the same artwork
   existed alongside it until P1's dependency/script/folder audit removed it as dead weight), and
@@ -251,18 +252,18 @@ scope (tracked as `AGENTS.md`'s "Known open items").
 
 | Job | Runner | What it does |
 |---|---|---|
-| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, install the `wails3` version pinned in `shell/go.mod`, generate bindings, then `lint`, `typecheck`, `build`, `test:go`, `verify:packaging` |
+| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, install the `wails3` version pinned in `go.mod`, generate bindings, then `lint`, `typecheck`, `build`, `test:go`, `verify:packaging` |
 | `ui` | `ubuntu-latest` | bindings, Playwright WebKit plus its system libraries, `bun run test:ui`; uploads `playwright-report/` on failure |
 | `container-tests` | `ubuntu-latest` | `bun run test:unit`, `bun run test:go` |
 | `package-smoke` | `macos-15`, skipped on pull requests | `bun run package`, then asserts the bundle: `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `Signature=adhoc`, `du -sh`; finally `bun run verify:packaging` |
 
 `checks`' own `test:go` step (on `macos-15`, no Docker) only ever exercises the driver-independent
-half of `shell/internal/adapters/*/*_test.go` — every Testcontainers-backed test skips itself with a
+half of `apps/kira-studio/internal/adapters/*/*_test.go` — every Testcontainers-backed test skips itself with a
 named `DockerUnavailableMessage` when no Docker daemon answers, rather than failing. The real,
 full-coverage run of that same `test:go` needs a runner with Docker, which is what `container-tests`
-is for. This split predates P58f and is unaffected by it: `tests/db/`'s per-engine specs used to be
+is for. This split predates P58f and is unaffected by it: `packages/db-fixtures/`'s per-engine specs used to be
 the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Docker nor nested
-virtualization); P58f D1 moved that coverage into `shell/internal/adapters/*/*_test.go`
+virtualization); P58f D1 moved that coverage into `apps/kira-studio/internal/adapters/*/*_test.go`
 (`docs/ARCHITECTURE.md`'s Testing section) without changing which runner needs to be the one that
 actually exercises it.
 
@@ -271,7 +272,7 @@ actually exercises it.
 1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes `package.json`'s `version` from the
    tag itself — no pre-tag version-bump commit is needed.
 2. It generates bindings, runs `lint`/`typecheck`, then `bun run package` unmodified.
-3. It zips the ad-hoc-signed bundle with `ditto -c -k --keepParent "shell/bin/Kira Studio.app"
+3. It zips the ad-hoc-signed bundle with `ditto -c -k --keepParent "apps/kira-studio/bin/Kira Studio.app"
    kira-studio-macos-arm64.zip`, re-runs `verify:packaging`, and opens a **draft** GitHub Release with
    that zip attached plus an artifact upload.
 4. A human runs §4 against the draft's artifact on real hardware, fills in the rows, then publishes.

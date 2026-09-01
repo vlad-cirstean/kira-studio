@@ -3,8 +3,8 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 
-// Real captures against a real Mongo 7 container, seeded with tests/db/fixtures/0003_mongo_seed.ts
-// (the same seed tests/db/mongo.spec.ts and tests/e2e/mongo.spec.ts use) — via
+// Real captures against a real Mongo 7 container, seeded with packages/db-fixtures/fixtures/0003_mongo_seed.ts
+// (the same seed packages/db-fixtures/mongo.spec.ts and tests/e2e/mongo.spec.ts use) — via
 // `bun scripts/capture-tree.ts mongo --recipe-file ...` (scripts/capture-tree.ts), not hand-written
 // (P50 D5's discipline). Confirmed here, a real environment finding: unlike Postgres (AGENTS.md's
 // Docker section — its own forListeningPorts() wait strategy hangs under `bun run` in this
@@ -17,7 +17,7 @@ import { IPC } from './ipcChannels';
 // is exactly what its two Mongo-console scenarios need (mongo/completion.ts's F5 reads it straight
 // out of the tree cache — no separate data-plane round trip for collection-name completion at
 // all, and none for methods/operators/collections used as console vocabulary either, since those
-// are pure client-side grammar — see src/renderer/views/console/completion.ts).
+// are pure client-side grammar — see apps/kira-studio/frontend/src/views/console/completion.ts).
 
 export const DB_PATH = 'database:kira_test';
 export const WIDGETS_PATH = `${DB_PATH}/collection:widgets`;
@@ -84,7 +84,7 @@ export const DB_CHILDREN = [
 ];
 
 // The real capture's full unfiltered widgets page (all 25 seeded documents — WIDGET_COUNT in
-// tests/db/fixtures/0003_mongo_seed.ts): the exact EJSON text `capture-tree.ts mongo` printed for
+// packages/db-fixtures/fixtures/0003_mongo_seed.ts): the exact EJSON text `capture-tree.ts mongo` printed for
 // this read (out/mongo-capture.log step 2), copied verbatim — not re-derived from the seed
 // function's own field-generation logic, which this must not silently drift from (P50 D5).
 export const WIDGETS_IDS: (string | null)[] = [

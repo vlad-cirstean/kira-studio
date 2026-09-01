@@ -1,4 +1,4 @@
-/** The Go→renderer push channels (`shell/internal/bridge/events.go`'s constants, verbatim).
+/** The Go→renderer push channels (`apps/kira-studio/internal/bridge/events.go`'s constants, verbatim).
  *  Formerly the push half of ipc.ts's IPC const; the request/response half retired with
  *  window.kira, and the wire types for bound calls now come from the generated bindings (P57 D7).
  *  `kira:engine:state` and `kira:port` are absent — both are dead channels retired by D6/D3. */
@@ -28,7 +28,7 @@ export const CHANNEL = {
  *  for the status bar, not a per-process breakdown. No generated binding carries this shape: it
  *  is emitted (`kira:app:metrics`), never returned from a bound call, so it has no home in any
  *  service's models.ts and stays hand-written here instead (formerly ipc.ts's own type). Mirrors
- *  `shell/internal/metrics.Sample`'s JSON tags. */
+ *  `apps/kira-studio/internal/metrics.Sample`'s JSON tags. */
 export interface AppMetricsSample {
   cpuPercent: number;
   memoryBytes: number;

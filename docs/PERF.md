@@ -174,7 +174,7 @@ process, `bun test tests/unit`) asserting the exact budget-respecting behaviour 
 number after 20 real page loads." (That TypeScript test itself did not survive the P58 port: P58a A21
 deleted `tests/unit/engine-cache.spec.ts` along with the `src/engine/` it tested, and the same
 budget-respecting behaviour is now asserted directly in Go, against the real cache the app ships —
-`shell/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases — with no port-side gap left to
+`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases — with no port-side gap left to
 name.) The identical reasoning drops two `tests/e2e/leaks.spec.ts`
 sub-scenarios ("L3 is bounded", "clearing the cache resets the hit rate") for the same
 `src/engine/cache/counts.ts` `ByteLru`, and one `tests/e2e/leaks.spec.ts` sub-scenario ("deleting a
@@ -279,7 +279,7 @@ P32's other unverified-in-this-sandbox items).
 **L-D after the Wails/Go migration.** The 252 MB this row used to carry was an electron-builder
 `--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer exists, so the figure
 was retired rather than carried forward against a different bundle. The measurement is now
-`du -sh "shell/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS hardware in this
+`du -sh "apps/kira-studio/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS hardware in this
 environment.
 
 **L-D after P58f M10.** `scripts/vendor-node.sh` and the `runtime/` tree it populated are gone
@@ -311,7 +311,7 @@ macOS hardware and produces a recorded go/amber/no-go verdict.** Nothing below s
 that.
 
 **Instrument, built and verified as part of this gate (P52 §3.3's "finding the replacement
-instrument is part of the work"):** `shell/cmd/g1measure`, a small standalone tool over
+instrument is part of the work"):** `apps/kira-studio/cmd/g1measure`, a small standalone tool over
 `internal/metrics`' own `gopsutil`-based `MatchingPIDs`/RSS summation — the same package
 `internal/metrics.Sampler` uses for the app's own `kira:app:metrics` events (§8.4), so the gate is
 measured with the app's real instrument, not a one-off script. **Cross-checked against plain `ps
@@ -325,7 +325,7 @@ the opposite structural surprise showed up: WebKitGTK's `WebKitNetworkProcess` a
 `WebKitWebProcess` **are** children of the Go process (confirmed via `ps --forest`), but
 `WebKitWebProcess` itself is re-executed through two layered `bwrap` (bubblewrap sandbox)
 wrapper processes first — trivial RSS themselves (1.6-2.2 MB each) but their presence is easy to
-miss if the match rule is naive. `shell/cmd/g1measure -match` accounts for all of it explicitly:
+miss if the match rule is naive. `apps/kira-studio/cmd/g1measure -match` accounts for all of it explicitly:
 `kira-studio-shell,runtime/node/bin/node,webkitgtk,bwrap`.
 
 **Method:** identical to the removed `tests/e2e/memory.spec.ts`'s own methodology (§2.2) —
@@ -343,7 +343,7 @@ call): **min of 10 samples = 616.3 MB.**
 | `WebKitWebProcess` | 252.7 MB |
 | `bwrap` × 2 | 3.7 MB |
 
-**Configuration (2) — real renderer** (the actual `src/renderer` Vue app, the nine boot-path
+**Configuration (2) — real renderer** (the actual `apps/kira-studio/frontend/src` Vue app, the nine boot-path
 reads against a real, empty Go SQLite database — §3.2's actual G1 scenario): **min of 10 samples
 = 689.5 MB.**
 
@@ -376,7 +376,7 @@ not as a substitute for it.
 
 **This is the gate's actual verdict.** Re-run per P52 §15 on the same real Apple Silicon Mac (arm64,
 macOS 26.5.2) P51 part 4 used, with the app actually built, signed, and launched — not inferred.
-Same instrument and method as §2.3: `shell/cmd/g1measure` (`internal/metrics`'
+Same instrument and method as §2.3: `apps/kira-studio/cmd/g1measure` (`internal/metrics`'
 `gopsutil`-based RSS summation), 10 samples 1 s apart after the window is shown and idle, minimum
 taken, cross-checked against plain `ps -o rss=` on the identical process set — both agreed to
 within rounding on every run below.
@@ -401,8 +401,8 @@ above Electron's own baseline. Against `docs/PERF.md` §2.2's 620–626 MB Elect
 **≈58% reduction** before a single line of `src/main` has been ported. Secondary hard check also
 passes: the engine child alone is 40.6–41.6 MB across both configs, well under the 150 MB ceiling.
 
-**Per P52 §15, this clears the gate: P53 (porting `src/main`'s business logic into `shell/`) is
-authorized to start.**
+**Per P52 §15, this clears the gate: P53 (porting `src/main`'s business logic into the Wails app)
+is authorized to start.**
 
 **Three real bugs surfaced getting this number, all fixed in this pass, not merely worked around:**
 
@@ -446,10 +446,10 @@ processes). `KIRA_G1_BLANK=1` can still reach a `open`-launched process via `lau
 KIRA_G1_BLANK 1` beforehand (`launchctl unsetenv` after) — LaunchServices doesn't otherwise pass
 through a launching shell's own environment.
 
-**What this does not close:** `shell/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
+**What this does not close:** `apps/kira-studio/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
 `ios`, `android` and `docker` were `wails3 init`'s default scaffold, unconditionally generated
 regardless of target — never wired to anything this macOS-only app needs. Removed in this pass
-(`shell/Taskfile.yml`'s `includes:` now lists only `common`/`darwin`), along with the now-dead
+(`apps/kira-studio/Taskfile.yml`'s `includes:` now lists only `common`/`darwin`), along with the now-dead
 `build:server`/`build:docker`/`run:docker`/`setup:docker` tasks and their `.gitignore` entries.
 Unrelated to G1 itself, but found and cleaned up in the same session.
 
@@ -457,7 +457,7 @@ Unrelated to G1 itself, but found and cleaned up in the same session.
 
 **Status: measured, re-taking the P52-P57 row's ~11x/48x figures against a controlled fixture, as
 P58 §1.4 and P58a §4.6 required of M2.** Both producers still exist in this phase — the Go codec
-(`shell/internal/page.Chunk`, P58 D5) and the Node engine's plain `JSON.stringify` of a
+(`apps/kira-studio/internal/page.Chunk`, P58 D5) and the Node engine's plain `JSON.stringify` of a
 `TextColumnChunk`'s typed arrays (`stdio-main.ts`'s `writeFrame`) — so this is the one window in
 the whole P58 migration where a like-for-like measurement is cheap, per the plan's own note.
 
@@ -467,7 +467,7 @@ truncated. Underlying (unencoded) size: **103,394 bytes** (`data` + `offsets`×4
 `truncated`×4) — close enough to "100 KB" to match the figure it replaces, and reproducible from
 the throwaway measurement programs this row was taken from (not committed to the repo, per this
 phase's own "no product code lands in M0/M2 measurement work" convention — the `Chunk`/`Uint32LE`
-encoding logic exercised is a verbatim copy of the real `shell/internal/page` code).
+encoding logic exercised is a verbatim copy of the real `apps/kira-studio/internal/page` code).
 
 **Wire bytes** (`len(json.Marshal(chunk))` in Go; `Buffer.byteLength(JSON.stringify(chunk), 'utf8')`
 in Node, `node --expose-gc`, v22.22.2):
@@ -520,7 +520,7 @@ hardware since the migration, and no number in this file changed as a result of 
 
 **The bundle these procedures run against.** `bun run package` (`cd shell && wails3 task
 darwin:package`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces
-**`shell/bin/Kira Studio.app`**. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
+**`apps/kira-studio/bin/Kira Studio.app`**. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
 `out/main/` entry points no longer exist. As of P58f M10 there is also no `Contents/MacOS/runtime/`
 tree of any kind — no vendored Node runtime, no engine-child bundle — since every adapter now runs
 natively inside the one Go binary. The only measurement-relevant path inside the bundle is
@@ -528,16 +528,16 @@ natively inside the one Go binary. The only measurement-relevant path inside the
 
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
 1. `bun run package`.
-2. Launch `shell/bin/Kira Studio.app` 3 times via Finder or `open`, discarding the first
+2. Launch `apps/kira-studio/bin/Kira Studio.app` 3 times via Finder or `open`, discarding the first
    (Gatekeeper's quarantine scan of an ad-hoc-signed bundle on first launch is not the app's cost).
    Launch it the way a user would rather than `exec`ing the binary — §2.4's own methodology note
    records that a directly-`exec`'d run is a structurally different process set on macOS.
 3. Read the cold-start line from `~/.kira-studio/logs/kira-<YYYY-MM-DD>.log` for each of the 3
-   launches and take the median. That line is emitted by `shell/internal/shell/window.go`'s
+   launches and take the median. That line is emitted by `apps/kira-studio/internal/shell/window.go`'s
    `events.Common.WindowRuntimeReady` handler (P56 — Wails' analogue of `did-finish-load`, and the
    measurement point that replaces Electron's `process.uptime()`, which no longer exists): it reads
    `msg="did-finish-load at uptime <N>ms" scope=startup`, where `<N>` is milliseconds from
-   `shell/main.go`'s `startedAt` (captured at process entry) to the frontend runtime being ready.
+   `apps/kira-studio/main.go`'s `startedAt` (captured at process entry) to the frontend runtime being ready.
    A packaged run writes to the file only — the stderr copy is dev-only (`config.IsDev()`).
 4. Record: `<median> ms — <date>, <machine>`.
 
@@ -562,7 +562,7 @@ packaged check is what's left):
    `metrics.AppProcessSet` exists.
 4. Record: `<total> MB — <date>, <machine>`.
 
-**Window-bounds debounce timer on close (F8, D8)** — now `shell/internal/shell/window.go`: the
+**Window-bounds debounce timer on close (F8, D8)** — now `apps/kira-studio/internal/shell/window.go`: the
 resize/move debouncer (300 ms, `boundsDebounce`) is cancelled on `events.Common.WindowClosing`, and
 again by `Attach`'s detach at quit. **The Electron-era symptom this check watched for does not carry
 over.** It looked for the process lingering on an unref'd-but-still-pending `setTimeout`; a pending
@@ -584,7 +584,7 @@ own `op:end`, so one adapter's crash cannot leave that op stuck `running`; (2) `
 (P58f D9) — finishes any row still `running` when the op-event channel itself closes, e.g. at
 shutdown. A hard kill of the whole process (SIGKILL, OOM, a panic outside `safeRun`) still leaves
 `running` rows on next launch, same as before P58f; there is nothing left this manual procedure
-would exercise that `shell/internal/adapterhost` and `shell/internal/oplog`'s own unit tests don't
+would exercise that `apps/kira-studio/internal/adapterhost` and `apps/kira-studio/internal/oplog`'s own unit tests don't
 already cover.
 
 **Log file retention (F12, D12)** — now `internal/logging`'s `Sweep`, which deletes `kira-*.log`
@@ -592,7 +592,7 @@ files older than `LogRetentionDays` (30) by mtime at startup. Verify by backdati
 past 30 days in `~/.kira-studio/logs/`, relaunching the packaged app, and confirming that file is
 gone while newer ones remain.
 
-**App size (lever L-D)** — `du -sh "shell/bin/Kira Studio.app"`, against the > 300 MB trigger. See
+**App size (lever L-D)** — `du -sh "apps/kira-studio/bin/Kira Studio.app"`, against the > 300 MB trigger. See
 §2.2's lever table for what that row currently does and does not claim.
 
 ## 4. P13's nonfunctional sweep — the three items P12 handed forward
@@ -600,12 +600,12 @@ gone while newer ones remain.
 The three items §4 previously handed to P13 are resolved as of P13; the two below whose coverage
 lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache (P58a A21, per
 §2.1) and are now asserted directly against the real cache in
-`shell/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases, not a browser-driven scenario.
+`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases, not a browser-driven scenario.
 
 1. **`src/engine/cache/counts.ts`'s `store` was a plain `Map<string, StoredCount>`** with no byte
    budget or eviction policy — **fixed (F19, D19)**. It is now a `ByteLru` sharing L2's shape:
    `L3_BUDGET_BYTES = 256 * 1024`, a nominal `COUNT_ENTRY_BYTES = 128` per entry, ≈ 2 048 entries
-   before eviction, ported unchanged into `shell/internal/enginecache`. The original browser-driven
+   before eviction, ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven
    proof (now retired) drove 2 500 distinct `{path, filter}` combinations through `data.count()` and
    observed `cacheStats().l3Entries` plateau at exactly **2 048** — confirming both that the bound
    is real and that it matches the constant's own arithmetic (256 KiB / 128 B), not just "some
@@ -624,6 +624,6 @@ lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache 
    **fixed (F20, D20)**. `clearPages()` now resets both counters to 0, so a hit rate read after
    clearing reflects "since last clear" rather than the engine process's entire lifetime — the only
    interpretation that matches what the Clear caches button in Settings → Cache appears to do,
-   ported unchanged into `shell/internal/enginecache`. The original browser-driven proof (now
+   ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven proof (now
    retired) warmed L2 to a real (non-"—") hit rate, clicked Clear, and asserted the Settings → Cache
    hit rate field read `—` again.

@@ -12,7 +12,7 @@ const (
 )
 
 // Status mirrors secretStorageStatusSchema byte for byte — the shape
-// shell/internal/bridge/connections.go carried as a P52-walking-skeleton stub; this is that
+// apps/kira-studio/internal/bridge/connections.go carried as a P52-walking-skeleton stub; this is that
 // struct, moved here unchanged.
 type Status struct {
 	Available        bool    `json:"available"`

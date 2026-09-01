@@ -13,7 +13,7 @@ import (
 // string literals (P52 §15: a bad needle match was one of the three real bugs found getting G1
 // measured).
 var (
-	// "Kira Studio" is the shipping executable name (P57 D11: shell/Taskfile.yml's APP_NAME,
+	// "Kira Studio" is the shipping executable name (P57 D11: apps/kira-studio/Taskfile.yml's APP_NAME,
 	// matched here since AppProcessSet finds this app's own process by executable path substring,
 	// not by pid tree — see sampler.go's header comment). P58f: no vendored Node child needle any
 	// more — every adapter is served in-process by this binary.

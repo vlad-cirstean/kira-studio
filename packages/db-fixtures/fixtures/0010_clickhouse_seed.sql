@@ -1,4 +1,4 @@
--- §9.1 dataset for tests/db/clickhouse.spec.ts — a port of 0008_mysql_seed.sql (P36 D36), not a
+-- §9.1 dataset for packages/db-fixtures/clickhouse.spec.ts — a port of 0008_mysql_seed.sql (P36 D36), not a
 -- copy: the same object graph, translated into ClickHouse's own grammar, so the same scenarios
 -- assert the same things wherever the two engines can agree. Every divergence is a documented
 -- engine difference, not an oversight:
@@ -12,7 +12,7 @@
 --   `weird``name` / `Order Items`                         -> unchanged; ClickHouse backtick-quotes
 --     identifiers the same way (F28)
 --
--- Executed by tests/db/support/clickhouse.ts one statement at a time (splitSqlStatements) against
+-- Executed by packages/db-fixtures/support/clickhouse.ts one statement at a time (splitSqlStatements) against
 -- a client scoped to `database: kira_test` — every unqualified name below resolves against that
 -- client-level default, so there is no leading `USE` statement to write (the ClickHouse HTTP
 -- interface has no session state to `USE` into in the first place, D13).

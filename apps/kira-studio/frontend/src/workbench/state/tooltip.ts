@@ -2,7 +2,7 @@ import type { ObjectDirective } from 'vue';
 import { reactive } from 'vue';
 
 // P22: the app's own tooltip mechanism, replacing the native `title` attribute everywhere in
-// src/renderer. One controller, one listener set, one floating element (AppTooltip.vue) — not 123
+// apps/kira-studio/frontend/src. One controller, one listener set, one floating element (AppTooltip.vue) — not 123
 // components each running their own mouseenter timer. Mirrors ContextMenu.vue's singleton shape
 // (F7) and ErrorPopover.vue's placement maths (F8).
 

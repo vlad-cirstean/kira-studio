@@ -25,16 +25,16 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Shell | **Wails v3** (`v3.0.0-beta.15`), Go | native title bar, macOS 13+, `arm64` only |
 | Language | TypeScript 7 (native compiler) for `.ts`; **Go** for the shell | `.vue` typechecks with whatever the Vue tooling supports (TS 5.x if needed); converge on one toolchain once `vue-tsc` runs on TS7 |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `vite.config.ts` at the repo root) | builds `src/renderer` straight into `shell/frontend/dist`, which `shell/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler` |
 | UI | Vue 3 (`<script setup>`, Composition API) | |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
 | Icons | `@vscode/codicons` | UI chrome |
-| Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`shell/internal/storage/model/`) |
+| Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
 | Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
 | Packaging | `wails3 task darwin:package` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`); ships as a zipped `.app`, no DMG, no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f) |
-| DB tests | Testcontainers, driven from Bun | `tests/db/` no longer holds per-engine specs (P58f D1) — it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `tests/e2e-real/` both seed from; real containers, real data; Colima |
+| DB tests | Testcontainers, driven from Bun | `packages/db-fixtures/` no longer holds per-engine specs (P58f D1) — it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 
@@ -85,11 +85,11 @@ footprint. The budget numbers themselves (and what's actually measured) live in
 
 ## Adapter contract
 
-Every engine is one package under `shell/internal/adapters/` (`postgres/`, `mysqlfamily/` shared by
+Every engine is one package under `apps/kira-studio/internal/adapters/` (`postgres/`, `mysqlfamily/` shared by
 mariadb/mysql, `sqlite/`, `clickhouse/`, `mongo/`, `redis/`, `sqs/`, `s3/`, `kafka/`), implementing
-the `Adapter` interface (`shell/internal/adapters/adapter.go`). A `Caps` struct
-(`shell/internal/adapters/caps.go`, field order kept identical to the TypeScript `Caps` type still
-declared in `src/shared/caps.ts` for the renderer, so the two diff against each other) declares what
+the `Adapter` interface (`apps/kira-studio/internal/adapters/adapter.go`). A `Caps` struct
+(`apps/kira-studio/internal/adapters/caps.go`, field order kept identical to the TypeScript `Caps` type still
+declared in `packages/shared/caps.ts` for the renderer, so the two diff against each other) declares what
 that engine can do — `DefaultPageKind`, `Pagination` strategy, `CanInsert`/`CanUpdate`/`CanDelete`,
 `Cancel`, `SQL`, `Definition`, `Describe`, `FileTransfer`, `KeyBrowser` (P41 — true only for
 redis/s3: the top-level container's own key/object space is unbounded and arbitrarily nested, so
@@ -124,7 +124,7 @@ Cancellation is never "stop showing the result" — it is always forwarded to th
 cannot cancel, the capability is absent and the stop button says so rather than lying.
 
 Every adapter maps its own driver's returned errors to the closed `ErrorCode` set via
-`shell/internal/adapters/errors.go`'s `New`/`CodeOf`, the driver's message preserved verbatim
+`apps/kira-studio/internal/adapters/errors.go`'s `New`/`CodeOf`, the driver's message preserved verbatim
 (Adapter rule 4, carried over unchanged from the TypeScript design this replaced). `errors.go` also
 holds the shared guard functions every adapter package calls rather than re-implementing: `Unsupported`/
 `NoQueryConsole` (the two sentence shapes behind every `E_UNSUPPORTED` capability stub),
@@ -154,7 +154,7 @@ MySQL share one driver (`mariadb`, a genuine dual client) and one core (`engine/
 mysql-family/`) — `mariadb/` and `mysql/` each hold only their own profile (server label,
 `applyEngineOptions`) and re-export everything else.
 
-**PostgreSQL is Go-native as of P58a M5** (`shell/internal/adapters/postgres/`, `pgx/v5`) —
+**PostgreSQL is Go-native as of P58a M5** (`apps/kira-studio/internal/adapters/postgres/`, `pgx/v5`) —
 `nativeKinds["postgres"]` is `true`, so a Postgres connection is served in-process by
 `adapterhost.Router`, never by the Node engine child. The Go port keeps the design facts
 above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the tracked backend
@@ -165,7 +165,7 @@ cancel request against the adapter's explicit `pg_cancel_backend` call
 (`internal/adapters/postgres/query.go`'s `runWithAbortRace`).
 
 **MariaDB and MySQL are Go-native as of P58b M6.2**
-(`shell/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`) —
+(`apps/kira-studio/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`) —
 `nativeKinds["mariadb"]` and `nativeKinds["mysql"]` are both `true`. The shared-core/thin-profile
 split carries over unchanged from the Node design: `mysqlfamily/` holds one `Adapter`
 implementation, and `mariadb/`/`mysql/` each hold only their own `Profile` (server label,
@@ -185,7 +185,7 @@ when `caching_sha2_password` needs one and TLS is off, with no option to refuse 
 
 ### SQLite (P35; Go-native as of P58b M6.3)
 
-**SQLite is Go-native as of P58b M6.3** (`shell/internal/adapters/sqlite/`, `modernc.org/sqlite`,
+**SQLite is Go-native as of P58b M6.3** (`apps/kira-studio/internal/adapters/sqlite/`, `modernc.org/sqlite`,
 pure Go and cgo-free — the same driver that also backs the app's own storage, see Storage below) —
 `nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
 an equally honest `true`: `node:sqlite` (a Node builtin, no native module, no build step, requiring
@@ -213,7 +213,7 @@ narrow, documented capability trade, not a silent gap.
 
 ### ClickHouse (P36; Go-native as of P58b M6.4)
 
-**ClickHouse is Go-native as of P58b M6.4** (`shell/internal/adapters/clickhouse/`, plain
+**ClickHouse is Go-native as of P58b M6.4** (`apps/kira-studio/internal/adapters/clickhouse/`, plain
 `net/http`) — `nativeKinds["clickhouse"]` is `true`, the last of the five SQL-family kinds P58b set
 out to migrate. Unlike every other adapter in this phase, the Go port carries **no driver
 dependency at all**: no `@clickhouse/client` equivalent, no vendored client library — a hand-rolled
@@ -243,7 +243,7 @@ server keeps executing a query after the original socket closes.
 
 ### Kafka (Go-native as of P58e M9.3)
 
-**Go-native as of P58e M9.3** (`shell/internal/adapters/kafka/`, `github.com/twmb/franz-go` +
+**Go-native as of P58e M9.3** (`apps/kira-studio/internal/adapters/kafka/`, `github.com/twmb/franz-go` +
 `franz-go/pkg/kadm`) — `nativeKinds["kafka"]` is `true`, the **tenth and last** of ten kinds, and the
 flip that records checkpoint C2 (the parent P58 plan's zero-traffic proof: a full manual pass across
 all ten kinds, plus cancel/settings-save/cache-clear, left `adapterhost.Router.ChildRoutes()` at
@@ -287,7 +287,7 @@ per-message delete or update at the protocol level, only retention/compaction.
 
 ### SQS (Go-native as of P58d M8.2)
 
-**Go-native as of P58d M8.2** (`shell/internal/adapters/sqs/`, `aws-sdk-go-v2/service/sqs`) —
+**Go-native as of P58d M8.2** (`apps/kira-studio/internal/adapters/sqs/`, `aws-sdk-go-v2/service/sqs`) —
 `nativeKinds["sqs"]` is `true`, the eighth of ten kinds P58 migrates. `caps.pagination = 'batch'` —
 every poll is an independent, non-resumable `ReceiveMessage` call with no addressable position;
 the stream view never auto-loads, only an explicit Poll button. `canDelete` is a real per-item
@@ -318,7 +318,7 @@ at first use, which is a gain the Test button reports sooner.
 
 ### S3 (Go-native as of P58d M8.3)
 
-**Go-native as of P58d M8.3** (`shell/internal/adapters/s3/`, `aws-sdk-go-v2/service/s3`) —
+**Go-native as of P58d M8.3** (`apps/kira-studio/internal/adapters/s3/`, `aws-sdk-go-v2/service/s3`) —
 `nativeKinds["s3"]` is `true`, reaching **nine of ten** native kinds — Kafka went native next, in
 P58e, reaching ten of ten (see the Kafka section above).
 The only engine with `caps.fileTransfer` — items are whole files, streamed to/from a local path via
@@ -353,7 +353,7 @@ carry `rabbitmq`/`exchange`; there is no successor section here.
 
 ### MongoDB / Redis (P9/P41; Go-native as of P58c M7.3/M7.4)
 
-**Both are Go-native as of P58c** (`shell/internal/adapters/mongo/` and `.../redis/`) —
+**Both are Go-native as of P58c** (`apps/kira-studio/internal/adapters/mongo/` and `.../redis/`) —
 `nativeKinds["mongodb"]` and `nativeKinds["redis"]` are both `true`, the sixth and seventh of ten
 kinds P58 migrates. MongoDB: document-shaped, `_id` keyset pagination falling back to
 `skip`/`limit`, cancellation via `$currentOp` + `killOp` on the *same* client the adapter already
@@ -449,11 +449,11 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 tabs(id, connection_id, path, kind, state_json, order, active)  -- session restore
 ```
 
-Migrations are forward-only numbered SQL files (`shell/internal/storage/migrations/`) applied on
-startup. Table access is hand-written `database/sql` in `shell/internal/storage/repos/` — there is
+Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
+startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
 no ORM; the Drizzle dependency went out with the Electron shell. Every row read back out of
 `settings`, `ui_layout` and `connections` is decoded through the model types in
-`shell/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
+`apps/kira-studio/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
 instead of propagating zero values into the UI.
 
 **A known, deliberate orphan.** `settings` stores leaves by key, and an existing installation may
@@ -595,7 +595,7 @@ all app state, and now every database driver too.
            │
 ┌──────────┴───────────┐
 │  Go shell (Wails v3) │  window, menus, SQLite, settings, op log, keychain,
-│  shell/main.go       │  pre-connect, every adapter, cache, metrics
+│  apps/kira-studio/main.go       │  pre-connect, every adapter, cache, metrics
 └──────────────────────┘
 ```
 
@@ -617,22 +617,22 @@ and there is no per-connection Go process either — the adapter host multiplexe
 connection through its own registry and cache regardless of how many are open at once.
 
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
-TypeScript bindings under `shell/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
-`wails3 generate bindings -b -i -ts -names`), which `src/renderer/bridge/control.ts` calls as plain
+TypeScript bindings under `apps/kira-studio/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
+`wails3 generate bindings -b -i -ts -names`), which `apps/kira-studio/frontend/src/bridge/control.ts` calls as plain
 typed async functions — `AppService.Info()`, `ConnectionsService.List()` — resolving under the hood
 to HTTP calls against the local `/wails/runtime` endpoint driven by `/wails/runtime.js`
 (`@wailsio/runtime`). Every call is wrapped in one `unwrap()` that normalizes a Go-side error into
 the `{message, code}` shape the renderer already branched on. The **data plane** is a single named
-stream, `"engine"`, opened once per page load by `src/renderer/bridge/port.ts` via
+stream, `"engine"`, opened once per page load by `apps/kira-studio/frontend/src/bridge/port.ts` via
 `JSONStream('engine')`, carrying JSON frames for bulk payloads (grid pages, tree results).
 
 **The data plane is a server, not a byte forwarder (P58 D3).** Bulk data is produced and encoded
 exactly once, in the process that owns the window — the old Electron-era invariant ("Go never reads
-a data-plane frame") could not survive Go adapters existing at all. `shell/internal/adapterhost/dataframe.go`'s
+a data-plane frame") could not survive Go adapters existing at all. `apps/kira-studio/internal/adapterhost/dataframe.go`'s
 `HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
 op, that connection's `connectionId` — to route it, then answers every op in-process by
 `adapterhost.Dispatcher`, its response `json.Marshal`ed directly with every chunk's four buffers
-base64-of-exact-LE-bytes (P58 D5). There is no other wire shape any more: `src/renderer/bridge/port.ts`'s
+base64-of-exact-LE-bytes (P58 D5). There is no other wire shape any more: `apps/kira-studio/frontend/src/bridge/port.ts`'s
 `reviveChunks`/`toTypedArray` decode only that one form (P58f D8 deleted the `JSON.stringify`
 index-keyed branch a Node-served connection used to produce, once every kind was native and nothing
 emitted it any more). `ping` is answered locally too — the engine *is* this process now (P58f D11),
@@ -654,8 +654,8 @@ and any single frame over 64 MiB (`streamMaxFrameBytes`) is rejected outright, e
 by `adapterhost.Session`'s own `maxDataFrameBytes`, which drops an oversized frame with a named log
 line rather than corrupting the stream.
 
-**The Go side is `shell/`.** `shell/main.go` builds the `application.New` options and registers
-twelve bound services under `shell/internal/bridge/` — `AppService`, `SettingsService`,
+**The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
+twelve bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
 `LayoutService`, `TabsService`, `ConnectionsService`, `TreeService`, `EngineService`, `OpsService`,
 `FiltersService`, `FilesService`, `QueriesService`, `LifecycleService`. `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
@@ -696,7 +696,7 @@ there is nothing to turn off, because the thing was never on. A smaller number h
 Wails exposes no equivalent, and the guarantee is genuinely weaker than it was. Those are listed as
 losses below rather than papered over.
 
-`shell/internal/shell/security.go` is the one module that owns what remains. `Harden()` returns the
+`apps/kira-studio/internal/shell/security.go` is the one module that owns what remains. `Harden()` returns the
 posture, and `window.go`'s `Options` is its single caller. It does four things: deny every
 permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` false, leave
 `EnableFileDrop` false, and leave `OpenInspectorOnStartup` false.
@@ -704,15 +704,15 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 | P46 control | Status under Wails |
 |---|---|
 | `contextIsolation` / `sandbox` / `nodeIntegration: false` | **No subject, strictly better.** There is no Node in the webview to isolate it from, and no `contextBridge`/`window.kira` surface at all — the renderer reaches Go only through generated bindings and the `engine` stream. |
-| DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `shell/build/darwin/Taskfile.yml`. |
+| DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `apps/kira-studio/build/darwin/Taskfile.yml`. |
 | Every Chromium permission except the clipboard | **Set, but inert on macOS.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed), but Wails v3.0.0-beta.15 implements `resolvePermission` only for Linux and Windows — there are zero darwin references. The option is kept because it is genuinely correct on Linux, where `wails3 task dev` runs; on macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
-| `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `src/renderer`/`src/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
+| `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `apps/kira-studio/frontend/src`/`packages/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
 | Navigation lock to the base URL | **No analogue — a real loss, already known.** There is no navigation-policy delegate on darwin at all (`webview_window_darwin.m` has no `decidePolicy`). This is weaker than the Electron `will-frame-navigate` guard plus fuses it replaces, and is recorded as a loss rather than mitigated. |
 | `webviewTag: false` | **No subject.** |
 | The spellchecker | **No analogue in the shell** — Wails exposes no spellcheck control. The mitigation moved into the renderer instead: `spellcheck="false"` on the field itself. The reason is unchanged: the connection dialog's password field becomes plain `type="text"` once the eye toggle reveals it. |
 | WebGL off | **No subject.** |
 | The seven `disable-*` Chromium switches | **No subject.** |
-| `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `shell/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
+| `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `apps/kira-studio/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
 | The three Electron fuses (`runAsNode` and friends) | **No subject.** There is no Electron binary to re-run as Node. |
 
 **Autofill** is unchanged and still a renderer-side control: `autocomplete="off"` on every
@@ -731,7 +731,7 @@ macOS — it is the correct value, and it is the value that actually applies on 
   message, a document, a connection). Replacing them with the app's own confirmation UI is a UI
   change for a future phase.
 
-**What actually holds this**, so a revert is never silent: `shell/internal/shell/security_test.go`
+**What actually holds this**, so a revert is never silent: `apps/kira-studio/internal/shell/security_test.go`
 and `menutemplate_test.go` (the posture value and the packaged-vs-dev menu template — the successors
 to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose subjects moved to Go). There is
 no Wails analogue of the old `tests/e2e/hardening.spec.ts`, and none was written: with the table
@@ -742,9 +742,9 @@ repo's CI runs.
 
 ## Testing
 
-Four suites, under `tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite in
-`shell/` (`bun run test:go`). `tests/db/` is a shared fixture corpus, not a suite of its own (see
-below). `ipc/` is the odd one out among the four — it is two suites in one directory, a Go backend
+Four suites, under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite
+in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not
+a suite of its own (see below). `ipc/` is the odd one out among the four — it is two suites in one directory, a Go backend
 half and a Playwright frontend half per adapter, sharing one fixture module by design (P50, below).
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
@@ -764,42 +764,44 @@ genuinely complex or deeply-nested logic — parsers, cursor/pagination boundary
 eviction, crypto, concurrency state machines. Most CRUD-, wrapper- and constructor-shaped tests were
 deleted as low-value rather than ported. The **Go suite was pruned against the same bar** in the
 same pass. Two specs were deleted because their subject moved rather than disappeared:
-`security.spec.ts` and `menu.spec.ts` are now `shell/internal/shell/security_test.go` and
+`security.spec.ts` and `menu.spec.ts` are now `apps/kira-studio/internal/shell/security_test.go` and
 `menutemplate_test.go`. A shared runtime stub (`tests/unit/support/wailsRuntime.ts`) registers a fake
 `/wails/runtime.js` and is imported for its side effect by every spec that needs one, rather than
 each spec declaring its own — Bun's module registry is shared across every spec file in one test
 run, so whichever spec's stub loads first wins for the whole run.
 
-**`tests/db/` is a shared fixture corpus now, not a spec suite (P58f D1).** Every per-engine
-`tests/db/*.spec.ts` is gone — the last four (clickhouse, mariadb, mysql, sqlite) retired in P58f
-M10 alongside `src/engine/`, the same day the argument for keeping them (*"a still-passing
+**`packages/db-fixtures/` is a shared fixture corpus now, not a spec suite (P58f D1).** Every
+per-engine `packages/db-fixtures/*.spec.ts` is gone — the last four (clickhouse, mariadb, mysql, sqlite) retired
+in P58f M10 alongside `src/engine/`, the same day the argument for keeping them (*"a still-passing
 TypeScript spec is a live oracle to diff a Go port against"*) expired, since that oracle read
-`src/engine/adapters/` directly. What survives, because Go and `tests/e2e-real/` both still read it:
-`fixtures/*.sql` (read by `shell/internal/adapters/testsupport/{postgres,mariadb,mysql,sqlite,clickhouse}.go`
+`src/engine/adapters/` directly. What survives, because Go and `apps/kira-studio/tests/e2e-real/`
+both still read it: `fixtures/*.sql` (read by
+`apps/kira-studio/internal/adapters/testsupport/{postgres,mariadb,mysql,sqlite,clickhouse}.go`
 by absolute path) and five `support/*.ts` modules (`docker`, `postgres`, `mariadb`, `sqlite`,
-`kafka`) that `tests/e2e-real/support/*.ts` re-exports for container seeding. `tests/db/kafka.spec.ts`,
-the one file in this directory that could never run under Bun at all (the old TypeScript driver's
-compiled binding loaded under no Bun ABI), had already moved to `shell/internal/adapters/kafka/kafka_test.go`
-in P58e M9, ahead of the rest.
+`kafka`) that `apps/kira-studio/tests/e2e-real/support/*.ts` re-exports for container seeding.
+`packages/db-fixtures/kafka.spec.ts`, the one file in this directory that could never run under Bun at all (the
+old TypeScript driver's compiled binding loaded under no Bun ABI), had already moved to
+`apps/kira-studio/internal/adapters/kafka/kafka_test.go` in P58e M9, ahead of the rest.
 
 The fixture data itself is unchanged from what it always seeded: wide tables, `NULL`s, unicode,
 large text/blob, nested JSON, composite PKs, self-referencing and multi-hop FKs, ≥ 1 M rows in one
 table to exercise paging and counts. Per-engine scenario coverage — connect/disconnect, tree
 enumeration, describe, definition, first page, deep page, count, projection, sort, filter,
 cancel-mid-query (asserted **server-side**), cache hit/miss behaviour, add/delete row, command
-preview correctness — now lives in `shell/internal/adapters/*/*_test.go`, one Go test file per
-engine, run by `bun run test:go`. Local-only for now — no CI wiring in v1.
+preview correctness — now lives in `apps/kira-studio/internal/adapters/*/*_test.go`, one Go test
+file per engine, run by `bun run test:go`. Local-only for now — no CI wiring in v1.
 
 **`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real wire
 boundary — the control plane and the bulk-data plane (see Process model, above) — and **its backend
 half moved to Go in P58f M10 (D13)**, since the wire boundary it exercises is now Go-to-Go, not
-Go-to-Node. Per adapter, `tests/ipc/<adapter>/` holds two files now: `<adapter>.frontend.spec.ts`
-drives the real Vue UI with both planes mocked, via `bun run test:ipc:fe`, which needs no Docker, no
-container and no native driver; and `<adapter>.fixture.ts` is the file it imports, generated —
-**never hand-written** — by `shell/internal/ipcfixture`'s per-adapter Go test
-(`clickhouse_test.go`, `kafka_test.go`, `mariadb_test.go`, `mysql_test.go`, `redis_test.go`,
-`sqs_test.go`; postgres and sqlite are covered elsewhere and generate no fixture of their own).
-`KIRA_IPC_FIXTURES=write go test ./internal/ipcfixture/...` drives the real `adapterhost`/`adapters`
+Go-to-Node. Per adapter, `apps/kira-studio/tests/ipc/<adapter>/` holds two files now:
+`<adapter>.frontend.spec.ts` drives the real Vue UI with both planes mocked, via `bun run
+test:ipc:fe`, which needs no Docker, no container and no native driver; and `<adapter>.fixture.ts`
+is the file it imports, generated — **never hand-written** — by
+`apps/kira-studio/internal/ipcfixture`'s per-adapter Go test (`clickhouse_test.go`, `kafka_test.go`,
+`mariadb_test.go`, `mysql_test.go`, `redis_test.go`, `sqs_test.go`; postgres and sqlite are covered
+elsewhere and generate no fixture of their own).
+`KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...` drives the real `adapterhost`/`adapters`
 stack against a real container, captures its real responses, and writes the `.ts` module
 (`write.go`'s `mustMarshalNoEscape` — Go's `encoding/json` escapes HTML and sorts map keys by
 default, so the generator uses `SetEscapeHTML(false)` and typed structs, never maps); every
@@ -819,16 +821,17 @@ consumers on that side and no Go equivalent needed.
 **`tests/e2e/` is gone** — the whole `_electron.launch()` tier, 23 spec files, was retired with the
 Electron shell rather than ported wholesale. Every pure-UI spec has a verified `tests/ui/` port;
 every full-stack-only spec has a named disposition, recorded here because two of them are losses:
-`sqlite.spec.ts`'s and the postgres wiring value was recovered by the new `tests/e2e-real/` tier;
-`s3.spec.ts`'s file-write contract (the engine writes the file itself, bytes never transit the shell
-or the renderer) was recovered by a `tests/db/` case; **`mongo.spec.ts`'s full-stack anchor value was
+`sqlite.spec.ts`'s and the postgres wiring value was recovered by the new
+`apps/kira-studio/tests/e2e-real/` tier; `s3.spec.ts`'s file-write contract (the engine writes the
+file itself, bytes never transit the shell or the renderer) was recovered by a `packages/db-fixtures/`
+case; **`mongo.spec.ts`'s full-stack anchor value was
 not recovered**, and that is an accepted, documented loss. `hardening.spec.ts` and `startup.spec.ts`
 were deleted outright with no analogue: there is no `webPreferences`, fuse or Chromium-permission
 concept left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
 **`tests/ui/`** (`bun run test:ui`) is its replacement for everything that ported: 36 tests across 18
-spec files driving the **real built `shell/frontend/dist` bundle** — real Vue, real
+spec files driving the **real built `apps/kira-studio/frontend/dist` bundle** — real Vue, real
 `bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, which is what a
 packaged build actually embeds (WKWebView on macOS, WebKitGTK on Linux). There is no native app
 process and no container: **both wire planes are mocked**, the control plane by

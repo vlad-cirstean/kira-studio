@@ -25,15 +25,15 @@ jobs:
           bun-version: latest
       - uses: actions/setup-go@v5
         with:
-          go-version-file: shell/go.mod
+          go-version-file: go.mod
       - run: bun install --frozen-lockfile
       - name: Generate Wails bindings (P57 D8/D13 — src/renderer/bridge/*.ts import them directly)
         run: |
           set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
+          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' go.mod | awk '{print $2}')"
           go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
           export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd shell && wails3 generate bindings -b -i -ts -names)
+          (cd apps/kira-studio && wails3 generate bindings -b -i -ts -names)
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run build
@@ -52,17 +52,17 @@ jobs:
           bun-version: latest
       - uses: actions/setup-go@v5
         with:
-          go-version-file: shell/go.mod
+          go-version-file: go.mod
       - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — AGENTS.md)
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
       - run: bun install --frozen-lockfile
       - name: Generate Wails bindings
         run: |
           set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
+          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' go.mod | awk '{print $2}')"
           go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
           export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd shell && wails3 generate bindings -b -i -ts -names)
+          (cd apps/kira-studio && wails3 generate bindings -b -i -ts -names)
       - name: Install WebKit and its system libraries (AGENTS.md)
         run: |
           bunx playwright install webkit
@@ -86,7 +86,7 @@ jobs:
           bun-version: latest
       - uses: actions/setup-go@v5
         with:
-          go-version-file: shell/go.mod
+          go-version-file: go.mod
       - run: bun install --frozen-lockfile
       - run: bun run test:unit
       - name: Go adapter tests against real Testcontainers (Docker is available on this runner)
@@ -104,13 +104,13 @@ jobs:
           bun-version: latest
       - uses: actions/setup-go@v5
         with:
-          go-version-file: shell/go.mod
+          go-version-file: go.mod
       - run: bun install --frozen-lockfile
       - run: bun run package
       - name: Assert packaged bundle (docs/PACKAGING.md §4) — no runtime/ tree as of P58f M10
         run: |
           set -eu
-          APP="shell/bin/Kira Studio.app"
+          APP="apps/kira-studio/bin/Kira Studio.app"
           test -d "$APP"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
             = 'com.kirathecat.kira-studio'

@@ -99,7 +99,7 @@ A couple of things worth knowing up front:
 
 - macOS 13 or later, Apple Silicon (`arm64`).
 - [Go](https://go.dev) 1.25+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`, pinned version
-  read from `shell/go.mod` by `scripts/wails-dev-setup.sh`) — the app is a native Go binary; every
+  read from `go.mod` by `scripts/wails-dev-setup.sh`) — the app is a native Go binary; every
   database adapter runs in-process in Go, no sidecar runtime.
 - [Bun](https://bun.sh) — the package manager, script runner and test runner for the Vue frontend
   and its test suites. Bun is tooling only; nothing ships an embedded Node runtime.
@@ -118,14 +118,14 @@ bun install
 bun run package
 ```
 
-The built, signed (ad-hoc) app lands at `shell/bin/Kira Studio.app` — nothing is written to
-`dist/`.
+The built, signed (ad-hoc) app lands at `apps/kira-studio/bin/Kira Studio.app` — nothing is
+written to `dist/`.
 
 Since the build is unsigned (ad-hoc), the first launch needs a Gatekeeper workaround:
 right-click → Open, or:
 
 ```sh
-xattr -dr com.apple.quarantine "shell/bin/Kira Studio.app"
+xattr -dr com.apple.quarantine "apps/kira-studio/bin/Kira Studio.app"
 ```
 
 See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the Wails bundle layout and the full
@@ -140,19 +140,19 @@ bun run dev        # builds the frontend, then `wails3 task dev` — native wind
 
 | Script | What it does |
 |---|---|
-| `bun run dev` | `bun run build`, then `cd shell && wails3 task dev` (`predev` runs `scripts/wails-dev-setup.sh` first — checks the pinned `wails3` version and generated bindings) |
-| `bun run build` | Production Vue build into `shell/frontend/dist` |
+| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `scripts/wails-dev-setup.sh` first — checks the pinned `wails3` version and generated bindings; the Wails task itself drives the frontend build via `common:build:frontend`) |
+| `bun run build` | Production Vue build into `apps/kira-studio/frontend/dist` |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
 | `bun run typecheck` | Runs the three splits below |
-| `bun run typecheck:node` | `src/shared` plus every `tests/` tier and `playwright.config.ts` (native TypeScript, `tsgo`) |
-| `bun run typecheck:web` | `src/renderer`, including `.vue` files, plus `src/shared` (`vue-tsc`) |
-| `bun run typecheck:unit` | `tests/unit` (`tsgo`) |
+| `bun run typecheck:tests` | `packages/shared` plus every `apps/kira-studio/tests/` tier and `playwright.config.ts` (native TypeScript, `tsgo`) |
+| `bun run typecheck:web` | `apps/kira-studio/frontend/src`, including `.vue` files, plus `packages/shared` (`vue-tsc`) |
+| `bun run typecheck:unit` | `apps/kira-studio/tests/unit` (`tsgo`) |
 | `bun run test:unit` | Unit suite — no external resource, finishes in about a second |
 | `bun run test:ui` | Builds, then runs Playwright (WebKit) against the built bundle with both wire planes mocked |
 | `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
-| `bun run test:go` | The Go test suite (`cd shell && go test ./...`) |
-| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `shell/bin/Kira Studio.app` |
+| `bun run test:go` | The Go test suite (`go test ./...`) |
+| `bun run package` | Builds the native Wails bundle and ad-hoc signs it — `apps/kira-studio/bin/Kira Studio.app` |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
 **App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
@@ -165,9 +165,9 @@ six seconds. Bypass it for a work-in-progress commit with `git commit --no-verif
 
 ## Tests
 
-Four TypeScript suites under `tests/` (`unit/`, `ui/`, `ipc/`, `e2e-real/`), plus the Go suite
-under `shell/`. `tests/db/` is a shared fixture corpus (fixtures + support code), not a spec suite
-of its own — no `xvfb` is needed for any tier.
+Four TypeScript suites under `apps/kira-studio/tests/` (`unit/`, `ui/`, `ipc/`, `e2e-real/`), plus
+the Go suite under `apps/kira-studio/`. `packages/db-fixtures/` is a shared fixture corpus
+(fixtures + support code), not a spec suite of its own — no `xvfb` is needed for any tier.
 
 - **`bun run test:unit`** — plain TypeScript modules exercised with fakes rather than a real
   container or a real window process. No external resource needed; finishes in about a second.
@@ -177,13 +177,13 @@ of its own — no `xvfb` is needed for any tier.
   (control and data) mocked. Builds first.
 - **`bun run test:ipc:fe`** — the frontend half of the per-adapter IPC-boundary suite (see
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): real rendered UI, mocked IPC.
-  The backend half is Go (`shell/internal/ipcfixture`), run via `bun run test:go` with
+  The backend half is Go (`apps/kira-studio/internal/ipcfixture`), run via `bun run test:go` with
   `KIRA_IPC_FIXTURES=write` to regenerate the fixture modules both halves read.
-- **`tests/e2e-real/`** — two specs against a real `-tags server` Go binary, deliberately launched
-  through plain Node rather than `bunx` (`node node_modules/.bin/playwright test
-  --project=e2e-real`) rather than through a `package.json` script — see `AGENTS.md`'s Docker
+- **`apps/kira-studio/tests/e2e-real/`** — two specs against a real `-tags server` Go binary,
+  deliberately launched through plain Node rather than `bunx` (`node node_modules/.bin/playwright
+  test --project=e2e-real`) rather than through a `package.json` script — see `AGENTS.md`'s Docker
   section for why.
-- **`bun run test:go`** — the Go test suite (`cd shell && go test ./...`), including the
+- **`bun run test:go`** — the Go test suite (`go test ./...`), including the
   Testcontainers-backed cases against real engines; container-backed cases self-skip without
   Docker. With Colima, start it first: `colima start --cpu 4 --memory 6 --disk 40`.
 - **Local fixture databases for manual testing** — see
@@ -203,24 +203,24 @@ diagram.
 Two facts worth knowing before reading further:
 - **Every driver runs in-process in Go**, behind one adapter interface — the frontend never
   touches a wire protocol directly.
-- **Adapters are capability-driven** (`src/shared/caps.ts`, mirrored by each Go adapter's own
-  `caps.go`): adding an engine is one new package under `shell/internal/adapters/`, not a change
-  to the UI.
+- **Adapters are capability-driven** (`packages/shared/caps.ts`, mirrored by each Go adapter's own
+  `caps.go`): adding an engine is one new package under `apps/kira-studio/internal/adapters/`, not
+  a change to the UI.
 
-Top-level layout:
+Top-level layout — `apps/` holds this and any future Wails app; `packages/` holds source shared
+across apps:
 
 ```
-shell/internal  the Go app: adapters, storage, IPC bridge, tree service, connection state, ops
-shell/frontend  generated Wails bindings + the built frontend bundle (both gitignored)
-src/renderer    the Vue 3 app
-src/shared      wire protocol + domain types the Go side mirrors as its own source of truth
-tests/unit      unit suite — no external resource
-tests/ui        Playwright against the built bundle, WebKit, both wire planes mocked
-tests/ipc       per-adapter IPC-boundary suite — real Go backend + mocked-IPC frontend
-tests/e2e-real  Playwright against a real `-tags server` Go binary
-tests/db        shared fixture corpus (fixtures/support code, not a spec suite of its own)
-docs            architecture, performance, packaging, design system; docs/v1.1 is the live record
-scripts/demo-dbs   local fixture databases for manual testing
+apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops
+apps/kira-studio/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
+apps/kira-studio/tests/unit      unit suite — no external resource
+apps/kira-studio/tests/ui        Playwright against the built bundle, WebKit, both wire planes mocked
+apps/kira-studio/tests/ipc       per-adapter IPC-boundary suite — real Go backend + mocked-IPC frontend
+apps/kira-studio/tests/e2e-real  Playwright against a real `-tags server` Go binary
+packages/shared      wire protocol + domain types the Go side mirrors as its own source of truth
+packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
+docs                 architecture, performance, packaging, design system; docs/v1.1 is the live record
+scripts/demo-dbs     local fixture databases for manual testing
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and

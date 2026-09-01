@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 // P16 design system LAW 12: work-in-progress is a ring and an elapsed time in the toolbar that
-// started it, never a bar across the top of the view. See src/renderer/state/runState.ts for
+// started it, never a bar across the top of the view. See apps/kira-studio/frontend/src/state/runState.ts for
 // the one shared ticker this reads its `elapsedMs` from.
 const props = defineProps<{
   status: 'idle' | 'running' | 'error';

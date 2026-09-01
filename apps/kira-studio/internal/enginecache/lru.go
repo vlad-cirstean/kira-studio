@@ -1,5 +1,5 @@
 // Package enginecache is the Go analogue of src/engine/cache/: L2 (result pages) and L3 (row
-// counts) only — L1 (metadata) lives in shell/internal/storage's SQLite repos so the tree renders
+// counts) only — L1 (metadata) lives in apps/kira-studio/internal/storage's SQLite repos so the tree renders
 // while disconnected, the same reason P1 D10 kept it out of the TypeScript engine.
 //
 // Unlike cache/{pages,counts}.ts's process-global singletons, Cache is a value constructed once by

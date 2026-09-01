@@ -12,7 +12,7 @@ const KEYCHAIN_AVAILABLE: SecretStorageStatus = {
 };
 
 /**
- * The five-call `Promise.all` `src/renderer/main.ts`'s `bootstrap()` fires before `mount()` —
+ * The five-call `Promise.all` `apps/kira-studio/frontend/src/main.ts`'s `bootstrap()` fires before `mount()` —
  * `layoutGetAll`/`settingsGetAll`/`connectionsList`+`connectionsStates`+`connectionsSecretsStatus`
  * (`hydrateConnections`)/`opsRecent`/`tabsList` — answered with an empty, healthy app: defaults,
  * no connections, no ops, no tabs. This is what a fresh `KIRA_HOME` gave every `tests/e2e/` spec

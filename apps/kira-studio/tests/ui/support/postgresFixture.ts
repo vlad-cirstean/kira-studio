@@ -5,7 +5,7 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 
-// Real captures against a real Postgres container, seeded with tests/db/fixtures/0001_seed.sql —
+// Real captures against a real Postgres container, seeded with packages/db-fixtures/fixtures/0001_seed.sql —
 // via scripts/capture-postgres-tree.ts, not hand-written (P50 D5's discipline: a hand-written tree
 // node once used the wrong `path` shape and was silently rendered rather than rejected). Shared
 // across the remaining tests/e2e/*.spec.ts ports that all open the same connect -> expand ->
@@ -401,8 +401,8 @@ export const COMPOSITE_PK_META = {
 };
 
 /** Real captures of `app.composite_pk`'s starting 3-row state — (1,1)/(1,2)/(2,1), a genuine
- *  2-column PK and no inbound FK (tests/db's own reason for choosing this table too, per
- *  tests/db/postgres.spec.ts). Callers add their own connect/tree/read/count/mutate snapshots on
+ *  2-column PK and no inbound FK (packages/db-fixtures's own reason for choosing this table too, per
+ *  packages/db-fixtures/postgres.spec.ts). Callers add their own connect/tree/read/count/mutate snapshots on
  *  top for whatever sequence their own scenario needs — unlike order_items, mutations.spec.ts and
  *  interaction.spec.ts each drive a different, stateful mutation sequence against it, so there is
  *  no one fixed "the" fixture the way orderItemsFixture() is. */
@@ -635,7 +635,7 @@ export function postgresConnectionSummary(
 export const BIG_ROWS_PATH = `${APP_PATH}/table:big_rows`;
 export const NULLS_PATH = `${APP_PATH}/table:nulls_and_unicode`;
 
-/** Real captured describe() for app.big_rows (1,000,000 rows, id/hash) — tests/db/fixtures/0001_seed.sql. */
+/** Real captured describe() for app.big_rows (1,000,000 rows, id/hash) — packages/db-fixtures/fixtures/0001_seed.sql. */
 export const BIG_ROWS_META = {
   path: 'database:kira_test/schema:app/table:big_rows',
   kind: 'table',
@@ -1023,7 +1023,7 @@ export function nullsAndUnicodeFixture(connectionId: string): {
 }
 
 // `app.big_rows`' content is fully deterministic (`id`, `hash=md5(id::text)` —
-// tests/db/support/postgres.ts's own seed) — generated here rather than inlined as a 10 000-row
+// packages/db-fixtures/support/postgres.ts's own seed) — generated here rather than inlined as a 10 000-row
 // literal array, the same reasoning tests/ui/data-view.spec.ts's own `bigRowsRows` helper already
 // documents (verified byte-for-byte against a real capture's first/last rows there). Exported
 // (unlike that file-local copy) because tests/ui/budgets.spec.ts and tests/ui/perf.spec.ts both

@@ -30,15 +30,15 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // Fixture provenance (P50 D5 discipline — never hand-write a captured response):
 //   - MariaDB: tests/ui/support/mariadbFixture.ts, real captures via
 //     `scripts/capture-tree.ts mariadb` against a real MariaDB container seeded with
-//     tests/db/fixtures/0002_mariadb_seed.sql.
+//     packages/db-fixtures/fixtures/0002_mariadb_seed.sql.
 //   - MongoDB: tests/ui/support/mongoFixture.ts, real captures via
 //     `scripts/capture-tree.ts mongo` against a real Mongo 7 container seeded with
-//     tests/db/fixtures/0003_mongo_seed.ts.
+//     packages/db-fixtures/fixtures/0003_mongo_seed.ts.
 //   - Redis: tests/ui/support/redisFixture.ts, a real captured `connect()` response only — see
 //     that file's own header comment for why nothing else is needed (every Redis scenario here
 //     exercises pure client-side completion/lint vocabulary, never a data-plane round trip).
 // scripts/capture-tree.ts generalizes the Postgres-only scripts/capture-postgres-tree.ts to any
-// tests/db/support/<adapter>.ts fixture — see its own header comment.
+// packages/db-fixtures/support/<adapter>.ts fixture — see its own header comment.
 //
 // A genuine environment finding surfaced capturing these: AGENTS.md's Docker section confirms
 // Postgres's own `forListeningPorts()` wait strategy hangs indefinitely under `bun run`'s

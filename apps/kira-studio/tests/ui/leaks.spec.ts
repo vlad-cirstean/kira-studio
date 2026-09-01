@@ -18,7 +18,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // perf.spec.ts's header comment documents for its own single dropped check:
 //
 // PORTS AS-IS (scenarios 1-3, minus one persistence tail): `window.__kiraRetainedBytes` and
-// `window.__kiraTreeConnectionIds` (main.ts:21-58) are genuinely pure `src/renderer` globals — the
+// `window.__kiraTreeConnectionIds` (main.ts:21-58) are genuinely pure `apps/kira-studio/frontend/src` globals — the
 // sum of five page stores' own byte bookkeeping, and the tree store's own known-connection-id set —
 // with zero involvement from whatever answers the data-plane stream. Opening/closing tabs, deleting
 // a connection, and observing the tree purge its dead connection's state are all real renderer work
@@ -39,7 +39,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 //     `WILDCARD_DEFAULTS` (an unconditional `null` echo, P57 finding) — a real regression in that
 //     save path (the original D7 bug this scenario existed to catch) would be invisible to a mock
 //     that never actually persists or constrains anything. The regression itself is Go-side
-//     (`shell/internal/storage/repos/tabs.go`) and would be better guarded there directly if it
+//     (`apps/kira-studio/internal/storage/repos/tabs.go`) and would be better guarded there directly if it
 //     isn't already (`tabs_test.go` currently covers null-connection-id and bad-row handling, but
 //     not specifically a stale-connection_id save after a sibling connection's deletion — a real,
 //     named gap worth a follow-up Go test, not something this port can paper over).
@@ -48,7 +48,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 //     `data.cacheStats()` (`bridge/data.ts`), which are real `DATA_OP` requests over the data-plane
 //     stream. The actual subject under test — `src/engine/cache/counts.ts`'s L3 `ByteLru` eviction
 //     bound, and `src/engine/cache/pages.ts`'s L2 hit/miss counters and their reset on
-//     `clearPages()` — lives inside the real `engine` child process, not in `src/renderer`. This
+//     `clearPages()` — lives inside the real `engine` child process, not in `apps/kira-studio/frontend/src`. This
 //     tier runs no such process at all; a mock answering `DATA_OP.count`/`DATA_OP.cacheStats` could
 //     only echo a hand-picked number, which would make "the bound holds" or "the rate resets" true
 //     by fixture construction rather than by the real eviction algorithm actually doing anything —

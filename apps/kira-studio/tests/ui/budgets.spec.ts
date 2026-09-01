@@ -55,7 +55,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 //     mocked equivalent is a `connectionsCreate` control snapshot answered without ever opening the
 //     New Connection dialog, matching the original's own economy.
 //   - `app.scroll_grid` (P29 D14's synthetic 60-col x 5000-row table, seeded ad hoc by
-//     `tests/e2e/support/pg.ts`'s `seedScrollFixture`, never part of `tests/db/fixtures/0001_seed.sql`)
+//     `tests/e2e/support/pg.ts`'s `seedScrollFixture`, never part of `packages/db-fixtures/fixtures/0001_seed.sql`)
 //     has no real capture anywhere in `tests/ui/` yet — `scripts/capture-postgres-tree.ts` gained a
 //     new `seedScrollGrid` step kind this session (seeds the identical table against the capture
 //     tool's own container) so this port could still capture real shapes rather than inventing
@@ -159,7 +159,7 @@ function scrollGridMeta() {
 // Real capture (scripts/capture-postgres-tree.ts, `children` step against database:kira_test/
 // schema:app, run against a container the new `seedScrollGrid` step had already seeded) — identical
 // to postgresFixture.ts's own APP_CHILDREN with one extra real entry (`scroll_grid` did not exist
-// when that capture ran, since it is never part of tests/db/fixtures/0001_seed.sql).
+// when that capture ran, since it is never part of packages/db-fixtures/fixtures/0001_seed.sql).
 const APP_CHILDREN_WITH_SCROLL_GRID = [
   {
     kind: 'table',

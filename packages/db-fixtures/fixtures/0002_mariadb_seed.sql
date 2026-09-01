@@ -1,4 +1,4 @@
--- §9.1 dataset for tests/db/mariadb.spec.ts, deliberately kept in parity with 0001_seed.sql so
+-- §9.1 dataset for packages/db-fixtures/mariadb.spec.ts, deliberately kept in parity with 0001_seed.sql so
 -- the two spec files can assert the same things. Run against `kira_test`, which MARIADB_DATABASE
 -- already created — no CREATE DATABASE / DROP SCHEMA dance needed (MariaDB has no schema level;
 -- kira_analytics, the second database, is created by support/mariadb.ts instead).

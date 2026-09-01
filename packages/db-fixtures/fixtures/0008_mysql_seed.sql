@@ -1,4 +1,4 @@
--- §9.1 dataset for tests/db/mysql.spec.ts — a port of 0002_mariadb_seed.sql (P34 D27), not a
+-- §9.1 dataset for packages/db-fixtures/mysql.spec.ts — a port of 0002_mariadb_seed.sql (P34 D27), not a
 -- copy: every table, column, row and comment below is byte-for-byte parallel to that file except
 -- the three constructs MySQL doesn't have (F13), each called out where it differs:
 --   UUID columns               -> CHAR(36) (wide_table stays at 59 columns either way)

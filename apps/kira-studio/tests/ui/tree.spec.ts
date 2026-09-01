@@ -31,7 +31,7 @@ import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from '.
 //     already use.
 //   - `window.kira.opsRecent({limit:1000})` (op-log-based call counting) becomes
 //     `control.log()` — mockRuntime.ts's own real record of every Call this tier actually
-//     answered, filtered down to the same set of channels shell/internal/storage/model/ops.go's
+//     answered, filtered down to the same set of channels apps/kira-studio/internal/storage/model/ops.go's
 //     own `opKinds` table logs as an "op" (`connect`/`disconnect`/`children`/`describe`/
 //     `definition`/`test`, plus the data-plane read/count/mutate/execute/transfer this spec never
 //     issues) — see `opsCount()` below. This is a more precise substitute than the original, not
@@ -42,7 +42,7 @@ import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from '.
 //     to prove the adapter itself returns no children for a table path — is dropped outright: it
 //     has no live wire to query in this tier, the UI itself never issues this call either (a table
 //     row renders with no twisty, already asserted separately just below), and the adapter-level
-//     fact is already covered directly at tests/db/postgres.spec.ts, which asserts wide_table's
+//     fact is already covered directly at packages/db-fixtures/postgres.spec.ts, which asserts wide_table's
 //     hasChildren:false.
 //
 // Two scenarios do not port at full fidelity:
@@ -141,7 +141,7 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-// The exact channel set shell/internal/storage/model/ops.go's own `opKinds` table logs as an "op"
+// The exact channel set apps/kira-studio/internal/storage/model/ops.go's own `opKinds` table logs as an "op"
 // (connectionsTest/data-plane read/count/mutate/execute/transfer included for completeness, even
 // though this spec never issues them) — the real substitute for the original's
 // `window.kira.opsRecent()`, not an approximation of it.
@@ -717,7 +717,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await cancelFilters();
 
   // --- unticking one schema hides exactly it, and costs no *engine* op (a FiltersService.Replace
-  // call is not one — confirmed by reading shell/internal/storage/model/ops.go directly, and
+  // call is not one — confirmed by reading apps/kira-studio/internal/storage/model/ops.go directly, and
   // opsCount() mirrors that table exactly) (D10/D23) — the "survives a relaunch" half of the
   // original (D11) is dropped per the header comment. -----------------------------------------
   const opsBeforeFilter = opsCount(control.log());

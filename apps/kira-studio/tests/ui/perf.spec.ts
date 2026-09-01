@@ -21,7 +21,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // Three of this file's four checks port as-is, for the same reason every timing assertion in
 // budgets.spec.ts did: the rAF scroll-frame-time tripwire and the DOM-cell-count bound both time
 // pure renderer re-render work over an already-fetched page, and the retained-bytes open/close
-// symmetry check reads `window.__kiraGridRetainedBytes` — a pure `src/renderer` global
+// symmetry check reads `window.__kiraGridRetainedBytes` — a pure `apps/kira-studio/frontend/src` global
 // (`main.ts:21-58`, confirmed by reading it) computed from the grid page store's own byte
 // bookkeeping, with zero involvement from whatever answers the data-plane stream. Opening the same
 // `big_rows` path in ten new tabs is ten identical `data:read` requests under a mock, which
@@ -35,7 +35,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // `__kiraGridRetainedBytes` is, but it isn't: it's a thin wrapper over `data.cacheStats()`
 // (`bridge/data.ts`), which issues a real `DATA_OP.cacheStats` request over the data-plane stream —
 // the L2 byte-budget cache it reports on (`src/engine/cache/pages.ts`'s `ByteLru`) lives inside the
-// real `engine` child process, not in `src/renderer` at all. Under this tier there is no such
+// real `engine` child process, not in `apps/kira-studio/frontend/src` at all. Under this tier there is no such
 // process; a mock can only echo back a hand-picked `{bytes, budgetBytes}` pair, which would make
 // "usage <= budget" true by fixture construction rather than by the real eviction algorithm
 // actually bounding anything — the same category of vacuous pass this repo's own low-value-test

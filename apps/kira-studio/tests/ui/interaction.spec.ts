@@ -107,7 +107,7 @@ const FIXTURE = compositePkConnectAndOpen(CONNECTION_ID);
 const ORDER_ITEMS_FIXTURE = orderItemsFixture(CONNECTION_ID);
 
 // Real captures (scripts/capture-postgres-tree.ts) of the regions -> customers -> orders ->
-// order_items <- products FK graph's own describe() output — see tests/db/fixtures/0001_seed.sql's
+// order_items <- products FK graph's own describe() output — see packages/db-fixtures/fixtures/0001_seed.sql's
 // own comment for why this shape exists. Transcribed verbatim from the capture tool's output, not
 // hand-written (P50 D5's discipline).
 const ORDERS_META: ObjectMeta = {

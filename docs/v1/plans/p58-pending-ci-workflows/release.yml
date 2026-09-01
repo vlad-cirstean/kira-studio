@@ -24,7 +24,7 @@ jobs:
           bun-version: latest
       - uses: actions/setup-go@v5
         with:
-          go-version-file: shell/go.mod
+          go-version-file: go.mod
       - run: bun install --frozen-lockfile
 
       - name: Set package.json version from the release tag
@@ -42,10 +42,10 @@ jobs:
       - name: Generate Wails bindings (P57 D8/D13)
         run: |
           set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' shell/go.mod | awk '{print $2}')"
+          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' go.mod | awk '{print $2}')"
           go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
           export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd shell && wails3 generate bindings -b -i -ts -names)
+          (cd apps/kira-studio && wails3 generate bindings -b -i -ts -names)
 
       - run: bun run lint
       - run: bun run typecheck
@@ -53,7 +53,7 @@ jobs:
       - run: bun run package
 
       - name: Zip the signed app bundle for distribution
-        run: ditto -c -k --keepParent "shell/bin/Kira Studio.app" "kira-studio-macos-arm64.zip"
+        run: ditto -c -k --keepParent "apps/kira-studio/bin/Kira Studio.app" "kira-studio-macos-arm64.zip"
 
       - name: Verify packaging
         run: bun run verify:packaging

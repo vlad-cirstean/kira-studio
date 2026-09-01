@@ -1,10 +1,10 @@
 // The legacy Electron/Node-engine-sidecar channel-name namespace this test tier still mocks
 // against (P50 D5/D15's own fixture-key convention, kept for continuity with tests/ipc/'s
-// committed fixtures — see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under src/renderer imports
+// committed fixtures — see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under apps/kira-studio/frontend/src imports
 // this anymore: the real wire protocol today is the generated Wails bindings under
-// shell/frontend/bindings/. This is test-owned infrastructure now, not a live app protocol, which
-// is why it lives here rather than in src/shared/protocol (P2 R1: it used to live there as
-// src/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it still described
+// apps/kira-studio/frontend/bindings/. This is test-owned infrastructure now, not a live app protocol, which
+// is why it lives here rather than in packages/shared/protocol (P2 R1: it used to live there as
+// packages/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it still described
 // something real).
 export const IPC = {
   appInfo: 'kira:app:info',

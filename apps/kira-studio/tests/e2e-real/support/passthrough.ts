@@ -42,7 +42,7 @@ interface CallRequestBody {
 
 function runtimeErrorBody(code: string, message: string): string {
   // Mirrors tests/ui/support/mockRuntime.ts's own runtimeErrorBody byte-for-byte: the exact shape
-  // shell/internal/bridge/transport_http.go's httpError writes for a bound-call error, so
+  // apps/kira-studio/internal/bridge/transport_http.go's httpError writes for a bound-call error, so
   // bridge/control.ts's `unwrap` reads it the same way it would a real one — which, from this
   // route's perspective, it is (§8: server mode really does answer FilesService.* this way).
   return JSON.stringify({

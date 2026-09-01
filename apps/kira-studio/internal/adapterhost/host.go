@@ -1,5 +1,5 @@
 // Package adapterhost is the Go analogue of src/engine/{scheduler/ops.ts,control.ts,rpc.ts,data.ts}:
-// Router serves every connection kind in-process against shell/internal/adapters (the adapter
+// Router serves every connection kind in-process against apps/kira-studio/internal/adapters (the adapter
 // contract) — there is no more routing decision to make, since P58f deleted the Node engine child
 // this package used to forward non-native kinds to.
 package adapterhost

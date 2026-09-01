@@ -7,7 +7,7 @@ import type { ColumnDescriptor, PagePosition } from '@shared/protocol/page';
  */
 export interface ControlSnapshot<T = unknown> {
   /** A value from tests/ui/support/ipcChannels.ts's IPC map (P2 R1: relocated there from
-   *  shared/protocol/ipc.ts, which nothing under src/renderer had imported since the P57/P58
+   *  shared/protocol/ipc.ts, which nothing under apps/kira-studio/frontend/src had imported since the P57/P58
    *  Electron/Node-engine cutover — this tier's own fixture-key namespace, not a live app protocol). */
   channel: string;
   /** Exactly what the renderer sends — used by the frontend half to match a request to a

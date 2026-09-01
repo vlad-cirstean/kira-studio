@@ -9,7 +9,7 @@ import { IPC } from './support/ipcChannels';
 // real shell process and inspects its real PID on the filesystem. Only the first half ports —
 // the second has no equivalent in a tier with no real backend process to spawn or supervise
 // (same reasoning as workbench.spec.ts's dropped relaunch scenarios), and is covered instead by
-// shell/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of exactly the
+// apps/kira-studio/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of exactly the
 // exit-drops-the-connection and one-shot-exit-is-fine behaviors that half asserted).
 //
 // Two of the first half's own checks are also dropped: "saving persists it" and "the stored value

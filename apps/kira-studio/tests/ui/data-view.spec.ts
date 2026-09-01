@@ -18,7 +18,7 @@ import {
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/data-view.spec.ts (P57 D16), against a real captured app.big_rows
-// (1,000,000 rows, id/hash=md5(id) — tests/db/fixtures/0001_seed.sql) and app.nulls_and_unicode,
+// (1,000,000 rows, id/hash=md5(id) — packages/db-fixtures/fixtures/0001_seed.sql) and app.nulls_and_unicode,
 // via scripts/capture-postgres-tree.ts (extended this session with a cursor backreference —
 // "after:<i>"/"before:<i>", resolved against an earlier read step's own real nextToken/prevToken —
 // and a `cancelAfterMs` step that races a real `adapter:cancel` against an in-flight read to
@@ -94,7 +94,7 @@ const HISTORY_SMALL_IDS = {
 
 // Real captures against a real 1,000,000-row app.big_rows (id, hash=md5(id)) — id/1000/10000-row
 // pages (D/E below) are NOT inlined verbatim: their content is fully deterministic
-// (tests/db/support/postgres.ts's own seed, `md5(i::text)`), verified byte-for-byte against the
+// (packages/db-fixtures/support/postgres.ts's own seed, `md5(i::text)`), verified byte-for-byte against the
 // real capture's first/last row (id=1000 -> a9b7ba70783b617e9998dc4dd82eb3c5, id=10000 -> b7a782741f667201b54880c925faec4b,
 // id=999991 -> 0ef26b9d4469882962b1bd35ef7556f4, id=1000000 -> 8155bc545f84d9652f1012ef2bdfb6eb),
 // so recomputing them at test time avoids a multi-thousand-row literal array for content nothing
