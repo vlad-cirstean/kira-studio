@@ -308,6 +308,13 @@ onMounted(() => {
       // §5 item 5 — the sticky row-number gutter, as a real frozen pane rather than one
       // position:sticky box per mounted row (the per-frame cost P22-…-iter2-rendering.md F12 flagged).
       frozenColumn: 0,
+      // F3 addendum (real-Mac finding) — SlickGrid's own wheel handler quantizes every
+      // wheel/trackpad tick to `deltaY * rowHeight` in JS, discarding WebKit's native momentum
+      // physics; that's what read on macOS as the fluid trackpad scroll going away. The viewport's
+      // already-native `overflow:auto` plus the already-bound native `scroll` listener (F3) are
+      // sufficient on their own — frozen-pane sync and this host's own velocity/runway logic both
+      // already run off native scroll, never off this handler.
+      enableMouseWheelScrollHandler: false,
       // §7.1 — no keyboard/click-navigation beyond the static demonstration above; Pass B territory.
       enableCellNavigation: false,
       enableAddRow: false,
