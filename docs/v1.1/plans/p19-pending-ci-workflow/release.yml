@@ -39,13 +39,8 @@ jobs:
           test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
           echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
 
-      - name: Generate Wails bindings (P57 D8/D13)
-        run: |
-          set -eu
-          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' go.mod | awk '{print $2}')"
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          (cd apps/kira-studio && wails3 generate bindings -b -i -ts -names)
+      - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
+        run: sh scripts/setup.sh
 
       - run: bun run lint
       - run: bun run typecheck
