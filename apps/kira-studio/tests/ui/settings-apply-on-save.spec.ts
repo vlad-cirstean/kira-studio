@@ -126,6 +126,33 @@ test('Revert to Defaults stages every section; Save is what commits it', async (
   });
 });
 
+// P12 round 1 finding #9: patchSettings used to apply the patch to settingsState (and re-render
+// --kira-row-height) *before* awaiting control.settingsSet — a rejected Save left the change live
+// in this window with no broadcast to any other window or the database, correctly showing an
+// error and staying open, but silently divergent from the truth until relaunch.
+test('a rejected Save leaves the live value alone and shows the error', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      {
+        channel: IPC.settingsSet,
+        error: { code: 'E_QUERY', message: 'settings write failed' },
+      },
+    ],
+  });
+  await openSettings(page);
+
+  await densityButton(page, 'compact').click();
+  await page.click('[data-testid="settings-save"]');
+
+  await expect(dialog(page).locator('[data-testid="settings-save-error"]')).toContainText(
+    'settings write failed',
+  );
+  await expect(dialog(page)).toBeVisible(); // stays open on a rejection (P17 D7)
+  expect(settingsSetCalls(control)).toHaveLength(1);
+  // The whole point: no live change from an unconfirmed patch, in this window or any other.
+  expect(await rowHeightVar(page)).toBe('28px');
+});
+
 test('an out-of-range value blocks Save until corrected', async ({ relaunch }) => {
   const { window: page, control } = await relaunch();
   await openSettings(page);

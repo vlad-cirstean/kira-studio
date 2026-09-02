@@ -47,16 +47,16 @@ export async function hydrateSettings(): Promise<void> {
   unsubscribeChanged = control.onSettingsChanged(applySettings);
 }
 
+// P12 round 1 finding #9: this used to apply `patch` to settingsState (and call applyAppearance())
+// *before* awaiting control.settingsSet — a leftover from the pre-P17 apply-immediately dialog.
+// P17 moved to stage-until-Save, and SettingsDialog.vue's onSave is now the only caller, so
+// nothing needs a live preview any more; the pre-apply was left with no rollback path. If the
+// backend rejected the patch, the dialog correctly showed an error and stayed open, but the
+// change was already live in this window with no kira:settings:changed broadcast, so every other
+// window and the database kept the old value — divergent until relaunch. Apply only what the
+// backend actually confirms, once, on success; the round trip is local SQLite, so there is no
+// real latency cost to waiting for it.
 export async function patchSettings(patch: SettingsPatch): Promise<void> {
-  if (patch.appearance) Object.assign(settingsState.appearance, patch.appearance);
-  if (patch.data) Object.assign(settingsState.data, patch.data);
-  if (patch.cache) Object.assign(settingsState.cache, patch.cache);
-  if (patch.advanced) Object.assign(settingsState.advanced, patch.advanced);
-  applyAppearance();
   const updated = await control.settingsSet(patch);
-  Object.assign(settingsState.appearance, updated.appearance);
-  Object.assign(settingsState.data, updated.data);
-  Object.assign(settingsState.cache, updated.cache);
-  Object.assign(settingsState.advanced, updated.advanced);
-  applyAppearance();
+  applySettings(updated);
 }
