@@ -23,9 +23,9 @@ function goBinDir(): string {
   return `${execFileSync('go', ['env', 'GOPATH'], { encoding: 'utf8' }).trim()}/bin`;
 }
 
-// `scripts/wails-dev-setup.sh` installs `wails3` via `go install` and expects it on PATH
-// afterward (predev:wails's own shell-profile note) — set explicitly here so this fixture never
-// depends on the invoking shell having done that.
+// `scripts/setup.sh` installs `wails3` via `go install` and expects it on PATH afterward (its own
+// shell-profile note) — set explicitly here so this fixture never depends on the invoking shell
+// having done that.
 function envWithGoBin(): NodeJS.ProcessEnv {
   const extra = goBinDir();
   const path = process.env.PATH ?? '';
@@ -45,10 +45,10 @@ async function acquireBuildLock(): Promise<() => Promise<void>> {
   }
 }
 
-// Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/wails-dev-setup.sh`
-// (pinned wails3, generated bindings — no vendored Node runtime or bundled engine to check for
-// since P58f) plus `bun run build` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
-// all:frontend/dist` picks up), then the one step those scripts don't do — `go build -tags
+// Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/setup.sh` (pinned
+// wails3, generated bindings — no vendored Node runtime or bundled engine to check for since P58f)
+// plus `bun run build` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
+// all:frontend/dist` picks up), then the one step that script doesn't do — `go build -tags
 // server`. Memoized per worker process so a spec file with multiple tests builds once, not once
 // per test.
 let prerequisitesReady: Promise<void> | undefined;
@@ -58,7 +58,7 @@ function buildPrerequisites(): Promise<void> {
     const release = await acquireBuildLock();
     try {
       const env = envWithGoBin();
-      execFileSync('sh', ['scripts/wails-dev-setup.sh'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
+      execFileSync('sh', ['scripts/setup.sh'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       // `build:wails` (a separate `vite.wails.config.ts`) was folded into the main `vite build`
       // once P57 removed Electron — this repo's own `vite.config.ts` already outputs straight to
       // `apps/kira-studio/frontend/dist`, main.go's `//go:embed` target.

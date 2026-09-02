@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
-    "setup": "sh scripts/install-deps.sh && sh scripts/wails-dev-setup.sh",
+    "setup": "sh scripts/setup.sh",
     "predev": "bun run setup",
     "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "build": "cd apps/kira-studio/frontend && bun run build",
