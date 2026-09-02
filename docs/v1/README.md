@@ -12,7 +12,6 @@ is true **as of the phase that named it**, and may have moved or changed since. 
 is authoritative for the app as it stands today; where the tree, `ARCHITECTURE.md` and this folder
 disagree, the tree outranks both, and `ARCHITECTURE.md` is authoritative for behavior over `SPEC.md`.
 
-The one part of this folder still being added to is `SPEC.md` §10, the phasing table: every phase,
-v1 or post-v1, gets a row recording what changed and why, and that ledger keeps accruing rows as
-new phases land — it just does not otherwise change what earlier phases already said about
-themselves.
+`SPEC.md` §10's phasing table is closed at P58, the last v1 phase — it does not accrue rows for
+post-v1 work. Post-v1 phases get their own rows in `docs/v1.1/SPEC.md` instead, exactly as
+`docs/v1.1/README.md` describes; that is the live phasing ledger.
