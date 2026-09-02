@@ -323,7 +323,17 @@ onMounted(() => {
       // unbounded batch ran; forcing every large-delta scroll to call render() immediately, before
       // D2 existed, would have run that same unbounded batch on every such frame instead. Landed as
       // its own commit, after D2, specifically so it stays bisectable from the batch cap.
-      forceSyncScrolling: true,
+      //
+      // Real-hardware update: unconditional `true` (this commit's original value, `0865ef6`) coupled
+      // main-thread render work to *every* native scroll-event tick during a fling, which real-macOS
+      // testing found produces visible stutter (the motion itself hitching) — a less forgivable
+      // failure than the incumbent tanstack grid's own "content lags, motion stays smooth" gap
+      // symptom. Defaulted back to `false` (D2's batch cap alone) pending a real A/B on whether D3 is
+      // actually the cause; kept overridable from the console (see main.ts's own doc comment on
+      // `forceSyncScrollingOverride`) so both variants can be compared without a rebuild per variant.
+      // Read once here, at construction — this option is construction-time only, same as
+      // `frozenColumn`/`enableColumnReorder`/etc. above.
+      forceSyncScrolling: window.__kiraGridTuning?.forceSyncScrollingOverride ?? false,
       // §7.1 — no keyboard/click-navigation beyond the static demonstration above; Pass B territory.
       enableCellNavigation: false,
       enableAddRow: false,

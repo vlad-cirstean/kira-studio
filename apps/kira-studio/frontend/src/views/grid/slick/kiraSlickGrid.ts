@@ -25,6 +25,10 @@ declare global {
       incrementalRows?: boolean;
       /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER. */
       maxNewCellsPerRenderOverride?: number;
+      /** P22 iter2-scroll-gaps D3: read by SlickGridHost.vue at grid construction, not by this file
+       *  — declared here too only because this program's declaration merging requires an identical
+       *  shape to main.ts's own. See main.ts's own doc comment for what it does. */
+      forceSyncScrollingOverride?: boolean;
     };
   }
 }

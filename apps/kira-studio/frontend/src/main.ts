@@ -181,6 +181,15 @@ declare global {
       /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER — the SlickGrid
        *  engine's per-call new-cell batch cap, read fresh on every `getRenderedRange` call. */
       maxNewCellsPerRenderOverride?: number;
+      /** P22 iter2-scroll-gaps D3, real-hardware finding: `forceSyncScrolling: true` unconditionally
+       *  (SlickGridHost.vue, added `0865ef6`) coupled main-thread render work to every native
+       *  scroll-event tick during a fling, which read on real macOS hardware as visible stutter —
+       *  worse than the incumbent tanstack grid's own "content lags, motion stays smooth" gap
+       *  symptom. Default flipped to `false` (D2's batch cap alone) pending a real A/B on whether D3
+       *  is actually the cause; `true` restores the old unconditional-sync behaviour. Unlike the
+       *  runway overrides above (read fresh on every call), this is a SlickGrid construction-time
+       *  option — read once, at `new KiraSlickGrid(...)`, not live thereafter. */
+      forceSyncScrollingOverride?: boolean;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can

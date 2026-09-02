@@ -447,15 +447,24 @@ were found *during* an attempt to run that exact protocol):
    then `= 2200` (equal to `CELL_BUDGET` — no capping at all, today's pre-fix behaviour in effect), same
    flick each time. If the gap/drop tracks this dial — worse at 2200, better at 150 — that is the
    direct, decisive real-hardware confirmation of the mechanism.
-4. **Isolate `forceSyncScrolling` from the batch cap**: since `window.__kiraGridTuning` has no live
-   toggle for it (a grid-construction option, not read live), compare a build with it landed against one
-   without, batch cap held constant at a reasonable default, as a build-level A/B.
+4. **Isolate `forceSyncScrolling` from the batch cap**: `window.__kiraGridTuning.
+   forceSyncScrollingOverride` now toggles it live (`true`/`false`), so this no longer needs a
+   build-level A/B — compare both values against the same batch cap, same gesture.
 
 Report the three `summary` blocks (baseline, both-fixes, the `maxNewCellsPerRenderOverride` sweep),
 this section's own `pxPerFrame`/`scrollEvents` context so the fling being compared is the same shape
-each time, and one sentence per step on whether the gap/drop was perceptible. **This A/B has not yet
-been run on real hardware** — like §7.4(b)'s own still-open gate above, whoever runs it should update
-this section with the real numbers and verdict.
+each time, and one sentence per step on whether the gap/drop was perceptible.
+
+**Real-hardware update (first run): the D2+D3 build stutters, and is worse than the incumbent's own
+motion smoothness.** `forceSyncScrolling: true` (unconditional, `0865ef6`) couples main-thread render
+work to every native scroll-event tick during a fling — on real macOS hardware this produced visible
+stutter (the motion itself hitching), a less forgivable failure than the incumbent tanstack grid's own
+"content lags, motion stays smooth" gap symptom. `forceSyncScrolling` has been defaulted back to
+`false` (D2's batch cap alone) and made live-toggleable
+(`window.__kiraGridTuning.forceSyncScrollingOverride`), so step 4 above can be re-run from the console
+without a rebuild per variant. **Still open**: whether D2's batch cap alone (without D3) actually
+restores smooth motion, or the gap/drop symptom persists at `forceSyncScrolling: false` too — whoever
+runs the full A/B above should update this section with the real numbers and verdict.
 
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 

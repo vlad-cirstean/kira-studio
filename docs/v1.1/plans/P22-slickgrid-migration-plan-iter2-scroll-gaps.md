@@ -484,6 +484,13 @@ single large-delta frame instead of at most once per 10 ms). Ordered as its own 
 it is bisectable independent of D2, and because D3 alone, without D2, is a plausible regression the
 real-Mac protocol should be able to isolate if the ordering assumption above turns out wrong.
 
+**Real-hardware update:** that isolation is exactly what happened — real-macOS testing of the D2+D3
+build found visible stutter (motion itself hitching), worse than the incumbent grid's own "content lags,
+motion stays smooth" gap symptom. `forceSyncScrolling` has since been defaulted back to `false` and made
+a live, console-toggleable override (`window.__kiraGridTuning.forceSyncScrollingOverride`, read once at
+grid construction) rather than a hardcoded `true`, so `docs/PERF.md` §2.1c's step 4 no longer needs a
+build-level A/B to isolate D3 from D2. See that section for the finding and the still-open question.
+
 ### D4 — Sandbox-provable evidence that the batch is actually capped. **Implement.**
 
 `tests/ui/slick-grid.spec.ts` grows one more assertion, in the same style as its existing "sub-row
