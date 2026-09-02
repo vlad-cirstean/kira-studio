@@ -22,12 +22,17 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
   alignmentFor,
+  BASE_LEAD_PX,
+  BASE_TRAIL_PX,
+  CELL_BUDGET,
   columnHeaderTooltip,
   columnOffsets,
   columnRangeExtractor,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  LEAD_FRAMES,
+  MAX_LEAD_PX,
   MAX_OVERSCAN_COLUMNS,
   OVERSCAN_PX,
   observeScrollElementOffset,
@@ -35,6 +40,7 @@ import {
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
+  rowRangeExtractor,
 } from '../shared/page/columns';
 import { createMatchIndex } from '../shared/page/search';
 import { setSearchFiltering } from '../shared/page/searchFilter';
@@ -327,18 +333,73 @@ function syncScrollState(): void {
 
 // P47 D10: the app's own scroll-work perf mark moved into markScrollWork, called from each
 // virtualizer's onChange — this rAF now only feeds the 300ms scroll-position persistence watcher
-// below. A fling can fire many native `scroll` events within a single frame; coalescing
-// syncScrollState to one call per animation frame keeps that watcher in step with what actually
-// painted instead of firing on every event.
+// below. Deliberately still rAF-coalesced (P47 D10, predates and is independent of P22): unlike the
+// offset observer's own pass-1 deferral (reverted, columns.ts's own comment), this one only ever
+// collapses events that were already ≤ 1/frame (P22 iter2 F2), so it costs nothing to keep and
+// nothing to gain from removing.
 //
-// P22 iter2 D2: window.__kiraScrollTrace's own tap point — noteScrollEvent is called on every raw
-// native `scroll` event, before the rAF coalescing below, so D2's "native scroll events observed
-// since the previous rAF" count is real (views/grid/scrollTrace.ts's own header comment explains
-// why this lives here rather than inside columns.ts's shared offset observer).
+// P22 iter2 D2/D3: velocity/direction and the real-fling trace are both derived here, off the same
+// native `scroll` event, rather than by widening observeScrollElementOffset's own shared signature
+// (columns.ts) — that function is also used by the column axis and by ConsoleResultGrid.vue, and
+// the plan's own §4 declines making the column axis velocity-aware, so keeping this row-axis-only
+// concern local to DataGrid.vue avoids leaking it into either. Read synchronously, before the rAF
+// coalescing below, so D2's "native scroll events since the previous rAF" count is real.
+//
+// Plain variables, not refs: rowVelocity() below is read only from the row virtualizer's own
+// rangeExtractor closure — a plain function virtual-core calls imperatively, entirely outside
+// Vue's reactivity graph (nothing ever depends on this reactively) — so a ref here would pay Vue's
+// dependency-tracking overhead on every scroll event for zero benefit. Likewise no reset timer: a
+// scroll event this stale to matter is caught by the staleness check inside rowVelocity() itself,
+// at the point something actually asks for it, rather than a `setTimeout`/`clearTimeout` pair paid
+// on every single event regardless of whether the answer is ever read again.
+let lastRowOffset = 0;
+let lastRowOffsetT = 0;
+let prevRowOffset = 0;
+let prevRowOffsetT = 0;
+// D3(c)'s own cell-budget divisor, kept as a plain variable updated by a `watch` below (once
+// visibleColumnIndices exists) rather than read from `colVirtualizer.value.getVirtualItems()`
+// directly inside rowRangeExtractor's own closure — calling into virtual-core's memoised
+// getVirtualItems() from *inside* the row axis's own range computation forced it to recompute on
+// every row-axis scroll frame regardless of whether the column window had actually changed,
+// measurably (confirmed empirically against budgets.spec.ts's own scroll-response budget).
+let mountedColumnCount = 1;
+
+// A one-off programmatic jump (a scrollbar click, Page Down, or a test driving `el.scrollTop =
+// target` directly) can move the offset by far more in one native `scroll` event than any real
+// per-frame fling delta could — WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung (456 px/frame) is
+// already called out there as "no human produces this", so a raw delta well past it is a discrete
+// jump, not a fling in progress, and must not trigger the velocity-adaptive runway: that would
+// mount several times the baseline row count for a single frame that gains nothing from the extra
+// runway (it isn't followed by more frames in the same direction), and this is real render cost —
+// confirmed against budgets.spec.ts's own scroll-response budget, which does exactly this kind of
+// isolated jump. A genuine fling is many evenly-paced native events, well under this ceiling.
+const MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME = 800;
+
+/** 0/0 once nothing has moved in a while — mirrors the offset observer's own isScrollingResetDelay
+ *  (columns.ts), without a duplicate timer to produce the same decay — or when the last delta reads
+ *  as a discrete jump rather than a fling in progress (see the constant above). */
+function rowVelocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
+  const dt = lastRowOffsetT - prevRowOffsetT;
+  if (!prevRowOffsetT || dt <= 0 || performance.now() - lastRowOffsetT > 150) {
+    return { pxPerFrame: 0, direction: 0 };
+  }
+  const delta = lastRowOffset - prevRowOffset;
+  const pxPerFrame = Math.abs(delta);
+  if (pxPerFrame > MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME) return { pxPerFrame: 0, direction: 0 };
+  return { pxPerFrame, direction: delta > 0 ? 1 : delta < 0 ? -1 : 0 };
+}
+
 let scrollRaf = 0;
 function onScroll(): void {
   const el = containerRef.value;
-  if (el) scrollTrace.noteScrollEvent(el.scrollTop, performance.now());
+  if (el) {
+    const now = performance.now();
+    scrollTrace.noteScrollEvent(el.scrollTop, now);
+    prevRowOffset = lastRowOffset;
+    prevRowOffsetT = lastRowOffsetT;
+    lastRowOffset = el.scrollTop;
+    lastRowOffsetT = now;
+  }
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
@@ -382,24 +443,6 @@ onUnmounted(() => {
   onDragMouseUp();
 });
 
-// P24 D3: in *display-position* space (0..displayRowCount), not page-row space — the rows a
-// filter hides are never virtualized at all, which is what keeps the unfiltered path's arithmetic
-// untouched (displayRowCount === page.rowCount when there's no filter).
-// P47 D6: paddingStart reserves the sticky header's rowHeight band / the gutter's GUTTER_WIDTH
-// band, since the virtualizers read raw scrollTop/scrollLeft (.grid-sizer content space), where
-// row 0 starts one row down and column 0 starts at GUTTER_WIDTH.
-const rowVirtualizer = useVirtualizer(
-  computed(() => ({
-    count: displayRowCount.value, // display-position space (P29 D11), NOT page rows
-    getScrollElement: () => containerRef.value,
-    estimateSize: () => rowHeight.value,
-    overscan: Math.ceil(OVERSCAN_PX / rowHeight.value),
-    paddingStart: rowHeight.value,
-    observeElementRect: observeScrollElementRect,
-    observeElementOffset: observeScrollElementOffset,
-    onChange: markScrollWork,
-  })),
-);
 // P47 D5: overscan: 0 because the pixel budget is applied by columnRangeExtractor instead —
 // TanStack's own item-count overscan is the wrong unit for a 40-480px column (P29 D2).
 const colVirtualizer = useVirtualizer(
@@ -412,6 +455,47 @@ const colVirtualizer = useVirtualizer(
     paddingStart: GUTTER_WIDTH,
     rangeExtractor: (range: Range) =>
       columnRangeExtractor(range, offsets.value, OVERSCAN_PX, MAX_OVERSCAN_COLUMNS),
+    observeElementRect: observeScrollElementRect,
+    observeElementOffset: observeScrollElementOffset,
+    onChange: markScrollWork,
+  })),
+);
+
+// P24 D3: in *display-position* space (0..displayRowCount), not page-row space — the rows a
+// filter hides are never virtualized at all, which is what keeps the unfiltered path's arithmetic
+// untouched (displayRowCount === page.rowCount when there's no filter).
+// P47 D6: paddingStart reserves the sticky header's rowHeight band / the gutter's GUTTER_WIDTH
+// band, since the virtualizers read raw scrollTop/scrollLeft (.grid-sizer content space), where
+// row 0 starts one row down and column 0 starts at GUTTER_WIDTH.
+// P22 iter2 D3: `overscan` (virtual-core's own symmetric, direction-blind item-count expansion)
+// replaced by rowRangeExtractor's own velocity-adaptive, direction-biased pixel budget — see
+// columns.ts's own comment. `window.__kiraGridTuning` is read fresh on every call (no reactive
+// wrapper needed: this closure only ever runs when the virtualizer itself recomputes the range,
+// i.e. on the next scroll — exactly the console-experiment contract §7.3 step 6 wants).
+const rowVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: displayRowCount.value, // display-position space (P29 D11), NOT page rows
+    getScrollElement: () => containerRef.value,
+    estimateSize: () => rowHeight.value,
+    paddingStart: rowHeight.value,
+    rangeExtractor: (range: Range) => {
+      const tuning = window.__kiraGridTuning;
+      const velocity = rowVelocity();
+      return rowRangeExtractor(
+        range,
+        rowHeight.value,
+        velocity.pxPerFrame,
+        velocity.direction,
+        mountedColumnCount,
+        {
+          baseLeadPx: BASE_LEAD_PX,
+          baseTrailPx: BASE_TRAIL_PX,
+          leadFrames: tuning?.leadFramesOverride ?? LEAD_FRAMES,
+          maxLeadPx: tuning?.maxLeadPxOverride ?? MAX_LEAD_PX,
+          cellBudget: CELL_BUDGET,
+        },
+      );
+    },
     observeElementRect: observeScrollElementRect,
     observeElementOffset: observeScrollElementOffset,
     onChange: markScrollWork,
@@ -477,6 +561,10 @@ const visibleColumnIndices = computed(() => {
   for (let c = colStart.value; c < colEnd.value; c++) out.push(c);
   return out;
 });
+// Keeps mountedColumnCount (declared above, read by rowRangeExtractor) current without the row
+// axis's own range computation ever having to call into the column virtualizer directly — see that
+// variable's own comment.
+watch(visibleColumnIndices, (v) => (mountedColumnCount = v.length), { immediate: true });
 
 let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
 watch([scrollTop, scrollLeft], () => {

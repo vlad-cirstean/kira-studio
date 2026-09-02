@@ -208,6 +208,93 @@ export function observeScrollElementOffset(
   };
 }
 
+// P22 iter2 D3: velocity-adaptive, direction-biased row overscan ("runway") — see the plan's §5 D3.
+// The row axis's overscan was symmetric and direction-blind (`overscan: Math.ceil(OVERSCAN_PX /
+// rowHeight)`, virtual-core's own defaultRangeExtractor): it expands range.startIndex/endIndex by
+// the same row count on both sides regardless of which way the user is scrolling, so a fast fling
+// only ever has half the buffer's worth of runway ahead of it (F6). This extends the window further
+// in the direction of travel, and only there, so the same total DOM buys more runway where it's
+// actually needed.
+//
+// BASE_LEAD_PX/BASE_TRAIL_PX both equal OVERSCAN_PX so that at zero velocity this produces *exactly*
+// the row window `overscan: Math.ceil(OVERSCAN_PX / rowHeight)` did — see rowRangeExtractor's own
+// comment for the arithmetic that guarantees this. Every existing at-rest budget (the overscan-
+// coverage invariants, the DOM-cell bounds) must see zero change from this file.
+//
+// LEAD_FRAMES/MAX_LEAD_PX are provisional: nobody in this repo has measured a real macOS momentum
+// scroll's velocity (the plan's F5) — these are a defensible first guess, to be re-set once
+// window.__kiraScrollTrace (D2) reports one from real hardware. Extra runway costs compositing
+// memory while flinging only (WEBVIEW-SCROLL-MEMORY.md §6) — accepted (F7) as a trade, not free.
+export const BASE_LEAD_PX = OVERSCAN_PX;
+export const BASE_TRAIL_PX = OVERSCAN_PX;
+/** Provisional (see above): extra lead px granted per px/frame of measured velocity. */
+export const LEAD_FRAMES = 6;
+/** Provisional (see above): hard ceiling on the lead side regardless of velocity. */
+export const MAX_LEAD_PX = 2400;
+// P22 iter2 D3(c): the cap is expressed in *cells*, not rows — a wide table (e.g. 61 columns) is
+// already close to budgets.spec.ts's < 2 500 DOM-cell bound at rest (F6), so a flat row cap would
+// let it blow that budget while a two-column table barely used its own share. Set below the
+// existing bound so a wide table's extra lead self-limits well before the DOM-size gate would.
+export const CELL_BUDGET = 2200;
+
+export interface RowRangeExtractorConfig {
+  baseLeadPx: number;
+  baseTrailPx: number;
+  leadFrames: number;
+  maxLeadPx: number;
+  cellBudget: number;
+}
+
+/**
+ * The row axis's own `rangeExtractor`, following columnRangeExtractor's own precedent (a pixel
+ * budget expanded into item counts, capped) rather than virtual-core's item-count `overscan`.
+ * `direction`/`velocityPxPerFrame` come from DataGrid.vue's own onScroll (not this module's offset
+ * observer above — see its comment); `mountedColumnCount` is the row axis's own budget divisor,
+ * read from the column virtualizer so a wide table's cap tightens with however many columns are
+ * actually mounted right now, not the table's total column count.
+ */
+export function rowRangeExtractor(
+  range: Pick<Range, 'startIndex' | 'endIndex' | 'count'>,
+  rowHeight: number,
+  /** |Δoffset| since the previous scroll event, in px. 0 at rest. */
+  velocityPxPerFrame: number,
+  /** Sign of the scroll delta: 1 forward (toward endIndex/down), -1 backward (up), 0 at rest. */
+  direction: 1 | -1 | 0,
+  mountedColumnCount: number,
+  cfg: RowRangeExtractorConfig,
+): number[] {
+  if (range.count <= 0) return [];
+
+  const trailRows = Math.ceil(cfg.baseTrailPx / rowHeight);
+  const leadBaselineRows = Math.ceil(cfg.baseLeadPx / rowHeight);
+  // Clamped below at cfg.baseLeadPx, so at velocityPxPerFrame === 0 this equals cfg.baseLeadPx
+  // exactly, leadRowsWanted === leadBaselineRows, extraLeadRows === 0 — D3(a)'s own requirement,
+  // true unconditionally regardless of the budget math below.
+  const leadPxWanted = Math.min(
+    cfg.maxLeadPx,
+    Math.max(cfg.baseLeadPx, cfg.baseLeadPx + velocityPxPerFrame * cfg.leadFrames),
+  );
+  const leadRowsWanted = Math.ceil(leadPxWanted / rowHeight);
+  const extraLeadRows = Math.max(0, leadRowsWanted - leadBaselineRows);
+
+  // The baseline (both sides, leadBaselineRows === trailRows) is always granted in full, exactly
+  // like today — only the *extra* velocity-driven lead is budget-capped, and only on the lead side.
+  const visibleRows = range.endIndex - range.startIndex + 1;
+  const budgetRows = Math.floor(cfg.cellBudget / Math.max(1, mountedColumnCount));
+  const grantedExtraLeadRows = Math.max(
+    0,
+    Math.min(extraLeadRows, budgetRows - visibleRows - trailRows - leadBaselineRows),
+  );
+  const leadRows = leadBaselineRows + grantedExtraLeadRows;
+
+  const [startRows, endRows] = direction < 0 ? [leadRows, trailRows] : [trailRows, leadRows];
+  const start = Math.max(range.startIndex - startRows, 0);
+  const end = Math.min(range.endIndex + endRows, range.count - 1);
+  const out: number[] = [];
+  for (let i = start; i <= end; i++) out.push(i);
+  return out;
+}
+
 // §8.5's type-aware right-alignment for numerics.
 export function alignmentFor(descriptor: ColumnDescriptor): 'left' | 'right' {
   return descriptor.typeClass === 'number' ? 'right' : 'left';

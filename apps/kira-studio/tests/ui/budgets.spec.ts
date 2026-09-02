@@ -720,6 +720,21 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     });
   }
 
+  // --- 1b2. D3's own cell-cap holds (P22 iter2 D3(c)) — the wide table is the case the cap exists
+  // for (F6/D3(c): a flat row-count overscan raise would blow budgets.spec.ts's own < 2 500 DOM-
+  // cell bound here). A synthetic high velocity (well past anything §7.3's real-hardware protocol
+  // is likely to report) drives the row axis's runway to its ceiling; the mounted cell count must
+  // still stay under the same bound item 1b's own coverage-invariant loop asserts at rest.
+  await scrollGrid.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await measureSustainedScroll(page, '[data-testid="data-grid"]', { pxPerFrame: 456, frames: 10 });
+  const cellCountAtSpeed = await page.locator('[data-testid="grid-cell"]').count();
+  expect(cellCountAtSpeed).toBeLessThan(2500);
+  await scrollGrid.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+
   // A sub-row scroll mutates nothing (D4); crossing a row boundary does.
   //
   // P57 M5 finding: this mock's own scroll_grid fixture only ever captures one pageSize=100 page

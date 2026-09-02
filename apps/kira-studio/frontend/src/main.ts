@@ -166,11 +166,15 @@ declare global {
      */
     __kiraScrollTrace?: { start: () => void; stop: () => ScrollTraceResult | null };
     /**
-     * P22 iter2 D4: runtime tuning for DataGrid.vue's per-row memoisation — read from the console
-     * so the real-Mac A/B in the plan's §7.3 step 6 needs one build, not a rebuild per variant.
-     * `undefined` means "use the compiled default".
+     * P22 iter2 D3/D4: runtime tuning for DataGrid.vue's row overscan (D3) and per-row memoisation
+     * (D4) — read from the console so the real-Mac A/B in the plan's §7.3 step 6 needs one build,
+     * not a rebuild per variant. `undefined` on any field means "use the compiled default".
      */
     __kiraGridTuning?: {
+      /** Overrides columns.ts's LEAD_FRAMES. */
+      leadFramesOverride?: number;
+      /** Overrides columns.ts's MAX_LEAD_PX. */
+      maxLeadPxOverride?: number;
       /** `false` disables D4's per-row memoisation (renderRows always allocates fresh RowVMs).
        *  Default (undefined) is "on". */
       incrementalRows?: boolean;
