@@ -246,14 +246,16 @@ export interface RowRangeExtractorConfig {
 }
 
 /**
- * The row axis's own `rangeExtractor`, following columnRangeExtractor's own precedent (a pixel
- * budget expanded into item counts, capped) rather than virtual-core's item-count `overscan`.
- * `direction`/`velocityPxPerFrame` come from DataGrid.vue's own onScroll (not this module's offset
- * observer above — see its comment); `mountedColumnCount` is the row axis's own budget divisor,
- * read from the column virtualizer so a wide table's cap tightens with however many columns are
- * actually mounted right now, not the table's total column count.
+ * The row axis's own budget arithmetic — a pixel budget (velocity-adaptive, direction-biased,
+ * cell-capped) reduced to a pair of inclusive row bounds. Split out from `rowRangeExtractor` below
+ * (P22 spike C1) so `views/grid/slick/kiraSlickGrid.ts`'s `getRenderedRange` override can reuse the
+ * exact same arithmetic instead of restating it — see that file's own comment. `direction`/
+ * `velocityPxPerFrame` come from the caller's own scroll-velocity sampler (DataGrid.vue's onScroll,
+ * or KiraSlickGrid's own); `mountedColumnCount` is the row axis's own budget divisor, read from the
+ * column virtualizer so a wide table's cap tightens with however many columns are actually mounted
+ * right now, not the table's total column count.
  */
-export function rowRangeExtractor(
+export function rowRangeBounds(
   range: Pick<Range, 'startIndex' | 'endIndex' | 'count'>,
   rowHeight: number,
   /** |Δoffset| since the previous scroll event, in px. 0 at rest. */
@@ -262,8 +264,8 @@ export function rowRangeExtractor(
   direction: 1 | -1 | 0,
   mountedColumnCount: number,
   cfg: RowRangeExtractorConfig,
-): number[] {
-  if (range.count <= 0) return [];
+): { start: number; end: number } {
+  if (range.count <= 0) return { start: 0, end: -1 };
 
   const trailRows = Math.ceil(cfg.baseTrailPx / rowHeight);
   const leadBaselineRows = Math.ceil(cfg.baseLeadPx / rowHeight);
@@ -290,6 +292,32 @@ export function rowRangeExtractor(
   const [startRows, endRows] = direction < 0 ? [leadRows, trailRows] : [trailRows, leadRows];
   const start = Math.max(range.startIndex - startRows, 0);
   const end = Math.min(range.endIndex + endRows, range.count - 1);
+  return { start, end };
+}
+
+/**
+ * The row axis's own `rangeExtractor`, following columnRangeExtractor's own precedent (a pixel
+ * budget expanded into item counts, capped) rather than virtual-core's item-count `overscan`. A
+ * two-line wrapper over `rowRangeBounds` above, expanding its `{ start, end }` into the `number[]`
+ * @tanstack/vue-virtual wants — behaviour-preserving by construction (P22 spike C1); see the plan's
+ * §5 D3 and §5 D4 for why the arithmetic itself lives in `rowRangeBounds` now.
+ */
+export function rowRangeExtractor(
+  range: Pick<Range, 'startIndex' | 'endIndex' | 'count'>,
+  rowHeight: number,
+  velocityPxPerFrame: number,
+  direction: 1 | -1 | 0,
+  mountedColumnCount: number,
+  cfg: RowRangeExtractorConfig,
+): number[] {
+  const { start, end } = rowRangeBounds(
+    range,
+    rowHeight,
+    velocityPxPerFrame,
+    direction,
+    mountedColumnCount,
+    cfg,
+  );
   const out: number[] = [];
   for (let i = start; i <= end; i++) out.push(i);
   return out;

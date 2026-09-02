@@ -88,6 +88,10 @@ export interface ScrollTraceResult {
 let recording = false;
 let rafId = 0;
 let gridEl: HTMLElement | null = null;
+// P22 spike D9: the mounted-row selector `measureMountedBand` queries — defaults to the incumbent
+// grid's own testid so every existing caller (DataGrid.vue) is unaffected; SlickGridHost.vue passes
+// '.slick-row' so the same probe can A/B both engines on one build (§7.4(b)) without a rebuild.
+let mountedRowSelector = '[data-testid="grid-row"]';
 
 let pendingEvents: { offset: number; t: number }[] = [];
 let pendingNotified = false;
@@ -95,10 +99,13 @@ let lastRenderMs = 0;
 let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
 
-/** DataGrid.vue's own onMounted/onUnmounted — at most one DataGrid is ever mounted at a time
- *  (MainView.vue keys its DataView by tab id), so a single module-level target is enough. */
-export function registerGrid(el: HTMLElement): void {
+/** DataGrid.vue's/SlickGridHost.vue's own onMounted/onUnmounted — at most one grid is ever mounted
+ *  at a time (MainView.vue keys its DataView by tab id), so a single module-level target is
+ *  enough. `rowSelector` (P22 spike D9) is the mounted-row query `measureMountedBand` below uses —
+ *  defaults to the incumbent grid's own testid. */
+export function registerGrid(el: HTMLElement, rowSelector = '[data-testid="grid-row"]'): void {
   gridEl = el;
+  mountedRowSelector = rowSelector;
 }
 
 export function unregisterGrid(el: HTMLElement): void {
@@ -123,7 +130,7 @@ export function noteNotify(): void {
 }
 
 function measureMountedBand(el: HTMLElement): { top: number; bottom: number; rows: number } {
-  const rows = el.querySelectorAll<HTMLElement>('[data-testid="grid-row"]');
+  const rows = el.querySelectorAll<HTMLElement>(mountedRowSelector);
   if (rows.length === 0) return { top: 0, bottom: 0, rows: 0 };
   let top = Number.POSITIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
