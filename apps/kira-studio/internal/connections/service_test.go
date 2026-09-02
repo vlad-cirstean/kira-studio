@@ -54,6 +54,9 @@ func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionC
 // TestTestValidatesInputBeforeProbing below can only pass by Service.Test's own Validate() call
 // stopping a bad request before it ever reaches here.
 func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
+	b.mu.Lock()
+	b.lastConfig = cfg
+	b.mu.Unlock()
 	b.testN.Add(1)
 	return "1.0", nil
 }
@@ -516,4 +519,66 @@ func TestTestValidatesInputBeforeProbing(t *testing.T) {
 	if n := h.backend.testCount(); n != 0 {
 		t.Errorf("Backend.Test was called %d times, want 0 — Validate() should have short-circuited first", n)
 	}
+}
+
+// TestTestDoesNotLeakStoredPasswordToARetargetedDraft is a regression test for the P12 round 1
+// finding #1 credential-reveal bypass: editing an existing connection's Host (or Port/Database/
+// URI) and pressing "Test connection" with no password retyped must not decrypt the stored
+// secret and send it to the new, unverified destination — it should test with no password at
+// all, exactly as a brand-new draft would.
+func TestTestDoesNotLeakStoredPasswordToARetargetedDraft(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("has-secret")
+	in.Password = strPtr("s3cret")
+	created := mustCreate(t, h.svc, in)
+
+	t.Run("unchanged destination still gets the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret")
+		draft.Password = nil // D1: edit dialogs always open with password: null
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(unchanged destination).OK = false, want true (err: %v)", result.Error)
+		}
+		got := h.backend.lastConnectConfig().Password
+		if got == nil || *got != "s3cret" {
+			t.Fatalf("Backend.Test saw password %v, want the stored secret", got)
+		}
+	})
+
+	t.Run("retargeted host does not get the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret")
+		draft.Password = nil
+		draft.Host = strPtr("attacker.example.com")
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(retargeted host).OK = false, want true (err: %v)", result.Error)
+		}
+		got := h.backend.lastConnectConfig().Password
+		if got != nil {
+			t.Fatalf("Backend.Test saw password %q for a retargeted host, want nil — the stored secret leaked", *got)
+		}
+		if gotHost := h.backend.lastConnectConfig().Host; gotHost == nil || *gotHost != "attacker.example.com" {
+			t.Fatalf("Backend.Test saw host %v, want the retargeted host", gotHost)
+		}
+	})
+
+	t.Run("retargeted port does not get the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret")
+		draft.Password = nil
+		otherPort := 15432
+		draft.Port = &otherPort
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(retargeted port).OK = false, want true (err: %v)", result.Error)
+		}
+		if got := h.backend.lastConnectConfig().Password; got != nil {
+			t.Fatalf("Backend.Test saw password %q for a retargeted port, want nil — the stored secret leaked", *got)
+		}
+	})
 }

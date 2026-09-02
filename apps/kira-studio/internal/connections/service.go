@@ -397,6 +397,31 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 	return RevealResult{Outcome: revealOutcomeRevealed, Password: password}
 }
 
+// destinationUnchanged reports whether the draft still points at the same place as the stored
+// row — host, port, database, and URI, whichever the connection's kind actually uses. Test only
+// injects the stored secret when this holds (see the comment on Test below): a draft edited to
+// point somewhere else must never get the old destination's password handed to it.
+func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
+	return equalStringPtr(in.Host, stored.Host) &&
+		equalIntPtr(in.Port, stored.Port) &&
+		equalStringPtr(in.Database, stored.Database) &&
+		equalStringPtr(in.URI, stored.URI)
+}
+
+func equalStringPtr(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func equalIntPtr(a, b *int) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
 // Test never errors: a test run is never armed and never leaves a process behind, however it
 // ended (the deferred Stop mirrors connections.ts:348-351's `finally`). It still runs the same
 // Validate() Create/Update do (P2 R1: this was the one Input-accepting entry point that skipped
@@ -411,10 +436,19 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 // secret without displaying it, the same footing as Connect. A missing or undecryptable secret
 // here is not fatal — resolveFromInput/Backend.Test below still run and report failure the normal
 // way, exactly as an actually-wrong password would.
+//
+// P12 round 1 finding #1: the stored secret is only injected when destinationUnchanged holds —
+// otherwise "Edit connection → change Host → Test" would decrypt the old destination's password
+// and send it to whatever host the draft currently points at, with no auth gate on this path at
+// all (Test is deliberately not auth-gated, see above). An edited destination instead tests with
+// no password, same as a brand-new draft.
 func (s *Service) Test(in Input, existingID string) TestResult {
 	if in.Password == nil && existingID != "" {
-		if pw, err := s.deps.Secrets.Get(existingID); err == nil {
-			in.Password = pw
+		if existing, err := s.deps.Conns.Get(existingID); err == nil && existing != nil &&
+			destinationUnchanged(in, existing.ConnectionFields) {
+			if pw, err := s.deps.Secrets.Get(existingID); err == nil {
+				in.Password = pw
+			}
 		}
 	}
 	if err := in.Validate(); err != nil {
