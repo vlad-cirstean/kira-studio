@@ -164,10 +164,15 @@ func seedMysqlExtras(ctx context.Context, host string, port int) error {
 		return err
 	}
 	for outer := 0; outer < 10; outer++ {
+		// P16 §6 finding: MySQL 9.x removed the native MD5()/SHA1() functions outright (verified
+		// against mysql:9.7 — "FUNCTION kira_test.MD5 does not exist", MySQL error 1305, the same
+		// message a missing stored routine gets). SHA2() has existed since MySQL 5.5.3 and is
+		// unaffected; LEFT(…, 32) keeps big_rows.payload at its existing CHAR(32) width rather than
+		// widening the schema for a value nothing reads back for its hash properties.
 		if _, err := db.ExecContext(ctx,
 			fmt.Sprintf(`INSERT INTO `+"`%s`"+`.big_rows (id, payload)
 			 SELECT d1.d*100000 + d2.d*10000 + d3.d*1000 + d4.d*100 + d5.d*10 + d6.d + 1 AS id,
-			        MD5(d1.d*100000 + d2.d*10000 + d3.d*1000 + d4.d*100 + d5.d*10 + d6.d + 1) AS payload
+			        LEFT(SHA2(d1.d*100000 + d2.d*10000 + d3.d*1000 + d4.d*100 + d5.d*10 + d6.d + 1, 256), 32) AS payload
 			 FROM digits d1, digits d2, digits d3, digits d4, digits d5, digits d6
 			 WHERE d1.d = ?`, mysqlDatabase), outer,
 		); err != nil {
