@@ -106,11 +106,14 @@ fi
 # whether the Go toolchain it was built with matches go.mod's directive (P20 F5/F6/F7 — the old
 # script's directory-presence gate let a stale-toolchain generation survive a CLI reinstall
 # indefinitely). A stamp of that identity, next to Task's own cache so both are cleared together,
-# is what decides whether this step runs at all — not inside frontend/bindings/, which -clean=true
-# wipes on every real generation.
+# decides whether this step runs on an *identity* change. P12 round 2 finding #8: the stamp alone
+# can't detect a manually-deleted (or interrupted-mid-generation) bindings directory, since nothing
+# re-derives it from `frontend/bindings/` itself — so the directory's own presence is checked too,
+# same as the old gate did, alongside the stamp rather than instead of it.
+BINDINGS_DIR="$ROOT_DIR/apps/kira-studio/frontend/bindings"
 STAMP_FILE="$ROOT_DIR/apps/kira-studio/.task/bindings.stamp"
 STAMP="$PINNED_VERSION|$GO_DIRECTIVE|$INSTALLED_TOOLCHAIN"
-if [ ! -f "$STAMP_FILE" ] || [ "$(cat "$STAMP_FILE")" != "$STAMP" ]; then
+if [ ! -d "$BINDINGS_DIR" ] || [ ! -f "$STAMP_FILE" ] || [ "$(cat "$STAMP_FILE")" != "$STAMP" ]; then
   echo "setup: wails3 task common:generate:bindings"
   (cd "$ROOT_DIR/apps/kira-studio" && wails3 task common:generate:bindings)
   mkdir -p "$(dirname "$STAMP_FILE")"
