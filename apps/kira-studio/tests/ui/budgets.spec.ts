@@ -557,8 +557,10 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // above (one step from an idle DOM, P22 F6), this keeps scrolling: notifiesPerFrame is the row
   // virtualizer's own re-render count per animation frame, and uncoveredPx is whether the mounted
   // row band still covers the viewport *while* scrolling continues, not just once it settles.
-  // Logged only for now (P22 C2) — this is the pre-fix baseline the coalescing fix (P22 D1, C3)
-  // will be measured against; C4 turns this into a gate once that fix lands.
+  // Pre-fix baseline (P22 C2, this exact instrument against the tree before P22 D1's
+  // observeScrollElementOffset landed): notifiesPerFrame max per rung was 3/7/8/8 at 40/100/200/
+  // 456 px/frame; uncoveredPx was already 0 throughout, which is why D2's row-overscan raise is not
+  // needed below.
   await grid.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -569,6 +571,15 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
       { pxPerFrame, frames: 20 },
     );
     logCoverage('big_rows', pxPerFrame, uncoveredPx, notifiesPerFrame);
+    // P22 D1's direct proof: the coalesced offset observer notifies at most once per animation
+    // frame no matter how many native scroll events land inside it.
+    expect(Math.max(...notifiesPerFrame)).toBeLessThanOrEqual(1);
+    // The symptom's own metric, gated at the doc's realistic 40-100px/frame band (P22 §7.1); 200
+    // and 456 are logged above but not gated — 456px/frame is WEBVIEW-SCROLL-MEMORY.md §5.4's own
+    // "no human produces this" top rung.
+    if (pxPerFrame <= 100) {
+      expect(Math.max(...uncoveredPx)).toBe(0);
+    }
     await grid.evaluate((el) => {
       el.scrollTop = 0;
     });
@@ -695,8 +706,9 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // this is where the coalescing fix matters most. This mock's own scroll_grid fixture only ever
   // captures one pageSize=100 page (this file's own note below), so the scrollable range is small;
   // measureScrollCoverage clamps each write at the bottom, which only turns trailing frames at the
-  // higher rungs into no-op (still-valid) samples, not failures. Logged only for now (P22 C2), same
-  // as 1a above.
+  // higher rungs into no-op (still-valid) samples, not failures.
+  // Pre-fix baseline (P22 C2): notifiesPerFrame max per rung was 4/5/8/8 at 40/100/200/456
+  // px/frame; uncoveredPx was 0 throughout, same as big_rows above.
   await scrollGrid.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -707,6 +719,10 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
       { pxPerFrame, frames: 20 },
     );
     logCoverage('scroll_grid', pxPerFrame, uncoveredPx, notifiesPerFrame);
+    expect(Math.max(...notifiesPerFrame)).toBeLessThanOrEqual(1);
+    if (pxPerFrame <= 100) {
+      expect(Math.max(...uncoveredPx)).toBe(0);
+    }
     await scrollGrid.evaluate((el) => {
       el.scrollTop = 0;
     });
