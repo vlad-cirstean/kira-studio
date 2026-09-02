@@ -16,7 +16,7 @@ import (
 
 // packages/db-fixtures/support/redis.ts's own constants, ported verbatim (C21).
 const (
-	RedisImage            = "redis:7"
+	RedisImage            = "redis:8.10"
 	RedisPassword         = "kira"
 	RedisPrimaryDbIndex   = 0
 	RedisSecondaryDbIndex = 1

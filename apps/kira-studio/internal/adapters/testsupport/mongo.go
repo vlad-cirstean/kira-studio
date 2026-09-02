@@ -20,7 +20,7 @@ import (
 // that TS function rather than reading a shared fixture file, since Mongo has no .sql-file seeding
 // path.
 const (
-	MongoImage             = "mongo:7"
+	MongoImage             = "mongo:8.3"
 	mongoRootUsername      = "root"
 	mongoRootPassword      = "kira"
 	MongoDatabase          = "kira_test"
