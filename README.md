@@ -7,7 +7,7 @@ workbench across ten database engines.
 
 ## Status
 
-- **Beta — v1 is in development.** Expect bugs and breaking changes between builds. See
+- **Beta — v1 shipped; v1.1 is in development.** Expect bugs and breaking changes between builds. See
   [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
@@ -37,15 +37,18 @@ workbench across ten database engines.
 called "SQL".
 
 ² MySQL 8.0.16 or newer (the `CHECK_CONSTRAINTS` information-schema floor). Uses the same
-`mariadb` driver package as the MariaDB adapter — a genuine dual client, no second dependency.
-`sslmode=require` is the documented default for MySQL 8's `caching_sha2_password` handshake: a
-plaintext connection needs either TLS or `allowPublicKeyRetrieval=true` (a per-connection option)
-the first time a given user authenticates, or the server refuses to send its RSA key.
+`go-sql-driver/mysql` driver and shared `mysqlfamily` core as the MariaDB adapter — one driver, two
+kinds, no second dependency. `caching_sha2_password`'s RSA-key handshake has no
+`allowPublicKeyRetrieval` equivalent in this driver: it requests the server's RSA public key
+unconditionally over plaintext when TLS is off and one is needed, with no option to refuse that
+request. Console writes also lose their row-count readout on this engine — no `RowsAffected()` on
+the multi-statement path the console runner needs, so a generic "OK" shows instead of "N row(s)
+affected" (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for both).
 
-³ SQLite has no server, no auth, and no cancel — `caps.cancel` is `false`, the app's first honest
-one: `node:sqlite` has no `sqlite3_interrupt` and its whole API is synchronous, so a running
-statement blocks the event loop and an abort could never be delivered while one runs. A SQLite
-connection points at a file (Fields mode's Database file field) rather than a host/port.
+³ SQLite has no server and no auth. `caps.cancel` **is** `true` — `modernc.org/sqlite` has a real
+`sqlite3_interrupt`, reached by cancelling a per-op dedicated `*sql.Conn`, a different mechanism
+from the side-connection cancel PostgreSQL/MariaDB/MySQL use. A SQLite connection points at a file
+(Fields mode's Database file field) rather than a host/port.
 
 ⁴ ClickHouse's own `PRIMARY KEY` is a sparse index over MergeTree parts, not a unique row key —
 there is no addressable row to update or delete, so `canUpdate`/`canDelete` stay permanently
@@ -88,12 +91,28 @@ A couple of things worth knowing up front:
 - **Operations panel** — every DB operation live, with duration, rows, command, cancel, re-run,
   and a persisted op log with retention.
 - **Caching** — three tiers: persisted metadata, a byte-budgeted in-memory result-page LRU, and
-  counts; with prefetch and a hit-rate readout (see [`docs/PERF.md`](docs/PERF.md)).
+  counts; no speculative prefetch — a page loads only on direct user action (see
+  [`docs/PERF.md`](docs/PERF.md)).
+- **Console format, Explain and auto-explain** — a Format button (`⇧⌥F`) in every console; an
+  Explain action and a per-connection auto-explain toggle that render each dialect's own query plan,
+  flagging estimated-rows-read above a configurable threshold.
+- **SQL language service** — completions, diagnostics and hovers in the SQL console, driven by a
+  per-connection DDL document you paste in yourself (no live schema introspection).
+- **Generate data…** — a fake-data row generator for the SQL grid, per-column recipes inferred from
+  each column's type.
+- **Confirm-before-reveal** — a saved password's Show press asks for device-owner confirmation
+  (Touch ID or system password on macOS, with an in-app fallback) before decrypting it, with a
+  5-minute grace window.
+- **Multiple windows** — *Window → New Window* (`⇧⌘N`) opens a second workbench sharing the same
+  backend and connections; each window keeps its own tabs.
 - **Keyboard & command palette** — a deliberately minimal VS Code-flavoured set: `⌘,` settings,
-  `⌘B` project panel, `⌘J` operations panel, `⇧⌘P` palette, `⌘F` find, `F5` refresh, `⌘↩` run
-  statement, `⇧⌘↩` run all, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close tab, `⇧⌘W` close window.
-- **Settings** — Appearance (font family/size, row density), Data (default page size, prefetch,
-  count-on-open), Cache (L2 byte budget, hit rate, clear caches), Advanced (op-log retention).
+  `⌘N` new connection, `⌘B` project panel, `⌘J` operations panel, `⇧⌘P` palette, `⌘F` find, `F5`
+  refresh, `⌘↩` run statement, `⇧⌘↩` run all, `⇧⌥F` format, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close
+  tab, `⇧⌘W` close window, `⇧⌘N` new window.
+- **Settings** — staged in a per-dialog draft and applied as one patch on Save, with a Revert to
+  Defaults action. Appearance (font family/size, row density, word wrap, row coloring), Data
+  (default page size), Cache (L2 byte budget, hit rate, clear caches), Advanced (op-log retention,
+  expensive-query row threshold).
 
 ## Requirements
 
@@ -145,7 +164,7 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | Script | What it does |
 |---|---|
 | `bun run setup` | `scripts/setup.sh` — `bun install` + `go mod download`, then installs the pinned `wails3` CLI and regenerates bindings if either has drifted. Runs automatically as `predev`/`prepackage`; call it directly to install without building or running anything. |
-| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `bun run setup` first; the Wails task itself drives the frontend build via `common:build:frontend`) |
+| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `bun run setup` first; the Wails task's own dev-mode config runs a blocking `common:build:frontend` for the embedded bundle, then `common:dev:frontend` in the background for HMR) |
 | `bun run build` | Production Vue build into `apps/kira-studio/frontend/dist` |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
@@ -157,6 +176,9 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | `bun run test:ui` | Builds, then runs Playwright (WebKit) against the built bundle with both wire planes mocked |
 | `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
 | `bun run test:go` | The Go test suite (`go test ./...`) |
+| `bun run test:e2e-real` | Builds, then runs the full-stack wiring suite against a real `-tags server` Go binary (see Tests below) |
+| `bun run test:compat` | `scripts/db-compat.sh` — the same per-engine conformance suite against each kind's oldest and newest supported server image, on demand, not part of CI |
+| `bun run generate:wire` | `scripts/generate-wire.sh` — regenerates the Go and TypeScript FlatBuffers code from `wire.fbs`; not part of a normal build |
 | `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`) |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
@@ -184,9 +206,9 @@ the Go suite under `apps/kira-studio/`. `packages/db-fixtures/` is a shared fixt
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): real rendered UI, mocked IPC.
   The backend half is Go (`apps/kira-studio/internal/ipcfixture`), run via `bun run test:go` with
   `KIRA_IPC_FIXTURES=write` to regenerate the fixture modules both halves read.
-- **`apps/kira-studio/tests/e2e-real/`** — two specs against a real `-tags server` Go binary,
-  deliberately launched through plain Node rather than `bunx` (`node node_modules/.bin/playwright
-  test --project=e2e-real`) rather than through a `package.json` script — see `AGENTS.md`'s Docker
+- **`apps/kira-studio/tests/e2e-real/`** — four specs against a real `-tags server` Go binary, run
+  via `bun run test:e2e-real`, which deliberately launches Playwright through plain Node rather than
+  `bunx` (`node node_modules/.bin/playwright test --project=e2e-real`) — see `AGENTS.md`'s Docker
   section for why.
 - **`bun run test:go`** — the Go test suite (`go test ./...`), including the
   Testcontainers-backed cases against real engines; container-backed cases self-skip without
@@ -252,10 +274,10 @@ v1 record — see `docs/v1/README.md`).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
 - [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md) — local fixture databases.
 
-## Not in v1
+## Not shipped
 
 Light mode; Windows/Linux; DDL editing; export to
-CSV/JSON; connection folders; split editor groups; multiple windows; SSH tunneling (planned for
+CSV/JSON; connection folders; split editor groups; SSH tunneling (planned for
 v2); code signing/notarization. **Auto-update is deliberately absent and verified as such** — see
 [`docs/PACKAGING.md`](docs/PACKAGING.md) §7. SQL-table writes (add-row, delete-row, cell-edit) are
 staged as pending changes with a preview; MongoDB/Redis/Kafka/SQS/S3 writes are capability-gated
