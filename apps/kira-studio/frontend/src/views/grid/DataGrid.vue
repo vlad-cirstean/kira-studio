@@ -865,85 +865,93 @@ function extendFromPoint(x: number, y: number): void {
   extendSelectionTo(row, col);
 }
 
-// P2 R1: every per-cell/per-row/per-header-column template handler below reads its row/col back
-// off the element's own data-row/data-col-index/data-column attributes instead of closing over the
-// v-for loop variable — the same trick extendFromPoint above already uses. A call expression that
-// closes over a loop variable (`@click="onCellClick(rowVm.row, cellVm.col, $event)"`, what these
-// used to be) can never be cached by Vue's compiler (compiler-core's hasScopeRef bails out on any
-// v-for-scoped reference) and gets a brand-new wrapper closure allocated for every one of the
-// potentially hundreds of visible cells on every render this component does for any reason
-// (scroll included). A bound identifier (`@click="onCellClickFromEvent"`) is a stable reference
-// Vue passes straight through with no per-render allocation at all.
-function cellCoordsFromTarget(e: Event): { row: number; col: number } | null {
-  const el = e.currentTarget as HTMLElement | null;
-  if (!el) return null;
+// P22 iter2 D5: the five per-cell and four per-gutter handlers below are delegated to one listener
+// per event type on `.data-grid` (the plan's §5 D5) rather than bound per element the way P2 R1
+// left them (2 107 addEventListener calls for a full window mount, ~49 per row entering it — F8) —
+// a win on its own, and a prerequisite for a future per-row component (F11(c): a listener bound on
+// a row's own root, or inside it, would be a second reference for shouldUpdateComponent's
+// reference-equality bail-out to keep stable). `closest()` off `e.target` is the same pattern
+// extendFromPoint/onDragMouseMove already use for a synthetic hit-test; here it resolves the
+// *real* event target's nearest matching ancestor instead.
+//
+// The header row, resize handle, header-select-zone and nav button are deliberately NOT delegated:
+// none of them is virtualized (mounted once per table open, not per scroll frame), so delegating
+// them would not serve D5's own cost target, and each already has a working per-element listener
+// (several using `.stop` to shield an ancestor's own handler — nav button in particular relies on
+// its `@click.stop` never reaching this file's own delegated click handler at all, which is why
+// that handler needs no special-case branch for it).
+function matchedGridElement(target: EventTarget | null): HTMLElement | null {
+  return (target as Element | null)?.closest<HTMLElement>(
+    '.grid-cell[data-row], .gutter-cell[data-row]',
+  ) as HTMLElement | null;
+}
+
+function rowColOf(el: HTMLElement): { row: number; col: number | null } | null {
   const row = Number(el.dataset.row);
-  const col = Number(el.dataset.colIndex);
-  return Number.isNaN(row) || Number.isNaN(col) ? null : { row, col };
+  if (Number.isNaN(row)) return null;
+  const col = el.dataset.colIndex !== undefined ? Number(el.dataset.colIndex) : null;
+  return { row, col: col !== null && Number.isNaN(col) ? null : col };
 }
 
-function rowFromTarget(e: Event): number | null {
-  const el = e.currentTarget as HTMLElement | null;
-  if (!el) return null;
-  const row = Number(el.dataset.row);
-  return Number.isNaN(row) ? null : row;
+function onDataGridMouseDown(e: MouseEvent): void {
+  const el = matchedGridElement(e.target);
+  if (!el) return;
+  const rc = rowColOf(el);
+  if (!rc) return;
+  if (rc.col !== null) onCellMouseDown(rc.row, rc.col, e);
+  else onGutterMouseDown(rc.row, e);
 }
 
-function onCellMouseDownFromEvent(e: MouseEvent): void {
-  const c = cellCoordsFromTarget(e);
-  if (c) onCellMouseDown(c.row, c.col, e);
+// `mouseenter` does not bubble, so it cannot be delegated as-is — `mouseover` plus a
+// same-matched-ancestor guard (comparing against `relatedTarget`) reproduces it: moving between
+// two descendants of the *same* matched cell/gutter (e.g. onto its nav button) must not re-fire.
+function onDataGridMouseOver(e: MouseEvent): void {
+  const el = matchedGridElement(e.target);
+  if (!el) return;
+  if (matchedGridElement(e.relatedTarget) === el) return;
+  const rc = rowColOf(el);
+  if (!rc) return;
+  if (rc.col !== null) onCellMouseEnter(rc.row, rc.col);
+  else onGutterMouseEnter(rc.row);
 }
 
-function onCellMouseEnterFromEvent(e: MouseEvent): void {
-  const c = cellCoordsFromTarget(e);
-  if (c) onCellMouseEnter(c.row, c.col);
+function onDataGridClick(e: MouseEvent): void {
+  const target = e.target as Element | null;
+  // The nav button's own `.stop`-shielded click never reaches here in practice (see this block's
+  // own header comment) — this branch is the explicit fallback the plan's F5 calls for, so a future
+  // change to the button's own listener doesn't silently mis-select the cell underneath it instead.
+  const navBtn = target?.closest<HTMLElement>('.cell-nav-btn');
+  if (navBtn) {
+    const cellEl = navBtn.closest<HTMLElement>('.grid-cell[data-row]');
+    const rc = cellEl ? rowColOf(cellEl) : null;
+    if (rc && rc.col !== null) onCellNavClick(rc.row, rc.col, e);
+    return;
+  }
+  const el = matchedGridElement(target);
+  if (!el) return;
+  const rc = rowColOf(el);
+  if (!rc) return;
+  if (rc.col !== null) onCellClick(rc.row, rc.col, e);
+  else onGutterClick(rc.row, e);
 }
 
-function onCellClickFromEvent(e: MouseEvent): void {
-  const c = cellCoordsFromTarget(e);
-  if (c) onCellClick(c.row, c.col, e);
+function onDataGridDblClick(e: MouseEvent): void {
+  const el = (e.target as Element | null)?.closest<HTMLElement>('.grid-cell[data-row]');
+  if (!el) return;
+  const rc = rowColOf(el);
+  if (rc && rc.col !== null) onCellDblClick(rc.row, rc.col);
 }
 
-function onCellDblClickFromEvent(e: MouseEvent): void {
-  const c = cellCoordsFromTarget(e);
-  if (c) onCellDblClick(c.row, c.col);
-}
-
-function onCellContextMenuFromEvent(e: MouseEvent): void {
-  const c = cellCoordsFromTarget(e);
-  if (c) onCellContextMenu(c.row, c.col, e);
-}
-
-// The nav button sits inside .grid-cell, so its own currentTarget carries no row/col of its own
-// (only data-nav-kind) — closest() finds the ancestor cell that does, same as extendFromPoint.
-function onCellNavClickFromEvent(e: MouseEvent): void {
-  const btn = e.currentTarget as HTMLElement | null;
-  const cellEl = btn?.closest<HTMLElement>('.grid-cell[data-row]');
-  if (!cellEl) return;
-  const row = Number(cellEl.dataset.row);
-  const col = Number(cellEl.dataset.colIndex);
-  if (Number.isNaN(row) || Number.isNaN(col)) return;
-  onCellNavClick(row, col, e);
-}
-
-function onGutterMouseDownFromEvent(e: MouseEvent): void {
-  const row = rowFromTarget(e);
-  if (row !== null) onGutterMouseDown(row, e);
-}
-
-function onGutterMouseEnterFromEvent(e: MouseEvent): void {
-  const row = rowFromTarget(e);
-  if (row !== null) onGutterMouseEnter(row);
-}
-
-function onGutterClickFromEvent(e: MouseEvent): void {
-  const row = rowFromTarget(e);
-  if (row !== null) onGutterClick(row, e);
-}
-
-function onGutterContextMenuFromEvent(e: MouseEvent): void {
-  const row = rowFromTarget(e);
-  if (row !== null) onGutterContextMenu(row, e);
+function onDataGridContextMenu(e: MouseEvent): void {
+  const el = matchedGridElement(e.target);
+  if (!el) return;
+  const rc = rowColOf(el);
+  if (!rc) return;
+  // Only prevented once a cell/gutter actually matched — a right-click on the sizer background,
+  // the header, or an insert-row cell must keep the native menu (F5's own detail).
+  e.preventDefault();
+  if (rc.col !== null) onCellContextMenu(rc.row, rc.col, e);
+  else onGutterContextMenu(rc.row, e);
 }
 
 function onHeaderClickFromEvent(e: MouseEvent): void {
@@ -1675,6 +1683,11 @@ defineExpose({ scrollCellIntoView });
     tabindex="0"
     @scroll="onScroll"
     @keydown="onKeydown"
+    @mousedown="onDataGridMouseDown"
+    @mouseover="onDataGridMouseOver"
+    @click="onDataGridClick"
+    @dblclick="onDataGridDblClick"
+    @contextmenu="onDataGridContextMenu"
   >
     <EmptyState
       v-if="page && page.rowCount === 0"
@@ -1790,10 +1803,6 @@ defineExpose({ scrollCellIntoView });
           :data-row="rowVm.row"
           :class="{ dirty: rowVm.dirty, deleted: rowVm.deleted }"
           :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
-          @mousedown="onGutterMouseDownFromEvent"
-          @mouseenter="onGutterMouseEnterFromEvent"
-          @click="onGutterClickFromEvent"
-          @contextmenu.prevent="onGutterContextMenuFromEvent"
         >
           {{ rowVm.gutterNumber }}
         </div>
@@ -1813,11 +1822,6 @@ defineExpose({ scrollCellIntoView });
             scrollMarginTop: `${rowHeight}px`,
             color: cellVm.color || undefined,
           }"
-          @mousedown="onCellMouseDownFromEvent"
-          @mouseenter="onCellMouseEnterFromEvent"
-          @click="onCellClickFromEvent"
-          @dblclick="onCellDblClickFromEvent"
-          @contextmenu.prevent="onCellContextMenuFromEvent"
         >
           <input
             v-if="cellVm.editing"
@@ -1849,7 +1853,6 @@ defineExpose({ scrollCellIntoView });
             data-testid="cell-nav-button"
             :data-nav-kind="cellVm.navKind"
             :aria-label="cellVm.navKind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
-            @click.stop="onCellNavClickFromEvent"
           >
             <CodiconIcon :name="cellVm.navKind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
           </button>
