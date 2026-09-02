@@ -119,9 +119,9 @@ test('colouring off at boot — both columns plain, no inline colour at all', as
   expect(await inlineColor(page, 'hash')).toBe('');
 });
 
-test('flipping the toggle live repaints the open grid', async ({ relaunch }) => {
+test('saving the toggle repaints the open grid', async ({ relaunch }) => {
   // Must supply its own settingsSet snapshot (mockRuntime.ts:154's wildcard otherwise echoes the
-  // untouched defaults back, and patchSettings would revert the flag right after the click).
+  // untouched defaults back, and patchSettings would revert the flag right after Save).
   const flippedSettings = {
     ...defaultSettings,
     appearance: { ...defaultSettings.appearance, rowColoring: false },
@@ -139,8 +139,8 @@ test('flipping the toggle live repaints the open grid', async ({ relaunch }) => 
 
   await page.click('[data-testid="open-settings"]');
   await page.click('[data-testid="settings-row-coloring"]');
-  await page.click('[data-testid="settings-close"]');
-  await expect(page.locator('[data-testid="settings-close"]')).toHaveCount(0);
+  await page.click('[data-testid="settings-save"]');
+  await expect(page.locator('[data-testid="settings-save"]')).toHaveCount(0);
 
   await expect.poll(() => computedColor(page, 'id')).toBe(PLAIN_COLOR);
   expect(await inlineColor(page, 'id')).toBe('');
