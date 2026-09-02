@@ -961,6 +961,24 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 | `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `apps/kira-studio/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
 | The three Electron fuses (`runAsNode` and friends) | **No subject.** There is no Electron binary to re-run as Node. |
 
+**Whether the `WKWebView` itself is configurable beyond this table — checked, and closed, at P22
+(D5).** `MacWebviewPreferences` (`webview_window_options.go:762-786`) is Wails v3.0.0-beta.16's
+entire macOS webview surface — ten fields, byte-identical to beta.15 — and none is a compositing or
+tiling knob; the `WKWebViewConfiguration` is built and `autorelease`d inside one cgo block
+(`webview_window_darwin.go:138-195`) with no hook of any kind between "config allocated" and
+"webview created" (the whole options file has exactly one func-typed field, `KeyBindings`).
+`WindowsOptions` carries `EnabledFeatures`/`DisabledFeatures`/`AdditionalBrowserArgs` for WebView2;
+`MacOptions` has only `ActivationPolicy` and terminate-on-last-window-closed — macOS is the one
+platform with no engine-flags escape hatch. `NativeWindow()` reaches Wails' private ObjC
+`WebviewWindow` subclass, whose `webView` ivar is castable, but there is nothing to set once you
+have it: the coverage-rect/tile-pooling behaviour `docs/WEBVIEW-SCROLL-MEMORY.md` §7 describes lives
+in WebCore, below anything `WKWebView`/`WKWebViewConfiguration`/`WKPreferences` expose publicly.
+Full citations: `docs/v1.1/plans/P22-webview-scroll-performance.md` §3 F8–F11. **A bounded SPI-header
+grep on a real Mac (that plan's §6.2 C6) is still pending** — no macOS SDK is reachable from this
+sandbox — and its result, whichever way it goes, does not change this disposition (F8–F10 close the
+Wails half on their own). Re-check after any Wails version bump; P19's posture means this repo keeps
+moving through betas.
+
 **Autofill** is unchanged and still a renderer-side control: `autocomplete="off"` on every
 `TextField.vue`-backed input, because zero `<form>` elements means the engine has no form owner to
 attach autofill heuristics to and the attribute is the actual per-input opt-out.
