@@ -42,10 +42,17 @@ export async function ensureDdl(connectionId: string): Promise<string> {
     pending = control.schemaGet(connectionId).then((r) => r.ddl);
     pendingLoads.set(connectionId, pending);
   }
-  const ddl = await pending;
-  pendingLoads.delete(connectionId);
-  schemasState.byConnection[connectionId] = ddl;
-  return ddl;
+  try {
+    const ddl = await pending;
+    schemasState.byConnection[connectionId] = ddl;
+    return ddl;
+  } finally {
+    // A rejection must clear this too — otherwise one transient failure (a backend error, a
+    // disconnect mid-boot) caches the rejected promise forever, and every later caller
+    // (completion, diagnostics, hover, the Schema dialog) re-awaits and re-throws the same
+    // stale rejection instead of getting a fresh attempt.
+    pendingLoads.delete(connectionId);
+  }
 }
 
 export async function saveDdl(connectionId: string, ddl: string): Promise<void> {
