@@ -46,30 +46,6 @@ export function formatConnectionUri(input: Omit<ConnectionInput, 'uri' | 'mode'>
   return url.toString();
 }
 
-// D7: strip the userinfo password out of a URI at save time; the extracted password
-// goes to the SecretStore, and the stored `uri` column is safe to hand to the renderer verbatim.
-export function stripUriPassword(uri: string): { uri: string; password: string | null } {
-  try {
-    const url = new URL(uri);
-    const password = url.password ? decodeURIComponent(url.password) : null;
-    url.password = '';
-    return { uri: url.toString(), password };
-  } catch {
-    return { uri, password: null };
-  }
-}
-
-export function injectUriPassword(uri: string, password: string | null): string {
-  if (!password) return uri;
-  try {
-    const url = new URL(uri);
-    url.password = encodeURIComponent(password);
-    return url.toString();
-  } catch {
-    return uri;
-  }
-}
-
 // False for: a non-postgres scheme, multi-host (comma in the host section), a unix-socket
 // path host, or userinfo that would not survive an encodeURIComponent round trip. When false,
 // the connection dialog stays in URI mode (§8.12) rather than silently dropping information.

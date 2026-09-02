@@ -8,9 +8,8 @@ import (
 
 // stripURIPassword removes the userinfo password from uri and returns it decoded. A string with
 // no "://" (or no userinfo, or no password in the userinfo) is returned unchanged with a nil
-// password — the same total behaviour domain/uri.ts's stripUriPassword's try/catch gives, without
-// actually needing WHATWG URL (P55 §2 D10: net/url's serialisation does not match it byte for
-// byte, so this is deliberate string surgery on the userinfo segment only).
+// password — deliberate string surgery on the userinfo segment only, not a round trip through
+// WHATWG URL (P55 §2 D10: net/url's own serialisation does not match it byte for byte).
 //
 // Algorithm: locate "://"; the authority runs to the first /, ? or # after it; if it contains @,
 // split at the last @ (a password can itself contain an encoded @); the userinfo's password is
@@ -43,8 +42,7 @@ func stripURIPassword(uri string) (stripped string, password *string) {
 }
 
 // injectURIPassword puts password back into uri's userinfo, encodeURIComponent-encoded. A nil or
-// empty password is a no-op (the identity), and a uri with no "://" is left unchanged — the same
-// total behaviour domain/uri.ts's injectUriPassword gives.
+// empty password is a no-op (the identity), and a uri with no "://" is left unchanged.
 func injectURIPassword(uri string, password *string) string {
 	if password == nil || *password == "" {
 		return uri
