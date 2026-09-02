@@ -7,6 +7,7 @@ import { WIDE_TABLE_COLUMNS, WIDE_TABLE_ROWS } from './support/cellEditorCapture
 import { IPC } from './support/ipcChannels';
 import {
   measureClickToDom,
+  measureRowUpdatesDuringScroll,
   measureScrollResponses,
   measureSustainedScroll,
   percentile,
@@ -569,6 +570,20 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
       el.scrollTop = 0;
     });
   }
+
+  // --- 1a2. D4's own render-count property (P22 iter2 D4, last paragraph): a row that merely
+  // slides to a new window position without any of its own content changing must not re-render —
+  // gated at ≤ (rows entered + rows left + 2), a small constant absorbing the odd off-by-one rather
+  // than a tight bound (this is a property of Vue's own reconciliation, not a timing measurement).
+  for (const step of await measureRowUpdatesDuringScroll(page, '[data-testid="data-grid"]', {
+    pxPerFrame: 100,
+    steps: 10,
+  })) {
+    expect(step.updates).toBeLessThanOrEqual(step.rowsEntered + step.rowsLeft + 2);
+  }
+  await grid.evaluate((el) => {
+    el.scrollTop = 0;
+  });
 
   // --- 1b. scroll_grid (60 cols x 5000 rows, P29 D14): the wide-AND-tall shape neither big_rows
   // nor wide_table alone can show (F8) — horizontal response, vertical response on a wide table,

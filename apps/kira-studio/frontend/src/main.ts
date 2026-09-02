@@ -165,9 +165,26 @@ declare global {
      * docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §7.3 for the protocol.
      */
     __kiraScrollTrace?: { start: () => void; stop: () => ScrollTraceResult | null };
+    /**
+     * P22 iter2 D4: runtime tuning for DataGrid.vue's per-row memoisation — read from the console
+     * so the real-Mac A/B in the plan's §7.3 step 6 needs one build, not a rebuild per variant.
+     * `undefined` means "use the compiled default".
+     */
+    __kiraGridTuning?: {
+      /** `false` disables D4's per-row memoisation (renderRows always allocates fresh RowVMs).
+       *  Default (undefined) is "on". */
+      incrementalRows?: boolean;
+    };
+    /**
+     * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
+     * count real Vue re-renders per scroll step and assert D4's own render-count property (P22
+     * iter2 D4's last paragraph) without needing real-hardware timing.
+     */
+    __kiraGridRowUpdates?: () => void;
   }
 }
 window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
+window.__kiraGridTuning = {};
 window.__kiraGridRetainedBytes = totalRetainedBytes;
 window.__kiraRetainedBytes = () =>
   totalRetainedBytes() +

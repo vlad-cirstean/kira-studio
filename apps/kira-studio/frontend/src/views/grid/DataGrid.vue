@@ -2,7 +2,7 @@
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { type Range, useVirtualizer } from '@tanstack/vue-virtual';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
 import {
@@ -47,6 +47,7 @@ import {
   rangeToTsv,
   rowsToTsv,
 } from './clipboardFormats';
+import GridRow from './GridRow.vue';
 import { cellMenu, foreignKeyNavItems, headerMenu, referencedByItems, rowMenu } from './menu';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import {
@@ -58,6 +59,7 @@ import {
   stageEdit,
   stageInsertValue,
 } from './pendingChanges';
+import { type CellVM, ROW_HEIGHT_KEY, type RowSig, type RowVM, sameRowSig } from './rowVm';
 import * as scrollTrace from './scrollTrace';
 import { matchedRows, searchState } from './search';
 import { parseTextSortTerms } from './sortTerms';
@@ -66,6 +68,9 @@ import { runtime, setSort } from './state';
 const props = defineProps<{ tabId: string }>();
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+// P22 iter2 D4/F11(a): GridRow.vue's own row height, threaded via provide/inject rather than a
+// second prop on <GridRow> — see rowVm.ts's own comment on ROW_HEIGHT_KEY.
+provide(ROW_HEIGHT_KEY, rowHeight);
 
 function tab() {
   return findDataTab(props.tabId);
@@ -736,6 +741,21 @@ function cancelEdit(): void {
   editingCell.value = null;
 }
 
+// P22 iter2 D4: the inline editor is DataGrid.vue's own single overlay <input> (template, below the
+// row loop), not part of GridRow.vue's own subtree — see GridRow.vue's own comment for why. This
+// computed positions it over whichever cell is currently being edited, in the same `.grid-sizer`
+// content-space coordinates renderRows' own CellVM.left/RowVM.pos already use.
+const editingCellRect = computed(() => {
+  const e = editingCell.value;
+  if (!e) return null;
+  const offs = offsets.value;
+  return {
+    left: GUTTER_WIDTH + (offs[e.col] ?? 0),
+    width: (offs[e.col + 1] ?? 0) - (offs[e.col] ?? 0),
+    top: rowHeight.value + displayPositionOf(e.row) * rowHeight.value,
+  };
+});
+
 function onCellDblClick(row: number, displayCol: number): void {
   startEdit(row, displayCol);
 }
@@ -1241,108 +1261,125 @@ function cellNavEntry(
 // isSearchMatch/isCurrentSearchMatch/alignFor/isForeignKeyDisplayCol/isEditing/cellNavEntry keep
 // their signatures and are called from here instead of the template. Changes no rendered
 // attribute, class name or data-testid — the existing suite is the regression guard for it.
-interface CellVM {
-  col: number; // display column index — what selection/copy address
-  name: string; // column name — the v-for :key, unchanged
-  left: number;
-  width: number;
-  text: string;
-  isNull: boolean;
-  truncated: boolean;
-  staged: boolean;
-  editing: boolean;
-  navKind: 'fk' | 'pk' | null;
-  classes: Record<string, boolean>;
-  /** '' when nothing should override the cell's own CSS-driven colour (NULL, an FK link, a
-   *  pending edit, or the current search match all already carry their own meaningful colour via
-   *  .grid-cell's class rules — a data-type colour stacked on top of any of those would silently
-   *  replace a higher-priority signal, since an inline style always wins over a class). Otherwise
-   *  the column's own colorForColumn. */
-  color: string;
-}
-
-interface RowVM {
-  /** The page row index (P24 D3/D4): gutter number, selection, pending changes and search
-   *  matches all address a row by this, unchanged by filtering. */
-  row: number;
-  /** The display position: pixel placement only — identical to `row` when nothing is filtered
-   *  (P29 D11, preserving P24 D3/D4's split literally). */
-  pos: number;
-  gutterNumber: number;
-  dirty: boolean;
-  deleted: boolean;
-  cells: CellVM[];
-}
-
-const renderRows = computed<RowVM[]>(() => {
-  const cols = visibleColumnIndices.value;
+function buildRowVm(
+  row: number,
+  pos: number,
+  base: number,
+  cols: number[],
+  navCache: Map<number, Record<string, string | null>>,
+  colorByCol: Map<number, string>,
+): RowVM {
   const names = columnOrder.value;
   const offs = offsets.value;
-  const base = rowNumberBase.value;
-  // Per-render only, keyed by row: cellNavEntry's own narrow value map (P29 D6), built at most
-  // once even though several columns of the same row can each carry a nav affordance.
-  const navCache = new Map<number, Record<string, string | null>>();
-  // Item (regression pass, task batch P46-6/7): once per column, not once per cell —
-  // colorForColumn is a pure function of the column name, so every row of the same column shares
-  // one answer; a whole viewport's worth of rows re-deriving it per cell would be the same
-  // 7-11-calls-per-cell problem P29 D5 (this computed's own comment above) already fixed once.
-  const colorByCol = new Map<number, string>();
+  const cells: CellVM[] = [];
   for (const c of cols) {
-    colorByCol.set(c, colorForColumn(names[c] ?? ''));
-  }
-  const out: RowVM[] = [];
-  for (const { row, pos } of visibleRows.value) {
-    const cells: CellVM[] = [];
-    for (const c of cols) {
-      const name = names[c] ?? '';
-      const dc = displayCell(row, c);
-      const nav = cellNavEntry(row, c, navCache);
-      const selected = isSelected(row, c);
-      const isFk = isForeignKeyDisplayCol(c) && !dc.isNull;
-      const isCurrentMatch = isCurrentSearchMatch(row, c);
-      cells.push({
-        col: c,
-        name,
-        left: GUTTER_WIDTH + (offs[c] ?? 0),
-        width: (offs[c + 1] ?? 0) - (offs[c] ?? 0),
-        text: dc.text,
-        isNull: dc.isNull,
-        truncated: dc.truncated,
-        staged: dc.staged,
-        editing: isEditing(row, c),
-        navKind: nav?.kind ?? null,
-        // NULL, an FK link, a pending edit and the current search match each already carry their
-        // own meaningful colour via .grid-cell's own class rules (.cell-null, .fk, .pending-edit,
-        // .search-match-current) — skipped here so the inline style never silently outranks one.
-        color: dc.isNull || isFk || dc.staged || isCurrentMatch ? '' : (colorByCol.get(c) ?? ''),
-        classes: cellClass({
-          alignRight: alignFor(c) === 'right',
-          selected,
-          // P42 D21: an edge is drawn only where it sits on the selection's own outer
-          // perimeter — computed only for a selected cell, since an unselected one never draws
-          // any of these regardless. P43 iter3 D45: bounded by the grid's own extents, so a
-          // whole-row/whole-column selection's outermost cells draw their own end caps too.
-          selEdgeTop: selected && !isSelectedNeighbor(row - 1, c),
-          selEdgeRight: selected && !isSelectedNeighbor(row, c + 1),
-          selEdgeBottom: selected && !isSelectedNeighbor(row + 1, c),
-          selEdgeLeft: selected && !isSelectedNeighbor(row, c - 1),
-          searchMatch: isSearchMatch(row, c),
-          searchMatchCurrent: isCurrentMatch,
-          pendingEdit: dc.staged,
-          fk: isFk,
-          hasNav: !!nav,
-        }),
-      });
-    }
-    out.push({
-      row,
-      pos,
-      gutterNumber: base + row + 1,
-      dirty: isDirtyRow(row),
-      deleted: isDeleted(row),
-      cells,
+    const name = names[c] ?? '';
+    const dc = displayCell(row, c);
+    const nav = cellNavEntry(row, c, navCache);
+    const selected = isSelected(row, c);
+    const isFk = isForeignKeyDisplayCol(c) && !dc.isNull;
+    const isCurrentMatch = isCurrentSearchMatch(row, c);
+    cells.push({
+      col: c,
+      name,
+      left: GUTTER_WIDTH + (offs[c] ?? 0),
+      width: (offs[c + 1] ?? 0) - (offs[c] ?? 0),
+      text: dc.text,
+      isNull: dc.isNull,
+      truncated: dc.truncated,
+      staged: dc.staged,
+      editing: isEditing(row, c),
+      navKind: nav?.kind ?? null,
+      // NULL, an FK link, a pending edit and the current search match each already carry their
+      // own meaningful colour via .grid-cell's own class rules (.cell-null, .fk, .pending-edit,
+      // .search-match-current) — skipped here so the inline style never silently outranks one.
+      color: dc.isNull || isFk || dc.staged || isCurrentMatch ? '' : (colorByCol.get(c) ?? ''),
+      classes: cellClass({
+        alignRight: alignFor(c) === 'right',
+        selected,
+        // P42 D21: an edge is drawn only where it sits on the selection's own outer
+        // perimeter — computed only for a selected cell, since an unselected one never draws
+        // any of these regardless. P43 iter3 D45: bounded by the grid's own extents, so a
+        // whole-row/whole-column selection's outermost cells draw their own end caps too.
+        selEdgeTop: selected && !isSelectedNeighbor(row - 1, c),
+        selEdgeRight: selected && !isSelectedNeighbor(row, c + 1),
+        selEdgeBottom: selected && !isSelectedNeighbor(row + 1, c),
+        selEdgeLeft: selected && !isSelectedNeighbor(row, c - 1),
+        searchMatch: isSearchMatch(row, c),
+        searchMatchCurrent: isCurrentMatch,
+        pendingEdit: dc.staged,
+        fk: isFk,
+        hasNav: !!nav,
+      }),
     });
   }
+  return {
+    row,
+    pos,
+    gutterNumber: base + row + 1,
+    dirty: isDirtyRow(row),
+    deleted: isDeleted(row),
+    cells,
+  };
+}
+
+// Evicted and rebuilt each call, bounded by the current window exactly like the decode cache
+// (store.ts's own setVisibleWindow, F13's precedent) — never grows unbounded, never outlives a row
+// leaving the mounted range.
+let rowVmCache = new Map<number, { vm: RowVM; sig: RowSig }>();
+
+// P22 iter2 D4(ii): renderRows now returns a *reference-stable* RowVM for a row nothing relevant
+// changed about, keyed by row and compared via RowSig/sameRowSig (rowVm.ts) — the mechanism
+// GridRow.vue's own shouldUpdateComponent bail-out depends on (F11). See rowVm.ts's own comment on
+// RowSig for what each field guards and why the comparison is by reference, never by deep value.
+const renderRows = computed<RowVM[]>(() => {
+  const cols = visibleColumnIndices.value;
+  const base = rowNumberBase.value;
+  // Per-render only: colorForColumn is a pure function of the column name (Item, task batch
+  // P46-6/7), so every row of the same column shares one answer; cellNavEntry's own narrow value
+  // map (P29 D6) is built at most once even though several columns of the same row can each carry
+  // a nav affordance.
+  const navCache = new Map<number, Record<string, string | null>>();
+  const colorByCol = new Map<number, string>();
+  for (const c of cols) colorByCol.set(c, colorForColumn(columnOrder.value[c] ?? ''));
+
+  // P22 iter2 D4: `window.__kiraGridTuning.incrementalRows === false` restores pre-D4 behaviour
+  // (always allocate a fresh RowVM) — the real-Mac A/B's way of isolating D4 from D3 (§7.3 step 6).
+  const incremental = window.__kiraGridTuning?.incrementalRows !== false;
+  const p = pendingFor(props.tabId);
+  const editing = editingCell.value;
+  const selection = rt()?.selection ?? null;
+  const matches = matchIndex.value ?? null;
+  const meta = rt()?.meta ?? null;
+  const rowColoring = settingsState.appearance.rowColoring;
+
+  const nextCache = new Map<number, { vm: RowVM; sig: RowSig }>();
+  const out: RowVM[] = [];
+  for (const { row, pos } of visibleRows.value) {
+    const sig: RowSig = {
+      pageVersion: pageVersion.n,
+      pos,
+      gutterBase: base,
+      dirty: !!p?.edits.has(row),
+      deleted: !!p?.deletes.has(row),
+      editingCol: editing?.row === row ? editing.col : -1,
+      stagedEdit: p?.edits.get(row),
+      cols,
+      columnOrder: columnOrder.value,
+      selection,
+      matches,
+      meta,
+      rowColoring,
+    };
+    const cached = incremental ? rowVmCache.get(row) : undefined;
+    const entry =
+      cached && sameRowSig(cached.sig, sig)
+        ? cached
+        : { vm: buildRowVm(row, pos, base, cols, navCache, colorByCol), sig };
+    nextCache.set(row, entry);
+    out.push(entry.vm);
+  }
+  rowVmCache = nextCache;
   return out;
 });
 
@@ -1779,85 +1816,41 @@ defineExpose({ scrollCellIntoView });
         </div>
       </div>
 
-      <!-- P29 D5/D11: each rowVm/cellVm is built once per render (renderRows above) — the
-           template only reads fields. `rowVm.row` is the page-row index (selection/gutter
-           number/pending changes/search all address a row by it, unchanged by filtering);
-           `rowVm.pos` is separately its display position, used only for pixel placement, so the
-           gutter still reads the row's true number (`3, 17, 84, …`) even while filtered. -->
-      <div
-        v-for="rowVm in renderRows"
-        :key="rowVm.row"
-        class="grid-row"
-        data-testid="grid-row"
-        :data-row="rowVm.row"
-        :class="{ 'pending-delete': rowVm.deleted }"
-        :style="{ top: `${rowHeight + rowVm.pos * rowHeight}px`, height: `${rowHeight}px` }"
-      >
-        <!-- scroll-margin-top = rowHeight on gutter/grid cells below: `.header-row` is
-             position: sticky, which a native scrollIntoView(IfNeeded) call doesn't otherwise know
-             to leave room for — without it, scrolling row 0's cell "into view" can land it flush
-             against the container's top, right underneath the sticky header. -->
-        <div
-          class="gutter-cell"
-          data-testid="grid-gutter-cell"
-          :data-row="rowVm.row"
-          :class="{ dirty: rowVm.dirty, deleted: rowVm.deleted }"
-          :style="{ width: `${GUTTER_WIDTH}px`, scrollMarginTop: `${rowHeight}px` }"
-        >
-          {{ rowVm.gutterNumber }}
-        </div>
-        <div
-          v-for="cellVm in rowVm.cells"
-          :key="cellVm.name"
-          class="grid-cell"
-          data-testid="grid-cell"
-          :data-row="rowVm.row"
-          :data-col-index="cellVm.col"
-          :data-column="cellVm.name"
-          :data-null="cellVm.isNull"
-          :class="cellVm.classes"
-          :style="{
-            left: `${cellVm.left}px`,
-            width: `${cellVm.width}px`,
-            scrollMarginTop: `${rowHeight}px`,
-            color: cellVm.color || undefined,
-          }"
-        >
-          <input
-            v-if="cellVm.editing"
-            v-model="editingBuffer"
-            class="cell-input"
-            data-testid="grid-cell-input"
-            autofocus
-            @keydown="onEditKeydown"
-            @blur="commitEdit"
-            @click.stop
-            @mousedown.stop
-          />
-          <template v-else-if="cellVm.isNull">
-            <span class="cell-null">NULL</span>
-          </template>
-          <template v-else>
-            {{ cellVm.text
-            }}<span
-              v-if="cellVm.truncated"
-              class="truncated-marker"
-              v-tooltip="'value truncated at 64 KB'"
-              >…</span
-            >
-          </template>
-          <button
-            v-if="cellVm.navKind"
-            type="button"
-            class="cell-nav-btn"
-            data-testid="cell-nav-button"
-            :data-nav-kind="cellVm.navKind"
-            :aria-label="cellVm.navKind === 'fk' ? 'Go to referenced row' : 'Referenced by'"
-          >
-            <CodiconIcon :name="cellVm.navKind === 'fk' ? 'arrow-right' : 'references'" :size="13" />
-          </button>
-        </div>
-      </div>
+      <!-- P29 D5/D11: each rowVm/cellVm is built once per render (renderRows above) — GridRow.vue
+           only reads fields. `rowVm.row` is the page-row index (selection/gutter number/pending
+           changes/search all address a row by it, unchanged by filtering); `rowVm.pos` is
+           separately its display position, used only for pixel placement, so the gutter still
+           reads the row's true number (`3, 17, 84, …`) even while filtered.
+           P22 iter2 D4: a component, not inline markup — `row-vm` is its one prop, on purpose
+           (F11(a)/GridRow.vue's own comment). Cell/gutter events are handled by this file's own
+           delegated listeners on `.data-grid` above (D5), not by GridRow.vue itself. -->
+      <GridRow v-for="rowVm in renderRows" :key="rowVm.row" :row-vm="rowVm" />
+
+      <!-- P22 iter2 D4: the inline editor lives here, not inside GridRow.vue — a single overlay
+           positioned over whichever cell is being edited (editingCellRect), since at most one cell
+           is ever editing at once and threading that state into every row would be exactly the
+           kind of second prop F11(a) warns against. `.cell-input-overlay` supplies the
+           position/z-index a nested cell-input never needed (its parent .grid-cell provided that
+           context); the cell underneath renders nothing while editing (GridRow.vue's own
+           `v-if="!cellVm.editing"`), so its own background/selection styling still shows through
+           this input's transparent one. -->
+      <input
+        v-if="editingCellRect"
+        v-model="editingBuffer"
+        class="cell-input cell-input-overlay"
+        data-testid="grid-cell-input"
+        autofocus
+        :style="{
+          left: `${editingCellRect.left}px`,
+          top: `${editingCellRect.top}px`,
+          width: `${editingCellRect.width}px`,
+          height: `${rowHeight}px`,
+        }"
+        @keydown="onEditKeydown"
+        @blur="commitEdit"
+        @click.stop
+        @mousedown.stop
+      />
 
       <!-- P24 D5: a pending insert is never hidden by the filter, whatever the query says — its
            *pixel* position follows the display row count (renders after the last visible row),
@@ -2016,227 +2009,19 @@ defineExpose({ scrollCellIntoView });
   z-index: 1;
 }
 
-.grid-row {
-  position: absolute;
-  left: 0;
-  right: 0;
-  /* Scopes a row's layout invalidation to the row (P29 D8) — not `paint` (the cells already clip
-     their own overflow, and the sticky gutter/absolutely-positioned nav button both sit inside
-     this box) and not `will-change` (this compositing a ~280 000px-tall sizer trades §2.1 for
-     §2.2, the way P12's memory findings warn against). */
-  contain: layout;
-}
+/* P22 iter2 D4: .grid-row/.gutter-cell/.grid-cell and their state variants moved to GridRow.vue's
+   own (unscoped) style block — Vue's scoped CSS only stamps a child component's *root* element with
+   the parent's scope attribute, not its descendants, so `.gutter-cell`/`.grid-cell` rules kept here
+   would silently stop applying to a row rendered by <GridRow>. `.grid-row` itself still needs no
+   duplicate rule here: it's on GridRow's root, which *does* carry this file's scope attribute, and
+   the insert-row template below (`class="grid-row pending-insert"`) picks up GridRow.vue's now-
+   unscoped rule the same as any other `.grid-row` in the app — see that file for the full set,
+   including `.grid-row.pending-insert`'s own background. */
 
-/* No zebra striping — the design's own _gridrows.html/_style.css draws no alternating row
-   colour, only the hover state below. */
-.grid-row:hover .grid-cell:not(.selected),
-.grid-row:hover .gutter-cell {
-  background: var(--kira-hover);
-}
-
-.gutter-cell {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: var(--kira-s-4);
-  box-sizing: border-box;
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-disabled);
-  font-size: var(--kira-t-xs);
-  border-right: var(--kira-border-width) solid var(--kira-border-strong);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  cursor: pointer;
-}
-
-/* README/FIX: a row with a staged edit gets the same 2px warn rail the mockup's
-   .tr.dirty .td.gutter::before draws — never a background tint across the whole row.
-   `.gutter-cell` is already `position: sticky` (a valid containing block for an absolutely
-   positioned child in its own right) — an added `position: relative` here used to override that
-   sticky positioning outright (a two-class selector beats the base rule's one), unpinning a
-   dirty/deleted/inserted row's index cell so it scrolled away horizontally with the rest of the
-   row instead of staying put. */
-.gutter-cell.dirty::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--kira-warn);
-}
-
-/* P31 D31/F30: a row staged for deletion gets its own red rail — mutually exclusive with .dirty
-   above (isDirtyRow no longer counts a delete), since a row headed for deletion will not have any
-   staged edits applied. */
-.gutter-cell.deleted::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--kira-error);
-}
-
-/* A pending-insert row is not "edited" (nothing existing changed) — same 2px rail treatment,
-   coloured ok/green instead of warn/yellow so the two staged-change kinds read apart at a glance. */
-.gutter-cell.inserted::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--kira-ok);
-}
-
-.grid-cell {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--kira-s-4);
-  box-sizing: border-box;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  border-right: var(--kira-border-width) solid var(--kira-border);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  cursor: default;
-  /* D1: guarantees the native role:'copy'/'paste' accelerators have nothing to act on while
-     the grid has focus, so they never race the grid's own local Ctrl+C/Ctrl+V handler. */
-  user-select: none;
-}
-
-.grid-cell.align-right {
-  justify-content: flex-end;
-  font-variant-numeric: tabular-nums;
-}
-
-.grid-cell.fk {
-  color: var(--kira-info);
-}
-
-/* The nav button only shows on hover/selected, but the text always truncates before its slot —
-   otherwise it's only "over the text" once you're already hovering to click it. */
-.grid-cell.has-nav {
-  padding-right: calc(var(--kira-s-4) + 18px);
-}
-
-/* P42 D21/F15: a per-cell `outline` drew a complete ring around every selected cell — two
-   adjacent selected cells' touching edges were two separate 1px lines, one pixel apart, both
-   focus-coloured. Each of the four sides is now its own inset box-shadow layer, switched on only
-   when that side sits on the selection's own outer perimeter (.sel-t/.sel-r/.sel-b/.sel-l,
-   renderRows above) — an internal seam between two selected cells gets no shadow from either
-   side, so the selection's outer boundary reads as one uniform 1px line. Custom properties (not
-   four separate declarations) are what make this compose: box-shadow's four layers are always
-   present, each independently no-op (transparent, zero-sized) until its own edge class overrides
-   just that one variable. */
-.grid-cell.selected {
-  background: var(--kira-select);
-  --sel-t: 0 0 0 0 transparent;
-  --sel-r: 0 0 0 0 transparent;
-  --sel-b: 0 0 0 0 transparent;
-  --sel-l: 0 0 0 0 transparent;
-  box-shadow:
-    inset var(--sel-t),
-    inset var(--sel-r),
-    inset var(--sel-b),
-    inset var(--sel-l);
-}
-
-.grid-cell.selected.sel-t {
-  --sel-t: 0 var(--kira-border-width) 0 0 var(--kira-focus);
-}
-
-.grid-cell.selected.sel-r {
-  --sel-r: calc(-1 * var(--kira-border-width)) 0 0 0 var(--kira-focus);
-}
-
-.grid-cell.selected.sel-b {
-  --sel-b: 0 calc(-1 * var(--kira-border-width)) 0 0 var(--kira-focus);
-}
-
-.grid-cell.selected.sel-l {
-  --sel-l: var(--kira-border-width) 0 0 0 var(--kira-focus);
-}
-
-.grid-cell.search-match {
-  background: var(--kira-search-match);
-}
-
-.grid-cell.search-match-current {
-  background: var(--kira-search-match-current);
-  color: var(--kira-bg);
-}
-
-.cell-null {
-  color: var(--kira-fg-disabled);
-  font-style: italic;
-}
-
-.truncated-marker {
-  color: var(--kira-fg-muted);
-  margin-left: 2px;
-  flex-shrink: 0;
-}
-
-/* p-td.edited: the warn colour is the whole affordance, never a background tint (that's reserved
-   for selection/search) — a selected+edited cell still shows both, exactly like _gridrows.html's
-   "sel edited" row. */
-.grid-cell.pending-edit {
-  color: var(--kira-warn);
-}
-
-/* P7 D5/D8: pure-CSS hover/selection affordance, no JS-tracked hover state — mirrors
-   .header-select-zone/.resize-handle's own absolute-inside-absolute precedent above. */
-.cell-nav-btn {
-  display: none;
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-elevated);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  z-index: 1;
-}
-
-.cell-nav-btn:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-.grid-cell:hover .cell-nav-btn,
-.grid-cell.selected .cell-nav-btn {
-  display: flex;
-}
-
-.grid-row.pending-delete {
-  text-decoration: line-through;
-  opacity: 0.5;
-}
-
-.grid-row.pending-insert {
-  background: color-mix(in srgb, var(--kira-accent) 8%, transparent);
-}
-
-/* Transparent, not an opaque fill: this input always sits inside a .grid-cell that already
-   carries its own background (blue .selected for a normal edit, the accent-tinted row for an
-   insert) — an opaque --kira-bg-input here just blotted out that cell's own colour with plain
-   grey the instant you started typing. */
+/* Transparent, not an opaque fill: this input is always positioned over a .grid-cell/.insert-cell
+   that already carries its own background (blue .selected for a normal edit, the accent-tinted row
+   for an insert) — an opaque --kira-bg-input here just blotted out that cell's own colour with
+   plain grey the instant you started typing. */
 .cell-input {
   width: 100%;
   height: 100%;
@@ -2250,9 +2035,18 @@ defineExpose({ scrollCellIntoView });
   font: inherit;
 }
 
+/* P22 iter2 D4: the row-cell editor moved from being a child of its own .grid-cell (which supplied
+   position/sizing implicitly) to a single sibling overlay in this file's own template — position
+   and stacking it now needs its own rule; :style still supplies the exact left/top/width. */
+.cell-input-overlay {
+  position: absolute;
+  z-index: 3;
+}
+
 /* An outline per input reads fine for the single active inline-edit cell, but every column of a
-   freshly-added row gets one at once — the row's own accent tint (.pending-insert above) is
-   already enough of a "this is new" signal without every cell boxed in blue too. */
+   freshly-added row gets one at once — the row's own accent tint (GridRow.vue's own
+   .pending-insert) is already enough of a "this is new" signal without every cell boxed in blue
+   too. */
 .insert-cell .cell-input {
   outline: none;
 }
