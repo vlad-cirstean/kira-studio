@@ -326,8 +326,9 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
   if (connection?.autoExplain) {
     const explainOpId = crypto.randomUUID();
     rt.explainOpId = explainOpId;
+    let autoExplainResult: AutoExplainState | null;
     try {
-      rt.autoExplain = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
+      autoExplainResult = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
     } catch (err) {
       // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
       // — Stop was pressed while this batch was the only op registered on the backend, so the
@@ -344,6 +345,10 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
     // Not only opId (a newer run superseding this one) — status too, since a Stop press during
     // this batch is only visible through status, not through opId changing (finding #5).
     if (rt.opId !== opId || rt.status !== 'running') return;
+    // P12 round 1 finding #6: assigned only after the supersession check above, not before —
+    // a superseded run's own (possibly slower) EXPLAIN result must never overwrite whatever the
+    // run that actually superseded it already put here (including having cleared it to null).
+    rt.autoExplain = autoExplainResult;
   }
 
   try {
