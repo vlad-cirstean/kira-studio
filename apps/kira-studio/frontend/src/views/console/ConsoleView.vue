@@ -201,13 +201,22 @@ function onSavedMenuClose(): void {
 const localDoc = shallowRef(props.tab.state.text);
 let lastEmitted = props.tab.state.text;
 
-function onDocChange(text: string): void {
-  lastEmitted = text;
-  setText(props.tab.id, text);
+// P12 round 1 finding #7: the three strips below are stale the moment the text they describe is
+// gone — not only on a keystroke (onDocChange), but also on any *external* text replacement
+// (ConsoleSavedMenu's apply(), this view's own onFormat() below), both of which call setText()
+// directly and go through CodeMirrorHost's external-sync path, which deliberately never re-emits
+// update:doc (the watcher below is what notices those instead). Shared so neither path can drift.
+function resetStalePreviewState(): void {
   formatError.value = null;
   explainError.value = null;
   // D19: the auto-explain strip clears on the next document edit, same as the two above.
   clearAutoExplain(props.tab.id);
+}
+
+function onDocChange(text: string): void {
+  lastEmitted = text;
+  setText(props.tab.id, text);
+  resetStalePreviewState();
 }
 
 watch(
@@ -215,6 +224,7 @@ watch(
   (text) => {
     if (text === lastEmitted) return;
     localDoc.value = text;
+    resetStalePreviewState();
   },
 );
 
@@ -258,7 +268,11 @@ function onFormat(): void {
   void (async () => {
     const result = await formatConsoleText(kind, props.tab.state.text);
     if (result.ok) {
-      formatError.value = null;
+      // Explicit, not left to the watch() above alone: an already-formatted document formats to
+      // byte-identical text, which never triggers that watcher (props.tab.state.text doesn't
+      // change) — Format succeeding is still a "next action" that should clear a stale explain/
+      // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
+      resetStalePreviewState();
       setText(props.tab.id, result.text);
     } else {
       formatError.value = result.reason ?? 'could not format this query';

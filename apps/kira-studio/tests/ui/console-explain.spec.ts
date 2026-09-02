@@ -417,6 +417,68 @@ test('Query console — auto-explain warns and still runs the query', async ({ r
   await expect(view.locator('[data-testid="explain-result-view"]')).toBeVisible();
 });
 
+// P12 round 1 finding #7: loading a saved query writes the new text via setText(), which goes
+// through CodeMirrorHost's external-sync path — the one path that deliberately never re-emits
+// update:doc, the only event onDocChange (the sole place that used to reset this strip) ever saw.
+test('Query console — loading a saved query clears a stale auto-explain warning', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-auto-explain-stale';
+  const CONNECTION_SUMMARY = {
+    ...postgresConnectionSummary(CONNECTION_ID, 'Stale DB', 'amber'),
+    autoExplain: true,
+  };
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+  const RUN_SQL = 'SELECT * FROM t';
+  const SAVED_QUERY = {
+    kind: 'console' as const,
+    id: 'saved-query-stale-1',
+    connectionId: CONNECTION_ID,
+    path: ORDER_ITEMS_PATH,
+    name: 'Other query',
+    pinned: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    usedAt: null,
+    body: { text: 'SELECT 1;' },
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Stale DB', 'amber', true),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+    {
+      channel: IPC.queriesListConsole,
+      args: { connectionId: CONNECTION_ID, path: ORDER_ITEMS_PATH },
+      response: [SAVED_QUERY],
+    },
+    { channel: IPC.queriesTouch, args: { id: SAVED_QUERY.id }, response: undefined },
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    explainSnap(CONNECTION_ID, RUN_SQL, JOIN_PLAN_JSON),
+    runSnap(CONNECTION_ID, RUN_SQL, numberPage('id', '1')),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Stale DB', 'amber', { autoExplain: true });
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await typeInto(view, page, RUN_SQL);
+  await page.click('[data-testid="console-run-statement"]');
+
+  const strip = view.locator('[data-testid="console-auto-explain"]');
+  await expect(strip).toBeVisible();
+
+  await page.click('[data-testid="console-saved-toggle"]');
+  await page.locator('[data-testid="console-saved-entry"]', { hasText: 'Other query' }).click();
+
+  await expect(view.locator('.cm-content')).toContainText('SELECT 1;');
+  await expect(strip).toHaveCount(0);
+});
+
 test('Query console — auto-explain off issues one execute call, not two', async ({ relaunch }) => {
   const CONNECTION_ID = 'conn-console-auto-explain-off';
   const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'No Auto DB', 'cyan');
