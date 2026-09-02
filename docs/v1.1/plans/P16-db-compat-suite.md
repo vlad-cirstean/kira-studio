@@ -569,7 +569,7 @@ fixtures are stricter (F3, F4) or where the library states a bound no container 
 | **mysql** | `go-sql-driver/mysql` v1.10.0 | **5.7** — README:49; CI `5.7` | **9.0** in CI; **9.7** is current LTS | `mysql:8.0` | `mysql:9.7` | Floor raised: `definition.go:26-28` needs `information_schema.CHECK_CONSTRAINTS` (8.0.16+); seed needs expression defaults (8.0.13+) and CTEs (8.0+). 5.7 EOL 2023-10-31 | HIGH |
 | **sqlite** | `modernc.org/sqlite` v1.57.0 (SQLite 3.53.3) | n/a — embedded | n/a | **not in matrix** | **not in matrix** | No server exists to vary (F11) | HIGH |
 | **clickhouse** | **none** — `net/http` | **25.3 LTS** (interpretation, F8) | **26.8 LTS** — newest published tag | `clickhouse/clickhouse-server:25.3` | `clickhouse/clickhouse-server:26.8` | No client library; bounds derive from ClickHouse's own policy, floor deliberately one LTS below the policy window | MED |
-| **mongodb** | `mongo-driver/v2` v2.8.2 | **4.2** — README:27; Evergreen `:1959` | **8.0** explicit + `latest`/`rapid` axes | `mongo:4.2` | `mongo:8.3` | Ceiling is newest GA (covered upstream by `latest`); floor may rise to 4.4 if §6 shows the fixture's two-boot auth path fails on 4.2 | HIGH max / MED min |
+| **mongodb** | `mongo-driver/v2` v2.8.2 | **4.2** — README:27; Evergreen `:1959` | **8.0** explicit + `latest`/`rapid` axes | `mongo:4.4` | `mongo:8.3` | Floor raised past the library's own 4.2 by §6's real run: `insert`/`delete` commands reject the `comment` field on 4.2 (`(Location40415) BSON field 'insert.comment' is an unknown field`) — `comment` on write commands is 4.4+ only, and every mutate call in this adapter sends one for cancel/kill-op correlation. Ceiling is newest GA (covered upstream by `latest`) | HIGH max / HIGH min |
 | **redis** | `redis/go-redis/v9` v9.20.0 | **8.0** official / **7.0** unofficial — README:20,28 | **8.8** — README:23 | `redis:7.0` | `redis:8.8` | Floor is the README's own explicit unofficial statement; ceiling is the library's claim, not the newest image (8.10 exists) | HIGH |
 | **kafka** | `twmb/franz-go` v1.21.6 | **0.8.0** — README:14,21 | **4.2+** — README:21 | `confluentinc/cp-kafka:7.4.0` (= Kafka 3.4) | `confluentinc/cp-kafka:8.3.0` (= Kafka 4.3.0) | Floor is a harness floor: the testcontainers module is KRaft-only and Confluent-image-specific (F7, F9). ZooKeeper-era Kafka is unreachable by this harness at any effort worth spending | MED min / HIGH max |
 | **sqs** | `aws-sdk-go-v2/service/sqs` v1.48.1 | n/a — AWS is versionless | n/a | `localstack/localstack:3` | `localstack/localstack:4` | LocalStack major stands in for "the emulator we test against"; **no UI note** (F10, D7) | HIGH |
@@ -598,7 +598,7 @@ Apache Kafka 4.3.0.
 | mariadb | `Requires MariaDB 10.11 or newer.` |
 | mysql | `Requires MySQL 8.0 or newer.` |
 | clickhouse | `Requires ClickHouse 25.3 or newer.` |
-| mongodb | `Requires MongoDB 4.2 or newer.` |
+| mongodb | `Requires MongoDB 4.4 or newer.` |
 | redis | `Requires Redis 7.0 or newer.` |
 | kafka | `Requires Apache Kafka 3.4 or newer.` |
 | sqlite | `Reads any SQLite 3 database file — no server required.` |
@@ -665,7 +665,7 @@ Resulting run list — **16 `go test` invocations, 18 container starts**:
 | 1-2 | `postgres` | `POSTGRES=postgres:14-alpine` / `:18-alpine` | 2 |
 | 3-4 | `mysqlfamily` | `MARIADB=mariadb:10.11` + `MYSQL=mysql:8.0` / `mariadb:12.3` + `mysql:9.7` | 4 |
 | 5-6 | `clickhouse` | `CLICKHOUSE=…:25.3` / `…:26.8` | 2 |
-| 7-8 | `mongo` | `MONGO=mongo:4.2` / `mongo:8.3` | 2 |
+| 7-8 | `mongo` | `MONGO=mongo:4.4` / `mongo:8.3` | 2 |
 | 9-10 | `redis` | `REDIS=redis:7.0` / `redis:8.8` | 2 |
 | 11-12 | `kafka` | `KAFKA=confluentinc/cp-kafka:7.4.0` / `:8.3.0` | 2 |
 | 13-14 | `sqs` | `LOCALSTACK=localstack/localstack:3` / `:4` | 2 |
