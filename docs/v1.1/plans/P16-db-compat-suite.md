@@ -962,31 +962,80 @@ After the run, in the same commits that carry the fixes:
 - `bun run test:ui` passes, including the new connection-dialog case.
 - No adapter's conformance suite loses a case.
 
+### 6.7 What the first run found
+
+Run in this sandbox 2026-09-01/02, staged per kind through `scripts/db-compat.sh --mirror`
+(images pulled once, then re-run `--no-pull` after each fix) — dockerd started per AGENTS.md,
+every image pulled through `mirror.gcr.io` and retagged, no image required a workaround beyond
+that. **All sixteen pairs pass green** as of the final run; three real findings surfaced along the
+way, all fixed under D10:
+
+1. **MySQL 9.x removed the native `MD5()`/`SHA1()` functions** (disposition 3, fixture-only).
+   `mysql:9.7` rejected `seedMysqlExtras`' `big_rows` bulk insert outright: `Error 1305 (42000):
+   FUNCTION kira_test.MD5 does not exist` — the same error MySQL gives for a missing stored
+   routine, confirmed directly against a live `mysql:9.7` container (`SELECT MD5('x')` fails the
+   same way with a database selected; `SHA2(...)` is unaffected). MariaDB 12.3 keeps `MD5()`
+   working (verified directly), so this is MySQL-specific. Nothing in the adapter itself calls
+   `MD5`/`SHA1` — only the fixture's bulk-insert payload generator did, and nothing reads that
+   value back for its hash properties, so `LEFT(SHA2(…, 256), 32)` is a drop-in replacement that
+   keeps `big_rows.payload`'s existing `CHAR(32)` width. Fixed in `fix(testsupport): stop seeding
+   MySQL's big_rows with MD5()` (`5357bbf`).
+2. **MongoDB 4.2's boot log doesn't match the fixture's wait strategy** (disposition 1, a real
+   fixture bug). `wait.ForLog("Waiting for connections")` is case-sensitive; MongoDB 4.4+ logs
+   structured JSON with `"msg":"Waiting for connections"` (capital W, matches), but 4.2's plain-text
+   logging spells the identical line lowercase — `waiting for connections on port 27017` (both
+   verified directly against live containers) — so the fixture never saw two occurrences and timed
+   out at 120s with "matched 0 times, expected 2" on every one of 4.2's 22 test cases. Fixed with a
+   case-insensitive regex wait strategy in `fix(testsupport): match Mongo's wait-for-connections log
+   case-insensitively` (`42d0411`) — this is a genuine improvement independent of the floor below,
+   since it makes the fixture robust to either logging era.
+3. **MongoDB 4.2 rejects `comment` on write commands** (disposition 2, a genuine server-version
+   capability gap — **the Mongo floor moves to 4.4**). With (2) fixed, 4.2 still failed three real
+   cases: `(Location40415) BSON field 'insert.comment' is an unknown field` /
+   `'delete.comment' is an unknown field'`. Every mutate call in this adapter
+   (`options.InsertOne().SetComment(op.OpID)` and its `Update`/`Delete`/`Replace` siblings) sets a
+   comment for cancel/kill-op correlation with the operation's own `OpID` — a real capability, not
+   incidental, so the fix is not to drop it. `comment` on `insert`/`update`/`delete` is a documented
+   MongoDB 4.4+ feature; confirmed green by pulling `mongo:4.4` directly and running the full suite
+   against it (`ok … 8.466s`), then again through the script. §3's Suite MIN, the UI note table, and
+   `MIN_SERVER_VERSION.mongodb` were updated together in `fix(mongo): raise the compat suite's
+   published MongoDB floor to 4.4` (`fbff4de`) — the published floor is 4.4, not the driver's
+   documented 4.2, and that gap is now recorded here rather than silent.
+
+Everything else matched its §6.4 prediction or better: postgres 14/18, mariadb 10.11/12.3,
+clickhouse 25.3/26.8, redis 7.0/8.8, kafka (cp-kafka 7.4.0/8.3.0, i.e. Kafka 3.4/4.3.0), and
+localstack 3/4 for both sqs and s3 all passed on the **first** attempt with no adapter or fixture
+change — including the two other predicted risk points (§6.4 #6 Redis 8's `INFO`/`MEMORY USAGE`
+output, #7 `cp-kafka:7.4.0`'s KRaft storage format, #8 ClickHouse's `fixedSettings`), none of which
+turned out to be real. The four hardcoded version regexes (D4/C2) correctly asserted the real
+version at every extreme, including the two they had never been able to assert before (postgres 14
+and 18, mongo 4.4 and 8.3, redis 7.0 and 8.8, mysql 8.0 and 9.7).
+
 ---
 
 ## 7. Acceptance checklist
 
-- [ ] Every adapter is enumerated with its exact client library and `go.mod` version (§1.1).
-- [ ] Every min/max claim cites a real source — README line, CI config line, upstream URL — or is
+- [x] Every adapter is enumerated with its exact client library and `go.mod` version (§1.1).
+- [x] Every min/max claim cites a real source — README line, CI config line, upstream URL — or is
       explicitly marked `[interpretation]` with what it interprets from (§3).
-- [ ] Every image in §3 was probed against the real registry, including the negatives (§3).
-- [ ] `testsupport.ImageFor` routes all eight pins; unset env = today's behaviour, byte for byte.
-- [ ] `testsupport.ServerMajor` has a unit test covering `17-alpine`, `12.3`, a namespaced image, a
+- [x] Every image in §3 was probed against the real registry, including the negatives (§3).
+- [x] `testsupport.ImageFor` routes all eight pins; unset env = today's behaviour, byte for byte.
+- [x] `testsupport.ServerMajor` has a unit test covering `17-alpine`, `12.3`, a namespaced image, a
       `:latest` tag, and a name with no tag.
-- [ ] The four hardcoded version regexes are derived, not relaxed; MariaDB's and ClickHouse's are
+- [x] The four hardcoded version regexes are derived, not relaxed; MariaDB's and ClickHouse's are
       now stricter than before.
-- [ ] `scripts/db-compat.sh` runs all sixteen pairs, does not abort on the first failure, prints one
+- [x] `scripts/db-compat.sh` runs all sixteen pairs, does not abort on the first failure, prints one
       summary table, exits non-zero on any failure, and passes `-count=1`.
-- [ ] `--mirror` applies AGENTS.md's `library/` rule correctly for all eight image names.
-- [ ] `.github/workflows/db-compat.yml` has `workflow_dispatch` and nothing else; `ci.yml` is
+- [x] `--mirror` applies AGENTS.md's `library/` rule correctly for all eight image names.
+- [x] `.github/workflows/db-compat.yml` has `workflow_dispatch` and nothing else; `ci.yml` is
       untouched; no CI job references `test:compat`.
-- [ ] `MIN_SERVER_VERSION` lives in `packages/shared/domain/connection.ts` beside `DEFAULT_PORT`;
+- [x] `MIN_SERVER_VERSION` lives in `packages/shared/domain/connection.ts` beside `DEFAULT_PORT`;
       SQS and S3 have no entry; SQLite's entry says "no server required".
-- [ ] The dialog shows the note on step `details` for a server kind, shows the file wording for
+- [x] The dialog shows the note on step `details` for a server kind, shows the file wording for
       SQLite, and shows nothing for S3 — asserted in `tests/ui/connections.spec.ts`.
-- [ ] **The suite has actually been run against real containers**, all sixteen pairs, and the run's
+- [x] **The suite has actually been run against real containers**, all sixteen pairs, and the run's
       results are recorded in §6.5.
-- [ ] Every failure the run produced is fixed under D10's three dispositions — none by weakening an
+- [x] Every failure the run produced is fixed under D10's three dispositions — none by weakening an
       assertion — and every published minimum in §3 and in `MIN_SERVER_VERSION` is one the run
       proved green.
 
