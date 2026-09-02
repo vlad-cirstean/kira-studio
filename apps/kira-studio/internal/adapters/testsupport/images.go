@@ -2,6 +2,7 @@ package testsupport
 
 import (
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -51,3 +52,27 @@ func lastSegment(image string) string {
 	}
 	return image
 }
+
+// VersionPattern builds the ^<prefix> <major>\. assertion a conformance suite's own
+// ServerVersion check runs against — "^PostgreSQL 17\." for major "17" — or falls back to
+// "^<prefix> \d+\." when ServerMajor could not derive one (P16 D4). Every kind whose pin is
+// wired through ImageFor uses this so the assertion tracks whichever image the compat run
+// actually asked for, instead of a version baked in at the time the suite was written.
+func VersionPattern(prefix, major string) *regexp.Regexp {
+	digits := `\d+`
+	if major != "" {
+		digits = regexp.QuoteMeta(major)
+	}
+	return regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + ` ` + digits + `\.`)
+}
+
+// PostgresServerMajor, MysqlServerMajor, MariaServerMajor, ClickHouseServerMajor, MongoServerMajor
+// and RedisServerMajor are ServerMajor pre-bound to each kind's own pinned default image, so a
+// conformance suite's version assertion never has to duplicate the pinned literal testsupport
+// already owns.
+func PostgresServerMajor() string   { return ServerMajor("postgres", defaultPostgresImage) }
+func MysqlServerMajor() string      { return ServerMajor("mysql", mysqlImage) }
+func MariaServerMajor() string      { return ServerMajor("mariadb", mariaImage) }
+func ClickHouseServerMajor() string { return ServerMajor("clickhouse", clickhouseImage) }
+func MongoServerMajor() string      { return ServerMajor("mongo", MongoImage) }
+func RedisServerMajor() string      { return ServerMajor("redis", RedisImage) }

@@ -72,7 +72,7 @@ func connectedAdapter(t *testing.T, cfg model.ResolvedConnectionConfig) adapters
 	return a
 }
 
-var versionRE = regexp.MustCompile(`^ClickHouse \d+\.`)
+var versionRE = testsupport.VersionPattern("ClickHouse", testsupport.ClickHouseServerMajor())
 
 func derefStr(s *string) string {
 	if s == nil {

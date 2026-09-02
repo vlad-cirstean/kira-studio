@@ -120,12 +120,12 @@ func connectedAdapter(t *testing.T, kind string, cfg model.ResolvedConnectionCon
 
 func TestMariaDB(t *testing.T) {
 	fixture := testsupport.StartMariadb(t)
-	runFamilySuite(t, "mariadb", fixture.Config, regexp.MustCompile(`^MariaDB \d+\.`))
+	runFamilySuite(t, "mariadb", fixture.Config, testsupport.VersionPattern("MariaDB", testsupport.MariaServerMajor()))
 }
 
 func TestMySQL(t *testing.T) {
 	fixture := testsupport.StartMysql(t)
-	runFamilySuite(t, "mysql", fixture.Config, regexp.MustCompile(`^MySQL 8\.`))
+	runFamilySuite(t, "mysql", fixture.Config, testsupport.VersionPattern("MySQL", testsupport.MysqlServerMajor()))
 }
 
 var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)

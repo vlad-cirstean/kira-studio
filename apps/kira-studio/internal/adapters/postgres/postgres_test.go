@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	regexpPGVersion = regexp.MustCompile(`^PostgreSQL 17`)
+	regexpPGVersion = testsupport.VersionPattern("PostgreSQL", testsupport.PostgresServerMajor())
 	bigRowsDetail   = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
 )
 
@@ -85,7 +85,7 @@ func TestPostgres_ConnectDisconnect(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 	if !regexpPGVersion.MatchString(info.ServerVersion) {
-		t.Errorf("ServerVersion = %q, want to start with \"PostgreSQL 17\"", info.ServerVersion)
+		t.Errorf("ServerVersion = %q, want to match %s", info.ServerVersion, regexpPGVersion)
 	}
 
 	if err := a.Disconnect(context.Background()); err != nil {

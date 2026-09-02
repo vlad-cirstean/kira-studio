@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 
 var (
 	deps           = adapters.Deps{Log: func(level, message string) {}}
-	regexpRedisVer = regexp.MustCompile(`^Redis 7`)
+	regexpRedisVer = testsupport.VersionPattern("Redis", testsupport.RedisServerMajor())
 	seg            = testsupport.Seg
 	childNames     = testsupport.ChildNames
 	containsName   = testsupport.ContainsName
@@ -76,7 +76,7 @@ func TestRedis_ConnectDisconnect(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 	if !regexpRedisVer.MatchString(info.ServerVersion) {
-		t.Errorf("ServerVersion = %q, want to start with \"Redis 7\"", info.ServerVersion)
+		t.Errorf("ServerVersion = %q, want to match %s", info.ServerVersion, regexpRedisVer)
 	}
 	if info.Details["database"] != "db0" {
 		t.Errorf("Details[database] = %q, want db0", info.Details["database"])

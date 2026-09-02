@@ -8,7 +8,6 @@ package mongo_test
 import (
 	"context"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +33,7 @@ func TestMain(m *testing.M) {
 
 var (
 	deps               = adapters.Deps{Log: func(level, message string) {}}
-	regexpMongoVersion = regexp.MustCompile(`^MongoDB 7`)
+	regexpMongoVersion = testsupport.VersionPattern("MongoDB", testsupport.MongoServerMajor())
 )
 
 var (
@@ -106,7 +105,7 @@ func TestMongo_ConnectDisconnect(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 	if !regexpMongoVersion.MatchString(info.ServerVersion) {
-		t.Errorf("ServerVersion = %q, want to start with \"MongoDB 7\"", info.ServerVersion)
+		t.Errorf("ServerVersion = %q, want to match %s", info.ServerVersion, regexpMongoVersion)
 	}
 	if info.Details["database"] != testsupport.MongoDatabase {
 		t.Errorf("Details[database] = %q, want %q", info.Details["database"], testsupport.MongoDatabase)
