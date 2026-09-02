@@ -26,6 +26,10 @@ function columnFlags(col: DdlColumn): string {
     col.primaryKey && 'PRIMARY KEY',
     col.notNull && 'NOT NULL',
     col.unique && 'UNIQUE',
+    // P12 round 1 finding #18: ddl.ts's own handleCreateIndex sets this and nothing consumed it —
+    // the obvious home for it, alongside the other three declared-in-DDL flags this hover already
+    // surfaces the same way.
+    col.indexed && 'INDEXED',
   ].filter((f): f is string => !!f);
   return flags.join(', ');
 }

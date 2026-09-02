@@ -130,7 +130,7 @@ describe('parseDdl — IF NOT EXISTS, and CREATE INDEX marking a column indexed'
     expect(schema.tables[0]).toMatchObject({ name: 'users', schema: 'public' });
   });
 
-  test('CREATE INDEX marks the indexed column, with no completion-visible effect', () => {
+  test('CREATE INDEX marks the indexed column (surfaced on hover, not completion)', () => {
     const schema = parseDdl(
       PostgreSQL,
       'CREATE TABLE users (id integer, email varchar(255));\nCREATE INDEX users_email_idx ON users (email);',

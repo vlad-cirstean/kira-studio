@@ -25,8 +25,8 @@ export interface DdlColumn {
   primaryKey?: boolean;
   notNull?: boolean;
   unique?: boolean;
-  /** Set when a `CREATE INDEX` in the same document names this column — Half B's own issue text
-   *  reads better for it (P18 v1.1 plan D9); this pass stores it and does nothing else with it. */
+  /** Set when a `CREATE INDEX` in the same document names this column — surfaced as an INDEXED
+   *  flag on the column's hover tooltip (sqlHover.ts's columnFlags, P12 round 1 finding #18). */
   indexed?: boolean;
   references?: { table: string; column?: string };
   /** From a `COMMENT ON COLUMN … IS '…'` statement — the hover's description line (D9). */
