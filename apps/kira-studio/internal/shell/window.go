@@ -13,6 +13,26 @@ import (
 
 const boundsDebounce = 300 * time.Millisecond
 
+// defaultWindowWidth and defaultWindowHeight are the first-launch window size on a screen large
+// enough to fit it unclamped — unconditional constants before P22 D6, now defaultBounds' upper
+// bound.
+const (
+	defaultWindowWidth  = 1280
+	defaultWindowHeight = 800
+
+	// minWindowWidth and minWindowHeight are a considered floor for this app's UI — a tree
+	// sidebar + grid + two toolbars + a status bar — not Electron's old 900×600 (P22 D6(b)
+	// declines lowering them: the floor ratio is only 1.21×, first-launch-only like the rest of
+	// this avenue, against a real usability cost at the bottom end).
+	minWindowWidth  = 1024
+	minWindowHeight = 640
+
+	// windowSizeMargin keeps a screen-clamped default from touching the work area's edges
+	// exactly — a window sized precisely to the visible area still reads as cramped even though
+	// nothing overlaps the menu bar or Dock.
+	windowSizeMargin = 40
+)
+
 // WindowDeps is Attach's dependencies, shared across every window the app opens — only the key
 // passed to Attach varies per window (P8 C2).
 type WindowDeps struct {
@@ -21,18 +41,33 @@ type WindowDeps struct {
 }
 
 // Options builds one window's options from its own record (D11): the stored rectangle if it has
-// one, Wails' own size defaults otherwise, always at its own `/?window=<key>` URL and `Name`
+// one, a screen-clamped default otherwise, always at its own `/?window=<key>` URL and `Name`
 // (D2 — the shell mints the key and hands it to the renderer this way, since it must be readable
 // synchronously at boot, before hydrateTabs() runs). There is no exact analogue of Electron's
 // show:false/ready-to-show pattern here — WindowRuntimeReady fires only after the frontend has
 // already loaded — a deliberate small divergence, not hidden (§1's window.ts read).
-func Options(sec SecurityOptions, w model.WindowRecord) application.WebviewWindowOptions {
+//
+// primaryWorkArea is the primary screen's work area for the no-stored-rectangle path (P22 D6(a));
+// nil is a legitimate input (falls back to the unclamped 1280×800 default) rather than a caller
+// error. In this app's own startup order — every window opened at boot is built and handed to
+// Wails before app.Run() (main.go's own top comment: "... -> the main window -> app.Run()"),
+// mirroring the pre-cutover Electron main.go's own ordering — Wails v3 beta.16 has not yet stood
+// up a live screen backend at that point (Run() is what sets *application.App's impl field, and
+// nothing before it can), so app.Screen.GetPrimary() reliably returns nil there today and this
+// clamp's fallback is what actually runs at first launch. Verified in this sandbox with
+// application.New(...).Screen.GetPrimary() pre-Run() — a property of Wails' Go control flow, not
+// of any platform-specific screen API, so it needs no real hardware to confirm. The clamp is
+// still implemented, tested and wired correctly, and takes effect the moment a caller can supply
+// a resolved work area — CascadeFrom already does exactly that for a second window, cascaded from
+// a first window that is by then live and running.
+func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *application.Rect) application.WebviewWindowOptions {
+	width, height := DefaultBounds(primaryWorkArea)
 	opts := application.WebviewWindowOptions{
 		Title:            "Kira Studio",
-		Width:            1280,
-		Height:           800,
-		MinWidth:         1024,
-		MinHeight:        640,
+		Width:            width,
+		Height:           height,
+		MinWidth:         minWindowWidth,
+		MinHeight:        minWindowHeight,
 		BackgroundColour: application.NewRGB(24, 24, 27),
 		URL:              "/?window=" + w.Key,
 		Name:             w.Key,
@@ -50,6 +85,40 @@ func Options(sec SecurityOptions, w model.WindowRecord) application.WebviewWindo
 		opts.InitialPosition = application.WindowXY
 	}
 	return opts
+}
+
+// DefaultBounds is Options' first-launch size decision (used only when a window has no stored
+// rectangle — the `if w.Bounds != nil` branch above overrides it unconditionally otherwise), split
+// out and exported so the clamp arithmetic is unit-testable the same way CascadeFrom's own
+// cascadeRect is split out for testability (P22 D6(a)'s own citation of that precedent — though
+// cascadeRect itself has no dedicated test in this repo today, so this is the pattern's structure,
+// not a test it literally extends). It can only ever *shrink* the 1280×800 default to fit a
+// smaller primary screen — never grow it — and falls back to exactly 1280×800 when no usable work
+// area is given.
+//
+// The motivation is UX, not memory: an unconditional 1280×800 first-launch window is edge-to-edge
+// on a same-size laptop panel, overlapping the menu bar and Dock, which is a real bug on its own
+// regardless of anything else. Its effect on WEBVIEW-SCROLL-MEMORY.md's reported plateau is real
+// but small and unmeasured in magnitude (docs/WEBVIEW-SCROLL-MEMORY.md §7 F14) — this is not the
+// fix for that symptom, and it is first-launch-only besides (a window that has ever been resized
+// never sees this default again).
+func DefaultBounds(work *application.Rect) (width, height int) {
+	if work == nil || work.Width <= 0 || work.Height <= 0 {
+		return defaultWindowWidth, defaultWindowHeight
+	}
+	width = clampInt(min(defaultWindowWidth, work.Width-windowSizeMargin), minWindowWidth, defaultWindowWidth)
+	height = clampInt(min(defaultWindowHeight, work.Height-windowSizeMargin), minWindowHeight, defaultWindowHeight)
+	return width, height
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // boundsFromRect converts Wails' int-fielded Rect (webview_window.go's Bounds()) to the

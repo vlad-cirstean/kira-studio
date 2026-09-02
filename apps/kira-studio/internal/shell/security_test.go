@@ -38,7 +38,7 @@ func TestHarden_DenyByDefaultPosture(t *testing.T) {
 // widen the webview's OS-level attack surface for a feature nothing uses. Regression test for the
 // P2 R1 finding where this had drifted to true.
 func TestOptions_FileDropDisabled(t *testing.T) {
-	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"})
+	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"}, nil)
 
 	if opts.EnableFileDrop {
 		t.Error("EnableFileDrop = true, want false (§1.6: no data-file-drop-target consumer exists)")

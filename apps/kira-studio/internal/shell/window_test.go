@@ -108,3 +108,80 @@ func TestAttach_DetachStopsPersisting(t *testing.T) {
 		t.Fatalf("persist ran after detach: bounds = %+v, want unchanged sentinel %+v", got, sentinelBounds)
 	}
 }
+
+// TestDefaultBounds covers P22 D6(a)'s clamp arithmetic — a large screen leaves the 1280×800
+// default untouched, a screen exactly that size still shrinks it (the margin, not just an
+// inequality, is what's under test), a small screen floors at the app's own minimum rather than
+// the screen's, and a nil or empty work area — the case this app's own startup order hits today,
+// per Options' doc comment — falls back to exactly today's unclamped default.
+func TestDefaultBounds(t *testing.T) {
+	tests := []struct {
+		name       string
+		work       *application.Rect
+		wantWidth  int
+		wantHeight int
+	}{
+		{
+			name:       "nil work area falls back to the unclamped default",
+			work:       nil,
+			wantWidth:  1280,
+			wantHeight: 800,
+		},
+		{
+			name:       "a screen much larger than the default leaves it unchanged",
+			work:       &application.Rect{Width: 3840, Height: 2160},
+			wantWidth:  1280,
+			wantHeight: 800,
+		},
+		{
+			name:       "a screen exactly the default's size still shrinks — the margin bites",
+			work:       &application.Rect{Width: 1280, Height: 800},
+			wantWidth:  1280 - 40,
+			wantHeight: 800 - 40,
+		},
+		{
+			name:       "a screen smaller than the app's own minimum floors at the minimum, not the screen",
+			work:       &application.Rect{Width: 900, Height: 600},
+			wantWidth:  1024,
+			wantHeight: 640,
+		},
+		{
+			name:       "a zero-value work area (unresolved screen) falls back to the unclamped default",
+			work:       &application.Rect{},
+			wantWidth:  1280,
+			wantHeight: 800,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWidth, gotHeight := shell.DefaultBounds(tt.work)
+			if gotWidth != tt.wantWidth || gotHeight != tt.wantHeight {
+				t.Errorf("DefaultBounds(%+v) = (%d, %d), want (%d, %d)", tt.work, gotWidth, gotHeight, tt.wantWidth, tt.wantHeight)
+			}
+			if gotWidth > 1280 || gotHeight > 800 {
+				t.Errorf("DefaultBounds(%+v) = (%d, %d) grew past the 1280×800 default — the clamp must only ever shrink it", tt.work, gotWidth, gotHeight)
+			}
+		})
+	}
+}
+
+// TestOptions_StoredBoundsOverrideTheClamp proves the clamp applies only to the no-stored-
+// rectangle path: a window with a persisted rectangle restores it exactly, regardless of what the
+// primary screen's work area would otherwise clamp the default to.
+func TestOptions_StoredBoundsOverrideTheClamp(t *testing.T) {
+	rec := model.WindowRecord{
+		Key:    "main",
+		Bounds: &model.WindowBounds{X: 10, Y: 20, Width: 2000, Height: 1500},
+	}
+	small := &application.Rect{Width: 320, Height: 240}
+
+	opts := shell.Options(shell.Harden(), rec, small)
+
+	if opts.Width != 2000 || opts.Height != 1500 || opts.X != 10 || opts.Y != 20 {
+		t.Fatalf("Options with stored bounds = %+v, want the stored rectangle unclamped", opts)
+	}
+	if opts.InitialPosition != application.WindowXY {
+		t.Errorf("InitialPosition = %v, want WindowXY for a restored rectangle", opts.InitialPosition)
+	}
+}

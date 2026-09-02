@@ -245,12 +245,23 @@ func main() {
 
 	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
 
+	// primaryWorkArea feeds shell.Options' first-launch size clamp (P22 D6(a)). Resolved once,
+	// here, rather than per window: every window below is opened before app.Run() (this
+	// function's own top comment), and shell.Options' own doc comment records why that means
+	// GetPrimary() reliably answers nil today regardless of platform — a real, sandbox-verified
+	// constraint of Wails' startup order, not a reason to skip the call, since the clamp still
+	// falls back correctly and takes effect the moment a screen can be resolved.
+	var primaryWorkArea *application.Rect
+	if screen := app.Screen.GetPrimary(); screen != nil {
+		primaryWorkArea = &screen.WorkArea
+	}
+
 	// openWindow opens one workbench from an already-persisted record and registers it — the one
 	// path every window (startup, reopen, "New Window") ultimately goes through. Its own
 	// WindowClosing listener implements D5: delete the row only if another window remains open,
 	// so closing the last window leaves it behind for the next Dock click or relaunch to restore.
 	openWindow := func(rec model.WindowRecord) {
-		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec))
+		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
 		detach := shell.Attach(win, windowDeps, rec.Key)
 		windows.Add(rec.Key, win, detach)
 		shell.AttachCloseFlush(win, rec.Key, events, closeFlush)
