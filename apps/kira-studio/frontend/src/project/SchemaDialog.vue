@@ -71,13 +71,23 @@ function onDocChange(text: string): void {
   }, 400);
 }
 
+// P12 round 1 finding #14: SettingsDialog.vue's own pattern (a saveError ref plus a footer strip)
+// mirrored exactly — this file's own header comment already claimed to reuse P17's staging shape,
+// but had no catch at all: a rejected schemaSet became an unhandled promise rejection from a
+// template @click, the dialog stayed open with nothing shown, and Save looked merely slow rather
+// than failed.
+const saveError = ref<string | null>(null);
+
 async function onSave(): Promise<void> {
   const id = connectionId.value;
   if (!id) return;
   saving.value = true;
+  saveError.value = null;
   try {
     await saveDdl(id, draft.value);
     closeSchemaDialog();
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err);
   } finally {
     saving.value = false;
   }
@@ -123,7 +133,10 @@ async function onSave(): Promise<void> {
     </div>
 
     <template #footer>
-      <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+      <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
+        saveError
+      }}</span>
+      <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="footer-actions p-push">
         <AppButton kind="dialog" @click="closeSchemaDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
@@ -146,6 +159,12 @@ async function onSave(): Promise<void> {
 .help {
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-disabled);
+  line-height: 1.5;
+}
+
+.field-error {
+  font-size: var(--kira-t-xs);
+  color: var(--kira-error);
   line-height: 1.5;
 }
 

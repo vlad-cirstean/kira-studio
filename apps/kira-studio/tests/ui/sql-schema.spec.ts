@@ -168,6 +168,44 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
   await expect(summary).toContainText('2 tables, 5 columns');
 });
 
+// P12 round 1 finding #14: Save had no catch at all — a rejected schemaSet became an unhandled
+// promise rejection from a template @click, and the dialog stayed open with nothing shown.
+test('a rejected Save shows the error and leaves the dialog open', async ({ relaunch }) => {
+  const CONNECTION_ID = 'conn-sql-schema-save-error';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'green');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'green'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+    {
+      channel: IPC.schemaSet,
+      args: { connectionId: CONNECTION_ID, ddl: TWO_TABLE_DDL },
+      error: { code: 'E_QUERY', message: 'schema write failed' },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Schema DB', 'green');
+
+  const dialog = page.locator('[data-testid="schema-dialog"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-schema"]');
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('.cm-content').click();
+  await page.keyboard.type(TWO_TABLE_DDL);
+  await page.locator('.dialog-footer button', { hasText: 'Save schema' }).click();
+
+  await expect(dialog.locator('[data-testid="schema-save-error"]')).toContainText(
+    'schema write failed',
+  );
+  await expect(dialog).toBeVisible();
+});
+
 test('SQL console completes tables, columns and aliases once a DDL document exists (D5/F2)', async ({
   relaunch,
   consoleErrors,
