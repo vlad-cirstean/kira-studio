@@ -336,6 +336,19 @@ offsets. So `columns.ts`'s `observeScrollElementOffset`/`observeScrollElementRec
 `DataGrid.vue`'s own rAF coalescing become **grid-internal** — but the app still needs its own
 listener for velocity and for `scrollTrace` (§6 D9).
 
+**Real-Mac addendum, found only once a human trackpad drove the built spike:** the native
+`scroll` listener above is not the only thing SlickGrid binds. `enableMouseWheelScrollHandler`
+(default `true`) additionally binds a `MouseWheel` handler that computes
+`scrollTop = Math.max(0, viewport.scrollTop - deltaY * rowHeight)` itself and writes it onto the
+viewport — quantizing every wheel/trackpad tick to whole rows in JS instead of letting WebKit's own
+momentum/inertia physics drive `scrollTop`. That is what the user's real-hardware report ("that
+fluid velocity sensitive mac scroll is gone") turned out to be: not a throughput problem, a
+hijacked-input one. Fix: `enableMouseWheelScrollHandler: false` in `SlickGridHost.vue`'s grid
+options. Safe because the native `scroll` listener this finding already describes is sufficient on
+its own — frozen-pane sync (`_handleScroll`, driven by `hasFrozenColumns()`, not by which listener
+fired) and the app's own `velocity()`/runway logic (§6 D9, above) both already read off native
+`scroll`/`el.scrollTop`, never off SlickGrid's wheel-specific internals.
+
 ### F4 — SlickGrid's runway is *smaller* than this app's, at rest and possibly in motion. **Decisive.**
 
 `getRenderedRange` (`:10257-10259`), verbatim:

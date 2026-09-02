@@ -360,6 +360,15 @@ same table, same page size, same hard two-finger flick.
    costs nothing and separates "the renderer is too slow" from "the runway is too short" — see the
    plan's §7.4(b) INCONCLUSIVE branch for the full reasoning.
 
+**Found and fixed on a real-hardware run of this protocol: SlickGrid's own wheel handler ate
+trackpad momentum.** `enableMouseWheelScrollHandler` (default `true`) quantizes every wheel/trackpad
+tick to `deltaY * rowHeight` in JS instead of letting the native `scroll` listener (already bound,
+already sufficient — see the plan's F3 addendum) and WebKit's own momentum physics drive `scrollTop`
+directly. That is what read on macOS as "that fluid velocity sensitive mac scroll is gone." Fixed by
+`enableMouseWheelScrollHandler: false` in `SlickGridHost.vue`'s grid options; frozen-pane sync and
+this app's own velocity/runway logic are unaffected, since both already run off native `scroll`, not
+off SlickGrid's wheel-specific internals.
+
 **Bundle size, measured in this session** (`bun run build`, before/after this phase's own C2/C5,
 gzip): the launch chunk grew from **353.31 KB to 397.64 KB** (**+44.33 KB**), and the CSS asset from
 21.75 KB to 22.90 KB (**+1.15 KB**) — **+45.48 KB total**, against the plan's own **≤45 000 B**
