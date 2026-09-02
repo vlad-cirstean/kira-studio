@@ -311,6 +311,70 @@ here without needing macOS hardware, not a platform-specific gap), so `DefaultBo
 unit-tested but its effect on an actual first launch is unverified on any platform in this sandbox.
 `internal/shell/window.go`'s own doc comment on `Options` records this in full.
 
+### 2.1c P22 spike — the SlickGrid A/B, and how to run it on real hardware
+
+**What this section is not: it does not say the fast-scroll lag is fixed.** Pass A
+(`docs/v1.1/plans/P22-slickgrid-migration-plan.md`) built a second, additive grid —
+`views/grid/SlickGridHost.vue`, wrapping `6pac/SlickGrid`'s core engine — behind
+`window.__kiraGridEngine === 'slick'`, mounted by `views/grid/DataView.vue` instead of the
+incumbent `DataGrid.vue`/`@tanstack/vue-virtual` grid. The incumbent stays the default and every
+pre-existing `tests/ui/`/`tests/unit/` spec keeps passing against it, unmodified. What Pass A proves
+is mechanism, not the user's actual symptom: `tests/ui/slick-grid.spec.ts` gates, in this sandbox,
+that the new bridge decodes real data correctly, the decode-cache stays pinned to the mounted window
+(P5 C1), a sub-row scroll mutates nothing, the mounted-cell count stays bounded, the at-rest runway
+covers at least what the incumbent's does for the same fixture, and — the item this phase's own
+brief singled out — closing the tab actually tears the grid down (`grid.destroy(true)`, no leaked
+`.slick-viewport`, no leaked `<style>` element, `__kiraRetention()` back at its pre-open reading).
+**None of that is the same claim as "the reported lag is gone."** §7.4(a)/(b) of the plan split those
+two claims into separate columns on purpose; this section is the protocol for the second one, which
+only real hardware can answer.
+
+**The gate.** Per the plan's own §7.4(b): PASS authorises Pass B (feature parity + cutover);
+INCONCLUSIVE or FAIL do not, and hand the question to the plan's §11 (a runway-only fix, or a
+conclusion that no DOM grid can help — see that section for the reasoning). **The result of this A/B
+is not yet known — it has never been run.** Whoever runs it should update this section, and the
+plan's own §7.4(b)/§8.6, with the real numbers and the real verdict once it has been.
+
+**Protocol — one build, both engines, the same real fling twice.** This is §2.1a's own protocol
+(above), doubled: run it once against the incumbent grid, once against the spike, same window size,
+same table, same page size, same hard two-finger flick.
+
+1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density — exactly §2.1a
+   step 1.
+2. Web Inspector → Console → `__kiraScrollTrace.start()`, one hard two-finger flick, let momentum
+   die, `copy(JSON.stringify(__kiraScrollTrace.stop()))`. This is the **incumbent** run — do it
+   first, before touching the engine switch, so both runs come from the same build.
+3. `window.__kiraGridEngine = 'slick'`, then reload the tab (a fresh mount reads the switch once —
+   `DataView.vue`'s own comment on why it's not reactive). Re-open the same table at the same page
+   size and density.
+4. Repeat step 2 against the spike grid — `__kiraScrollTrace.registerGrid` works against either
+   engine on this same build (D9's own `rowSelector` parameter, `.slick-row` for the spike,
+   `[data-testid="grid-row"]` for the incumbent), so no rebuild is needed between the two runs.
+5. Report, for **each** run: `summary.pxPerFrame` (p50/p95/max), `summary.uncoveredPx`
+   (p50/p95/max), `summary.renderMs` (p50/p95/max), the `scrollEvents` histogram, and one sentence on
+   whether the lag was *perceptibly* different between the two — the perceptual read is what actually
+   answers the original report; the numbers are what keep that read honest (§9's own discipline,
+   restated in the plan's own §7.4(b) header).
+6. If the result is inconclusive by the numbers alone, `window.__kiraGridTuning.maxLeadPxOverride =
+   4000` on **both** engines (§7.3 step 6's own cheap next experiment) is a five-minute test that
+   costs nothing and separates "the renderer is too slow" from "the runway is too short" — see the
+   plan's §7.4(b) INCONCLUSIVE branch for the full reasoning.
+
+**Bundle size, measured in this session** (`bun run build`, before/after this phase's own C2/C5,
+gzip): the launch chunk grew from **353.31 KB to 397.64 KB** (**+44.33 KB**), and the CSS asset from
+21.75 KB to 22.90 KB (**+1.15 KB**) — **+45.48 KB total**, against the plan's own **≤45 000 B**
+ceiling (§7.4(a) item 7) and its **~42 KB JS / ~1.3 KB CSS** projection (F9). This is **~480 B (about
+1%) over the plan's stated ceiling** — flagged here plainly rather than rounded away. It is not
+F9's own named failure mode: an isolated re-measurement of `{ SlickGrid, SlickEventHandler }` alone
+(the only two named imports from `slickgrid` anywhere in the tree) reproduces F9's own ~42 KB figure
+almost exactly (41 960 B gzip, esbuild@0.28.2, this session) — so nothing pulled in `SlickDataView`
+or a plugin. The extra ~2.4 KB is this phase's own new application code (`SlickGridHost.vue`,
+`views/grid/slick/dataSource.ts`, `views/grid/slick/kiraSlickGrid.ts`), which the plan's own ≤45 000 B
+figure budgeted headroom for but not quite enough of. Worth a look if Pass B adds materially more
+code to this path; not, on its own, a reason to hold Pass A back — the acceptance criterion's real
+concern (an accidentally-imported `SlickDataView`/plugin) is affirmatively ruled out here, not just
+asserted.
+
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails in this environment no matter what, on non-app-controllable process

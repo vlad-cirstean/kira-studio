@@ -1038,6 +1038,11 @@ The gate:
   height. In that case Pass A stays in the tree behind its switch (it costs nothing while dark) or is
   reverted as one commit; **the decision is the user's and this plan does not pre-empt it.**
 
+**C7's implementation** (Pass A landed) keeps this protocol's canonical, runnable copy in
+`docs/PERF.md` §2.1c, beside §2.1a's own real-fling protocol — that section also carries the real
+measured bundle-size delta (§7.4(a) item 7) and notes that this gate's own result is not yet known.
+Update both places together if the protocol ever changes.
+
 ---
 
 ## 8. Pass B — feature parity and cutover (design, not yet the commit list)
