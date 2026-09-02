@@ -315,6 +315,15 @@ onMounted(() => {
       // sufficient on their own — frozen-pane sync and this host's own velocity/runway logic both
       // already run off native scroll, never off this handler.
       enableMouseWheelScrollHandler: false,
+      // P22 iter2-scroll-gaps D3 — safe, and only safe, now that D2 (kiraSlickGrid.ts's
+      // getRenderedRange) bounds a single render() call's own synchronous cost independent of fling
+      // distance. Without D2 this would be a regression: SlickGrid's default `_handleScroll` defers
+      // to a 10ms-windowed `scrollThrottle.enqueue()` whenever a single frame's delta exceeds one
+      // full viewport height (`dy >= this.viewportH`), which at least caps how *often* the old
+      // unbounded batch ran; forcing every large-delta scroll to call render() immediately, before
+      // D2 existed, would have run that same unbounded batch on every such frame instead. Landed as
+      // its own commit, after D2, specifically so it stays bisectable from the batch cap.
+      forceSyncScrolling: true,
       // §7.1 — no keyboard/click-navigation beyond the static demonstration above; Pass B territory.
       enableCellNavigation: false,
       enableAddRow: false,
