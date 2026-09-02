@@ -347,7 +347,11 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
       // — Stop was pressed while this batch was the only op registered on the backend, so the
       // real run must not fire at all, not just lose its warning.
-      rt.explainOpId = null;
+      // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
+      // (runStatement/runAll have no `running` guard against each other) may have already stamped
+      // its own explainOpId here by the time this catch runs; clearing unconditionally would
+      // discard *that* run's id, leaving Stop with nothing registered on the backend to cancel.
+      if (rt.explainOpId === explainOpId) rt.explainOpId = null;
       applyLoadFailure(rt, opId, err, tabId, {
         onDisconnected: () => {
           rt.status = 'idle';
@@ -355,7 +359,9 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       });
       return;
     }
-    rt.explainOpId = null;
+    // P12 round 2 finding #4: same identity guard as above — an overlapping run's own explainOpId
+    // must survive this run's clear.
+    if (rt.explainOpId === explainOpId) rt.explainOpId = null;
     // Not only opId (a newer run superseding this one) — status too, since a Stop press during
     // this batch is only visible through status, not through opId changing (finding #5).
     if (rt.opId !== opId || rt.status !== 'running') return;

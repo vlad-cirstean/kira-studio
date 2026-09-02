@@ -244,6 +244,9 @@ async function ensureConnectedForRun(): Promise<void> {
 }
 
 function runStatement(): void {
+  // P12 round 2 finding #4: the toolbar's Run button is disabled while running (below), but the
+  // command (⌘↵/palette) had no such gate — two overlapping runs raced explainOpId/opId bookkeeping.
+  if (running.value) return;
   const stmt = statementAtCursor(props.tab.state.text, cursorPos.value, {
     backslashEscapes: backslashEscapesFor(dialect.value),
   });
@@ -255,6 +258,7 @@ function runStatement(): void {
 }
 
 function runAll(): void {
+  if (running.value) return;
   const statements = splitSqlStatements(props.tab.state.text, {
     backslashEscapes: backslashEscapesFor(dialect.value),
   }).map((s) => s.text);
