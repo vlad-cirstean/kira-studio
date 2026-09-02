@@ -156,21 +156,16 @@ tasks:
             -c "Set :CFBundleVersion {{.APP_VERSION}}" \
             "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
         else
-          echo "create:app:bundle: no PlistBuddy on $(uname -s) — Info.plist keeps its checked-in version, not {{.APP_VERSION}}" >&2
+          echo "create:app:bundle: no PlistBuddy — this is a broken macOS environment (build/package already precondition on Darwin), not a supported one" >&2
+          exit 1
         fi
-      - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
+      - task: codesign:adhoc
 
   codesign:adhoc:
     summary: Ad-hoc signs the app bundle (macOS only)
     internal: true
     cmds:
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
-
-  codesign:skip:
-    summary: Skips codesigning when cross-compiling
-    internal: true
-    cmds:
-      - 'echo "Skipping codesign (not available on {{OS}}). Sign the .app on macOS before distribution."'
 
   run:
     cmds:
