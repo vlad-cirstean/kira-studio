@@ -136,10 +136,13 @@ function pruneExpandedDocIds(rt: ConsoleViewRuntime, key: string): void {
 registerTabRuntimeCleanup((tabId) => {
   const rt = runtime[tabId];
   if (rt) {
-    for (const result of rt.results) {
-      unregisterDocumentRows(result.key);
-      dropRows(result.key);
-    }
+    // P12 round 1 finding #10: routed through the one release path every user-driven removal
+    // (closeResult, closeOtherResults, closeResultsToTheRight, dropResults, evictOldestResults)
+    // already uses — this used to call unregisterDocumentRows/dropRows directly and skip dropPage
+    // and dropPlan, so a closed tab's decoded pages and (especially) its explainResults.ts plan
+    // entries — QueryPlan.raw alone tens of KB each, nextSeq never reused — were retained in their
+    // module-level maps for the life of the process.
+    for (const result of rt.results) releaseResult(rt, result);
   }
   delete runtime[tabId];
 });

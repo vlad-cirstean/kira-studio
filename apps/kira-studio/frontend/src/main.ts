@@ -13,6 +13,7 @@ import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { hydrateSettings } from './state/settings';
+import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
   pageStoreEntries as consolePageStoreEntries,
   totalRetainedBytes as consoleRetainedBytes,
@@ -68,6 +69,9 @@ interface KiraRetentionSnapshot {
    *  their summed byte length — the one figure `totalRetainedBytes()` structurally cannot see,
    *  since a multi-page ExecuteResponse frame shares one ArrayBuffer across every page it carried. */
   frameBuffers: { count: number; bytes: number };
+  /** explainResults.ts's own module-level plan store (P12 round 1 finding #10) — entirely
+   *  separate from `stores.console` above, which only covers resultPages.ts's page store. */
+  explainPlans: number;
 }
 
 function storeStats<P extends { byteSize: number }>(
@@ -187,6 +191,7 @@ window.__kiraRetention = () => {
       ...streamEntries,
       ...consoleEntries,
     ]),
+    explainPlans: consolePlanCount(),
   };
 };
 window.__kiraCount = data.count;

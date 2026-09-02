@@ -250,6 +250,45 @@ const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsDelete, args: { id: CONN_A }, response: null },
 ];
 
+// A minimal, real-shaped Postgres EXPLAIN (FORMAT JSON) page — enough for parseExplainPages to
+// produce a QueryPlan, which is all scenario 1 needs to exercise explainResults.ts's own store
+// (P12 round 1 finding #10).
+const EXPLAIN_PAGE: LogicalPage = {
+  kind: 'tabular',
+  columns: [
+    {
+      name: 'QUERY PLAN',
+      dataType: 'json',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: false,
+      generated: false,
+    },
+  ],
+  rows: [
+    [
+      JSON.stringify([
+        {
+          Plan: {
+            'Node Type': 'Function Scan',
+            'Relation Name': 'generate_series',
+            'Plan Rows': 5000,
+          },
+        },
+      ]),
+    ],
+  ],
+  position: {
+    offset: 0,
+    pageSize: 1,
+    hasMore: false,
+    nextToken: null,
+    prevToken: null,
+    strategy: 'offset',
+  },
+  truncatedCells: 0,
+};
+
 const PORT: PortSnapshot[] = [
   ...FIXTURE_A.port,
   ...FIXTURE_B.port,
@@ -261,6 +300,17 @@ const PORT: PortSnapshot[] = [
       statements: ['SELECT * FROM generate_series(1, 5000) AS n'],
     },
     response: { kind: 'execute', pages: [GENERATE_SERIES_PAGE] },
+  },
+  {
+    op: DATA_OP.execute,
+    payload: {
+      connectionId: CONN_A,
+      path: ORDER_ITEMS_PATH,
+      statements: [
+        'EXPLAIN (FORMAT JSON, COSTS TRUE, VERBOSE FALSE, SETTINGS FALSE, BUFFERS FALSE) SELECT * FROM generate_series(1, 5000) AS n',
+      ],
+    },
+    response: { kind: 'execute', pages: [EXPLAIN_PAGE] },
   },
 ];
 
@@ -297,6 +347,12 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
   await typeInto(consoleView, page, 'SELECT * FROM generate_series(1, 5000) AS n;');
   await page.click('[data-testid="console-run-all"]');
   await expect(consoleView.locator('[data-testid="console-result-grid"]')).toHaveCount(1);
+  // P12 round 1 finding #10: explainResults.ts's own plan store is invisible to
+  // __kiraRetainedBytes entirely (it isn't a page store) — only __kiraRetention's `explainPlans`
+  // field sees it, so this is the one action in this scenario that actually exercises it.
+  await page.click('[data-testid="console-explain"]');
+  await expect(consoleView.locator('[data-testid="explain-result-view"]')).toBeVisible();
+  expect((await retention(page)) as { explainPlans: number }).toMatchObject({ explainPlans: 1 });
 
   await openDefinitionFromMenu(page, ORDER_ITEMS_PATH);
   await expect(page.locator('[data-testid="definition-view"]')).toBeVisible();

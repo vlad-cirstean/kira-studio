@@ -25,3 +25,10 @@ export function getPlan(key: string): ExplainResult | undefined {
 export function dropPlan(key: string): void {
   results.delete(key);
 }
+
+/** Playwright-only (main.ts's `window.__kiraRetention`, P12 round 1 finding #10) — this module-
+ *  level map has no size limit and no per-tab bulk-drop of its own, so it was invisible to the
+ *  leak-detection tooling entirely until a closed tab's plans stopped being released into it. */
+export function planCount(): number {
+  return results.size;
+}
