@@ -24,6 +24,8 @@ import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
 import { consoleCompletionSources } from './completion';
+import ExplainResultView from './ExplainResultView.vue';
+import { isExplainable } from './explain';
 import { canFormatConsole, formatConsoleText } from './format';
 import { consoleLintSource } from './lint';
 import { getPage } from './resultPages';
@@ -33,6 +35,7 @@ import {
   closeOtherResults,
   closeResult,
   closeResultsToTheRight,
+  explain,
   run,
   runtime,
   setActiveResult,
@@ -122,6 +125,30 @@ const savedMenuOpen = ref(false);
 // gets its own component-local strip instead of a runtime-shape change.
 const formatError = ref<string | null>(null);
 const canFormat = computed(() => canFormatConsole(connectionKind.value));
+
+// P18 (v1.1) C12/D12: the statement the cursor is currently in, undefined for a non-SQL console —
+// the single source both the Explain button's disabled state and onExplain() itself read, so the
+// two can never disagree about which statement is "current".
+const statementAtCursorText = computed<string | undefined>(() => {
+  if (dialect.value === undefined) return undefined;
+  return statementAtCursor(props.tab.state.text, cursorPos.value, {
+    backslashEscapes: backslashEscapesFor(dialect.value),
+  })?.text;
+});
+// D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
+// statement, which is a state (like the format button's own disabled-on-empty-text), not a
+// capability like Redis having no Format button at all.
+const canExplain = computed(
+  () => statementAtCursorText.value !== undefined && isExplainable(statementAtCursorText.value),
+);
+const explainTooltip = computed(() =>
+  canExplain.value
+    ? 'Explain the statement under the cursor'
+    : 'Put the cursor in a SELECT or WITH statement to explain it',
+);
+// D9's own precedent: a component-local strip, not a runtime-shape change (the manual button's
+// own failure is shown; auto-explain's failure path — C14 — degrades silently instead, D19 rule 6).
+const explainError = ref<string | null>(null);
 // Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
 // doesn't read as a type-only use of the CodeMirrorHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
@@ -148,6 +175,7 @@ function onDocChange(text: string): void {
   lastEmitted = text;
   setText(props.tab.id, text);
   formatError.value = null;
+  explainError.value = null;
 }
 
 watch(
@@ -206,6 +234,17 @@ function onFormat(): void {
   })();
 }
 
+function onExplain(): void {
+  const kind = connectionKind.value;
+  const stmt = statementAtCursorText.value;
+  if (!kind || !stmt || !canExplain.value) return;
+  void (async () => {
+    await ensureConnectedForRun();
+    const result = await explain(props.tab.id, kind, stmt);
+    explainError.value = result.ok ? null : result.reason;
+  })();
+}
+
 // --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
 // KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
 function onToggleSearch(): void {
@@ -226,6 +265,12 @@ const resultGridRef = ref<{
 const activeResultIsDocument = computed(
   () => getPage(rt.value?.activeKey ?? '')?.kind === 'document',
 );
+// P18 D17: the find toolbar resolves a Page (search.ts's activePage) and a plan result set is not
+// one — gated off here the same way the expand/collapse-all pair above is gated on document-ness,
+// rather than left to just silently find nothing.
+const activeResultIsPlan = computed(
+  () => rt.value?.results.find((r) => r.key === rt.value?.activeKey)?.kind === 'plan',
+);
 function onExpandAllResults(): void {
   resultGridRef.value?.expandAll();
 }
@@ -243,6 +288,7 @@ onMounted(() => {
     registerCommand('view.run', runStatement),
     registerCommand('view.run-all', runAll),
     registerCommand('view.format', onFormat),
+    registerCommand('view.explain', onExplain),
     registerCommand('view.find', onToggleSearch),
   ];
 });
@@ -258,7 +304,10 @@ const RESULT_KIND_ICON: Record<string, string> = {
   document: 'json',
   keyvalue: 'symbol-key',
 };
+// P18 D17: a plan result set has no Page at all (getPage(key) resolves undefined), so its icon is
+// resolved from ConsoleResult.kind directly rather than through resultPages.ts's own map.
 function iconForResult(key: string): string {
+  if (rt.value?.results.find((r) => r.key === key)?.kind === 'plan') return 'list-tree';
   return RESULT_KIND_ICON[getPage(key)?.kind ?? ''] ?? 'table';
 }
 
@@ -363,6 +412,20 @@ const statusLine = computed(() => {
         >
           Format
         </AppButton>
+        <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
+             disabled, on a non-SQL console; disabled-with-tooltip (not hidden) on a SQL console
+             whose statement at the cursor isn't a SELECT/WITH, since Explain applies to this
+             console and just not to this particular statement. -->
+        <AppButton
+          v-if="dialect"
+          icon="list-tree"
+          data-testid="console-explain"
+          :disabled="!canExplain"
+          v-tooltip="explainTooltip"
+          @click="onExplain"
+        >
+          Explain
+        </AppButton>
         <div class="sep"></div>
         <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
@@ -397,7 +460,10 @@ const statusLine = computed(() => {
           <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
         </div>
         <div class="sep"></div>
+        <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
+             is gated off the same way expand/collapse-all above is gated on document-ness. -->
         <IconButton
+          v-if="!activeResultIsPlan"
           icon="search"
           :active="!!rt?.searchOpen"
           v-tooltip="'Find in the active result set'"
@@ -415,6 +481,9 @@ const statusLine = computed(() => {
         </MessageStrip>
         <MessageStrip v-if="formatError" tone="err" data-testid="console-format-error">
           {{ formatError }}
+        </MessageStrip>
+        <MessageStrip v-if="explainError" tone="err" data-testid="console-explain-error">
+          {{ explainError }}
         </MessageStrip>
       </template>
 
@@ -500,7 +569,7 @@ const statusLine = computed(() => {
           </template>
         </div>
         <SearchToolbar
-          v-if="rt.searchOpen"
+          v-if="rt.searchOpen && !activeResultIsPlan"
           :tab-id="tab.id"
           testid-prefix="console-"
           row-noun="rows"
@@ -509,8 +578,12 @@ const statusLine = computed(() => {
           @close="onCloseSearch"
         />
         <div class="result-grid">
+          <!-- D17: a plan result set renders through its own view — reusing the strip/close/
+               eviction machinery above, but never ConsoleResultGrid, which resolves a Page that a
+               plan result set does not have. -->
+          <ExplainResultView v-if="rt.activeKey && activeResultIsPlan" :page-key="rt.activeKey" />
           <ConsoleResultGrid
-            v-if="rt.activeKey"
+            v-else-if="rt.activeKey"
             ref="resultGridRef"
             :page-key="rt.activeKey"
             :tab-id="tab.id"

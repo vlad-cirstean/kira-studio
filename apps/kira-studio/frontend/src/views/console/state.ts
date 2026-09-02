@@ -1,17 +1,26 @@
+import type { ConnectionKind } from '@shared/domain/connection';
 import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
+import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
 import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
 import { applyLoadFailure, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { explainStatementsFor } from './explain';
+import { dropPlan, setPlan } from './explainResults';
+import { parseExplainPages } from './plan';
+import type { QueryPlan } from './planModel';
 import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
 /** One result set of a run. `key` is identity and never changes while the result is open — the
  *  "Result N" label the strip prints (P40) is its *position*, which renumbers when a sibling
- *  closes, so it is deliberately not stored here. */
+ *  closes, so it is deliberately not stored here. P18 D17: `kind` distinguishes an ordinary
+ *  query-result page (resultPages.ts) from a plan result (explainResults.ts) — both share every
+ *  other piece of this record's own lifecycle (close/close-others/close-to-the-right/eviction). */
 export interface ConsoleResult {
   key: string;
   rowCount: number;
+  kind: 'page' | 'plan';
 }
 
 export interface ConsoleViewRuntime {
@@ -121,6 +130,7 @@ export function resultPageKey(tabId: string, seq: number): string {
  *  and evictOldestResults below — goes through this one release path. */
 function releaseResult(rt: ConsoleViewRuntime, result: ConsoleResult): void {
   dropPage(result.key);
+  dropPlan(result.key);
   unregisterDocumentRows(result.key);
   dropRows(result.key);
   pruneExpandedDocIds(rt, result.key);
@@ -249,7 +259,7 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       // which resolves a scope key through a registered source rather than an import — this
       // result's own key is that scope, and resultPages.ts's documentRow is its source.
       if (page.kind === 'document') registerDocumentRows(key, (row) => documentRow(key, row));
-      return { key, rowCount: page.rowCount };
+      return { key, rowCount: page.rowCount, kind: 'page' as const };
     });
     rt.results.push(...newResults);
     evictOldestResults(rt, newResults.length);
@@ -274,4 +284,50 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
 
 export function stop(tabId: string): void {
   stopOp(runtime[tabId]);
+}
+
+/** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
+ *  toggle, same eviction, same close/close-others machinery. Exported so D19's auto-explain
+ *  "Show plan" action can push a plan it already parsed without a second round trip. */
+export function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
+  const tab = findConsoleTab(tabId);
+  if (!tab) return;
+  const rt = ensureRuntime(tabId);
+  if (!tab.state.newResultSet) dropResults(tabId);
+  const key = resultPageKey(tabId, rt.nextSeq++);
+  setPlan(key, { plan, statement });
+  rt.results.push({ key, rowCount: 0, kind: 'plan' });
+  evictOldestResults(rt, 1);
+  rt.activeKey = key;
+}
+
+/** C12/D11/D13: composes `kind`'s own EXPLAIN for `statement`, issues it through the same
+ *  `data:execute` op *Run statement* uses, parses the result, and pushes it as a plan result set.
+ *  Unlike `run()`, a failure here is returned rather than written into `rt.error` — D19's silent-
+ *  degrade rule is for auto-explain specifically; the manual Explain button surfaces its own
+ *  failure the same way Format does (P13's own component-local strip, ConsoleView.vue). */
+export async function explain(
+  tabId: string,
+  kind: ConnectionKind,
+  statement: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const tab = findConsoleTab(tabId);
+  if (!tab?.connectionId) return { ok: false, reason: 'no active connection' };
+  const statements = explainStatementsFor(kind, statement);
+  if (statements.length === 0) return { ok: false, reason: 'this console has nothing to explain' };
+
+  try {
+    const response = await data.execute({
+      opId: crypto.randomUUID(),
+      tabId,
+      connectionId: tab.connectionId,
+      path: tab.path,
+      statements,
+    });
+    const plan = parseExplainPages(kind, response.pages, settingsState.advanced.expensiveQueryRows);
+    pushPlanResult(tabId, statement, plan);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
