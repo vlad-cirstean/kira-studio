@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DataTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openGenerateDataDialog } from '../../state/fakeData';
@@ -151,6 +151,14 @@ onUnmounted(() => {
   for (const off of unregisterCommands) off();
 });
 
+// P22 regular-table spike — the engine switch (main.ts's `__kiraGridEngine`). Read once, when this
+// component is created, not reactively: a mid-session switch should remount the tab, and the
+// real-Mac protocol sets the global from the console and reopens the tab. Async so the default
+// engine's bundle is byte-for-byte unaffected by the spike existing — regular-table and this host
+// only ever load in a session that asked for them.
+const RegularTableHost = defineAsyncComponent(() => import('./RegularTableHost.vue'));
+const gridEngine = window.__kiraGridEngine === 'regular' ? 'regular' : 'tanstack';
+
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
 
 function onGoToMatch(match: Match): void {
@@ -291,7 +299,12 @@ function onCloseSearch(): void {
           <span>{{ rt.actionError }}</span>
         </MessageStrip>
         <div class="grid-area">
-          <DataGrid ref="dataGridRef" :tab-id="tab.id" />
+          <RegularTableHost
+            v-if="gridEngine === 'regular'"
+            ref="dataGridRef"
+            :tab-id="tab.id"
+          />
+          <DataGrid v-else ref="dataGridRef" :tab-id="tab.id" />
         </div>
       </template>
     </ViewChrome>
