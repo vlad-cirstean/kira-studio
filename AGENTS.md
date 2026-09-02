@@ -78,10 +78,9 @@ team works, and how to run things in whichever box a session happens to be on.
   similar tests, delete. This applies going forward to new code, not only as a cleanup of what's
   already there.
 - **The adapter conformance suites are exempt from that bar, not an application of it.**
-  `apps/kira-studio/internal/adapters/{postgres,mysqlfamily,sqlite,clickhouse}/*_test.go` are the
-  sole successors to the deleted `packages/db-fixtures/*.spec.ts` files, and nothing else exercises a Go adapter
-  capability by capability — `apps/kira-studio/tests/e2e-real/` only spot-checks a scenario or two
-  per kind. Keep
+  `apps/kira-studio/internal/adapters/*/*_test.go` are the sole successors to the deleted
+  `packages/db-fixtures/*.spec.ts` files, and nothing else exercises a Go adapter capability by
+  capability — `apps/kira-studio/tests/e2e-real/` only spot-checks a scenario or two per kind. Keep
   per-capability coverage there even where it reads like a CRUD round-trip; prune only genuine
   duplication (a case another subtest in the same file already asserts, a pass-through of shared
   `adapters/` logic that has its own test, a setup-only case with no assertion).
@@ -113,7 +112,10 @@ team works, and how to run things in whichever box a session happens to be on.
     suite itself (`scripts/db-compat.sh`) works today and needs no CI wiring to run by hand.
   - `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — P19's GitHub Actions major-version
     bump (`actions/checkout`, `actions/setup-go`, `actions/upload-artifact` to `@v7`) applied to the
-    two live workflows.
+    two live workflows, **revised by P20 beyond P19's own three `uses:` bumps**: all three inline
+    "install pinned wails3, then generate bindings" blocks replaced with `sh scripts/setup.sh`, plus
+    a corrected `ci.yml` step name (it cited `src/renderer/bridge/*.ts`, gone since P3). Both staged
+    sets remain genuinely unapplied — confirmed by diff against the live files.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
@@ -270,11 +272,11 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   (`modernc.org/sqlite`, pure Go, for both the sqlite adapter and the app's own storage). Only the
   `apps/kira-studio` `main` package imports Wails and therefore needs the GTK/WebKit headers, so
   prefer `./apps/kira-studio/internal/...` for a fast loop.
-- **Regenerate bindings with the exact flags `apps/kira-studio/build/Taskfile.yml`'s
-  `generate:bindings` task uses — `wails3 generate bindings -clean=true -b -names -ts -i` (run from
-  `apps/kira-studio/`) — never a shorter hand-typed version; prefer `wails3 task
-  common:generate:bindings` (or `scripts/setup.sh`, which calls it) so the flags are never retyped
-  at all.** `apps/kira-studio/frontend/bindings/**` are real Vite import targets, so missing ones fail
+- **Regenerate bindings via `wails3 task common:generate:bindings` (or `scripts/setup.sh`, which
+  calls it) — never a hand-typed `wails3 generate bindings` flag list.** The task's own command has
+  already drifted out from under a hand-typed copy of it once; citing the task instead of the flags
+  it currently passes is what keeps this bullet from going stale the same way again.
+  `apps/kira-studio/frontend/bindings/**` are real Vite import targets, so missing ones fail
   the build with an unresolvable import rather than a stale-bindings surprise; regenerate whenever a
   bridge service's method set changes, and before any frontend build. **`-names` is load-bearing, not
   cosmetic**: without it, every generated call site emits `$Call.ByID(<numeric-id>, ...)` instead of
