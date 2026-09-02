@@ -267,6 +267,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     'copy-name',
     'copy-uri',
     'filters',
+    'schema',
     'open-console',
     'color',
     'readonly',
