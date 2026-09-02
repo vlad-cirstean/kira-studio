@@ -272,6 +272,18 @@ reachable from a dev build's View → Open DevTools (`internal/shell/menutemplat
 Full detail, including what to do if neither mechanism moves the needle, is
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` §7.3.
 
+**A second renderer to run that same protocol against** (`claude/experiment-regular-table`, a spike,
+not merged): `window.__kiraGridEngine = 'regular'` — then close and reopen the table tab, since the
+switch is read once per tab mount — swaps `DataView.vue` onto a `regular-table` host that pools its
+`<td>` elements instead of rebuilding them per entering row (measured: 84 cells before a 1 428-row
+scroll, 84 after, **0 created**). Anything but `'regular'`, including leaving it unset, is the grid
+above. Same build, same trace, same gesture, so the numbers are directly comparable — with one trap:
+that renderer pins its table inside a sticky clip, so the same lag shows as **stale rows** rather
+than as empty background, and `uncoveredPx` (not "did I see a gap") is the metric that compares.
+`window.__kiraGridTuning.regularRunwayPx` is its counterpart to `maxLeadPxOverride`, and matters
+because it renders the visible viewport and nothing else. Protocol and findings:
+`docs/v1.1/plans/P22-regular-table-spike.md` §7.
+
 ### 2.1b P22 D6 — the first-launch window default, and what it is and is not worth
 
 **Implemented, and framed deliberately: this is a UX fix, not the fix for §2.1a's memory doc.**
