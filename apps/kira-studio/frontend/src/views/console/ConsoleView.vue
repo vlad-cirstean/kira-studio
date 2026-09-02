@@ -162,10 +162,16 @@ const explainError = ref<string | null>(null);
 
 // P18 (v1.1) C14/D19: the compact message the auto-explain strip shows — the row estimate (when
 // this dialect reports one) plus the first warn-severity issue, e.g. `Estimated to read 184,153
-// rows · full table scan on "orders" with a filter`.
+// rows · full table scan on "orders" with a filter`. P12 round 1 finding #8: 'truncated' has no
+// plan to summarize — its own message says the check itself couldn't run, not that it found
+// nothing.
 const autoExplainMessage = computed(() => {
   const state = rt.value?.autoExplain;
-  const worst = state?.plans[state.worstIndex]?.plan;
+  if (!state) return '';
+  if (state.kind === 'truncated') {
+    return "This query's plan was too large to check for problems — it will still run normally.";
+  }
+  const worst = state.plans[state.worstIndex]?.plan;
   if (!worst) return '';
   const parts: string[] = [];
   if (worst.estimatedRowsRead !== undefined) {
@@ -175,6 +181,7 @@ const autoExplainMessage = computed(() => {
   if (firstWarning) parts.push(firstWarning.message);
   return parts.join(' · ') || 'This query may be expensive to run';
 });
+const canShowAutoExplainPlan = computed(() => rt.value?.autoExplain?.kind === 'plans');
 
 function onShowAutoExplainPlan(): void {
   showAutoExplainPlan(props.tab.id);
@@ -535,7 +542,13 @@ const statusLine = computed(() => {
              running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
         <MessageStrip v-if="rt?.autoExplain" tone="warn" data-testid="console-auto-explain">
           <span class="auto-explain-message">{{ autoExplainMessage }}</span>
-          <button type="button" class="auto-explain-action" data-testid="console-auto-explain-show-plan" @click="onShowAutoExplainPlan">
+          <button
+            v-if="canShowAutoExplainPlan"
+            type="button"
+            class="auto-explain-action"
+            data-testid="console-auto-explain-show-plan"
+            @click="onShowAutoExplainPlan"
+          >
             Show plan
           </button>
         </MessageStrip>

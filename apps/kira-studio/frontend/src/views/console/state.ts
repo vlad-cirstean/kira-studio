@@ -11,7 +11,7 @@ import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../share
 import { applyLoadFailure, classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { explainStatementsFor, isExplainable } from './explain';
 import { dropPlan, setPlan } from './explainResults';
-import { parseExplainPages } from './plan';
+import { ExplainTruncatedError, parseExplainPages } from './plan';
 import type { QueryPlan } from './planModel';
 import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
@@ -27,14 +27,18 @@ export interface ConsoleResult {
 }
 
 /** D19: the outcome of the pre-run EXPLAIN batch auto-explain issues for every qualifying
- *  statement in the run that just fired — `worstIndex` names the one whose own overThreshold or
- *  warn-severity issue triggered the strip. The whole array is kept (not just the worst plan) so
- *  a future "show every plan" affordance costs nothing to add; today only `plans[worstIndex]` is
- *  read (the strip's own Show plan action). */
-export interface AutoExplainState {
-  plans: Array<{ statement: string; plan: QueryPlan }>;
-  worstIndex: number;
-}
+ *  statement in the run that just fired. `kind: 'plans'` is the ordinary case — `worstIndex` names
+ *  the one whose own overThreshold or warn-severity issue triggered the strip; the whole array is
+ *  kept (not just the worst plan) so a future "show every plan" affordance costs nothing to add,
+ *  today only `plans[worstIndex]` is read (the strip's own Show plan action). `kind: 'truncated'`
+ *  (P12 round 1 finding #8) is a distinct outcome from "nothing to warn about" (null, no strip at
+ *  all): at least one qualifying statement's own plan was too large to parse (page/chunk.go's 64
+ *  KiB MaxCellBytes), so whether it would have warned is genuinely unknown — the strip says so
+ *  rather than silently claiming there was nothing to check. */
+type AutoExplainPlans = Array<{ statement: string; plan: QueryPlan }>;
+export type AutoExplainState =
+  | { kind: 'plans'; plans: AutoExplainPlans; worstIndex: number }
+  | { kind: 'truncated' };
 
 export interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
@@ -256,7 +260,9 @@ const AUTO_EXPLAIN_MAX_STATEMENTS = 10;
 // statements (D13: one for most dialects, two for ClickHouse) into a *single* data:execute call,
 // then re-slices the returned pages back per originating statement to parse each one. Returns
 // null whenever there is nothing to warn about — no qualifying statement, too many of them, or
-// the EXPLAIN call itself failed (rule 6: swallowed, never surfaced for this path).
+// the EXPLAIN call itself failed (rule 6: swallowed, never surfaced for this path) — or
+// `{kind: 'truncated'}` when a plan was too large to parse at all (finding #8): genuinely unknown
+// whether it would have warned, so this is deliberately not folded into the null case.
 async function autoExplainCheck(
   tab: ConsoleTabRecord,
   kind: ConnectionKind,
@@ -279,7 +285,7 @@ async function autoExplainCheck(
       path: tab.path,
       statements: allExplainStatements,
     });
-    const plans: AutoExplainState['plans'] = [];
+    const plans: AutoExplainPlans = [];
     let cursor = 0;
     for (let i = 0; i < explainable.length; i++) {
       const pageCount = perStatementSql[i]?.length ?? 0;
@@ -293,13 +299,18 @@ async function autoExplainCheck(
     const worstIndex = plans.findIndex(
       ({ plan }) => plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn'),
     );
-    return worstIndex === -1 ? null : { plans, worstIndex };
+    return worstIndex === -1 ? null : { kind: 'plans', plans, worstIndex };
   } catch (err) {
     // D19 rule 6: an EXPLAIN-call failure never blocks the real run — except a cancellation. That
     // is the user pressing Stop while this pre-run batch is in flight, not the batch itself
     // failing, and must stop the real run too rather than let it fire the moment this batch
     // settles (P12 round 1 finding #5) — rethrown so run()'s own catch can react.
     if (classifyLoadError(err).kind === 'cancelled') throw err;
+    // P12 round 1 finding #8: distinct from "nothing to warn about" — whether this statement
+    // would have warned is genuinely unknown, not "no issue found", so the strip must say so
+    // rather than silently showing nothing (the previous behavior every other parse failure here
+    // still gets, per D19 rule 6, since those are genuine EXPLAIN-call failures, not this).
+    if (err instanceof ExplainTruncatedError) return { kind: 'truncated' };
     return null;
   }
 }
@@ -417,7 +428,7 @@ export function clearAutoExplain(tabId: string): void {
 export function showAutoExplainPlan(tabId: string): void {
   const rt = runtime[tabId];
   const state = rt?.autoExplain;
-  if (!state) return;
+  if (state?.kind !== 'plans') return; // 'truncated' has no plan to show
   const worst = state.plans[state.worstIndex];
   if (!worst) return;
   pushPlanResult(tabId, worst.statement, worst.plan);
