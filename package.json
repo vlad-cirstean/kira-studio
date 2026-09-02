@@ -59,6 +59,7 @@
     "bun-types": "1.4.0",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
+    "regular-table": "0.9.0",
     "simple-icons": "16.29.0",
     "sql-formatter": "15.8.2",
     "tailwindcss": "4.3.3",
