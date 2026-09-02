@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import type { RowDensity, SettingsPatch } from '@shared/domain/settings';
-import { computed, ref } from 'vue';
+import {
+  CACHE_L2_BUDGET_MB_RANGE,
+  defaultSettings,
+  FONT_SIZE_RANGE,
+  OP_LOG_RETENTION_DAYS_RANGE,
+  type RowDensity,
+  type Settings,
+  type SettingsPatch,
+} from '@shared/domain/settings';
+import { computed, reactive, ref } from 'vue';
 import { data } from '../bridge/data';
 import { fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes } from '../format';
@@ -15,89 +23,134 @@ const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 
 const emit = defineEmits<{ close: [] }>();
 
-// Cancel reverts to whatever was in effect when the dialog opened — every field otherwise
-// applies immediately (the footer says so), so "cancel" needs a baseline to patch back to
-// rather than an unsaved draft to simply discard.
+// P17 D1: everything the user touches lives in this draft until Save — settingsState (and
+// therefore every other window, the database, and the app's own rendering) sees nothing until
+// then. The component is created on open and destroyed on close (StatusBar.vue's
+// v-if="settingsOpen"), which is the draft's whole lifetime — no store, no reset logic needed.
 // JSON round-trip rather than structuredClone(): settingsState is a Vue reactive proxy, and
-// structuredClone's algorithm throws on a Proxy in this Electron/Chromium build rather than
-// transparently cloning the plain data underneath it.
-const initialSettings: SettingsPatch = JSON.parse(
-  JSON.stringify({
-    appearance: settingsState.appearance,
-    data: settingsState.data,
-    cache: settingsState.cache,
-    advanced: settingsState.advanced,
-  }),
-);
+// structuredClone's algorithm throws on a Proxy rather than cloning the plain data underneath it.
+const cloneSections = (s: Settings): Settings =>
+  JSON.parse(
+    JSON.stringify({
+      appearance: s.appearance,
+      data: s.data,
+      cache: s.cache,
+      advanced: s.advanced,
+    }),
+  );
 
-async function onCancel(): Promise<void> {
-  await patchSettings(initialSettings);
-  emit('close');
+// Frozen at runtime (mutation would be a bug); typed as plain Settings so diffSection below can
+// compare it against the mutable draft without a readonly/mutable type mismatch.
+const baseline: Settings = Object.freeze(cloneSections(settingsState)) as Settings;
+const draft = reactive<Settings>(cloneSections(settingsState));
+
+// P17 D2: the generic per-leaf diff Save sends. Walking Object.keys(base) rather than a
+// hand-maintained leaf list means a future leaf (P18's, or anything after it) is picked up with
+// no edit here — see the plan doc's own reasoning for why that removes the need for a dedicated
+// diff unit test.
+function diffSection<T extends object>(base: T, current: T): Partial<T> | undefined {
+  const changed: Partial<T> = {};
+  let anyChanged = false;
+  for (const key of Object.keys(base) as (keyof T)[]) {
+    if (current[key] !== base[key]) {
+      changed[key] = current[key];
+      anyChanged = true;
+    }
+  }
+  return anyChanged ? changed : undefined;
 }
+
+const pendingPatch = computed<SettingsPatch>(() => {
+  const patch: SettingsPatch = {};
+  const appearance = diffSection(baseline.appearance, draft.appearance);
+  if (appearance) patch.appearance = appearance;
+  const dataDiff = diffSection(baseline.data, draft.data);
+  if (dataDiff) patch.data = dataDiff;
+  const cache = diffSection(baseline.cache, draft.cache);
+  if (cache) patch.cache = cache;
+  const advanced = diffSection(baseline.advanced, draft.advanced);
+  if (advanced) patch.advanced = advanced;
+  return patch;
+});
+
+const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
 const sections = ['Appearance', 'Data', 'Cache', 'Advanced'] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
 
-// P31 D9/D10: a live local draft, updated on every keystroke (@input) so the preview line and
-// the availability check track what's actually typed — the commit itself stays on @change
-// (P16 §6's original reasoning holds: per-keystroke commits would repaint the whole app's font
-// for every partial family name). Superseding P16 §6's later `7641dd6` revert to plain @change
-// with no feedback at all: this restores the feedback without reintroducing the repaint cost.
-const fontFamilyDraft = ref(settingsState.appearance.fontFamily);
-const fontFamilyUnavailable = computed(() => !fontStackAvailable(fontFamilyDraft.value));
-const fontFamilyFallback = computed(() => resolveFontFallback(fontFamilyDraft.value));
+const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
+const fontFamilyFallback = computed(() => resolveFontFallback(draft.appearance.fontFamily));
 
 function onFontFamilyInput(e: Event): void {
-  fontFamilyDraft.value = (e.target as HTMLInputElement).value;
+  draft.appearance.fontFamily = (e.target as HTMLInputElement).value;
 }
 
-function onFontFamilyChange(e: Event): void {
-  const value = (e.target as HTMLInputElement).value;
-  fontFamilyDraft.value = value;
-  void patchSettings({ appearance: { fontFamily: value } });
-}
-
-function onFontSizeChange(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (Number.isNaN(value)) return;
-  void patchSettings({ appearance: { fontSize: value } });
+function onFontSizeInput(e: Event): void {
+  draft.appearance.fontSize = Number((e.target as HTMLInputElement).value);
 }
 
 function setRowDensity(density: RowDensity): void {
-  void patchSettings({ appearance: { rowDensity: density } });
+  draft.appearance.rowDensity = density;
 }
 
 function onWordWrapChange(e: Event): void {
-  void patchSettings({ appearance: { wordWrap: (e.target as HTMLInputElement).checked } });
+  draft.appearance.wordWrap = (e.target as HTMLInputElement).checked;
 }
 
 function onRowColoringChange(e: Event): void {
-  void patchSettings({ appearance: { rowColoring: (e.target as HTMLInputElement).checked } });
+  draft.appearance.rowColoring = (e.target as HTMLInputElement).checked;
 }
 
-const rowPreviewHeight = computed(() =>
-  settingsState.appearance.rowDensity === 'compact' ? 22 : 28,
-);
+const rowPreviewHeight = computed(() => (draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onDefaultPageSizeChange(e: Event): void {
   const value = Number((e.target as HTMLSelectElement).value);
   const pageSize = PAGE_SIZES.find((size) => size === value);
   if (!pageSize) return;
-  void patchSettings({ data: { defaultPageSize: pageSize } });
+  draft.data.defaultPageSize = pageSize;
 }
 
-function onCacheBudgetChange(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (!Number.isFinite(value) || value < 8 || value > 1024) return;
-  void patchSettings({ cache: { l2BudgetMb: value } });
+function onCacheBudgetInput(e: Event): void {
+  draft.cache.l2BudgetMb = Number((e.target as HTMLInputElement).value);
 }
 
-function onOpLogRetentionChange(e: Event): void {
-  const value = Number((e.target as HTMLInputElement).value);
-  if (!Number.isFinite(value) || value < 1 || value > 365) return;
-  void patchSettings({ advanced: { opLogRetentionDays: value } });
+function onOpLogRetentionInput(e: Event): void {
+  draft.advanced.opLogRetentionDays = Number((e.target as HTMLInputElement).value);
 }
+
+// P17 D6: the draft accepts whatever is typed (@input, so the field never fights the user
+// mid-keystroke) — validity is derived here, not enforced at write time, and gates Save below.
+const fontSizeError = computed<string | null>(() => {
+  const v = draft.appearance.fontSize;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
+    return `${FONT_SIZE_RANGE.min}–${FONT_SIZE_RANGE.max} px`;
+  }
+  return null;
+});
+
+const cacheBudgetError = computed<string | null>(() => {
+  const v = draft.cache.l2BudgetMb;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < CACHE_L2_BUDGET_MB_RANGE.min || v > CACHE_L2_BUDGET_MB_RANGE.max) {
+    return `${CACHE_L2_BUDGET_MB_RANGE.min}–${CACHE_L2_BUDGET_MB_RANGE.max} MB`;
+  }
+  return null;
+});
+
+const opLogRetentionError = computed<string | null>(() => {
+  const v = draft.advanced.opLogRetentionDays;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < OP_LOG_RETENTION_DAYS_RANGE.min || v > OP_LOG_RETENTION_DAYS_RANGE.max) {
+    return `${OP_LOG_RETENTION_DAYS_RANGE.min}–${OP_LOG_RETENTION_DAYS_RANGE.max} days`;
+  }
+  return null;
+});
+
+const isValid = computed(
+  () => !fontSizeError.value && !cacheBudgetError.value && !opLogRetentionError.value,
+);
 
 const hitRateLabel = computed(() => {
   const stats = cacheStatsState.stats;
@@ -116,6 +169,41 @@ const cacheSizeLabel = computed(() => {
 async function onClearCaches(): Promise<void> {
   await data.clearCaches();
 }
+
+// P17 D4: stages the defaults into the draft — Save still has to be clicked to commit them.
+// Every section, not just the active one (the SPEC row asks for "every setting").
+function onRevertDefaults(): void {
+  Object.assign(draft.appearance, defaultSettings.appearance);
+  Object.assign(draft.data, defaultSettings.data);
+  Object.assign(draft.cache, defaultSettings.cache);
+  Object.assign(draft.advanced, defaultSettings.advanced);
+}
+
+// P17 D5: Cancel, Escape, the ✕ and the backdrop all route here — the draft dies with the
+// component, no IPC call, no confirmation (see the plan doc's D5 for why not).
+function onDismiss(): void {
+  emit('close');
+}
+
+const saveError = ref<string | null>(null);
+
+// P17 D7: a failed Save keeps the dialog open and shows the error; only a successful Save closes
+// it. Saving with nothing changed sends no patch at all (D2).
+async function onSave(): Promise<void> {
+  if (!isValid.value) return;
+  saveError.value = null;
+  const patch = pendingPatch.value;
+  if (Object.keys(patch).length === 0) {
+    emit('close');
+    return;
+  }
+  try {
+    await patchSettings(patch);
+    emit('close');
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err);
+  }
+}
 </script>
 
 <template>
@@ -125,7 +213,7 @@ async function onClearCaches(): Promise<void> {
     :height="560"
     test-id="settings-dialog"
     close-test-id="settings-dialog-close"
-    @close="emit('close')"
+    @close="onDismiss"
   >
     <template #header>
       <span class="icon-box muted"><CodiconIcon name="gear" :size="13" /></span>
@@ -157,9 +245,8 @@ async function onClearCaches(): Promise<void> {
                 size="md"
                 list="kira-font-families"
                 :invalid="fontFamilyUnavailable"
-                :model-value="fontFamilyDraft"
+                :model-value="draft.appearance.fontFamily"
                 @input="onFontFamilyInput"
-                @change="onFontFamilyChange"
               />
               <datalist id="kira-font-families">
                 <option value="Menlo, monospace" />
@@ -170,7 +257,7 @@ async function onClearCaches(): Promise<void> {
               <span
                 class="font-preview"
                 data-testid="font-preview"
-                :style="{ fontFamily: fontFamilyDraft }"
+                :style="{ fontFamily: draft.appearance.fontFamily }"
                 >The quick brown fox jumps over the lazy dog — 0123456789</span
               >
               <span v-if="fontFamilyUnavailable" class="field-error" data-testid="font-unavailable">
@@ -186,14 +273,19 @@ async function onClearCaches(): Promise<void> {
               <div class="size-input">
                 <TextField
                   type="number"
-                  min="9"
-                  max="24"
+                  :min="FONT_SIZE_RANGE.min"
+                  :max="FONT_SIZE_RANGE.max"
                   size="md"
-                  :model-value="String(settingsState.appearance.fontSize)"
-                  @change="onFontSizeChange"
+                  :invalid="!!fontSizeError"
+                  data-testid="settings-font-size"
+                  :model-value="String(draft.appearance.fontSize)"
+                  @input="onFontSizeInput"
                 />
               </div>
-              <span class="helper-text">9–24 px</span>
+              <span v-if="fontSizeError" class="field-error" data-testid="settings-font-size-error">
+                {{ fontSizeError }}
+              </span>
+              <span v-else class="helper-text">{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</span>
             </label>
 
             <div class="field">
@@ -201,14 +293,14 @@ async function onClearCaches(): Promise<void> {
               <div class="segmented">
                 <button
                   type="button"
-                  :class="{ active: settingsState.appearance.rowDensity === 'compact' }"
+                  :class="{ active: draft.appearance.rowDensity === 'compact' }"
                   @click="setRowDensity('compact')"
                 >
                   Compact · 22 px
                 </button>
                 <button
                   type="button"
-                  :class="{ active: settingsState.appearance.rowDensity === 'comfortable' }"
+                  :class="{ active: draft.appearance.rowDensity === 'comfortable' }"
                   @click="setRowDensity('comfortable')"
                 >
                   Comfortable · 28 px
@@ -236,7 +328,7 @@ async function onClearCaches(): Promise<void> {
 
             <label class="field checkbox">
               <input
-                :checked="settingsState.appearance.wordWrap"
+                :checked="draft.appearance.wordWrap"
                 type="checkbox"
                 data-testid="settings-word-wrap"
                 @change="onWordWrapChange"
@@ -250,7 +342,7 @@ async function onClearCaches(): Promise<void> {
 
             <label class="field checkbox">
               <input
-                :checked="settingsState.appearance.rowColoring"
+                :checked="draft.appearance.rowColoring"
                 type="checkbox"
                 data-testid="settings-row-coloring"
                 @change="onRowColoringChange"
@@ -269,7 +361,7 @@ async function onClearCaches(): Promise<void> {
               <select
                 class="p-select bordered"
                 data-testid="settings-default-page-size"
-                :value="settingsState.data.defaultPageSize"
+                :value="draft.data.defaultPageSize"
                 @change="onDefaultPageSizeChange"
               >
                 <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
@@ -282,13 +374,17 @@ async function onClearCaches(): Promise<void> {
               <span>Result page cache budget (MB)</span>
               <TextField
                 type="number"
-                min="8"
-                max="1024"
+                :min="CACHE_L2_BUDGET_MB_RANGE.min"
+                :max="CACHE_L2_BUDGET_MB_RANGE.max"
                 size="md"
+                :invalid="!!cacheBudgetError"
                 data-testid="settings-cache-budget"
-                :model-value="String(settingsState.cache.l2BudgetMb)"
-                @change="onCacheBudgetChange"
+                :model-value="String(draft.cache.l2BudgetMb)"
+                @input="onCacheBudgetInput"
               />
+              <span v-if="cacheBudgetError" class="field-error" data-testid="settings-cache-budget-error">
+                {{ cacheBudgetError }}
+              </span>
             </label>
             <label class="field">
               <span>Current usage</span>
@@ -313,13 +409,17 @@ async function onClearCaches(): Promise<void> {
               <span>Operation log retention (days)</span>
               <TextField
                 type="number"
-                min="1"
-                max="365"
+                :min="OP_LOG_RETENTION_DAYS_RANGE.min"
+                :max="OP_LOG_RETENTION_DAYS_RANGE.max"
                 size="md"
+                :invalid="!!opLogRetentionError"
                 data-testid="settings-oplog-retention"
-                :model-value="String(settingsState.advanced.opLogRetentionDays)"
-                @change="onOpLogRetentionChange"
+                :model-value="String(draft.advanced.opLogRetentionDays)"
+                @input="onOpLogRetentionInput"
               />
+              <span v-if="opLogRetentionError" class="field-error" data-testid="settings-oplog-retention-error">
+                {{ opLogRetentionError }}
+              </span>
             </label>
             <p class="muted-note">Takes effect after restart.</p>
           </template>
@@ -327,16 +427,26 @@ async function onClearCaches(): Promise<void> {
     </div>
 
     <template #footer>
-      <span class="helper-text">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
+      <AppButton kind="dialog" data-testid="settings-revert-defaults" @click="onRevertDefaults">
+        Revert to Defaults
+      </AppButton>
+      <span class="footer-status">
+        <span v-if="saveError" class="field-error" data-testid="settings-save-error">{{ saveError }}</span>
+        <span v-else class="helper-text" data-testid="settings-footer-status"
+          >Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> ·
+          {{ isDirty ? 'Unsaved changes' : 'changes apply when you save' }}</span
+        >
+      </span>
       <span class="footer-actions">
-        <AppButton kind="dialog" data-testid="settings-cancel" @click="onCancel">Cancel</AppButton>
+        <AppButton kind="dialog" data-testid="settings-cancel" @click="onDismiss">Cancel</AppButton>
         <AppButton
           kind="dialog"
           variant="primary"
-          data-testid="settings-close"
-          @click="emit('close')"
+          data-testid="settings-save"
+          :disabled="!isValid"
+          @click="onSave"
         >
-          Done
+          Save
         </AppButton>
       </span>
     </template>
@@ -546,9 +656,15 @@ async function onClearCaches(): Promise<void> {
   flex: 1;
 }
 
+.footer-status {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
 .footer-actions {
   display: flex;
   gap: var(--kira-s-3);
-  margin-left: auto;
 }
 </style>

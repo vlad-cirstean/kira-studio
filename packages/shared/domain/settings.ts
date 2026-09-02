@@ -3,8 +3,18 @@ import { z } from 'zod';
 export const rowDensitySchema = /*#__PURE__*/ z.enum(['compact', 'comfortable']);
 export type RowDensity = z.infer<typeof rowDensitySchema>;
 
+// P17 D6: the three numeric bounds a control can actually violate, as exported constants so the
+// schema (where one applies), the input min/max attributes and the settings dialog's own
+// validity check read one number each, not three hard-coded copies.
+export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
+export const CACHE_L2_BUDGET_MB_RANGE = { min: 8, max: 1024 } as const;
+export const OP_LOG_RETENTION_DAYS_RANGE = { min: 1, max: 365 } as const;
+
 export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   fontFamily: z.string(),
+  // UI-only bound (FONT_SIZE_RANGE) — deliberately not enforced here, same discipline as
+  // wordWrap/rowColoring's `.default(...)` below: an already-stored row outside 9-24 must still
+  // hydrate.
   fontSize: z.number(),
   rowDensity: rowDensitySchema,
   // P42 D14: word wrap in every CodeMirror surface (query console, Mongo console, cell editor,
@@ -31,12 +41,16 @@ export const dataSettingsSchema = /*#__PURE__*/ z.object({
 export type DataSettings = z.infer<typeof dataSettingsSchema>;
 
 export const cacheSettingsSchema = /*#__PURE__*/ z.object({
-  l2BudgetMb: z.number().int().min(8).max(1024),
+  l2BudgetMb: z.number().int().min(CACHE_L2_BUDGET_MB_RANGE.min).max(CACHE_L2_BUDGET_MB_RANGE.max),
 });
 export type CacheSettings = z.infer<typeof cacheSettingsSchema>;
 
 export const advancedSettingsSchema = /*#__PURE__*/ z.object({
-  opLogRetentionDays: z.number().int().min(1).max(365),
+  opLogRetentionDays: z
+    .number()
+    .int()
+    .min(OP_LOG_RETENTION_DAYS_RANGE.min)
+    .max(OP_LOG_RETENTION_DAYS_RANGE.max),
 });
 export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
 
