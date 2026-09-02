@@ -255,6 +255,45 @@ settled step, and the redundant re-renders this fix removes all happen (and are 
 have been broken" from the fact that a real lag was reported; it wasn't, and couldn't have been, by
 that instrument. `measureScrollCoverage` is the one that can, and now does.
 
+### 2.1b P22 D6 — the first-launch window default, and what it is and is not worth
+
+**Implemented, and framed deliberately: this is a UX fix, not the fix for §2.1a's memory doc.**
+`internal/shell/window.go`'s unconditional `Width: 1280, Height: 800` — edge-to-edge and overlapping
+the menu bar/Dock on a same-size laptop panel, a real bug on its own — is now `DefaultBounds`, a pure
+function (unit-tested, `window_test.go`'s `TestDefaultBounds`) that clamps the default to the primary
+screen's work area, minus a small margin, when a screen can be resolved. It can only ever *shrink*
+1280×800, never grow it, and falls back to exactly 1280×800 (today's behaviour) when no work area is
+given. `MinWidth`/`MinHeight` are unchanged at 1024×640 — P22 D6(b) declines lowering them to
+Electron's old 900×600, judging the current minimum a considered floor for this app's UI against a
+first-launch-only, unmeasured memory win not worth the usability cost.
+
+**F12 — first-launch-only.** `Options()` already overrides `Width`/`Height`/`X`/`Y` from a window's
+stored rectangle whenever it has one, and `Attach()` persists bounds on every resize/move. A user who
+has ever resized a window never sees this default again, on this clamp or the unclamped one it
+replaces.
+
+**F13 — the Electron comparison, recovered and quantified.** `18fe7bb^:src/main/window.ts` (deleted
+by the Electron-to-Wails cutover) passed no explicit `width`/`height`, only `minWidth: 900, minHeight:
+600` — so Electron's own 800×600 default, clamped up to 900×600 at first launch. Against Wails'
+1280×800: a first-launch-only **1.90×** (540 000 px² vs 1 024 000 px²), and a floor ratio of only
+**1.21×** (900×600 vs 1024×640). `docs/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
+undersold the first-launch number and omitted the floor one; both are now recorded there directly.
+
+**F14 — the area premise is a projection, not a measurement, and this pass does not change that.**
+`docs/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
+harness — so "cost scales with viewport area" is a mechanism-level inference from that document's own
+tile-coverage-rect explanation, not something either document has measured. No macOS hardware was
+available to this implementing pass either, so the area ladder that would settle it (that document's
+§7/§9) remains unrun. **Nothing in this section should be read as a memory-cost number for the new
+default** — only F13's ratios are measured; the megabytes they might translate to are not.
+
+**Real Mac verification pending, same as everywhere else in this chapter.** This sandbox has no live
+screen backend to test the clamp against for real (Wails v3.0.0-beta.16's `*application.App` has no
+resolvable primary screen before `Run()` — a property of Wails' own Go startup ordering, verified
+here without needing macOS hardware, not a platform-specific gap), so `DefaultBounds`' arithmetic is
+unit-tested but its effect on an actual first launch is unverified on any platform in this sandbox.
+`internal/shell/window.go`'s own doc comment on `Options` records this in full.
+
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails in this environment no matter what, on non-app-controllable process
