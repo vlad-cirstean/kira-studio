@@ -1,0 +1,170 @@
+import type { TabularPage } from '@shared/protocol/page';
+import { pageColumnIndexFor } from '../../shared/page/columns';
+import { type CellView, cell } from '../page';
+import type { PendingInsert } from '../pendingChanges';
+import { pendingFor, stagedValue } from '../pendingChanges';
+
+// P22 spike, §6 D1 — the load-bearing decision this migration lives or dies on: SlickGrid's own
+// `CustomDataView` seam over the app's EXISTING frozen-page/decode-cache/staged-edit pipeline,
+// never a materialised row array (that is `SlickDataView`'s job, declined — F9/§4). Nothing here
+// is Vue-reactive; `docs/ARCHITECTURE.md`'s "no Vue reactivity on row data" invariant holds by
+// construction because `RowHandle` is a plain frozen object and `GridDataSourceState` is a plain
+// object the host swaps by reassignment, never a `ref`/`reactive`.
+
+/** What SlickGrid hands a formatter/extractor as the rendered row's "item" — never a materialised
+ *  row. `row` is the page-row index every other subsystem (selection, pending changes, search, the
+ *  gutter number) addresses a row by; `pos` is display position only (pixel placement / SlickGrid's
+ *  own row index), equal to `row` unless a filter is hiding non-matching rows (P24 D3/D4's own
+ *  split, reused verbatim). Frozen: nothing downstream may treat this as a mutable row. */
+export interface RowHandle {
+  readonly row: number;
+  readonly pos: number;
+  /** A pending insert's id, when this position is past the loaded page (D1's insert region). */
+  readonly insertId?: string;
+}
+
+/** The display-position space this grid renders in: `displayRows` (ascending page-row indices)
+ *  when a filter is hiding non-matching rows, `null` when unfiltered — DataGrid.vue's own
+ *  `displayPositionOf`/`rowAtDisplayPosition` split (P24 D3/D4), reused rather than re-derived. */
+export interface DisplayRowIndex {
+  readonly displayRows: readonly number[] | null;
+  readonly pageRowCount: number;
+}
+
+function displayRowCount(idx: DisplayRowIndex): number {
+  return idx.displayRows ? idx.displayRows.length : idx.pageRowCount;
+}
+
+/** Total display length: real (possibly filtered) rows plus any pending inserts past the end. */
+export function dataLength(idx: DisplayRowIndex, insertCount: number): number {
+  return displayRowCount(idx) + insertCount;
+}
+
+/**
+ * Display position -> `RowHandle`, across the filter and into the pending-insert region past the
+ * last display row — mirrors DataGrid.vue's `rowAtDisplayPosition` plus its own
+ * `page.rowCount + idx` insert-identity rule (`onPaste`'s own comment). The one place this
+ * translation lives for the Slick engine (D1 bullet 4): `getLength`/`getItem` below are its only
+ * callers, replacing `displayPositionOf`/`rowAtDisplayPosition`'s use inside the old virtualizer.
+ */
+export function rowHandleAt(
+  idx: DisplayRowIndex,
+  inserts: readonly Pick<PendingInsert, 'id'>[],
+  pos: number,
+): RowHandle {
+  const count = displayRowCount(idx);
+  if (pos >= count) {
+    const insert = inserts[pos - count];
+    return Object.freeze({ row: idx.pageRowCount + (pos - count), pos, insertId: insert?.id });
+  }
+  const row = idx.displayRows ? (idx.displayRows[pos] ?? pos) : pos;
+  return Object.freeze({ row, pos });
+}
+
+/** The mutable state a `KiraGridDataSource` reads on every `getItem`/`getLength`/`getItemMetadata`
+ *  call — a plain object the host (SlickGridHost.vue) reassigns wholesale via `setState` on a
+ *  relevant change (page reload, filter, a staged insert), and never a Vue `ref`/`reactive` (D1's
+ *  own rule: the extractor and formatter run *during* SlickGrid's own render, and must never touch
+ *  Vue reactivity whose mutation could re-enter it). */
+export interface GridDataSourceState {
+  index: DisplayRowIndex;
+  inserts: readonly Pick<PendingInsert, 'id'>[];
+  /** Per-page-row CSS classes (the dirty/deleted/inserted gutter rails, §5 item 18) — `undefined`
+   *  renders no metadata for that row, matching `getItemMetadata`'s own `| null` contract. */
+  rowClasses?: (row: number) => string | undefined;
+}
+
+export interface KiraGridDataSource {
+  getLength(): number;
+  getItem(pos: number): RowHandle;
+  getItemMetadata(pos: number): { cssClasses?: string } | null;
+  /**
+   * F1's own insurance, not a real render-path seam (the render path is
+   * `dataItemColumnValueExtractor`, below): a future call site — or SlickGrid's own
+   * `autosizeColumns`, left off via `autosizeColsMode: LegacyOff` but still a public method someone
+   * could call — that reaches for `getCellValue` gets the extractor's own answer instead of
+   * silently falling through to `getDataItem(i)[field]`, which would read `undefined` for every
+   * column on a `RowHandle` that only ever has `row`/`pos`/`insertId`.
+   */
+  getCellValue(index: number, field: string): unknown;
+}
+
+/**
+ * A stable `CustomDataView` over frozen pages. Never materialises a row, never allocates one for a
+ * row SlickGrid isn't actually building — a retained row is never revisited (F2), so this object's
+ * own identity, and the `state` it closes over, are the only things that change across a render.
+ * `extractValue` is the exact function the grid's own `dataItemColumnValueExtractor` option is set
+ * to (the host wires both to the same closure) — threaded through here too so `getCellValue` can
+ * delegate to it instead of drifting into a second, wrong implementation.
+ */
+export function createGridDataSource(
+  initialState: GridDataSourceState,
+  extractValue: (item: RowHandle, field: string) => unknown,
+): KiraGridDataSource & { setState(next: GridDataSourceState): void } {
+  let state = initialState;
+  return {
+    setState(next) {
+      state = next;
+    },
+    getLength() {
+      return dataLength(state.index, state.inserts.length);
+    },
+    getItem(pos) {
+      return rowHandleAt(state.index, state.inserts, pos);
+    },
+    getItemMetadata(pos) {
+      if (!state.rowClasses) return null;
+      const item = rowHandleAt(state.index, state.inserts, pos);
+      const cssClasses = state.rowClasses(item.row);
+      return cssClasses ? { cssClasses } : null;
+    },
+    getCellValue(pos, field) {
+      return extractValue(rowHandleAt(state.index, state.inserts, pos), field);
+    },
+  };
+}
+
+/**
+ * Builds the `dataItemColumnValueExtractor` closure itself (§6 D1's pseudocode) — routes every cell
+ * access through the app's EXISTING decode/cache/staged-edit pipeline: `page.ts`'s `cell()` (which
+ * memoises both the decoded string and the built `CellView`, `store.ts`'s `cachedView`) layered with
+ * `pendingChanges.ts`'s `stagedValue()`, exactly as DataGrid.vue's own `displayCell` does — nothing
+ * about that pipeline is rebuilt here, only re-entered. `fieldToPageCol` is resolved once per
+ * column-order rebuild (not per cell) via the same `pageColumnIndexFor` DataGrid.vue itself calls,
+ * so a repeat lookup for an already-decoded cell is allocation-free (page.ts's own memoisation) and
+ * a repeat lookup for a column position is an O(1) map read.
+ */
+export function createDisplayValueExtractor(
+  tabId: string,
+  page: TabularPage,
+  columnOrder: string[],
+): (item: RowHandle, field: string) => CellView {
+  const fieldToPageCol = new Map<string, number>();
+  for (let i = 0; i < columnOrder.length; i++) {
+    fieldToPageCol.set(columnOrder[i], pageColumnIndexFor(page, columnOrder, i));
+  }
+  return (item, field) => {
+    if (item.insertId !== undefined) {
+      const value = pendingFor(tabId)?.inserts.find((i) => i.id === item.insertId)?.values[field];
+      return { text: value ?? '', isNull: value === null || value === undefined, truncated: false };
+    }
+    const staged = stagedValue(tabId, item.row, field);
+    if (staged !== undefined) {
+      return { text: staged ?? '', isNull: staged === null, truncated: false };
+    }
+    const pageCol = fieldToPageCol.get(field) ?? -1;
+    if (pageCol < 0) return { text: '', isNull: true, truncated: false };
+    return cell(tabId, item.row, pageCol);
+  };
+}
+
+/** The dirty/deleted-rail source for `GridDataSourceState.rowClasses` (§5 item 18) — a page row
+ *  index in, the same two mutually-exclusive rail classes GridRow.vue's own CSS already draws
+ *  (`.gutter-cell.dirty`/`.gutter-cell.deleted`, ported verbatim in `slickTheme.css`). */
+export function pendingRowClasses(tabId: string, row: number): string | undefined {
+  const p = pendingFor(tabId);
+  if (!p) return undefined;
+  if (p.deletes.has(row)) return 'kira-row-deleted';
+  if (p.edits.has(row)) return 'kira-row-dirty';
+  return undefined;
+}
