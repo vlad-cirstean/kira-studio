@@ -46,6 +46,11 @@ const dialect = computed(() => schemaDialectFor(connectionKind.value));
 watch(
   () => schemaDialogState.connectionId,
   async (id) => {
+    // P12 round 2 finding #12: the dialog only unmounts on close (ProjectPanel.vue's `v-if`
+    // gates on `open`, not `connectionId`) — switching connections while it stays open reuses
+    // this same instance, so a debounce timer left running from typing in the previous
+    // connection's DDL text would otherwise fire later and clobber this one's debouncedDraft.
+    clearTimeout(parseSummaryTimer);
     draft.value = '';
     debouncedDraft.value = '';
     if (!id) return;
