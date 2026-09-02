@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
 import { connectionRecord } from '../state/connections';
 import {
@@ -23,6 +23,16 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 const draft = ref('');
 const saving = ref(false);
 
+// P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
+// parse summary below reads this instead — a full Lezer parse of the whole document (measured up
+// to ~58ms on a 200-table schema, against the app's own 50ms interaction budget) has no business
+// running on every keystroke. 400ms mirrors CodeMirrorHost.vue's own `@codemirror/lint` debounce
+// precedent. An external load (the watcher below) writes both refs immediately, with no delay —
+// only typing goes through the timer.
+const debouncedDraft = ref('');
+let parseSummaryTimer: ReturnType<typeof setTimeout> | undefined;
+onBeforeUnmount(() => clearTimeout(parseSummaryTimer));
+
 const connectionId = computed(() => schemaDialogState.connectionId);
 const connectionKind = computed(() => connectionRecord(connectionId.value)?.kind);
 const connectionName = computed(() => connectionRecord(connectionId.value)?.name ?? '');
@@ -37,10 +47,12 @@ watch(
   () => schemaDialogState.connectionId,
   async (id) => {
     draft.value = '';
+    debouncedDraft.value = '';
     if (!id) return;
     const ddl = await ensureDdl(id);
     if (schemaDialogState.connectionId !== id) return; // superseded by a later open
     draft.value = ddl;
+    debouncedDraft.value = ddl;
   },
   { immediate: true },
 );
@@ -49,10 +61,14 @@ watch(
 // DDL is actually being understood. ddl.ts's own extractor never throws and never reports a
 // structured parse error (D9: an unrecognised statement is silently skipped, not a failure), so
 // "recognised nothing at all" is the one failure state this can show.
-const parseSummary = computed(() => ddlParseSummary(connectionKind.value, draft.value));
+const parseSummary = computed(() => ddlParseSummary(connectionKind.value, debouncedDraft.value));
 
 function onDocChange(text: string): void {
   draft.value = text;
+  clearTimeout(parseSummaryTimer);
+  parseSummaryTimer = setTimeout(() => {
+    debouncedDraft.value = text;
+  }, 400);
 }
 
 async function onSave(): Promise<void> {
