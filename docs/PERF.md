@@ -384,6 +384,79 @@ code to this path; not, on its own, a reason to hold Pass A back — the accepta
 concern (an accidentally-imported `SlickDataView`/plugin) is affirmatively ruled out here, not just
 asserted.
 
+**P22 iter2-scroll-gaps: fast-fling rendering gaps and dropped frames, found while attempting to run
+the protocol above.** Once the wheel-handler fix (above) restored genuinely native trackpad momentum,
+a real-Mac run of this same protocol surfaced two further symptoms on very fast flicks: brief
+rendering gaps at the leading edge (content not yet painted where the compositor already scrolled to)
+and occasional dropped frames. Doubling `leadFramesOverride`/`maxLeadPxOverride` live from the
+console — the first, most obvious lever — made no difference, which is itself a real finding: those
+two overrides govern how *wide* the target window is, not how much of that window's *newly-entering*
+portion a single synchronous SlickGrid `render()` call is allowed to build, and a fling landing in
+never-before-mounted territory has no `rowsCache` overlap either way — doubling the runway only
+doubles the size of the batch that was already too large.
+
+Traced against SlickGrid 5.20.0's own source
+(`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md` §1-§3, cited by line number) to
+`render()`'s own unconditional cost: every row entering `rowsCache` for the first time pays a
+synchronous decode (`page.ts`/`store.ts`, real and un-batched, but memoised after the first access)
+**and** unconditional per-cell DOM construction (`Utils32.createDomElement`, class-list joins,
+attribute writes — paid identically whether or not the decode cache happens to be warm, because the
+build/skip decision is keyed on `rowsCache` membership, never on decode freshness). A secondary,
+independent contributor: SlickGrid's own `_handleScroll` defers to a 10 ms-windowed
+`scrollThrottle.enqueue()` whenever a single frame's delta exceeds one viewport height, which a hard
+fling's high end reaches routinely — deferring the render rather than speeding it up, on a macrotask
+boundary unrelated to the display's own frame cadence.
+
+**The fix** (landed as four commits, `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md`
+§5-§6): `KiraSlickGrid.getRenderedRange` now always returns the strictly-visible range in full — nothing
+on screen is ever deferred — and caps the *extra* runway per call at `MAX_NEW_CELLS_PER_RENDER = 600`
+cells (`columns.ts`, provisional like `LEAD_FRAMES`/`MAX_LEAD_PX`, overridable live via
+`window.__kiraGridTuning.maxNewCellsPerRenderOverride`), independent of `CELL_BUDGET`'s total-window
+cap. When the velocity-scaled target exceeds what the per-call budget allows, the shortfall is made up
+by a self-scheduled `requestAnimationFrame`-chained `render()` that converges on the full target over a
+handful of frames — turning "synchronous cost proportional to how far the fling jumped" into
+"synchronous cost bounded by viewport size, converging over N frames." `forceSyncScrolling: true`
+(only safe once the batch is capped — a separate, later commit, deliberately bisectable from the batch
+cap) removes the 10 ms throttle-deferral branch entirely. `scrollTrace.ts` also gained `noteRenderMs`
+— before this pass, `__kiraScrollTrace.renderMs`/`.notified` were **always 0/false** for the SlickGrid
+engine (a stale comment claimed otherwise; nothing actually called `noteNotify()` on this path), so the
+protocol below was unusable for this engine until that was fixed first, alone, ahead of the batch cap.
+
+**What this phase can and cannot claim from the sandbox alone.** The mechanism is confirmed and
+refined from SlickGrid's own source, and the batch a single render pass can be forced to build is now
+provably bounded independent of fling distance (`tests/ui/slick-grid.spec.ts`'s own convergence
+assertion: the mounted `.slick-cell` count after a jump well past the whole runway grows over several
+animation frames rather than appearing all at once). **Nothing here claims the gap/drop symptom itself
+is fixed** — like every other perceptual/latency question in this document's history, only a real
+compositor can answer that, and this sandbox has none.
+
+**The extended real-Mac protocol — same setup, same gesture, same `__kiraScrollTrace`, now with real
+`renderMs` for this engine.** Extends the steps above rather than replacing them (the two symptoms
+were found *during* an attempt to run that exact protocol):
+
+1. **Baseline**, on a build with only the `noteRenderMs` instrumentation fix landed (no batch cap, no
+   `forceSyncScrolling`): `__kiraScrollTrace.start()`, one hard two-finger flick, let momentum die,
+   `copy(JSON.stringify(__kiraScrollTrace.stop()))`. Report `summary.renderMs` (p50/p95/max) — the
+   first *real* number this engine has ever produced — and `summary.uncoveredPx` (p50/p95/max). Note,
+   qualitatively, whether the gap/drop happens on this build.
+2. **With the batch cap and `forceSyncScrolling` both landed**, same build, same gesture: repeat step
+   1's trace, report the same numbers, plus one sentence on whether the gap/drop was *perceptibly*
+   different.
+3. **The A/B on `MAX_NEW_CELLS_PER_RENDER` itself**, batch cap live:
+   `window.__kiraGridTuning.maxNewCellsPerRenderOverride = 150` (small — more, cheaper chase frames),
+   then `= 2200` (equal to `CELL_BUDGET` — no capping at all, today's pre-fix behaviour in effect), same
+   flick each time. If the gap/drop tracks this dial — worse at 2200, better at 150 — that is the
+   direct, decisive real-hardware confirmation of the mechanism.
+4. **Isolate `forceSyncScrolling` from the batch cap**: since `window.__kiraGridTuning` has no live
+   toggle for it (a grid-construction option, not read live), compare a build with it landed against one
+   without, batch cap held constant at a reasonable default, as a build-level A/B.
+
+Report the three `summary` blocks (baseline, both-fixes, the `maxNewCellsPerRenderOverride` sweep),
+this section's own `pxPerFrame`/`scrollEvents` context so the fling being compared is the same shape
+each time, and one sentence per step on whether the gap/drop was perceptible. **This A/B has not yet
+been run on real hardware** — like §7.4(b)'s own still-open gate above, whoever runs it should update
+this section with the real numbers and verdict.
+
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails in this environment no matter what, on non-app-controllable process

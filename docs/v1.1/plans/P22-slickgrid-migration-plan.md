@@ -1056,6 +1056,12 @@ The gate:
 measured bundle-size delta (§7.4(a) item 7) and notes that this gate's own result is not yet known.
 Update both places together if the protocol ever changes.
 
+**`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md`** extends this same protocol
+with two further real-Mac symptoms (fast-fling rendering gaps and dropped frames) found during an
+attempt to run it, and the fix — a per-`render()`-call new-cell budget with self-scheduled
+`requestAnimationFrame` catch-up, plus `forceSyncScrolling: true` — now folded into `docs/PERF.md`
+§2.1c alongside this section's own protocol.
+
 ---
 
 ## 8. Pass B — feature parity and cutover (design, not yet the commit list)
