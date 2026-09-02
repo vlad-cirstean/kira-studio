@@ -154,10 +154,18 @@ function refsInStatement(toks: readonly LNode[], source: string): TableRef[] {
 /** Every top-level Statement in `source`, with its FROM/JOIN table refs and any WITH-declared CTE
  *  names. Subqueries are not walked — this is a best-effort binder, not a real one (D7's own
  *  false-positive rule: under-detect rather than guess). */
-export function statementsWithRefs(dialect: SQLDialect, source: string): StatementRefs[] {
-  const root = dialect.language.parser.parse(source).topNode as unknown as LNode;
+// `root` lets a caller that has already parsed `source` (sqlHover.ts's resolveHover, P12 round 1
+// finding #13) pass the tree through instead of paying for a second, redundant parse of the exact
+// same string — measured ~5-13ms per hover on a moderately large script, half of it provably
+// redundant. Omitted, this parses `source` itself, unchanged from before.
+export function statementsWithRefs(
+  dialect: SQLDialect,
+  source: string,
+  root?: LNode,
+): StatementRefs[] {
+  const parsedRoot = root ?? (dialect.language.parser.parse(source).topNode as unknown as LNode);
   const out: StatementRefs[] = [];
-  for (const stmt of childrenOf(root)) {
+  for (const stmt of childrenOf(parsedRoot)) {
     if (stmt.name !== 'Statement') continue;
     const toks = childrenOf(stmt).filter((n) => n.name !== ';');
     out.push({

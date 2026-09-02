@@ -60,6 +60,9 @@ function resolveHover(
   doc: string,
   pos: number,
 ): ConsoleHoverInfo | null {
+  // P12 round 1 finding #13: parsed once here, then handed to both statementsWithRefs() calls
+  // below (its own `root` param) — before, each one re-parsed this exact same string, a provably
+  // redundant second parse of text already parsed one line above.
   const root = dialect.language.parser.parse(doc).topNode as unknown as LNode;
   const { node, parent } = findLeafAt(root, pos);
   if (!isNameNode(node)) return null;
@@ -75,7 +78,7 @@ function resolveHover(
       const qualifierNode = segs[index - 1] as LNode;
       const qualifierText = unquotedName(qualifierNode, doc);
       const columnText = unquotedName(node, doc);
-      const statement = statementsWithRefs(dialect, doc).find(
+      const statement = statementsWithRefs(dialect, doc, root).find(
         (s) => s.statement.from <= pos && pos <= s.statement.to,
       );
       let table: DdlTable | undefined;
@@ -99,7 +102,7 @@ function resolveHover(
 
   // D8: an unqualified word that isn't a table — a column hover only when exactly one table
   // *referenced in this statement* declares it (never guessed across the whole schema).
-  const statement = statementsWithRefs(dialect, doc).find(
+  const statement = statementsWithRefs(dialect, doc, root).find(
     (s) => s.statement.from <= pos && pos <= s.statement.to,
   );
   if (!statement) return null;
