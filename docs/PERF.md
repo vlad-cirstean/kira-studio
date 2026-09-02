@@ -847,6 +847,25 @@ other result is closed — freeing exactly that page's own share.
    ("change the constant only if the peak justifies it") is not cleared by a peak that confirms the
    existing number rather than contradicting it.
 
+### 2.10 P12 round 1 — bundle size re-measured, P18's own "unchanged in size" claim now stale
+
+P18's own plan doc (`docs/v1.1/plans/P18-sql-language-server-explain.md` §7.5) asserted
+`dist/assets/index-*.js` and the `sql-formatter` chunk were both unchanged in size. True at the
+time, but P18 did land real, eagerly-bundled app code for the EXPLAIN feature itself
+(`ExplainResultView.vue` + five plan parsers + supporting modules) — P12 round 1's own performance
+review caught the claim going stale and this re-measures it (`bun run build`, current HEAD, after
+every fix that review's findings needed):
+
+- `index-*.js`: **1,117,138 B raw / 356,081 B gzip** — up from P15's own recorded
+  **1,057,495 B / 334,906 B gzip** baseline (`docs/v1.1/plans/P15-fake-data-generator.md`), a
+  **+59,643 B (+5.6%) raw / +21,175 B (+6.3%) gzip** growth entirely accounted for by P18's own new
+  code. Correctly *not* lazy-loaded: an order of magnitude below the size P13/P15 split their own
+  dependencies out at (both lazy chunks below are well over 140 KB raw on their own).
+- `sqlFormatterEntry-*.js`: **141,507 B** — unchanged, still a properly split lazy chunk.
+- `fakerEntry-*.js`: **416,026 B** — unchanged, still a properly split lazy chunk.
+
+No dependency leaked into the main chunk; the growth is real app code, not a regression.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
