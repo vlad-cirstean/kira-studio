@@ -373,6 +373,11 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       path: tab.path,
       statements,
     });
+    // P12 round 2 finding #3: the tab may have closed while this run was in flight — `rt` is
+    // still a live reference to the detached runtime object (deleting `runtime[tabId]` doesn't
+    // touch it), so `rt.opId !== opId` alone doesn't catch this and every write below would leak
+    // a result nothing can ever reach again (resultPages.ts's `nextSeq` never repeats).
+    if (!runtime[tabId]) return;
     if (rt.opId !== opId) return; // superseded by a newer run
 
     // P40 D6, default re-flipped back on P46-2: the toolbar toggle decides append vs. replace — on

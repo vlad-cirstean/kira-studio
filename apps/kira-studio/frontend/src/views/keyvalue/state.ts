@@ -108,6 +108,10 @@ export async function load(
       pageSize: tab.state.pageSize,
       cursor: effectiveCursor,
     });
+    // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
+    // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
+    // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
+    if (!runtime[tabId]) return;
     if (rt.opId !== opId) return;
     if (response.page.kind !== 'keyvalue') {
       throw new Error(`unexpected page kind for a key/value tab: ${response.page.kind}`);
