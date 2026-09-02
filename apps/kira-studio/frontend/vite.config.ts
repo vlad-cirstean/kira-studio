@@ -37,7 +37,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       // Generated with `-b`, the bindings import "/wails/runtime.js" — a path Wails' own asset
       // server resolves inside the webview, not an npm package. Keep it literal.
       external: [/^\/wails\//],
