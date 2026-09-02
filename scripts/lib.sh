@@ -27,6 +27,20 @@ ensure_gopath_on_path() {
   export PATH
 }
 
+# Prints the SHA-256 of a file — `sha256sum` (Linux) and `shasum -a 256` (macOS, this app's only
+# supported platform, which has no `sha256sum` at all) are the two implementations that actually
+# exist here; `command -v` picks whichever is present rather than assuming one.
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    echo "$(basename -- "$0"): neither sha256sum nor shasum found — install one, then re-run" >&2
+    exit 1
+  fi
+}
+
 # The github.com/wailsapp/wails/v3 version go.mod pins. Pinned, not `@latest`: a stale `@latest`
 # install has resolved to a newer beta than the runtime library go.mod pins, silently skewing the
 # bindings generator against it.

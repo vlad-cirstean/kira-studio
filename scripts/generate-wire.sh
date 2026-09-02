@@ -60,13 +60,21 @@ else
       ;;
   esac
 
+  require_cmd curl "install it (your OS package manager, or curl.se), then re-run"
+  require_cmd unzip "install it (your OS package manager), then re-run"
+
   mkdir -p "$TOOLS_DIR"
   ARCHIVE="$TOOLS_DIR/$ASSET"
   echo "generate-wire: downloading flatc $FLATC_VERSION ($ASSET)"
   curl -fsSL -o "$ARCHIVE" \
     "https://github.com/google/flatbuffers/releases/download/v$FLATC_VERSION/$ASSET"
 
-  ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+  # P12 round 2 finding #9: was `sha256sum`, which doesn't exist on macOS — this app's only
+  # supported platform — so every run there without a cached flatc printed a false "SHA-256
+  # mismatch" (empty actual value, `sha256sum: command not found` masked by `set -eu` not
+  # catching a piped command's real exit status) and deleted the archive, never having verified
+  # anything.
+  ACTUAL_SHA256="$(sha256_file "$ARCHIVE")"
   if [ "$ACTUAL_SHA256" != "$SHA256" ]; then
     echo "generate-wire: SHA-256 mismatch for $ASSET" >&2
     echo "  expected: $SHA256" >&2
