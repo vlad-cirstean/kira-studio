@@ -6,6 +6,7 @@ import {
   CELL_BUDGET,
   LEAD_FRAMES,
   MAX_LEAD_PX,
+  MAX_NEW_CELLS_PER_RENDER,
   OVERSCAN_PX,
   type RowRangeExtractorConfig,
   rowRangeBounds,
@@ -22,6 +23,8 @@ declare global {
       leadFramesOverride?: number;
       maxLeadPxOverride?: number;
       incrementalRows?: boolean;
+      /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER. */
+      maxNewCellsPerRenderOverride?: number;
     };
   }
 }
@@ -43,6 +46,25 @@ function runwayConfig(): RowRangeExtractorConfig {
     maxLeadPx: tuning?.maxLeadPxOverride ?? MAX_LEAD_PX,
     cellBudget: CELL_BUDGET,
   };
+}
+
+/** P22 iter2-scroll-gaps D2 step 4/7 — how many rows in `[start, end]` fall outside
+ *  `[prevStart, prevEnd]`, i.e. how many of them are *not* already in SlickGrid's own `rowsCache`
+ *  (`prev` is `lastRenderedRowBounds`, a reliable proxy for `rowsCache` membership — that plan's own
+ *  D2 comment: `cleanupRows` keeps exactly the previously-returned range). A pure function, split out
+ *  so the batch-cap arithmetic is testable without constructing a real `SlickGrid`. */
+export function countNewRows(
+  start: number,
+  end: number,
+  prevStart: number,
+  prevEnd: number,
+): number {
+  if (end < start) return 0;
+  const total = end - start + 1;
+  const overlapStart = Math.max(start, prevStart);
+  const overlapEnd = Math.min(end, prevEnd);
+  const overlap = overlapEnd >= overlapStart ? overlapEnd - overlapStart + 1 : 0;
+  return total - overlap;
 }
 
 /** The column axis's own overscan clamp (D4's third bullet: `OVERSCAN_PX` per side instead of a
@@ -105,6 +127,14 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  memoisation for the whole overscan band. */
   lastRenderedRowBounds: { start: number; end: number } = { start: 0, end: -1 };
 
+  /** P22 iter2-scroll-gaps D2 step 8 — set while a self-scheduled `requestAnimationFrame` catch-up
+   *  render is already in flight, so a call arriving before it fires does not schedule a second one.
+   *  Re-entrancy note (this file's own existing comment, above, on `velocity`/`mountedColumnCount`):
+   *  reads of this field must tolerate `undefined` on the very first, pre-field-init call exactly
+   *  like those two already do — `!this.chasePending` is falsy (i.e. "not pending") for `undefined`
+   *  without needing a separate default. */
+  chasePending = false;
+
   override getRenderedRange(
     viewportTop?: number,
     viewportLeft?: number,
@@ -116,18 +146,115 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     // that first, base-constructor-triggered call; every read of a subclass field here has to
     // tolerate that, not just default it once at the field declaration (confirmed empirically —
     // `TypeError: this.velocity is not a function` from inside the `super(...)` call otherwise).
+    // `this.chasePending`/`this.lastRenderedRowBounds` (P22 iter2-scroll-gaps D2) are read the same
+    // defensive way below, for the identical reason.
     const range = super.getVisibleRange(viewportTop, viewportLeft);
     const { pxPerFrame, direction } = this.velocity
       ? this.velocity()
       : { pxPerFrame: 0, direction: 0 as const };
-    const { start, end } = rowRangeBounds(
-      { startIndex: range.top, endIndex: range.bottom, count: this.getDataLength() },
-      this.getOptions().rowHeight ?? 28,
+    const dataLength = this.getDataLength();
+    const rowHeight = this.getOptions().rowHeight ?? 28;
+
+    // P22 iter2-scroll-gaps D2 — the plan's own 9-step algorithm (§5 D2), restructured from the
+    // single `rowRangeBounds` call this override used to make directly.
+    //
+    // Step 1: the strictly-visible range, always returned in full — nothing currently on screen is
+    // ever deferred to a later frame.
+    const mustStart = Math.max(0, range.top);
+    const mustEnd = Math.min(range.bottom, dataLength - 1);
+
+    // Step 2: today's full computation (visible + velocity-scaled runway), unchanged — the target
+    // this call would return in full if there were no per-call budget at all.
+    const target = rowRangeBounds(
+      { startIndex: range.top, endIndex: range.bottom, count: dataLength },
+      rowHeight,
       pxPerFrame,
       direction,
       this.mountedColumnCount || 1,
       runwayConfig(),
     );
+
+    // Step 3: the previous call's returned range — a reliable proxy for "what's currently in
+    // SlickGrid's own rowsCache" (cleanupRows keeps exactly the previously-returned range,
+    // enableCellRowSpan is off — P22-slickgrid-migration-plan.md F2's own citation).
+    const prev = this.lastRenderedRowBounds ?? { start: 0, end: -1 };
+
+    // Step 4: how many rows the non-negotiable floor alone requires building fresh this call.
+    const mustNewRows = countNewRows(mustStart, mustEnd, prev.start, prev.end);
+
+    // Step 5: the per-call budget, in rows — MAX_NEW_CELLS_PER_RENDER (or its runtime override),
+    // divided by however many columns are currently mounted (mirrors CELL_BUDGET's own divisor,
+    // columns.ts's rowRangeBounds).
+    const tuning = window.__kiraGridTuning;
+    const maxNewCells = tuning?.maxNewCellsPerRenderOverride ?? MAX_NEW_CELLS_PER_RENDER;
+    const budgetRows = Math.floor(maxNewCells / Math.max(1, this.mountedColumnCount || 1));
+
+    let start: number;
+    let end: number;
+    if (mustEnd < mustStart) {
+      // No data, or nothing visible — nothing to render.
+      start = 0;
+      end = -1;
+    } else if (mustNewRows >= budgetRows) {
+      // Step 6: even the non-negotiable floor is expensive on this table/window combination this
+      // call — accept a viewport-bounded (not fling-distance-bounded) cost, and defer *all* extra
+      // runway to the chase rather than spending what's left of the budget trying to also add lead.
+      start = mustStart;
+      end = mustEnd;
+    } else {
+      // Step 7: expand outward from `must` toward `target`, lead side first (today's existing
+      // direction bias — rowRangeBounds' own [trailRows, leadRows]/[leadRows, trailRows] asymmetry),
+      // until either `target` is reached or the remaining budget is exhausted. A row already inside
+      // `prev` costs nothing to add (SlickGrid skips it — it's already in rowsCache); only a genuinely
+      // new row spends budget, so growth only stalls when it actually reaches un-cached territory.
+      let remaining = budgetRows - mustNewRows;
+      start = mustStart;
+      end = mustEnd;
+      const growEnd = (limit: number) => {
+        while (end < limit) {
+          const next = end + 1;
+          if (next < prev.start || next > prev.end) {
+            if (remaining <= 0) break;
+            remaining -= 1;
+          }
+          end = next;
+        }
+      };
+      const growStart = (limit: number) => {
+        while (start > limit) {
+          const next = start - 1;
+          if (next < prev.start || next > prev.end) {
+            if (remaining <= 0) break;
+            remaining -= 1;
+          }
+          start = next;
+        }
+      };
+      // direction < 0 (scrolling up/backward) leads on the start side, matching rowRangeBounds' own
+      // [leadRows, trailRows] assignment there; direction >= 0 (forward or at rest) leads on the end
+      // side, matching its [trailRows, leadRows].
+      if (direction < 0) {
+        growStart(target.start);
+        growEnd(target.end);
+      } else {
+        growEnd(target.end);
+        growStart(target.start);
+      }
+    }
+
+    // Step 8: if the returned range is narrower than `target` on either side, self-schedule a
+    // catch-up render — every call (real-scroll- or catch-up-driven) recomputes `must`/`target` fresh
+    // from the grid's *current* scroll position, so there is no queue of stale ranges to reconcile,
+    // only "how far is `prev` from `target`, right now."
+    if ((start > target.start || end < target.end) && end >= start && !this.chasePending) {
+      this.chasePending = true;
+      requestAnimationFrame(() => {
+        this.chasePending = false;
+        this.render();
+      });
+    }
+
+    // Step 9: the range actually returned this call — read by step 3 on the *next* call.
     this.lastRenderedRowBounds = { start, end };
     // getCanvasNode() with no args resolves column 0 — this app's frozen gutter (D4/§5 item 5),
     // whose own pane is a fixed GUTTER_WIDTH wide, not the scrollable data pane whose width this

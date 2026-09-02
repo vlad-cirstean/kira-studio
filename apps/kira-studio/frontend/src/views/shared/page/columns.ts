@@ -237,6 +237,20 @@ export const MAX_LEAD_PX = 2400;
 // existing bound so a wide table's extra lead self-limits well before the DOM-size gate would.
 export const CELL_BUDGET = 2200;
 
+// P22 iter2-scroll-gaps D2: provisional (same epistemic status as LEAD_FRAMES/MAX_LEAD_PX, above —
+// nobody has a real renderMs-per-cell figure from the SlickGrid engine yet; D1 is what produces the
+// first one). This is a PER-CALL cap on how many new (not-yet-cached) cells a single synchronous
+// SlickGrid render() pass may build, independent of CELL_BUDGET (which caps the TOTAL mounted
+// window across calls, not any one call's own new-row batch). Sized to keep one render() call's
+// synchronous work well under a single frame's budget even on a 120 Hz display; re-set once the
+// real-Mac protocol (docs/PERF.md §2.1c) reports actual renderMs figures for a cold batch of this
+// size. Consumed by views/grid/slick/kiraSlickGrid.ts's own getRenderedRange override — the
+// incumbent tanstack-virtual/DataGrid.vue grid has no equivalent single-call batch-size hazard
+// (P22-slickgrid-migration-plan.md's own F2: SlickGrid's render() builds every newly-entering row
+// synchronously in one unconditional DOM-construction pass, unlike Vue's own patch, which this app's
+// incumbent grid goes through instead), so this constant is SlickGrid-only.
+export const MAX_NEW_CELLS_PER_RENDER = 600;
+
 export interface RowRangeExtractorConfig {
   baseLeadPx: number;
   baseTrailPx: number;

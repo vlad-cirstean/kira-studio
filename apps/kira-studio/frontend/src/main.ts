@@ -178,6 +178,9 @@ declare global {
       /** `false` disables D4's per-row memoisation (renderRows always allocates fresh RowVMs).
        *  Default (undefined) is "on". */
       incrementalRows?: boolean;
+      /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER — the SlickGrid
+       *  engine's per-call new-cell batch cap, read fresh on every `getRenderedRange` call. */
+      maxNewCellsPerRenderOverride?: number;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
