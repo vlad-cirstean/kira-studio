@@ -422,6 +422,13 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
 
 export function stop(tabId: string): void {
   const rt = runtime[tabId];
+  // P12 round 2 finding #5: set synchronously, not left to the in-flight promise's own eventual
+  // rejection — if the auto-explain batch happens to resolve normally before the cancel signal
+  // reaches it (rather than rejecting with E_CANCELLED), rt.status would otherwise still read
+  // 'running' when run()'s post-await guard checks it, and the real (possibly expensive) query
+  // would fire anyway despite the Stop press. Marking it here makes that guard see the Stop
+  // regardless of how the batch's own promise happens to settle.
+  if (rt?.status === 'running') rt.status = 'cancelled';
   // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
   // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
   if (rt?.explainOpId) void control.opsCancel(rt.explainOpId);
