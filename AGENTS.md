@@ -104,7 +104,13 @@ team works, and how to run things in whichever box a session happens to be on.
 
 ## Known open items
 
-- _None._
+- **P16's DB-compatibility CI workflow is staged, not live.** `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml`
+  is the finished `workflow_dispatch`-only workflow for the on-demand DB compatibility suite
+  (`docs/v1.1/plans/P16-db-compat-suite.md`); it isn't in `.github/workflows/` because this
+  session's GitHub push access lacks the `workflow` OAuth scope, which GitHub requires for any
+  commit touching `.github/workflows/*.yml`. Apply it once a session's push access carries that
+  scope — see the README beside it for the exact move. The suite itself (`scripts/db-compat.sh`)
+  works today and needs no CI wiring to run by hand.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
