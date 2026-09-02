@@ -370,7 +370,20 @@ A `CGEventCreateScrollWheelEvent` injector was built, but the posted events neve
 webview (memory stayed flat at 120M through 1800 events) — `CGEventPost` needs an
 Accessibility/TCC grant the harness process does not have. §5.4's velocity ladder is a proxy, and
 its realistic-velocity band matches the reported symptom, but WebKit's momentum-scroll code path
-is genuinely untested.
+is genuinely untested — for *memory*. Still true, and still closed for that question (this
+document's scope).
+
+For the *rendering-latency* half of the same symptom, this gap is half-closed:
+`window.__kiraScrollTrace` (`views/grid/scrollTrace.ts`, P22 iter2 D2) is an in-page probe reachable
+from a dev build's DevTools, and it needs no injected event at all — the human supplies the momentum
+on their own trackpad, and the probe reads the real DOM/scroll state from inside the page rather
+than trying to synthesize the gesture from outside the process. That route wasn't available to this
+document's own harness (a separate process posting synthetic `CGEvent`s), which is exactly why it
+never worked; a probe living inside the WKWebView itself doesn't need TCC for anything. See
+`docs/PERF.md` §2.1a and
+`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` §7.3 for the protocol. This does
+not reopen this document's own memory conclusions — a rendering-latency measurement is a different
+question than `ri_phys_footprint`, asked here only because the same real-fling gap applied to both.
 
 **The area ladder behind §7 avenue 3's premise (P22 F14).** "Cost scales with viewport area" is
 asserted here, not measured — every figure in this document came from one 1440×960 `NSWindow`. §7

@@ -190,70 +190,87 @@ originally described) is the only tier that could recover the L2/event-driven ch
 drops, if ever wanted on top of `lru_test.go`'s unit coverage — named as a possible follow-up, not
 built.
 
-### 2.1a P22 D1/D3 — sustained-velocity scroll coverage, and the fix for the fast-scroll rendering lag
+### 2.1a P22 — the fast-scroll rendering lag: pass 1's fix was a no-op, corrected in a second pass
 
-**The finding a passing scroll-response budget could not see.** §2.1's `measureScrollResponses`
-measures one scroll step from an idle, settled DOM — it never has two scroll deltas in flight
-(`docs/v1.1/plans/P22-webview-scroll-performance.md` F6). The user-reported symptom ("rows visibly
-take a moment to render/catch up when scrolling fast") only exists *while* scrolling continues, which
-that instrument structurally cannot observe. `measureScrollCoverage` (new,
-`tests/ui/support/measure.ts`) does: velocity-parameterised in px/frame (the same discipline
-`docs/WEBVIEW-SCROLL-MEMORY.md` §5.4 established for the memory half), it keeps a sustained scroll
-going for N frames and records, per frame, how many times the row virtualizer's `onChange` fired
-(`notifiesPerFrame`) and how much of the viewport the mounted row band failed to cover
-(`uncoveredPx`).
+**This section previously recorded pass 1 (P22 D1, `observeScrollElementOffset`'s rAF-deferred
+notify) as a solved problem with a measured root cause. It wasn't — the premise was refuted, the
+instrument that certified it was unfalsifiable by construction, and the "fix" changed nothing a user
+could see.** Kept below in full, not deleted, because the corrected understanding is only legible
+against what it corrects. See
+`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` for the complete evidence (§2)
+and decisions (§5); this is the short version.
 
-**Root cause.** `@tanstack/virtual-core@3.17.8`'s stock `observeElementOffset` invokes its callback
-synchronously on every native `scroll` event, not once per animation frame — unlike
-`observeElementRect`, which this app already overrides (P49 F3/D4). A fling can fire many native
-scroll events inside one frame, and every notify rebuilt the whole rendered row/column window from
-scratch, so the app did N full re-renders per frame and threw N-1 away before paint. The fix
-(`observeScrollElementOffset`, `views/shared/page/columns.ts`) coalesces the offset-driven notify
-into one `requestAnimationFrame` per burst, reading the offset inside the callback so the computed
-range is the freshest one available, not the burst's first event — mirroring `DataGrid.vue`'s own
-`onScroll` rAF coalescing, which only ever fed the 300 ms scroll-position-persistence watcher, not
-rendering.
+**What pass 1 assumed, and why it's false.** Pass 1's F1 asserted *"a fling can fire many native
+`scroll` events within a single frame"*, and that virtual-core's stock offset observer therefore
+drove N full re-renders per frame. That's false in every modern engine: HTML's *run the scroll
+steps* dispatches a scrolled element's `scroll` event at most once per rendering update, before *run
+the animation frame callbacks* runs in that same update — §2.1 above already documents this for
+Chromium (the paragraph this section used to cite), and pass 1's own commit message independently
+confirmed it for WebKit ("WebKit coalesces any number of synchronous writes into exactly one native
+`scroll` event"). The observer was already ≤ 1 notify per frame before pass 1 touched it, so
+coalescing it into one `requestAnimationFrame` per "burst" coalesced a burst that never occurs.
 
-**Reproducing the burst.** A real fling delivers many native scroll notifications to the main thread
-before one repaint; a single scripted `el.scrollTop = x` cannot reproduce that on this tier —
-confirmed empirically that WebKit coalesces any number of synchronous writes in one task into exactly
-one native `scroll` event. `measureScrollCoverage` instead splits each simulated frame's advance into
-8 sub-steps, each a real `scrollTop` write followed by a synthetic `dispatchEvent(new
-Event('scroll'))` — manufacturing the same "N notifications before one paint" shape a real fling
-delivers by other means. This tests the observer's own coalescing behaviour directly, which is
-exactly what this sandbox *can* settle; whether WebKit's real threaded/momentum scrolling produces
-such a burst on a packaged build is a real-Mac question this environment cannot answer (P22 §7.3
-item 1 — a human, a packaged build, a hard trackpad fling, looking at whether rows still render late).
+**Why the old table above (now removed) looked like proof anyway.** `measureScrollCoverage`
+(deleted) manufactured the burst itself: `SUB_STEPS_PER_FRAME = 8` synthetic
+`dispatchEvent(new Event('scroll'))` calls per simulated frame, straight into the observer's own
+listener. The "before" column was bounded above by 8 **by construction** (the loop's own constant),
+and the "after" column of 1 was what `requestAnimationFrame` does to eight synchronous dispatches
+**by definition**. Neither number ever described the application. The accompanying `uncoveredPx ===
+0` reading was separately unfalsifiable: that harness drives `scrollTop` from the main thread, so
+the DOM's scroll offset and the main thread's own knowledge of it are the same value by
+construction — the condition that produces the real symptom (WebKit's scrolling thread moving the
+composited layer ahead of what the main thread has rendered, during a real momentum scroll) cannot
+occur when a script is doing the scrolling.
 
-**Pre-fix baseline vs. after, `tests/ui/budgets.spec.ts` (this sandbox's webkit/mocked tier, 20 frames
-per rung, `SUB_STEPS_PER_FRAME = 8`):**
+**The corrected picture.** The rAF deferral is reverted — `observeScrollElementOffset` is back to
+virtual-core's own stock synchronous timing, with only its `isScrollingResetDelay` debounce kept.
+Two mechanisms replace it, aimed at what actually governs the symptom on real hardware:
 
-| Fixture | px/frame | `notifiesPerFrame` max, before | `notifiesPerFrame` max, after | `uncoveredPx` max (before and after) |
-|---|---|---|---|---|
-| `big_rows` (2 cols, narrow) | 40 | 3 | **1** | 0 |
-| `big_rows` | 100 | 7 | **1** | 0 |
-| `big_rows` | 200 | 8 | **1** | 0 |
-| `big_rows` | 456 | 8 | **1** | 0 |
-| `scroll_grid` (61 cols, wide+tall) | 40 | 4 | **1** | 0 |
-| `scroll_grid` | 100 | 5 | **1** | 0 |
-| `scroll_grid` | 200 | 8 | **1** | 0 |
-| `scroll_grid` | 456 | 8 | **1** | 0 |
+- **Runway** — the row axis's overscan (`OVERSCAN_PX`, 560 px) was symmetric and direction-blind.
+  `rowRangeExtractor` (`views/shared/page/columns.ts`) extends it asymmetrically toward the scroll
+  direction, scaled by a measured velocity, capped in *cells* so a wide table can't blow the DOM-size
+  budget. At zero velocity it is byte-identical to the old symmetric window — every at-rest budget in
+  this file is unchanged by it.
+- **Throughput** — `renderRows` (`DataGrid.vue`) now returns a reference-stable `RowVM` object for a
+  row nothing relevant changed about, and rows render through `GridRow.vue`, a child component whose
+  one prop lets Vue's own `shouldUpdateComponent` skip re-rendering a retained row entirely (no
+  vnode diff, no DOM patch) instead of rebuilding all ~43 mounted rows on every scroll frame.
 
-`notifiesPerFrame` collapses to exactly 1 at every frame, every velocity, both fixtures — the direct
-proof the coalescing works and is gated in `budgets.spec.ts` at every rung. `uncoveredPx` was already
-0 throughout, even pre-fix: `OVERSCAN_PX`'s existing 560 px buffer (P29 D2) absorbed the burst at
-every velocity tested here, so P22 D2's conditional row-overscan raise was **not needed** — recorded
-as a real, measured "skip", not an unraised default. `uncoveredPx === 0` is gated at the realistic
-40-100 px/frame band; 200/456 are logged, not gated (456 px/frame is
-`docs/WEBVIEW-SCROLL-MEMORY.md` §5.4's own "no human produces this" top rung, kept only so the two
-documents' velocity axes line up).
+Both are sandbox-provable as *mechanisms* — `tests/ui/budgets.spec.ts` gates D3's at-rest window
+staying exactly what it was, D3's cell cap holding under a synthetic high velocity, and D4's own
+render-count property (a row updates only if its signature actually changed). **Neither is provable
+as *the fix* from this tier.** Whether either one moves the user's actual perceived lag is a
+real-hardware question this environment cannot answer — see the protocol below.
 
-**A passing scroll-response budget and a visible fling lag are measurements of different things.**
-§2.1's scroll-response numbers above were passing the whole time this bug existed — they measure one
-settled step, and the redundant re-renders this fix removes all happen (and are all thrown away)
-*before* that single measured step's DOM ever commits. A reader should not re-derive "the budget must
-have been broken" from the fact that a real lag was reported; it wasn't, and couldn't have been, by
-that instrument. `measureScrollCoverage` is the one that can, and now does.
+**The lesson.** A passing scroll-response budget (§2.1) and a visible fling lag are measurements of
+different things, and pass 1 additionally paired a refuted mechanism with an instrument that could
+not have disproven it either way. The general shape — an instrument that cannot observe the
+phenomenon produces a confident, wrong conclusion — is the same failure
+`docs/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
+
+**What a real measurement needs, and how to take it.** `window.__kiraScrollTrace`
+(`views/grid/scrollTrace.ts`) is an in-page probe, not a `tests/ui/` instrument: it records, per
+animation frame, the real native `scroll` events observed, a measured px/frame velocity, live
+`uncoveredPx`, and Vue's own update duration — all read from a *real* fling on *real* hardware, which
+this environment has never been able to produce (`docs/WEBVIEW-SCROLL-MEMORY.md` §9's own
+`CGEventPost` injector never got a TCC grant, but that gap was for driving momentum from *outside*
+the process; this probe lives inside the page and lets the human supply the momentum instead). It is
+reachable from a dev build's View → Open DevTools (`internal/shell/menutemplate.go`). Protocol:
+
+1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density.
+2. Web Inspector → Console → `__kiraScrollTrace.start()`.
+3. One hard two-finger flick, let momentum die out.
+4. `copy(JSON.stringify(__kiraScrollTrace.stop()))` — report `summary.pxPerFrame` (the first real
+   measurement of a macOS momentum scroll's velocity this repo has ever had) and the `scrollEvents`
+   histogram (the direct, real-hardware test of the "at most one `scroll` per frame" premise above —
+   if it's ever > 1, that premise is wrong on real WebKit and this section needs revisiting).
+5. `window.__kiraGridTuning.maxLeadPxOverride = 4000` (then flick, `stop()`), then `= 560` (today's
+   runway, flick again), then `.incrementalRows = false` (D4 off, flick again) — three traces, one
+   build, no rebuild between them. If the lag visibly changes with the runway setting and
+   `uncoveredPx` moves accordingly, that's the constraint; if not, compare `renderMs` instead.
+
+Full detail, including what to do if neither mechanism moves the needle, is
+`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` §7.3.
 
 ### 2.1b P22 D6 — the first-launch window default, and what it is and is not worth
 
