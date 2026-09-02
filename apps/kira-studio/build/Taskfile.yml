@@ -18,8 +18,10 @@ tasks:
       - package.json
       - bun.lock
       - apps/*/frontend/package.json
+    # A bare directory here makes Task treat the task as never up to date, so `bun install` — and
+    # the `prepare` hook it fires — reran three times per `bun run dev` (P20 F2/F3).
     generates:
-      - node_modules
+      - node_modules/**/*
     preconditions:
       - sh: bun --version
         msg: "bun not found — install it from https://bun.sh"
