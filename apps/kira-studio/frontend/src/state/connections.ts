@@ -84,6 +84,7 @@ function defaultDraft(): ConnectionInput {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 

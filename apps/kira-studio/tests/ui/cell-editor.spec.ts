@@ -160,6 +160,7 @@ function connectionCreateArgs(name: string, color: string, readOnly = false) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 

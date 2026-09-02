@@ -97,6 +97,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      autoExplain: false,
     },
     response: CONNECTION_SUMMARY,
   },

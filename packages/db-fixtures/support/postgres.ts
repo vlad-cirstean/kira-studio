@@ -81,6 +81,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
     username: 'postgres',
     uri: null,
     options: {},
+    autoExplain: false,
     password: PASSWORD,
   };
 

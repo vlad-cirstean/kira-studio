@@ -72,6 +72,7 @@ async function start(): Promise<KafkaFixture> {
     username: null,
     uri: null,
     options: {},
+    autoExplain: false,
     password: null,
   };
 

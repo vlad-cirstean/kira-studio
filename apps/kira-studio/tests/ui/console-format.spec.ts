@@ -39,6 +39,7 @@ function postgresCreateArgs(name: string, color: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 
@@ -58,6 +59,7 @@ function mongoCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 
@@ -77,6 +79,7 @@ function redisCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 

@@ -13,6 +13,7 @@ import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { confirmDialog } from '../state/confirmDialog';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
+import { schemaDialectFor } from '../state/schemas';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -302,6 +303,13 @@ const isAwsStyle = computed(() => !!draft.value && AWS_STYLE_KINDS.has(draft.val
 // button rather than the network-shaped host/port/user/password block.
 const isFileStyle = computed(() => !!draft.value && FILE_KINDS.has(draft.value.kind));
 
+// P18 (v1.1) D18: the auto-explain checkbox is a SQL-only surface, same gate the console's own
+// SQL behaviours use — through state/schemas.ts's schemaDialectFor wrapper, SPEC §11's own rule
+// that project/ must not import views/ directly (menus.ts's "Schema (DDL)…" gate uses the same
+// wrapper). Absent, not disabled, on the five non-SQL kinds, matching isFileStyle's own precedent
+// immediately above.
+const isSqlKind = computed(() => !!draft.value && schemaDialectFor(draft.value.kind) !== undefined);
+
 // P35 D15: the SQLite-specific filter list — chooseOpen's own filters payload is generic, so a
 // second file kind would pass a different list here rather than this being hardcoded lower down.
 async function onBrowseDatabaseFile(): Promise<void> {
@@ -553,6 +561,17 @@ const preconnectText = computed({
             <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
             <span>Read-only</span>
             <span class="helper-text">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
+          </label>
+
+          <label v-if="isSqlKind" class="field checkbox">
+            <input v-model="draft.autoExplain" type="checkbox" data-testid="connection-auto-explain" />
+            <span>Auto-explain SELECT queries</span>
+            <span class="helper-text">
+              Runs the database's own EXPLAIN before each SELECT this connection issues from a
+              query console, and warns when a query is estimated to read more than the configured
+              row threshold. EXPLAIN only plans the query — it never runs it — so this costs one
+              extra planning round trip, not a second execution.
+            </span>
           </label>
 
           <div class="field">

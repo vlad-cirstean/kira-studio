@@ -118,6 +118,7 @@ function connectionCreateArgs(name: string, color: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    autoExplain: false,
   };
 }
 

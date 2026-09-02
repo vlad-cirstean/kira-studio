@@ -111,6 +111,12 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // arm() once the adapter connects, regardless of what the settle-window race resolved to (a
   // no-op if the script already exited, since there's nothing left to monitor).
   preconnectSidecar: z.boolean().default(false),
+  // P18 (v1.1) D18: runs the connection's own EXPLAIN before every SELECT a console run issues on
+  // it, warning (never blocking) when the threshold or a structural issue fires. A first-class
+  // column rather than an options_json key — the same reason preconnect above is one: `options`
+  // round-trips through the connection URI and the Copy URI menu item, and a behaviour that issues
+  // an extra statement per run must not be switchable on by pasting a URI.
+  autoExplain: z.boolean().default(false),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes

@@ -26,6 +26,7 @@ const CONN: ConnectionSummary = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  autoExplain: false,
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -48,6 +49,7 @@ const UNCHANGED_UPDATE_ARGS = {
   options: CONN.options,
   preconnect: CONN.preconnect,
   preconnectSidecar: CONN.preconnectSidecar,
+  autoExplain: CONN.autoExplain,
   password: null,
 };
 

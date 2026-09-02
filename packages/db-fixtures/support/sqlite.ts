@@ -95,6 +95,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<SqliteFixture> 
     username: null,
     uri: null,
     options: {},
+    autoExplain: false,
     password: null,
   };
 
