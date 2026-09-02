@@ -79,7 +79,13 @@ func startMongo() (*MongoFixture, error) {
 		// real instance with --auth — waiting for only the first "Waiting for connections" gets a
 		// refused connection a moment later. The module's own default wait strategy resolves on
 		// that throwaway first boot; this is spelled out explicitly instead.
-		WaitingFor: wait.ForLog("Waiting for connections").WithOccurrence(2).WithStartupTimeout(mongoStartupTimeout),
+		//
+		// P16 §6 finding: case-insensitive on purpose. 4.4+ logs structured JSON with
+		// "msg":"Waiting for connections" (capital W, verified against mongo:8.3); 4.2's plain-text
+		// logging spells the identical line lowercase — "waiting for connections on port 27017"
+		// (verified against mongo:4.2) — and the exact-case match above never saw it, timing out at
+		// 0/2 occurrences. A regex match with (?i) covers both without needing two wait strategies.
+		WaitingFor: wait.ForLog("(?i)waiting for connections").AsRegexp().WithOccurrence(2).WithStartupTimeout(mongoStartupTimeout),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
