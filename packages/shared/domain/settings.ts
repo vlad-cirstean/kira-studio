@@ -9,6 +9,12 @@ export type RowDensity = z.infer<typeof rowDensitySchema>;
 export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
 export const CACHE_L2_BUDGET_MB_RANGE = { min: 8, max: 1024 } as const;
 export const OP_LOG_RETENTION_DAYS_RANGE = { min: 1, max: 365 } as const;
+// P18 (v1.1) D14/D20: the "expensive query" threshold is an estimated-*rows-read* number, never a
+// cost unit — the two dialects that report a same-named `cost` field disagree by three orders of
+// magnitude for a comparable scan (see the plan's F17), so no cost-based number could be shared
+// across engines. 1,000 floor keeps the field meaningful; 1e9 ceiling is generous headroom above
+// any real table this app's own fixture corpus uses.
+export const EXPENSIVE_QUERY_ROWS_RANGE = { min: 1_000, max: 1_000_000_000 } as const;
 
 export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   fontFamily: z.string(),
@@ -51,6 +57,15 @@ export const advancedSettingsSchema = /*#__PURE__*/ z.object({
     .int()
     .min(OP_LOG_RETENTION_DAYS_RANGE.min)
     .max(OP_LOG_RETENTION_DAYS_RANGE.max),
+  // P18 D14/D20: drives both the manual Explain panel's over-threshold flag and auto-explain's
+  // warning strip. `.default(...)` is load-bearing the same way every other P17-era leaf's is —
+  // an older stored settings row has no such key.
+  expensiveQueryRows: z
+    .number()
+    .int()
+    .min(EXPENSIVE_QUERY_ROWS_RANGE.min)
+    .max(EXPENSIVE_QUERY_ROWS_RANGE.max)
+    .default(100_000),
 });
 export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
 
@@ -60,7 +75,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appearanceSettingsSchema,
   data: dataSettingsSchema.default({ defaultPageSize: 100 }),
   cache: cacheSettingsSchema.default({ l2BudgetMb: 64 }),
-  advanced: advancedSettingsSchema.default({ opLogRetentionDays: 30 }),
+  advanced: advancedSettingsSchema.default({ opLogRetentionDays: 30, expensiveQueryRows: 100_000 }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -88,5 +103,6 @@ export const defaultSettings: Settings = {
   },
   advanced: {
     opLogRetentionDays: 30,
+    expensiveQueryRows: 100_000,
   },
 };

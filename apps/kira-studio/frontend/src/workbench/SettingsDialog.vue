@@ -2,6 +2,7 @@
 import {
   CACHE_L2_BUDGET_MB_RANGE,
   defaultSettings,
+  EXPENSIVE_QUERY_ROWS_RANGE,
   FONT_SIZE_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
   type RowDensity,
@@ -119,6 +120,10 @@ function onOpLogRetentionInput(e: Event): void {
   draft.advanced.opLogRetentionDays = Number((e.target as HTMLInputElement).value);
 }
 
+function onExpensiveQueryRowsInput(e: Event): void {
+  draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
+}
+
 // P17 D6: the draft accepts whatever is typed (@input, so the field never fights the user
 // mid-keystroke) — validity is derived here, not enforced at write time, and gates Save below.
 const fontSizeError = computed<string | null>(() => {
@@ -148,8 +153,21 @@ const opLogRetentionError = computed<string | null>(() => {
   return null;
 });
 
+const expensiveQueryRowsError = computed<string | null>(() => {
+  const v = draft.advanced.expensiveQueryRows;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < EXPENSIVE_QUERY_ROWS_RANGE.min || v > EXPENSIVE_QUERY_ROWS_RANGE.max) {
+    return `${EXPENSIVE_QUERY_ROWS_RANGE.min.toLocaleString()}–${EXPENSIVE_QUERY_ROWS_RANGE.max.toLocaleString()}`;
+  }
+  return null;
+});
+
 const isValid = computed(
-  () => !fontSizeError.value && !cacheBudgetError.value && !opLogRetentionError.value,
+  () =>
+    !fontSizeError.value &&
+    !cacheBudgetError.value &&
+    !opLogRetentionError.value &&
+    !expensiveQueryRowsError.value,
 );
 
 const hitRateLabel = computed(() => {
@@ -422,6 +440,32 @@ async function onSave(): Promise<void> {
               </span>
             </label>
             <p class="muted-note">Takes effect after restart.</p>
+
+            <label class="field">
+              <span>Expensive query threshold (rows)</span>
+              <TextField
+                type="number"
+                :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
+                :max="EXPENSIVE_QUERY_ROWS_RANGE.max"
+                size="md"
+                :invalid="!!expensiveQueryRowsError"
+                data-testid="settings-expensive-query-rows"
+                :model-value="String(draft.advanced.expensiveQueryRows)"
+                @input="onExpensiveQueryRowsInput"
+              />
+              <span
+                v-if="expensiveQueryRowsError"
+                class="field-error"
+                data-testid="settings-expensive-query-rows-error"
+              >
+                {{ expensiveQueryRowsError }}
+              </span>
+              <span v-else class="helper-text"
+                >A query whose plan is estimated to read at least this many rows is flagged as
+                expensive by the console's Explain button and by auto-explain. Not comparable
+                across engines' own cost figures — see the plan panel's own note.</span
+              >
+            </label>
           </template>
       </section>
     </div>

@@ -59,6 +59,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
 	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
 	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
+	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, model.InRange(1_000, 1_000_000_000))
 	return result, nil
 }
 
@@ -115,6 +116,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	if a := patch.Advanced; a != nil {
 		if a.OpLogRetentionDays != nil {
 			if err := upsertSettingsLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.ExpensiveQueryRows != nil {
+			if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
 				return model.Settings{}, err
 			}
 		}

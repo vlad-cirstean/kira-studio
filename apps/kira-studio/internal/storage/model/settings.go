@@ -20,6 +20,9 @@ type CacheSettings struct {
 
 type AdvancedSettings struct {
 	OpLogRetentionDays int `json:"opLogRetentionDays"`
+	// P18 D14/D20: an estimated-rows-read threshold, never a cost unit — settings.ts's own
+	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
+	ExpensiveQueryRows int `json:"expensiveQueryRows"`
 }
 
 type Settings struct {
@@ -43,6 +46,7 @@ func DefaultSettings() Settings {
 		Cache: CacheSettings{L2BudgetMb: 64},
 		Advanced: AdvancedSettings{
 			OpLogRetentionDays: 30,
+			ExpensiveQueryRows: 100_000,
 		},
 	}
 }
@@ -68,6 +72,7 @@ type CachePatch struct {
 
 type AdvancedPatch struct {
 	OpLogRetentionDays *int `json:"opLogRetentionDays,omitempty"`
+	ExpensiveQueryRows *int `json:"expensiveQueryRows,omitempty"`
 }
 
 type SettingsPatch struct {
@@ -100,6 +105,7 @@ func InRange(lo, hi int) func(int) bool {
 var (
 	validL2BudgetMb         = InRange(8, 1024)
 	validOpLogRetentionDays = InRange(1, 365)
+	validExpensiveQueryRows = InRange(1_000, 1_000_000_000)
 )
 
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
@@ -118,6 +124,9 @@ func (p SettingsPatch) Validate() error {
 	if p.Advanced != nil {
 		if p.Advanced.OpLogRetentionDays != nil && !validOpLogRetentionDays(*p.Advanced.OpLogRetentionDays) {
 			return fmt.Errorf("model: advanced.opLogRetentionDays: out of range value %d", *p.Advanced.OpLogRetentionDays)
+		}
+		if p.Advanced.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*p.Advanced.ExpensiveQueryRows) {
+			return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *p.Advanced.ExpensiveQueryRows)
 		}
 	}
 	return nil
