@@ -25,6 +25,11 @@ import {
 } from './views/documents/page';
 import { searchState as documentSearchState } from './views/documents/search';
 import { pageStoreEntries as gridPageStoreEntries, totalRetainedBytes } from './views/grid/page';
+import {
+  type ScrollTraceResult,
+  start as startScrollTrace,
+  stop as stopScrollTrace,
+} from './views/grid/scrollTrace';
 import { searchState as gridSearchState } from './views/grid/search';
 import {
   pageStoreEntries as keyValuePageStoreEntries,
@@ -153,8 +158,16 @@ declare global {
      * structures §2's findings (F4-F8) are about.
      */
     __kiraRetention?: () => KiraRetentionSnapshot;
+    /**
+     * P22 iter2 D2: a real-fling scroll trace a human drives from DevTools on real hardware (a dev
+     * build — View → Open DevTools, internal/shell/menutemplate.go) — NOT a Playwright hook, and
+     * not gated in CI. See views/grid/scrollTrace.ts's own header comment and
+     * docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §7.3 for the protocol.
+     */
+    __kiraScrollTrace?: { start: () => void; stop: () => ScrollTraceResult | null };
   }
 }
+window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
 window.__kiraGridRetainedBytes = totalRetainedBytes;
 window.__kiraRetainedBytes = () =>
   totalRetainedBytes() +

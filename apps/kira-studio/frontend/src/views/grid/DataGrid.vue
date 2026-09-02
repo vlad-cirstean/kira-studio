@@ -58,6 +58,7 @@ import {
   stageEdit,
   stageInsertValue,
 } from './pendingChanges';
+import * as scrollTrace from './scrollTrace';
 import { matchedRows, searchState } from './search';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, setSort } from './state';
@@ -324,8 +325,15 @@ function syncScrollState(): void {
 // below. A fling can fire many native `scroll` events within a single frame; coalescing
 // syncScrollState to one call per animation frame keeps that watcher in step with what actually
 // painted instead of firing on every event.
+//
+// P22 iter2 D2: window.__kiraScrollTrace's own tap point — noteScrollEvent is called on every raw
+// native `scroll` event, before the rAF coalescing below, so D2's "native scroll events observed
+// since the previous rAF" count is real (views/grid/scrollTrace.ts's own header comment explains
+// why this lives here rather than inside columns.ts's shared offset observer).
 let scrollRaf = 0;
 function onScroll(): void {
+  const el = containerRef.value;
+  if (el) scrollTrace.noteScrollEvent(el.scrollTop, performance.now());
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
@@ -337,23 +345,30 @@ function onScroll(): void {
 // scheduling hops and before Vue's render job, the same point onScroll's rAF marked before.
 function markScrollWork(): void {
   window.__kiraGridScrollWorkStart?.(performance.now());
+  scrollTrace.noteNotify();
 }
 
 // P49 F3/D4: observeScrollElementRect moved to columns.ts so ConsoleResultGrid.vue's own column
 // virtualizer can share it rather than growing a second copy — see its doc comment there.
 
+// P22 iter2 D2: at most one DataGrid is ever mounted at a time (MainView.vue keys its DataView by
+// tab id), so scrollTrace's own registerGrid/unregisterGrid track a single target.
+let mountedEl: HTMLElement | null = null;
 onMounted(() => {
   const el = containerRef.value;
   if (!el) return;
+  mountedEl = el;
   const t = tab();
   if (t) {
     el.scrollTop = t.state.scrollTop;
     el.scrollLeft = t.state.scrollLeft;
   }
   syncScrollState();
+  scrollTrace.registerGrid(el);
 });
 onUnmounted(() => {
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  if (mountedEl) scrollTrace.unregisterGrid(mountedEl);
   // D9: the pending write is a scroll offset patchDataTabState would discard anyway once the
   // tab is gone — clearing it just stops the timer firing against an unmounted component.
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
