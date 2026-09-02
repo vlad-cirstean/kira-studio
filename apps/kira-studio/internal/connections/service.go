@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -397,25 +398,32 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 	return RevealResult{Outcome: revealOutcomeRevealed, Password: password}
 }
 
-// destinationUnchanged reports whether the draft still points at the same place as the stored
-// row — host, port, database, and URI, whichever the connection's kind actually uses. Test only
-// injects the stored secret when this holds (see the comment on Test below): a draft edited to
-// point somewhere else must never get the old destination's password handed to it.
+// destinationUnchanged reports whether the draft still points at the same place, over the same
+// route, as the stored row. Test only injects the stored secret when this holds (see the comment
+// on Test below): a draft edited to reach a different destination must never get the old
+// destination's password handed to it.
+//
+// P12 round 2 finding #1: compares every ConnectionFields member EXCEPT the ones genuinely
+// cosmetic/safe to change without re-gating (Name, Color, ReadOnly, AutoExplain) — deny-list, not
+// allow-list. Round 1's original fix (host/port/database/URI only) and this finding
+// (Preconnect/PreconnectSidecar/Options, e.g. sslmode or an S3 endpoint) are the same bug class:
+// a field left out of an allowlist defaults to "leaked" instead of "gated". A denylist means a
+// future new field defaults to gated instead of forgotten.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
-	return equalStringPtr(in.Host, stored.Host) &&
-		equalIntPtr(in.Port, stored.Port) &&
-		equalStringPtr(in.Database, stored.Database) &&
-		equalStringPtr(in.URI, stored.URI)
+	return in.Kind == stored.Kind &&
+		in.Mode == stored.Mode &&
+		equalPtr(in.Host, stored.Host) &&
+		equalPtr(in.Port, stored.Port) &&
+		equalPtr(in.Database, stored.Database) &&
+		equalPtr(in.Username, stored.Username) &&
+		equalPtr(in.URI, stored.URI) &&
+		reflect.DeepEqual(in.Options, stored.Options) &&
+		equalPtr(in.Preconnect, stored.Preconnect) &&
+		in.PreconnectSidecar == stored.PreconnectSidecar
 }
 
-func equalStringPtr(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
-}
-
-func equalIntPtr(a, b *int) bool {
+// equalPtr reports whether two pointers are both nil or both point at equal values.
+func equalPtr[T comparable](a, b *T) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
@@ -437,11 +445,12 @@ func equalIntPtr(a, b *int) bool {
 // here is not fatal — resolveFromInput/Backend.Test below still run and report failure the normal
 // way, exactly as an actually-wrong password would.
 //
-// P12 round 1 finding #1: the stored secret is only injected when destinationUnchanged holds —
-// otherwise "Edit connection → change Host → Test" would decrypt the old destination's password
-// and send it to whatever host the draft currently points at, with no auth gate on this path at
-// all (Test is deliberately not auth-gated, see above). An edited destination instead tests with
-// no password, same as a brand-new draft.
+// P12 round 1 finding #1 (widened by round 2 finding #1): the stored secret is only injected when
+// destinationUnchanged holds — otherwise "Edit connection → change Host (or Preconnect, or
+// Options["sslmode"]/["endpoint"]) → Test" would decrypt the old destination's password and send
+// it down whatever route the draft currently points at, with no auth gate on this path at all
+// (Test is deliberately not auth-gated, see above). An edited destination instead tests with no
+// password, same as a brand-new draft.
 func (s *Service) Test(in Input, existingID string) TestResult {
 	if in.Password == nil && existingID != "" {
 		if existing, err := s.deps.Conns.Get(existingID); err == nil && existing != nil &&

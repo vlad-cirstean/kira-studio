@@ -582,3 +582,63 @@ func TestTestDoesNotLeakStoredPasswordToARetargetedDraft(t *testing.T) {
 		}
 	})
 }
+
+// TestTestGatesOnPreconnectAndOptionsOnlyEdits is a regression test for the P12 round 2 finding
+// #1 bypass: round 1's fix only compared Host/Port/Database/URI, so a draft that changes only
+// Preconnect (the command Test starts and routes the probe through before the destination is even
+// reached) or only Options["sslmode"] still passed the "unchanged" check and leaked the stored
+// secret down a route the user just edited.
+func TestTestGatesOnPreconnectAndOptionsOnlyEdits(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("has-secret-2")
+	in.Password = strPtr("s3cret")
+	in.Options = map[string]any{"sslmode": "verify-full"}
+	created := mustCreate(t, h.svc, in)
+
+	t.Run("preconnect-only edit does not get the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret-2")
+		draft.Password = nil
+		draft.Options = map[string]any{"sslmode": "verify-full"}
+		draft.Preconnect = strPtr("true")
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(preconnect-only edit).OK = false, want true (err: %v)", result.Error)
+		}
+		if got := h.backend.lastConnectConfig().Password; got != nil {
+			t.Fatalf("Backend.Test saw password %q for a preconnect-only edit, want nil — the stored secret leaked", *got)
+		}
+	})
+
+	t.Run("sslmode-only edit does not get the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret-2")
+		draft.Password = nil
+		draft.Options = map[string]any{"sslmode": "disable"}
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(sslmode-only edit).OK = false, want true (err: %v)", result.Error)
+		}
+		if got := h.backend.lastConnectConfig().Password; got != nil {
+			t.Fatalf("Backend.Test saw password %q for an sslmode-only edit, want nil — the stored secret leaked", *got)
+		}
+	})
+
+	t.Run("truly unchanged destination still gets the stored secret", func(t *testing.T) {
+		draft := fieldsInput("has-secret-2")
+		draft.Password = nil
+		draft.Options = map[string]any{"sslmode": "verify-full"}
+
+		result := h.svc.Test(draft, created.ID)
+
+		if !result.OK {
+			t.Fatalf("Test(unchanged destination).OK = false, want true (err: %v)", result.Error)
+		}
+		got := h.backend.lastConnectConfig().Password
+		if got == nil || *got != "s3cret" {
+			t.Fatalf("Backend.Test saw password %v, want the stored secret", got)
+		}
+	})
+}
