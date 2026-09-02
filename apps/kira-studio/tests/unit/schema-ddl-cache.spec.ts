@@ -10,7 +10,7 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 
 const { control } = await import('../../frontend/src/bridge/control');
-const { ensureDdl, schemasState } = await import('../../frontend/src/state/schemas');
+const { ensureDdl, saveDdl, schemasState } = await import('../../frontend/src/state/schemas');
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -55,5 +55,37 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
     expect(ddl).toBe('create table t (id int);');
     expect(secondCallCount).toBe(1);
     expect(schemasState.byConnection[connectionId]).toBe('create table t (id int);');
+  });
+
+  // P12 round 2 finding #14: ensureDdl wrote `schemasState.byConnection[connectionId] = ddl`
+  // unconditionally after its own await — a slow initial fetch resolving *after* a faster
+  // saveDdl (a real user Save) had already written fresher text overwrote the store back to the
+  // stale fetched value, with nothing left to notice until the next relaunch.
+  test('a slow initial fetch does not clobber a faster concurrent saveDdl (P12 round 2 F14)', async () => {
+    const connectionId = 'conn-ensure-ddl-race';
+    delete schemasState.byConnection[connectionId];
+
+    const slowFetch = deferred<{ connectionId: string; ddl: string; updatedAt: string }>();
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
+    (control as any).schemaGet = () => slowFetch.promise;
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaSet.
+    (control as any).schemaSet = (_id: string, ddlText: string) =>
+      Promise.resolve({ connectionId, ddl: ddlText, updatedAt: '' });
+
+    // The initial load starts, but its own response is left in flight.
+    const loading = ensureDdl(connectionId);
+
+    // A faster concurrent Save (e.g. the user typed and saved before the slow load returned)
+    // writes fresh text straight into the store, bypassing ensureDdl/pendingLoads entirely.
+    await saveDdl(connectionId, 'create table fresh (id int);');
+    expect(schemasState.byConnection[connectionId]).toBe('create table fresh (id int);');
+
+    // The slow fetch *now* resolves with the stale pre-save text — it must not overwrite the
+    // fresher save, and the still-pending ensureDdl call must resolve to the fresh text too.
+    slowFetch.resolve({ connectionId, ddl: 'create table stale (id int);', updatedAt: '' });
+    const loaded = await loading;
+
+    expect(schemasState.byConnection[connectionId]).toBe('create table fresh (id int);');
+    expect(loaded).toBe('create table fresh (id int);');
   });
 });

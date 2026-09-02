@@ -44,8 +44,17 @@ export async function ensureDdl(connectionId: string): Promise<string> {
   }
   try {
     const ddl = await pending;
-    schemasState.byConnection[connectionId] = ddl;
-    return ddl;
+    // P12 round 2 finding #14: a slow initial fetch must not overwrite a fresher write that
+    // landed while it was in flight — saveDdl (a real user Save) or applyRemote (another
+    // window's broadcast) both write straight into `byConnection`, bypassing this function
+    // entirely, so by the time this await resolves the store may already hold text newer than
+    // what this fetch just returned. Write only when nothing else has written a value yet, and
+    // return whatever the store actually holds either way, so a caller never sees the stale
+    // fetch result after losing this race.
+    if (schemasState.byConnection[connectionId] === undefined) {
+      schemasState.byConnection[connectionId] = ddl;
+    }
+    return schemasState.byConnection[connectionId] ?? ddl;
   } finally {
     // A rejection must clear this too — otherwise one transient failure (a backend error, a
     // disconnect mid-boot) caches the rejected promise forever, and every later caller
