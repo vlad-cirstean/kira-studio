@@ -172,3 +172,102 @@ export function measureScrollResponses(
     { gridSelector, steps, axis },
   );
 }
+
+export interface ScrollCoverageResult {
+  /** The requested velocity this ladder rung was run at, echoed back for the caller's own logging. */
+  velocity: number;
+  /**
+   * Per frame: how much of the viewport band the mounted `[data-testid="grid-row"]` band failed to
+   * cover, in px, floored at 0. The symptom's own metric (P22 §5 D3) — what the user sees as
+   * unpainted sizer during a fast scroll.
+   */
+  uncoveredPx: number[];
+  /**
+   * Per frame: how many times the row virtualizer's onChange (markScrollWork) fired. P22 D1's
+   * direct proof — must fall to <= 1 once the offset-driven notify is coalesced to one per frame.
+   */
+  notifiesPerFrame: number[];
+}
+
+/**
+ * Measures rendered-band coverage and re-renders-per-frame *during* sustained scrolling, velocity-
+ * parameterised in px/frame (P22 §0.4's own ground rule, mirroring WEBVIEW-SCROLL-MEMORY.md §5.4).
+ * `measureScrollResponses` above cannot see this: it steps once from an idle DOM and waits for it to
+ * settle, so it never has two scroll deltas in flight (P22 F6). This instrument keeps scrolling.
+ *
+ * A genuine fling delivers many native `scroll` notifications to the main thread before one repaint
+ * — the very thing @tanstack/virtual-core@3.17.8's stock observeElementOffset notifies on
+ * synchronously, per event (P22 F1). A single scripted `el.scrollTop = x` cannot reproduce that
+ * burst: confirmed empirically that WebKit coalesces any number of synchronous writes in one task
+ * into exactly one native `scroll` event, well before the offset observer distinguishes "coalesced
+ * to one rAF" from "not". So each simulated frame below splits its advance into SUB_STEPS_PER_FRAME
+ * synthetic `scroll` dispatches (one per sub-step, after actually moving scrollTop) — manufacturing
+ * the same "N notifications before one paint" burst a real fling delivers by other means. This tests
+ * the observer's own coalescing behaviour directly, which is exactly what P22 F7 says this sandbox
+ * *can* settle (the app's own re-render count) as against what it cannot (whether WebKit's real
+ * threaded/momentum scrolling produces such a burst on a packaged build — see P22 §7.3 item 1).
+ */
+export function measureScrollCoverage(
+  page: Page,
+  gridSelector: string,
+  opts: { pxPerFrame: number; frames: number },
+): Promise<ScrollCoverageResult> {
+  const { pxPerFrame, frames } = opts;
+  return page.evaluate(
+    ({ gridSelector, pxPerFrame, frames }) => {
+      const found = document.querySelector<HTMLElement>(gridSelector);
+      if (!found) throw new Error(`measureScrollCoverage: ${gridSelector} not found`);
+      const el = found;
+
+      const w = window as unknown as { __kiraGridScrollWorkStart?: (t: number) => void };
+      const prevHook = w.__kiraGridScrollWorkStart;
+      let notifiesThisFrame = 0;
+      w.__kiraGridScrollWorkStart = () => {
+        notifiesThisFrame++;
+      };
+
+      const SUB_STEPS_PER_FRAME = 8;
+      const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+
+      function nextFrame(): Promise<void> {
+        return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      }
+
+      function uncoveredPx(): number {
+        const rows = document.querySelectorAll<HTMLElement>('[data-testid="grid-row"]');
+        const viewStart = el.scrollTop;
+        const viewEnd = viewStart + el.clientHeight;
+        if (rows.length === 0) return Math.max(0, viewEnd - viewStart);
+        let mountedStart = Number.POSITIVE_INFINITY;
+        let mountedEnd = Number.NEGATIVE_INFINITY;
+        for (const row of rows) {
+          if (row.offsetTop < mountedStart) mountedStart = row.offsetTop;
+          const end = row.offsetTop + row.offsetHeight;
+          if (end > mountedEnd) mountedEnd = end;
+        }
+        const above = Math.max(0, mountedStart - viewStart);
+        const below = Math.max(0, viewEnd - mountedEnd);
+        return above + below;
+      }
+
+      return (async () => {
+        const uncovered: number[] = [];
+        const notifies: number[] = [];
+        for (let f = 0; f < frames; f++) {
+          notifiesThisFrame = 0;
+          for (let s = 0; s < SUB_STEPS_PER_FRAME; s++) {
+            const next = Math.min(maxScrollTop, el.scrollTop + pxPerFrame / SUB_STEPS_PER_FRAME);
+            el.scrollTop = next;
+            el.dispatchEvent(new Event('scroll'));
+          }
+          await nextFrame();
+          uncovered.push(uncoveredPx());
+          notifies.push(notifiesThisFrame);
+        }
+        w.__kiraGridScrollWorkStart = prevHook;
+        return { velocity: pxPerFrame, uncoveredPx: uncovered, notifiesPerFrame: notifies };
+      })();
+    },
+    { gridSelector, pxPerFrame, frames },
+  );
+}
