@@ -29,6 +29,21 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   kafka: 9092,
 };
 
+// P16: the minimum server version each adapter's client library (and this app's own catalog SQL)
+// actually supports — the verified floor of the on-demand compatibility suite
+// (docs/v1.1/plans/P16-db-compat-suite.md §3), not a marketing claim. SQS/S3 have no server
+// version at all (AWS's APIs are versionless), so they have no entry.
+export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
+  postgres: 'Requires PostgreSQL 14 or newer.',
+  mariadb: 'Requires MariaDB 10.11 or newer.',
+  mysql: 'Requires MySQL 8.0 or newer.',
+  clickhouse: 'Requires ClickHouse 25.3 or newer.',
+  mongodb: 'Requires MongoDB 4.2 or newer.',
+  redis: 'Requires Redis 7.0 or newer.',
+  kafka: 'Requires Apache Kafka 3.4 or newer.',
+  sqlite: 'Reads any SQLite 3 database file — no server required.',
+};
+
 export const connectionColorSchema = /*#__PURE__*/ z.enum([
   'none',
   'red',

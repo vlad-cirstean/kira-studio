@@ -6,6 +6,7 @@ import {
   connectionKindSchema,
   DEFAULT_PORT,
   FILE_KINDS,
+  MIN_SERVER_VERSION,
 } from '@shared/domain/connection';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, ref } from 'vue';
@@ -182,6 +183,13 @@ function continueToDetails(): void {
   if (!d || !SUPPORTED_KINDS.has(d.kind)) return;
   step.value = 'details';
 }
+
+// P16 D8/D9: a plain informational note, sourced from the shared kind-keyed map beside
+// DEFAULT_PORT — absent for kinds with no server version to state (SQS, S3).
+const minVersionNote = computed(() => {
+  const d = draft.value;
+  return d ? MIN_SERVER_VERSION[d.kind] : undefined;
+});
 
 const filteredKinds = computed(() => {
   const q = engineSearch.value.trim().toLowerCase();
@@ -414,6 +422,10 @@ const preconnectText = computed({
             </div>
           </div>
           <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
+
+          <p v-if="minVersionNote" class="min-version-note" data-testid="connection-min-version">
+            {{ minVersionNote }}
+          </p>
 
           <div class="field">
             <label>Mode</label>
@@ -769,6 +781,12 @@ const preconnectText = computed({
 }
 
 .uri-note {
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-xs);
+}
+
+.min-version-note {
+  margin: 0;
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-xs);
 }

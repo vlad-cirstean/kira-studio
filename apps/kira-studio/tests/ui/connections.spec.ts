@@ -367,4 +367,25 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="menu-item-delete"]');
   await acceptConfirm(page);
   await expect.poll(rowCount).toBe(beforeDuplicate);
+
+  // --- P16 D8/D9: step `details` states each engine's minimum supported server version, sourced
+  // from shared/domain/connection.ts's MIN_SERVER_VERSION, absent for the versionless kinds -----
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await expect(page.locator('[data-testid="connection-min-version"]')).toHaveText(
+    'Requires PostgreSQL 14 or newer.',
+  );
+
+  await page.click('[data-testid="connection-cancel"]');
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-s3"]');
+  await expect(page.locator('[data-testid="connection-min-version"]')).toHaveCount(0);
+
+  await page.click('[data-testid="connection-cancel"]');
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-sqlite"]');
+  await expect(page.locator('[data-testid="connection-min-version"]')).toHaveText(
+    'Reads any SQLite 3 database file — no server required.',
+  );
+  await page.click('[data-testid="connection-cancel"]');
 });
