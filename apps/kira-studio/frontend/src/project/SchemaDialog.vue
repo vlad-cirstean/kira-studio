@@ -1,0 +1,156 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
+import { connectionRecord } from '../state/connections';
+import {
+  closeSchemaDialog,
+  ddlParseSummary,
+  ensureDdl,
+  saveDdl,
+  schemaDialectFor,
+  schemaDialogState,
+} from '../state/schemas';
+import AppButton from '../theme/primitives/AppButton.vue';
+import DialogFrame from '../theme/primitives/DialogFrame.vue';
+
+// P18 (v1.1) D3: the DDL document a user pastes for one connection, staged until Save — the
+// draft is component-local, cloned at open; Cancel, Escape, the ✕ and the backdrop all discard
+// silently (DialogFrame's own @close); only Save writes. Reuses P17's landed staging shape
+// exactly rather than inventing a second one. schemaDialectFor/ddlParseSummary (state/schemas.ts)
+// are this file's one dispatch point into the SQL surface — SPEC §11 forbids project/ importing
+// views/ directly, the same rule state/viewCommands.ts exists to satisfy for other callers.
+
+const draft = ref('');
+const saving = ref(false);
+
+const connectionId = computed(() => schemaDialogState.connectionId);
+const connectionKind = computed(() => connectionRecord(connectionId.value)?.kind);
+const connectionName = computed(() => connectionRecord(connectionId.value)?.name ?? '');
+const dialect = computed(() => schemaDialectFor(connectionKind.value));
+
+watch(
+  () => schemaDialogState.connectionId,
+  async (id) => {
+    if (!id) return;
+    draft.value = await ensureDdl(id);
+  },
+  { immediate: true },
+);
+
+// D3: a live parse summary — "N tables, M columns" — the only feedback that tells a user their
+// DDL is actually being understood. ddl.ts's own extractor never throws and never reports a
+// structured parse error (D9: an unrecognised statement is silently skipped, not a failure), so
+// "recognised nothing at all" is the one failure state this can show.
+const parseSummary = computed(() => ddlParseSummary(connectionKind.value, draft.value));
+
+function onDocChange(text: string): void {
+  draft.value = text;
+}
+
+async function onSave(): Promise<void> {
+  const id = connectionId.value;
+  if (!id) return;
+  saving.value = true;
+  try {
+    await saveDdl(id, draft.value);
+    closeSchemaDialog();
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <DialogFrame
+    v-if="schemaDialogState.open"
+    title="Schema (DDL)"
+    :width="720"
+    max-height="80vh"
+    test-id="schema-dialog"
+    close-test-id="schema-dialog-close"
+    @close="closeSchemaDialog"
+  >
+    <template #header>
+      <span>Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></span>
+    </template>
+
+    <div class="dialog-body-inner">
+      <span class="help">
+        Paste this connection's own schema — table and column definitions the SQL console
+        completes, checks and hovers against. Nothing here ever reads from the connection itself.
+      </span>
+      <div class="editor-wrap">
+        <CodeMirrorHost
+          :doc="draft"
+          language="sql"
+          :sql-dialect="dialect"
+          :read-only="false"
+          :autocomplete="false"
+          @update:doc="onDocChange"
+        />
+      </div>
+      <div class="p-strip note summary-strip" data-testid="schema-parse-summary">
+        <span v-if="parseSummary">{{ parseSummary }}</span>
+        <span v-else class="empty-note">
+          Paste output from <span class="mono">pg_dump --schema-only</span>,
+          <span class="mono">SHOW CREATE TABLE</span> or <span class="mono">.schema</span> —
+          whichever your connection's own engine gives you.
+        </span>
+      </div>
+    </div>
+
+    <template #footer>
+      <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+      <span class="footer-actions p-push">
+        <AppButton kind="dialog" @click="closeSchemaDialog">Cancel</AppButton>
+        <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
+          Save schema
+        </AppButton>
+      </span>
+    </template>
+  </DialogFrame>
+</template>
+
+<style scoped>
+.dialog-body-inner {
+  padding: var(--kira-s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-4);
+  height: 60vh;
+}
+
+.help {
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: var(--kira-font-family);
+}
+
+.editor-wrap {
+  flex: 1;
+  min-height: 0;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  overflow: hidden;
+}
+
+.summary-strip {
+  align-self: stretch;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+}
+
+.empty-note {
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-disabled);
+}
+
+.footer-actions {
+  display: flex;
+  gap: var(--kira-s-3);
+}
+</style>

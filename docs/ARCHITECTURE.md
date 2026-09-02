@@ -454,6 +454,7 @@ settings(key, value)                                   -- fonts, sizes, budgets,
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
             uri, options_json, preconnect, preconnect_sidecar, created_at, updated_at, sort_order)
 connection_filters(id, connection_id, node_kind, pattern, is_regex, action)  -- hide/show rules
+connection_ddl(connection_id, ddl, updated_at)          -- pasted DDL for the SQL language service
 saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
                                                        -- saved filters/queries per table + console
 filter_history(id, connection_id, path, where_text, order_by_json, used_at)
@@ -616,6 +617,14 @@ copy of it; and `views/shared/page/columns.ts`'s `columnHeaderTooltip`/`GUTTER_W
 `DEFAULT_COLUMN_WIDTH` are the one column-header tooltip and the one pair of layout constants
 behind the grid and the console's own tabular result, ending three different spellings of the same
 two numbers the two had drifted into.
+
+**The SQL console's language service is DDL-driven, never introspective.** P18 (v1.1)'s
+completion/diagnostics/hover providers (`views/console/sqlLanguageService.ts`,
+`sqlDiagnostics.ts`, `sqlHover.ts`) read only a per-connection `DdlSchema` parsed from a user-pasted
+DDL document (`connection_ddl`, below) via `@codemirror/lang-sql`'s own per-dialect Lezer parser —
+no schema introspection over a live connection, ever, even though the renderer already has live
+column metadata in reach (`runtime[tabId].meta`, the WHERE/ORDER BY boxes' own completion source).
+With no DDL document, a SQL console is byte-for-byte what it was before this phase.
 
 **The renderer runs Vue in VDOM mode, deliberately, not by default.** Vapor mode (Vue's
 compiled, no-virtual-DOM rendering) was evaluated against this tree in P6

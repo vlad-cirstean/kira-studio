@@ -19,6 +19,7 @@ import {
 import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
 import { uploadMenuItem } from '../state/objectStore';
+import { openSchemaDialog, schemaDialectFor } from '../state/schemas';
 import {
   openBrowseTab,
   openConsoleTab,
@@ -184,6 +185,18 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       icon: 'filter',
       run: () => openFiltersDialog(row.connectionId, row.path),
     },
+    // P18 (v1.1) D3: a SQL-only surface, same gate the console's own SQL behaviours use.
+    ...(schemaDialectFor(record?.kind) !== undefined
+      ? [
+          {
+            type: 'item' as const,
+            id: 'schema',
+            label: 'Schema (DDL)…',
+            icon: 'symbol-structure',
+            run: () => openSchemaDialog(row.connectionId),
+          },
+        ]
+      : []),
     ...consoleMenuItem(row),
     {
       type: 'submenu',

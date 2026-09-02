@@ -2,6 +2,7 @@
 import { nextTick, ref } from 'vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
+import SchemaDialog from '../../project/SchemaDialog.vue';
 import SearchBox from '../../project/SearchBox.vue';
 import { treeState } from '../../project/state/tree';
 import { connectionsState, openCreateDialog } from '../../state/connections';
@@ -91,6 +92,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
       <span class="p-xs dim side-empty-text">Everything you connect to<br />shows up here.</span>
     </div>
     <FiltersDialog />
+    <SchemaDialog />
   </div>
 </template>
 
