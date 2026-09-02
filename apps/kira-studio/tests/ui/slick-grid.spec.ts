@@ -409,6 +409,27 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   });
   expect(crossRowMutations).toBeGreaterThan(0);
 
+  // --- 3a. the render batch converges over frames, not in one jump (P22 iter2-scroll-gaps D4) -----
+  // A jump well past the whole runway, landing in never-before-mounted territory (the very bottom of
+  // the table — nothing above has scrolled anywhere near it). D2's own per-call new-cell budget means
+  // the mounted .slick-cell count measured on the *very next* animation frame is smaller than the
+  // count measured several more frames later — the window visibly *converges* toward its full target
+  // over a handful of self-scheduled catch-up renders, rather than jumping to full size in one call.
+  const convergence = await rightViewport(page).evaluate(async (el) => {
+    el.scrollTop = el.scrollHeight;
+    const counts: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      counts.push(document.querySelectorAll('[data-testid="data-grid"] .slick-cell').length);
+    }
+    return counts;
+  });
+  // The strictly-visible floor is never itself deferred (D2 step 1) — some cells mount immediately.
+  expect(convergence[0]).toBeGreaterThan(0);
+  // ...but the batch cap defers the rest of the runway, so the window is still growing several
+  // frames later — a single-jump render would make these equal.
+  expect(convergence[0]).toBeLessThan(convergence[convergence.length - 1]);
+
   // --- 4. mounted .slick-cell count stays under 2 500 across a velocity ladder -------------------
   // scroll_grid_data's own 60 data columns behave like budgets.spec.ts's own scroll_grid — this is
   // the wide-table case the cell-budget cap (D4's third bullet) exists for.
