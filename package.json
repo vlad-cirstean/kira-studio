@@ -70,6 +70,7 @@
   },
   "dependencies": {
     "flatbuffers": "25.9.23",
+    "slickgrid": "5.20.0",
     "zod": "4.5.4"
   }
 }
