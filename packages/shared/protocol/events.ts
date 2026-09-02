@@ -25,6 +25,7 @@ export const CHANNEL = {
   layoutChanged: 'kira:layout:changed',
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
+  schemaChanged: 'kira:schema:changed',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

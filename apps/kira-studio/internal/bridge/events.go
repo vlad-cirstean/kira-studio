@@ -32,6 +32,7 @@ const (
 	ChannelLayoutChanged          = "kira:layout:changed"
 	ChannelOpUpdate               = "kira:op:update"
 	ChannelAppMetrics             = "kira:app:metrics"
+	ChannelSchemaChanged          = "kira:schema:changed"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

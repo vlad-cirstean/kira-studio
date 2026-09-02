@@ -8,6 +8,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
+import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
@@ -29,6 +30,7 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
+import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
@@ -320,4 +322,11 @@ export const control = {
     where: string | null,
     orderBy: SortSpec | null,
   ): Promise<void> => unwrap(QueriesService.HistoryRecord({ connectionId, path, where, orderBy })),
+
+  schemaGet: (connectionId: string): Promise<ConnectionDdl> =>
+    unwrap(SchemaService.Get({ connectionId })).then((r) => trust<ConnectionDdl>(r)),
+  schemaSet: (connectionId: string, ddl: string): Promise<ConnectionDdl> =>
+    unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
+  onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
+    on(CHANNEL.schemaChanged, cb),
 };

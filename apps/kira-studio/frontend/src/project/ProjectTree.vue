@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
 import { connectionsState } from '../state/connections';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
+import { initSchemaSync } from '../state/schemas';
 import { settingsState } from '../state/settings';
 import {
   openBrowseTab,
@@ -56,6 +57,7 @@ const virtualListRef = ref<{ scrollToIndex: (index: number, inset?: number) => v
 
 onMounted(() => {
   initTreeSync();
+  initSchemaSync();
 });
 
 // P28 D2: published by VirtualList's own scrollstate emit — ProjectTree is the only component
