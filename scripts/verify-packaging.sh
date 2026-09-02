@@ -16,6 +16,11 @@
 # first failure.
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
+cd "$ROOT_DIR"
+
 FAILED=0
 
 fail() {
@@ -38,7 +43,10 @@ if grep -rnE "autoUpdater|electron-updater" apps/ packages/ >/dev/null 2>&1; the
 fi
 
 # --- S5: the packaging script cannot publish ---------------------------------------------------
-PACKAGE_SCRIPT="$(node -p "require('./package.json').scripts['package'] || ''")"
+# A POSIX `sed` read, not `node -p require(...)`: this repository does not declare `node` as a
+# dependency anywhere (P58f deleted the vendored runtime), so a machine that satisfies every
+# documented Requirement could still fail this script at line 1 before a single check ran (P20 F13).
+PACKAGE_SCRIPT="$(sed -n 's/^[[:space:]]*"package": *"\(.*\)",\{0,1\}$/\1/p' package.json | head -1)"
 case "$PACKAGE_SCRIPT" in
   # P10: the shipped artifact is the .dmg, so the script must run the task that builds one.
   # `darwin:package` alone stops at the .app and would leave the release with nothing to upload —

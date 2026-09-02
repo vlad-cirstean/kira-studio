@@ -1,14 +1,17 @@
 #!/bin/sh
 # generate-wire.sh — regenerates the FlatBuffers data-plane wire code (P11) from
 # packages/shared/protocol/wire.fbs. Fetches a pinned flatc into a gitignored .tools/ cache
-# (verified by SHA-256) rather than assuming one is on PATH, the same reasoning wails-dev-setup.sh
-# applies to wails3: an unpinned compiler is exactly how generated code drifts from what's
+# (verified by SHA-256) rather than assuming one is on PATH, the same reasoning setup.sh applies to
+# wails3: an unpinned compiler is exactly how generated code drifts from what's
 # committed. Run via `bun run generate:wire` whenever wire.fbs changes; the generated output is
 # committed to the repo (P11 D11), so this script's job is to reproduce it byte-for-byte, not to
 # run automatically on every build.
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
 SCHEMA="$ROOT_DIR/packages/shared/protocol/wire.fbs"
 
 FLATC_VERSION=25.9.23

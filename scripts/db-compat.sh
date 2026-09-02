@@ -14,6 +14,11 @@
 # why FAILED is tracked by hand rather than left to the shell's own exit-on-error.
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
+cd "$ROOT_DIR"
+
 ONLY=""
 EXTREME=""
 MIRROR=0

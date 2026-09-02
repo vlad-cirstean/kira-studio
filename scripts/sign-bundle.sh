@@ -9,7 +9,10 @@
 # re-verifying against a real packaged bundle rather than copied. macOS only.
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
 APP="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.app"
 DMG="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.dmg"
 
