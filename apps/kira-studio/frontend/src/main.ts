@@ -178,6 +178,11 @@ declare global {
       /** `false` disables D4's per-row memoisation (renderRows always allocates fresh RowVMs).
        *  Default (undefined) is "on". */
       incrementalRows?: boolean;
+      /** P22 regular-table spike — a trailing render runway in px for the `'regular'` engine,
+       *  which otherwise draws the visible viewport and nothing else. The counterpart of
+       *  `maxLeadPxOverride` for that engine; see views/grid/regular/element.ts's `runwayPx`.
+       *  Default (undefined) is 0, i.e. the library's own behaviour. */
+      regularRunwayPx?: number;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
@@ -185,6 +190,14 @@ declare global {
      * iter2 D4's last paragraph) without needing real-hardware timing.
      */
     __kiraGridRowUpdates?: () => void;
+    /**
+     * P22 regular-table spike — which renderer `DataView.vue` mounts for a SQL data tab. Read once
+     * per tab mount, deliberately not reactively: switching engines mid-session should remount the
+     * tab, and the real-Mac protocol (docs/v1.1/plans/P22-regular-table-spike.md) sets this from
+     * the Web Inspector console and reopens the tab. Anything but `'regular'` — including leaving
+     * it unset — is the incumbent tanstack-virtual `DataGrid.vue`, so the spike ships dark.
+     */
+    __kiraGridEngine?: 'tanstack' | 'regular';
   }
 }
 window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
