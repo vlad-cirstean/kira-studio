@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: bun install --frozen-lockfile
+
+      # The one place a build reads a version (apps/kira-studio/Taskfile.yml's APP_VERSION): from
+      # here it is linked into the binary and stamped into the bundle's Info.plist, and
+      # verify:packaging asserts the packaged bundle came out carrying exactly this string.
+      - name: Set the app version from the release tag
+        run: |
+          set -eu
+          TAG="${GITHUB_REF_NAME#v}"
+          CONFIG=apps/kira-studio/build/config.yml
+          perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
+          test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
+          echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
+
+      - name: Generate Wails bindings (P57 D8/D13)
+        run: |
+          set -eu
+          PINNED_VERSION="$(grep -m1 'github.com/wailsapp/wails/v3 ' go.mod | awk '{print $2}')"
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          (cd apps/kira-studio && wails3 generate bindings -b -i -ts -names)
+
+      - run: bun run lint
+      - run: bun run typecheck
+
+      - run: bun run package
+
+      # P10: `bun run package` already produced and signed the .dmg — this only gives it the
+      # platform-qualified name the release asset carries.
+      - name: Name the signed disk image for distribution
+        run: cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
+
+      - name: Verify packaging
+        run: bun run verify:packaging
+
+      - name: Compose release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          Unsigned (ad-hoc), local, arm64-only macOS build — macOS 14+. See docs/PACKAGING.md
+          and README.md for details.
+
+          Open the disk image and drag Kira Studio onto the Applications shortcut inside it.
+
+          Since this build is unsigned, macOS Gatekeeper will block the first launch. Either
+          right-click the app and choose Open, or run:
+
+              xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+
+          This release has no auto-update. The artifact below carries no update metadata or feed
+          — see docs/PACKAGING.md §7 for why, and what would need to change first.
+          EOF
+
+      - name: Create draft release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "Kira Studio $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            kira-studio-macos-arm64.dmg
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kira-studio-macos-arm64
+          path: kira-studio-macos-arm64.dmg
+          retention-days: 14

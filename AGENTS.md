@@ -104,21 +104,16 @@ team works, and how to run things in whichever box a session happens to be on.
 
 ## Known open items
 
-- **P16's DB-compatibility CI workflow is staged, not live.** `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml`
-  is the finished `workflow_dispatch`-only workflow for the on-demand DB compatibility suite
-  (`docs/v1.1/plans/P16-db-compat-suite.md`); it isn't in `.github/workflows/` because this
-  session's GitHub push access lacks the `workflow` OAuth scope, which GitHub requires for any
-  commit touching `.github/workflows/*.yml`. Apply it once a session's push access carries that
-  scope — see the README beside it for the exact move. The suite itself (`scripts/db-compat.sh`)
-  works today and needs no CI wiring to run by hand.
-- **`TestFixture_Redis` (`internal/ipcfixture/redis_test.go`) fails against a fresh
-  `redis:7` container in this sandbox, reproducibly, unrelated to any SQL/console/connections work**:
-  the live tree listing and a console `DBSIZE` both come back exactly one key higher than
-  `testdata/redis.fixture.json` committed (`"12 keys"`/`"11"` expected vs `"13 keys"`/`"12"` got) —
-  confirmed on two independent fresh containers, not a one-off flake. Every other package in
-  `go test ./...` (all six adapters' real-container conformance suites included) passes. Not
-  investigated further here — out of scope for whichever phase next touches the redis adapter or
-  `internal/ipcfixture`, but worth knowing before assuming a change broke it.
+- **Two CI workflow bumps are staged, not live**, both for the same reason: this session's GitHub
+  push access lacks the `workflow` OAuth scope, which GitHub requires for any commit touching
+  `.github/workflows/*.yml`. Apply each once a session's push access carries that scope — see the
+  README beside each for the exact move.
+  - `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml` — P16's finished `workflow_dispatch`-only
+    workflow for the on-demand DB compatibility suite (`docs/v1.1/plans/P16-db-compat-suite.md`). The
+    suite itself (`scripts/db-compat.sh`) works today and needs no CI wiring to run by hand.
+  - `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — P19's GitHub Actions major-version
+    bump (`actions/checkout`, `actions/setup-go`, `actions/upload-artifact` to `@v7`) applied to the
+    two live workflows.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
