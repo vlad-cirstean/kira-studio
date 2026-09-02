@@ -1052,7 +1052,7 @@ local cache-aside over `engineOp`:
 // object deliberately implements none of them beyond hit/miss.
 const cache = new Map<string, TreeNode[]>();
 async function children(connectionId: string, path: string, refresh = false) {
-  const key = `${connectionId} ${path}`;
+  const key = `${connectionId}\0${path}`;
   if (!refresh && cache.has(key)) {
     return { nodes: cache.get(key)!, source: 'cache' as const, truncated: false };
   }
