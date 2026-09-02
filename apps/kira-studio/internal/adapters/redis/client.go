@@ -36,17 +36,19 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 	var port int
 
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
-		if u, err := url.Parse(*cfg.URI); err == nil {
-			host = u.Hostname()
-			if p := u.Port(); p != "" {
-				port, _ = strconv.Atoi(p)
-			}
-			if u.User != nil {
-				username = u.User.Username()
-				password, _ = u.User.Password()
-			}
-			database = strings.TrimPrefix(u.Path, "/")
+		u, err := url.Parse(*cfg.URI)
+		if err != nil {
+			return connectFields{}, 0, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
 		}
+		host = u.Hostname()
+		if p := u.Port(); p != "" {
+			port, _ = strconv.Atoi(p)
+		}
+		if u.User != nil {
+			username = u.User.Username()
+			password, _ = u.User.Password()
+		}
+		database = strings.TrimPrefix(u.Path, "/")
 	} else {
 		if cfg.Host != nil {
 			host = *cfg.Host

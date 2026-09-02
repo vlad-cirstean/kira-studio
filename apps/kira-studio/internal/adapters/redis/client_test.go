@@ -59,3 +59,23 @@ func TestResolveFields_TLSModes(t *testing.T) {
 		}
 	})
 }
+
+// P12 round 2 finding #2: every other URI-parsing adapter (clickhouse, mysqlfamily, sqlite, kafka)
+// returns a connect error when url.Parse fails; resolveFields used to silently fall through with
+// every field left at its zero value, which host/port then defaulted to localhost:6379 with no
+// password — a malformed URI silently connected to whatever Redis is running on the user's own
+// machine, unauthenticated, instead of surfacing the parse failure.
+func TestResolveFields_UnparsableURIIsConnectError(t *testing.T) {
+	for _, uri := range []string{
+		"redis://host:port/0",  // non-numeric port
+		"redis://ho st:6379/0", // unescaped space in host
+		"redis://a:b:c/0",      // unbracketed multi-colon host, e.g. an IPv6 literal
+	} {
+		t.Run(uri, func(t *testing.T) {
+			cfg := model.ResolvedConnectionConfig{Mode: "uri", URI: &uri}
+			if _, _, err := resolveFields(cfg, nil); err == nil {
+				t.Fatalf("resolveFields(%q) err = nil, want a connect error", uri)
+			}
+		})
+	}
+}
