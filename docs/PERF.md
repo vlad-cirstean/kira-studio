@@ -866,6 +866,29 @@ every fix that review's findings needed):
 
 No dependency leaked into the main chunk; the growth is real app code, not a regression.
 
+### 2.11 P19 — bundle re-measured under Vite 8/Rolldown; a Green Tea GC caveat on every Go-side RSS/CPU figure above
+
+**Bundle (`bun run build`, current HEAD, Vite 8.2.2/Rolldown):**
+
+- `index-*.js`: **1,115,370 B raw / 351.14 KB gzip** — down slightly from §2.10's Rollup+esbuild
+  figure (1,117,138 B / 356,081 B gzip), noise-level and not attributed to Rolldown specifically;
+  no dependency graph or chunking decision changed (P19 D4).
+- `sqlFormatterEntry-*.js`: **130,746 B raw / 37.41 KB gzip** — still a separate lazy chunk.
+- `fakerEntry-*.js`: **415,801 B raw / 155.46 KB gzip** — still a separate lazy chunk.
+
+Both dynamic-import splits survive Rolldown's own chunking (P19 §7.2's own acceptance bar for the
+Vite major) — neither collapsed into the main chunk.
+
+**The Green Tea GC caveat.** Go 1.26 (this repo moved to Go 1.27 in the same phase, P19 C4) turns
+Green Tea on by default — Go's own numbers put it at 10-40% less GC overhead than the prior
+collector. **Every Go-side RSS/CPU figure recorded above this line (§2.3's Linux walking-skeleton
+RSS, §2.4's real-macOS-arm64 gate G1 result) was measured under the pre-Green-Tea collector.** This
+phase does not re-measure them — re-measuring needs the same real macOS hardware §2.4's own
+methodology note requires, which this sandbox does not have, and P19's own scope is a dependency
+and toolchain bump, not a re-run of P5's or P7's measurement procedures. Read §2.3/§2.4 as
+historical baselines from before this GC change, not current numbers, until whoever next runs the
+real-Mac procedure (§3) re-measures them.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
