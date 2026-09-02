@@ -14,7 +14,8 @@ described in §2.2 — see the scroll-response methodology note in §2.1 for why
 numbers aren't directly comparable on the scroll-response row specifically. macOS **packaged**
 numbers (§3's manual procedures, run against the built app rather than this dev build) are still
 not recorded — no opportunity to run them has come up yet; §3 documents the procedure and what to
-fill in.
+fill in. **Every Go-side wall-clock figure in §2.5-§2.8 predates Go 1.26's Green Tea GC** — see
+§2.11's own caveat, below, for exactly which of those numbers that affects and which it doesn't.
 
 ## 1. Budget table
 
@@ -58,7 +59,7 @@ alongside the assertion split below and the D13 table in the P47 note — the pr
 
 **Console keystroke → completion popup.** Docker/Colima is available on this environment (the
 macOS dev machine this file's numbers now come from), so the Postgres-backed
-`tests/e2e/budgets.spec.ts` suite runs in full rather than self-skipping; the row above is a real
+`tests/ui/budgets.spec.ts` suite runs in full rather than self-skipping; the row above is a real
 measurement, not a carry-over.
 
 **P29 (scroll rendering gap) — resolved, numbers recorded.** `budgets.spec.ts`'s horizontal
@@ -907,16 +908,35 @@ their allocation numbers (and the frontend decode timings) as still current, unt
 re-runs these throwaway measurement programs (or the real-Mac procedure, §3, for §2.3/§2.4)
 confirms the wall-clock ones too.
 
+### 2.12 P21 — bundle re-measured at the close of the v1.1 chapter; §2.11 confirmed still current
+
+**Bundle (`bun run build`, `62c7e84`, Vite 8.2.2/Rolldown, 631 modules):**
+
+- `index-*.js`: **1,115,990 B raw / 351.31 KB gzip** — +620 B / +0.17 KB gzip against §2.11
+  (+0.06%), noise at this scale: P12 rounds 1-2's own frontend fixes landed between §2.11's capture
+  and this one, and no dependency graph or chunking decision changed.
+- `sqlFormatterEntry-*.js`: **130,746 B raw / 37.41 KB gzip** — byte-for-byte identical to §2.11.
+- `fakerEntry-*.js`: **415,801 B raw / 155.46 KB gzip** — byte-for-byte identical to §2.11.
+- `index-*.css`: **120,067 B raw / 21.77 KB gzip** — not recorded in §2.11; recorded here for the
+  first time.
+
+Both dynamic-import splits survive, exactly as §2.11 already established — nothing collapsed into
+the main chunk. **§2.11's figures are confirmed still current**, and its Green Tea GC caveat is
+**unchanged and still applies**: no Go-side wall-clock number was re-measured by this phase either
+— P21 is a docs-only sweep (§0.3 of `docs/v1.1/plans/P21-docs-refresh.md`), not a new measurement
+program.
+
 ## 3. Manual procedures (macOS, packaged build)
 
-Not yet run — no macOS hardware available in this environment. Run these once on macOS 13+ arm64
+Not yet run — no macOS hardware available in this environment. Run these once on macOS 14+ arm64
 and record the results here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
 re-pointed procedure, not a re-measurement — nothing in this section has been executed on real
 hardware since the migration, and no number in this file changed as a result of the rewrite.
 
-**The bundle these procedures run against.** `bun run package` (`cd shell && wails3 task
-darwin:package`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces
-**`apps/kira-studio/bin/Kira Studio.app`**. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
+**The bundle these procedures run against.** `bun run package` (`cd apps/kira-studio && wails3 task
+darwin:package:dmg`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces both
+**`apps/kira-studio/bin/Kira Studio.app`** and, around it, **`Kira Studio.dmg`** — the shipped
+artifact as of P10. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
 `out/main/` entry points no longer exist. As of P58f M10 there is also no `Contents/MacOS/runtime/`
 tree of any kind — no vendored Node runtime, no engine-child bundle — since every adapter now runs
 natively inside the one Go binary. The only measurement-relevant path inside the bundle is
@@ -944,19 +964,29 @@ packaged check is what's left):
    Redis connections; 4 Postgres tabs + 2 MariaDB tabs + 2 MongoDB tabs + 2 Redis tabs, all loaded.
 2. Read the memory figure from the app's own status bar (bottom right, `data-testid=app-metrics-mem`).
    That readout *is* the replacement for `app.getAppMetrics()`: `internal/metrics`' `Sampler` +
-   `Ticker` sum RSS and CPU across the app's own process set every 5 s (`metrics.Interval`) and emit
-   it as `kira:app:metrics`. There is no separate manual command to run for the headline number, and
-   no per-process breakdown — it is one app-wide figure by construction (§2.2's per-process table has
-   no equivalent here).
-3. Optional second opinion, using the same instrument §2.3/§2.4 measured gate G1 with:
-   `cd shell && go run ./cmd/g1measure` (its `-anchor`/`-helper` defaults are
-   `metrics.AnchorNeedles`/`HelperNeedles`; min of 10 samples 1 s apart), or a `ps -o rss=` sum over
-   the same set — as of P58f M10, just the `Kira Studio` binary and the `com.apple.WebKit.*` helpers
-   (there is no vendored Node process left to include). Do not grep `com.apple.WebKit` by hand
-   unfiltered: it also matches every *other* running app's idle WebKit helpers, the over-count
-   §2.4's third bug records (≈ 87 MB of other apps on that machine) and the reason
-   `metrics.AppProcessSet` exists.
-4. Record: `<total> MB — <date>, <machine>`.
+   `Ticker` sum CPU and, on darwin, **`ri_phys_footprint`** (not RSS — since P7,
+   `internal/metrics/probe_darwin.go` reads `proc_pid_rusage(RUSAGE_INFO_V2)` per pid per tick)
+   across the app's own process set every 5 s (`metrics.Interval`) and emit it as `kira:app:metrics`.
+   There is no separate manual command to run for the headline number, and no per-process breakdown
+   — it is one app-wide figure by construction (§2.2's per-process table has no equivalent here).
+3. **Optional second opinion — not the same instrument as step 2, and the two numbers are not
+   directly comparable.** `cd apps/kira-studio && go run ./cmd/g1measure` (its `-anchor`/`-helper`
+   defaults are `metrics.AnchorNeedles`/`HelperNeedles`; min of 10 samples 1 s apart) and a plain
+   `ps -o rss=` sum both report **RSS**, never phys_footprint — `cmd/g1measure/main.go` sums
+   gopsutil's `mi.RSS` and was never updated when P7 switched the status-bar readout to
+   phys_footprint. RSS counts shared dyld/WebKit pages once per process; phys_footprint counts them
+   once total — so an RSS sum and a phys_footprint reading over the same process set are two
+   different numbers, not two ways of measuring the same one (`docs/ARCHITECTURE.md`'s explanation
+   of the difference). The **350 MB budget below was set against an RSS sum** (§2.2), so a step-2
+   phys_footprint reading is *not* a like-for-like comparison against it — record the RSS figure
+   (step 3) against the budget, and record the status-bar figure too if in doubt which one a future
+   reader will want. As of P58f M10 the process set for either instrument is just the `Kira Studio`
+   binary and the `com.apple.WebKit.*` helpers (there is no vendored Node process left to include).
+   Do not grep `com.apple.WebKit` by hand unfiltered: it also matches every *other* running app's
+   idle WebKit helpers, the over-count §2.4's third bug records (≈ 87 MB of other apps on that
+   machine) and the reason `metrics.AppProcessSet` exists.
+4. Record both figures if in doubt, and label each with which instrument it came from: `<RSS total>
+   MB (g1measure/ps) / <phys_footprint total> MB (status bar) — <date>, <machine>`.
 
 **Window-bounds debounce timer on close (F8, D8)** — now `apps/kira-studio/internal/shell/window.go`: the
 resize/move debouncer (300 ms, `boundsDebounce`) is cancelled on `events.Common.WindowClosing`, and
