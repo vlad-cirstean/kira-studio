@@ -1,13 +1,14 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import type { Page } from '@shared/protocol/page';
+import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { connectionRecord } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
 import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
-import { applyLoadFailure, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { applyLoadFailure, classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { explainStatementsFor, isExplainable } from './explain';
 import { dropPlan, setPlan } from './explainResults';
 import { parseExplainPages } from './plan';
@@ -39,6 +40,10 @@ export interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   opId: string | null; // the in-flight op, for the stop button
+  // P12 round 1 finding #5: the pre-run auto-explain batch's own op id, tracked separately from
+  // opId (which already holds the *real* run's future id by the time this fires) — without it,
+  // Stop had nothing registered on the backend to cancel while this batch was in flight.
+  explainOpId: string | null;
   results: ConsoleResult[]; // the last run's result sets — runtime-only, never saved (§8.4)
   activeKey: string | null; // which result set the single mounted grid shows (P40 D2)
   searchOpen: boolean; // mirrors views/{grid,documents,keyvalue}/state.ts's own flag (P40 D8)
@@ -59,6 +64,7 @@ function defaultRuntime(): ConsoleViewRuntime {
     status: 'idle',
     error: null,
     opId: null,
+    explainOpId: null,
     results: [],
     activeKey: null,
     searchOpen: false,
@@ -255,6 +261,7 @@ async function autoExplainCheck(
   tab: ConsoleTabRecord,
   kind: ConnectionKind,
   statements: string[],
+  opId: string,
 ): Promise<AutoExplainState | null> {
   if (!tab.connectionId) return null;
   const explainable = statements.filter((s) => isExplainable(s));
@@ -266,7 +273,7 @@ async function autoExplainCheck(
 
   try {
     const response = await data.execute({
-      opId: crypto.randomUUID(),
+      opId,
       tabId: tab.id,
       connectionId: tab.connectionId,
       path: tab.path,
@@ -287,7 +294,12 @@ async function autoExplainCheck(
       ({ plan }) => plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn'),
     );
     return worstIndex === -1 ? null : { plans, worstIndex };
-  } catch {
+  } catch (err) {
+    // D19 rule 6: an EXPLAIN-call failure never blocks the real run — except a cancellation. That
+    // is the user pressing Stop while this pre-run batch is in flight, not the batch itself
+    // failing, and must stop the real run too rather than let it fire the moment this batch
+    // settles (P12 round 1 finding #5) — rethrown so run()'s own catch can react.
+    if (classifyLoadError(err).kind === 'cancelled') throw err;
     return null;
   }
 }
@@ -312,8 +324,26 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
   // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
   const connection = connectionRecord(tab.connectionId);
   if (connection?.autoExplain) {
-    rt.autoExplain = await autoExplainCheck(tab, connection.kind, statements);
-    if (rt.opId !== opId) return; // superseded by a newer run while the EXPLAIN batch was in flight
+    const explainOpId = crypto.randomUUID();
+    rt.explainOpId = explainOpId;
+    try {
+      rt.autoExplain = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
+    } catch (err) {
+      // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
+      // — Stop was pressed while this batch was the only op registered on the backend, so the
+      // real run must not fire at all, not just lose its warning.
+      rt.explainOpId = null;
+      applyLoadFailure(rt, opId, err, tabId, {
+        onDisconnected: () => {
+          rt.status = 'idle';
+        },
+      });
+      return;
+    }
+    rt.explainOpId = null;
+    // Not only opId (a newer run superseding this one) — status too, since a Stop press during
+    // this batch is only visible through status, not through opId changing (finding #5).
+    if (rt.opId !== opId || rt.status !== 'running') return;
   }
 
   try {
@@ -361,7 +391,11 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
 }
 
 export function stop(tabId: string): void {
-  stopOp(runtime[tabId]);
+  const rt = runtime[tabId];
+  // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
+  // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
+  if (rt?.explainOpId) void control.opsCancel(rt.explainOpId);
+  stopOp(rt);
 }
 
 /** D19: the strip clears on the next run (already handled inside `run()` itself) and on the next
@@ -414,18 +448,35 @@ export async function explain(
   const statements = explainStatementsFor(kind, statement);
   if (statements.length === 0) return { ok: false, reason: 'this console has nothing to explain' };
 
+  // P12 round 1 finding #5: the same opId/status bookkeeping run() uses, so Explain is cancellable
+  // via Stop and shows the same busy state — before, this had no opId registered on the runtime at
+  // all, so Stop was inert against it and nothing in the UI showed it was in flight. rt.error is
+  // deliberately left untouched either way (see the docstring above): a failure here is reported
+  // through this function's own return value, not the shared error strip.
+  const rt = ensureRuntime(tabId);
+  const opId = crypto.randomUUID();
+  rt.status = 'running';
+  rt.opId = opId;
+
   try {
     const response = await data.execute({
-      opId: crypto.randomUUID(),
+      opId,
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
       statements,
     });
+    if (rt.opId !== opId) return { ok: true }; // superseded by a newer op — nothing left to report into
     const plan = parseExplainPages(kind, response.pages, settingsState.advanced.expensiveQueryRows);
     pushPlanResult(tabId, statement, plan);
+    rt.status = 'idle';
+    rt.opId = null;
     return { ok: true };
   } catch (err) {
+    if (rt.opId === opId) {
+      rt.opId = null;
+      rt.status = classifyLoadError(err).kind === 'cancelled' ? 'cancelled' : 'idle';
+    }
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 }

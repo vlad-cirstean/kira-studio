@@ -140,14 +140,22 @@ const statementAtCursorText = computed<string | undefined>(() => {
 // D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
 // statement, which is a state (like the format button's own disabled-on-empty-text), not a
 // capability like Redis having no Format button at all.
+// P12 round 1 finding #5: explain() now shares run()'s own opId/status bookkeeping (so it's
+// cancellable and shows a busy state) — running must gate this button too, or starting Explain
+// while a run is already in flight would silently steal rt.opId out from under it, and the run's
+// own eventual response would then read as superseded and get its results discarded.
 const canExplain = computed(
-  () => statementAtCursorText.value !== undefined && isExplainable(statementAtCursorText.value),
+  () =>
+    !running.value &&
+    statementAtCursorText.value !== undefined &&
+    isExplainable(statementAtCursorText.value),
 );
-const explainTooltip = computed(() =>
-  canExplain.value
+const explainTooltip = computed(() => {
+  if (running.value) return 'A run is already in progress';
+  return canExplain.value
     ? 'Explain the statement under the cursor'
-    : 'Put the cursor in a SELECT or WITH statement to explain it',
-);
+    : 'Put the cursor in a SELECT or WITH statement to explain it';
+});
 // D9's own precedent: a component-local strip, not a runtime-shape change (the manual button's
 // own failure is shown; auto-explain's failure path — C14 — degrades silently instead, D19 rule 6).
 const explainError = ref<string | null>(null);
