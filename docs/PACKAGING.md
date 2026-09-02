@@ -14,21 +14,32 @@ every database adapter is served in-process by the Go binary itself.
 
 ## 1. Building locally
 
-Requires macOS arm64, Bun, Go (`go.mod`: 1.25.0), and Xcode command-line tools. Everything else —
-`bun install`, `go mod download`, and the `wails3` CLI at the version `go.mod` pins
-(`v3.0.0-beta.15`) — installs itself:
+Requires macOS arm64, Bun, Go (`go.mod`: 1.27.0), and Xcode command-line tools. Everything else —
+`bun install`, `go mod download`, and the `wails3` CLI at the version `go.mod` pins — installs
+itself:
 
 ```sh
 bun run package                 # installs everything first, then wails3 task darwin:package:dmg, then scripts/sign-bundle.sh
 ```
 
 `bun run package` and `bun run dev` both run `bun run setup` first (wired as `prepackage`/`predev`),
-which is `scripts/install-deps.sh` (`bun install` + `go mod download`) followed by
-`scripts/wails-dev-setup.sh` (the pinned `wails3` CLI + generated bindings). Both scripts are
-idempotent and do only what is missing — `sh scripts/wails-dev-setup.sh` installs the pinned wails3
-and generates the Wails bindings (`wails3 generate bindings -b -i -ts -names` — gitignored, and
-`apps/kira-studio/frontend/src/bridge/*.ts` imports them, so `bun run build` fails without them). To
-run just the install step (e.g. to warm up a machine before writing code), use `bun run setup`.
+which is `scripts/setup.sh`, the one entry point for everything a fresh clone needs before building.
+It sources `scripts/lib.sh` for the shared `ROOT_DIR`, `require_cmd`, `ensure_gopath_on_path`,
+`sha256_file` and `pinned_wails_version`/`go_directive` helpers, then:
+
+- runs `bun install` and `go mod download`;
+- installs the pinned `wails3` CLI **with `GOTOOLCHAIN` pinned to `go.mod`'s own `go` directive** —
+  never `auto`, which resolves the toolchain from Wails' own floor and silently degrades the
+  bindings generator's type-checker (`setup.sh:64-71`, `:88-92`);
+  it reinstalls only when the pinned version changed, or when the installed binary's own build
+  toolchain is older than the directive (`setup.sh:73-80`);
+- delegates bindings regeneration to `wails3 task common:generate:bindings`, gated on an identity
+  stamp at `apps/kira-studio/.task/bindings.stamp` **and** on the bindings directory's own presence
+  (`setup.sh:113-127`) — `apps/kira-studio/frontend/src/bridge/*.ts` imports the generated bindings
+  directly, so `bun run build` fails without them.
+
+`setup.sh` does only what is missing on each run. To run just the install step (e.g. to warm up a
+machine before writing code), use `bun run setup`.
 `apps/kira-studio/{bin,frontend/dist,frontend/bindings}` are gitignored (`apps/kira-studio/.gitignore`).
 
 Expected artifacts (nothing lands in `dist/` or `out/` any more):
@@ -61,9 +72,10 @@ There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is
 signing; both the guard and the copy step are gone, since there is nothing left to vendor.
 
 **Dev loop:** `bun run dev` (`cd apps/kira-studio && wails3 task dev`) launches a real native window
-with hot reload — the Wails task's own dev-mode config drives the frontend build via
-`common:dev:frontend`; `predev` runs `wails-dev-setup.sh` first. `wails3 task darwin:run` builds and
-runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packaging.
+with hot reload — the Wails task's own dev-mode config drives the frontend build with a blocking
+`common:build:frontend` for the embedded bundle, then runs `common:dev:frontend` (the Vite dev
+server) in the background for HMR; `predev` runs `bun run setup` first. `wails3 task darwin:run`
+builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` without packaging.
 
 ## 2. Config summary
 
@@ -103,8 +115,10 @@ build time:
 An unlinked build — `go run`, `go test`, `go build ./...` by hand — reports `internal/buildinfo`'s own
 literal, `0.0.0-dev`, which is how you can tell one from a real build. `verify-packaging.sh`'s **A5**
 asserts the packaged bundle's `CFBundleShortVersionString` equals `config.yml`'s `info.version`, so a
-bundle assembled around a stale plist, or one where the PlistBuddy step silently skipped (its guard is
-`-x /usr/libexec/PlistBuddy`, absent off macOS), fails the check rather than shipping quietly.
+bundle assembled around a stale plist fails the check rather than shipping quietly — and the
+PlistBuddy step itself no longer skips silently off macOS: its guard is `-x /usr/libexec/PlistBuddy`,
+and the `else` branch hard-fails `create:app:bundle` with an explicit "broken macOS environment"
+error rather than continuing past it.
 
 The root `package.json`'s `version` is **not** it — that is npm metadata for a private, unpublished
 workspace root, and nothing in the app or the build reads it.
@@ -116,9 +130,8 @@ workspace root, and nothing in the app or the build reads it.
 | `darwin:package:dmg` | what `bun run package` invokes: `deps: package`, then `create:dmg` |
 | `create:dmg` | `wails3 tool package --format dmg` over the built `.app` — background `darwin/dmg-background.png`, volume icon *and* file icon `darwin/icons.icns`, window 540×380. The tool adds the `/Applications` symlink and places the two icons itself. macOS only (`platforms: [darwin]`) |
 | `darwin:package` | `deps: build`, then `create:app:bundle`. Still callable on its own when all you want is the bundle |
-| `darwin:build` → `build:native` | on macOS: `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
-| `darwin:build` → `build:docker` | off macOS only: cross-compiles in the `wails-cross` Docker image. Never exercised in this repo (§5) |
-| `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then `codesign:adhoc` on macOS (`codesign:skip` elsewhere). The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
+| `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
+| `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then ends unconditionally with `codesign:adhoc` — only reachable behind `build`'s own Darwin precondition, so there is no off-macOS fallback to speak of. The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
 
 `common:build:frontend` runs the same `bun run build` the checklist above already ran; Task's
 `sources`/`generates` up-to-date checking makes the second invocation a no-op against fresh output, so
@@ -180,8 +193,8 @@ table below.
 |---|---|
 | `bun run build` (vite → `apps/kira-studio/frontend/dist`) | **pass** — run here this session |
 | `bun run typecheck`, `bun run lint` | **pass** |
-| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; A1/A3/N2 correctly reported *skipped*, since no `apps/kira-studio/bin/Kira Studio.app` exists here |
-| `wails3 task darwin:package` | **not run** — needs macOS (or the untested Docker cross-compile path, §5) |
+| `sh scripts/verify-packaging.sh` | **pass** — static checks S1/S2/S5 ran; `verify-packaging: note — skipped A1/A3/A5/N2 — "apps/kira-studio/bin/Kira Studio.app" not present` and `verify-packaging: note — skipped A4/N3 — "apps/kira-studio/bin/Kira Studio.dmg" not present`, then `verify-packaging: all checks passed` |
+| `wails3 task darwin:package` | **not run** — needs macOS (§5) |
 | `scripts/sign-bundle.sh` | **not run** — `codesign` is macOS-only and the script refuses to run off Darwin |
 | Real bundle contents, `Info.plist` values, ad-hoc signatures | **not verified** — no bundle was produced here |
 | `.app` on-disk size | **not measured** — expect substantially less than the pre-P58f figure now that there is no ~126 MB vendored `runtime/` tree to carry, likely close to the compiled Go binary's own size alone; not a recorded number |
@@ -240,19 +253,19 @@ human to launch the packaged app and use it.
 Unlike the electron-builder pipeline this replaced — which assembled a complete, inspectable `.app` on
 Linux by downloading prebuilt Electron binaries, and only failed at the macOS-only `sips` step for
 `dmg` — the Wails pipeline compiles a real Go binary with `CGO_ENABLED=1` against macOS system
-frameworks. On Linux that leaves three doors, and none of them was opened here:
+frameworks. On Linux that leaves two doors, and neither was opened here:
 
-- **`build:native`** requires macOS. Not attempted.
-- **`build:docker`** (`darwin:build`'s automatic off-macOS branch) needs Docker plus a locally built
-  `wails-cross` image (`wails3 task setup:docker`). Not attempted; this repo has never exercised it, so
-  it is unverified rather than known-good or known-broken.
-- **`codesign`** does not exist off Darwin at all. `create:app:bundle` falls back to `codesign:skip`
-  (a printed warning), and `sign-bundle.sh` exits 1 on purpose.
+- **`build:native`** requires macOS — `darwin:build` preconditions on `uname -s = Darwin` and has no
+  off-macOS branch at all any more (§2). Not attempted.
+- **`codesign`** does not exist off Darwin at all, and there is no fallback path to reach: every step
+  that would call it is behind the same Darwin precondition. `sign-bundle.sh` exits 1 on purpose off
+  macOS.
 
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
-"skipped A1/A3/N2" note and passes on the static checks alone, and even with a bundle it would skip
-A1/A3/N2 for want of `codesign`/`PlistBuddy`. **A green `verify:packaging` on Linux proves only the
-static checks (S1/S2/S5), not that any bundle is correct.**
+"skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone, and
+even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5), not that any bundle is
+correct.**
 
 What *is* fully verifiable off macOS: everything that feeds the bundle rather than being the bundle —
 the renderer build, typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
@@ -282,8 +295,9 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   the same reasoning as `Assets.car`. What is still deferred is Developer ID signing and
   notarization, which SPEC.md §3 puts past v1 — an ad-hoc-signed image is still Gatekeeper-blocked
   on first launch (§4's checklist covers the workaround).
-- **Every item in §4 is unrun** — no macOS hardware has been available. Whoever runs a build on real
-  hardware should fill in those rows.
+- **§4 items 1, 2, 3 and 10 passed on real macOS 26.5.2 arm64 hardware (P10); item 11 is partial;
+  items 4-9 are still unrun.** Whoever next has macOS hardware should run items 4-9 and finish
+  item 11's outstanding half — the drag-onto-Applications gesture and how the Finder window looks.
 - **The bundle has no `Assets.car`, and the icon comes from `icons.icns` alone.** `appicon.png` and
   `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
   scaffolded default; `wails3 task common:generate:icons` regenerates `darwin/icons.icns` from that
@@ -349,9 +363,11 @@ list, §3's app-identity line), and that was already true under Electron. macOS 
 a signed and notarized app, which §6 defers. `verify-packaging.sh` keeps re-asserting the absence:
 
 - **S1** — no `electron-updater`/`update-electron-app` dependency in `package.json`.
-- **S2** — no `autoUpdater`/`electron-updater` reference anywhere in `src/`.
-- **S5** — `package.json`'s `package` script still runs `wails3 task darwin:package`, so this check
-  fails loudly if the packaging entry point is swapped for something that could publish.
+- **S2** — no updater code in `apps/` or `packages/` (there has been no `src/` since P3's
+  restructure and P58f's `src/engine/` deletion).
+- **S5** — `package.json`'s `package` script still runs `wails3 task darwin:package:dmg` (P10 moved
+  this from the plain `.app`-only task, so the shipped `.dmg` always has something to upload); this
+  check fails loudly if the packaging entry point is swapped for something that could publish.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
@@ -360,6 +376,24 @@ by construction rather than deleted per build.
 **What a future auto-update would require, in order:** code signing and notarization (SPEC.md §1/§3),
 then a SPEC.md scope change reversing "no auto-update", then an update feed and updater wiring.
 
-**Whether the release workflow has actually run:** *no — and the workflow file in `.github/workflows/`
-is still the pre-P57 Electron one (§6), so the first tag pushed must not be pushed before those files
-are applied.*
+**Whether the release workflow has actually run:** *no — the first tag pushed will be the first real
+exercise of `release.yml`.*
+
+**The on-demand DB compatibility suite is not part of either workflow.** `scripts/db-compat.sh`
+(`bun run test:compat`, P16) runs the same per-engine conformance packages against each kind's
+oldest and newest supported server image, sixteen (kind, min|max) pairs — deliberately outside
+`bun run test:go` and outside `ci.yml`, since it is meant to be run occasionally rather than on
+every push. Its `workflow_dispatch`-only CI wiring is written and staged, not live (below); until
+then it only runs locally or on demand.
+
+**Two staged, finished-but-unapplied workflow sets, both blocked on the same missing `workflow`
+OAuth scope** (`AGENTS.md`'s Known open items):
+
+- `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml` — the `workflow_dispatch` wiring for the
+  suite above.
+- `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — five `actions/{checkout,setup-go,
+  upload-artifact}` version bumps to `@v7`, plus P20's rerouting of all three inline
+  binding-generation blocks through `sh scripts/setup.sh` and a corrected `ci.yml` step name.
+
+Each staged directory's own README carries the `git mv` instructions for applying it once a
+session's push access carries the `workflow` scope.
