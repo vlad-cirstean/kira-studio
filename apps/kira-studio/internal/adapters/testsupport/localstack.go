@@ -33,7 +33,7 @@ const (
 // in this sandbox, but restricting it is still the right default.
 func startLocalStack(ctx context.Context, services string) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
-		Image:        LocalStackImage,
+		Image:        ImageFor("localstack", LocalStackImage),
 		ExposedPorts: []string{localStackPort},
 		Env:          map[string]string{"SERVICES": services},
 		WaitingFor:   wait.ForHTTP("/_localstack/health").WithPort(localStackPort).WithStartupTimeout(localStackStartupTimeout),

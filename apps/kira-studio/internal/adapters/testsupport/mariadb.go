@@ -61,7 +61,7 @@ func startMariadb() (*MariaFixture, error) {
 	// performance_schema is off by default on MariaDB (unlike MySQL) — needed so a real "attribute
 	// is gone after disconnect" acceptance case can query performance_schema.SESSION_CONNECT_ATTRS
 	// (B23).
-	container, err := tcmariadb.Run(ctx, mariaImage,
+	container, err := tcmariadb.Run(ctx, ImageFor("mariadb", mariaImage),
 		tcmariadb.WithDatabase(mariaDatabase),
 		tcmariadb.WithUsername(mariaUsername),
 		tcmariadb.WithPassword(mariaPassword),

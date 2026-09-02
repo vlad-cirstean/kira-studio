@@ -84,7 +84,7 @@ func startKafka() (*KafkaFixture, error) {
 	// KF-4(d)'s finding: without it at the container level, a nonexistent-topic read auto-creates
 	// the topic broker-side (independent of any client-side AllowAutoTopicCreation setting) and
 	// pollutes every test that runs after it in the same container.
-	c, err := tckafka.Run(startupCtx, kafkaImage,
+	c, err := tckafka.Run(startupCtx, ImageFor("kafka", kafkaImage),
 		tckafka.WithClusterID(kafkaClusterID),
 		testcontainers.WithEnv(map[string]string{"KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false"}),
 	)

@@ -53,9 +53,9 @@ func repoRoot() string {
 }
 
 const (
-	image    = "postgres:17-alpine"
-	password = "kira"
-	database = "kira_test"
+	defaultPostgresImage = "postgres:17-alpine"
+	password             = "kira"
+	database             = "kira_test"
 )
 
 // StartPostgres is postgres.ts's startPostgres. Skips the test (never a silent pass, never a hard
@@ -91,7 +91,7 @@ func startPostgres() (*PgFixture, error) {
 	// waiting for the second occurrence is what @testcontainers/postgresql's own pg_isready-based
 	// healthcheck solves on the TypeScript side — testcontainers-go's postgres module has no
 	// equivalent built-in healthcheck, so this is spelled out explicitly here instead.
-	container, err := tcpostgres.Run(ctx, image,
+	container, err := tcpostgres.Run(ctx, ImageFor("postgres", defaultPostgresImage),
 		tcpostgres.WithDatabase(database),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword(password),

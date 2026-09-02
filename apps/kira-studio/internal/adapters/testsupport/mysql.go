@@ -57,7 +57,7 @@ func StopMysql() {
 func startMysql() (*MysqlFixture, error) {
 	ctx := context.Background()
 
-	container, err := tcmysql.Run(ctx, mysqlImage,
+	container, err := tcmysql.Run(ctx, ImageFor("mysql", mysqlImage),
 		tcmysql.WithDatabase(mysqlDatabase),
 		tcmysql.WithUsername(mysqlUsername),
 		tcmysql.WithPassword(mysqlPassword),

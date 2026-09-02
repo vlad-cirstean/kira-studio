@@ -89,7 +89,7 @@ func startRedis() (*RedisFixture, error) {
 	// image's own --requirepass flag, via GenericContainer, is what support/redis.ts's
 	// RedisContainer().withPassword() does under the hood anyway.
 	req := testcontainers.ContainerRequest{
-		Image:        RedisImage,
+		Image:        ImageFor("redis", RedisImage),
 		ExposedPorts: []string{redisPort},
 		Cmd:          []string{"redis-server", "--requirepass", RedisPassword},
 		WaitingFor:   wait.ForLog("Ready to accept connections").WithStartupTimeout(redisStartupTimeout),

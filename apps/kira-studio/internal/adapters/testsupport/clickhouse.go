@@ -64,7 +64,7 @@ func startClickHouse() (*ClickHouseFixture, error) {
 	// Without CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1, the official image's own bootstrap grants
 	// kira_admin plain GRANT ALL ON *.* — which excludes ACCESS MANAGEMENT (CREATE USER, GRANT,
 	// ...) — so the CREATE USER statements below would fail with ACCESS_DENIED.
-	container, err := tcclickhouse.Run(ctx, clickhouseImage,
+	container, err := tcclickhouse.Run(ctx, ImageFor("clickhouse", clickhouseImage),
 		tcclickhouse.WithDatabase(clickhouseDatabase),
 		tcclickhouse.WithUsername(clickhouseAdminUser),
 		tcclickhouse.WithPassword(clickhouseAdminPass),

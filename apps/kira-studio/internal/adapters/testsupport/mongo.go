@@ -68,7 +68,7 @@ func startMongo() (*MongoFixture, error) {
 	ctx := context.Background()
 
 	req := testcontainers.ContainerRequest{
-		Image:        MongoImage,
+		Image:        ImageFor("mongo", MongoImage),
 		ExposedPorts: []string{mongoPort},
 		Env: map[string]string{
 			"MONGO_INITDB_ROOT_USERNAME": mongoRootUsername,
