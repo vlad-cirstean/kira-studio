@@ -259,6 +259,32 @@ export function setNewResultSet(tabId: string, on: boolean): void {
 // entirely rather than issuing a batch this size.
 const AUTO_EXPLAIN_MAX_STATEMENTS = 10;
 
+function isFlaggedPlan(plan: QueryPlan): boolean {
+  return plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn');
+}
+
+// P12 round 2 finding #13: on a multi-statement Run-all, the strip's "Show plan" action should
+// point at the *worst* offender, not just the first one flagged — an early statement tripping a
+// mild warning must not eclipse a much more expensive one later in the same run. Picks the
+// flagged plan with the highest estimatedRowsRead, falling back to the first flagged index when
+// none of them carries a row estimate at all (e.g. every statement is SQLite, which never reports
+// one — D14).
+function worstFlaggedIndex(plans: AutoExplainPlans): number {
+  let best = -1;
+  let bestRows = -1;
+  for (let i = 0; i < plans.length; i++) {
+    const plan = plans[i]?.plan;
+    if (!plan || !isFlaggedPlan(plan)) continue;
+    if (best === -1) best = i; // the fallback, if nothing below ever beats it
+    const rows = plan.estimatedRowsRead;
+    if (rows !== undefined && rows > bestRows) {
+      bestRows = rows;
+      best = i;
+    }
+  }
+  return best;
+}
+
 // D19 rules 1-4/6: filters to explainable statements, composes every one of their own EXPLAIN
 // statements (D13: one for most dialects, two for ClickHouse) into a *single* data:execute call,
 // then re-slices the returned pages back per originating statement to parse each one. Returns
@@ -299,9 +325,7 @@ async function autoExplainCheck(
         plan: parseExplainPages(kind, pages, settingsState.advanced.expensiveQueryRows),
       });
     }
-    const worstIndex = plans.findIndex(
-      ({ plan }) => plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn'),
-    );
+    const worstIndex = worstFlaggedIndex(plans);
     return worstIndex === -1 ? null : { kind: 'plans', plans, worstIndex };
   } catch (err) {
     // D19 rule 6: an EXPLAIN-call failure never blocks the real run — except a cancellation. That
