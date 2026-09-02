@@ -5,7 +5,7 @@ import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 // modules (documents/keyvalue/stream) were about to duplicate verbatim — the exact drift P24's
 // F5 already documented in these same four files. One module, one cleanup registration, one
 // semantic.
-export const searchFilterState = reactive({} as Record<string, boolean>);
+const searchFilterState = reactive({} as Record<string, boolean>);
 
 export function isSearchFiltering(tabId: string): boolean {
   return searchFilterState[tabId] === true;

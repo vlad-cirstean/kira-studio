@@ -159,12 +159,6 @@ export function columnTypeIcon(dataType: string): string {
   return CATEGORY_ICON[columnTypeCategory(dataType)];
 }
 
-/** The authoritative counterpart of columnTypeIcon, for a caller that already has a
- *  ColumnDescriptor's own typeClass in hand rather than just its dataType string. */
-export function typeClassIcon(typeClass: TypeClass): string {
-  return CATEGORY_ICON[categoryForTypeClass(typeClass)];
-}
-
 // Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse CodeMirror's own VS
 // Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
 // Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user

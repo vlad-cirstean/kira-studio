@@ -438,9 +438,10 @@ export function showAutoExplainPlan(tabId: string): void {
 }
 
 /** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
- *  toggle, same eviction, same close/close-others machinery. Exported so D19's auto-explain
- *  "Show plan" action can push a plan it already parsed without a second round trip. */
-export function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
+ *  toggle, same eviction, same close/close-others machinery. Reused by D19's auto-explain
+ *  "Show plan" action (below, same file) so it can push a plan it already parsed without a second
+ *  round trip. */
+function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
   const tab = findConsoleTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);

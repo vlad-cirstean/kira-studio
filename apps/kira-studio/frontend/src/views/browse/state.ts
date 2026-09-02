@@ -140,7 +140,7 @@ export function selectRow(tabId: string, path: string | null): void {
 // P41 D14: an S3 upload/delete lands in a level the project tree no longer renders (F22) — this
 // is how UploadObjectDialog.vue (and any future Browse-panel mutation) tells a live Browse tab
 // its own currently-shown level may be stale, without project/ importing views/ directly.
-export async function invalidateLevel(connectionId: string, path: string): Promise<void> {
+async function invalidateLevel(connectionId: string, path: string): Promise<void> {
   for (const tabId of Object.keys(runtime)) {
     const tab = findBrowseTab(tabId);
     if (!tab || tab.connectionId !== connectionId) continue;

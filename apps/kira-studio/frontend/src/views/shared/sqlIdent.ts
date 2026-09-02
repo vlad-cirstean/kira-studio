@@ -47,7 +47,7 @@ export function quoteIdent(dialect: SqlDialect | undefined, name: string): strin
 // default. sql-split.ts/sql-lint.ts's shared quote-scanning loop needs to know which regime it's
 // in, or a Postgres/SQLite literal ending in a literal backslash (e.g. `'foo\'`) gets its closing
 // quote mistaken for an escaped character and the scan runs on past the literal's real end.
-export const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
+const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
 
 /** true when `dialect`'s string literals treat a backslash as an escape character — undefined
  *  (no SQL dialect, e.g. a Mongo/Redis console) keeps the pre-P2-R2 default of `true` since
