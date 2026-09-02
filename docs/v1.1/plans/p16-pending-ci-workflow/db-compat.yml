@@ -1,0 +1,42 @@
+name: DB compatibility (on demand)
+
+# P16 D6 (docs/v1.1/plans/P16-db-compat-suite.md §5 C4): workflow_dispatch ONLY. No push, no
+# pull_request, no schedule — ci.yml is not edited and does not reference this file, so ordinary
+# CI runs are byte-identical to before this workflow existed.
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'Single kind (postgres, mysqlfamily, clickhouse, mongo, redis, kafka, sqs, s3), or "all"'
+        default: 'all'
+      extreme:
+        description: 'min | max | both'
+        default: 'both'
+
+permissions:
+  contents: read
+
+jobs:
+  db-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run the compatibility matrix
+        # GitHub's own runners reach Docker Hub directly — --mirror is a sandbox-only workaround
+        # for the outbound proxy documented in AGENTS.md, so it is deliberately omitted here.
+        run: |
+          set -eu
+          ARGS=""
+          if [ "${{ inputs.kind }}" != "all" ]; then
+            ARGS="$ARGS --only ${{ inputs.kind }}"
+          fi
+          case "${{ inputs.extreme }}" in
+            min) ARGS="$ARGS --min" ;;
+            max) ARGS="$ARGS --max" ;;
+            both|*) ;;
+          esac
+          sh scripts/db-compat.sh $ARGS
