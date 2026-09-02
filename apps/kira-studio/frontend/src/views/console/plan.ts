@@ -80,6 +80,11 @@ export function parseExplainPages(
       return parseSqlitePlan(rows);
     }
     case 'clickhouse': {
+      // P12 round 2 finding #6: ClickHouse's EXPLAIN also returns its whole plan as one cell
+      // (same truncation risk as postgres/mysql/mariadb above) — missing this check produced a
+      // raw "JSON Parse error: Unterminated string" for the manual button and silently showed
+      // nothing for auto-explain.
+      if (firstCellTruncated(first)) throw new ExplainTruncatedError();
       // D13: the second Execute page is EXPLAIN ESTIMATE's own result — absent only if the
       // server returned fewer pages than requested, which parseExplainPages treats as "no
       // estimate" rather than throwing (§7.3: page order is asserted in the unit test, not

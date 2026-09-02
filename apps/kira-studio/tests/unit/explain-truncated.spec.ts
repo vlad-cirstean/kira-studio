@@ -43,7 +43,7 @@ function truncatedPlanPage() {
 }
 
 describe('parseExplainPages — truncated cell (P12 round 1 F8)', () => {
-  for (const kind of ['postgres', 'mysql', 'mariadb'] as const) {
+  for (const kind of ['postgres', 'mysql', 'mariadb', 'clickhouse'] as const) {
     test(`${kind}: a truncated plan cell throws ExplainTruncatedError, not a JSON parse error`, () => {
       const page = truncatedPlanPage();
       expect(page.truncatedCells).toBe(1); // sanity: the fixture really did clip on the wire
