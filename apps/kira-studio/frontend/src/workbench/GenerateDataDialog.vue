@@ -54,6 +54,17 @@ let abortController: AbortController | null = null;
 // D9: recomputed on every plan change, not baked into recipeFor's own one-time proposal.
 const warnings = computed(() => planWarnings(plans.value, meta.value));
 
+// P12 round 1 finding #2: with no plans at all (the tab's page hadn't loaded yet when the dialog
+// opened, so `page?.columns ?? []` came back empty) or every plan set to Skip, a run has no column
+// left to write — generateBatch would emit `{kind:'insert', values:{}}` per row, which sqlmutate.go
+// turns into `INSERT INTO t () VALUES ()`: silently committed all-defaults rows on MySQL/MariaDB,
+// a confusing syntax error on Postgres/SQLite. Neither Generate nor Preview should ever run then.
+const noColumnsLoaded = computed(() => plans.value.length === 0);
+const allColumnsSkipped = computed(
+  () => plans.value.length > 0 && plans.value.every((p) => p.recipe.kind === 'skip'),
+);
+const noUsableColumns = computed(() => noColumnsLoaded.value || allColumnsSkipped.value);
+
 onMounted(() => {
   const id = tabId.value;
   const page = id ? getPage(id) : undefined;
@@ -75,6 +86,7 @@ const previewDoc = computed(
 );
 
 async function onTogglePreview(): Promise<void> {
+  if (noUsableColumns.value) return;
   previewOpen.value = !previewOpen.value;
   if (!previewOpen.value) return;
   const t = tab.value;
@@ -96,7 +108,7 @@ async function onTogglePreview(): Promise<void> {
 
 async function onGenerate(): Promise<void> {
   const t = tab.value;
-  if (!t?.connectionId || running.value) return;
+  if (!t?.connectionId || running.value || noUsableColumns.value) return;
   running.value = true;
   runError.value = null;
   committedRows.value = 0;
@@ -261,6 +273,23 @@ function onSequenceStartChange(index: number, start: number): void {
       </div>
 
       <MessageStrip
+        v-if="noColumnsLoaded"
+        tone="warn"
+        icon="warning"
+        data-testid="generate-data-no-columns"
+      >
+        No column information available yet. Close this dialog, let the page load, then try again.
+      </MessageStrip>
+      <MessageStrip
+        v-else-if="allColumnsSkipped"
+        tone="warn"
+        icon="warning"
+        data-testid="generate-data-no-columns"
+      >
+        Every column is set to Skip — pick a recipe for at least one column to generate rows.
+      </MessageStrip>
+
+      <MessageStrip
         v-if="warnings.length"
         tone="warn"
         icon="warning"
@@ -276,6 +305,7 @@ function onSequenceStartChange(index: number, start: number): void {
           type="button"
           class="preview-toggle p-sm"
           data-testid="generate-data-preview-toggle"
+          :disabled="noUsableColumns"
           @click="onTogglePreview"
         >
           {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
@@ -319,7 +349,7 @@ function onSequenceStartChange(index: number, start: number): void {
             kind="dialog"
             variant="primary"
             data-testid="generate-data-submit"
-            :disabled="rowCount < 1"
+            :disabled="rowCount < 1 || noUsableColumns"
             @click="onGenerate"
           >
             Generate
@@ -384,6 +414,11 @@ function onSequenceStartChange(index: number, start: number): void {
   color: var(--kira-accent);
   cursor: pointer;
   padding: 0;
+}
+
+.preview-toggle:disabled {
+  color: var(--kira-fg-muted);
+  cursor: not-allowed;
 }
 
 .preview-body {
