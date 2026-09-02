@@ -291,17 +291,52 @@ The comparison is genuinely apples-to-apples on app code, so "Chromium's tile ma
 hard budget and evicts aggressively; WebKit's pools retired tiles and frees them on an idle timer"
 is the remaining explanation.
 
-One caveat worth recording: Electron used restored/default window bounds (min 900×600) while Wails
-hardcodes 1280×800, and cost scales with viewport area. Some of the perceived regression is a
-bigger default window.
+> **Update (P22, 2026-09-02).** This section's caveat and its three-item avenue list were written
+> before either avenue had actually been tried. `docs/v1.1/plans/P22-webview-scroll-performance.md`
+> picked both up; its own §3 (F8–F14) and §5 (D5, D6) are now the fuller record, cited below rather
+> than reproduced whole.
 
-Remaining avenues, none in the frontend and none tried:
+**The caveat, corrected with real numbers (P22 F13).** Recovered from `18fe7bb^:src/main/window.ts`
+(deleted by the Electron-to-Wails cutover, `18fe7bb`): Electron's `BrowserWindow` passed no explicit
+`width`/`height` — so its own 800×600 default, clamped up by `minWidth: 900, minHeight: 600` — against
+Wails' unconditional `Width: 1280, Height: 800`. That is a **first-launch-only 1.90×** (900×600 =
+540 000 px² vs 1280×800 = 1 024 000 px²), and a *floor* ratio of only **1.21×** (900×600 vs Wails'
+1024×640 minimum). Both restore bounds the same way, on the same 300 ms debounce. Smaller than this
+section originally implied, and worth stating plainly rather than left as "min 900×600."
 
-1. **Accept it.** It is self-releasing, and the app is within 11 % of the floor.
-2. **Embedder-level configuration.** WKWebView tile behaviour is configured at the host, not in
-   CSS. Whether Wails v3 exposes any usable `WKWebViewConfiguration` / `WKPreferences` surface is
-   unknown; the relevant WebKit knobs are largely private API.
-3. **Default window size.** 1280×800 is a choice, and cost scales with viewport area.
+**The premise itself, checked (P22 F14).** "Cost scales with viewport area" was asserted here, not
+measured — every figure in this document was taken in one 1440×960 `NSWindow` (Appendix A); §5.5
+varied painted content *width* inside that fixed viewport, which is a different variable, and there
+is no run anywhere in this document at two window sizes. It is a mechanism-level inference from §7's
+own tile-coverage-rect explanation, not one of this investigation's measurements. A run that would
+settle it: the Appendix A harness at two `NSWindow` sizes with everything else held constant,
+`proc_pid_rusage(RUSAGE_INFO_V2)` polled at 4 Hz (never `vmmap` — §2.1), and velocity held fixed
+while area varies (§5.4's own confound, applied to the other axis this time). Not run — no macOS
+hardware in the P22 implementing sandbox either. §9 carries this forward as still unverified.
+
+**Remaining avenues, now closed** — one acceptance and two dispositions, not three open questions:
+
+1. **Accept it.** Unchanged (D8). It is self-releasing, and the app is within 11 % of the floor
+   for any scroller that paints content at all.
+2. **Embedder-level configuration — declined.** P22 D5, on F8–F11: Wails v3.0.0-beta.16's entire
+   macOS webview surface is ten fields, none a tiling knob; the `WKWebViewConfiguration` is built
+   inside one cgo block with no hook; macOS is the one platform with no engine-flags escape hatch;
+   and the one reachable escape hatch (`NativeWindow()` → Wails' private ObjC class) is declined —
+   an unexported-layout dependency to reach a knob that, per this document's own §7, is largely
+   private WebKit API to begin with. A bounded real-Mac SPI-header grep is recorded as still
+   pending in `docs/ARCHITECTURE.md`'s renderer-security-surface section; the decline does not wait
+   on it.
+3. **Default window size — implemented, but as UX, not as this avenue's memory fix.** P22 D6:
+   `internal/shell/window.go`'s first-launch default is now a screen-aware clamp that can only ever
+   *shrink* 1280×800 to fit a smaller primary screen, justified because an unconditional 1280×800
+   window is edge-to-edge on a same-size laptop panel — a real bug independent of anything measured
+   here. Its effect on this document's plateau is real but **first-launch-only** (F12: any window
+   that has ever been resized never sees the default again) and **unmeasured in magnitude** (F14,
+   above) — nobody should cite it as the fix for the reported symptom. `MinWidth`/`MinHeight` were
+   left unchanged (D6(b)): the 1.21× floor ratio isn't worth the usability cost of a smaller floor.
+
+Full findings and citations: `docs/v1.1/plans/P22-webview-scroll-performance.md` §3 (F8–F14) and §5
+(D5–D8).
 
 ### 7.1 `internal/metrics` — no change needed
 
@@ -336,6 +371,12 @@ webview (memory stayed flat at 120M through 1800 events) — `CGEventPost` needs
 Accessibility/TCC grant the harness process does not have. §5.4's velocity ladder is a proxy, and
 its realistic-velocity band matches the reported symptom, but WebKit's momentum-scroll code path
 is genuinely untested.
+
+**The area ladder behind §7 avenue 3's premise (P22 F14).** "Cost scales with viewport area" is
+asserted here, not measured — every figure in this document came from one 1440×960 `NSWindow`. §7
+records what a run to settle it looks like (Appendix A's harness at two window sizes, velocity held
+fixed, `proc_pid_rusage` not `vmmap`); not run, in either this document's original investigation or
+P22's implementing pass. Until it exists, no number for avenue 3 should be quoted as measured.
 
 ---
 
