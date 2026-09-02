@@ -135,6 +135,25 @@ const ClickHouseDialect = /*@__PURE__*/ SQLDialect.define({
     'multipolygon aggregatefunction simpleaggregatefunction',
 });
 
+// P18 (v1.1) C1: the one place a SqlDialect id becomes lang-sql's own SQLDialect object — pulled
+// out of languageExtension's own ternary chain so the DDL extractor and the schema completion
+// source (sqlLanguageService.ts) share this exact mapping rather than re-deriving it. Pure move,
+// no behaviour change.
+export function dialectObjectFor(dialect: SqlDialect | undefined): SQLDialect | undefined {
+  switch (dialect) {
+    case 'postgres':
+      return PostgreSQL;
+    case 'mysql':
+      return MySQL;
+    case 'sqlite':
+      return SQLite;
+    case 'clickhouse':
+      return ClickHouseDialect;
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Static imports, not dynamic — the grammars are small, and an `await import()` in the
  * middle of the 50 ms selection path (SPEC §2.1) would buy nothing and would race two rapid
@@ -151,19 +170,7 @@ export function languageExtension(id: EditorLanguageId, dialect?: SqlDialect): E
       // conventional SQL house style and consistent with the WHERE/ORDER BY boxes' own curated
       // vocabularies (filterCompletion.ts), which are uppercase by construction. FuzzyMatcher
       // case-folds, so typing `sel` still matches `SELECT`.
-      return sql({
-        dialect:
-          dialect === 'postgres'
-            ? PostgreSQL
-            : dialect === 'mysql'
-              ? MySQL
-              : dialect === 'sqlite'
-                ? SQLite
-                : dialect === 'clickhouse'
-                  ? ClickHouseDialect
-                  : undefined,
-        upperCaseKeywords: true,
-      });
+      return sql({ dialect: dialectObjectFor(dialect), upperCaseKeywords: true });
     case 'mongo':
       return mongoLanguage.extension;
     case 'redis':
