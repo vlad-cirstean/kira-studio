@@ -28,11 +28,19 @@ const connectionKind = computed(() => connectionRecord(connectionId.value)?.kind
 const connectionName = computed(() => connectionRecord(connectionId.value)?.name ?? '');
 const dialect = computed(() => schemaDialectFor(connectionKind.value));
 
+// P12 round 1 finding #3: the reset must happen synchronously, before the `await` below, and the
+// response must be discarded if the dialog has since moved on to a different connection — without
+// both, a fast open of connection B landing before a slow open of connection A's ensureDdl
+// resolves would let A's stale DDL text land in B's (still fully editable) draft, and Save would
+// write it into B's connection_ddl row.
 watch(
   () => schemaDialogState.connectionId,
   async (id) => {
+    draft.value = '';
     if (!id) return;
-    draft.value = await ensureDdl(id);
+    const ddl = await ensureDdl(id);
+    if (schemaDialogState.connectionId !== id) return; // superseded by a later open
+    draft.value = ddl;
   },
   { immediate: true },
 );
@@ -62,7 +70,6 @@ async function onSave(): Promise<void> {
 
 <template>
   <DialogFrame
-    v-if="schemaDialogState.open"
     title="Schema (DDL)"
     :width="720"
     max-height="80vh"
