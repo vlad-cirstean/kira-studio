@@ -103,19 +103,7 @@ team works, and how to run things in whichever box a session happens to be on.
 
 ## Known open items
 
-- **Two CI workflow bumps are staged, not live**, both for the same reason: this session's GitHub
-  push access lacks the `workflow` OAuth scope, which GitHub requires for any commit touching
-  `.github/workflows/*.yml`. Apply each once a session's push access carries that scope — see the
-  README beside each for the exact move.
-  - `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml` — P16's finished `workflow_dispatch`-only
-    workflow for the on-demand DB compatibility suite (`docs/v1.1/plans/P16-db-compat-suite.md`). The
-    suite itself (`scripts/db-compat.sh`) works today and needs no CI wiring to run by hand.
-  - `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — P19's GitHub Actions major-version
-    bump (`actions/checkout`, `actions/setup-go`, `actions/upload-artifact` to `@v7`) applied to the
-    two live workflows, **revised by P20 beyond P19's own three `uses:` bumps**: all three inline
-    "install pinned wails3, then generate bindings" blocks replaced with `sh scripts/setup.sh`, plus
-    a corrected `ci.yml` step name (it cited `src/renderer/bridge/*.ts`, gone since P3). Both staged
-    sets remain genuinely unapplied — confirmed by diff against the live files.
+- None.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 

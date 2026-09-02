@@ -321,16 +321,17 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 
 ## 7. CI, releases, and auto-update
 
-**Status:** applied. `.github/workflows/{ci,release}.yml` now hold the content described below — the
-staging directory (`docs/v1/plans/p58-pending-ci-workflows/`) it waited in, through sessions whose
-GitHub token lacked the `workflow` OAuth scope, is gone. No CI run has exercised them yet.
+**Status:** applied. `.github/workflows/` holds all three workflows described below. Each of them
+spent time in a staging directory — `docs/v1/plans/p58-pending-ci-workflows/`, then
+`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/` — waiting for a session whose GitHub token carried
+the `workflow` OAuth scope; all of those directories are gone. No CI run has exercised them yet.
 
 **`ci.yml`** (push/PR to `main`, plus `workflow_dispatch`):
 
 | Job | Runner | What it does |
 |---|---|---|
-| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, install the `wails3` version pinned in `go.mod`, generate bindings, then `lint`, `typecheck`, `build`, `test:go`, `verify:packaging` |
-| `ui` | `ubuntu-latest` | bindings, Playwright WebKit plus its system libraries, `bun run test:ui`; uploads `playwright-report/` on failure |
+| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, `sh scripts/setup.sh` (which installs the `wails3` pinned in `go.mod` and regenerates bindings), then `lint`, `typecheck`, `build`, `test:go`, `verify:packaging` |
+| `ui` | `ubuntu-latest` | `sh scripts/setup.sh`, Playwright WebKit plus its system libraries, `bun run test:ui`; uploads `playwright-report/` on failure |
 | `container-tests` | `ubuntu-latest` | `bun run test:unit`, `bun run test:go` |
 | `package-smoke` | `macos-15`, skipped on pull requests | `bun run package`, then asserts the bundle: `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `Signature=adhoc`, `du -sh`; finally `bun run verify:packaging` |
 
@@ -383,17 +384,13 @@ exercise of `release.yml`.*
 (`bun run test:compat`, P16) runs the same per-engine conformance packages against each kind's
 oldest and newest supported server image, sixteen (kind, min|max) pairs — deliberately outside
 `bun run test:go` and outside `ci.yml`, since it is meant to be run occasionally rather than on
-every push. Its `workflow_dispatch`-only CI wiring is written and staged, not live (below); until
-then it only runs locally or on demand.
+every push. It has its own `workflow_dispatch`-only workflow, `.github/workflows/db-compat.yml`,
+which nothing else references — an ordinary CI run is byte-identical to before it existed.
 
-**Two staged, finished-but-unapplied workflow sets, both blocked on the same missing `workflow`
-OAuth scope** (`AGENTS.md`'s Known open items):
-
-- `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml` — the `workflow_dispatch` wiring for the
-  suite above.
-- `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — five `actions/{checkout,setup-go,
-  upload-artifact}` version bumps to `@v7`, plus P20's rerouting of all three inline
-  binding-generation blocks through `sh scripts/setup.sh` and a corrected `ci.yml` step name.
-
-Each staged directory's own README carries the `git mv` instructions for applying it once a
-session's push access carries the `workflow` scope.
+**All three workflows are now live.** `db-compat.yml` (P16), and P19's `actions/{checkout,setup-go,
+upload-artifact}` bumps to `@v7` across `ci.yml` and `release.yml` together with P20's rerouting of
+all three inline binding-generation blocks through `sh scripts/setup.sh`, spent several phases
+staged under `docs/v1.1/plans/p1{6,9}-pending-ci-workflow/` because the sessions that wrote them
+had GitHub push access without the `workflow` OAuth scope, which GitHub requires for any commit
+touching `.github/workflows/*.yml`. A session with that scope applied them; both staging
+directories are gone. No CI run has exercised any of the three yet.
