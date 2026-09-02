@@ -15,6 +15,20 @@ declare global {
      *  probe. Left untyped (`unknown`) here — this file is a separate TS program from
      *  frontend/src's own, and leaks.spec.ts only ever compares it whole with `toEqual`. */
     __kiraRetention?: () => unknown;
+    /** P22 regular-table spike (apps/kira-studio/frontend/src/main.ts) — which renderer
+     *  `DataView.vue` mounts for a SQL data tab, read once per tab mount. Anything but
+     *  `'regular'` is the incumbent `DataGrid.vue`. Set by regular-table.spec.ts before the tab
+     *  is opened, and by a human from the Web Inspector for the real-Mac A/B. */
+    __kiraGridEngine?: 'tanstack' | 'regular';
+    /** P22 iter2 D3/D4 + the regular-table spike (apps/kira-studio/frontend/src/main.ts) — runtime
+     *  render tuning, read fresh on every render so an A/B needs one build rather than one per
+     *  variant. Redeclared, not imported, matching this file's own convention. */
+    __kiraGridTuning?: {
+      leadFramesOverride?: number;
+      maxLeadPxOverride?: number;
+      incrementalRows?: boolean;
+      regularRunwayPx?: number;
+    };
     /** P22 iter2 D2 — a real-fling scroll trace (apps/kira-studio/frontend/src/views/grid/scrollTrace.ts).
      *  Not a Playwright hook in intent (a human on real hardware is meant to drive it), but
      *  scroll-trace.spec.ts exercises its start()/stop() plumbing sandboxed — see that file's own
