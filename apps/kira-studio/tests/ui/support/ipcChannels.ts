@@ -69,10 +69,14 @@ export const IPC = {
   queriesHistoryList: 'kira:queries:historyList',
   queriesHistoryRecord: 'kira:queries:historyRecord',
 
+  schemaGet: 'kira:schema:get',
+  schemaSet: 'kira:schema:set',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
   settingsChanged: 'kira:settings:changed',
+  schemaChanged: 'kira:schema:changed',
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
 } as const;

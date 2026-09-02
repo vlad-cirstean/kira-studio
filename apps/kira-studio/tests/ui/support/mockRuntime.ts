@@ -78,6 +78,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   queriesTouch: 'QueriesService.Touch',
   queriesHistoryList: 'QueriesService.HistoryList',
   queriesHistoryRecord: 'QueriesService.HistoryRecord',
+  schemaGet: 'SchemaService.Get',
+  schemaSet: 'SchemaService.Set',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -148,6 +150,11 @@ const EMPTY_OBJECT_META = {
 };
 const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.filtersList]: JSON.stringify({ hiddenKinds: [], hiddenPaths: [] }),
+  // P18 (v1.1): every SQL console loads its connection's own DDL document on mount
+  // (state/schemas.ts's ensureDdl) — a spec with no Schema (DDL)… of its own gets the same
+  // "absent until the user writes one" empty document D2 gives a fresh connection, not a fixture
+  // miss. connectionId is echoed as '' here since the frontend only reads `.ddl` off this call.
+  [IPC.schemaGet]: JSON.stringify({ connectionId: '', ddl: '', updatedAt: '' }),
   [IPC.windowsEnsure]: 'null',
   [IPC.tabsSave]: 'null',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),

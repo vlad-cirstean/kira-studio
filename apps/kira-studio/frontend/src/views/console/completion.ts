@@ -7,6 +7,9 @@ import {
   MONGO_VALUE_CONSTRUCTORS,
   type MongoValueConstructor,
 } from '../shared/mongoVocabulary';
+import { sqlDialectFor } from '../shared/sqlIdent';
+import type { DdlSchema } from './ddl';
+import { sqlCompletionSources } from './sqlLanguageService';
 
 // P27 D17: reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain
 // AutocompleteField consumes — only the caret-positioning mechanism differs, since CodeMirror has
@@ -140,14 +143,20 @@ function redisCompletionSource(): CompletionSource {
   };
 }
 
-/** null/undefined for postgres/mariadb/mysql — lang-sql's own language-data source stays in charge
- *  (D23); the console's `autocomplete` prop is what gates SQL completion on those kinds. */
+/** For the five SQL kinds: undefined with no DDL document for this connection (D5, lang-sql's own
+ *  language-data keyword source stays in charge — the console's `autocomplete` prop is what gates
+ *  SQL completion generally); P18 (v1.1)'s schema+keyword pair (sqlLanguageService.ts) once one
+ *  exists. */
 export function consoleCompletionSources(
   kind: ConnectionKind,
   connectionId: string | null,
   path: string,
+  schema?: DdlSchema,
+  database?: string | null,
 ): readonly CompletionSource[] | undefined {
   if (kind === 'mongodb' && connectionId) return [mongoCompletionSource(connectionId, path)];
   if (kind === 'redis') return [redisCompletionSource()];
+  const dialect = sqlDialectFor(kind);
+  if (dialect && schema) return sqlCompletionSources(dialect, schema, database);
   return undefined;
 }

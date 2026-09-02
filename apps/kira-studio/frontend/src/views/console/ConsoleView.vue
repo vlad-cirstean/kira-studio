@@ -6,9 +6,11 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
+import { dialectObjectFor } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
+import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -26,6 +28,7 @@ import { canFormatConsole, formatConsoleText } from './format';
 import { consoleLintSource } from './lint';
 import { getPage } from './resultPages';
 import { type Match, pageSearchApi } from './search';
+import { sqlHoverSource } from './sqlHover';
 import {
   closeOtherResults,
   closeResult,
@@ -69,12 +72,32 @@ const language = computed<EditorLanguageId>(() => {
   return 'plain';
 });
 
-// D21/D22: undefined for postgres/mariadb/mysql (lang-sql's own keyword source stays in charge) and for
-// any kind with no console at all, which a mounted ConsoleView never actually has (caps.sql
-// gates the tab) — `language.value !== 'plain'` covers both without special-casing kafka/sqs/s3.
+// P18 (v1.1) C5/D5: a SQL console's own DDL document, loaded once per connection and re-parsed
+// only when its text actually changes (state/schemas.ts's own memoisation) — undefined dialect
+// (a non-SQL console) never fires the load at all.
+watch(
+  () => [props.tab.connectionId, dialect.value] as const,
+  ([connectionId, d]) => {
+    if (connectionId && d) void ensureDdl(connectionId);
+  },
+  { immediate: true },
+);
+const ddlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
+
+// D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
+// actually has (caps.sql gates the tab) — `language.value !== 'plain'` covers that without
+// special-casing kafka/sqs/s3. The SQL branch (D5) is undefined with no DDL document for this
+// connection — lang-sql's own keyword source stays in charge, byte-for-byte today's behaviour.
 const completionSources = computed(() => {
-  if (!connectionKind.value || language.value === 'plain' || language.value === 'sql') {
-    return undefined;
+  if (!connectionKind.value || language.value === 'plain') return undefined;
+  if (language.value === 'sql') {
+    return consoleCompletionSources(
+      connectionKind.value,
+      props.tab.connectionId,
+      props.tab.path,
+      ddlSchema.value,
+      connectionRecord(props.tab.connectionId)?.database,
+    );
   }
   return consoleCompletionSources(connectionKind.value, props.tab.connectionId, props.tab.path);
 });
@@ -82,7 +105,15 @@ const completionSources = computed(() => {
 // D24: one lexical linter per engine, scoped to this console's own text — undefined for any tab
 // this view never actually mounts for (caps.sql gates the tab), so `connectionKind.value` is
 // always postgres/mariadb/mysql/mongodb/redis in practice.
-const lintSource = computed(() => consoleLintSource(connectionKind.value));
+const lintSource = computed(() => consoleLintSource(connectionKind.value, ddlSchema.value));
+
+// C6/D8: undefined with no DDL document (D5) or a non-SQL kind — CodeMirrorHost's own hoverSource
+// prop is additive, so every other console stays exactly as it was.
+const hoverSource = computed(() => {
+  const dialectObject = dialect.value && dialectObjectFor(dialect.value);
+  if (!dialectObject) return undefined;
+  return sqlHoverSource(dialectObject, ddlSchema.value);
+});
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
@@ -405,6 +436,7 @@ const statusLine = computed(() => {
           :autocomplete="language !== 'plain'"
           :completion-sources="completionSources"
           :lint-source="lintSource"
+          :hover-source="hoverSource"
           @update:doc="onDocChange"
           @update:cursor="cursorPos = $event"
         />

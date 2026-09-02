@@ -102,6 +102,26 @@ export const kiraEditorTheme = EditorView.theme(
     '.cm-diagnostic-warning': {
       borderLeft: '3px solid var(--kira-warn)',
     },
+    // P18 (v1.1) D8: the SQL hover tooltip (editor/hover.ts) — the same ".cm-tooltip-lint" chrome
+    // reused rather than a new floating-panel style, plain text lines rather than a markdown
+    // renderer (§0.4's "no new primitive where one exists").
+    '.cm-kira-hover': {
+      backgroundColor: 'var(--kira-bg-elevated)',
+      border: 'var(--kira-border-width) solid var(--kira-border-strong)',
+      borderRadius: 'var(--kira-radius)',
+      boxShadow: 'var(--kira-shadow-dialog)',
+      fontFamily: 'var(--kira-font-family)',
+      fontSize: 'var(--kira-t-sm)',
+      color: 'var(--kira-fg)',
+      padding: '6px 8px',
+      maxWidth: '360px',
+      overflow: 'hidden',
+    },
+    '.cm-kira-hover-line': {
+      whiteSpace: 'pre',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
   },
   { dark: true },
 );

@@ -2,13 +2,28 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
+import { dialectObjectFor } from '../../editor/languages';
 import { tryParseShellText } from '../shared/document/ejson';
-import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
+import { backslashEscapesFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
+import type { DdlSchema } from './ddl';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
+import { ddlDiagnostics } from './sqlDiagnostics';
 
-function lintSqlConsole(kind: ConnectionKind | undefined): (text: string) => ConsoleDiagnostic[] {
-  const backslashEscapes = backslashEscapesFor(sqlDialectFor(kind));
-  return (text) => lintSql(text, { backslashEscapes });
+// D7: lintSql's own lexical checks first, then — only while a non-empty DdlSchema exists (D5) —
+// the DDL-driven warnings layered on top. Both read the same document; a lexically broken
+// statement (an unterminated quote) still gets its own DDL diagnostics for whatever the parser
+// managed to make sense of, since Lezer's own error recovery (F4) never throws.
+function lintSqlConsole(
+  dialect: SqlDialect | undefined,
+  schema: DdlSchema | undefined,
+): (text: string) => ConsoleDiagnostic[] {
+  const backslashEscapes = backslashEscapesFor(dialect);
+  const dialectObject = dialect && dialectObjectFor(dialect);
+  return (text) => {
+    const lexical = lintSql(text, { backslashEscapes });
+    if (!dialectObject || !schema || schema.tables.length === 0) return lexical;
+    return [...lexical, ...ddlDiagnostics(dialectObject, text, schema)];
+  };
 }
 
 const MONGO_BRACKET_PAIRS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
@@ -184,12 +199,15 @@ function lintRedisConsole(text: string): ConsoleDiagnostic[] {
 }
 
 /** undefined for any connection kind with no console at all — a mounted ConsoleView never has
- *  one (caps.sql gates the tab), so this only ever actually returns a function. */
+ *  one (caps.sql gates the tab), so this only ever actually returns a function. `schema` is only
+ *  consulted for a SQL kind (D7). */
 export function consoleLintSource(
   kind: ConnectionKind | undefined,
+  schema?: DdlSchema,
 ): ((doc: string) => ConsoleDiagnostic[]) | undefined {
   if (kind === 'mongodb') return lintMongoConsole;
   if (kind === 'redis') return lintRedisConsole;
-  if (sqlDialectFor(kind)) return lintSqlConsole(kind);
+  const dialect = sqlDialectFor(kind);
+  if (dialect) return lintSqlConsole(dialect, schema);
   return undefined;
 }

@@ -9,7 +9,14 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
 import { Annotation, Compartment, EditorState, type Extension, Prec } from '@codemirror/state';
-import { EditorView, highlightSpecialChars, keymap, lineNumbers } from '@codemirror/view';
+import {
+  EditorView,
+  type HoverTooltipSource,
+  highlightSpecialChars,
+  hoverTooltip,
+  keymap,
+  lineNumbers,
+} from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
@@ -36,6 +43,11 @@ const props = defineProps<{
    *  theming, so a caller (the console) never imports @codemirror/lint. Ignored (no linting) when
    *  absent, which every prior host stays. */
   lintSource?: (doc: string) => ConsoleDiagnostic[];
+  /** P18 (v1.1) C6/D8: a real, ready-to-use HoverTooltipSource (editor/hover.ts's
+   *  buildHoverSource is what a caller uses to build one from a pure text-in lookup) — this host
+   *  never sees SQL-specific logic, only plugs the value straight into hoverTooltip(). Ignored
+   *  (no hover) when absent, which every prior host stays. */
+  hoverSource?: HoverTooltipSource;
   /** A one-line toolbar field's own syntax-highlighted overlay (AutocompleteField.vue) rather
    *  than a document editor: no line-number gutter, no wrapping regardless of the appearance
    *  setting (there is only ever one line to wrap), and the root sizes to that one line instead of
@@ -69,6 +81,7 @@ const languageCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 const autocompleteCompartment = new Compartment();
 const lintCompartment = new Compartment();
+const hoverCompartment = new Compartment();
 const wordWrapCompartment = new Compartment();
 
 // P42 D14/D14a: every editable and read-only surface mounts through this one host, so this is
@@ -163,6 +176,11 @@ function resolveLint(): Extension[] {
   ];
 }
 
+// C6: additive — an absent hoverSource is simply no extension, same shape as resolveLint().
+function resolveHover(): Extension[] {
+  return props.hoverSource ? [hoverTooltip(props.hoverSource)] : [];
+}
+
 onMounted(() => {
   const state = EditorState.create({
     doc: props.doc,
@@ -179,6 +197,7 @@ onMounted(() => {
       keymap.of(defaultKeymap),
       autocompleteCompartment.of(resolveAutocomplete()),
       lintCompartment.of(resolveLint()),
+      hoverCompartment.of(resolveHover()),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
@@ -256,6 +275,14 @@ watch(
   () => {
     if (!view) return;
     view.dispatch({ effects: lintCompartment.reconfigure(resolveLint()) });
+  },
+);
+
+watch(
+  () => props.hoverSource,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: hoverCompartment.reconfigure(resolveHover()) });
   },
 );
 
