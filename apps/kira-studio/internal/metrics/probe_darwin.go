@@ -71,7 +71,7 @@ import (
 // time, which is exactly what this conversion assumes. C6's real-Mac calibration test (against
 // syscall.Getrusage) is what actually settles this rather than assumes it (P7 OQ-1) — if it turns
 // out these fields are already nanoseconds, this conversion is the one line that changes.
-var machTimebase = sync.OnceValue(func() (numer, denom float64) {
+var machTimebase = sync.OnceValues(func() (numer, denom float64) {
 	var n, d C.uint32_t
 	C.kira_mach_timebase(&n, &d)
 	if d == 0 { // never happens per Apple's own docs; a guaranteed non-zero divisor is cheap insurance
