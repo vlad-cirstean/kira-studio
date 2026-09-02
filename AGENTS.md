@@ -224,10 +224,10 @@ See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design fac
 - **`apps/kira-studio/tests/e2e-real/sqlite-real.spec.ts` runs unconditionally**, Docker-free by
   design — a real `-tags server` Go binary, every adapter served in-process (no separate engine
   child as of P58f M10), and a real temp-file database driven by a plain Playwright tab. Its only
-  prerequisites are `wails-dev-setup.sh` (pinned `wails3` + generated bindings) and `bun run build`
+  prerequisites are `scripts/setup.sh` (pinned `wails3` + generated bindings) and `bun run build`
   (the frontend bundle `apps/kira-studio/main.go`'s `//go:embed` picks up) — both memoized per
   worker process by `apps/kira-studio/tests/e2e-real/fixtures.ts`'s `buildPrerequisites()`, which
-  also runs the one step those scripts don't: `go build -tags server`.
+  also runs the one step that script doesn't: `go build -tags server`.
 
 ## Secrets / `KIRA_INSECURE_SECRETS` (P25, moved to Go in P52/P57)
 
@@ -253,7 +253,11 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   `gtk4`/`webkitgtk-6.0`), then `go install github.com/wailsapp/wails/v3/cmd/wails3@<the version
   go.mod pins>` and `export PATH=$PATH:$(go env GOPATH)/bin`. **Pin that version — never
   `@latest`**, which once resolved a beta ahead of `go.mod` and silently skewed the bindings
-  generator against the runtime library.
+  generator against the runtime library. **Pin `GOTOOLCHAIN` to `go.mod`'s own `go` directive for
+  that install too** (`GOTOOLCHAIN=go<directive> go install …`) — `auto` resolves the toolchain
+  from the *target module's* own floor (Wails', not this repo's), which silently degraded the
+  bindings generator's type-checker into emitting 52 spurious "requires newer Go version" warnings
+  on this exact repo before it was pinned; `scripts/setup.sh` does this automatically.
 - **`wails.io`/`v3.wails.io` are 403-blocked** — on real macOS hardware too, so this is
   organizational proxy policy, not a sandbox artifact, and the official docs cannot be read from any
   box here. `proxy.golang.org` is reachable, which is all the Go toolchain needs — as of P58f M10
@@ -266,9 +270,11 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   (`modernc.org/sqlite`, pure Go, for both the sqlite adapter and the app's own storage). Only the
   `apps/kira-studio` `main` package imports Wails and therefore needs the GTK/WebKit headers, so
   prefer `./apps/kira-studio/internal/...` for a fast loop.
-- **Regenerate bindings with the exact flags `scripts/wails-dev-setup.sh` uses — `wails3 generate
-  bindings -clean=true -b -names -ts -i` (run from `apps/kira-studio/`) — never a shorter hand-typed
-  version.** `apps/kira-studio/frontend/bindings/**` are real Vite import targets, so missing ones fail
+- **Regenerate bindings with the exact flags `apps/kira-studio/build/Taskfile.yml`'s
+  `generate:bindings` task uses — `wails3 generate bindings -clean=true -b -names -ts -i` (run from
+  `apps/kira-studio/`) — never a shorter hand-typed version; prefer `wails3 task
+  common:generate:bindings` (or `scripts/setup.sh`, which calls it) so the flags are never retyped
+  at all.** `apps/kira-studio/frontend/bindings/**` are real Vite import targets, so missing ones fail
   the build with an unresolvable import rather than a stale-bindings surprise; regenerate whenever a
   bridge service's method set changes, and before any frontend build. **`-names` is load-bearing, not
   cosmetic**: without it, every generated call site emits `$Call.ByID(<numeric-id>, ...)` instead of

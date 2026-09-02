@@ -8,12 +8,16 @@ see [`docs/v1/plans/P58f-cutover.md`](../../docs/v1/plans/P58f-cutover.md) for t
 removed the Node engine sidecar those two plans still describe.
 
 Not standalone: it embeds `frontend/dist`, built from the real `frontend/src` by the repo root's
-`bun run build` (see `frontend/vite.config.ts`) — build that first. From the repo root:
+`bun run build` (see `frontend/vite.config.ts`) — but `frontend/src` itself imports the generated
+bindings (`frontend/src/bridge/*.ts`), so generate those first or the Vite build fails on an
+unresolvable import. From the repo root:
 
 ```
-bun run build                          # builds frontend/src into apps/kira-studio/frontend/dist
 cd apps/kira-studio
 wails3 task common:generate:bindings
+cd ../..
+bun run build                          # builds frontend/src into apps/kira-studio/frontend/dist
+cd apps/kira-studio
 go run .
 ```
 

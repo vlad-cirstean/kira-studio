@@ -98,9 +98,9 @@ A couple of things worth knowing up front:
 ## Requirements
 
 - macOS 14 or later, Apple Silicon (`arm64`).
-- [Go](https://go.dev) 1.25+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`, pinned version
-  read from `go.mod` by `scripts/wails-dev-setup.sh`) — the app is a native Go binary; every
-  database adapter runs in-process in Go, no sidecar runtime.
+- [Go](https://go.dev) 1.27+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`, pinned version
+  read from `go.mod` by `scripts/setup.sh`) — the app is a native Go binary; every database adapter
+  runs in-process in Go, no sidecar runtime.
 - [Bun](https://bun.sh) — the package manager, script runner and test runner for the Vue frontend
   and its test suites. Bun is tooling only; nothing ships an embedded Node runtime.
 - Xcode command-line tools, for packaging.
@@ -144,7 +144,7 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 
 | Script | What it does |
 |---|---|
-| `bun run setup` | `scripts/install-deps.sh` (`bun install` + `go mod download`) then `scripts/wails-dev-setup.sh` (installs the pinned `wails3` CLI and generates bindings if missing). Runs automatically as `predev`/`prepackage`; call it directly to install without building or running anything. |
+| `bun run setup` | `scripts/setup.sh` — `bun install` + `go mod download`, then installs the pinned `wails3` CLI and regenerates bindings if either has drifted. Runs automatically as `predev`/`prepackage`; call it directly to install without building or running anything. |
 | `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `bun run setup` first; the Wails task itself drives the frontend build via `common:build:frontend`) |
 | `bun run build` | Production Vue build into `apps/kira-studio/frontend/dist` |
 | `bun run lint` | Biome check |

@@ -23,6 +23,7 @@
     "test:ui": "bun run build && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui",
     "test:ipc:fe": "bun run build && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit",
+    "test:e2e-real": "bun run build && node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.config.ts --project=e2e-real",
     "prepackage": "bun run setup",
     "package": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package:dmg && sh ../../scripts/sign-bundle.sh'",
     "verify:packaging": "sh scripts/verify-packaging.sh",
