@@ -5,7 +5,12 @@ import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { WIDE_TABLE_COLUMNS, WIDE_TABLE_ROWS } from './support/cellEditorCaptures';
 import { IPC } from './support/ipcChannels';
-import { measureClickToDom, measureScrollResponses, percentile } from './support/measure';
+import {
+  measureClickToDom,
+  measureScrollCoverage,
+  measureScrollResponses,
+  percentile,
+} from './support/measure';
 import {
   APP_PATH,
   BIG_ROWS_META,
@@ -434,6 +439,23 @@ function logStats(label: string, values: number[]): void {
   console.log(`budgets.spec.ts ${label}: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`);
 }
 
+// P22 D3's own velocity ladder: the doc's realistic 40-100 px/frame band, a fling peak, and
+// WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung, so the two documents' axes line up.
+const SCROLL_COVERAGE_LADDER = [40, 100, 200, 456];
+
+function logCoverage(
+  label: string,
+  velocity: number,
+  uncoveredPx: number[],
+  notifiesPerFrame: number[],
+): void {
+  console.log(
+    `budgets.spec.ts scroll coverage (${label}, ${velocity}px/frame): ` +
+      `notifiesPerFrame=[${notifiesPerFrame.join(',')}] max=${Math.max(...notifiesPerFrame)} ` +
+      `uncoveredPx=[${uncoveredPx.join(',')}] max=${Math.max(...uncoveredPx)}`,
+  );
+}
+
 // P18 addendum D26. `measureClickToDom`'s "arm the observer and read `performance.now()` inside
 // one synchronous evaluate() call" trick doesn't transfer directly to a keystroke: unlike
 // `.click()`, there is no script-callable way to make an element genuinely receive typed input —
@@ -529,6 +551,28 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // in-file serialization mode addresses.
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(12);
   expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(50);
+
+  // --- 1a. sustained-velocity coverage & notify-rate ladder (P22 D3), on big_rows (narrow,
+  // >200,000px scrollable — plenty of room for every rung below). Unlike measureScrollResponses
+  // above (one step from an idle DOM, P22 F6), this keeps scrolling: notifiesPerFrame is the row
+  // virtualizer's own re-render count per animation frame, and uncoveredPx is whether the mounted
+  // row band still covers the viewport *while* scrolling continues, not just once it settles.
+  // Logged only for now (P22 C2) — this is the pre-fix baseline the coalescing fix (P22 D1, C3)
+  // will be measured against; C4 turns this into a gate once that fix lands.
+  await grid.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
+    const { uncoveredPx, notifiesPerFrame } = await measureScrollCoverage(
+      page,
+      '[data-testid="data-grid"]',
+      { pxPerFrame, frames: 20 },
+    );
+    logCoverage('big_rows', pxPerFrame, uncoveredPx, notifiesPerFrame);
+    await grid.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+  }
 
   // --- 1b. scroll_grid (60 cols x 5000 rows, P29 D14): the wide-AND-tall shape neither big_rows
   // nor wide_table alone can show (F8) — horizontal response, vertical response on a wide table,
@@ -644,6 +688,28 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
 
     const cellCount = await page.locator('[data-testid="grid-cell"]').count();
     expect(cellCount).toBeLessThan(2500);
+  }
+
+  // The same ladder as 1a, on the wide-AND-tall shape — 60 columns means every notify's
+  // full-window rebuild (P22 F2) is far more expensive per call than on big_rows' 2 columns, so
+  // this is where the coalescing fix matters most. This mock's own scroll_grid fixture only ever
+  // captures one pageSize=100 page (this file's own note below), so the scrollable range is small;
+  // measureScrollCoverage clamps each write at the bottom, which only turns trailing frames at the
+  // higher rungs into no-op (still-valid) samples, not failures. Logged only for now (P22 C2), same
+  // as 1a above.
+  await scrollGrid.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
+    const { uncoveredPx, notifiesPerFrame } = await measureScrollCoverage(
+      page,
+      '[data-testid="data-grid"]',
+      { pxPerFrame, frames: 20 },
+    );
+    logCoverage('scroll_grid', pxPerFrame, uncoveredPx, notifiesPerFrame);
+    await scrollGrid.evaluate((el) => {
+      el.scrollTop = 0;
+    });
   }
 
   // A sub-row scroll mutates nothing (D4); crossing a row boundary does.
