@@ -42,7 +42,7 @@ export const controlSnapshots: ControlSnapshot[] = [
     response: {
       connectionId: 'test-redis',
       status: 'connected',
-      serverVersion: 'Redis 7.4.11',
+      serverVersion: 'Redis 8.10.1',
       error: null,
       since: 0,
       caps: {
@@ -84,7 +84,7 @@ export const controlSnapshots: ControlSnapshot[] = [
           name: 'db0',
           path: 'database:db0',
           hasChildren: false,
-          detail: '12 keys',
+          detail: '13 keys',
         },
         {
           kind: 'database',
@@ -322,7 +322,7 @@ export const portSnapshots: PortSnapshot[] = [
         kind: 'keyvalue',
         redisType: 'hash',
         ttlMs: null,
-        memoryBytes: 88,
+        memoryBytes: 58,
         fields: ['age', 'city'],
         values: ['30', 'NYC'],
         position: {
@@ -857,7 +857,7 @@ export const portSnapshots: PortSnapshot[] = [
         kind: 'keyvalue',
         redisType: 'list',
         ttlMs: null,
-        memoryBytes: 312,
+        memoryBytes: 266,
         fields: [
           '0',
           '1',
@@ -1010,7 +1010,7 @@ export const portSnapshots: PortSnapshot[] = [
           ttlMs: null,
           memoryBytes: null,
           fields: ['DBSIZE'],
-          values: ['11'],
+          values: ['12'],
           position: {
             offset: 0,
             pageSize: 1,

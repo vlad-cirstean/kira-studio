@@ -123,7 +123,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         qualifiedName: 'orders-queue',
         language: 'json',
         statements: [
-          '{\n  "ApproximateNumberOfMessages": "0",\n  "ApproximateNumberOfMessagesDelayed": "0",\n  "ApproximateNumberOfMessagesNotVisible": "5",\n  "CreatedTimestamp": "1700000000",\n  "DelaySeconds": "0",\n  "LastModifiedTimestamp": "1700000000",\n  "MaximumMessageSize": "262144",\n  "MessageRetentionPeriod": "345600",\n  "QueueArn": "arn:aws:sqs:us-east-1:170000000000:orders-queue",\n  "ReceiveMessageWaitTimeSeconds": "0",\n  "SqsManagedSseEnabled": "true",\n  "VisibilityTimeout": "30"\n}',
+          '{\n  "ApproximateNumberOfMessages": "0",\n  "ApproximateNumberOfMessagesDelayed": "0",\n  "ApproximateNumberOfMessagesNotVisible": "5",\n  "CreatedTimestamp": "1700000000",\n  "DelaySeconds": "0",\n  "LastModifiedTimestamp": "1700000000",\n  "MaximumMessageSize": "1048576",\n  "MessageRetentionPeriod": "345600",\n  "QueueArn": "arn:aws:sqs:us-east-1:170000000000:orders-queue",\n  "ReceiveMessageWaitTimeSeconds": "0",\n  "SqsManagedSseEnabled": "true",\n  "VisibilityTimeout": "30"\n}',
         ],
         origin: 'server',
         notes: [],
@@ -165,7 +165,7 @@ export const controlSnapshots: ControlSnapshot[] = [
               },
               {
                 name: 'MaximumMessageSize',
-                value: '262144',
+                value: '1048576',
                 detail: null,
               },
               {
@@ -216,7 +216,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         qualifiedName: 'orders-queue',
         language: 'json',
         statements: [
-          '{\n  "ApproximateNumberOfMessages": "0",\n  "ApproximateNumberOfMessagesDelayed": "0",\n  "ApproximateNumberOfMessagesNotVisible": "5",\n  "CreatedTimestamp": "1700000000",\n  "DelaySeconds": "0",\n  "LastModifiedTimestamp": "1700000000",\n  "MaximumMessageSize": "262144",\n  "MessageRetentionPeriod": "345600",\n  "QueueArn": "arn:aws:sqs:us-east-1:170000000000:orders-queue",\n  "ReceiveMessageWaitTimeSeconds": "0",\n  "SqsManagedSseEnabled": "true",\n  "VisibilityTimeout": "30"\n}',
+          '{\n  "ApproximateNumberOfMessages": "0",\n  "ApproximateNumberOfMessagesDelayed": "0",\n  "ApproximateNumberOfMessagesNotVisible": "5",\n  "CreatedTimestamp": "1700000000",\n  "DelaySeconds": "0",\n  "LastModifiedTimestamp": "1700000000",\n  "MaximumMessageSize": "1048576",\n  "MessageRetentionPeriod": "345600",\n  "QueueArn": "arn:aws:sqs:us-east-1:170000000000:orders-queue",\n  "ReceiveMessageWaitTimeSeconds": "0",\n  "SqsManagedSseEnabled": "true",\n  "VisibilityTimeout": "30"\n}',
         ],
         origin: 'server',
         notes: [],
@@ -258,7 +258,7 @@ export const controlSnapshots: ControlSnapshot[] = [
               },
               {
                 name: 'MaximumMessageSize',
-                value: '262144',
+                value: '1048576',
                 detail: null,
               },
               {
