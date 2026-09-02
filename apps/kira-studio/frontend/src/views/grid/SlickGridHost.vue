@@ -189,10 +189,10 @@ function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
 
 // §6 D9 — called from the host's own viewport scroll listener, the same logical point
 // markScrollWork marks in DataGrid.vue today (before the render work, after the browser's own
-// scheduling hops). scrollTrace.noteNotify() is called separately, from inside
-// KiraSlickGrid.getRenderedRange itself (kiraSlickGrid.ts's own comment) — that is this engine's
-// actual "did the range recompute" signal, closer to DataGrid.vue's virtualizer onChange than a raw
-// scroll event is.
+// scheduling hops). P22 iter2-scroll-gaps D1: the render timing itself is reported by
+// scrollTrace.noteRenderMs(), called from KiraSlickGrid's own `render()` override
+// (kiraSlickGrid.ts) — not from getRenderedRange, which only computes the range and runs *before*
+// the work that override times has happened.
 function onViewportScroll(): void {
   const el = viewportEl;
   if (!el) return;

@@ -10,6 +10,7 @@ import {
   type RowRangeExtractorConfig,
   rowRangeBounds,
 } from '../../shared/page/columns';
+import * as scrollTrace from '../scrollTrace';
 import type { RowHandle } from './dataSource';
 
 // main.ts's own `declare global` (the real source of truth for this shape, D9) lives in a
@@ -154,5 +155,18 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     const avgWidth = totalWidth / Math.max(1, columns.length);
     this.mountedColumnCount = Math.max(1, Math.ceil((rightPx - leftPx) / avgWidth));
     return { top: start, bottom: end, leftPx, rightPx };
+  }
+
+  /** P22 iter2-scroll-gaps D1 — `render()` is fully synchronous (§1.1 of that plan: no `await`, no
+   *  `setTimeout`, no `requestIdleCallback` anywhere between `_handleScroll` and `onRendered`
+   *  firing), so the caller already has the duration in hand; report it straight to
+   *  `scrollTrace.noteRenderMs` instead of Vue's `nextTick`-based `noteNotify` (meaningless here —
+   *  there is no Vue patch on this render path at all). This is also D2's own seam: the batch-
+   *  capping/chase logic lives in `getRenderedRange`, called from inside `super.render()` below, so
+   *  timing wraps the whole call, chase-scheduled catch-ups included. */
+  override render(): void {
+    const start = performance.now();
+    super.render();
+    scrollTrace.noteRenderMs(performance.now() - start);
   }
 }

@@ -129,6 +129,16 @@ export function noteNotify(): void {
   });
 }
 
+/** P22 iter2-scroll-gaps D1: for an engine whose render pass is fully synchronous (SlickGrid — no
+ *  Vue patch/flush involved on this path at all), the caller already has the duration in hand;
+ *  report it directly instead of nextTick's Vue-specific approximation, which noteNotify() stays as,
+ *  unchanged, for DataGrid.vue's own callers. Called from KiraSlickGrid's own `render()` override. */
+export function noteRenderMs(ms: number): void {
+  if (!recording) return;
+  pendingNotified = true;
+  lastRenderMs = ms;
+}
+
 function measureMountedBand(el: HTMLElement): { top: number; bottom: number; rows: number } {
   const rows = el.querySelectorAll<HTMLElement>(mountedRowSelector);
   if (rows.length === 0) return { top: 0, bottom: 0, rows: 0 };
