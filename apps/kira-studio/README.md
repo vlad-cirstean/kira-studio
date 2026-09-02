@@ -13,13 +13,16 @@ bindings (`frontend/src/bridge/*.ts`), so generate those first or the Vite build
 unresolvable import. From the repo root:
 
 ```
-cd apps/kira-studio
-wails3 task common:generate:bindings
-cd ../..
+bun run setup                          # bun install, go mod download, pinned wails3, bindings
 bun run build                          # builds frontend/src into apps/kira-studio/frontend/dist
 cd apps/kira-studio
 go run .
 ```
+
+`bun run setup` (`scripts/setup.sh`) is the entry point that does the first step correctly,
+including the `GOTOOLCHAIN` pin and the bindings identity stamp — running
+`wails3 task common:generate:bindings` by hand works too, but skips the CLI-version/toolchain check
+`bun run setup` exists to add.
 
 `blank/` and `cmd/g1measure/` are P52 gate-G1 measurement scaffolding
 (`docs/PERF.md` §2.3), not part of the shipped app.

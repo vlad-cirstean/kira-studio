@@ -8,8 +8,8 @@ topics/queues/buckets with a small backlog — enough to exercise every tree vie
 waiting on a multi-minute seed.
 
 The tenth engine, SQLite, needs no container at all (P35 D36) — the artefact a SQLite connection
-needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using the same
-`node:sqlite` module the app's own adapter reads it with. See its own section below.
+needs is a file on disk, so `sqlite/seed.ts` builds one directly with `bun`, using `node:sqlite`.
+See its own section below.
 
 Kafka uses the same image/mode as the `@testcontainers/kafka` harness `packages/db-fixtures/support/kafka.ts`
 provides (confluentinc/cp-kafka in KRaft mode) — re-exported by `tests/e2e-real/support/kafka.ts`

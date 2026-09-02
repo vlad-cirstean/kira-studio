@@ -9,7 +9,7 @@ its own. Measured on the current tree: 6 font sizes, ~19 distinct padding pairs,
 7 control heights, 8 button class names, and `.icon-button` defined
 independently in three files.
 
-Static mockups, not a clickable prototype. Nothing under `src/renderer/` is
+Static mockups, not a clickable prototype. Nothing under `apps/kira-studio/frontend/src` is
 touched by anything in this folder.
 
 ## How it is built
