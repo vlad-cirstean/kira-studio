@@ -1,7 +1,20 @@
+import type { Caps } from '@shared/caps';
 import type { MutationRowOp } from '@shared/domain/mutations';
 import { data } from '../../../bridge/data';
 import { parseTypeBounds, type TypeBounds } from './typeBounds';
 import type { ColumnPlan, GeneratorId, Recipe } from './types';
+
+// P15 D1: a capability test (tabular + canInsert), not a kind check — a future adapter with real
+// columns and an insert path opts in for free. Deliberately narrower than isWritable/canInsert
+// alone: mongo/redis/kafka/sqs/s3 all have canInsert but no column set to generate against.
+//
+// P12 round 1 finding #16: the one gate for whether Generate data is offered at all, shared by
+// DataToolbar.vue's own button and DataView.vue's command-palette entry — previously restated by
+// hand in both, already caught drifting once (the second copy's own comment admitted it "mirrors
+// DataToolbar.vue's canGenerateData exactly").
+export function canGenerateDataFor(caps: Caps | null, readOnly: boolean | undefined): boolean {
+  return !!caps?.tabular && !!caps?.canInsert && !readOnly;
+}
 
 // D2: the one dynamic import of fakerEntry.ts, memoised at module scope so a second run (or a
 // second Preview) pays nothing beyond the first — the whole reason fakerEntry.ts exists as its

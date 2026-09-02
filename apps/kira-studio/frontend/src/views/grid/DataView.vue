@@ -17,6 +17,7 @@ import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGa
 import DataGrid from './DataGrid.vue';
 import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
+import { canGenerateDataFor } from './fakeData/generate';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { commitPending, discardPending, hasPending, pendingFor } from './pendingChanges';
 import { type Match, pageSearchApi } from './search';
@@ -118,10 +119,11 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
-// P15 D1/D11: the palette's own gate — mirrors DataToolbar.vue's canGenerateData exactly, since
-// the palette entry has no disabled-button affordance to lean on.
+// P15 D1/D11: the palette's own gate, since the palette entry has no disabled-button affordance
+// to lean on — shares canGenerateDataFor with DataToolbar.vue's own button (P12 round 1 F16) so
+// the two can't drift apart the way this file's own predicate once did.
 function onGenerateData(): void {
-  if (!caps.value?.tabular || !caps.value?.canInsert || connRecord.value?.readOnly) return;
+  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly)) return;
   openGenerateDataDialog(props.tab.id);
 }
 

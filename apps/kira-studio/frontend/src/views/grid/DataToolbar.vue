@@ -8,6 +8,7 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
+import { canGenerateDataFor } from './fakeData/generate';
 import { getPage } from './page';
 import { addInsertRow, discardInsertRow, pendingFor, toggleDelete } from './pendingChanges';
 import {
@@ -58,14 +59,8 @@ const deleteRowTooltip = computed(() => {
   return 'This connection does not support deleting rows';
 });
 
-// P15 D1: a capability test (tabular + canInsert), not a kind check — a future adapter with real
-// columns and an insert path opts in for free. Deliberately narrower than isWritable/canInsert
-// alone: mongo/redis/kafka/sqs/s3 all have canInsert but no column set to generate against (F5).
-const canGenerateData = computed(
-  () =>
-    !!caps.value?.tabular &&
-    !!caps.value?.canInsert &&
-    !connectionRecord(props.tab.connectionId)?.readOnly,
+const canGenerateData = computed(() =>
+  canGenerateDataFor(caps.value, connectionRecord(props.tab.connectionId)?.readOnly),
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return 'Generate data…';
