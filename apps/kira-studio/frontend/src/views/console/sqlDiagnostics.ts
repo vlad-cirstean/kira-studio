@@ -9,13 +9,19 @@ import { deepCompositeIdentifiers, statementsWithRefs, type TableRef } from './s
 // ambiguous-unqualified-column, which needs a real binder (USING, natural joins, lateral scopes)
 // this app has no reason to build.
 
+// P12 round 2 finding #7: a CTE named after a real DDL table must resolve to the CTE (unprovable
+// from DDL alone, so "null" — no diagnostic, D7's own "false positive is worse than missing" rule)
+// rather than silently falling through to the base table it shadows.
 function resolveAliasMap(
   refs: readonly TableRef[],
+  cteNames: ReadonlySet<string>,
   schema: DdlSchema,
 ): Map<string, DdlTable | null> {
   const map = new Map<string, DdlTable | null>();
   for (const ref of refs) {
-    const table = findTable(schema, ref.schema, ref.name) ?? null;
+    const table = cteNames.has(ref.name.toLowerCase())
+      ? null
+      : (findTable(schema, ref.schema, ref.name) ?? null);
     if (ref.alias) map.set(ref.alias.toLowerCase(), table);
     map.set(ref.name.toLowerCase(), table);
   }
@@ -52,6 +58,7 @@ function unknownColumnDiagnostics(
   statementNode: LNode,
   consumedFroms: ReadonlySet<number>,
   source: string,
+  cteNames: ReadonlySet<string>,
   schema: DdlSchema,
 ): ConsoleDiagnostic[] {
   const out: ConsoleDiagnostic[] = [];
@@ -68,7 +75,12 @@ function unknownColumnDiagnostics(
     const columnText = source.slice(columnNode.from, columnNode.to).replace(/^["`]|["`]$/g, '');
 
     let table = aliasMap.get(qualifierText.toLowerCase());
-    if (table === undefined) table = findTable(schema, undefined, qualifierText) ?? undefined;
+    // P12 round 2 finding #7: same CTE-shadow guard as resolveAliasMap — this fallback path
+    // resolves a qualifier the alias map doesn't carry (a table referenced without going through
+    // a FROM/JOIN ref), so it needs its own check.
+    if (table === undefined && !cteNames.has(qualifierText.toLowerCase())) {
+      table = findTable(schema, undefined, qualifierText) ?? undefined;
+    }
     if (!table) continue; // the qualifier itself doesn't resolve — rule 1's job, or not resolvable at all.
 
     if (table.columns.some((c) => c.name.toLowerCase() === columnText.toLowerCase())) continue;
@@ -93,9 +105,11 @@ export function ddlDiagnostics(
   const out: ConsoleDiagnostic[] = [];
   for (const { statement, refs, cteNames } of statementsWithRefs(dialect, text)) {
     out.push(...unknownRelationDiagnostics(refs, cteNames, schema));
-    const aliasMap = resolveAliasMap(refs, schema);
+    const aliasMap = resolveAliasMap(refs, cteNames, schema);
     const consumedFroms = new Set(refs.map((r) => r.nodeFrom));
-    out.push(...unknownColumnDiagnostics(aliasMap, statement, consumedFroms, text, schema));
+    out.push(
+      ...unknownColumnDiagnostics(aliasMap, statement, consumedFroms, text, cteNames, schema),
+    );
   }
   return out;
 }

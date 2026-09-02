@@ -85,14 +85,21 @@ function resolveHover(
       const statement = statementsWithRefs(dialect, doc, root).find(
         (s) => s.statement.from <= pos && pos <= s.statement.to,
       );
+      // P12 round 2 finding #7: a CTE shadowing a real DDL table name must resolve to nothing
+      // here, not the base table it shadows — same "false positive worse than missing" rule
+      // sqlDiagnostics.ts's own resolveAliasMap follows, applied to hover instead of a diagnostic.
       let table: DdlTable | undefined;
       if (statement) {
         const ref = statement.refs.find(
           (r) => (r.alias ?? r.name).toLowerCase() === qualifierText.toLowerCase(),
         );
-        if (ref) table = findTable(schema, ref.schema, ref.name);
+        if (ref && !statement.cteNames.has(ref.name.toLowerCase())) {
+          table = findTable(schema, ref.schema, ref.name);
+        }
       }
-      if (!table) table = findTable(schema, undefined, qualifierText);
+      if (!table && !(statement?.cteNames.has(qualifierText.toLowerCase()) ?? false)) {
+        table = findTable(schema, undefined, qualifierText);
+      }
       if (!table) return null;
       const col = table.columns.find((c) => c.name.toLowerCase() === columnText.toLowerCase());
       if (!col) return null;
