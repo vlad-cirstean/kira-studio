@@ -111,6 +111,14 @@ team works, and how to run things in whichever box a session happens to be on.
   commit touching `.github/workflows/*.yml`. Apply it once a session's push access carries that
   scope — see the README beside it for the exact move. The suite itself (`scripts/db-compat.sh`)
   works today and needs no CI wiring to run by hand.
+- **`TestFixture_Redis` (`internal/ipcfixture/redis_test.go`) fails against a fresh
+  `redis:7` container in this sandbox, reproducibly, unrelated to any SQL/console/connections work**:
+  the live tree listing and a console `DBSIZE` both come back exactly one key higher than
+  `testdata/redis.fixture.json` committed (`"12 keys"`/`"11"` expected vs `"13 keys"`/`"12"` got) —
+  confirmed on two independent fresh containers, not a one-off flake. Every other package in
+  `go test ./...` (all six adapters' real-container conformance suites included) passes. Not
+  investigated further here — out of scope for whichever phase next touches the redis adapter or
+  `internal/ipcfixture`, but worth knowing before assuming a change broke it.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
@@ -263,10 +271,19 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   (`modernc.org/sqlite`, pure Go, for both the sqlite adapter and the app's own storage). Only the
   `apps/kira-studio` `main` package imports Wails and therefore needs the GTK/WebKit headers, so
   prefer `./apps/kira-studio/internal/...` for a fast loop.
-- **`wails3 generate bindings -b -i -ts` (run from `apps/kira-studio/`) must happen before any
-  frontend build**, not just before `go run .`: `apps/kira-studio/frontend/bindings/**` are real
-  Vite import targets, so missing ones fail the build with an unresolvable import rather than a
-  stale-bindings surprise. Regenerate whenever a bridge service's method set changes.
+- **Regenerate bindings with the exact flags `scripts/wails-dev-setup.sh` uses — `wails3 generate
+  bindings -clean=true -b -names -ts -i` (run from `apps/kira-studio/`) — never a shorter hand-typed
+  version.** `apps/kira-studio/frontend/bindings/**` are real Vite import targets, so missing ones fail
+  the build with an unresolvable import rather than a stale-bindings surprise; regenerate whenever a
+  bridge service's method set changes, and before any frontend build. **`-names` is load-bearing, not
+  cosmetic**: without it, every generated call site emits `$Call.ByID(<numeric-id>, ...)` instead of
+  `$Call.ByName("<pkg>.<Service>.<Method>", ...)`, and `tests/ui/support/mockRuntime.ts`'s whole
+  request-interception layer is keyed on the `ByName` string FQN (`CHANNEL_TO_FQN`) — a `-names`-less
+  regeneration silently breaks every `tests/ui/` spec at the very first bound call of the boot
+  sequence (`layoutGetAll`), which surfaces as `page.waitForSelector('[data-testid="status-bar"]')`
+  timing out with a page-level `Error: no CHANNEL_TO_FQN entry for undefined` — nothing about the
+  failure points at bindings at all, so this is easy to lose an hour to before checking the call
+  shape a fresh `generate bindings` run actually produced.
 - **A first `wails3 task dev` build takes ~60s** (native compile, icon/binding generation, Vite cold
   start). Giving up after 15-25s looks exactly like a sandbox limitation and isn't.
 - **A background process started in one shell invocation cannot be signalled from a later, separate
