@@ -32,6 +32,7 @@ import { getPage } from './resultPages';
 import { type Match, pageSearchApi } from './search';
 import { sqlHoverSource } from './sqlHover';
 import {
+  clearAutoExplain,
   closeOtherResults,
   closeResult,
   closeResultsToTheRight,
@@ -42,6 +43,7 @@ import {
   setNewResultSet,
   setSearchOpen,
   setText,
+  showAutoExplainPlan,
   stop,
   toggleSearchOpen,
 } from './state';
@@ -149,6 +151,26 @@ const explainTooltip = computed(() =>
 // D9's own precedent: a component-local strip, not a runtime-shape change (the manual button's
 // own failure is shown; auto-explain's failure path — C14 — degrades silently instead, D19 rule 6).
 const explainError = ref<string | null>(null);
+
+// P18 (v1.1) C14/D19: the compact message the auto-explain strip shows — the row estimate (when
+// this dialect reports one) plus the first warn-severity issue, e.g. `Estimated to read 184,153
+// rows · full table scan on "orders" with a filter`.
+const autoExplainMessage = computed(() => {
+  const state = rt.value?.autoExplain;
+  const worst = state?.plans[state.worstIndex]?.plan;
+  if (!worst) return '';
+  const parts: string[] = [];
+  if (worst.estimatedRowsRead !== undefined) {
+    parts.push(`Estimated to read ${worst.estimatedRowsRead.toLocaleString()} rows`);
+  }
+  const firstWarning = worst.issues.find((i) => i.severity === 'warn');
+  if (firstWarning) parts.push(firstWarning.message);
+  return parts.join(' · ') || 'This query may be expensive to run';
+});
+
+function onShowAutoExplainPlan(): void {
+  showAutoExplainPlan(props.tab.id);
+}
 // Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
 // doesn't read as a type-only use of the CodeMirrorHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
@@ -176,6 +198,8 @@ function onDocChange(text: string): void {
   setText(props.tab.id, text);
   formatError.value = null;
   explainError.value = null;
+  // D19: the auto-explain strip clears on the next document edit, same as the two above.
+  clearAutoExplain(props.tab.id);
 }
 
 watch(
@@ -485,6 +509,14 @@ const statusLine = computed(() => {
         <MessageStrip v-if="explainError" tone="err" data-testid="console-explain-error">
           {{ explainError }}
         </MessageStrip>
+        <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
+             running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
+        <MessageStrip v-if="rt?.autoExplain" tone="warn" data-testid="console-auto-explain">
+          <span class="auto-explain-message">{{ autoExplainMessage }}</span>
+          <button type="button" class="auto-explain-action" data-testid="console-auto-explain-show-plan" @click="onShowAutoExplainPlan">
+            Show plan
+          </button>
+        </MessageStrip>
       </template>
 
       <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
@@ -617,6 +649,21 @@ const statusLine = computed(() => {
 .p-strip.err {
   white-space: pre-wrap;
   font-family: var(--kira-font-family);
+}
+
+.auto-explain-message {
+  flex: 1;
+}
+
+.auto-explain-action {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  flex-shrink: 0;
 }
 
 .editor-body {

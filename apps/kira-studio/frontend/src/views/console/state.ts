@@ -1,12 +1,14 @@
 import type { ConnectionKind } from '@shared/domain/connection';
+import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import type { Page } from '@shared/protocol/page';
 import { data } from '../../bridge/data';
+import { connectionRecord } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
 import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
 import { applyLoadFailure, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { explainStatementsFor } from './explain';
+import { explainStatementsFor, isExplainable } from './explain';
 import { dropPlan, setPlan } from './explainResults';
 import { parseExplainPages } from './plan';
 import type { QueryPlan } from './planModel';
@@ -23,6 +25,16 @@ export interface ConsoleResult {
   kind: 'page' | 'plan';
 }
 
+/** D19: the outcome of the pre-run EXPLAIN batch auto-explain issues for every qualifying
+ *  statement in the run that just fired — `worstIndex` names the one whose own overThreshold or
+ *  warn-severity issue triggered the strip. The whole array is kept (not just the worst plan) so
+ *  a future "show every plan" affordance costs nothing to add; today only `plans[worstIndex]` is
+ *  read (the strip's own Show plan action). */
+export interface AutoExplainState {
+  plans: Array<{ statement: string; plan: QueryPlan }>;
+  worstIndex: number;
+}
+
 export interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
@@ -36,6 +48,10 @@ export interface ConsoleViewRuntime {
   // runtime-only and starts collapsed — a find() result is usually skimmed for shape, and
   // expanding a couple hundred documents by default is a very tall list nobody asked for.
   expandedDocIds: Set<string>;
+  // P18 D19: null except right after a run whose pre-flight EXPLAIN found something worth a
+  // warning — cleared on the next run and on the next document edit (ConsoleView.vue's own
+  // formatError/explainError precedent).
+  autoExplain: AutoExplainState | null;
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
@@ -48,6 +64,7 @@ function defaultRuntime(): ConsoleViewRuntime {
     searchOpen: false,
     nextSeq: 0,
     expandedDocIds: new Set(),
+    autoExplain: null,
   };
 }
 
@@ -225,6 +242,56 @@ export function setNewResultSet(tabId: string, on: boolean): void {
   patchConsoleTabState(tabId, { newResultSet: on });
 }
 
+// D19: a pasted 200-statement script must not become 200 EXPLAINs — auto-explain skips itself
+// entirely rather than issuing a batch this size.
+const AUTO_EXPLAIN_MAX_STATEMENTS = 10;
+
+// D19 rules 1-4/6: filters to explainable statements, composes every one of their own EXPLAIN
+// statements (D13: one for most dialects, two for ClickHouse) into a *single* data:execute call,
+// then re-slices the returned pages back per originating statement to parse each one. Returns
+// null whenever there is nothing to warn about — no qualifying statement, too many of them, or
+// the EXPLAIN call itself failed (rule 6: swallowed, never surfaced for this path).
+async function autoExplainCheck(
+  tab: ConsoleTabRecord,
+  kind: ConnectionKind,
+  statements: string[],
+): Promise<AutoExplainState | null> {
+  if (!tab.connectionId) return null;
+  const explainable = statements.filter((s) => isExplainable(s));
+  if (explainable.length === 0 || explainable.length > AUTO_EXPLAIN_MAX_STATEMENTS) return null;
+
+  const perStatementSql = explainable.map((s) => explainStatementsFor(kind, s));
+  const allExplainStatements = perStatementSql.flat();
+  if (allExplainStatements.length === 0) return null;
+
+  try {
+    const response = await data.execute({
+      opId: crypto.randomUUID(),
+      tabId: tab.id,
+      connectionId: tab.connectionId,
+      path: tab.path,
+      statements: allExplainStatements,
+    });
+    const plans: AutoExplainState['plans'] = [];
+    let cursor = 0;
+    for (let i = 0; i < explainable.length; i++) {
+      const pageCount = perStatementSql[i]?.length ?? 0;
+      const pages = response.pages.slice(cursor, cursor + pageCount);
+      cursor += pageCount;
+      plans.push({
+        statement: explainable[i],
+        plan: parseExplainPages(kind, pages, settingsState.advanced.expensiveQueryRows),
+      });
+    }
+    const worstIndex = plans.findIndex(
+      ({ plan }) => plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn'),
+    );
+    return worstIndex === -1 ? null : { plans, worstIndex };
+  } catch {
+    return null;
+  }
+}
+
 // One execute() call per run, covering both "Run statement" (one-element array) and "Run all"
 // (the caller pre-splits via sql-split.ts) — the adapter's own all-or-nothing semantics (P5.5
 // D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
@@ -237,6 +304,17 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
   rt.status = 'running';
   rt.opId = opId;
   rt.error = null;
+  // D19: cleared on every new run, the same "next action supersedes the last one" discipline
+  // ConsoleView.vue's own formatError/explainError already follow on a document edit.
+  rt.autoExplain = null;
+
+  // D19 rules 1-5: issued and awaited *before* the real run — the query still runs regardless of
+  // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
+  const connection = connectionRecord(tab.connectionId);
+  if (connection?.autoExplain) {
+    rt.autoExplain = await autoExplainCheck(tab, connection.kind, statements);
+    if (rt.opId !== opId) return; // superseded by a newer run while the EXPLAIN batch was in flight
+  }
 
   try {
     const response = await data.execute({
@@ -284,6 +362,26 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
 
 export function stop(tabId: string): void {
   stopOp(runtime[tabId]);
+}
+
+/** D19: the strip clears on the next run (already handled inside `run()` itself) and on the next
+ *  document edit — ConsoleView.vue's own onDocChange calls this alongside its formatError/
+ *  explainError resets, the same "next action supersedes the last one" discipline. */
+export function clearAutoExplain(tabId: string): void {
+  const rt = runtime[tabId];
+  if (rt) rt.autoExplain = null;
+}
+
+/** D19's own "Show plan" action: the plan is already parsed (it was needed to decide whether to
+ *  warn at all), so this is `pushPlanResult` over the one that triggered the warning — no second
+ *  round trip. */
+export function showAutoExplainPlan(tabId: string): void {
+  const rt = runtime[tabId];
+  const state = rt?.autoExplain;
+  if (!state) return;
+  const worst = state.plans[state.worstIndex];
+  if (!worst) return;
+  pushPlanResult(tabId, worst.statement, worst.plan);
 }
 
 /** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
