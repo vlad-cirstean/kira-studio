@@ -36,7 +36,7 @@ fill in.
 
 ## 2. Automated results (this environment)
 
-### 2.1 Interaction budgets — `tests/e2e/budgets.spec.ts`, `tests/e2e/perf.spec.ts`
+### 2.1 Interaction budgets — `tests/ui/budgets.spec.ts`, `tests/ui/perf.spec.ts` (originally `tests/e2e/budgets.spec.ts`/`tests/e2e/perf.spec.ts`, ported at P57 M5 — see that sub-section below)
 
 | Metric | p50 (work) | p95 (work) | p50 (e2e, logged) | p95 (e2e, logged) | Budget | Result |
 |---|---|---|---|---|---|---|
@@ -881,13 +881,31 @@ Vite major) — neither collapsed into the main chunk.
 
 **The Green Tea GC caveat.** Go 1.26 (this repo moved to Go 1.27 in the same phase, P19 C4) turns
 Green Tea on by default — Go's own numbers put it at 10-40% less GC overhead than the prior
-collector. **Every Go-side RSS/CPU figure recorded above this line (§2.3's Linux walking-skeleton
-RSS, §2.4's real-macOS-arm64 gate G1 result) was measured under the pre-Green-Tea collector.** This
-phase does not re-measure them — re-measuring needs the same real macOS hardware §2.4's own
-methodology note requires, which this sandbox does not have, and P19's own scope is a dependency
-and toolchain bump, not a re-run of P5's or P7's measurement procedures. Read §2.3/§2.4 as
-historical baselines from before this GC change, not current numbers, until whoever next runs the
-real-Mac procedure (§3) re-measures them.
+collector. **Every Go-side RSS/CPU figure recorded above this line was measured under the
+pre-Green-Tea collector** — not just §2.3's Linux walking-skeleton RSS and §2.4's real-macOS-arm64
+gate G1 result, but also §2.5's transient-heap row, §2.6's before/after wall-clock and allocation
+table, §2.7's Go encode time/`TotalAlloc` table, and §2.8's fixed-regression table. §2.3/§2.4
+genuinely need the real macOS hardware §2.4's own methodology note requires, which this sandbox
+does not have; §2.5-§2.8 need no such hardware — they are pure in-module Go benchmarks (throwaway
+programs run in this sandbox, per each section's own "Method" note) — but this phase does not
+re-measure them either, since P19's own scope is a dependency and toolchain bump, not a re-run of
+P4's/P58a's/P11's own measurement procedures.
+
+**Which of §2.5-§2.8's numbers actually move under Green Tea, and which don't.** Every allocation
+figure in those four sections (`TotalAlloc` deltas, the "Alloc/wire ratio" and "Transient heap
+bytes" columns) counts bytes the allocator handed out, not GC pause time or scheduling overhead —
+Green Tea changes *how* those bytes are collected and *when* a collection pauses the program, not
+how many bytes a given code path allocates for a given input, so these figures are collector-
+independent and stand as measured. Every Go-side wall-clock figure (the encode "time" columns, and
+§2.6/§2.7's "speedup" columns derived from them) can move under a GC with materially less overhead,
+since wall-clock time includes whatever GC work ran concurrently with or was triggered by the
+measured call — these need re-measurement before being read as current, same as §2.3/§2.4. §2.7's
+frontend decode timings are a different case again: they run under Bun/JavaScriptCore, not Go, so
+there is no Go GC in that measured window at all — unaffected by this caveat either way. Read
+§2.5-§2.8's Go-side wall-clock numbers as historical baselines from before this GC change, and
+their allocation numbers (and the frontend decode timings) as still current, until whoever next
+re-runs these throwaway measurement programs (or the real-Mac procedure, §3, for §2.3/§2.4)
+confirms the wall-clock ones too.
 
 ## 3. Manual procedures (macOS, packaged build)
 
