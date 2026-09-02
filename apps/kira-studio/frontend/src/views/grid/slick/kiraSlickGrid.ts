@@ -108,23 +108,51 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     viewportTop?: number,
     viewportLeft?: number,
   ): { top: number; bottom: number; leftPx: number; rightPx: number } {
+    // Defensive reads below, not stylistic ones: `SlickGrid`'s own constructor calls `init()`
+    // (unless `explicitInitialization` is set), which renders synchronously — i.e. calls this
+    // override — *before* a JS subclass's own field initialisers run (those run only after
+    // `super()` returns). `this.velocity`/`this.mountedColumnCount` are genuinely `undefined` on
+    // that first, base-constructor-triggered call; every read of a subclass field here has to
+    // tolerate that, not just default it once at the field declaration (confirmed empirically —
+    // `TypeError: this.velocity is not a function` from inside the `super(...)` call otherwise).
     const range = super.getVisibleRange(viewportTop, viewportLeft);
-    const { pxPerFrame, direction } = this.velocity();
+    const { pxPerFrame, direction } = this.velocity
+      ? this.velocity()
+      : { pxPerFrame: 0, direction: 0 as const };
     const { start, end } = rowRangeBounds(
       { startIndex: range.top, endIndex: range.bottom, count: this.getDataLength() },
       this.getOptions().rowHeight ?? 28,
       pxPerFrame,
       direction,
-      this.mountedColumnCount,
+      this.mountedColumnCount || 1,
       runwayConfig(),
     );
     this.lastRenderedRowBounds = { start, end };
+    // getCanvasNode() with no args resolves column 0 — this app's frozen gutter (D4/§5 item 5),
+    // whose own pane is a fixed GUTTER_WIDTH wide, not the scrollable data pane whose width this
+    // clamp needs. Column index 1 (the first data column) is always > frozenColumn (0), so it
+    // resolves the right/scrollable canvas instead — see `_getContainerElement`'s own
+    // `isRightSide = hasFrozenColumns() && idx > frozenColumn` test, read from source. It may not
+    // exist yet on that same first, pre-subclass-field render (no data column mounted yet).
+    const canvasWidth = this.getCanvasNode(1)?.clientWidth ?? 0;
     const { leftPx, rightPx } = clampColumnOverscan(
       range.leftPx,
       range.rightPx,
       OVERSCAN_PX,
-      this.getCanvasNode().clientWidth,
+      canvasWidth,
     );
+    // The row axis's own budget divisor (D4's third bullet), self-maintained rather than supplied
+    // by the host: DataGrid.vue's own mountedColumnCount is read from a *separate* column
+    // virtualizer, and its own comment warns that calling into it from inside the row-range
+    // computation regressed the scroll budget. SlickGrid has no separate column virtualizer to call
+    // into — this approximates the mounted column count from this same render's own column window
+    // and the grid's average column width, entirely locally, so the hazard that comment warns about
+    // does not apply here at all. One frame stale by construction (like the app's own precedent):
+    // it's set for the *next* call, from *this* call's own leftPx/rightPx.
+    const columns = this.getColumns() ?? [];
+    const totalWidth = columns.reduce((sum, c) => sum + (c.width ?? 0), 0) || 1;
+    const avgWidth = totalWidth / Math.max(1, columns.length);
+    this.mountedColumnCount = Math.max(1, Math.ceil((rightPx - leftPx) / avgWidth));
     return { top: start, bottom: end, leftPx, rightPx };
   }
 }

@@ -45,6 +45,9 @@ declare global {
         };
       } | null;
     };
+    /** P22 spike §7.2 (apps/kira-studio/frontend/src/views/grid/DataView.vue) — set before boot
+     *  (page.addInitScript + a reload) to mount SlickGridHost.vue instead of DataGrid.vue. */
+    __kiraGridEngine?: 'tanstack' | 'slick';
   }
 }
 

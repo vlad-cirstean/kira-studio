@@ -30,7 +30,7 @@ export function nodeIcon(kind: NodeKind | 'group'): string {
   return kind === 'group' ? 'folder' : KIND_ICON[kind];
 }
 
-type ColumnTypeCategory =
+export type ColumnTypeCategory =
   | 'numeric'
   | 'boolean'
   | 'datetime'
@@ -126,7 +126,11 @@ function columnTypeCategory(dataType: string): ColumnTypeCategory {
 // independently, in the renderer — that second guess is exactly how "datetime" and "longtext"
 // both fell through to the wrong bucket above. binary/json both fold into the same uncoloured
 // 'other' the string guesser's own binary/json cases also resolve to, so the two paths agree.
-function categoryForTypeClass(typeClass: TypeClass): ColumnTypeCategory {
+// Exported (P22 spike C5): the Slick grid host builds its own per-column `tc-<category>` CSS class
+// (D6) straight from this, rather than re-deriving the category from typeClassColor's own resolved
+// colour string — the same "read the authoritative verdict once" discipline this function's own
+// comment already states for typeClassColor's callers.
+export function categoryForTypeClass(typeClass: TypeClass): ColumnTypeCategory {
   switch (typeClass) {
     case 'number':
       return 'numeric';

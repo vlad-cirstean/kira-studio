@@ -61,17 +61,29 @@ export function rowHandleAt(
   return Object.freeze({ row, pos });
 }
 
-/** The mutable state a `KiraGridDataSource` reads on every `getItem`/`getLength`/`getItemMetadata`
- *  call — a plain object the host (SlickGridHost.vue) reassigns wholesale via `setState` on a
- *  relevant change (page reload, filter, a staged insert), and never a Vue `ref`/`reactive` (D1's
- *  own rule: the extractor and formatter run *during* SlickGrid's own render, and must never touch
- *  Vue reactivity whose mutation could re-enter it). */
+/** The mutable state a `KiraGridDataSource` reads on every `getItem`/`getLength`/`getItemMetadata`/
+ *  `extractValue` call — a plain object the host (SlickGridHost.vue) reassigns wholesale via
+ *  `setState` on a relevant change (page reload, filter, a staged insert), and never a Vue
+ *  `ref`/`reactive` (D1's own rule: the extractor and formatter run *during* SlickGrid's own
+ *  render, and must never touch Vue reactivity whose mutation could re-enter it).
+ *
+ *  `extractValue` itself lives in this state (not a separate, one-time constructor argument) for a
+ *  load-bearing reason: SlickGrid's own `dataItemColumnValueExtractor` grid option is captured
+ *  *once*, at construction — routing it through this mutable state (via `KiraGridDataSource.
+ *  extractValue`, below) is what lets a page reload's new decode/staged-edit closure actually reach
+ *  the grid without reconstructing the whole instance. A first version of this file passed
+ *  `extractValue` as a separate constructor argument instead; every cell after the first page
+ *  reload silently kept reading the *original* (often `page === null`, "everything is NULL")
+ *  closure, because the grid's own option object is fixed at construction and was never the one
+ *  being updated — confirmed against a real render, not merely reasoned about. */
 export interface GridDataSourceState {
   index: DisplayRowIndex;
   inserts: readonly Pick<PendingInsert, 'id'>[];
   /** Per-page-row CSS classes (the dirty/deleted/inserted gutter rails, §5 item 18) — `undefined`
    *  renders no metadata for that row, matching `getItemMetadata`'s own `| null` contract. */
   rowClasses?: (row: number) => string | undefined;
+  /** The current `dataItemColumnValueExtractor` body — see this interface's own header comment. */
+  extractValue: (item: RowHandle, field: string) => unknown;
 }
 
 export interface KiraGridDataSource {
@@ -79,8 +91,17 @@ export interface KiraGridDataSource {
   getItem(pos: number): RowHandle;
   getItemMetadata(pos: number): { cssClasses?: string } | null;
   /**
-   * F1's own insurance, not a real render-path seam (the render path is
-   * `dataItemColumnValueExtractor`, below): a future call site — or SlickGrid's own
+   * The current state's own `extractValue`, keyed by `RowHandle` directly — the exact shape
+   * SlickGrid's own `dataItemColumnValueExtractor` option calls with (`item`, not a position; that
+   * grid option receives the *already-resolved* item, not an index to resolve). The host's grid
+   * option is set to this method once, at construction, and stays correct across every later
+   * `setState` because this method reads live `state`, not a captured closure — see
+   * `GridDataSourceState`'s own header comment for why that distinction is load-bearing.
+   */
+  extractValue(item: RowHandle, field: string): unknown;
+  /**
+   * F1's own insurance, not a real render-path seam (the render path is `extractValue`/
+   * `dataItemColumnValueExtractor`, above): a future call site — or SlickGrid's own
    * `autosizeColumns`, left off via `autosizeColsMode: LegacyOff` but still a public method someone
    * could call — that reaches for `getCellValue` gets the extractor's own answer instead of
    * silently falling through to `getDataItem(i)[field]`, which would read `undefined` for every
@@ -93,13 +114,9 @@ export interface KiraGridDataSource {
  * A stable `CustomDataView` over frozen pages. Never materialises a row, never allocates one for a
  * row SlickGrid isn't actually building — a retained row is never revisited (F2), so this object's
  * own identity, and the `state` it closes over, are the only things that change across a render.
- * `extractValue` is the exact function the grid's own `dataItemColumnValueExtractor` option is set
- * to (the host wires both to the same closure) — threaded through here too so `getCellValue` can
- * delegate to it instead of drifting into a second, wrong implementation.
  */
 export function createGridDataSource(
   initialState: GridDataSourceState,
-  extractValue: (item: RowHandle, field: string) => unknown,
 ): KiraGridDataSource & { setState(next: GridDataSourceState): void } {
   let state = initialState;
   return {
@@ -118,8 +135,11 @@ export function createGridDataSource(
       const cssClasses = state.rowClasses(item.row);
       return cssClasses ? { cssClasses } : null;
     },
+    extractValue(item, field) {
+      return state.extractValue(item, field);
+    },
     getCellValue(pos, field) {
-      return extractValue(rowHandleAt(state.index, state.inserts, pos), field);
+      return state.extractValue(rowHandleAt(state.index, state.inserts, pos), field);
     },
   };
 }

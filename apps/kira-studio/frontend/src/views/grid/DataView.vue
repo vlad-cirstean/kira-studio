@@ -20,6 +20,7 @@ import FilterToolbar from './FilterToolbar.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { commitPending, discardPending, hasPending, pendingFor } from './pendingChanges';
+import SlickGridHost from './SlickGridHost.vue';
 import { type Match, pageSearchApi } from './search';
 import {
   load,
@@ -152,6 +153,13 @@ onUnmounted(() => {
 });
 
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
+
+// P22 spike §7.2 — the engine switch. Read once (a plain `computed` with no reactive dependency of
+// its own settles to this value the first time it's evaluated and never re-runs): switching engines
+// mid-session isn't a supported flow, only a fresh tab mount picks up a change to the flag. Default
+// 'tanstack' — the new grid ships dark until a real-hardware A/B (docs/PERF.md §2.1a/§2.1c)
+// authorises Pass B's cutover.
+const engine = computed(() => (window.__kiraGridEngine === 'slick' ? 'slick' : 'tanstack'));
 
 function onGoToMatch(match: Match): void {
   dataGridRef.value?.scrollCellIntoView(match.row, match.col);
@@ -291,7 +299,8 @@ function onCloseSearch(): void {
           <span>{{ rt.actionError }}</span>
         </MessageStrip>
         <div class="grid-area">
-          <DataGrid ref="dataGridRef" :tab-id="tab.id" />
+          <SlickGridHost v-if="engine === 'slick'" ref="dataGridRef" :tab-id="tab.id" />
+          <DataGrid v-else ref="dataGridRef" :tab-id="tab.id" />
         </div>
       </template>
     </ViewChrome>

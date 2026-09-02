@@ -185,6 +185,15 @@ declare global {
      * iter2 D4's last paragraph) without needing real-hardware timing.
      */
     __kiraGridRowUpdates?: () => void;
+    /**
+     * P22 spike §7.2 — DataView.vue's engine switch: 'slick' mounts SlickGridHost.vue instead of
+     * DataGrid.vue for that tab's grid. Read once per mount, not reactively; unset (the default)
+     * keeps the incumbent tanstack-virtual grid. Not a Playwright hook in the usual sense (no test
+     * sets it directly) — it exists for the same real-hardware A/B protocol
+     * `__kiraGridTuning`/`__kiraScrollTrace` already serve, and `tests/ui/slick-grid.spec.ts` sets it
+     * via `page.addInitScript` before boot to exercise the spike build in this sandbox.
+     */
+    __kiraGridEngine?: 'tanstack' | 'slick';
   }
 }
 window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };

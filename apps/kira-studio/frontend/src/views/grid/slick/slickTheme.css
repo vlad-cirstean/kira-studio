@@ -1,0 +1,106 @@
+/* P22 spike, §6 D7 — a near-verbatim port of GridRow.vue's own <style> block (grid-row -> slick-row,
+   grid-cell -> slick-cell, gutter-cell -> kira-gutter), overriding slick.grid.css's own dozen
+   hardcoded colours with --kira-* tokens. Unscoped (imported once by SlickGridHost.vue, not a
+   scoped SFC block) because SlickGrid builds its DOM outside Vue's template entirely — a `<style
+   scoped>` block can never reach it. No colour/spacing/radius literal below is not a --kira-*
+   token; neither of slickgrid's own theme stylesheets (slick-default-theme.css,
+   slick-alpine-theme.css) is imported (F9 — those are ~26KB of visual opinions this app doesn't
+   share; only the structural slick.grid.css is).
+   Structural note: this app's own scroll/font vars line up with slick.grid.css's own `.slick-cell`
+   sizing (padding, line-height) so the two never fight over box geometry — only colour. */
+
+.slick-grid-host {
+  height: 100%;
+  position: relative;
+  font-size: var(--kira-t-md);
+  font-family: var(--kira-font-family);
+  color: var(--kira-fg);
+}
+
+/* slick.grid.css's own header/row/cell borders and backgrounds, retokenised. */
+.slick-grid-host .slick-header,
+.slick-grid-host .slick-headerrow {
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+}
+
+.slick-grid-host .slick-header-column {
+  background: var(--kira-bg-elevated);
+  color: var(--kira-fg);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  font-size: var(--kira-t-md);
+}
+
+.slick-grid-host .slick-row {
+  background: var(--kira-bg);
+}
+
+/* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */
+.slick-grid-host .slick-row:hover .slick-cell:not(.kira-cell-selected) {
+  background: var(--kira-hover);
+}
+
+.slick-grid-host .slick-cell {
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  color: var(--kira-fg);
+  padding: 0 var(--kira-s-4);
+}
+
+.slick-grid-host .kira-gutter {
+  background: var(--kira-bg-elevated);
+  color: var(--kira-fg-disabled);
+  font-size: var(--kira-t-xs);
+  justify-content: flex-end;
+  border-right: var(--kira-border-width) solid var(--kira-border-strong);
+}
+
+.slick-grid-host .kira-align-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* §6 D6 point 1 — type colour is per-column (a static class, never a per-cell inline style).
+   Source order matters: the priority-signal rules further down (NULL / staged / current-match)
+   are declared AFTER these on purpose, so the cascade — not a JS conditional — is what keeps a
+   data-type colour from ever outranking one of them (equal specificity, later rule wins). Gated on
+   .kira-grid--row-coloring so the P9 rowColoring setting is one class toggle on the host root.
+   Only 3 of the 5 reachable categories carry a real colour (theme/icons.ts's own
+   categoryForTypeClass never returns anything else for the string/other categories) — those two
+   rules are kept anyway for D6's own "nine categories become one-line rules" parity, and because a
+   future TypeClass addition should not have to remember this file. */
+.kira-grid--row-coloring .tc-numeric {
+  color: var(--kira-syntax-number);
+}
+.kira-grid--row-coloring .tc-boolean {
+  color: var(--kira-syntax-keyword);
+}
+.kira-grid--row-coloring .tc-datetime {
+  color: var(--kira-syntax-control);
+}
+.kira-grid--row-coloring .tc-string,
+.kira-grid--row-coloring .tc-other {
+  color: var(--kira-fg);
+}
+
+.slick-grid-host .cell-null {
+  color: var(--kira-fg-disabled);
+  font-style: italic;
+}
+
+.slick-grid-host .truncated-marker {
+  color: var(--kira-fg-muted);
+  margin-left: var(--kira-s-1);
+}
+
+/* §6 D5 — the setCellCssStyles seam's own CSS layer, keyed 'kira-selection'/'kira-search' (D5's
+   table). Declared after the type-colour rules above so the cascade enforces D6's own priority
+   rule for free. Pass A applies these two classes to a fixed, deterministic pair of cells (never
+   from a click or a drag) — see SlickGridHost.vue's own comment on why: proving the rendering seam
+   without building the Pass-B interaction layer it will eventually carry. */
+.slick-grid-host .kira-cell-selected {
+  background: var(--kira-select);
+}
+.slick-grid-host .kira-cell-search-match {
+  background: var(--kira-search-match);
+}
