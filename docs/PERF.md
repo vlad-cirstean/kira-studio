@@ -24,6 +24,7 @@ fill in. **Every Go-side wall-clock figure in §2.5-§2.8 predates Go 1.26's Gre
 | Grid scroll frame ≤ 8 ms (12 ms on the `tests/ui/` tier, see §2.1) | app-work delta (DataGrid.vue's own scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Row window stays coalesced to <= 1 re-render/frame during sustained fast scroll (P22 D1) | `notifiesPerFrame` <= 1 at 40/100/200/456 px/frame; `uncoveredPx` === 0 at 40-100 px/frame | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1a** |
 | — (secondary) | rAF interval p95 < 24 ms (80 ms on the `tests/ui/` tier, see §2.1), DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
 | Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
@@ -188,6 +189,71 @@ Go process, real embedded adapters — P58f M10 removed the separate engine proc
 originally described) is the only tier that could recover the L2/event-driven checks this port
 drops, if ever wanted on top of `lru_test.go`'s unit coverage — named as a possible follow-up, not
 built.
+
+### 2.1a P22 D1/D3 — sustained-velocity scroll coverage, and the fix for the fast-scroll rendering lag
+
+**The finding a passing scroll-response budget could not see.** §2.1's `measureScrollResponses`
+measures one scroll step from an idle, settled DOM — it never has two scroll deltas in flight
+(`docs/v1.1/plans/P22-webview-scroll-performance.md` F6). The user-reported symptom ("rows visibly
+take a moment to render/catch up when scrolling fast") only exists *while* scrolling continues, which
+that instrument structurally cannot observe. `measureScrollCoverage` (new,
+`tests/ui/support/measure.ts`) does: velocity-parameterised in px/frame (the same discipline
+`docs/WEBVIEW-SCROLL-MEMORY.md` §5.4 established for the memory half), it keeps a sustained scroll
+going for N frames and records, per frame, how many times the row virtualizer's `onChange` fired
+(`notifiesPerFrame`) and how much of the viewport the mounted row band failed to cover
+(`uncoveredPx`).
+
+**Root cause.** `@tanstack/virtual-core@3.17.8`'s stock `observeElementOffset` invokes its callback
+synchronously on every native `scroll` event, not once per animation frame — unlike
+`observeElementRect`, which this app already overrides (P49 F3/D4). A fling can fire many native
+scroll events inside one frame, and every notify rebuilt the whole rendered row/column window from
+scratch, so the app did N full re-renders per frame and threw N-1 away before paint. The fix
+(`observeScrollElementOffset`, `views/shared/page/columns.ts`) coalesces the offset-driven notify
+into one `requestAnimationFrame` per burst, reading the offset inside the callback so the computed
+range is the freshest one available, not the burst's first event — mirroring `DataGrid.vue`'s own
+`onScroll` rAF coalescing, which only ever fed the 300 ms scroll-position-persistence watcher, not
+rendering.
+
+**Reproducing the burst.** A real fling delivers many native scroll notifications to the main thread
+before one repaint; a single scripted `el.scrollTop = x` cannot reproduce that on this tier —
+confirmed empirically that WebKit coalesces any number of synchronous writes in one task into exactly
+one native `scroll` event. `measureScrollCoverage` instead splits each simulated frame's advance into
+8 sub-steps, each a real `scrollTop` write followed by a synthetic `dispatchEvent(new
+Event('scroll'))` — manufacturing the same "N notifications before one paint" shape a real fling
+delivers by other means. This tests the observer's own coalescing behaviour directly, which is
+exactly what this sandbox *can* settle; whether WebKit's real threaded/momentum scrolling produces
+such a burst on a packaged build is a real-Mac question this environment cannot answer (P22 §7.3
+item 1 — a human, a packaged build, a hard trackpad fling, looking at whether rows still render late).
+
+**Pre-fix baseline vs. after, `tests/ui/budgets.spec.ts` (this sandbox's webkit/mocked tier, 20 frames
+per rung, `SUB_STEPS_PER_FRAME = 8`):**
+
+| Fixture | px/frame | `notifiesPerFrame` max, before | `notifiesPerFrame` max, after | `uncoveredPx` max (before and after) |
+|---|---|---|---|---|
+| `big_rows` (2 cols, narrow) | 40 | 3 | **1** | 0 |
+| `big_rows` | 100 | 7 | **1** | 0 |
+| `big_rows` | 200 | 8 | **1** | 0 |
+| `big_rows` | 456 | 8 | **1** | 0 |
+| `scroll_grid` (61 cols, wide+tall) | 40 | 4 | **1** | 0 |
+| `scroll_grid` | 100 | 5 | **1** | 0 |
+| `scroll_grid` | 200 | 8 | **1** | 0 |
+| `scroll_grid` | 456 | 8 | **1** | 0 |
+
+`notifiesPerFrame` collapses to exactly 1 at every frame, every velocity, both fixtures — the direct
+proof the coalescing works and is gated in `budgets.spec.ts` at every rung. `uncoveredPx` was already
+0 throughout, even pre-fix: `OVERSCAN_PX`'s existing 560 px buffer (P29 D2) absorbed the burst at
+every velocity tested here, so P22 D2's conditional row-overscan raise was **not needed** — recorded
+as a real, measured "skip", not an unraised default. `uncoveredPx === 0` is gated at the realistic
+40-100 px/frame band; 200/456 are logged, not gated (456 px/frame is
+`docs/WEBVIEW-SCROLL-MEMORY.md` §5.4's own "no human produces this" top rung, kept only so the two
+documents' velocity axes line up).
+
+**A passing scroll-response budget and a visible fling lag are measurements of different things.**
+§2.1's scroll-response numbers above were passing the whole time this bug existed — they measure one
+settled step, and the redundant re-renders this fix removes all happen (and are all thrown away)
+*before* that single measured step's DOM ever commits. A reader should not re-derive "the budget must
+have been broken" from the fact that a real lag was reported; it wasn't, and couldn't have been, by
+that instrument. `measureScrollCoverage` is the one that can, and now does.
 
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
