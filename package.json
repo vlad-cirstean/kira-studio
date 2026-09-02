@@ -54,7 +54,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
     "@vscode/codicons": "0.0.46-24",
-    "@wailsio/runtime": "3.0.0-beta.15",
+    "@wailsio/runtime": "3.0.0-beta.16",
     "bun-types": "1.4.0",
     "mariadb": "3.5.4",
     "pg": "8.23.0",

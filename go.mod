@@ -26,7 +26,7 @@ require (
 	github.com/twmb/franz-go v1.21.6
 	github.com/twmb/franz-go/pkg/kadm v1.18.0
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
-	github.com/wailsapp/wails/v3 v3.0.0-beta.15
+	github.com/wailsapp/wails/v3 v3.0.0-beta.16
 	go.mongodb.org/mongo-driver/v2 v2.8.2
 	modernc.org/sqlite v1.57.0
 )
