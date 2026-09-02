@@ -85,6 +85,13 @@ export interface ScrollTraceResult {
   summary: ScrollTraceSummary;
 }
 
+/** The mounted row band, in the scroll container's own content-pixel space. */
+export interface MountedBand {
+  top: number;
+  bottom: number;
+  rows: number;
+}
+
 let recording = false;
 let rafId = 0;
 let gridEl: HTMLElement | null = null;
@@ -92,6 +99,14 @@ let gridEl: HTMLElement | null = null;
 // grid's own testid so every existing caller (DataGrid.vue) is unaffected; SlickGridHost.vue passes
 // '.slick-row' so the same probe can A/B both engines on one build (§7.4(b)) without a rebuild.
 let mountedRowSelector = '[data-testid="grid-row"]';
+// P22 regular-table spike: an engine whose rendered rows are not laid out in the scroll
+// container's own content space supplies the band itself. regular-table pins its `<table>` inside
+// a `position: sticky` clip (its container.css `div.rt-scroll-table-clip`) and translates content
+// by the sub-row remainder only, so `offsetTop` there measures a viewport offset, not a scroll
+// offset — `measureMountedBand`'s reading would be meaningless rather than merely different, and
+// `uncoveredPx` would come out a flattering, fabricated zero. See RegularTableHost.vue's own
+// provider for the equivalent it computes instead.
+let bandProvider: (() => MountedBand) | null = null;
 
 let pendingEvents: { offset: number; t: number }[] = [];
 let pendingNotified = false;
@@ -103,13 +118,19 @@ let frames: ScrollTraceFrame[] = [];
  *  at a time (MainView.vue keys its DataView by tab id), so a single module-level target is
  *  enough. `rowSelector` (P22 spike D9) is the mounted-row query `measureMountedBand` below uses —
  *  defaults to the incumbent grid's own testid. */
-export function registerGrid(el: HTMLElement, rowSelector = '[data-testid="grid-row"]'): void {
+export function registerGrid(
+  el: HTMLElement,
+  rowSelector = '[data-testid="grid-row"]',
+  band: (() => MountedBand) | null = null,
+): void {
   gridEl = el;
   mountedRowSelector = rowSelector;
+  bandProvider = band;
 }
 
 export function unregisterGrid(el: HTMLElement): void {
   if (gridEl === el) gridEl = null;
+  bandProvider = null;
 }
 
 /** DataGrid.vue's own onScroll, called on every native `scroll` event — a single array push behind
@@ -127,6 +148,21 @@ export function noteNotify(): void {
   void nextTick(() => {
     lastRenderMs = performance.now() - start;
   });
+}
+
+/**
+ * P22 regular-table spike — the non-Vue engines' counterpart to `noteNotify`.
+ *
+ * `noteNotify` measures a Vue reactive flush via `nextTick`, which an engine that never enters
+ * Vue's scheduler at all would report as ~0 regardless of how long its DOM work actually took.
+ * A host that can time its own render pass directly (RegularTableHost.vue times regular-table's
+ * synchronous `predraw` commit) reports it here instead, so `summary.renderMs` keeps meaning the
+ * same thing across an A/B: the main-thread work one scroll-driven render costs.
+ */
+export function noteRender(durationMs: number): void {
+  if (!recording) return;
+  pendingNotified = true;
+  lastRenderMs = durationMs;
 }
 
 function measureMountedBand(el: HTMLElement): { top: number; bottom: number; rows: number } {
@@ -153,7 +189,11 @@ function tick(rafT: number): void {
   const el = gridEl;
   const liveScrollTop = el?.scrollTop ?? 0;
   const clientHeight = el?.clientHeight ?? 0;
-  const band = el ? measureMountedBand(el) : { top: 0, bottom: 0, rows: 0 };
+  const band = bandProvider
+    ? bandProvider()
+    : el
+      ? measureMountedBand(el)
+      : { top: 0, bottom: 0, rows: 0 };
   const uncoveredPx = el
     ? Math.max(0, band.top - liveScrollTop) +
       Math.max(0, liveScrollTop + clientHeight - band.bottom)
