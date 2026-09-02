@@ -23,6 +23,10 @@ echo "setup: bun install (workspace root + every apps/*/frontend)"
 echo "setup: go mod download"
 (cd "$ROOT_DIR" && go mod download)
 
+# Saved before ensure_gopath_on_path patches $PATH for the rest of this process (below) — the
+# "add this to your shell profile" hint further down needs the *pre-patch* value, or it can never
+# fire (P12 round 2 finding #15): checking the already-patched $PATH always finds GOPATH/bin on it.
+ORIGINAL_PATH="$PATH"
 ensure_gopath_on_path
 
 PINNED_VERSION="$(pinned_wails_version)"
@@ -87,7 +91,7 @@ if [ "$NEED_INSTALL" = "1" ]; then
   # module's floor, go1.26.8 here) and never `local` (this container's base toolchain, go1.24.7,
   # is below Wails' own floor and `local` refuses outright).
   GOTOOLCHAIN="go$GO_DIRECTIVE" go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
-  case ":$PATH:" in
+  case ":$ORIGINAL_PATH:" in
     *":$(go env GOPATH)/bin:"*) ;;
     *)
       echo "setup: add this to your shell profile so wails3 stays on PATH:" >&2

@@ -18,11 +18,14 @@ require_cmd() {
 
 # Puts the Go toolchain's install bin dir on PATH for the rest of this process, so a `go install`ed
 # CLI (wails3) is callable without depending on the invoking shell's own profile.
+# P12 round 2 finding #15: the local var is deliberately not named GOBIN — Go's own toolchain
+# assigns that name meaning (it overrides `go install`'s target directory), so a caller with GOBIN
+# already exported would have it silently rewritten process-wide by this function.
 ensure_gopath_on_path() {
-  GOBIN="$(go env GOPATH)/bin"
+  _gopath_bin="$(go env GOPATH)/bin"
   case ":$PATH:" in
-    *":$GOBIN:"*) ;;
-    *) PATH="$PATH:$GOBIN" ;;
+    *":$_gopath_bin:"*) ;;
+    *) PATH="$PATH:$_gopath_bin" ;;
   esac
   export PATH
 }
