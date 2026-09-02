@@ -121,7 +121,13 @@ export function initSchemaSync(): void {
   unsubscribeConnectionsChanged = control.onConnectionsChanged((records) => {
     const liveIds = new Set(records.map((r) => r.id));
     for (const id of Object.keys(schemasState.byConnection)) {
-      if (!liveIds.has(id)) delete schemasState.byConnection[id];
+      if (!liveIds.has(id)) {
+        delete schemasState.byConnection[id];
+        // P12 round 1 finding #11: parsedCache is keyed on connectionId too, and this module's
+        // own comment above claims dropping a deleted connection's entry is the only cleanup it
+        // owns — measured ~521 KiB per stale entry left behind without this.
+        parsedCache.delete(id);
+      }
     }
   });
 }
