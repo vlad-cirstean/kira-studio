@@ -152,21 +152,26 @@ export function observeScrollElementRect(
   return () => observer.disconnect();
 }
 
-// P22 D1: @tanstack/virtual-core@3.17.8's own stock observeElementOffset (observeOffset in its
-// index.ts) reads the scroll offset and invokes its callback synchronously on every native `scroll`
-// event, not once per animation frame — unlike observeScrollElementRect above, this app never
-// overrode it. A fling can fire many native scroll events inside a single frame (DataGrid.vue's own
-// onScroll comment already says so, for the position-persistence watcher it coalesces), and every
-// such notify rebuilds the whole rendered window (renderRows), so the app did N full re-renders per
-// frame and threw N-1 of them away before paint. This coalesces the *scrolling* notify into one rAF
-// per burst, reading the offset inside the callback — after, not at, event time — so the computed
-// range is the freshest one available when the frame actually renders, not the burst's first event.
-// The trailing `isScrolling: false` notify keeps the stock observer's own debounce
-// (isScrollingResetDelay, default 150ms) so end-of-scroll semantics are unchanged; this app never
-// sets useScrollendEvent, so that alternate stock path is not reproduced here. Bare
-// requestAnimationFrame/setTimeout rather than instance.targetWindow's, matching DataGrid.vue's own
-// scrollRaf/scrollSaveTimer — this is a single-window desktop webview, not a library that has to
-// support a scroll element living in a different window/iframe.
+// P22 iter2 D1: reverted from pass 1's rAF-deferred notify (P22 D1, f28b25a/57d2f1a) — see
+// docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §2 for the full evidence.
+// Pass 1's premise was that a fling can fire many native `scroll` events inside a single animation
+// frame, so it deferred this observer's notify into one requestAnimationFrame per burst. That
+// premise is false in every modern engine: HTML's *run the scroll steps* dispatches a scrolled
+// element's `scroll` event at most once per rendering update, before *run the animation frame
+// callbacks* runs in that same update — already documented at docs/PERF.md:98-102 for Chromium, and
+// independently in f28b25a's own commit message for WebKit ("WebKit coalesces any number of
+// synchronous writes into exactly one native `scroll` event"). So the deferral coalesced a burst
+// that never happens, changed nothing a user could see, and cost two rAF schedules plus two timer
+// resets per scroll event per grid (one of each per virtualizer) for no benefit — worse, it risked
+// slipping a notify to the *next* frame whenever the browser delivers `scroll` to the main thread
+// after that update's own rAF phase has already run, which is exactly the wrong direction for a
+// "rows lag behind a fling" symptom. This restores @tanstack/virtual-core@3.17.8's own stock timing
+// (observeElementOffset in its index.ts): `cb` runs synchronously on `scroll`, with only the stock
+// observer's own isScrollingResetDelay debounce (default 150ms) kept for the trailing
+// `isScrolling: false` notify — this app never sets useScrollendEvent, so that alternate stock path
+// is not reproduced here. DataGrid.vue's own onScroll (not this function) is where a velocity
+// estimate and the real-fling trace hook are now derived, off the same native `scroll` event this
+// observer also listens for — see its own comment for why that seam is kept separate from this one.
 export function observeScrollElementOffset(
   instance: {
     scrollElement: Element | null;
@@ -182,7 +187,6 @@ export function observeScrollElementOffset(
     return horizontal ? el.scrollLeft * ((isRtl && -1) || 1) : el.scrollTop;
   };
 
-  let raf = 0;
   let resetTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleEnd = () => {
     clearTimeout(resetTimer);
@@ -194,17 +198,12 @@ export function observeScrollElementOffset(
 
   const handler = () => {
     scheduleEnd();
-    if (raf) return;
-    raf = requestAnimationFrame(() => {
-      raf = 0;
-      cb(readOffset(), true);
-    });
+    cb(readOffset(), true);
   };
 
   el.addEventListener('scroll', handler, { passive: true });
   return () => {
     el.removeEventListener('scroll', handler);
-    if (raf) cancelAnimationFrame(raf);
     clearTimeout(resetTimer);
   };
 }

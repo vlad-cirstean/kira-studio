@@ -7,8 +7,8 @@ import { WIDE_TABLE_COLUMNS, WIDE_TABLE_ROWS } from './support/cellEditorCapture
 import { IPC } from './support/ipcChannels';
 import {
   measureClickToDom,
-  measureScrollCoverage,
   measureScrollResponses,
+  measureSustainedScroll,
   percentile,
 } from './support/measure';
 import {
@@ -439,19 +439,17 @@ function logStats(label: string, values: number[]): void {
   console.log(`budgets.spec.ts ${label}: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`);
 }
 
-// P22 D3's own velocity ladder: the doc's realistic 40-100 px/frame band, a fling peak, and
-// WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung, so the two documents' axes line up.
+// P22 iter2 D7's own velocity ladder: the original plan's realistic 40-100 px/frame band, a fling
+// peak, and WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung, so the two documents' axes line up.
 const SCROLL_COVERAGE_LADDER = [40, 100, 200, 456];
 
-function logCoverage(
-  label: string,
-  velocity: number,
-  uncoveredPx: number[],
-  notifiesPerFrame: number[],
-): void {
+// P22 iter2 D7: logged, never gated — see measureSustainedScroll's own header comment for why a
+// main-thread-scrolled tier can't falsify `uncoveredPx` (P22 iter2 F4). Pass 1's `notifiesPerFrame`
+// gate is gone with it (F1: it measured `measureScrollCoverage`'s own SUB_STEPS_PER_FRAME constant,
+// not the app).
+function logCoverage(label: string, velocity: number, uncoveredPx: number[]): void {
   console.log(
     `budgets.spec.ts scroll coverage (${label}, ${velocity}px/frame): ` +
-      `notifiesPerFrame=[${notifiesPerFrame.join(',')}] max=${Math.max(...notifiesPerFrame)} ` +
       `uncoveredPx=[${uncoveredPx.join(',')}] max=${Math.max(...uncoveredPx)}`,
   );
 }
@@ -552,34 +550,21 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(12);
   expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(50);
 
-  // --- 1a. sustained-velocity coverage & notify-rate ladder (P22 D3), on big_rows (narrow,
-  // >200,000px scrollable — plenty of room for every rung below). Unlike measureScrollResponses
-  // above (one step from an idle DOM, P22 F6), this keeps scrolling: notifiesPerFrame is the row
-  // virtualizer's own re-render count per animation frame, and uncoveredPx is whether the mounted
-  // row band still covers the viewport *while* scrolling continues, not just once it settles.
-  // Pre-fix baseline (P22 C2, this exact instrument against the tree before P22 D1's
-  // observeScrollElementOffset landed): notifiesPerFrame max per rung was 3/7/8/8 at 40/100/200/
-  // 456 px/frame; uncoveredPx was already 0 throughout, which is why D2's row-overscan raise is not
-  // needed below.
+  // --- 1a. sustained-velocity coverage ladder (P22 iter2 D7), on big_rows (narrow, >200,000px
+  // scrollable — plenty of room for every rung below). Unlike measureScrollResponses above (one
+  // step from an idle DOM, P22 F6), this keeps scrolling — uncoveredPx is whether the mounted row
+  // band still covers the viewport *while* scrolling continues, not just once it settles. Logged,
+  // not gated (measureSustainedScroll's own comment says why a main-thread-scrolled tier can't
+  // falsify this) — see docs/PERF.md §2.1a for what a real measurement needs instead.
   await grid.evaluate((el) => {
     el.scrollTop = 0;
   });
   for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
-    const { uncoveredPx, notifiesPerFrame } = await measureScrollCoverage(
-      page,
-      '[data-testid="data-grid"]',
-      { pxPerFrame, frames: 20 },
-    );
-    logCoverage('big_rows', pxPerFrame, uncoveredPx, notifiesPerFrame);
-    // P22 D1's direct proof: the coalesced offset observer notifies at most once per animation
-    // frame no matter how many native scroll events land inside it.
-    expect(Math.max(...notifiesPerFrame)).toBeLessThanOrEqual(1);
-    // The symptom's own metric, gated at the doc's realistic 40-100px/frame band (P22 §7.1); 200
-    // and 456 are logged above but not gated — 456px/frame is WEBVIEW-SCROLL-MEMORY.md §5.4's own
-    // "no human produces this" top rung.
-    if (pxPerFrame <= 100) {
-      expect(Math.max(...uncoveredPx)).toBe(0);
-    }
+    const { uncoveredPx } = await measureSustainedScroll(page, '[data-testid="data-grid"]', {
+      pxPerFrame,
+      frames: 20,
+    });
+    logCoverage('big_rows', pxPerFrame, uncoveredPx);
     await grid.evaluate((el) => {
       el.scrollTop = 0;
     });
@@ -702,27 +687,19 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   }
 
   // The same ladder as 1a, on the wide-AND-tall shape — 60 columns means every notify's
-  // full-window rebuild (P22 F2) is far more expensive per call than on big_rows' 2 columns, so
-  // this is where the coalescing fix matters most. This mock's own scroll_grid fixture only ever
-  // captures one pageSize=100 page (this file's own note below), so the scrollable range is small;
-  // measureScrollCoverage clamps each write at the bottom, which only turns trailing frames at the
-  // higher rungs into no-op (still-valid) samples, not failures.
-  // Pre-fix baseline (P22 C2): notifiesPerFrame max per rung was 4/5/8/8 at 40/100/200/456
-  // px/frame; uncoveredPx was 0 throughout, same as big_rows above.
+  // full-window rebuild is far more expensive per call than on big_rows' 2 columns. This mock's own
+  // scroll_grid fixture only ever captures one pageSize=100 page (this file's own note below), so
+  // the scrollable range is small; measureSustainedScroll clamps each write at the bottom, which
+  // only turns trailing frames at the higher rungs into no-op (still-valid) samples, not failures.
   await scrollGrid.evaluate((el) => {
     el.scrollTop = 0;
   });
   for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
-    const { uncoveredPx, notifiesPerFrame } = await measureScrollCoverage(
-      page,
-      '[data-testid="data-grid"]',
-      { pxPerFrame, frames: 20 },
-    );
-    logCoverage('scroll_grid', pxPerFrame, uncoveredPx, notifiesPerFrame);
-    expect(Math.max(...notifiesPerFrame)).toBeLessThanOrEqual(1);
-    if (pxPerFrame <= 100) {
-      expect(Math.max(...uncoveredPx)).toBe(0);
-    }
+    const { uncoveredPx } = await measureSustainedScroll(page, '[data-testid="data-grid"]', {
+      pxPerFrame,
+      frames: 20,
+    });
+    logCoverage('scroll_grid', pxPerFrame, uncoveredPx);
     await scrollGrid.evaluate((el) => {
       el.scrollTop = 0;
     });
