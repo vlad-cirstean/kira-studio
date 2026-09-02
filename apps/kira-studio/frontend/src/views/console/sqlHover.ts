@@ -63,11 +63,16 @@ function resolveHover(
   schema: DdlSchema,
   doc: string,
   pos: number,
+  tree?: LNode,
 ): ConsoleHoverInfo | null {
   // P12 round 1 finding #13: parsed once here, then handed to both statementsWithRefs() calls
   // below (its own `root` param) — before, each one re-parsed this exact same string, a provably
   // redundant second parse of text already parsed one line above.
-  const root = dialect.language.parser.parse(doc).topNode as unknown as LNode;
+  // P12 round 2 finding #11: `tree`, when given, is CodeMirror's own already-parsed syntax tree
+  // (editor/hover.ts's buildHoverSource, via `syntaxTree(view.state)`) — measured up to ~51ms on a
+  // 191KB document otherwise, over budget with no debounce. A fresh parse only happens when no
+  // tree is supplied (e.g. a caller with no live EditorView, like a unit test).
+  const root = tree ?? (dialect.language.parser.parse(doc).topNode as unknown as LNode);
   const { node, parent } = findLeafAt(root, pos);
   if (!isNameNode(node)) return null;
 
@@ -137,5 +142,5 @@ export function sqlHoverSource(
   schema: DdlSchema,
 ): HoverTooltipSource | undefined {
   if (schema.tables.length === 0) return undefined;
-  return buildHoverSource((doc, pos) => resolveHover(dialect, schema, doc, pos));
+  return buildHoverSource<LNode>((doc, pos, tree) => resolveHover(dialect, schema, doc, pos, tree));
 }

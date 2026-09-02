@@ -5,6 +5,7 @@
 // diagnostic") and a wrong hover card for entirely valid SQL.
 import { describe, expect, test } from 'bun:test';
 import { PostgreSQL } from '@codemirror/lang-sql';
+import { EditorState } from '@codemirror/state';
 import type { DdlSchema } from '../../frontend/src/views/console/ddl';
 import { ddlDiagnostics } from '../../frontend/src/views/console/sqlDiagnostics';
 import { sqlHoverSource } from '../../frontend/src/views/console/sqlHover';
@@ -40,10 +41,11 @@ describe('a CTE shadowing a DDL table name (P12 round 2 F7)', () => {
     // +1: findLeafAt's inclusive boundary check picks the preceding "." node at the exact
     // boundary, so land one character inside "id" instead.
     const pos = sql.indexOf('orders.id') + 'orders.'.length + 1;
-    // Only buildHoverSource's view.state.doc.toString() call is ever exercised.
-    const view = { state: { doc: { toString: () => sql } } } as unknown as Parameters<
-      NonNullable<typeof source>
-    >[0];
+    // A real EditorState with PostgreSQL's own language installed — buildHoverSource (P12 round 2
+    // finding #11) now reads `syntaxTree(view.state)` itself, which needs the language's state
+    // field actually present, not just a `.doc.toString()` stub.
+    const state = EditorState.create({ doc: sql, extensions: [PostgreSQL.language] });
+    const view = { state } as unknown as Parameters<NonNullable<typeof source>>[0];
     const tooltip = source?.(view, pos, 1);
     expect(tooltip).toBeNull();
   });

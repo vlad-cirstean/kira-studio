@@ -1,3 +1,4 @@
+import { syntaxTree } from '@codemirror/language';
 import type { HoverTooltipSource, Tooltip } from '@codemirror/view';
 
 // P18 (v1.1) D8/F9: turns a pure text-in lookup into a real CodeMirror HoverTooltipSource — the
@@ -13,11 +14,18 @@ export interface ConsoleHoverInfo {
   lines: string[];
 }
 
-export function buildHoverSource(
-  lookup: (doc: string, pos: number) => ConsoleHoverInfo | null,
+// P12 round 2 finding #11: `syntaxTree(view.state)` reads the tree `@codemirror/language` already
+// maintains incrementally as the document changes — this is the one module allowed to touch it, so
+// the tree is read once here and handed to `lookup` rather than making every caller re-parse the
+// whole document from scratch on every hover. `T` is left to the caller (never named here) so this
+// module stays as SQL-agnostic as the "no EditorView at the call site" docstring above already
+// requires — sqlHover.ts is the only caller, and it alone knows what a `Tree`'s `topNode` means.
+export function buildHoverSource<T>(
+  lookup: (doc: string, pos: number, tree: T) => ConsoleHoverInfo | null,
 ): HoverTooltipSource {
   return (view, pos): Tooltip | null => {
-    const info = lookup(view.state.doc.toString(), pos);
+    const tree = syntaxTree(view.state).topNode as unknown as T;
+    const info = lookup(view.state.doc.toString(), pos, tree);
     if (!info) return null;
     return {
       pos: info.from,

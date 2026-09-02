@@ -95,15 +95,20 @@ function unknownColumnDiagnostics(
 }
 
 /** DDL-driven diagnostics over `text` — empty when `schema` has no tables (D5: no DDL document,
- *  no diagnostics beyond the lexical ones lintSql already gives). */
+ *  no diagnostics beyond the lexical ones lintSql already gives). `root`: an already-parsed tree
+ *  (P12 round 2 finding #11, same optional third argument sqlHover.ts's own statementsWithRefs
+ *  calls take) — a fresh parse only happens when none is supplied. Currently always undefined at
+ *  this module's one call site (lint.ts), which is deliberately debounced 400ms and not (yet) worth
+ *  the CodeMirror-internals plumbing hover.ts's own redundant-parse fix needed. */
 export function ddlDiagnostics(
   dialect: SQLDialect,
   text: string,
   schema: DdlSchema,
+  root?: LNode,
 ): ConsoleDiagnostic[] {
   if (schema.tables.length === 0) return [];
   const out: ConsoleDiagnostic[] = [];
-  for (const { statement, refs, cteNames } of statementsWithRefs(dialect, text)) {
+  for (const { statement, refs, cteNames } of statementsWithRefs(dialect, text, root)) {
     out.push(...unknownRelationDiagnostics(refs, cteNames, schema));
     const aliasMap = resolveAliasMap(refs, cteNames, schema);
     const consumedFroms = new Set(refs.map((r) => r.nodeFrom));
