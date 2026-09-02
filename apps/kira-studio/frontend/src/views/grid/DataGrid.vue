@@ -30,6 +30,7 @@ import {
   initialWidths,
   MAX_OVERSCAN_COLUMNS,
   OVERSCAN_PX,
+  observeScrollElementOffset,
   observeScrollElementRect,
   pageColumnIndexFor,
   resetMeasureCtx,
@@ -375,6 +376,7 @@ const rowVirtualizer = useVirtualizer(
     overscan: Math.ceil(OVERSCAN_PX / rowHeight.value),
     paddingStart: rowHeight.value,
     observeElementRect: observeScrollElementRect,
+    observeElementOffset: observeScrollElementOffset,
     onChange: markScrollWork,
   })),
 );
@@ -391,6 +393,7 @@ const colVirtualizer = useVirtualizer(
     rangeExtractor: (range: Range) =>
       columnRangeExtractor(range, offsets.value, OVERSCAN_PX, MAX_OVERSCAN_COLUMNS),
     observeElementRect: observeScrollElementRect,
+    observeElementOffset: observeScrollElementOffset,
     onChange: markScrollWork,
   })),
 );

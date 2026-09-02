@@ -152,6 +152,63 @@ export function observeScrollElementRect(
   return () => observer.disconnect();
 }
 
+// P22 D1: @tanstack/virtual-core@3.17.8's own stock observeElementOffset (observeOffset in its
+// index.ts) reads the scroll offset and invokes its callback synchronously on every native `scroll`
+// event, not once per animation frame — unlike observeScrollElementRect above, this app never
+// overrode it. A fling can fire many native scroll events inside a single frame (DataGrid.vue's own
+// onScroll comment already says so, for the position-persistence watcher it coalesces), and every
+// such notify rebuilds the whole rendered window (renderRows), so the app did N full re-renders per
+// frame and threw N-1 of them away before paint. This coalesces the *scrolling* notify into one rAF
+// per burst, reading the offset inside the callback — after, not at, event time — so the computed
+// range is the freshest one available when the frame actually renders, not the burst's first event.
+// The trailing `isScrolling: false` notify keeps the stock observer's own debounce
+// (isScrollingResetDelay, default 150ms) so end-of-scroll semantics are unchanged; this app never
+// sets useScrollendEvent, so that alternate stock path is not reproduced here. Bare
+// requestAnimationFrame/setTimeout rather than instance.targetWindow's, matching DataGrid.vue's own
+// scrollRaf/scrollSaveTimer — this is a single-window desktop webview, not a library that has to
+// support a scroll element living in a different window/iframe.
+export function observeScrollElementOffset(
+  instance: {
+    scrollElement: Element | null;
+    options: { horizontal?: boolean; isRtl?: boolean; isScrollingResetDelay?: number };
+  },
+  cb: (offset: number, isScrolling: boolean) => void,
+): (() => void) | undefined {
+  const el = instance.scrollElement as HTMLElement | null;
+  if (!el) return undefined;
+
+  const readOffset = () => {
+    const { horizontal, isRtl } = instance.options;
+    return horizontal ? el.scrollLeft * ((isRtl && -1) || 1) : el.scrollTop;
+  };
+
+  let raf = 0;
+  let resetTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleEnd = () => {
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(
+      () => cb(readOffset(), false),
+      instance.options.isScrollingResetDelay ?? 150,
+    );
+  };
+
+  const handler = () => {
+    scheduleEnd();
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      cb(readOffset(), true);
+    });
+  };
+
+  el.addEventListener('scroll', handler, { passive: true });
+  return () => {
+    el.removeEventListener('scroll', handler);
+    if (raf) cancelAnimationFrame(raf);
+    clearTimeout(resetTimer);
+  };
+}
+
 // §8.5's type-aware right-alignment for numerics.
 export function alignmentFor(descriptor: ColumnDescriptor): 'left' | 'right' {
   return descriptor.typeClass === 'number' ? 'right' : 'left';
