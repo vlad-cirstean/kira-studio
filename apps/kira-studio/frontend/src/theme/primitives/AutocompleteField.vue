@@ -29,6 +29,10 @@ const props = withDefaults(
     modelValue: string;
     candidates: Completion[];
     prefix?: string;
+    /** P27: lights the prefix label up in `--kira-accent` instead of the default disabled grey —
+     * set by a filter/sort field's caller when the underlying (applied, not just typed) value is
+     * set. Unrelated to `active` on IconButton/AppButton (that means "toggled open"). */
+    prefixActive?: boolean;
     placeholder?: string;
     invalid?: boolean;
     /** Item 2: a read-only CodeMirrorHost, stacked behind this field's own (still fully in
@@ -242,7 +246,7 @@ onBeforeUnmount(() => {
     class="p-input autocomplete-field"
     :class="{ 'is-invalid': invalid }"
   >
-    <span v-if="prefix" class="ph">{{ prefix }}</span>
+    <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
     <span class="input-wrap">
       <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
            behind the real input rather than the input itself. `key` remounts it on a language

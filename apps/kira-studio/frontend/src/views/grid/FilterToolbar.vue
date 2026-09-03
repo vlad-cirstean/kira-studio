@@ -142,6 +142,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
     <AutocompleteField
       v-model="whereText"
       prefix="WHERE"
+      :prefix-active="!!tab.state.filter"
       placeholder="status = 'paid'"
       data-testid="filter-where-input"
       :invalid="hasError"
@@ -157,6 +158,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
     <AutocompleteField
       v-model="orderByText"
       prefix="ORDER BY"
+      :prefix-active="!!tab.state.sort"
       placeholder="placed_at DESC"
       data-testid="filter-orderby-input"
       :candidates="orderByCandidates"

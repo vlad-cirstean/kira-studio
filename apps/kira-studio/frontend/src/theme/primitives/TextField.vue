@@ -14,6 +14,10 @@ const props = withDefaults(
     type?: 'text' | 'password' | 'number';
     icon?: string;
     prefix?: string;
+    /** P27: lights the prefix label up in `--kira-accent` instead of the default disabled grey —
+     * set by a filter/sort field's caller when the underlying (applied, not just typed) value is
+     * set. Unrelated to `active` on IconButton/AppButton (that means "toggled open"). */
+    prefixActive?: boolean;
     placeholder?: string;
     size?: 'sm' | 'md';
     ui?: boolean;
@@ -59,7 +63,7 @@ function stepBy(dir: 1 | -1): void {
     :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper }"
   >
     <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
-    <span v-if="prefix" class="ph">{{ prefix }}</span>
+    <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
     <input
       autocomplete="off"
       v-bind="$attrs"

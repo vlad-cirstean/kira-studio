@@ -168,6 +168,16 @@
 .p-input input::placeholder {
   color: var(--kira-fg-disabled);
 }
+/* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "offset", "since")
+   used to render in this exact same disabled grey regardless of whether the field held an applied
+   value — no visual difference between "nothing is filtered/sorted" and "this view is filtered/
+   sorted right now." `--kira-accent` is this app's existing "this is on" colour elsewhere
+   (IconButton.vue's `.is-primary`/`.has-indicator`, DataGrid.vue's own sort chevron) — reused here
+   rather than a new one. Each caller (FilterToolbar.vue, DocumentView.vue, StreamView.vue) decides
+   "active" off its own persisted tab state, not the live edit buffer. */
+.p-input .ph.ph-active {
+  color: var(--kira-accent);
+}
 
 /* Hide the OS-native up/down spinner — .p-input .stepper below draws the app's own. */
 .p-input input[type="number"] {

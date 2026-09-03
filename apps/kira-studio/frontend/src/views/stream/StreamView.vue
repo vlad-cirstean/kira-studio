@@ -664,6 +664,7 @@ onUnmounted(() => {
           <TextField
             v-model="offsetText"
             prefix="offset"
+            :prefix-active="!!tab.state.offsetFilter"
             placeholder="e.g. 1000"
             data-testid="stream-filter-offset"
             @enter="onApplyFilter"
@@ -675,6 +676,7 @@ onUnmounted(() => {
             icon="filter"
             data-testid="stream-filter-partition"
             v-tooltip="'Filter by partition'"
+            :style="selectedPartitions.length ? { color: 'var(--kira-accent)' } : undefined"
             @click="onTogglePartitionMenu"
           >
             {{ partitionButtonLabel }}
@@ -718,6 +720,7 @@ onUnmounted(() => {
             <TextField
               v-model="timestampText"
               prefix="since"
+              :prefix-active="!!tab.state.timestampFilter"
               placeholder="ISO timestamp"
               data-testid="stream-filter-timestamp"
               :invalid="!!timestampError"

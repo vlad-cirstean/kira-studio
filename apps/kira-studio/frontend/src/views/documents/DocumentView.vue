@@ -670,6 +670,7 @@ onUnmounted(() => {
           <AutocompleteField
             v-model="sortText"
             prefix="SORT"
+            :prefix-active="!!tab.state.sort"
             placeholder="{ createdAt: -1, name: 1 }"
             v-tooltip="'Mongo sort document: 1 = ascending, -1 = descending'"
             data-testid="document-sort"
