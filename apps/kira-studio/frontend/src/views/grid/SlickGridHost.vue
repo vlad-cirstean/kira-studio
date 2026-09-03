@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ObjectMeta } from '@shared/domain/tree';
+import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type {
   Column,
@@ -9,9 +10,13 @@ import type {
   OnBeforeHeaderCellDestroyEventArgs,
   OnHeaderCellRenderedEventArgs,
   SingleColumnSort,
+  SlickEventData,
 } from 'slickgrid';
 import { SlickEventHandler } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { shortcutFor } from '../../shortcuts/keys';
+import { connectionRecord, connectionsState } from '../../state/connections';
+import { runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { categoryForTypeClass } from '../../theme/icons';
@@ -21,9 +26,12 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
+import type { RowSnapshot } from './clipboardFormats';
+import { rowMenu } from './menu';
 import { matchedRows } from './search';
 import {
   createDisplayValueExtractor,
@@ -35,8 +43,8 @@ import { KiraSlickGrid } from './slick/kiraSlickGrid';
 import './slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { getPage, pageVersion, setVisibleWindow } from './page';
-import { pendingFor } from './pendingChanges';
+import { cell, getPage, pageVersion, setVisibleWindow } from './page';
+import { pendingFor, stagedValue } from './pendingChanges';
 import * as scrollTrace from './scrollTrace';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, setSort } from './state';
@@ -47,11 +55,10 @@ import { runtime, setSort } from './state';
 // see the grid, its rowsCache or its DOM, or every internal object SlickGrid touches on every
 // render gets proxied), constructed in onMounted, destroyed in onUnmounted.
 //
-// Pass A's own scope boundary (§7.1): no editing, no menus, no clipboard, no drag-select, no insert
-// rows, no keyboard beyond what SlickGrid gives for free (here: none — enableCellNavigation is
-// off). This file is deliberately NOT a feature-complete replacement for DataGrid.vue; it exists
-// behind window.__kiraGridEngine === 'slick' so a real A/B can be run against DataGrid.vue on the
-// same build (docs/PERF.md §2.1a's protocol, extended by this phase's own C7).
+// Pass A shipped this file scoped to decode/bridge/gutter/colour/theme/runway only (§7.0); Pass B
+// (P22-slickgrid-pass-b.md) is building it out to full parity, feature by feature, each landing as
+// its own commit per that plan's §9 — this file's own comments cite the commit/decision each piece
+// belongs to as they land.
 const props = defineProps<{ tabId: string }>();
 
 // See kiraSlickGrid.ts's own comment: Column<T>'s `field` type is a recursive
@@ -118,6 +125,80 @@ function cellFormatter(
 
 function rt() {
   return runtime[props.tabId];
+}
+
+// P22 Pass B, C3 — the row-shortcut/copy/paste plumbing needs the same writability/identity
+// predicates DataGrid.vue's own computeds provide; plain functions here (not `computed`s) since
+// nothing below reads them from inside the render path (D0 is about that path specifically, not
+// about app logic in general) and every call site is already an event handler.
+function hasPrimaryKey(): boolean {
+  return getPage(props.tabId)?.columns.some((c) => c.isPrimaryKey) ?? false;
+}
+function isWritable(): boolean {
+  const t = tab();
+  if (!t?.connectionId) return false;
+  return !connectionRecord(t.connectionId)?.readOnly;
+}
+function caps() {
+  const connectionId = tab()?.connectionId;
+  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+}
+// Gates whether double-click/Enter starts an inline edit (D8/C8) — the toolbar's own add/preview/
+// commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
+function canEditTable(): boolean {
+  return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate;
+}
+// P36 D26: deliberately not folded into canEditTable — an engine could offer one of
+// canUpdate/canDelete without the other.
+function canDeleteRows(): boolean {
+  return isWritable() && hasPrimaryKey() && !!caps()?.canDelete;
+}
+
+// Produced locally from the path, never round-tripped to the engine for a string join — the same
+// discipline DataGrid.vue's own qualifiedName() and grid/menu.ts's qualifiedNameForPath use.
+const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
+function qualifiedName(): string {
+  const t = tab();
+  if (!t?.connectionId) return '';
+  return decodePath(t.connectionId, t.path)
+    .segments.filter((s) => QUALIFIED_KINDS.has(s.kind))
+    .map((s) => s.name)
+    .join('.');
+}
+
+// Merges a staged edit over the real page value for display — DataGrid.vue's own displayCell,
+// content (not mechanism, §1) so it moves into rowValues.ts unchanged at C7 once the menus/
+// clipboard land there too; needed now for rowMenu's own row-copy/duplicate snapshot.
+function displayCell(
+  row: number,
+  displayCol: number,
+): { text: string; isNull: boolean; truncated: boolean; staged: boolean } {
+  const p = getPage(props.tabId);
+  if (!p) return { text: '', isNull: true, truncated: false, staged: false };
+  const order = resolveColumnOrder(p, tab()?.state.columnOrder ?? null);
+  const name = order[displayCol];
+  const staged = name ? stagedValue(props.tabId, row, name) : undefined;
+  if (staged !== undefined) {
+    return { text: staged ?? '', isNull: staged === null, truncated: false, staged: true };
+  }
+  const pageCol = pageColumnIndexFor(p, order, displayCol);
+  if (pageCol < 0) return { text: '', isNull: true, truncated: false, staged: false };
+  const view = cell(props.tabId, row, pageCol);
+  return { ...view, staged: false };
+}
+
+// The row's effective values across the whole display column order — DataGrid.vue's own
+// rowSnapshot, reused by rowMenu's own copy/duplicate items.
+function rowSnapshot(row: number): RowSnapshot {
+  const p = getPage(props.tabId);
+  const order = p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
+  const values: Record<string, string | null> = {};
+  for (let c = 0; c < order.length; c++) {
+    const name = order[c];
+    const dc = displayCell(row, c);
+    values[name] = dc.isNull ? null : dc.text;
+  }
+  return { columns: [...order], values };
 }
 
 // FIX-8: PK/FK stated as a label, never inferred from colour alone — mirrors DataGrid.vue's own
@@ -551,6 +632,91 @@ function onColumnsResized(): void {
   suppressWidthEcho = false;
 }
 
+// F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
+// (`isImmediatePropagationStopped()`, checked right after this fires): the app's own handler runs
+// before SlickGrid's own default key handling and wins simply by calling it on the branches it
+// owns. `enableCellNavigation: true` (above) is what gives the arrow-key/Enter-to-edit path for
+// free — DataGrid.vue's own onKeydown arrow block (:1762-1779) has no counterpart here.
+function onKeydown(e: SlickEventData): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+
+  const key = (e.key ?? '').toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'c') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    // C7 lands the body (onCopy) — this commit only claims the key.
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && key === 'v') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    // C7 lands the body (onPaste) — this commit only claims the key.
+    return;
+  }
+
+  // shortcutFor reads a real KeyboardEvent's own modifier/key fields — SlickEventData copies
+  // exactly that subset onto itself from the native event it wraps (slick.core.ts's own
+  // constructor), so this is a safe reinterpretation, not an unsafe cast to a different shape.
+  const nativeLike = e as unknown as KeyboardEvent;
+
+  // P21 D5: dispatched through rowMenu() itself (the same builder the row/gutter context menu
+  // will call, C7) so the printed shortcut and the executed action can't drift, and
+  // `disabled: !canEdit` is honoured for free — inert on a read-only table without restating that
+  // guard here.
+  const rowShortcut = shortcutFor(nativeLike, ['grid.duplicateRows', 'grid.deleteRows']);
+  if (rowShortcut && runtimeEntry.selection?.kind === 'row') {
+    const { rows } = runtimeEntry.selection;
+    const ran = runMenuShortcut(
+      rowMenu({
+        tabId: props.tabId,
+        rows,
+        qualifiedName: qualifiedName(),
+        snapshot: rowSnapshot,
+        canEdit: canEditTable(),
+        canDelete: canDeleteRows(),
+      }),
+      rowShortcut,
+    );
+    if (ran) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+    return;
+  }
+
+  // P31 D32/F31: Delete/Cmd+Backspace also fires from a cell or range selection, not just a row
+  // selection (which requires a gutter click) — clicking a cell is the ordinary way a row gets
+  // picked. Duplicate stays row-selection-only. Still dispatched through rowMenu() for the same
+  // reasons as above.
+  const deleteShortcut = shortcutFor(nativeLike, ['grid.deleteRows']);
+  const cellOrRangeSel = runtimeEntry.selection;
+  if (deleteShortcut && (cellOrRangeSel?.kind === 'cell' || cellOrRangeSel?.kind === 'range')) {
+    const rows =
+      cellOrRangeSel.kind === 'range'
+        ? Array.from(
+            { length: Math.abs(cellOrRangeSel.row - cellOrRangeSel.anchorRow) + 1 },
+            (_, i) => Math.min(cellOrRangeSel.row, cellOrRangeSel.anchorRow) + i,
+          )
+        : [cellOrRangeSel.row];
+    const ran = runMenuShortcut(
+      rowMenu({
+        tabId: props.tabId,
+        rows,
+        qualifiedName: qualifiedName(),
+        snapshot: rowSnapshot,
+        canEdit: canEditTable(),
+        canDelete: canDeleteRows(),
+      }),
+      deleteShortcut,
+    );
+    if (ran) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+}
+
 onMounted(() => {
   const el = rootRef.value;
   if (!el) return;
@@ -632,8 +798,11 @@ onMounted(() => {
       // Read once here, at construction — this option is construction-time only, same as
       // `frozenColumn`/`enableColumnReorder`/etc. above.
       forceSyncScrolling: window.__kiraGridTuning?.forceSyncScrollingOverride ?? false,
-      // §7.1 — no keyboard/click-navigation beyond the static demonstration above; Pass B territory.
-      enableCellNavigation: false,
+      // C3/F6 — display-position-correct arrows for free (F6): the app's own onKeydown no longer
+      // needs to juggle displayPositionOf/rowAtDisplayPosition (DataGrid.vue:1762-1779) because the
+      // data source already indexes display positions; navigateUp/Down/Left/Right and the Enter ->
+      // edit path (D8) come from this option, unported.
+      enableCellNavigation: true,
       enableAddRow: false,
       editable: false,
       explicitInitialization: false,
@@ -655,6 +824,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
   eventHandler.subscribe(grid.onSort, onSort);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
+  eventHandler.subscribe(grid.onKeyDown, onKeydown);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
