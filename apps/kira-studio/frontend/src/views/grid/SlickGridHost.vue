@@ -43,6 +43,7 @@ import {
   resolveColumnOrder,
 } from '../shared/page/columns';
 import { setSearchFiltering } from '../shared/page/searchFilter';
+import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import {
@@ -695,7 +696,6 @@ function classesFrom(flags: CellClassFlags): string[] {
   return Object.keys(cellClass(flags));
 }
 
-type EdgeHash = Record<number, Record<string, string>>;
 const SEL_EDGE_LAYER_KEYS = ['kira-sel-t', 'kira-sel-r', 'kira-sel-b', 'kira-sel-l'] as const;
 
 /** C5/§5 D5 — the selection's own perimeter, O(perimeter ∩ rendered) by construction: only the
@@ -904,30 +904,22 @@ function refreshStagedLayer(): void {
 // inside the same 150ms sandbox bound this file's other cost gates use; D5 already names the
 // fallback (a rendered-range ± hysteresis band) if it doesn't.
 function computeSearchHashes(): [EdgeHash, EdgeHash] {
-  const matchHash: EdgeHash = {};
-  const currentHash: EdgeHash = {};
-  if (!grid || !dataSource) return [matchHash, currentHash];
+  if (!grid || !dataSource) return [{}, {}];
   const entry = searchState[props.tabId];
-  if (!entry || entry.matches.length === 0) return [matchHash, currentHash];
+  if (!entry || entry.matches.length === 0) return [{}, {}];
   const p = getPage(props.tabId);
-  if (!p) return [matchHash, currentHash];
+  if (!p) return [{}, {}];
   const orderSet = new Set(currentOrder());
   const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
-  const matchClass = classesFrom({ searchMatch: true })[0] ?? 'search-match';
-  const currentClass = classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current';
-  for (const m of entry.matches) {
-    const name = p.columns[m.col]?.name;
-    if (!name || !orderSet.has(name)) continue;
-    const pos = displayPositionOf(idx, m.row);
-    matchHash[pos] ??= {};
-    (matchHash[pos] as Record<string, string>)[name] = matchClass;
-  }
-  const current = entry.index >= 0 ? entry.matches[entry.index] : undefined;
-  const currentName = current && p.columns[current.col]?.name;
-  if (current && currentName && orderSet.has(currentName)) {
-    currentHash[displayPositionOf(idx, current.row)] = { [currentName]: currentClass };
-  }
-  return [matchHash, currentHash];
+  return searchCellLayers(
+    entry.matches,
+    entry.index,
+    (col) => p.columns[col]?.name,
+    (name) => orderSet.has(name),
+    (row) => displayPositionOf(idx, row),
+    classesFrom({ searchMatch: true })[0] ?? 'search-match',
+    classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current',
+  );
 }
 
 function refreshSearchLayer(): void {

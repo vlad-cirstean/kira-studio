@@ -22,6 +22,7 @@ import {
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
+import { searchCellLayers } from '../shared/slick/cssLayers';
 import {
   createGridDataSource,
   type DisplayRowIndex,
@@ -311,35 +312,28 @@ function classesFrom(flags: CellClassFlags): string[] {
 }
 
 // §3.5: "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
-// current one. Not clipped to the rendered band (unlike the one-cell selection layer's neighbour
-// in SlickGridHost.vue, `kira-search` there is deliberately unclipped too — D5's own table): a
-// search result is not bounded the way a rendered band is.
+// current one, via views/shared/slick/cssLayers.ts's own searchCellLayers (§3.6 C4) so this isn't
+// written a second time from SlickGridHost.vue's own computeSearchHashes. Not clipped to the
+// rendered band (unlike the one-cell selection layer's neighbour — SlickGridHost.vue's own
+// `kira-search` is deliberately unclipped too, D5's own table): a search result is not bounded the
+// way a rendered band is. `isVisibleColumn` is always `true` — a console result never reorders or
+// hides a column, unlike the data grid's own column-menu-driven set.
 function refreshSearchLayer(): void {
   if (!grid || !page) return;
   const entry = searchState[props.tabId];
-  const matches = entry?.matches ?? [];
-  const matchHash: Record<number, Record<string, string>> = {};
-  const currentHash: Record<number, Record<string, string>> = {};
-  if (matches.length > 0) {
-    const idx: DisplayRowIndex = {
-      displayRows: matchedRows(props.tabId),
-      pageRowCount: page.rowCount,
-    };
-    const matchClass = classesFrom({ searchMatch: true })[0] ?? 'search-match';
-    const currentClass = classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current';
-    for (const m of matches) {
-      const name = page.columns[m.col]?.name;
-      if (!name) continue;
-      const pos = displayPositionOf(idx, m.row);
-      matchHash[pos] ??= {};
-      (matchHash[pos] as Record<string, string>)[name] = matchClass;
-    }
-    const current = entry && entry.index >= 0 ? matches[entry.index] : undefined;
-    const currentName = current && page.columns[current.col]?.name;
-    if (current && currentName) {
-      currentHash[displayPositionOf(idx, current.row)] = { [currentName]: currentClass };
-    }
-  }
+  const idx: DisplayRowIndex = {
+    displayRows: matchedRows(props.tabId),
+    pageRowCount: page.rowCount,
+  };
+  const [matchHash, currentHash] = searchCellLayers(
+    entry?.matches ?? [],
+    entry?.index ?? -1,
+    (col) => page?.columns[col]?.name,
+    () => true,
+    (row) => displayPositionOf(idx, row),
+    classesFrom({ searchMatch: true })[0] ?? 'search-match',
+    classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current',
+  );
   grid.setCellCssStyles('kira-search', matchHash);
   grid.setCellCssStyles('kira-search-current', currentHash);
 }
