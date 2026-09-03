@@ -136,6 +136,47 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			},
 		},
 		{
+			Name: "SASL broker, kira_noacl (authenticated, no ACL grants)",
+			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
+				c.Username, c.Password = testsupport.Strp(testsupport.KafkaSaslNoAclUsername), testsupport.Strp(testsupport.KafkaSaslNoAclPassword)
+				return c
+			},
+			// Connect only pings for broker reachability and fetches cluster-wide metadata with no
+			// topics named (adapter.go's own comment) — neither needs a grant on anything, so a
+			// correctly-authenticated principal with zero ACLs still connects, exactly like every
+			// other adapter's least-privilege matrix row. Confirmed against a real container: this
+			// still connects even with another case's topic already sitting on the shared broker.
+			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"brokers": "1"}},
+			Then: []testsupport.Scenario{
+				{
+					// finding 4's pin: errors.go:58-59 maps TopicAuthorizationFailed into the same
+					// E_AUTH branch as SaslAuthenticationFailed — a correctly-authenticated
+					// principal refused by ACL reads exactly like a wrong password, the same
+					// conflation clickhouse/authmatrix_test.go:79-86, mongo/authmatrix_test.go's
+					// missing-role case and redis/authmatrix_test.go's NOPERM case already pin for
+					// their own adapters. kira_noacl authenticates fine (SASL/PLAIN succeeds) but
+					// was granted no ACL at all (testsupport/kafka_sasl.go's StandardAuthorizer,
+					// default result DENIED), so a plain topic read is the refusal.
+					Name: "read of an existing topic fails, and today that is coded E_AUTH (not yet distinguished from a credential failure)",
+					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+						const topic = "p26-matrix-sasl-noacl"
+						testsupport.CreateTopicSasl(t, sasl, topic)
+						_, err := a.Read(context.Background(), adapters.ReadRequest{
+							Path:     testsupport.NodePath(cfg.ID, testsupport.Seg("topic", topic)),
+							PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+						}, adapters.NewOpCtx("matrix-sasl-noacl-read"))
+						if err == nil {
+							t.Fatal("Read: want an error for a principal with no ACL grants")
+						}
+						code, _ := adapters.CodeOf(err)
+						if code != adapters.CodeAuth {
+							t.Errorf("code = %v, want E_AUTH (current behaviour — see comment above)", code)
+						}
+					},
+				},
+			},
+		},
+		{
 			Name: "SASL broker, kira/wrong",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp("wrong")

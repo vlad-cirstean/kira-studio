@@ -31,6 +31,14 @@ const (
 	kafkaSaslClusterID      = "kira-sasl-test-cluster"
 	kafkaSaslContainerPort  = "9095/tcp"
 	kafkaSaslControllerPort = "9094/tcp"
+
+	// KafkaSaslNoAclUsername/Password (finding 4): a second principal baked into the same
+	// PLAIN JAAS config, granted no ACLs at all once the authorizer below is enabled — the
+	// SASL-authenticated-but-authorization-refused principal clickhouse/mongo/redis's own matrices
+	// already have and kafka's did not. Static config, same as kira/kira, since PLAIN's credential
+	// table is boot-time only (no dynamic-user API the way SCRAM has).
+	KafkaSaslNoAclUsername = "kira_noacl"
+	KafkaSaslNoAclPassword = "kira_noacl"
 )
 
 // KafkaSaslFixture is the SASL_PLAINTEXT/PLAIN counterpart to KafkaFixture — used only by the
@@ -108,14 +116,16 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 		return nil, err
 	}
 
-	// A single mechanism entry serves two roles at once, per PlainLoginModule's own contract:
+	// A single mechanism entry serves three roles at once, per PlainLoginModule's own contract:
 	// username/password is this broker's own identity when it dials itself for inter-broker
-	// traffic, and user_<name>=<password> is the table of credentials it accepts from an
-	// incoming client — the same "kira"/"kira" pair for both, so there is exactly one principal to
-	// reason about.
+	// traffic, and each user_<name>=<password> is one entry in the table of credentials it accepts
+	// from an incoming client. kira is also this cluster's sole super user (KAFKA_SUPER_USERS
+	// below) so enabling the authorizer doesn't change its own behaviour or break inter-broker
+	// traffic; kira_noacl authenticates the same way but is granted no ACLs at all, for finding 4's
+	// authorization-refusal pin.
 	jaas := fmt.Sprintf(
-		`org.apache.kafka.common.security.plain.PlainLoginModule required username="%[1]s" password="%[2]s" user_%[1]s="%[2]s";`,
-		kafkaSaslUsername, kafkaSaslPassword,
+		`org.apache.kafka.common.security.plain.PlainLoginModule required username="%[1]s" password="%[2]s" user_%[1]s="%[2]s" user_%[3]s="%[4]s";`,
+		kafkaSaslUsername, kafkaSaslPassword, KafkaSaslNoAclUsername, KafkaSaslNoAclPassword,
 	)
 
 	req := testcontainers.ContainerRequest{
@@ -157,6 +167,21 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 			"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1",
 			"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR":            "1",
 			"KAFKA_AUTO_CREATE_TOPICS_ENABLE":                "false",
+			// KRaft's own ACL authorizer (finding 4) — StandardAuthorizer, not the ZooKeeper-era
+			// AclAuthorizer, since this cluster has no ZooKeeper at all. kira is the sole
+			// SASL-authenticated super user, so it bypasses every ACL check exactly as it did with
+			// no authorizer configured at all (both its own client use and its inter-broker
+			// identity, see the jaas comment above); every other SASL principal (kira_noacl) is
+			// denied by default, since Kafka's own allow.everyone.if.no.acl.found defaults to
+			// false. User:ANONYMOUS also has to be a super user: the CONTROLLER listener is plain
+			// PLAINTEXT (KAFKA_LISTENER_SECURITY_PROTOCOL_MAP above), so KRaft's own
+			// controller-to-controller quorum traffic authenticates as ANONYMOUS — without this,
+			// the broker fails to boot at all ("ClusterAuthorizationException ... is not
+			// authorized" on the CONTROLLER listener, confirmed against a real container). The
+			// CONTROLLER listener is never exposed to a client, so this carries no real privilege
+			// escalation.
+			"KAFKA_AUTHORIZER_CLASS_NAME": "org.apache.kafka.metadata.authorizer.StandardAuthorizer",
+			"KAFKA_SUPER_USERS":           "User:" + kafkaSaslUsername + ";User:ANONYMOUS",
 		},
 		WaitingFor: wait.ForLog("(?i)Kafka Server started").AsRegexp().WithStartupTimeout(kafkaStartupTimeout),
 	}
