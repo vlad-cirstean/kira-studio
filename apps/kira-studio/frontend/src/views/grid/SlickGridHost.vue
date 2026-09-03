@@ -19,6 +19,7 @@ import { connectionRecord, connectionsState } from '../../state/connections';
 import { runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
+import { type CellClassFlags, cellClass } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import {
   alignmentFor,
@@ -499,6 +500,137 @@ function tagRenderedRows(): void {
   }
 }
 
+// C5/§5 D5 — a display column index -> the SlickGrid column *id* (field name) it corresponds to,
+// i.e. the key setCellCssStyles' own hash wants (F2's own `hash[j][this.columns[k].id]`).
+// `getColumns()` includes the gutter at index 0, hence the +1.
+function fieldAtDisplayCol(displayCol: number): string | undefined {
+  const c = grid?.getColumns()[displayCol + 1];
+  return c ? String(c.field) : undefined;
+}
+
+function classesFrom(flags: CellClassFlags): string {
+  return Object.keys(cellClass(flags)).join(' ');
+}
+
+/** C5/§5 D5 — the selection's own perimeter, O(perimeter ∩ rendered) by construction: only the
+ *  two edge columns (c0/c1, or every selected row's own two edge columns for a row selection, or
+ *  every selected column's own two edge rows for a column selection) are ever walked per rendered
+ *  row — never the interior. A committed selection is at most one rectangle (or, in row/column
+ *  mode, a set of full-width/full-height strips), which is what keeps this bounded regardless of
+ *  how large the selection itself is (F2's O(area) cost is `kira-cell-selected`'s own — SlickGrid's
+ *  built-in layer, gated separately at C6). Page-row space in, translated once per rendered row via
+ *  `dataSource.getItem(pos).row` — the same arithmetic `onGridRendered` already uses.
+ */
+function computeSelEdgesHash(): Record<number, Record<string, string>> {
+  const hash: Record<number, Record<string, string>> = {};
+  if (!grid || !dataSource) return hash;
+  const sel = rt()?.selection;
+  if (!sel) return hash;
+  const { start, end } = grid.lastRenderedRowBounds;
+  if (end < start) return hash;
+
+  const mark = (pos: number, displayCol: number, flags: CellClassFlags): void => {
+    const field = fieldAtDisplayCol(displayCol);
+    if (!field) return;
+    const cls = classesFrom(flags);
+    if (!cls) return;
+    hash[pos] ??= {};
+    const row = hash[pos] as Record<string, string>;
+    row[field] = row[field] ? `${row[field]} ${cls}` : cls;
+  };
+
+  if (sel.kind === 'cell' || sel.kind === 'range') {
+    const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
+    const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
+    const r0 = Math.min(anchorRow, sel.row);
+    const r1 = Math.max(anchorRow, sel.row);
+    const c0 = Math.min(anchorCol, sel.col);
+    const c1 = Math.max(anchorCol, sel.col);
+    for (let pos = start; pos <= end; pos++) {
+      const pageRow = dataSource.getItem(pos).row;
+      if (pageRow < r0 || pageRow > r1) continue;
+      const isTop = pageRow === r0;
+      const isBottom = pageRow === r1;
+      mark(pos, c0, {
+        selEdgeLeft: true,
+        selEdgeRight: c0 === c1,
+        selEdgeTop: isTop,
+        selEdgeBottom: isBottom,
+      });
+      if (c1 !== c0)
+        mark(pos, c1, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
+      // Interior columns of the top/bottom row only — c0/c1 already got their own edge above.
+      if (isTop) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeTop: true });
+      if (isBottom) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeBottom: true });
+    }
+  } else if (sel.kind === 'row') {
+    const rows = new Set(sel.rows);
+    const lastCol = grid.getColumns().length - 1 - 1; // minus the gutter, then to a 0-based index
+    for (let pos = start; pos <= end; pos++) {
+      const pageRow = dataSource.getItem(pos).row;
+      if (!rows.has(pageRow)) continue;
+      const isTop = !rows.has(pageRow - 1);
+      const isBottom = !rows.has(pageRow + 1);
+      mark(pos, 0, { selEdgeLeft: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
+      if (lastCol > 0)
+        mark(pos, lastCol, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
+    }
+  } else if (sel.kind === 'column') {
+    const cols = new Set(sel.cols);
+    const pageRowCount = getPage(props.tabId)?.rowCount ?? 0;
+    for (let pos = start; pos <= end; pos++) {
+      const pageRow = dataSource.getItem(pos).row;
+      const isTop = pageRow === 0;
+      const isBottom = pageRow === pageRowCount - 1;
+      for (const c of cols) {
+        mark(pos, c, {
+          selEdgeTop: isTop,
+          selEdgeBottom: isBottom,
+          selEdgeLeft: !cols.has(c - 1),
+          selEdgeRight: !cols.has(c + 1),
+        });
+      }
+    }
+  }
+  return hash;
+}
+
+function refreshSelEdges(): void {
+  grid?.setCellCssStyles('kira-sel-edges', computeSelEdgesHash());
+}
+
+/** C5/§5 D5 — bounded by what the user staged (`pendingFor(tabId).edits`, a handful of rows in
+ *  any real session), clipped to the rendered range the same way the edges layer is. */
+function computeStagedHash(): Record<number, Record<string, string>> {
+  const hash: Record<number, Record<string, string>> = {};
+  if (!grid || !dataSource) return hash;
+  const p = pendingFor(props.tabId);
+  if (!p || p.edits.size === 0) return hash;
+  const { start, end } = grid.lastRenderedRowBounds;
+  if (end < start) return hash;
+  const cls = classesFrom({ pendingEdit: true });
+  for (let pos = start; pos <= end; pos++) {
+    const pageRow = dataSource.getItem(pos).row;
+    const edit = p.edits.get(pageRow);
+    if (!edit) continue;
+    const row: Record<string, string> = {};
+    for (const column of Object.keys(edit.changes)) row[column] = cls;
+    hash[pos] = row;
+  }
+  return hash;
+}
+
+function refreshStagedLayer(): void {
+  grid?.setCellCssStyles('kira-staged', computeStagedHash());
+}
+
+// The rendered row *band* (not every render — a sub-row scroll re-renders nothing new, and the
+// edges/staged layers only ever depend on what's actually mounted) leaving the previous one is
+// the other trigger D5 names for the edges layer, beside a selection change; folded into
+// onGridRendered since it already runs on every grid.onRendered and already reads
+// lastRenderedRowBounds.
+let lastCssLayerBand = { start: 0, end: -1 };
+
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
   const { start, end } = grid.lastRenderedRowBounds;
@@ -510,23 +642,11 @@ function onGridRendered(): void {
   const hi = Math.max(first.row, last.row);
   setVisibleWindow(props.tabId, lo, hi + 1);
   setVisibleRows(props.tabId, lo, hi + 1);
-}
 
-/** §7.0's own "representative static selection/search CSS layer" — a fixed, deterministic pair of
- *  cells, never produced by a click or a drag (that's Pass B's own interaction layer, §7.1). This
- *  exists to prove the setCellCssStyles seam (D5) actually renders, so a thin spike that skipped it
- *  entirely couldn't produce a false-positive "it's fast" result by rendering less than the real
- *  design would. */
-function applyStaticCssLayers(): void {
-  if (!grid) return;
-  const cols = grid.getColumns();
-  const firstDataField = cols[1]?.field;
-  const secondDataField = cols[2]?.field;
-  if (firstDataField) {
-    grid.setCellCssStyles('kira-selection', { 0: { [firstDataField]: 'kira-cell-selected' } });
-  }
-  if (secondDataField) {
-    grid.setCellCssStyles('kira-search', { 0: { [secondDataField]: 'kira-cell-search-match' } });
+  if (start !== lastCssLayerBand.start || end !== lastCssLayerBand.end) {
+    lastCssLayerBand = { start, end };
+    refreshSelEdges();
+    refreshStagedLayer();
   }
 }
 
@@ -697,6 +817,8 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   runtimeEntry.selection = posSel ? toPageRowSelection(posSel) : null;
+  // C5/§5 D5 — the perimeter layer's other trigger, beside a rendered-band change (onGridRendered).
+  refreshSelEdges();
 }
 
 // D4 — the header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick,
@@ -961,7 +1083,6 @@ onMounted(() => {
     lastOffsetT = performance.now();
   }
   grid.render();
-  applyStaticCssLayers();
   syncSortIndicators();
 
   if (viewportEl) {
@@ -1017,8 +1138,11 @@ watch(
     grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
     grid.updateRowCount();
     grid.invalidateAllRows();
+    // C5 — the rendered band's own numbers can coincidentally match the pre-reload band (a page
+    // reload commonly lands back at scrollTop 0), which would fool onGridRendered's own
+    // band-change check into skipping a refresh a genuinely new page needs. The sentinel forces it.
+    lastCssLayerBand = { start: 0, end: -1 };
     grid.render();
-    applyStaticCssLayers();
     syncSortIndicators();
   },
 );
@@ -1057,6 +1181,24 @@ watch(
     rebuildAndSetColumns();
     grid?.render();
   },
+);
+
+// C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged.
+// `pendingFor(tabId)?.edits` is a reactive Map (pendingChanges.ts's own `pendingState`, a Vue
+// `reactive()`), so both Map iteration and each entry's own `changes` object track reactively —
+// no reference-identity trap the way the TabPending object itself would be (created once per tab
+// and mutated in place, never reassigned). The signature is row -> staged *column count*, not
+// values: refreshStagedLayer only needs to know *which* cells are staged, never what they hold,
+// so a same-column value edit (no key added/removed) correctly does not re-trigger this.
+watch(
+  () => {
+    const p = pendingFor(props.tabId);
+    if (!p) return '';
+    let sig = '';
+    for (const [row, edit] of p.edits) sig += `${row}:${Object.keys(edit.changes).length};`;
+    return sig;
+  },
+  () => refreshStagedLayer(),
 );
 
 defineExpose({

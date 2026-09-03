@@ -159,16 +159,49 @@
   margin-left: var(--kira-s-1);
 }
 
-/* §6 D5 — the setCellCssStyles seam's own CSS layer, keyed 'kira-selection'/'kira-search' (D5's
-   table). Declared after the type-colour rules above so the cascade enforces D6's own priority
-   rule for free. Pass A applies these two classes to a fixed, deterministic pair of cells (never
-   from a click or a drag) — see SlickGridHost.vue's own comment on why: proving the rendering seam
-   without building the Pass-B interaction layer it will eventually carry. */
+/* §6 D5/C5 — the setCellCssStyles seam's own CSS layers: SlickGrid's own 'kira-cell-selected'
+   (the whole selection's fill, F2) and the app's own 'kira-sel-edges'/'kira-staged'/
+   'kira-search' (D5's table). Declared after the type-colour rules above so the cascade enforces
+   D6's own priority rule for free. */
 .slick-grid-host .kira-cell-selected {
   background: var(--kira-select);
 }
 .slick-grid-host .kira-cell-search-match {
   background: var(--kira-search-match);
+}
+
+/* P42 D21/F15, ported verbatim from GridRow.vue's own `.grid-cell.selected` rule (C5) — an inset
+   box-shadow per side, switched on only when that side sits on the selection's own outer
+   perimeter (`.sel-t`/`.sel-r`/`.sel-b`/`.sel-l`, SlickGridHost.vue's own computeSelEdgesHash),
+   so two adjacent selected cells' shared inner edge draws nothing from either side and the
+   selection's outer boundary reads as one uniform line. */
+.slick-grid-host .kira-cell-selected {
+  --sel-t: 0 0 0 0 transparent;
+  --sel-r: 0 0 0 0 transparent;
+  --sel-b: 0 0 0 0 transparent;
+  --sel-l: 0 0 0 0 transparent;
+  box-shadow:
+    inset var(--sel-t),
+    inset var(--sel-r),
+    inset var(--sel-b),
+    inset var(--sel-l);
+}
+.slick-grid-host .kira-cell-selected.sel-t {
+  --sel-t: 0 var(--kira-border-width) 0 0 var(--kira-focus);
+}
+.slick-grid-host .kira-cell-selected.sel-r {
+  --sel-r: calc(-1 * var(--kira-border-width)) 0 0 0 var(--kira-focus);
+}
+.slick-grid-host .kira-cell-selected.sel-b {
+  --sel-b: 0 calc(-1 * var(--kira-border-width)) 0 0 var(--kira-focus);
+}
+.slick-grid-host .kira-cell-selected.sel-l {
+  --sel-l: var(--kira-border-width) 0 0 0 var(--kira-focus);
+}
+
+/* C5/§5 D5 — a staged (uncommitted) edit, GridRow.vue's own `.grid-cell.pending-edit` rule. */
+.slick-grid-host .pending-edit {
+  color: var(--kira-warn);
 }
 
 /* P22 Pass B, C2/§5 D14 — the header parity rules: sort chevron + order badge, resize handle,
