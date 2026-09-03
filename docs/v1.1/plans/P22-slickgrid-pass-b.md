@@ -1111,6 +1111,11 @@ since after Pass B that dependency has exactly **one** runtime consumer: `Consol
 column axis. (`columns.ts:3` imports only the `Range` *type* — zero runtime.) Either way it is a
 third pass with its own plan, and its honest scope is the **tabular branch only**.
 
+**Reopened**: `docs/v1.1/plans/P30-data-views-slickgrid-evaluation.md` §3, at that exact scope —
+the tabular branch only, migrated onto the reusable layer under this plan's own host
+(`views/shared/slick/`); the document and key-value branches stay on `VirtualList`, per reason 1
+above, still correct for them.
+
 ---
 
 ## 7. The cutover, and every test's fate

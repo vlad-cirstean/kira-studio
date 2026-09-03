@@ -736,6 +736,33 @@ it alone and the old branch is back, with its code still present. C6 is the dele
 revertible. C7 cannot precede C6 (the old branch imports the dependency). C4 sits before the cutover
 so the console's search layer is not written twice.
 
+**Implementation correction, found at C1, not anticipated above**: §3.3's claim that the new file
+"imports and does not modify" `views/grid/slick/kiraSlickGrid.ts`/`dataSource.ts`/`slickTheme.css`
+in place is wrong about the *path* — `biome.json`'s `noRestrictedImports` (SPEC §11) forbids any
+`views/<kind>/*` file from importing another `views/<kind>/*` by relative path, `views/grid/**`
+included, with no carve-out for `slick/`. A prerequisite commit (before C1) relocated the three
+genuinely engine-agnostic modules — plus `scrollTrace.ts`, pulled along because `kiraSlickGrid.ts`'s
+own `render()`/`getRenderedRange()` overrides call into it unconditionally — to
+`views/shared/slick/`, splitting `dataSource.ts` in two: the generic `CustomDataView`/display-
+position core moved wholesale; `createDisplayValueExtractor`/`pendingRowClasses`, which read
+`views/grid/pendingChanges.ts`, stayed behind in `views/grid/slick/dataSource.ts` (now a thin
+`export *` of the shared core plus those two functions), so `SlickGridHost.vue`'s own
+`from './slick/dataSource'` import needed no change at all. `SlickGridHost.vue`'s other two imports
+(`kiraSlickGrid`, `slickTheme.css`) did need updating to the new path — a second, purely mechanical
+edit to that file beyond C4, contradicting §3.6 C4's "the only edit to that file in the whole plan"
+claim in letter (not in spirit: zero logic changed, only where three `import` statements point).
+No behaviour changed; `views/console/ConsoleSlickGrid.vue` imports from `views/shared/slick/*`
+throughout instead of `views/grid/slick/*` as §3.3/§3.5's prose names it.
+
+A second, load-bearing correction from the same commit: this toolchain's `vue-tsc` performs real
+control-flow narrowing across a template's `v-if`/`v-else-if` chain on a discriminated union
+(`page.kind`). Once C5 made `ConsoleSlickGrid.vue`'s own branch claim `page.kind === 'tabular'`
+unconditionally, the old `VirtualList` branch's identical condition narrowed `page` to `never`
+inside it and `bun run typecheck:web` failed on the resulting `.columns`-does-not-exist errors —
+not merely flagged unreachable code, genuinely broke the type-check gate every commit here is
+required to pass. There is no intermediate state between "flag removed" and "dead branch deleted"
+that typechecks, so C5 and C6 landed as one commit instead of two.
+
 ---
 
 ## 10. Verification
@@ -800,9 +827,12 @@ already unmounts per result chip, so the hook exists).
 
 ## 12. Open questions, handed forward
 
-1. **Should console results honour P9's row-colouring setting?** §3.7 item 1. Recommended yes
-   (it is the most visible answer to the user's own question); needs one word from the user, and the
-   plan works either way.
+1. **Should console results honour P9's row-colouring setting?** §3.7 item 1. **Decided yes at
+   implementation** (the recommendation, taken absent a concrete reason not to, per the
+   implementing session's own standing instruction not to block on a one-word confirmation) —
+   `ConsoleSlickGrid.vue`'s root carries `kira-grid--row-coloring` exactly as `SlickGridHost.vue`'s
+   does. Reversible: drop the root class binding and the `tc-*` prefix if the answer turns out to
+   be no; nothing else in the implementation depends on it either way.
 2. **Non-persisted console column widths.** §3.7 item 3. The ~10-line fix is named; deliberately not
    taken.
 3. **`rowRangeBounds` into `VirtualList`'s overscan.** §8.2. Available, one file, no library; not
@@ -812,8 +842,13 @@ already unmounts per result chip, so the hook exists).
    field count plus explicit expansions); the proportionate fix if it ever is needed is a cap plus
    "show N more", **not** a nested virtualizer, because that would break `rows.ts`'s exact-height
    contract.
-5. **Whether `ConsoleSlickGrid.vue` should move to `views/shared/slick/`.** Only when it gains a
-   second consumer, which today would be `StreamView` under §4's named conditions.
+5. **Whether `ConsoleSlickGrid.vue` should move to `views/shared/slick/`.** Still open, unchanged:
+   only when it gains a second consumer (`StreamView`, under §4's named conditions) — SPEC §11
+   doesn't force it any earlier, since `views/console/ConsoleSlickGrid.vue` itself imports *from*
+   `views/shared/slick/` rather than needing to live there. What *did* move there at implementation,
+   for a different, immediate reason (SPEC §11 again — see §3.6's own implementation-correction
+   note above), is the reusable layer underneath it: `kiraSlickGrid.ts`, `dataSource.ts`'s generic
+   core, `slickTheme.css`, `scrollTrace.ts`, and (§3.6 C4) the new `cssLayers.ts`.
 
 ---
 
