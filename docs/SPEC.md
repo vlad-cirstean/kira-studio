@@ -27,7 +27,7 @@ out of v1. Interactive rebase is explicitly v2.
 | # | Constraint | Consequence |
 |---|---|---|
 | C1 | The whole app must run in a plain Electron shell with no VS Code present. | Every VS Code API touch lives behind a port (§3.3). Zero `import * as vscode` outside `packages/host-vscode`. Enforced by lint rule and a build-time import check. |
-| C2 | Speed is a feature, not a nice-to-have. | Explicit performance budget (§5.1). Graph layout off the main thread, canvas rendering, no Vue reactivity over the commit array. |
+| C2 | Speed is a feature, not a nice-to-have. | Explicit performance budget (§5.1). Graph layout off the main thread, a virtualized grid whose DOM is bounded by the viewport rather than by history, no Vue reactivity over the commit array. |
 | C3 | Uses the user's own Git. | No bundled Git binary, no native bindings (§4.1). |
 | C4 | Frontend is validated with Playwright. | The UI must be runnable in a plain browser against a mock host bridge (§8.4). This falls out of C1 for free. |
 
@@ -197,14 +197,19 @@ kira-version-vscode/
 │   │       ├── bridge/             client.ts   typed client over the ipc contract
 │   │       ├── state/              repo.ts graphView.ts selection.ts search.ts settings.ts
 │   │       │                       viewState.ts    persisted view state (§2.1, §5.4)
-│   │       ├── graph/              GraphCanvas.vue  canvas element + lifecycle
-│   │       │                       renderer.ts      draws lanes/edges/nodes from typed arrays
-│   │       │                       hitTest.ts       arithmetic row/lane hit testing
-│   │       │                       palette.ts       reads theme tokens for canvas use (§3.4)
+│   │       ├── graph/              graphColumn.ts   the graph column's SlickGrid definition + formatter
+│   │       │                       rowSvg.ts        builds one row's <svg> slice from its segments
+│   │       │                       hitTest.ts       arithmetic lane-within-gutter hit testing
+│   │       │                       palette.ts       lane colour classes + HC outline metadata (§3.4)
+│   │       │                       layoutStore.ts   reassembles layout chunks; per-row segment query
+│   │       │                       layoutClient.ts  main-thread side of the layout worker
 │   │       │                       layout.worker.ts lane assignment off the main thread
 │   │       ├── components/
 │   │       │   ├── Toolbar.vue RepoPicker.vue BranchPicker.vue RefreshButton.vue
-│   │       │   ├── CommitList.vue CommitRow.vue LoadMoreButton.vue RefBadge.vue
+│   │       │   ├── CommitGrid.vue  SlickGrid host: lifecycle, data view, events, a11y pass
+│   │       │   ├── columns.ts      message/author/date/sha column defs and formatters
+│   │       │   ├── refBadges.ts    badge element builder used by the message formatter
+│   │       │   ├── LoadMoreButton.vue
 │   │       │   ├── DetailPane.vue CommitMeta.vue FileTree.vue DiffView.vue
 │   │       │   ├── SearchBox.vue SearchResults.vue ConflictBanner.vue
 │   │       │   ├── StashList.vue TagList.vue
@@ -212,7 +217,7 @@ kira-version-vscode/
 │   │       │                       StashDialog.vue TagDialog.vue RevertDialog.vue
 │   │       ├── theme/              vscode-tokens.css  the token layer (§3.4)
 │   │       │                       density.css        row heights, spacing scale
-│   │       │                       readTokens.ts      getComputedStyle bridge for canvas
+│   │       │                       readTokens.ts      getComputedStyle bridge for numeric metrics
 │   │       └── icons/              codicon.css + the mapping of actions → codicon names
 │   │
 │   ├── host-vscode/                the ONLY package permitted to import `vscode`
@@ -281,7 +286,7 @@ as an import specifier in exactly one package, and `bun:`/`Bun` in none (§8.1).
 ┌─ webview / renderer ─────────────────────────────────────────┐
 │  Vue app (state, panes, dialogs)                             │
 │      └─ Worker: parse + lane layout ─► transferable buffers  │
-│      └─ Canvas graph renderer                                │
+│      └─ SlickGrid rows; graph column = one <svg> per row     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -357,12 +362,18 @@ What VS Code injects into the webview document, with no API call on our side:
   chain. Components reference only `--kv-*`. Two reasons: not every theme defines every
   colour id (the fallback chain matters), and one indirection layer means retheming a
   component is one line in one file rather than a search across the codebase.
-- **The canvas is the one place this needs code.** A `<canvas>` cannot consume CSS variables;
-  `renderer.ts` needs real colour strings. So `theme/readTokens.ts` resolves the token layer
-  once via `getComputedStyle(document.documentElement)`, caches it, and a
-  `MutationObserver` on `<body>`'s class and style attributes re-reads and triggers a full
-  repaint when the theme changes. Without this the graph would keep its old colours after a
-  theme switch while everything around it updated — the most visible possible bug.
+- **The graph needs no colour code at all, because it is SVG.** SVG elements take `stroke` and
+  `fill` from CSS, so a lane is drawn as `<path class="kv-lane-3">` and the stylesheet says
+  `stroke: var(--kv-graph-lane-3)`. The theme switch re-cascades over the graph exactly as it
+  does over everything else, with no observer, no re-read and no repaint on our side. This is
+  the single largest reason the graph column is SVG rather than a `<canvas>`, which cannot
+  consume CSS variables and would need a resolved colour string plus a `MutationObserver` and a
+  forced repaint to avoid keeping its old colours after a theme switch — the most visible
+  possible bug, here designed out rather than defended against.
+- **`theme/readTokens.ts` survives with a narrower job**: resolving the *numeric* metrics the
+  grid needs as JavaScript values — `--kv-row-height` above all, which the row virtualizer takes
+  as a number, not as CSS. It still watches `<body>`'s class and style attributes, so a density
+  change re-measures; it no longer carries any colour.
 - **Graph lane colours** are the only palette we invent, since no workbench colour id means
   "branch lane 3". They are generated per theme kind for contrast against
   `--vscode-editor-background`, checked for WCAG contrast, and made distinguishable under the
@@ -636,11 +647,26 @@ thread.
 
 ### 5.3 Rendering
 
-- The graph column is a single `<canvas>`, redrawn per frame for the visible row window
-  only, `devicePixelRatio`-aware. Hit testing is arithmetic (row = `floor(y / rowHeight)`),
-  not DOM.
-- Text columns (message, author, date, ref badges) are virtualized DOM rows — real text for
-  accessibility, selection, and theming — with a recycled row pool.
+- **One virtualized grid owns every column, the graph included.** The commit list is
+  [SlickGrid](https://github.com/6pac/SlickGrid) (MIT, the maintained fork) driven from a
+  `CustomDataView` adapter over the typed-array store, so the DOM it holds is bounded by the
+  viewport rather than by history: at 100k commits the grid renders the ~20–60 rows on screen
+  plus a small buffer and removes the rest. Rows are `role="row"` divs of `role="gridcell"`
+  divs; every column's content is produced by a synchronous cell formatter returning a real DOM
+  element.
+- **The graph column is a column, not an overlay.** Its formatter returns one small `<svg>`
+  holding only the slice of the graph that passes through *that row's* height — the vertical
+  runs of the lanes crossing it, the arc of any edge that changes lane inside it, and the
+  commit's own node. A row therefore never needs to know about an edge as a whole, only about
+  what enters and leaves its own band, which is what makes a windowed grid and a graph spanning
+  40,000 rows compatible without a second, separately-positioned rendering surface. There is no
+  `<canvas>` anywhere in the app.
+- **Segments are grouped by lane colour into one `<path>` each**, so a row's SVG is typically
+  four elements and never more than ten, rather than one element per segment.
+- Text columns (message, author, date, ref badges) are real text in the same grid — for
+  accessibility, selection, and theming.
+- Hit testing is the grid's own row/cell event (`onClick` carries `row` and `cell`); *within*
+  the graph cell, which lane was clicked is arithmetic on the cell-relative x, not DOM.
 - Commit data lives in `markRaw`/`shallowRef` structures backed by typed arrays. Vue's
   reactivity never traverses the commit set; only the view window, selection, and filter
   state are reactive.
@@ -680,11 +706,15 @@ Rules:
   `cat-file --batch`.
 - **Worker → main transfers are `ArrayBuffer` transfers, not clones**, so layout output is
   never duplicated across threads.
-- **The DOM row pool is fixed-size** (visible rows + small overrun). No row is created during
-  scrolling; nodes are recycled and their text updated.
-- **Caches are bounded and evictable**: diff text LRU (cap by bytes, not entries), rendered
-  canvas tiles, and the per-repo commit set, which is dropped when the repo is deselected and
-  when the window has been hidden past a threshold.
+- **The rendered DOM is bounded by the viewport, not by history.** The grid's row cache holds
+  the visible rows plus a small buffer and removes rows as they leave it, so the node count is
+  flat from row 0 to row 99,999. Rows *are* created and destroyed as you scroll — that is the
+  cost of DOM-native rendering, and it is bounded (a handful of elements per row, allocated for
+  the rows newly scrolled into view in that frame), which is why §5.1's worst-frame budget is
+  the thing that gates it rather than a rule about recycling.
+- **Caches are bounded and evictable**: diff text LRU (cap by bytes, not entries) and the
+  per-repo commit set, which is dropped when the repo is deselected and when the window has
+  been hidden past a threshold.
 - Memory is a **measured budget**, not an aspiration: the perf harness (P0) measures renderer
   heap after loading the 100k synthetic repo and fails on a >20% regression, alongside the
   timing budgets in §5.1.
@@ -853,8 +883,12 @@ toolbar where it is repo-scoped.
 
 `docs/design/panel-mockup.html` is the approved visual reference for §6 — open it in a browser.
 It is a static drawing, not an implementation, but it is not decoration either: the lane graph
-is a real layout pass over a real commit topology rendered to canvas, and the theme switcher
-demonstrates the token bridge from §3.4 repainting that canvas on a theme change.
+is a real layout pass over a real commit topology, and the theme switcher demonstrates the token
+bridge from §3.4 recolouring it on a theme change. The mockup draws that graph to a `<canvas>`;
+the shipped app does not (§5.3). The canvas there is a convenience of a single static file with
+no virtualization to satisfy, and it is a drawing technique of the mockup, not a design decision
+this document carries — the geometry it shows (row height, lane pitch, node radii, the arc
+shape) is what makes it the visual reference, and that geometry is identical in SVG.
 
 It shows the panel in place beside the Terminal tab, all four theme kinds, the conflicted
 state (§7.11), and the narrow-panel drawer breakpoint (§6.3).
@@ -1299,7 +1333,7 @@ Two suites:
    detail pane, dialogs, keyboard nav, and every pre-flight *presentation* path (including
    error and conflict states, which are trivial to induce with a mock and painful to induce
    for real). Fast, hermetic, runs on every commit. Visual regression via Playwright
-   screenshot comparison on the canvas graph, in both light and dark themes.
+   screenshot comparison on the graph column, in both light and dark themes.
 2. **Integration suite.** The real host, real Git, real repositories built by a fixture
    generator, driving actual operations and asserting on the repository state afterwards.
    Under Electron this is Playwright's `_electron.launch` directly. Under VS Code, Playwright
@@ -1331,11 +1365,12 @@ Where Svelte 5 genuinely wins:
 
 Why it does not matter much *here*:
 
-- The hot paths are deliberately outside the framework. The graph is a `<canvas>` drawn from
-  typed arrays; layout is in a worker; commit data is column-wise typed arrays that are
-  explicitly kept out of the reactivity system (§5.3, §5.5). The framework renders a toolbar,
-  a fixed-size pool of ~60 recycled row components, a detail pane, and dialogs. Vue's VDOM
-  overhead over that surface is not measurable against a 16 ms frame.
+- The hot paths are deliberately outside the framework — more so than when this was first
+  written. The commit list is SlickGrid, which renders its own rows and cells imperatively from
+  typed arrays; layout is in a worker; commit data is column-wise typed arrays explicitly kept
+  out of the reactivity system (§5.3, §5.5). The framework renders a toolbar, a detail pane,
+  dialogs, and the host element the grid mounts into — it renders **no rows at all**. Vue's
+  VDOM overhead over that surface is not measurable against a 16 ms frame.
 - Vue's reactivity cost is opt-in, and we already opt out with `shallowRef`/`markRaw`. The
   comparison is not "Vue's proxies over 100k commits vs Svelte's runes" — nothing is reactive
   over 100k commits in either case.
@@ -1352,14 +1387,15 @@ the UI depends only on the `packages/ipc` contract, so `packages/ui` is replacea
 touching anything else. The decision to revisit would be driven by a measurement, not a
 preference.
 
-**Verdict: stay with Vue.** The memory and speed requirements are met by §5.3/§5.5 —
-canvas, workers, typed arrays, interning, row recycling — and those apply identically under
-either framework. Re-evaluate only if the P4 perf harness shows framework overhead in the
+**Verdict: stay with Vue.** The memory and speed requirements are met by §5.3/§5.5 — a
+viewport-bounded virtualized grid, per-row SVG, workers, typed arrays, interning — and those
+apply identically under either framework. Re-evaluate only if the P4 perf harness shows framework overhead in the
 frame budget.
 
 ### 8.6 The rest
 
-Vue 3.5+ (`<script setup>`, no Options API), Vite for the UI bundle and the harness dev
+Vue 3.5+ (`<script setup>`, no Options API), `slickgrid` (the 6pac fork, MIT) for the commit
+list's virtualization and column model, Vite for the UI bundle and the harness dev
 server, esbuild (or `bun build`) for the host bundles, `@vscode/vsce` + `ovsx` for
 publishing, `electron-builder` for the desktop app.
 
@@ -1411,8 +1447,8 @@ Phases are sequential; each ends at a checkpoint.
 | **P0** | Foundation | Monorepo per the normative tree in 3.1, Bun workspaces, Biome, **single TS 5.x checker with TS7-clean compiler options plus `tsgo` as an optional `check:fast`** (8.3), Vite, `packages/ipc` contract skeleton, `apps/harness` with mock bridge, Playwright wired to it, fixture-repo generator, perf-budget harness (time **and** heap). | `bun install && bun run check && bun run test` green locally on macOS; harness renders a placeholder UI; one Playwright test passes; `vue-tsc`/TS-7 state re-confirmed and versions pinned. |
 | **P1** | Git driver | `GitDriver`: discovery, version probe with the **2.38 hard-floor block state**, repo capability probe, spawn discipline (§4.3), streaming NUL parser, cancellation, write queue, `cat-file --batch`, typed error classification. | Unit tests over recorded porcelain fixtures; integration tests against generated repos; sub-2.38 Git produces the block state, never a half-working app. |
 | **P2** | History pipeline | Streaming `git log` walk with **paused long-lived-process paging (5.1.1)** and remaining-count query, ref query, status query, lane layout in a worker, packed transferable buffers, column-wise typed-array store with string interning (5.5). | First page within budget; repeated Load more to 100k within time **and heap** budget; layout unit tests over hand-built topologies incl. octopus merges. |
-| **P3** | Host bridge | RPC transport for both hosts, VS Code panel webview view registered and reachable, Electron shell booting the same bundle, state persistence/rehydration, **the shared settings schema driving both hosts (D25)**, theme token layer, `readTokens` canvas bridge, and Electron palette generation from VS Code theme JSON (3.4). | Panel opens in VS Code and shows live data; Electron app shows the same; hide/reveal rehydrates without re-running git; switching VS Code theme restyles the panel live, canvas included, with no reload. |
-| **P4** | Graph UI | Vue shell, virtualized row list, **Load more button with remaining count and viewport/selection preservation**, canvas graph renderer, branch/tag ref badges, columns, selection, refresh action, keyboard nav, responsive breakpoints (§6.3). | 60 fps scroll on the 100k repo; Playwright visual + interaction suite; accessibility pass on the virtualized list; visual regression green across all four theme kinds; side-by-side density review against the native workbench list (6.1). |
+| **P3** | Host bridge | RPC transport for both hosts, VS Code panel webview view registered and reachable, Electron shell booting the same bundle, state persistence/rehydration, **the shared settings schema driving both hosts (D25)**, theme token layer, the `readTokens` bridge, and Electron palette generation from VS Code theme JSON (3.4). | Panel opens in VS Code and shows live data; Electron app shows the same; hide/reveal rehydrates without re-running git; switching VS Code theme restyles the panel live, the graph surface included, with no reload. |
+| **P4** | Graph UI | Vue shell, the SlickGrid commit list over the typed-array store, **Load more button with remaining count and viewport/selection preservation**, the SVG graph column, branch/tag ref badges, columns, selection, refresh action, keyboard nav, responsive breakpoints (§6.3). | 60 fps scroll on the 100k repo; Playwright visual + interaction suite; accessibility pass on the virtualized list; visual regression green across all four theme kinds; side-by-side density review against the native workbench list (6.1). |
 | **P5** | Commit detail | Right pane: metadata, message/trailers/signature, parents, file tree with statuses and counts, **click-a-file-opens-its-diff** via the in-app unified diff view, copy actions. | Detail populated ≤80 ms; diff opens from tree click and follows keyboard selection; tree correct for renames, merges (parent selector), binary/LFS files. |
 | **P6** | Refs & checkout | Branch list and **tag list with full tag manipulation (§7.9)**, create branch, switch branch, detached checkout, delete/rename, **revert (7.10)**, **linked-worktree detection (D12)**, the **undo slot (7.12) seeded by branch and tag deletion**, the **in-progress/conflicted-state banner with VS Code merge-editor delegation, continue and abort (7.11)**, and the full checkout pre-flight engine (§7.5). | Pre-flight classification unit-tested exhaustively; integration tests cover clean-carry, blocked-by-tracked, blocked-by-untracked, in-progress-op; tag create/delete/push incl. annotated and remote-delete asymmetry; revert incl. merge-parent selection; an induced conflicting revert reaches the banner, gates other operations, and both continues and aborts cleanly; undo restores a deleted branch and a deleted annotated tag. |
 | **P7** | Remote ops | Fetch (incl. **opt-in background auto-fetch, default off**), push, decomposed pull with strategy selection, force-push with lease + `--force-if-includes`, protected branches, askpass path, progress + typed auth errors. | Integration tests against a local bare remote incl. non-ff rejection, lease violation, hook rejection; no operation can hang on a prompt. |
@@ -1436,7 +1472,8 @@ deliberately deferred rather than left undecided.**
 |---|---|---|
 | D1 | Git integration approach | **System Git via child process.** Not bundled, not libgit2/NodeGit, not isomorphic-git. Credentials, config fidelity and ecosystem tooling all decide it. Reasoning in 4.1. |
 | D2 | Minimum Git version | **2.38 as a hard requirement**, no degraded path. The target is a developer workstation running current Git; below the floor the app shows a blocking upgrade state (4.2). This is what makes the conflict predictions exact rather than heuristic. |
-| D3 | Frontend framework | **Vue.** Svelte's advantages are real but land outside this app's hot paths, which are canvas, workers and typed arrays. Evaluated in 8.5. |
+| D3 | Frontend framework | **Vue.** Svelte's advantages are real but land outside this app's hot paths, which are a viewport-bounded virtualized grid, workers and typed arrays — the framework renders no commit rows at all. Evaluated in 8.5. |
+| D3a | Commit-list rendering | **SlickGrid (6pac fork, MIT) for every column, with the graph column rendered as one small `<svg>` per row. No `<canvas>`.** The grid supplies the virtualization AGENTS.md's "prefer a library" rule asks us not to hand-roll, and driving it from a `CustomDataView` over the typed-array store keeps §5.5 intact. SVG rather than canvas because a graph column that is a *column* needs no second positioned surface to keep in sync with the rows, and because SVG takes its lane colours from the same CSS variables as everything else, deleting the theme-repaint problem in §3.4 rather than solving it. Per-row cost is bounded by the viewport, so the 100k requirement is met by virtualization, not by the drawing technique. Rendering detail in 5.3, the full evaluation in `docs/plans/P4.md`. |
 | D4 | TypeScript 7 | **Write TS7-clean code from day one, run a single TS 5.x checker until `vue-tsc` supports TS 7** (expected ~7.1, October 2026, inside this project's P0-P4 window). The originally-proposed two-checker split was wrong: `vue-tsc` checks whole programs, so TS 5.x would have been checking everything anyway. Full reasoning in 8.3. |
 | D5 | Theme | **Ride VS Code's injected theme.** It pushes the full workbench palette as `--vscode-*` CSS variables plus theme-kind body classes into every webview and keeps them live across theme switches. Electron wears the same variable names, generated from VS Code's own theme JSON. Details in 3.4, aesthetic rules in 6.1. |
 | D6 | Supported hosts | **Local desktop VS Code, plus the standalone Electron build.** Remote contexts (SSH, WSL, Codespaces, dev containers) and browser VS Code are out of scope and untested (2.1.1). |
