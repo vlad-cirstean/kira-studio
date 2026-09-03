@@ -21,6 +21,7 @@ import {
   initialWidths,
   resetMeasureCtx,
 } from '../shared/page/columns';
+import { setVisibleRows } from '../shared/page/visibleRows';
 import {
   createGridDataSource,
   type DisplayRowIndex,
@@ -31,7 +32,7 @@ import {
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
-import { cell, getPage } from './resultPages';
+import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
@@ -240,6 +241,24 @@ function tagRenderedRows(): void {
   }
 }
 
+// P30 §3.6 C3 — the decode-window/retention report (P5 C1): the same setVisibleRows +
+// setVisibleWindow pair ConsoleResultGrid.vue's own onVisibleRangeIndices made from
+// VirtualList's `visible-range` emit, now driven from grid.onRendered/lastRenderedRowBounds the
+// way SlickGridHost.vue's own onGridRendered does — the *rendered* (overscanned) band, not the
+// narrower strictly-visible one, so a row still inside the runway keeps its decode cache alive.
+function onGridRendered(): void {
+  if (!grid || !dataSource) return;
+  const { start, end } = grid.lastRenderedRowBounds;
+  const length = dataSource.getLength();
+  if (length <= 0 || end < start) return;
+  const first = dataSource.getItem(Math.max(0, Math.min(start, length - 1)));
+  const last = dataSource.getItem(Math.max(0, Math.min(end, length - 1)));
+  const lo = Math.min(first.row, last.row);
+  const hi = Math.max(first.row, last.row);
+  setVisibleRows(props.tabId, lo, hi + 1);
+  setVisibleWindow(props.pageKey, lo, hi + 1);
+}
+
 function fieldAtCol(colIdx: number): string | undefined {
   const c = grid?.getColumns()[colIdx];
   return c ? String(c.field) : undefined;
@@ -390,6 +409,7 @@ onMounted(() => {
 
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, tagRenderedRows);
+  eventHandler.subscribe(grid.onRendered, onGridRendered);
   eventHandler.subscribe(grid.onClick, onGridClick);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
