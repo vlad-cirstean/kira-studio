@@ -6,7 +6,9 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 
-const { dataLength, rowHandleAt } = await import('../../frontend/src/views/grid/slick/dataSource');
+const { dataLength, rowHandleAt, rowAtDisplayPosition, displayPositionOf } = await import(
+  '../../frontend/src/views/grid/slick/dataSource'
+);
 type DisplayRowIndex = Parameters<typeof rowHandleAt>[0];
 
 // P22 spike C3: display-position <-> page-row translation across a filter, the insert-row region
@@ -68,5 +70,45 @@ describe('rowHandleAt/dataLength (P22 spike D1) — display-position -> RowHandl
     expect(dataLength(idx, 0)).toBe(0);
     const handle = rowHandleAt(idx, [], 0);
     expect(handle).toEqual({ row: 0, pos: 0 });
+  });
+});
+
+// P22 Pass B, C4/§5 D4: displayPositionOf/rowAtDisplayPosition move here from DataGrid.vue —
+// rowAtDisplayPosition reuses rowHandleAt's own pageRowAt arithmetic (never a second
+// implementation that could drift), and displayPositionOf is its inverse, real once C12 wires a
+// live search filter, identity until then.
+describe('displayPositionOf/rowAtDisplayPosition (P22 Pass B C4) — page row <-> display position', () => {
+  test('1. unfiltered: identity in both directions', () => {
+    const idx: DisplayRowIndex = { displayRows: null, pageRowCount: 100 };
+    expect(rowAtDisplayPosition(idx, 42)).toBe(42);
+    expect(displayPositionOf(idx, 42)).toBe(42);
+  });
+
+  test('2. filtered: an exact hit round-trips through both directions', () => {
+    const idx: DisplayRowIndex = { displayRows: [3, 7, 9, 40], pageRowCount: 100 };
+    expect(rowAtDisplayPosition(idx, 2)).toBe(9);
+    expect(displayPositionOf(idx, 9)).toBe(2);
+    expect(displayPositionOf(idx, 3)).toBe(0);
+    expect(displayPositionOf(idx, 40)).toBe(3);
+  });
+
+  test('3. filtered: a page row the filter just hid falls through to the nearest visible position', () => {
+    const idx: DisplayRowIndex = { displayRows: [3, 7, 9, 40], pageRowCount: 100 };
+    // 8 isn't in displayRows — sorts between 7 (pos 1) and 9 (pos 2), landing on pos 2.
+    expect(displayPositionOf(idx, 8)).toBe(2);
+    // Past the last match, clamped to the last position rather than running off the end.
+    expect(displayPositionOf(idx, 99)).toBe(3);
+  });
+
+  test("4. the insert region: rowAtDisplayPosition reuses rowHandleAt's own identity rule", () => {
+    const idx: DisplayRowIndex = { displayRows: [3, 7], pageRowCount: 100 };
+    // Position 2 is the first past the 2 filtered rows -> the insert region, row = pageRowCount.
+    expect(rowAtDisplayPosition(idx, 2)).toBe(100);
+    expect(displayPositionOf(idx, 100)).toBe(2);
+  });
+
+  test('5. an empty display set: displayPositionOf clamps to 0, never a negative index', () => {
+    const idx: DisplayRowIndex = { displayRows: [], pageRowCount: 100 };
+    expect(displayPositionOf(idx, 50)).toBe(0);
   });
 });

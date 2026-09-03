@@ -59,6 +59,37 @@ function pageRowAt(idx: DisplayRowIndex, pos: number): number {
   return idx.displayRows ? (idx.displayRows[pos] ?? pos) : pos;
 }
 
+/** P22 Pass B, C4/§5 D4 — display position -> page row, exported: `selection.ts`'s own
+ *  `SlickRange`<->`Selection` translation needs exactly this arithmetic (a `SlickRange`'s
+ *  row fields are always display positions — SlickGrid indexes the `CustomDataView` it was
+ *  handed, never a page row), and it must be the SAME arithmetic `getItem`/`getItemMetadata`
+ *  use, not a second implementation that could drift from it. Identity while nothing is
+ *  filtered (`idx.displayRows === null`), which is Pass B's whole state until C12 wires a live
+ *  search filter — this function is correct for that case by construction, not by luck. */
+export function rowAtDisplayPosition(idx: DisplayRowIndex, pos: number): number {
+  return pageRowAt(idx, pos);
+}
+
+/** The inverse of `rowAtDisplayPosition` — page row -> display position. Mirrors DataGrid.vue's
+ *  own `displayPositionOf` (P24 D3/D5/D6/D11): `displayRows` is always ascending (matchedRows'
+ *  own contract), so an exact hit (the common case — the row is visible) is a binary search, and
+ *  a miss (the row was just filtered out from under a live selection) falls through to the
+ *  position it would sort into, landing on the nearest visible row instead of doing nothing. */
+export function displayPositionOf(idx: DisplayRowIndex, row: number): number {
+  const count = displayRowCount(idx);
+  if (row >= idx.pageRowCount) return count + (row - idx.pageRowCount); // pending insert
+  const dr = idx.displayRows;
+  if (!dr) return row; // unfiltered: identity
+  let lo = 0;
+  let hi = dr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((dr[mid] as number) < row) lo = mid + 1;
+    else hi = mid;
+  }
+  return Math.min(lo, Math.max(0, dr.length - 1));
+}
+
 export function rowHandleAt(
   idx: DisplayRowIndex,
   inserts: readonly Pick<PendingInsert, 'id'>[],

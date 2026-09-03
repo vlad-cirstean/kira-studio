@@ -12,7 +12,7 @@ import type {
   SingleColumnSort,
   SlickEventData,
 } from 'slickgrid';
-import { SlickEventHandler } from 'slickgrid';
+import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { shortcutFor } from '../../shortcuts/keys';
 import { connectionRecord, connectionsState } from '../../state/connections';
@@ -36,8 +36,10 @@ import { matchedRows } from './search';
 import {
   createDisplayValueExtractor,
   createGridDataSource,
+  displayPositionOf,
   pendingRowClasses,
   type RowHandle,
+  rowAtDisplayPosition,
 } from './slick/dataSource';
 import { KiraSlickGrid } from './slick/kiraSlickGrid';
 import './slick/slickTheme.css';
@@ -46,8 +48,9 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { cell, getPage, pageVersion, setVisibleWindow } from './page';
 import { pendingFor, stagedValue } from './pendingChanges';
 import * as scrollTrace from './scrollTrace';
+import { rangesFromSelection, selectionFromRanges } from './slick/selection';
 import { parseTextSortTerms } from './sortTerms';
-import { runtime, setSort } from './state';
+import { runtime, type Selection, setSort } from './state';
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -336,6 +339,14 @@ let grid: KiraSlickGrid | null = null;
 let eventHandler: SlickEventHandler | null = null;
 let dataSource: ReturnType<typeof createGridDataSource> | null = null;
 let viewportEl: HTMLElement | null = null;
+// C4/§5 D0 rule 2 — never a ref/shallowRef/reactive, same as `grid` itself.
+let selectionModel: SlickHybridSelectionModel | null = null;
+// D4's own one-shot flag, set by the header select zone immediately before it pushes ranges into
+// the model — mirrors DataGrid.vue's own `dragProducedRange` shape.
+let pendingSelectionKind: 'column' | null = null;
+// Shift-range anchor for the header select zone's own click cycle — DataGrid.vue's own `colAnchor`
+// ref, kept as a plain variable here since nothing renders from it.
+let colAnchor: number | null = null;
 
 // Mirrors DataGrid.vue's own onScroll velocity sampler (rowVelocity()) verbatim — plain variables,
 // not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only from inside
@@ -550,9 +561,9 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
     badge.textContent = label;
     args.node.appendChild(badge);
   }
-  // D4/C4 owns the select zone's actual click semantics (pushing a `column` selection into both
-  // rt().selection and the hybrid selection model, §5 D4's pendingKind) — this only builds the
-  // static strip and stops it from reaching the header's own sort-click handler underneath it.
+  // §5 D4 — pushes a `column` selection into both rt().selection and the hybrid selection model
+  // (via the pendingKind flag, onHeaderSelectClick) and stops the click from reaching the
+  // header's own sort-click handler underneath the strip.
   const zone = document.createElement('span');
   zone.className = 'header-select-zone';
   zone.dataset.testid = 'grid-header-select';
@@ -562,6 +573,8 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   zone.setAttribute('aria-label', 'Select column');
   zone.addEventListener('click', (ev) => {
     ev.stopPropagation();
+    const displayCol = Number(zone.dataset.colIndex);
+    if (Number.isInteger(displayCol)) onHeaderSelectClick(displayCol, ev as MouseEvent);
   });
   args.node.appendChild(zone);
 }
@@ -630,6 +643,92 @@ function onColumnsResized(): void {
   suppressWidthEcho = true;
   patchDataTabState(props.tabId, { columnWidths: widths });
   suppressWidthEcho = false;
+}
+
+// C4/§5 D4 — `selectionFromRanges`/`rangesFromSelection` (slick/selection.ts) are deliberately
+// row-space-agnostic; these two glue functions are the one place that translates between a
+// `SlickRange`'s own display-position rows and `Selection`'s page rows, via dataSource.ts's own
+// rowAtDisplayPosition/displayPositionOf (identity today, real once C12 wires a live filter).
+function toPageRowSelection(sel: Selection): Selection {
+  if (!dataSource) return sel;
+  const idx = {
+    displayRows: currentDisplayRows(),
+    pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+  };
+  const toPageRow = (pos: number) => rowAtDisplayPosition(idx, Math.max(0, pos));
+  switch (sel.kind) {
+    case 'cell':
+      return { ...sel, row: toPageRow(sel.row) };
+    case 'range':
+      return { ...sel, anchorRow: toPageRow(sel.anchorRow), row: toPageRow(sel.row) };
+    case 'row':
+      return { ...sel, rows: sel.rows.map(toPageRow) };
+    default:
+      return sel;
+  }
+}
+function toPositionSelection(sel: Selection): Selection {
+  const idx = {
+    displayRows: currentDisplayRows(),
+    pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+  };
+  const toPos = (row: number) => displayPositionOf(idx, row);
+  switch (sel.kind) {
+    case 'cell':
+      return { ...sel, row: toPos(sel.row) };
+    case 'range':
+      return { ...sel, anchorRow: toPos(sel.anchorRow), row: toPos(sel.row) };
+    case 'row':
+      return { ...sel, rows: sel.rows.map(toPos) };
+    default:
+      return sel;
+  }
+}
+
+// D4 — the selection model owns the geometry, `rt().selection` owns the meaning. Fires on every
+// `setSelectedRanges` call: a click, a drag frame (cell mode: only on drag END — F1's own
+// `handleCellRangeSelected` returns early for `caller === 'onCellRangeSelecting'` — §4.1 item 3),
+// shift/ctrl accumulation, keyboard extension, and this host's own header-select-zone push below.
+function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
+  const runtimeEntry = rt();
+  if (!runtimeEntry) return;
+  const rowMode = selectionModel?.currentSelectionModeIsRow() ?? false;
+  const kind = pendingSelectionKind;
+  pendingSelectionKind = null;
+  const posSel = selectionFromRanges(ranges, rowMode, kind);
+  runtimeEntry.selection = posSel ? toPageRowSelection(posSel) : null;
+}
+
+// D4 — the header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick,
+// content — mirrored verbatim): shift extends a contiguous range from the last anchor, ctrl/cmd
+// toggles one column into a disjoint set, a plain click replaces the selection with just that
+// column. Pushes the resulting range(s) into the selection model (via the pendingKind flag) so
+// the model and rt().selection can never disagree about what's painted.
+function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
+  if (!grid || !selectionModel) return;
+  const sel = rt()?.selection;
+  let cols: number[];
+  if (e.shiftKey && colAnchor !== null) {
+    const [a, b] = [colAnchor, displayCol].sort((x, y) => x - y);
+    cols = [];
+    for (let c = a; c <= b; c++) cols.push(c);
+  } else if ((e.ctrlKey || e.metaKey) && sel?.kind === 'column') {
+    cols = sel.cols.includes(displayCol)
+      ? sel.cols.filter((c) => c !== displayCol)
+      : [...sel.cols, displayCol];
+    colAnchor = displayCol;
+  } else {
+    cols = [displayCol];
+    colAnchor = displayCol;
+  }
+  // Display row count, not the page's own row count — `setSelectedRanges` below is
+  // position-space, and the two only coincide because nothing filters yet (C12).
+  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
+  const colCount = grid.getColumns().length - 1; // minus the gutter
+  pendingSelectionKind = 'column';
+  selectionModel.setSelectedRanges(
+    rangesFromSelection({ kind: 'column', cols }, displayRowCount, colCount),
+  );
 }
 
 // F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
@@ -766,9 +865,12 @@ onMounted(() => {
       // F1 — this app measures column widths itself (columns.ts's own canvas-based initialWidths);
       // leaving autosizeColumns() unused also keeps getCellValue off the render path entirely.
       autosizeColsMode: 'LegacyOff',
-      // D5 — SlickGrid's own selection-highlight layer must never compete with the app's own
-      // 'kira-selection' setCellCssStyles layer.
-      selectedCellCssClass: '',
+      // C4/§5 D4 — SlickGrid's own selection-highlight layer now IS the app's own selection
+      // paint (replacing Pass A's '' — F2's O(area) hash cost is gated at C6, not avoided here).
+      selectedCellCssClass: 'kira-cell-selected',
+      // F1 — enables ctrl/shift disjoint *row* selection in SlickHybridSelectionModel's own row
+      // branch (handleClick, :539-556) — the grid's own default, stated explicitly.
+      multiSelect: true,
       // §5 item 5 — the sticky row-number gutter, as a real frozen pane rather than one
       // position:sticky box per mounted row (the per-frame cost P22-…-iter2-rendering.md F12 flagged).
       frozenColumn: 0,
@@ -817,6 +919,22 @@ onMounted(() => {
   // P22 iter2-onset D2 — the chase's per-frame gate, beside the wall-clock one above.
   grid.scrollEventSeq = () => scrollEventSeq;
 
+  // C4/§5 D4 — F1: near-exact match for this app's four selection kinds; the gutter is the one
+  // rowSelectColumnIds entry (clicking it selects the row). enableMultiSelection: false is a
+  // parity choice, not a limitation (§4.1 item 4) — multi-cell disjoint selection has no consumer
+  // (Selection has no shape for it). showDragHandle: false — no Excel-style fill affordance.
+  selectionModel = new SlickHybridSelectionModel({
+    selectionType: 'mixed',
+    rowSelectColumnIds: [GUTTER_FIELD],
+    selectActiveCell: true,
+    selectActiveRow: true,
+    dragToSelect: true,
+    autoScrollWhenDrag: true,
+    enableMultiSelection: false,
+    showDragHandle: false,
+  });
+  grid.setSelectionModel(selectionModel);
+
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, tagRenderedRows);
   eventHandler.subscribe(grid.onRendered, onGridRendered);
@@ -825,6 +943,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onSort, onSort);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
+  eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
@@ -863,6 +982,12 @@ onUnmounted(() => {
   }
   eventHandler?.unsubscribeAll();
   eventHandler = null;
+  // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
+  // registered `_selector` plugin, via the plugins-unregister loop it does run) — its own
+  // `_eventHandler.unsubscribeAll()` (grid.onActiveCellChanged/onClick/onKeyDown) needs this
+  // explicit call, before the grid it's subscribed against goes away.
+  selectionModel?.destroy();
+  selectionModel = null;
   // F8 — `true` also nulls SlickGrid's own ~60 internal element references; its own destroy()
   // unbinds every listener it registered, unregisters every plugin, cancels any in-flight edit and
   // removes its per-instance injected <style> element. The only real risk was ever this app
