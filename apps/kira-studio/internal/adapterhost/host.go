@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	idgen "github.com/kirathecat/kira-studio/apps/kira-studio/internal/id"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -115,7 +115,7 @@ type opEndPayload struct {
 func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, *adapters.OpCtx) (any, error)) (string, any, error) {
 	opID := spec.OpID
 	if opID == "" {
-		opID = idgen.New()
+		opID = uuid.NewString()
 	}
 
 	h.mu.Lock()

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/id"
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -109,7 +109,7 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 	if err := model.ValidSavedQueryName(name); err != nil {
 		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: %w", err)
 	}
-	newID := id.New()
+	newID := uuid.NewString()
 	now := model.NowISO()
 	if _, err := r.DB.Exec(
 		`INSERT INTO saved_queries (id, connection_id, path, name, kind, body, pinned, created_at, used_at)

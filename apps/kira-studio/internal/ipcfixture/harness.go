@@ -97,7 +97,7 @@ func NewApp(t *testing.T) *App {
 }
 
 // SeedConnection inserts a connection row through the real repo (bypassing only
-// connections.Service.Create's own random id.New() assignment, so the fixture's connection id is
+// connections.Service.Create's own random uuid.NewString() assignment, so the fixture's connection id is
 // the fixed literal every committed fixture already carries — a harness-only deviation, the same
 // one internal/tree's and internal/connections' own fake-backend tests already make) and stores its
 // password through the real secrets repo.

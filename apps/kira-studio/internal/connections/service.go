@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
-	idgen "github.com/kirathecat/kira-studio/apps/kira-studio/internal/id"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
@@ -254,7 +254,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 
 	fields := in.ConnectionFields
 	fields.URI = uri
-	id := idgen.New()
+	id := uuid.NewString()
 	created, err := s.deps.Conns.Insert(id, fields, model.NowISO())
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
@@ -322,7 +322,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	if existing == nil {
 		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
 	}
-	newID := idgen.New()
+	newID := uuid.NewString()
 	fields := existing.ConnectionFields
 	fields.Name = fields.Name + " copy"
 	created, err := s.deps.Conns.Insert(newID, fields, model.NowISO())
