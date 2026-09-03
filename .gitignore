@@ -148,3 +148,6 @@ test-results/
 playwright-report/
 blob-report/
 *.vsix
+
+# Claude Code agent worktrees (local orchestration scratch state, not app content)
+.claude/
