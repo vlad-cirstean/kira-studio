@@ -1328,15 +1328,21 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   });
 
   // --- sort: header click asc -> desc -> none, then free-text ORDER BY wins -------------------
-  await page.click('[data-testid="grid-header-cell"][data-column="id"]'); // -> asc (explicit)
+  // P22 Pass B, items 9-11 (a later coordinator round) — a left-click on a header's BODY now
+  // selects the column instead of sorting it; sorting moved to a dedicated arrow control
+  // (`data-testid="grid-header-sort"`) on the right of each header cell. This still exercises the
+  // identical asc -> desc -> none cycle, just via the new control.
+  const idSortArrow =
+    '[data-testid="grid-header-cell"][data-column="id"] [data-testid="grid-header-sort"]';
+  await page.click(idSortArrow); // -> asc (explicit)
   await expect
     .poll(() => page.locator('[data-testid="pager"]').getAttribute('data-pagination'))
     .toBe('keyset');
-  await page.click('[data-testid="grid-header-cell"][data-column="id"]'); // -> desc
+  await page.click(idSortArrow); // -> desc
   await expect.poll(() => firstGutterNumber(page)).toBe('1');
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1000000');
 
-  await page.click('[data-testid="grid-header-cell"][data-column="id"]'); // -> none
+  await page.click(idSortArrow); // -> none
   await expect(sortIndicators(page)).toHaveCount(0);
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1'); // default order is still PK-ascending
 

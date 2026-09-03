@@ -218,9 +218,13 @@ onUpdated(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.grid-cell.fk {
-  color: var(--kira-info);
-}
+/* Deliberate redesign, not a rename (item 13, a later coordinator round on the SlickGrid parity
+   work — see slickTheme.css's own identical note): the blue `--kira-info` text colour that used
+   to apply to a foreign-key column's own cell value is dropped outright, here and in
+   slickTheme.css's `.slick-cell.fk` twin, since `cellClass.ts`'s `fk` flag is shared between the
+   two engines. `.grid-cell.fk` stays a class DataGrid.vue still applies (nothing downstream reads
+   it for colour any more, but nothing needs to stop applying it either) — only the colour rule
+   itself is gone. */
 
 /* The nav button only shows on hover/selected, but the text always truncates before its slot —
    otherwise it's only "over the text" once you're already hovering to click it. */

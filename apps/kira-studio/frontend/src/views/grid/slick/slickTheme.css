@@ -42,6 +42,24 @@
   border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
+/* Real-interaction fix (a later coordinator round, "a white bar/strip renders above the
+   headers") — stock's own `.slick-header.ui-state-default` rule (slick.grid.css) carries a
+   hardcoded `border-top: 1px solid #d3d3d3`, confirmed via a real computed-style dump
+   (`rgb(211, 211, 211)`, exactly stock's own literal) sitting right at the very top of the grid —
+   a light-grey hairline against this app's own dark `--kira-bg-elevated`, which reads on screen
+   as a stray bright strip. `.header-cell`'s own incumbent rule has no such border at all
+   (`DataGrid.vue`'s `.header-row`) — `none` here is the equivalent, not a new allowance.
+   A dedicated rule, not folded into the `.slick-header, .slick-headerrow` one above: the same
+   cascade-order tie the header-column fix's own comment explains (slick.grid.css loads *after*
+   this file, SlickGridHost.vue's own import order, so a same-specificity override loses silently)
+   applies here too — `.slick-header.ui-state-default` needs the matching `.ui-state-default`
+   suffix to actually outrank stock's rule, which `.slick-header, .slick-headerrow` (bare, two
+   classes each) does not carry. Confirmed via the rendered DOM that every `.slick-header` node
+   carries `ui-state-default` (the same class list `onHeaderCellRendered`'s own siblings do). */
+.slick-grid-host .slick-header.ui-state-default {
+  border-top: none;
+}
+
 /* P22 Pass B, visual-parity fix — GridRow.vue's own header cell (`.header-cell`, DataGrid.vue) is a
    flex row so a long column name can ellipsis on its own (`.header-label`'s own overflow/
    text-overflow) while `PK`/`FK` (`.header-key`'s own `flex-shrink: 0`) always stays fully
@@ -287,14 +305,14 @@
    numeric column the left placement is strictly better — the button no longer sits where the
    value's last digits are. `.slick-cell` is already `position: absolute` (slick.grid.css), so it
    is a containing block on its own; no `position: relative` needed here.
-   Unlike the incumbent's own always-in-the-DOM-but-`display:none`-until-hover button (one per nav
-   cell, revealed by a pure-CSS `:hover`/`.selected` rule), this is the single host-owned element
-   D11b moves between cells in JS — its mere presence in a cell already means "show it", so no
-   hide/reveal rule is needed here at all. */
-.slick-grid-host .slick-cell.has-nav {
-  padding-left: calc(var(--kira-s-4) + 18px);
-}
-
+   Deliberate redesign, not the original port (item 12, a later coordinator round): "always
+   visible... overlay on top of the cell's text... rather than reserving padding that pushes/
+   truncates the text" — `padding-left` (this rule used to reserve `calc(--kira-s-4 + 18px)` for
+   the button, pushing/truncating the cell's own text to make room for it) is dropped entirely;
+   `.cell-nav-btn`'s own opaque `background` (below, unchanged) is what keeps the icon legible
+   sitting directly on top of the text now, rather than beside it. SlickGridHost.vue's own
+   `placeNavButtonsForRenderedCells` is what actually builds one real button per nav-eligible
+   rendered cell now (superseding D11b's single hover-moved node) — this file only styles it. */
 .slick-grid-host .cell-nav-btn {
   position: absolute;
   left: 4px;
@@ -319,11 +337,16 @@
   color: var(--kira-fg);
 }
 
-/* GridRow.vue's own `.grid-cell.fk` rule, unchanged (D11c): FK-only, narrower than `.has-nav`'s
-   own fk-or-pk precheck — a PK column's own value isn't itself "a reference" to color. */
-.slick-grid-host .slick-cell.fk {
-  color: var(--kira-info);
-}
+/* Deliberate redesign, not the original port (item 13, a later coordinator round: "drop the
+   distinctive blue text coloring currently applied to [key] column values" — the request named
+   the primary key specifically, but the only blue-text mechanism this codebase has is `.fk`'s own
+   `--kira-info` colour on a genuine foreign-key column's value; a real primary-key-only column
+   (e.g. `id`, no FK of its own) was already confirmed, via a real screenshot, to render in the
+   ordinary text colour, not blue — see the commit message for the full note). Removed outright
+   (not just emptied) here, and from GridRow.vue's own identical `.grid-cell.fk` rule (§0's own
+   "shared, fix once" framing) — `.fk` itself stays as a class (`cellFormatter` still needs it to
+   pick the nav button's icon glyph, `placeNavButtonsForRenderedCells`), it simply carries no
+   colour rule of its own any more. */
 
 .slick-grid-host .kira-align-right {
   /* justify-content is the one that actually positions a lone-text-node cell under
@@ -449,15 +472,34 @@
    narrow column's header (`.slick-header-column`'s own comment) doesn't have to spare — confirmed
    the hard way: at rest they otherwise silently starved `.slick-column-name` down to 0 width on
    `order_items`' own `id` column (64px, PK badge, real capture) before this fix. */
+/* Deliberate redesign, not the original port (item 11, a later coordinator round: "add a
+   dedicated sort-arrow control on the right side of each header cell — sorting only happens by
+   clicking that arrow now"). This div already existed for every column at rest (SlickGrid always
+   builds it, per this rule's own comment above) — reused as the click target itself
+   (onHeaderCellRendered's own listener) rather than adding a second element. Two things this
+   needs that the old "zero width until sorted" fix didn't: (1) a real, always-present hit target
+   — `width: 14px` now, even at rest, not `0` — the visible GLYPH stays conditional (no `content`
+   until `-asc`/`-desc`, unchanged below), only the CLICKABLE BOX is now permanent; this does
+   reopen a little of the space the earlier "starves `.slick-column-name` on a narrow column" fix
+   was guarding against, accepted here since a permanent sort control needs a permanent hit area —
+   14px is the smallest box that still matches this control's own visible glyph width; (2)
+   `position: relative` + a `z-index` above `.header-select-zone`'s own (below) — the zone is a
+   LATER DOM sibling appended by onHeaderCellRendered, so without an explicit stack order it would
+   paint on top and silently swallow every click aimed at this arrow, `stopPropagation` inside its
+   own listener notwithstanding (that only stops bubbling for whichever element the click actually
+   *hit* — hit-testing is a paint-order question, not a listener-order one). */
 .slick-grid-host .slick-sort-indicator {
   flex-shrink: 0;
-  width: 0;
+  width: 14px;
   height: 13px;
   margin: 0;
   border: none;
   background: none;
   font-family: "codicon", monospace;
   font-size: 13px;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
   line-height: 1;
   color: var(--kira-accent);
   overflow: hidden;
@@ -524,14 +566,19 @@
   color: var(--kira-info);
 }
 
-/* DataGrid.vue's own `.header-select-zone` — a narrow strip at the header cell's left edge,
-   click-to-select-the-whole-column (§5 D4, C4), kept out of the sort click's own hit area. Its own
-   click handler lands in C4; this only builds the DOM and stops it reaching the sort click. */
+/* DataGrid.vue's own `.header-select-zone` started as a narrow 10px strip at the header cell's
+   left edge (§5 D4, C4). Deliberate redesign, not the original port (items 9-11, a later
+   coordinator round): now covers the WHOLE header cell (`inset: 0`) — a left-click anywhere on a
+   header's body selects that column instead of sorting it (item 10); sorting moved to the
+   dedicated arrow control above, which stacks above this zone (`z-index: 1` there vs. `0` here)
+   so it stays reachable despite being a DOM sibling this zone would otherwise paint over. Right-
+   click still reaches `onGridHeaderContextMenu` regardless of this zone (that binding is on the
+   grid's own `contextmenu` handler, a different event entirely) — item 9's "right-click also
+   selects the column" was already true (`onHeaderContextMenuHandler` already pushes a column
+   selection before opening the menu), unrelated to this zone's own left-click-only listener. */
 .slick-grid-host .header-select-zone {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 10px;
+  inset: 0;
+  z-index: 0;
   cursor: pointer;
 }

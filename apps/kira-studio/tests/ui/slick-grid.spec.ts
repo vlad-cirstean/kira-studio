@@ -1102,7 +1102,7 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
 // row — interaction.spec.ts's own FK/PK nav section already covers the NULL-source absence case
 // (employees.manager_id) end to end; nothing in this app's fixtures has a genuinely multi-column
 // FK to re-derive that scenario against a "composite" key specifically.
-test('P22 Pass B C11 T9 — the nav button is a single DOM node, positioned left, absent off a nav column', async ({
+test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, positioned left, absent off a nav column', async ({
   relaunch,
 }) => {
   const CONNECTION_ID = 'conn-slick-navbtn';
@@ -1164,26 +1164,31 @@ test('P22 Pass B C11 T9 — the nav button is a single DOM node, positioned left
     page.locator('[data-testid="grid-header-cell"][data-column="product_id"]'),
   ).toBeVisible();
 
-  const navButtons = page.locator('[data-testid="cell-nav-button"]');
+  // P22 Pass B, item 12 (a later coordinator round) — deliberate redesign: the nav button is now
+  // always visible on every nav-eligible rendered cell, never hover-gated, and overlays the
+  // cell's own text (no reserved padding) instead of a single JS-moved node. Superseded the old
+  // "absent at rest / exactly one instance on hover / moves between cells" assertions below.
 
-  // --- absent at rest, and off a non-nav column -------------------------------------------------
-  await expect(navButtons).toHaveCount(0);
-  await gridCell(page, 0, 'quantity').hover();
-  await expect(navButtons).toHaveCount(0);
+  // --- present at rest (no hover at all), on every rendered nav cell, absent off one ------------
+  await expect(cellNavButton(page, 0, 'product_id')).toHaveCount(1);
+  await expect(cellNavButton(page, 0, 'order_id')).toHaveCount(1);
+  await expect(cellNavButton(page, 0, 'quantity')).toHaveCount(0);
+  const quantityButtons = gridCell(page, 0, 'quantity').locator('[data-testid="cell-nav-button"]');
+  await expect(quantityButtons).toHaveCount(0);
 
-  // --- exactly one instance, left-positioned, on a genuine FK column -----------------------------
-  await gridCell(page, 0, 'product_id').hover();
-  await expect(navButtons).toHaveCount(1);
+  // --- correct kind, left-positioned, overlaying the text rather than pushing it with padding ---
   await expect(cellNavButton(page, 0, 'product_id')).toHaveAttribute('data-nav-kind', 'fk');
   const cellBox = await gridCell(page, 0, 'product_id').boundingBox();
-  const btnBox = await navButtons.boundingBox();
+  const btnBox = await cellNavButton(page, 0, 'product_id').boundingBox();
   if (!cellBox || !btnBox) throw new Error('missing bounding box');
   expect(btnBox.x - cellBox.x).toBeGreaterThanOrEqual(0);
   expect(btnBox.x - cellBox.x).toBeLessThanOrEqual(24);
 
-  // --- moving to a different nav cell moves the same single node, never adding a second ----------
-  await gridCell(page, 0, 'order_id').hover();
-  await expect(navButtons).toHaveCount(1);
+  // --- both nav columns on the same row carry their own button simultaneously, no hover needed --
   await expect(cellNavButton(page, 0, 'order_id')).toHaveAttribute('data-nav-kind', 'fk');
-  await expect(cellNavButton(page, 0, 'product_id')).toHaveCount(0);
+  const bothPresent = await Promise.all([
+    cellNavButton(page, 0, 'product_id').isVisible(),
+    cellNavButton(page, 0, 'order_id').isVisible(),
+  ]);
+  expect(bothPresent).toEqual([true, true]);
 });

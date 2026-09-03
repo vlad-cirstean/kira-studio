@@ -7,14 +7,11 @@ import type {
   CustomDataView,
   FormatterResultWithText,
   ItemMetadata,
-  MultiColumnSort,
-  OnActiveCellChangedEventArgs,
   OnBeforeEditCellEventArgs,
   OnBeforeHeaderCellDestroyEventArgs,
   OnClickEventArgs,
   OnHeaderCellRenderedEventArgs,
   OnHeaderClickEventArgs,
-  SingleColumnSort,
   SlickEventData,
 } from 'slickgrid';
 import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickgrid';
@@ -176,12 +173,11 @@ function cellFormatter(
     input.value = view.isNull ? '' : view.text;
     return input;
   }
-  // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` this
-  // column's real button computes lazily on hover): whether this column is fk-or-pk and this
-  // cell isn't NULL. `.has-nav`'s padding reserve rides on this predicate; `.fk`'s colour class
-  // is narrower (fk only, matching DataGrid.vue's own `isForeignKeyDisplayCol` — a PK column's
-  // own value isn't "a reference", so it never gets the reference colour, only the padding for a
-  // button that may or may not turn out to have any referencing rows on hover).
+  // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` a click on
+  // this column's own nav button computes lazily — navEntryAt, below): whether this column is
+  // fk-or-pk and this cell isn't NULL. `placeNavButtonsForRenderedCells` rides on `.has-nav`
+  // (below) to know which rendered cells get a button at all (item 12's always-visible redesign);
+  // `.fk` no longer carries a colour of its own (item 13), only which icon glyph the button gets.
   const name = String(columnDef.field);
   const isFk = !view.isNull && navColumns.fk.has(name);
   const hasNav = isFk || (!view.isNull && navColumns.pk.has(name));
@@ -509,19 +505,14 @@ let pendingSelectionKind: 'column' | null = null;
 // ref, kept as a plain variable here since nothing renders from it.
 let colAnchor: number | null = null;
 
-// C11/§5 D11b — the single, host-owned FK/PK nav button: created once (onMounted), moved into
-// whichever cell currently wants it, never a ref/reactive (D0) — a plain DOM node this file owns
-// and moves directly, the same discipline the header select-zone's own `zone` element uses.
-let navButton: HTMLButtonElement | null = null;
-let navIcon: HTMLElement | null = null;
 // D11c's own cheap precheck's Set membership, cached across the whole meta lifetime — recomputed
 // only where `rt()?.meta`'s own watch already rebuilds columns (rebuildAndSetColumns's own call
 // site, below), never per cell or per hover.
 let navColumns: NavColumns = navColumnsFor(null);
-// The cell the mouse is currently over, if any — `onMouseEnter`/`onMouseLeave` are the only two
-// writers. `null` (not hovering) falls back to the grid's own active cell (`refreshNavButton`),
-// matching D11b's own `place(activeCellIfNav())` on mouseleave.
-let hoveredCell: { pos: number; cellIdx: number } | null = null;
+// C11/§5 D11b originally kept a single host-owned FK/PK nav button here (moved on hover) plus a
+// `hoveredCell` tracker; superseded by item 12 (a later coordinator round) — see
+// `placeNavButtonsForRenderedCells`' own comment — with a real button per nav-eligible rendered
+// cell, always visible, no hover tracking left to own.
 
 // Mirrors DataGrid.vue's own onScroll velocity sampler (rowVelocity()) verbatim — plain variables,
 // not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only from inside
@@ -759,9 +750,25 @@ function computeSelEdgeHashes(
       if (!rows.has(pageRow)) continue;
       const isTop = !rows.has(pageRow - 1);
       const isBottom = !rows.has(pageRow + 1);
-      mark(pos, 0, { selEdgeLeft: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
-      if (lastCol > 0)
-        mark(pos, lastCol, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
+      // Real-interaction fix (a later coordinator round, "row selection only shows a border on
+      // the first cell") — this loop used to mark only the two edge COLUMNS (c=0, c=lastCol)
+      // with selEdgeTop/selEdgeBottom, which is correct for a cell/range rectangle's own top/
+      // bottom edge (only the two boundary columns' cells sit on that edge) but wrong for a row
+      // selection: every column across the full row width sits on the row's own top/bottom
+      // boundary, not just the two ends. Confirmed live: a gutter row-select's fill
+      // (`kira-cell-selected`) already covered every cell correctly, but the perimeter's own
+      // top/bottom box-shadow line only ever appeared on the leftmost and rightmost columns,
+      // leaving a visible gap over every interior column — exactly the "only the first cell"
+      // symptom. Every column now gets selEdgeTop/selEdgeBottom; selEdgeLeft/selEdgeRight stay
+      // exclusive to column 0 / lastCol, same as before.
+      for (let c = 0; c <= lastCol; c++) {
+        mark(pos, c, {
+          selEdgeLeft: c === 0,
+          selEdgeRight: c === lastCol,
+          selEdgeTop: isTop,
+          selEdgeBottom: isBottom,
+        });
+      }
     }
   } else if (sel.kind === 'column') {
     const cols = new Set(sel.cols);
@@ -943,26 +950,12 @@ function onGridRendered(): void {
     refreshSelEdges();
     refreshStagedLayer();
   }
-  // D11b — "the previous host node may have been rebuilt": a render can replace the very cell
-  // node `navButton` is currently a child of (an invalidated row rebuilds its cells from scratch),
-  // silently detaching the button from anything visible even though it's still logically "showing"
-  // for the same hovered/active cell. Re-placing on every render is what keeps it attached.
-  refreshNavButton();
-}
-
-// C11/§5 D11b — one button, not one per nav cell (§4.1 item 5's own cost note: `cellNavEntry`
-// itself, which builds `navValuesFor` for the row, now runs once per hover/active-cell-change
-// instead of once per rendered cell per render, the strict reduction the plan promised).
-function buildNavButton(): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'cell-nav-btn';
-  btn.dataset.testid = 'cell-nav-button';
-  navIcon = document.createElement('span');
-  navIcon.setAttribute('aria-hidden', 'true');
-  navIcon.style.fontSize = '13px';
-  btn.appendChild(navIcon);
-  return btn;
+  // D11b originally re-placed a single hover-tracked button here; superseded (item 12, a later
+  // coordinator round — see placeNavButtonsForRenderedCells' own comment) by an always-visible
+  // button per nav-eligible rendered cell. Still called on every render for the identical reason
+  // D11b's own comment gave: a render can rebuild the very cell node a button lives in
+  // (`invalidateRow`), silently dropping it, so this has to re-scan rather than run once.
+  placeNavButtonsForRenderedCells();
 }
 
 // `pos`/`cellIdx` are SlickGrid's own display position / column index (incl. the gutter at 0) —
@@ -985,60 +978,58 @@ function navEntryAt(pos: number, cellIdx: number): CellNavEntry | null {
   );
 }
 
-function placeNavButton(target: { pos: number; cellIdx: number } | null): void {
-  if (!grid) return;
-  if (!navButton) navButton = buildNavButton();
-  const entry = target && navEntryAt(target.pos, target.cellIdx);
-  const cellNode = entry && target ? grid.getCellNode(target.pos, target.cellIdx) : null;
-  if (!entry || !cellNode) {
-    navButton.remove();
-    return;
+// Deliberate redesign, not a bug fix (item 12, a later coordinator round): "make the PK/FK nav
+// button always visible (not hover-only), and have it overlay on top of the cell's text... rather
+// than reserving padding". Supersedes D11b's single host-owned, JS-moved-on-hover button —
+// one real <button> per rendered nav-eligible cell instead, built once per cell and left in
+// place (idempotent: a cell already carrying `.cell-nav-btn` is skipped) until its row is
+// rebuilt, the same per-render-pass discipline `tagRenderedRows`' own `data-kira-row-tagged`
+// idempotency already uses, and bounded the identical way that pass already is: the rendered
+// window's rows × however many of this table's columns are nav-eligible, never the whole table.
+// This is a deliberate departure from §4.1 item 5's own cost note (D11b's comment above used to
+// cite it) — the trade this makes explicitly, at the user's own request: `cellNavEntry`'s real,
+// row-value-dependent lookup (a referencedBy query, `navEntryAt` above) still only ever runs on
+// click, never per render — this only needs the CHEAP, column-level precheck `cellFormatter`
+// already classes every cell with (`.fk`/`.has-nav`) to pick which icon glyph to show, so it
+// cannot know per-row whether a specific PK value actually has any referencing rows the way the
+// old hover path's real `navEntryAt` call did before showing anything — a PK cell in a nav-
+// eligible COLUMN always gets a button now, even on a row that turns out (only discoverable by
+// clicking) to have no real referencing rows. Accepted trade for "always visible": the button
+// still resolves and no-ops harmlessly on click in that case (`onGridClick` below, unchanged).
+// A useful side effect, not the primary motivation: this also structurally removes the whole
+// class of hover-driven append/remove flicker the old single-button design had (item 4, this same
+// coordinator round) — there is no more DOM node being moved on hover at all.
+function placeNavButtonsForRenderedCells(): void {
+  const root = rootRef.value;
+  if (!root) return;
+  const cells = root.querySelectorAll<HTMLElement>('.grid-canvas-right .slick-cell.has-nav');
+  for (const cellEl of cells) {
+    if (cellEl.querySelector('.cell-nav-btn')) continue;
+    const isFk = cellEl.classList.contains('fk');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cell-nav-btn';
+    btn.dataset.testid = 'cell-nav-button';
+    btn.dataset.navKind = isFk ? 'fk' : 'pk';
+    btn.setAttribute('aria-label', isFk ? 'Go to referenced row' : 'Referenced by');
+    const icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.style.fontSize = '13px';
+    icon.className = `codicon codicon-${isFk ? 'arrow-right' : 'references'}`;
+    btn.appendChild(icon);
+    cellEl.appendChild(btn);
   }
-  navButton.dataset.navKind = entry.kind;
-  navButton.setAttribute(
-    'aria-label',
-    entry.kind === 'fk' ? 'Go to referenced row' : 'Referenced by',
-  );
-  if (navIcon)
-    navIcon.className = `codicon codicon-${entry.kind === 'fk' ? 'arrow-right' : 'references'}`;
-  if (navButton.parentElement !== cellNode) cellNode.appendChild(navButton);
 }
 
-// Hover wins over the active cell while hovering (`hoveredCell` set); mouseleave clears it and
-// falls back to `grid.getActiveCell()` — D11b's own `place(activeCellIfNav())`.
-function refreshNavButton(): void {
-  if (!grid) return;
-  if (hoveredCell) {
-    placeNavButton(hoveredCell);
-    return;
-  }
-  const active = grid.getActiveCell();
-  placeNavButton(active ? { pos: active.row, cellIdx: active.cell } : null);
-}
-
-function onGridMouseEnter(e: SlickEventData): void {
-  if (!grid) return;
-  const hit = grid.getCellFromEvent(e);
-  hoveredCell = hit ? { pos: hit.row, cellIdx: hit.cell } : null;
-  refreshNavButton();
-}
-
-function onGridMouseLeave(): void {
-  hoveredCell = null;
-  refreshNavButton();
-}
-
-function onGridActiveCellChanged(): void {
-  refreshNavButton();
-}
-
-// F13 — a click on `navButton` (a real child of the `.slick-cell` it's currently living in)
-// resolves through SlickGrid's own `getCellFromEvent` exactly like any other cell click, so
-// `args.row`/`args.cell` already name the right cell without this file tracking anything of its
-// own; `stopImmediatePropagation` (checked by `handleClick` right after triggering `onClick`,
-// `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the active cell there.
+// F13 — a click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
+// per nav-eligible rendered cell since item 12's redesign — placeNavButtonsForRenderedCells'
+// own comment) resolves through SlickGrid's own `getCellFromEvent` exactly like any other cell
+// click, so `args.row`/`args.cell` already name the right cell without this file tracking
+// anything of its own; `stopImmediatePropagation` (checked by `handleClick` right after
+// triggering `onClick`, `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the
+// active cell there.
 function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
-  if (!navButton || !e.target?.closest('.cell-nav-btn')) return;
+  if (!e.target?.closest('.cell-nav-btn')) return;
   e.stopImmediatePropagation();
   const entry = navEntryAt(args.row, args.cell);
   if (!entry) return;
@@ -1090,9 +1081,19 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
     badge.textContent = label;
     args.node.appendChild(badge);
   }
-  // §5 D4 — pushes a `column` selection into both rt().selection and the hybrid selection model
-  // (via the pendingKind flag, onHeaderSelectClick) and stops the click from reaching the
-  // header's own sort-click handler underneath the strip.
+  // Deliberate redesign, not the original port (items 9-11, a later coordinator round): "left-
+  // click on a header's body selects that column instead of sorting", "right-click also selects
+  // the column" (already true — onHeaderContextMenuHandler, below), and "sorting only happens via
+  // a dedicated arrow control" on the right. §5 D4's own zone used to be a narrow 10px strip at
+  // the cell's left edge, leaving the rest of the header body to SlickGrid's own native
+  // handleHeaderClick/setupColumnSort (slick.grid.ts) — that native click-to-sort binding is
+  // UNCHANGED (still reads `column.sortable`, still fires `grid.onSort`), but now it never
+  // actually runs from a header-body click: the zone below covers the ENTIRE header cell
+  // (`inset: 0`, not just a strip) and stops propagation before a body click can ever bubble up
+  // to that delegated listener. The one thing still allowed to sort is the dedicated arrow button
+  // built further down, whose own listener stops propagation before THIS zone's listener runs
+  // (DOM order: the zone is a lower sibling in paint order via z-index, not later in the
+  // listener chain, so both need their own stopPropagation independently).
   const zone = document.createElement('span');
   zone.className = 'header-select-zone';
   zone.dataset.testid = 'grid-header-select';
@@ -1106,6 +1107,27 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
     if (Number.isInteger(displayCol)) onHeaderSelectClick(displayCol, ev as MouseEvent);
   });
   args.node.appendChild(zone);
+
+  // Item 11's own dedicated sort control — SlickGrid always builds a `.slick-sort-indicator` div
+  // per column regardless of sort state (F8's own comment, above), so this reuses that existing
+  // node as the click target rather than adding a second element: it already sits at the header
+  // cell's right edge (slickTheme.css's own margin/positioning, unchanged) and `setSortColumns`
+  // already drives its `-asc`/`-desc` glyph classes on every sort change (syncSortIndicators) —
+  // nothing about that display wiring changes, only that clicking it now also DOES something.
+  // `slickTheme.css` gives it a small permanent width so it has a real hit target even at rest
+  // (an inactive column's arrow is invisible — no glyph — but still clickable, the same "hidden
+  // affordance" trade this whole redesign makes explicit).
+  const sortIndicator = args.node.querySelector<HTMLElement>('.slick-sort-indicator');
+  if (sortIndicator) {
+    sortIndicator.dataset.testid = 'grid-header-sort';
+    sortIndicator.setAttribute('role', 'button');
+    sortIndicator.setAttribute('aria-label', `Sort by ${name}`);
+    sortIndicator.tabIndex = 0;
+    sortIndicator.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      cycleSortFor(name);
+    });
+  }
 }
 
 // Nothing to clean up beyond the header cell's own subtree (destroyed with it, badge/zone and the
@@ -1146,25 +1168,28 @@ function syncSortIndicators(): void {
   }
 }
 
-// tristateMultiColumnSort + multiColumnSort: false (grid options) is what makes a header click
-// cycle asc -> desc -> none by itself (F8) — this only translates SlickGrid's own resulting
-// `onSort` event into the app's `setSort`, the same single-term-replaces-the-whole-sort semantics
-// DataGrid.vue's own onHeaderClick has (never accumulating past one column; only the ORDER BY box
-// itself can produce a genuine multi-term sort).
-function onSort(_e: unknown, args: SingleColumnSort | MultiColumnSort): void {
-  // multiColumnSort: false (grid options, above) — this event is always the single-column shape
-  // in practice; the union (and columnId's own `| null` at runtime, despite ColumnSort's type not
-  // saying so — F8's own citation) is the library's, not this app's.
-  if (args.multiColumnSort) return;
-  const columnId = (args as SingleColumnSort).columnId as string | number | null;
-  if (columnId === null || columnId === undefined) {
+// Deliberate redesign, not the original port (items 9-11, a later coordinator round) — supersedes
+// F8's own `onSort`/`grid.onSort` wiring. That handler translated SlickGrid's own NATIVE
+// click-to-sort event (`tristateMultiColumnSort` + `multiColumnSort: false`'s own asc -> desc ->
+// none cycle, fired from `setupColumnSort`'s delegated header-click listener, slick.grid.ts) into
+// `setSort` — but a header body click no longer reaches that native listener at all
+// (onHeaderCellRendered's own `header-select-zone` now covers the whole cell and stops
+// propagation before it can bubble there), so `grid.onSort` can no longer fire from a click; the
+// header context menu's own Sort asc/Sort desc/Clear sort items (menu.ts) already call `setSort`
+// directly and were never routed through `onSort` either. This function is what the new dedicated
+// sort-arrow control (onHeaderCellRendered, above) calls instead — the identical single-column
+// asc -> desc -> none tristate cycle `onSort` used to derive from SlickGrid's own bookkeeping,
+// computed here directly from `currentSortTerms()` (the same source `syncSortIndicators` already
+// reads), so no SlickGrid-internal sort state needs to exist for this to work correctly.
+function cycleSortFor(name: string): void {
+  const current = currentSortTerms().find((t) => t.column === name);
+  if (!current) {
+    void setSort(props.tabId, { kind: 'structured', terms: [{ column: name, direction: 'asc' }] });
+  } else if (current.direction === 'asc') {
+    void setSort(props.tabId, { kind: 'structured', terms: [{ column: name, direction: 'desc' }] });
+  } else {
     void setSort(props.tabId, null);
-    return;
   }
-  void setSort(props.tabId, {
-    kind: 'structured',
-    terms: [{ column: String(columnId), direction: args.sortAsc ? 'asc' : 'desc' }],
-  });
 }
 
 // §4 item 6, §5 D6 — the corner cell selects everything, as a single `range` (never a `row`
@@ -1804,16 +1829,16 @@ onMounted(() => {
   eventHandler.subscribe(grid.onRendered, onGridRendered);
   eventHandler.subscribe(grid.onHeaderCellRendered, onHeaderCellRendered);
   eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
-  eventHandler.subscribe(grid.onSort, onSort);
+  // No grid.onSort subscription any more — see cycleSortFor's own comment: a header body click
+  // can no longer reach SlickGrid's native click-to-sort handler at all (items 9-11), so that
+  // event never fires from a click, and the header context menu's own sort items already call
+  // `setSort` directly without going through it either.
   eventHandler.subscribe(grid.onHeaderClick, onHeaderClick);
   eventHandler.subscribe(grid.onContextMenu, onGridContextMenu);
   eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(grid.onBeforeEditCell, onBeforeEditCell);
-  eventHandler.subscribe(grid.onMouseEnter, onGridMouseEnter);
-  eventHandler.subscribe(grid.onMouseLeave, onGridMouseLeave);
-  eventHandler.subscribe(grid.onActiveCellChanged, onGridActiveCellChanged);
   eventHandler.subscribe(grid.onClick, onGridClick);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
   const cellRangeSelector = selectionModel.getCellRangeSelector();
@@ -1886,12 +1911,6 @@ onUnmounted(() => {
   grid = null;
   dataSource = null;
   viewportEl = null;
-  // C11 — `grid.destroy(true)` already tears down the `.slick-cell` navButton may still be a
-  // child of; these three just drop this file's own references so a later remount (a reopened
-  // tab reuses this same module scope) starts from a clean slate, not a stale hover/button/Set.
-  navButton = null;
-  navIcon = null;
-  hoveredCell = null;
 });
 
 watch(
