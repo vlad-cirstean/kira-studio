@@ -45,8 +45,10 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 			Then: []testsupport.Scenario{
 				// A read-only connection still reads.
 				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main"), testsupport.Seg("table", "customers"))),
-				// sqlite/errors.go:44-45 maps primary code 8 (SQLITE_READONLY) to E_UNSUPPORTED —
-				// nothing exercised that from a real refusal before this phase's own Tier-1 test.
+				// mutate.go:64's own adapters.AssertWritable(readOnly) guard refuses before any
+				// statement reaches the driver — the app-layer check, not sqlite/errors.go:44-45's
+				// driver-level SQLITE_READONLY (code 8) mapping; the sibling ExecuteIsRefused below
+				// is the one that actually reaches the driver's own readOnly case.
 				testsupport.MutateIsRefused(model.MutationPlan{
 					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main"), testsupport.Seg("table", "regions")),
 					Ops: []model.MutationRowOp{{
