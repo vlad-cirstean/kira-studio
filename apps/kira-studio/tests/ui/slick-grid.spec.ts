@@ -1199,3 +1199,102 @@ test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, posit
   ]);
   expect(bothPresent).toEqual([true, true]);
 });
+
+// P22 postscript §14.2 — root cause: `new KiraSlickGrid(...)` (SlickGridHost.vue's own onMounted)
+// runs synchronously through slick.grid.ts's own `initialize()` -> `finishInitialization()` ->
+// `createColumnHeaders()`, firing `grid.onHeaderCellRendered` for the FIRST, constructor-built
+// header cells *before* this file's own `eventHandler.subscribe(grid.onHeaderCellRendered, ...)`
+// has even run (subscribing needs a `grid` instance to subscribe to). Every DOM addition that
+// handler is responsible for — the PK/FK `.header-key` badge, the `.header-select-zone` click
+// target — is silently missing from that first build. A table's first-ever open never shows it:
+// `rt()?.meta`'s own watch fires moments later (the async `treeDescribe` resolving) and rebuilds
+// headers a second time, this time through the now-subscribed listener. It stops being invisible
+// the moment a tab's meta is already cached before this component remounts — exactly what a plain
+// tab switch (not a close) does, since a tab's own meta survives in its runtime record until the
+// tab itself closes (state.ts). SlickGridHost.vue now forces one extra header rebuild,
+// unconditionally, right after subscribing — this asserts a real PK/FK badge and the header
+// select-zone both still exist after switching away from a table's tab and back to it, the exact
+// scenario the postscript's own repro attempts (which always used a full tab close+reopen, which
+// re-fetches meta and accidentally re-triggers the masking rebuild) never covered.
+test('P22 postscript — PK/FK header badge and select-zone survive a tab switch, not just a fresh open', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-switchback';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Switchback DB', 'cyan');
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Switchback DB',
+        kind: 'postgres',
+        color: 'cyan',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({
+    control,
+    stream: orderItemsFixture(CONNECTION_ID).port,
+  });
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Switchback DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-cyan"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const row = await findRow(page, ORDER_ITEMS_PATH);
+  await row.dblclick();
+  const firstTabId = (await page
+    .locator('[data-testid="tab"][data-active="true"]')
+    .getAttribute('data-tab-id')) as string;
+  const productHeader = page.locator('[data-testid="grid-header-cell"][data-column="product_id"]');
+  await expect(productHeader).toBeVisible();
+  await expect(productHeader.locator('.header-key.is-fk')).toHaveCount(1);
+  await expect(productHeader.locator('.header-select-zone')).toHaveCount(1);
+
+  // Open a second tab on the SAME table — a genuinely different tabId, whose own meta needs its
+  // own first fetch (masking the bug the same way a first-ever open always does) — then switch
+  // back to the first tab, whose meta is already cached (state.ts) and needs no further fetch.
+  await openRowMenu(page, ORDER_ITEMS_PATH);
+  await page.click('[data-testid="menu-item-open-data-new-tab"]');
+  await expect(
+    page.locator('[data-testid="grid-header-cell"][data-column="product_id"]'),
+  ).toBeVisible();
+  const secondTabId = (await page
+    .locator('[data-testid="tab"][data-active="true"]')
+    .getAttribute('data-tab-id')) as string;
+  expect(secondTabId).not.toBe(firstTabId);
+
+  await page.locator(`[data-testid="tab"][data-tab-id="${firstTabId}"]`).click();
+  await expect(productHeader).toBeVisible();
+  await expect(productHeader.locator('.header-key.is-fk')).toHaveCount(1);
+  await expect(productHeader.locator('.header-select-zone')).toHaveCount(1);
+  await expect(cellNavButton(page, 0, 'product_id')).toHaveCount(1);
+});

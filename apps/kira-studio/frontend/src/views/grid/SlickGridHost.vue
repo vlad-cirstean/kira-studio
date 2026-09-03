@@ -1846,6 +1846,40 @@ onMounted(() => {
     eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
   }
 
+  // P22 postscript §14.2's two "reported but not reproduced" dock/badge symptoms, root-caused
+  // together: `new KiraSlickGrid(...)` above runs synchronously through slick.grid.ts's own
+  // `initialize()` -> `finishInitialization()` -> `createColumnHeaders()` (since
+  // `explicitInitialization: false`) — i.e. it fires `grid.onHeaderCellRendered` for the FIRST,
+  // constructor-built set of header cells *before this file's own `eventHandler.subscribe(grid.
+  // onHeaderCellRendered, onHeaderCellRendered)` above has even run* (subscribing needs a `grid`
+  // instance to subscribe *to*, so it can only happen after the constructor call that already
+  // fired the event). Every DOM addition `onHeaderCellRendered` is responsible for — the PK/FK
+  // `.header-key` badge, the `.header-select-zone` click target, the `data-testid`/tooltip
+  // attributes the header context menu and this file's own header-click handlers key off — is
+  // silently missing from that first build. On a table's first-ever open this goes unnoticed:
+  // `rt()?.meta`'s own watch (below) fires moments later, once the async `treeDescribe` resolves
+  // (meta genuinely changes from unset), and its own `rebuildAndSetColumns()` call rebuilds every
+  // header a second time — this time with the listener attached — papering over the gap. It stops
+  // being invisible the moment a tab's `meta` is already cached in its runtime record before this
+  // component (re)mounts (state.ts: meta survives a tab switch, cleared only when the tab actually
+  // closes) — the *only* case that describes: reopening/switching back to an already-visited tab.
+  // Then `rt()?.meta` never changes post-mount, that watch never fires, and the constructor's own
+  // listener-less header build is the only one that ever runs — every header stays missing its
+  // badge and its select zone for that mount's entire life. This is why the migration's own
+  // "close tab, reopen" repro attempts never caught it (closing clears the runtime record, so a
+  // reopen re-fetches meta and re-triggers the same rebuild that masks the bug on a first visit) —
+  // a plain tab *switch*, not a close, is what exposes it, exactly as originally reported ("PK/FK
+  // header badges disappear after switching a tab away and back"). Confirmed live, this session:
+  // `.header-select-zone`'s own count went from 1 (fresh mount) to 0 (switch away to a second
+  // table, then back) — the same missing element `cell-editor.spec.ts`'s "Target page ... has been
+  // closed" timeouts trace back to (clicking a header control that plain doesn't exist yet).
+  // Fixed the same way the meta/appearance/columnWidths watches below already fix a *later*
+  // change of the same kind: force one more header rebuild, through the now-subscribed listener,
+  // unconditionally on every mount — cheap (`rebuildAndSetColumns` is already this file's own
+  // steady-state answer to "columns need rebuilding") and idempotent if the meta watch does also
+  // fire moments later.
+  rebuildAndSetColumns();
+
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
     viewportEl.scrollTop = t.state.scrollTop;
