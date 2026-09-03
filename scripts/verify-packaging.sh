@@ -42,6 +42,55 @@ if grep -rnE "autoUpdater|electron-updater" apps/ packages/ >/dev/null 2>&1; the
   fail "updater code present" "apps/ or packages/ references autoUpdater or electron-updater"
 fi
 
+# --- S6: the packaged frontend bundle does not carry the Playwright debug hooks ----------------
+# P29 F1/§2.1's trap: build/Taskfile.yml's build:frontend task fingerprints its `sources` (frontend
+# excluding node_modules/dist), not `dist` itself, so `bun run test:ui` (build:test, hooks on) then
+# `bun run package` with no intervening source edit would otherwise let Task's up-to-date check
+# skip the rebuild and embed the hooks-enabled bundle. Checked against frontend/dist rather than
+# the .app bundle so this also runs on Linux and before packaging.
+# __kiraScrollTrace is deliberately excluded — its console.warn string literal survives in
+# scrollTrace.ts's always-shipped note* half, so it would be a false positive; the five below
+# appear nowhere outside main.ts's __KIRA_DEBUG_HOOKS__-gated block.
+if [ -d apps/kira-studio/frontend/dist/assets ]; then
+  if grep -lE '__kiraCount|__kiraCacheStats|__kiraRetention|__kiraRetainedBytes|__kiraTreeConnectionIds' \
+      apps/kira-studio/frontend/dist/assets/*.js >/dev/null 2>&1; then
+    fail "debug hooks in packaged bundle" "frontend/dist/assets/*.js carries the Playwright debug hooks — rebuild with 'bun run build', not 'build:test'"
+  fi
+else
+  note "skipped S6 — apps/kira-studio/frontend/dist/assets not present (run 'bun run build' first)"
+fi
+
+# --- S7: no un-gated debug global in main.ts ----------------------------------------------------
+# Every window.__kira* assignment in main.ts must sit inside the `if (__KIRA_DEBUG_HOOKS__)` block
+# (P29 F1) — this is the static check that would have caught window.__kiraGridEngine shipping
+# unconditionally, and would catch the next hook added the same way.
+MAIN_TS="apps/kira-studio/frontend/src/main.ts"
+if [ -f "$MAIN_TS" ]; then
+  GATE_LINE="$(grep -n '^if (__KIRA_DEBUG_HOOKS__)' "$MAIN_TS" | head -1 | cut -d: -f1)"
+  if [ -z "$GATE_LINE" ]; then
+    fail "no debug-hook gate" "$MAIN_TS has no top-level 'if (__KIRA_DEBUG_HOOKS__)' block"
+  else
+    UNGATED="$(awk -v gate="$GATE_LINE" 'NR < gate && /^[[:space:]]*window\.__kira/' "$MAIN_TS")"
+    if [ -n "$UNGATED" ]; then
+      fail "un-gated debug global" "$MAIN_TS assigns window.__kira* before its __KIRA_DEBUG_HOOKS__ gate at line $GATE_LINE"
+    fi
+  fi
+else
+  fail "main.ts missing" "$MAIN_TS not found — this check needs updating along with it"
+fi
+
+# --- S8: no dev-mode env branch in shipped Go's own entry point --------------------------------
+# apps/kira-studio/main.go must read no os.Getenv at all — true after P29 F2 deleted the
+# KIRA_G1_BLANK branch. A precise, low-false-positive invariant for the app's own entry point.
+MAIN_GO="apps/kira-studio/main.go"
+if [ -f "$MAIN_GO" ]; then
+  if grep -q 'os\.Getenv' "$MAIN_GO"; then
+    fail "dev-mode env branch in main.go" "$MAIN_GO calls os.Getenv — the app's own entry point must read no env-driven dev/debug branch"
+  fi
+else
+  fail "main.go missing" "$MAIN_GO not found — this check needs updating along with it"
+fi
+
 # --- S5: the packaging script cannot publish ---------------------------------------------------
 # A POSIX `sed` read, not `node -p require(...)`: this repository does not declare `node` as a
 # dependency anywhere (P58f deleted the vendored runtime), so a machine that satisfies every

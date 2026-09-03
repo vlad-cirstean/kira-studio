@@ -264,8 +264,8 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone, and
 even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5), not that any bundle is
-correct.**
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8), not that any bundle
+is correct.**
 
 What *is* fully verifiable off macOS: everything that feeds the bundle rather than being the bundle —
 the renderer build, typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
@@ -369,6 +369,22 @@ a signed and notarized app, which §6 defers. `verify-packaging.sh` keeps re-ass
 - **S5** — `package.json`'s `package` script still runs `wails3 task darwin:package:dmg` (P10 moved
   this from the plain `.app`-only task, so the shipped `.dmg` always has something to upload); this
   check fails loudly if the packaging entry point is swapped for something that could publish.
+
+P29 added three more static checks, guarding §2.1/§2.2's own findings against regressing:
+
+- **S6** — `frontend/dist/assets/*.js` (when it exists) does not carry the Playwright debug-hook
+  identifiers (`__kiraCount`, `__kiraCacheStats`, `__kiraRetention`, `__kiraRetainedBytes`,
+  `__kiraTreeConnectionIds`) — the guard against `build:frontend`'s Task fingerprint trap: it keys
+  off `frontend`'s own `sources` (excluding `dist`), so `bun run test:ui` (which writes the
+  hooks-enabled `build:test` bundle to `dist`) followed by `bun run package` with no intervening
+  source edit would otherwise let Task's up-to-date check skip the rebuild and embed the wrong
+  bundle. Checked against `frontend/dist` rather than the `.app` bundle so it also runs on Linux
+  and before packaging.
+- **S7** — `frontend/src/main.ts` assigns no `window.__kira*` outside its
+  `if (__KIRA_DEBUG_HOOKS__)` block — the check that would have caught
+  `window.__kiraGridEngine` shipping unconditionally, and catches the next hook added the same way.
+- **S8** — `apps/kira-studio/main.go` calls no `os.Getenv` at all — true since `KIRA_G1_BLANK` was
+  deleted. A precise, low-false-positive invariant for the app's own entry point.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
