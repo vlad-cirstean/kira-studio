@@ -56,8 +56,13 @@ export function canRoundTripToFields(parsed: ParsedUri, kind: ConnectionKind): b
   if (FILE_KINDS.has(kind)) {
     return parsed.scheme === kind && !!parsed.database && parsed.database.startsWith('/');
   }
-  if (kind !== 'postgres') return false;
-  if (parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql') return false;
+  if (kind !== 'postgres' && kind !== 'mongodb') return false;
+  if (kind === 'postgres' && parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql')
+    return false;
+  // mongodb+srv has no explicit port (resolved via DNS SRV) — the shared host check below already
+  // treats a null port as fine, so both schemes fall through it unchanged.
+  if (kind === 'mongodb' && parsed.scheme !== 'mongodb' && parsed.scheme !== 'mongodb+srv')
+    return false;
   if (!parsed.host || parsed.host.includes(',') || parsed.host.startsWith('/')) return false;
   for (const value of [parsed.username, parsed.password]) {
     if (value === null) continue;
