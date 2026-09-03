@@ -466,6 +466,22 @@ without a rebuild per variant. **Still open**: whether D2's batch cap alone (wit
 restores smooth motion, or the gap/drop symptom persists at `forceSyncScrolling: false` too — whoever
 runs the full A/B above should update this section with the real numbers and verdict.
 
+**Found chasing the above with a real Safari Web Inspector Timeline recording: `slickTheme.css`'s port
+of `GridRow.vue` had dropped `contain: layout` from `.slick-row`, fragmenting every paint into
+one-per-cell** (`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md` §10 — mechanism,
+proof, and fix). SlickGrid's own `slick.grid.css` gives `.slick-cell` a non-`auto` `z-index`, making
+every cell its own stacking context; without `.slick-row` itself being one, each cell's stacking
+context escaped to the far-away scroller ancestor instead of nesting in its row. Proven reversibly, on
+both engines, with real WebKit computed-style checks and Chromium CDP paint-count tracing: 20,054
+paints (~89% cell-sized) without the declaration, 3,399 (0% cell-sized) with it restored, matching the
+incumbent grid's own profile; geometry confirmed byte-identical either way. Fixed by restoring
+`contain: layout;` to `.slick-grid-host .slick-row`. **Still not confirmed on real macOS hardware**:
+paint count is not the same claim as reduced frame stutter — the original real-Mac recording left
+~73% of frame wall-clock time unattributed to anything a WebContent-process trace can see (likely
+GPU-process rasterization/compositing downstream of paint count), so a fresh real-Mac Timeline
+recording of the same hard-fling scenario, before/after this fix, is still needed and is the next step
+for whoever picks this back up.
+
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails in this environment no matter what, on non-app-controllable process

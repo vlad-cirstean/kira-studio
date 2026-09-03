@@ -33,6 +33,21 @@
 
 .slick-grid-host .slick-row {
   background: var(--kira-bg);
+  /* The one declaration this port dropped from GridRow.vue's own `.grid-row` rule (see its
+     comment there) — and the dropped-ness was the P22-iter2 per-cell paint fragmentation bug,
+     proven via WebKit computed-style + Chromium CDP paint tracing (see P22-iter2's own doc, final
+     section). slick.grid.css gives `.slick-cell` a non-auto z-index, so every cell becomes its own
+     stacking context; without `.slick-row` also being one (which `contain: layout` establishes,
+     among other things), each cell's stacking context escapes to the far-away scroller ancestor
+     instead of staying contained within its row, so every mounted cell paints independently
+     (20,054 paints -> 3,399 restoring this line). Two things to remember before touching this:
+     (1) `.slick-cell.editable`'s z-index:11 (slick.grid.css) can no longer paint above a
+     *following* row's cells once a Pass-B editor exists — solve it the way GridRow.vue already
+     does, a single overlay `<input>` outside the row structure, not a z-index escape; (2) this
+     also makes `.slick-row` a containing block for `position: fixed` descendants — a future
+     cell-menu/tooltip must portal outside the row subtree, not rely on `position: fixed` inside
+     it. */
+  contain: layout;
 }
 
 /* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */

@@ -659,3 +659,83 @@ the same still-open A/B, not a new one.
 - **D3's interaction with `hasFrozenColumns()`'s scroll-sync write (§3 F2)** is priced as cheap and
   unconditional either way; if a real-Mac session ever shows otherwise, that would be a new finding,
   not a re-litigation of F2's own verdict here.
+
+---
+
+## 10. Postscript — a dropped `contain: layout` was fragmenting every paint into one-per-cell
+
+Found after this document's own C1-C5 landed, while chasing the still-open real-Mac gap/drop question
+above with a real macOS Safari Web Inspector Timeline recording, cross-checked with Chromium/WebKit CDP
+paint tracing via Playwright in this sandbox. Not part of the render-batch story above — a different
+mechanism, in the same file family, worth its own section rather than folding into §5's decision list
+after the fact.
+
+**The finding.** `slickTheme.css` (`views/grid/slick/slickTheme.css`) documents itself, in its own
+header, as "a near-verbatim port of `GridRow.vue`'s own `<style>` block." The port dropped one
+declaration: `GridRow.vue`'s `.grid-row` rule carries `contain: layout` (with its own comment citing
+P29 D8 — scoping a row's layout invalidation to the row, not `paint`/`will-change`, for reasons that
+comment already gives); the ported `.slick-grid-host .slick-row` rule carried only the retokenised
+`background`. That single missing line is the proven cause of SlickGrid producing **~6x more paint
+operations than the incumbent** under identical scroll load, ~89% of them cell-sized (one paint per
+cell) rather than row/region-sized.
+
+**The mechanism.** `slick.grid.css` (SlickGrid's own shipped structural stylesheet, unmodified by this
+app) gives `.slick-cell` a non-`auto` `z-index: 1`, which makes every cell its own CSS stacking
+context regardless of anything this app does. Normally that is harmless — a stacking context nests
+inside whatever real stacking context contains it. But without `.slick-row` itself being a stacking
+context, there is no near ancestor for a cell's stacking context to nest inside: it bubbles all the way
+up to the nearest one that actually exists, the far-away scroller/canvas element, not its own row.
+`contain: layout` is one of the CSS properties that establishes a new stacking context on the element
+it's set on (alongside `contain: paint`, `isolation: isolate`, a non-`auto` `z-index` of its own, and a
+few others) — so restoring it to `.slick-row` gives each row a real, near stacking-context ancestor for
+its cells to nest inside, instead of the far one. That containment is what collapses "every cell paints
+independently" back down to "a row's cells paint together, scoped to the row."
+
+**How this was proven, not assumed — reversibly, in both directions, on both engines.**
+- Real WebKit (Playwright), computed-style read: confirmed `.slick-row` is not a stacking context today
+  and that SlickGrid's own `.slick-cell` carries `z-index: 1` regardless of anything in `slickTheme.css`.
+- Chromium CDP paint-count tracing under identical scroll load: **20,054 paints, ~89% cell-sized**
+  without the declaration; **3,399 paints, 0% cell-sized** with it restored — matching the incumbent
+  grid's own profile.
+- Reversed on the incumbent too: removing `contain: layout` from `GridRow.vue`'s own `.grid-row` made
+  it fragment the same way SlickGrid does today, confirming the mechanism is the missing declaration,
+  not something else specific to the SlickGrid port.
+- Geometry check: position/size of the first 60 mounted rows and every one of their cells, byte-identical
+  with and without the declaration — this is a paint-batching change, not a layout change, exactly as
+  `contain: layout`'s own semantics promise.
+- A screenshot render at a scrolled position, visually confirmed correct with the fix applied.
+
+**Alternatives tested and rejected — do not use.** `contain: paint` measured worse (it clips rather
+than eliminating fragmentation, producing row-sized-but-nonzero clips instead of zero cell-sized ones).
+`will-change` was not tested further than `GridRow.vue`'s own comment already argues against — same
+reasoning applies here (P12's memory findings). Of the tested stacking-context-establishing options
+(`isolation: isolate`, `z-index: 0`, `contain: layout`), `contain: layout` was chosen because it is
+what the incumbent already ships (consistency) and because it also scopes the row's own layout
+invalidation as a bonus, exactly per its `GridRow.vue` comment.
+
+**The fix.** `contain: layout;` restored to `.slick-grid-host .slick-row` in `slickTheme.css`, with an
+in-file comment carrying the mechanism and the two risks below so a future reader doesn't reintroduce
+the drop.
+
+**Two known, deliberately-not-fixed-now risks — documented, not solved, since Pass B (editing, portals)
+hasn't landed:**
+1. Making `.slick-row` a stacking context means `slick.grid.css`'s own
+   `.slick-cell.editable { z-index: 11; overflow: visible }` can no longer paint above a *following*
+   row's cells (only within its own row's stacking context now). Not a regression for this spike —
+   editing isn't wired up yet — but a Pass-B cell-editor concern. The incumbent grid already solves this
+   the same way it will need to be solved here: a single overlay `<input>` rendered outside the row
+   structure entirely, never a z-index escape.
+2. `contain: layout` also establishes a containing block for `position: fixed` descendants. Nothing in
+   the current row/cell subtree uses `position: fixed` today, but a future cell-menu/tooltip portal must
+   render outside the row subtree rather than relying on `position: fixed` inside it.
+
+**What this is not yet: confirmed on real macOS hardware.** Paint *count* is what a WebContent-process
+CDP trace and the sandbox's Playwright/WebKit checks can see; it is not the same claim as "the reported
+stutter is reduced." In the real-Mac Safari Web Inspector Timeline recording this finding came from,
+roughly **73% of frame wall-clock time was unattributed to anything a WebContent-process-only trace can
+see** — most plausibly GPU-process rasterization/compositing work downstream of paint count, which
+fewer/larger paints should reduce but which this investigation has not measured reducing. A fresh
+real-Mac Safari Web Inspector Timeline recording of the same hard-fling scenario, before and after this
+fix, is the still-open step that would confirm it actually helps the frame-stutter symptom `docs/PERF.md`
+§2.1c is tracking — not merely that it produces the paint-count profile the incumbent already has.
+`docs/PERF.md` §2.1c carries a pointer to this section for that still-open step.
