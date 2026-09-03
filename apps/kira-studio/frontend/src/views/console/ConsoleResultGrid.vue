@@ -36,6 +36,7 @@ import {
 } from '../shared/page/columns';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
+import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
 import {
   cell,
   documentRow,
@@ -65,6 +66,13 @@ const props = defineProps<{
   connectionId: string | null;
   path: string;
 }>();
+
+// P30 §3.6 C1 — the scaffold flag: while it's `false`, ConsoleSlickGrid.vue exists and compiles
+// (so vue-tsc's per-commit typecheck already exercises its props/template) but never mounts,
+// leaving the incumbent VirtualList branch below as the only one a user or a test ever sees.
+// Flipped on for real, and then removed entirely, at C5 (§3.6) — a one-line revert of that commit
+// alone restores this off state, with the new component's own code untouched either way.
+const ENABLE_SLICK_TABULAR = false;
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
@@ -374,6 +382,14 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
     <div v-else-if="rowIndices.length === 0" class="no-rows" data-testid="console-no-matching-rows">
       No matching rows
     </div>
+    <ConsoleSlickGrid
+      v-else-if="ENABLE_SLICK_TABULAR && page.kind === 'tabular'"
+      :page-key="pageKey"
+      :tab-id="tabId"
+      :connection-id="connectionId"
+      :path="path"
+      class="body"
+    />
     <VirtualList
       v-else-if="page.kind === 'tabular'"
       ref="listRef"
