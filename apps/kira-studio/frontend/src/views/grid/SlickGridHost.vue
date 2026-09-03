@@ -47,7 +47,7 @@ import {
 } from './clipboardFormats';
 import { cellMenu, headerMenu, rowMenu } from './menu';
 import { addInsertRow, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
-import { matchedRows } from './search';
+import { matchedRows, searchState } from './search';
 import {
   createDisplayValueExtractor,
   createGridDataSource,
@@ -772,6 +772,48 @@ function computeStagedHash(): Record<number, Record<string, string>> {
 
 function refreshStagedLayer(): void {
   grid?.setCellCssStyles('kira-staged', computeStagedHash());
+}
+
+// C12/§5 D5 — `kira-search`'s own row: "every match", not clipped to the rendered range the way
+// `kira-sel-edges`/`kira-staged` are (a rectangle's perimeter, or a handful of staged rows, are
+// cheap to re-walk on every render-band change; a search result is neither bounded that way, so
+// this only recomputes when D5's own table says to — the result or current match changing, plus
+// a live filter shifting every match's own display position, both watched below). T7 (§9.2) is
+// this decision's own named gate: with 10 000 matches active, a selection change must still land
+// inside the same 150ms sandbox bound this file's other cost gates use; D5 already names the
+// fallback (a rendered-range ± hysteresis band) if it doesn't.
+function computeSearchHashes(): [EdgeHash, EdgeHash] {
+  const matchHash: EdgeHash = {};
+  const currentHash: EdgeHash = {};
+  if (!grid || !dataSource) return [matchHash, currentHash];
+  const entry = searchState[props.tabId];
+  if (!entry || entry.matches.length === 0) return [matchHash, currentHash];
+  const p = getPage(props.tabId);
+  if (!p) return [matchHash, currentHash];
+  const orderSet = new Set(currentOrder());
+  const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
+  const matchClass = classesFrom({ searchMatch: true })[0] ?? 'search-match';
+  const currentClass = classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current';
+  for (const m of entry.matches) {
+    const name = p.columns[m.col]?.name;
+    if (!name || !orderSet.has(name)) continue;
+    const pos = displayPositionOf(idx, m.row);
+    matchHash[pos] ??= {};
+    (matchHash[pos] as Record<string, string>)[name] = matchClass;
+  }
+  const current = entry.index >= 0 ? entry.matches[entry.index] : undefined;
+  const currentName = current && p.columns[current.col]?.name;
+  if (current && currentName && orderSet.has(currentName)) {
+    currentHash[displayPositionOf(idx, current.row)] = { [currentName]: currentClass };
+  }
+  return [matchHash, currentHash];
+}
+
+function refreshSearchLayer(): void {
+  if (!grid) return;
+  const [matchHash, currentHash] = computeSearchHashes();
+  grid.setCellCssStyles('kira-search', matchHash);
+  grid.setCellCssStyles('kira-search-current', currentHash);
 }
 
 // The rendered row *band* (not every render — a sub-row scroll re-renders nothing new, and the
@@ -1679,6 +1721,11 @@ onMounted(() => {
   }
   grid.render();
   syncSortIndicators();
+  // C12 — a tab switch (not a fresh connect) can remount this host onto a tab that already has a
+  // completed search from before it was last hidden; searchState isn't cleared until the tab
+  // itself closes (registerTabRuntimeCleanup), so this needs the same initial sync `onMounted`
+  // already gives every other CSS layer via its own grid.render() call, above.
+  refreshSearchLayer();
 
   if (viewportEl) {
     scrollTrace.registerGrid(viewportEl, '.slick-row');
@@ -1748,7 +1795,45 @@ watch(
     lastCssLayerBand = { start: 0, end: -1 };
     grid.render();
     syncSortIndicators();
+    refreshSearchLayer();
   },
+);
+
+// C12/§5 D12 — the filter *is* the data source: `matchedRows(tabId)` (via `currentDisplayRows()`,
+// already what `dataSourceState()`'s own `index.displayRows` reads) tracks both the search
+// toolbar's own scan result and its "filter to matches" toggle reactively (both read a reactive
+// `searchState`/`searchFilterState` entry internally), so this watch's getter needs nothing of
+// its own beyond calling the same function every other read site already uses.
+// `getLength`/`getItem` already do the rest (`dataSource.ts`) once the state is swapped in — the
+// same three-call shape the `pageVersion` watch above uses for a full reload, minus rebuilding
+// columns (a filter never changes which columns exist, only which rows do). Match positions shift
+// under a live filter exactly like selection/staged positions do, so `kira-search` needs its own
+// explicit refresh here too — unlike those two, it is not band-scoped, so `onGridRendered`'s own
+// band-change check (which the `lastCssLayerBand` sentinel forces below) would never catch it.
+watch(
+  () => currentDisplayRows(),
+  () => {
+    if (!grid || !dataSource) return;
+    const p = getPage(props.tabId);
+    dataSource.setState(dataSourceState(p, currentOrder()));
+    grid.updateRowCount();
+    grid.invalidateAllRows();
+    lastCssLayerBand = { start: 0, end: -1 };
+    grid.render();
+    refreshSearchLayer();
+  },
+);
+
+// C12/§5 D5 — `kira-search`'s own trigger: a scan publishing a new/updated result, or goNext/
+// goPrev moving the current match. The signature is result identity + current index + pending,
+// not the matches themselves — rebuilding the whole hash is `computeSearchHashes`' own job once
+// this fires, not this getter's.
+watch(
+  () => {
+    const entry = searchState[props.tabId];
+    return entry ? `${entry.matches.length}:${entry.index}:${entry.pending ? 1 : 0}` : '';
+  },
+  () => refreshSearchLayer(),
 );
 
 // C9/§5 D9 — an insert row's own count changes independent of `pageVersion` (Add Row, a discard,
@@ -1881,14 +1966,19 @@ watch(
 
 defineExpose({
   // DataView.vue's own contract (matching DataGrid.vue's identical export): `row` is a *page* row
-  // index, `col` a *display* column index. SlickGrid's own scrollCellIntoView wants its own display
-  // *position* and a column index that accounts for the frozen gutter occupying slot 0. Pass A never
-  // reactively filters (this file's own currentDisplayRows() comment), so page row === display
-  // position by construction — the identity pass-through below is exact, not an approximation, for
-  // as long as that stays true; a live filter wired in Pass B must translate through the data
-  // source's own row<->position mapping here instead.
+  // index, `col` a *display* column index. SlickGrid's own scrollCellIntoView wants its own
+  // display *position* and a column index that accounts for the frozen gutter occupying slot 0.
+  // C12/§5 D12 — the real translation Pass A's own comment here said a live filter would need:
+  // `displayPositionOf` collapses to identity while nothing is filtered (unchanged behaviour for
+  // the common case) and only actually shifts anything once C12's own filter watch can make
+  // page row and display position diverge.
   scrollCellIntoView(row: number, col: number): void {
-    grid?.scrollCellIntoView(row, col + 1);
+    if (!grid) return;
+    const idx = {
+      displayRows: currentDisplayRows(),
+      pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+    };
+    grid.scrollCellIntoView(displayPositionOf(idx, row), col + 1);
   },
 });
 </script>

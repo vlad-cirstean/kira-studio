@@ -933,6 +933,109 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
   await expect.poll(() => tall.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
 });
 
+// P22 Pass B, C12/§9.2 T7 — "the F5 merge cost" (Pass A §8.6 item 2's own open question, discharged
+// with a measurement, not an argument): with a 10 000-match search active, a selection change must
+// still land inside the same 150ms sandbox bound T6's own select-all gate uses. `kira-search` is
+// explicitly the one CSS layer §5 D5's own table allows to be O(matches) rather than
+// O(perimeter ∩ rendered) — this is what proves that choice doesn't tax anything *else* (the
+// selection's own O(area) select-all cost, C6) once a large search result is sitting on top of it.
+// Fails -> D5's own named fallback (a rendered-range ± hysteresis band for kira-search) lands in
+// this same commit.
+test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 10 000 search matches active', async ({
+  relaunch,
+}) => {
+  test.setTimeout(60_000);
+
+  const BIG_CONNECTION_ID = 'conn-slick-search-big';
+  const BIG_CONNECTION_SUMMARY = postgresConnectionSummary(
+    BIG_CONNECTION_ID,
+    'Search Big DB',
+    'cyan',
+  );
+  const bigControl: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Search Big DB',
+        kind: 'postgres',
+        color: 'cyan',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: BIG_CONNECTION_SUMMARY,
+    },
+    ...bigRowsFixture(BIG_CONNECTION_ID).control,
+  ];
+  const bigPort: PortSnapshot[] = [
+    ...bigRowsFixture(BIG_CONNECTION_ID).port, // pageSize=100 — the tab's own initial load
+    bigRowsHugePage(BIG_CONNECTION_ID), // pageSize=10000 — page-size-10000's own request
+  ];
+
+  const { window: page } = await relaunch({ control: bigControl, stream: bigPort });
+  await forceSlickEngine(page);
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Search Big DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-cyan"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const bigRowsRow = await findRow(page, BIG_ROWS_PATH);
+  await bigRowsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"] .slick-cell')).not.toHaveCount(0);
+  await page.click('[data-testid="page-size-10000"]');
+  await expect
+    .poll(async () => page.locator('[data-testid="data-grid"] .slick-cell').count(), {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(0);
+
+  // 10 000 matches, one per row: every big_rows `id` is a bare digit string (bigRowsRow's own
+  // shape), so a whole-cell digit-run regex matches the `id` column exactly once per row and
+  // never the `hash` column (32 hex chars, never all-digit in this fixture's md5 seed).
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await page.click('[data-testid="search-regex"]');
+  await page.fill('[data-testid="search-input"]', '^\\d+$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('of 10,000', {
+    timeout: 15_000,
+  });
+
+  const elapsedMs = await page.evaluate(() => {
+    const corner = document.querySelector<HTMLElement>('[data-testid="grid-select-all"]');
+    if (!corner) throw new Error('select-all corner not found');
+    const start = performance.now();
+    corner.click();
+    return performance.now() - start;
+  });
+  expect(elapsedMs).toBeLessThan(150);
+  await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+});
+
 // P22 Pass B, C9/§9.2 T8 — the pacing invariant (T1's own histogram-all-1 assertion, above) held
 // again with N staged insert rows on screen. D9's own §0.3 acknowledgement: this is the one place
 // this pass returns DOM from a formatter (the insert region's own `<input>`, self-contained and

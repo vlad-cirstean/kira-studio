@@ -1422,10 +1422,13 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // land on the next *visible* row (id=5, page row 4), not page row 2 (id=3, hidden).
   await gridCell(page, 1, 'id').click();
   await page.keyboard.press('ArrowDown');
+  // P22 Pass B — `kira-cell-selected` (§5 D4), not the incumbent's own bare `.selected`.
   await expect(
-    page.locator('[data-testid="grid-row"] [data-testid="grid-cell"].selected'),
+    page.locator('[data-testid="grid-row"] [data-testid="grid-cell"].kira-cell-selected'),
   ).toBeVisible();
-  await expect(gridRow(page, 4).locator('[data-testid="grid-cell"].selected')).toHaveCount(1);
+  await expect(
+    gridRow(page, 4).locator('[data-testid="grid-cell"].kira-cell-selected'),
+  ).toHaveCount(1);
 
   // Copy column values follows the filter (D10): one clipboard line per visible row, not per
   // loaded row. `installClipboardSpy` (header comment) stands in for the original's real OS

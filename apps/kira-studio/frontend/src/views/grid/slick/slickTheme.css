@@ -311,6 +311,19 @@
   color: var(--kira-warn);
 }
 
+/* C12/§5 D5/D12 — the live search highlight, GridRow.vue's own `.grid-cell.search-match`/
+   `.search-match-current` rules, ported verbatim. Two separate `setCellCssStyles` layers
+   (`kira-search`/`kira-search-current`, SlickGridHost.vue) rather than one merged class list, so
+   the current match's own cell — which is always also a match — can carry both without either
+   layer's hash value ever needing more than one class name in it. */
+.slick-grid-host .search-match {
+  background: var(--kira-search-match);
+}
+
+.slick-grid-host .search-match-current {
+  background: var(--kira-search-match-current);
+}
+
 /* P22 Pass B, C2/§5 D14 — the header parity rules: sort chevron + order badge, resize handle,
    PK/FK badge and the header select zone. `.slick-header-column-sorted`'s shipped italic is
    neutralised — this app signals sort with the chevron, not a font style. */
