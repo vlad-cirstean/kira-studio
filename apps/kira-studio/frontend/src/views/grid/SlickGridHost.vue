@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import type { Column, CustomDataView, FormatterResultWithText } from 'slickgrid';
+import type { ObjectMeta } from '@shared/domain/tree';
+import type { ColumnDescriptor } from '@shared/protocol/page';
+import type {
+  Column,
+  CustomDataView,
+  FormatterResultWithText,
+  MultiColumnSort,
+  OnBeforeHeaderCellDestroyEventArgs,
+  OnHeaderCellRenderedEventArgs,
+  SingleColumnSort,
+} from 'slickgrid';
 import { SlickEventHandler } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { appearanceVersion, settingsState } from '../../state/settings';
@@ -7,6 +17,7 @@ import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { categoryForTypeClass } from '../../theme/icons';
 import {
   alignmentFor,
+  columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
@@ -27,6 +38,8 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { pendingFor } from './pendingChanges';
 import * as scrollTrace from './scrollTrace';
+import { parseTextSortTerms } from './sortTerms';
+import { runtime, setSort } from './state';
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -103,6 +116,54 @@ function cellFormatter(
   return view.text;
 }
 
+function rt() {
+  return runtime[props.tabId];
+}
+
+// FIX-8: PK/FK stated as a label, never inferred from colour alone — mirrors DataGrid.vue's own
+// foreignKeyColumnNames/keyLabelFor, folded to a Set built once per buildColumns call (not once
+// per column) since it's the same answer for every column of one call.
+function foreignKeyNamesFor(meta: ObjectMeta | null): Set<string> {
+  const names = new Set<string>();
+  for (const fk of meta?.foreignKeys ?? []) for (const c of fk.columns) names.add(c);
+  return names;
+}
+function keyLabelFor(
+  descriptor: ColumnDescriptor | undefined,
+  name: string,
+  foreignKeyNames: Set<string>,
+): 'PK' | 'FK' | null {
+  if (descriptor?.isPrimaryKey) return 'PK';
+  if (foreignKeyNames.has(name)) return 'FK';
+  return null;
+}
+
+// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so this replicates
+// workbench/state/tooltip.ts's own updateTip() by hand: data-kira-tip (the plain, newline-joined
+// a11y text) and data-kira-tip-parts (the structured JSON `v-tooltip`'s own directive would have
+// written) plus aria-label — since nothing runs that directive over SlickGrid-owned DOM.
+function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<string, string> {
+  const plain = [content.title, content.meta, content.body]
+    .filter((v): v is string => !!v)
+    .join('\n');
+  return {
+    'data-kira-tip': plain,
+    'data-kira-tip-parts': JSON.stringify(content),
+    'aria-label': plain,
+  };
+}
+
+// The DESCRIBE-derived dataType (meta.columns) when it has loaded, else the page's own
+// ColumnDescriptor — mirrors DataGrid.vue's own dataTypeFor, so the header tooltip can never show
+// a column two different type strings depending on which one asked first.
+function dataTypeFor(
+  name: string,
+  descriptor: ColumnDescriptor | undefined,
+  metaByName: Map<string, { dataType: string; comment: string | null }>,
+): string {
+  return metaByName.get(name)?.dataType ?? descriptor?.dataType ?? '';
+}
+
 /** §6 D6 point 1 — colour and alignment are per-column and static: a `tc-<category>` class plus
  *  `kira-align-right` where the column's own descriptor says numeric. Nine categories collapse to
  *  the five `categoryForTypeClass` can actually return; slickTheme.css carries all five anyway
@@ -111,6 +172,7 @@ function buildColumns(
   page: ReturnType<typeof getPage>,
   order: string[],
   storedWidths: Record<string, number>,
+  meta: ObjectMeta | null,
 ): KiraColumn[] {
   const cols: KiraColumn[] = [
     {
@@ -122,8 +184,12 @@ function buildColumns(
       maxWidth: GUTTER_WIDTH,
       resizable: false,
       sortable: false,
-      focusable: false,
-      selectable: false,
+      // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
+      // canCellBeActive(row, 0), which `handleClick`'s row branch checks
+      // (slick.hybridselectionmodel.ts:497). Tab/Left-arrow landing on the gutter is the one
+      // side effect (D8 vetoes editing there; a gutter active cell becomes a row selection).
+      focusable: true,
+      selectable: true,
       cssClass: 'kira-gutter',
       formatter: gutterFormatter,
       // P22 Pass B, C1/§5 D10 — F3: cellAttrs/headerCellAttrs are per-column static attribute
@@ -133,27 +199,37 @@ function buildColumns(
       // `data-row` correction (below, tagRenderedRows) needs an actual per-render pass, and rows
       // are ~200, not ~2 400 cells.
       cellAttrs: { 'data-testid': 'grid-gutter-cell' },
-      headerCellAttrs: { 'data-testid': 'grid-select-all' },
+      headerCellAttrs: {
+        'data-testid': 'grid-select-all',
+        role: 'button',
+        'aria-label': 'Select all cells',
+      },
     },
   ];
   if (!page) return cols;
   const measured = initialWidths(page);
   const byName = new Map(page.columns.map((c) => [c.name, c]));
+  const metaByName = new Map(meta?.columns.map((c) => [c.name, c]) ?? []);
   order.forEach((name, displayIndex) => {
     const descriptor = byName.get(name);
     const classes = [`tc-${descriptor ? categoryForTypeClass(descriptor.typeClass) : 'other'}`];
     if (descriptor && alignmentFor(descriptor) === 'right') classes.push('kira-align-right');
+    const tooltip = columnHeaderTooltip(
+      descriptor ?? { name, typeClass: 'other' },
+      dataTypeFor(name, descriptor, metaByName),
+      metaByName.get(name)?.comment,
+    );
     cols.push({
       id: name,
       field: name,
       name,
       width: storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH,
-      // Item 10 (column resize) is Pass B (§7.1) — resizable defaults true on SlickGrid's own
-      // Column shape, so this is explicit, not an omission: a half-working resize affordance
-      // (drags visually, never persists via patchDataTabState) would look like a bug, not a scope
-      // boundary.
-      resizable: false,
-      sortable: false,
+      // F9 — the app's own resize floor; onColumnsResized persists the drag (below).
+      minWidth: 40,
+      resizable: true,
+      // F8 — creates the sort indicator divs; tristateMultiColumnSort/multiColumnSort (grid
+      // options, below) make a click cycle asc -> desc -> none, this app's own header cycle.
+      sortable: true,
       cssClass: classes.join(' '),
       formatter: cellFormatter,
       cellAttrs: {
@@ -165,6 +241,7 @@ function buildColumns(
         'data-testid': 'grid-header-cell',
         'data-column': name,
         'data-col-index': String(displayIndex),
+        ...tooltipAttrs(tooltip),
       },
     });
   });
@@ -369,7 +446,109 @@ function rebuildAndSetColumns(): void {
   if (!grid) return;
   const p = getPage(props.tabId);
   const order = p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
-  grid.setColumns(buildColumns(p, order, currentWidths()));
+  grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
+  // setColumns rebuilds every header from scratch (F8's own indicator divs included) — restore
+  // the sort chevrons the fresh headers just lost.
+  syncSortIndicators();
+}
+
+// §4 item 7, §5 D2 — the PK/FK badge and the header select zone are the two pieces of header DOM
+// SlickGrid's own Column shape can't express (a static `name` string, no child markup), so they're
+// appended imperatively once per header cell BUILD. `onHeaderCellRendered` fires once per column
+// per `setColumns` call (never per scroll frame — headers aren't virtualized), matching the
+// gutter/data-column split cellAttrs/headerCellAttrs already draw.
+function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs): void {
+  const name = String(args.column.field ?? '');
+  if (name === GUTTER_FIELD) return;
+  const p = getPage(props.tabId);
+  const descriptor = p?.columns.find((c) => c.name === name);
+  const label = keyLabelFor(descriptor, name, foreignKeyNamesFor(rt()?.meta ?? null));
+  if (label) {
+    const badge = document.createElement('span');
+    badge.className = label === 'FK' ? 'header-key mono is-fk' : 'header-key mono';
+    badge.textContent = label;
+    args.node.appendChild(badge);
+  }
+  // D4/C4 owns the select zone's actual click semantics (pushing a `column` selection into both
+  // rt().selection and the hybrid selection model, §5 D4's pendingKind) — this only builds the
+  // static strip and stops it from reaching the header's own sort-click handler underneath it.
+  const zone = document.createElement('span');
+  zone.className = 'header-select-zone';
+  zone.dataset.testid = 'grid-header-select';
+  zone.dataset.column = name;
+  zone.dataset.colIndex = args.node.dataset.colIndex ?? '';
+  zone.setAttribute('role', 'button');
+  zone.setAttribute('aria-label', 'Select column');
+  zone.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+  });
+  args.node.appendChild(zone);
+}
+
+// Nothing to clean up beyond the header cell's own subtree (destroyed with it, badge/zone and the
+// zone's listener included) — subscribed anyway so a future addition (e.g. a listener registered
+// *outside* this node) has an obvious place to land, per §5 D2's own header-cell lifecycle pair.
+function onBeforeHeaderCellDestroy(_e: unknown, _args: OnBeforeHeaderCellDestroyEventArgs): void {}
+
+// F8 — the app's own asc -> desc -> none cycle, mirrored from `sortTerms`/tab.state.sort (D6's own
+// text-sort parse included) into SlickGrid's own indicator DOM via setSortColumns, which redraws
+// only the header — no row touched, no setColumns rebuild. Called from a watch callback (D0), not
+// a computed: this makes an imperative call into the grid.
+function currentSortTerms(): { column: string; direction: 'asc' | 'desc' }[] {
+  const t = tab();
+  const sort = t?.state.sort;
+  if (!sort) return [];
+  const p = getPage(props.tabId);
+  const order = p ? resolveColumnOrder(p, t.state.columnOrder ?? null) : [];
+  if (sort.kind === 'structured') return sort.terms;
+  return parseTextSortTerms(sort.text, order);
+}
+function syncSortIndicators(): void {
+  if (!grid) return;
+  const terms = currentSortTerms();
+  grid.setSortColumns(
+    terms.map((term) => ({ columnId: term.column, sortAsc: term.direction === 'asc' })),
+  );
+}
+
+// tristateMultiColumnSort + multiColumnSort: false (grid options) is what makes a header click
+// cycle asc -> desc -> none by itself (F8) — this only translates SlickGrid's own resulting
+// `onSort` event into the app's `setSort`, the same single-term-replaces-the-whole-sort semantics
+// DataGrid.vue's own onHeaderClick has (never accumulating past one column; only the ORDER BY box
+// itself can produce a genuine multi-term sort).
+function onSort(_e: unknown, args: SingleColumnSort | MultiColumnSort): void {
+  // multiColumnSort: false (grid options, above) — this event is always the single-column shape
+  // in practice; the union (and columnId's own `| null` at runtime, despite ColumnSort's type not
+  // saying so — F8's own citation) is the library's, not this app's.
+  if (args.multiColumnSort) return;
+  const columnId = (args as SingleColumnSort).columnId as string | number | null;
+  if (columnId === null || columnId === undefined) {
+    void setSort(props.tabId, null);
+    return;
+  }
+  void setSort(props.tabId, {
+    kind: 'structured',
+    terms: [{ column: String(columnId), direction: args.sortAsc ? 'asc' : 'desc' }],
+  });
+}
+
+// D3 — SlickGrid drags the handle and persists nothing on its own; this app reads the resulting
+// widths straight off getColumns() and patches them into tab state (F9). The echo guard is the
+// same shape DataGrid.vue's own dragProducedRange uses: without it, the columnWidths watch below
+// would call setColumns and rebuild every header (and every rendered row) mid-drag.
+let suppressWidthEcho = false;
+function onColumnsResized(): void {
+  if (!grid) return;
+  const t = tab();
+  if (!t) return;
+  const widths: Record<string, number> = { ...t.state.columnWidths };
+  for (const col of grid.getColumns()) {
+    if (col.id === GUTTER_FIELD || col.width === undefined) continue;
+    widths[String(col.id)] = col.width;
+  }
+  suppressWidthEcho = true;
+  patchDataTabState(props.tabId, { columnWidths: widths });
+  suppressWidthEcho = false;
 }
 
 onMounted(() => {
@@ -401,9 +580,17 @@ onMounted(() => {
   grid = new KiraSlickGrid(
     el,
     dataSource as CustomDataView<RowHandle>,
-    buildColumns(p, order, currentWidths()),
+    buildColumns(p, order, currentWidths(), rt()?.meta ?? null),
     {
       rowHeight: rowHeight.value,
+      // F8 — tristateMultiColumnSort + multiColumnSort: false is exactly this app's own header
+      // click cycle (asc -> desc -> none), replacing DataGrid.vue's own onHeaderClick entirely;
+      // numberedMultiColumnSort + sortColNumberInSeparateSpan renders the order badge for the
+      // ORDER BY box's own multi-term sort even though a header click alone never produces one.
+      tristateMultiColumnSort: true,
+      multiColumnSort: false,
+      numberedMultiColumnSort: true,
+      sortColNumberInSeparateSpan: true,
       // F7 — Sortable.js is never loaded or bundled; this app reorders columns via ColumnsMenu.vue,
       // never by dragging a header, so the default (true, which hard-throws without a global
       // `Sortable`) must be off.
@@ -464,6 +651,10 @@ onMounted(() => {
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, tagRenderedRows);
   eventHandler.subscribe(grid.onRendered, onGridRendered);
+  eventHandler.subscribe(grid.onHeaderCellRendered, onHeaderCellRendered);
+  eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
+  eventHandler.subscribe(grid.onSort, onSort);
+  eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
@@ -482,6 +673,7 @@ onMounted(() => {
   }
   grid.render();
   applyStaticCssLayers();
+  syncSortIndicators();
 
   if (viewportEl) {
     scrollTrace.registerGrid(viewportEl, '.slick-row');
@@ -527,11 +719,12 @@ watch(
         ? createDisplayValueExtractor(props.tabId, p, order)
         : () => ({ text: '', isNull: true, truncated: false }),
     });
-    grid.setColumns(buildColumns(p, order, currentWidths()));
+    grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
     grid.updateRowCount();
     grid.invalidateAllRows();
     grid.render();
     applyStaticCssLayers();
+    syncSortIndicators();
   },
 );
 
@@ -546,6 +739,26 @@ watch(
   () => appearanceVersion.n,
   () => {
     resetMeasureCtx();
+    rebuildAndSetColumns();
+    grid?.render();
+  },
+);
+
+// D2(c)/D3 — a columnWidths change that did NOT originate from this host's own resize drag
+// (onColumnsResized's echo guard) rebuilds the header/cell width bag; loadMeta (state.ts) resolves
+// after the page itself, so the header tooltip/PK-FK badges need their own watch too, independent
+// of pageVersion.
+watch(
+  () => tab()?.state.columnWidths,
+  () => {
+    if (suppressWidthEcho) return;
+    rebuildAndSetColumns();
+    grid?.render();
+  },
+);
+watch(
+  () => rt()?.meta,
+  () => {
     rebuildAndSetColumns();
     grid?.render();
   },

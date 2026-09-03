@@ -92,6 +92,16 @@ export function gridScroller(page: Page): Locator {
   return page.locator(GRID_SCROLLER_SELECTOR);
 }
 
+/** The sort chevron shown over a sorted column's header. Tanstack draws its own `.sort-indicator`
+ *  span; SlickGrid's own `.slick-sort-indicator-asc`/`-desc` (F8, only created once a column is
+ *  actually sorted — `setSortColumns` adds the class, it doesn't toggle a rule). */
+export function sortIndicators(page: Page): Locator {
+  if (ENGINE === 'slick') {
+    return page.locator('.slick-sort-indicator-asc, .slick-sort-indicator-desc');
+  }
+  return page.locator('.sort-indicator');
+}
+
 /** A NULL cell's own `.cell-null` marker. Tanstack renders a child `<span class="cell-null">`;
  *  SlickGrid folds the same class onto the cell node itself instead (the formatter's own
  *  `addClasses`, F10 — `-iter2-pacing` D5's "text, never DOM" rule, same reason `.cell-truncated`

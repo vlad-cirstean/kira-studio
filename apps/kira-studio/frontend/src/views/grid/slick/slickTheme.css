@@ -170,3 +170,82 @@
 .slick-grid-host .kira-cell-search-match {
   background: var(--kira-search-match);
 }
+
+/* P22 Pass B, C2/§5 D14 — the header parity rules: sort chevron + order badge, resize handle,
+   PK/FK badge and the header select zone. `.slick-header-column-sorted`'s shipped italic is
+   neutralised — this app signals sort with the chevron, not a font style. */
+.slick-grid-host .slick-header-column-sorted {
+  font-style: normal;
+}
+
+/* F8: two divs when sortColNumberInSeparateSpan is on — `.slick-sort-indicator` (the chevron,
+   codicon-arrow-up/-down at --kira-accent, CodiconIcon.vue's own glyph reproduced as a
+   font-family + content pseudo-element rather than an <i> node) and `.slick-sort-indicator-
+   numbered` (DataGrid.vue's own `.sort-order` badge). */
+.slick-grid-host .slick-sort-indicator {
+  width: 13px;
+  height: 13px;
+  margin: 0 0 0 var(--kira-s-2);
+  border: none;
+  background: none;
+  font-family: "codicon", monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--kira-accent);
+}
+.slick-grid-host .slick-sort-indicator-asc::before {
+  content: "\eaa1";
+}
+.slick-grid-host .slick-sort-indicator-desc::before {
+  content: "\ea9a";
+}
+.slick-grid-host .slick-sort-indicator-numbered {
+  margin: 0 0 0 2px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--kira-accent);
+  color: var(--kira-accent-fg);
+  font-family: var(--kira-font-family);
+  font-style: normal;
+  font-weight: 400;
+  font-size: var(--kira-t-xs);
+  line-height: 1;
+}
+
+/* F9 — the app's own 4px handle, DataGrid.vue's own `.resize-handle` retokenised (the shipped
+   9px/right:-5px is wider than this app's design). */
+.slick-grid-host .slick-resizable-handle {
+  width: 4px;
+  right: -2px;
+  cursor: col-resize;
+}
+
+/* FIX-8: PK/FK stated as a label, never inferred from colour alone — DataGrid.vue's own
+   `.header-key` badge, appended by onHeaderCellRendered (D2) since a SlickGrid Column's own `name`
+   is plain text with no child markup. */
+.slick-grid-host .header-key {
+  margin-left: var(--kira-s-2);
+  color: var(--kira-warn);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+}
+.slick-grid-host .header-key.is-fk {
+  color: var(--kira-info);
+}
+
+/* DataGrid.vue's own `.header-select-zone` — a narrow strip at the header cell's left edge,
+   click-to-select-the-whole-column (§5 D4, C4), kept out of the sort click's own hit area. Its own
+   click handler lands in C4; this only builds the DOM and stops it reaching the sort click. */
+.slick-grid-host .header-select-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: pointer;
+}

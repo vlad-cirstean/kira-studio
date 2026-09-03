@@ -3,7 +3,14 @@ import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { cellText, gridCell, gridRow, gridScroller, nullMarker } from './support/grid';
+import {
+  cellText,
+  gridCell,
+  gridRow,
+  gridScroller,
+  nullMarker,
+  sortIndicators,
+} from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -1330,13 +1337,13 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1000000');
 
   await page.click('[data-testid="grid-header-cell"][data-column="id"]'); // -> none
-  await expect(page.locator('.sort-indicator')).toHaveCount(0);
+  await expect(sortIndicators(page)).toHaveCount(0);
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1'); // default order is still PK-ascending
 
   await page.fill('[data-testid="filter-orderby-input"]', 'id ASC');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
   await expect.poll(() => cellText(page, 0, 'id')).toBe('1');
-  await expect(page.locator('.sort-indicator')).toHaveCount(1);
+  await expect(sortIndicators(page)).toHaveCount(1);
   await page.fill('[data-testid="filter-orderby-input"]', '');
   await page.press('[data-testid="filter-orderby-input"]', 'Enter');
 
