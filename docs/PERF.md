@@ -482,6 +482,125 @@ GPU-process rasterization/compositing downstream of paint count), so a fresh rea
 recording of the same hard-fling scenario, before/after this fix, is still needed and is the next step
 for whoever picks this back up.
 
+**P22 iter2-pacing: the chase-frame doubling, its fix, and the real-Mac protocol that judges it.**
+The `contain: layout` recording above (fce3e54) was also the first real second-derivative reading
+this investigation has: p50 41.2 → 32.1 ms, p95 99.7 → 50.5 ms, composite cost per frame 10.19 →
+4.34 ms — genuinely better — but **pacing stayed uneven**, durations swinging ~17-58 ms within the
+same fling, and the share of frame time unattributable to a WebContent-process trace *rose* to
+**88%**. The one actionable finding in that recording: frames in which the self-scheduled catch-up
+("chase") render fires average **49.8 ms against 33.3 ms** for frames without one — a mechanism this
+app owns outright, root-caused and fixed in
+`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md`. Read that document for the full
+evidence (a real WebKit reproduction — two render() passes in 131 of 140 wheel-driven frames — and
+the source citations behind it); this entry is the real-Mac protocol it specifies, folded into this
+section per that plan's own instruction, not a new one.
+
+*What changed, in one paragraph.* The chase never spread work across frames while a fling was in
+flight — it fired on the very next `requestAnimationFrame` unconditionally, which (per HTML's *run
+the scroll steps*) is with overwhelming probability a frame that also carries that frame's own
+scroll-driven render, doubling every fixed per-render cost. The fix (`CHASE_QUIET_MS`,
+`kiraSlickGrid.ts`'s `scheduleChase`) gates the chase on scroll **quiescence** instead — deliberately
+*not* "did a render already run this frame?", because two sandbox harnesses gave opposite intra-frame
+orderings for the two renders (a `scrollTop +=` write from inside a rAF vs. a `page.mouse.wheel`
+drive), so a same-frame-token fix would be right in one engine/input-path and wrong in another.
+Live-tunable (`window.__kiraGridTuning.chaseQuietMsOverride`, `0` = the exact pre-fix policy) so the
+A/B below needs one build, not a rebuild per variant. `__kiraScrollTrace` also gained the signal this
+protocol is judged by: `frameMs` (the frame-duration series itself), `renderCount` per frame, a
+`renderMs` that is now a **sum reset every frame** (before this pass it was a single sticky value
+that never reset — a no-render frame silently reported the *previous* frame's cost, and a doubled
+frame reported only its second render's own cost), and — the pacing signal specifically —
+**`mean`/`stddev` on every `ScrollTraceStats` block**, not just p50/p95/max. **"Proper pacing" is a
+statement about spread; a percentile alone can't answer it, which is why `frameMs.stddev` is the
+number every step below is actually judged by, not `frameMs.mean`.**
+
+**Do not compare a `renderMs` figure recorded before this pass to one recorded after it — they are
+not the same quantity.** Every `renderMs`/`renderCount` number in this document's history before P22
+iter2-pacing landed came from the sticky, never-reset field; treat every one of them as an
+order-of-magnitude sanity check only, never as a baseline this protocol's own numbers should match.
+
+*What this pass is allowed to claim from the sandbox alone, and what it is not.* Provable here: that
+the chase collided with the scroll render under the old policy (measured, two engines); that after
+the fix it provably never does (`tests/ui/slick-grid.spec.ts`'s T1, gated against a real WebKit
+reproduction, with T3 proving the harness would have caught the old behaviour); that the trace now
+reports per-frame counts and sums instead of a stale value (T5); that a chase left armed at teardown
+no longer re-enters `render()` against a torn-down grid (T4, verified to throw
+`TypeError: undefined is not an object (evaluating 'r.isNull')` with the teardown fix reverted, and
+to pass stably three runs in a row with it in place). **Nothing here claims the fix reduces perceived
+stutter, or that `frameMs.stddev` actually falls on real hardware — this investigation's own history
+(`forceSyncScrolling`, `0865ef6` → `18a2cc4`, directly above) is the standing reason a sandbox-plausible
+fix does not get to certify itself. The fix is not confirmed working until a real Mac trace, run
+through the protocol below, says so.**
+
+*The three readings that would refute this pass — stated before running, not after* (the plan's own
+§7.2): **(a)** `renderCountHistogram` on the baseline shows essentially no 2-render frames — the
+doubling doesn't occur on real hardware, and the fix is aimed at nothing; revert
+`chaseQuietMsOverride`'s default (already an identity operation at `0`) and re-open the investigation.
+**(b)** The histogram goes to all-1 after the fix but `frameMs.stddev` doesn't move — the chase was
+never the pacing term, the remaining variance is in the invisible (GPU-process) bucket, and the
+honest next step is Xcode Instruments, not another app-level pass; this is the branch the plan
+considers most likely if (a) passes but the numbers stay flat. **(c)** `uncoveredPx` p95 regresses
+materially — the runway is now too thin during a fling; lower `chaseQuietMsOverride` or raise the
+per-frame runway cap, both console lines.
+
+**Protocol — same build, same 50 000+-row table at page size 10 000, comfortable density,
+`window.__kiraGridEngine = 'slick'` with a tab reload, one hard two-finger flick per run, momentum
+allowed to die, `copy(JSON.stringify(__kiraScrollTrace.stop()))`.** Extends §2.1c's own protocol
+above (same setup) rather than replacing it.
+
+**Report for every run:** `summary.frameMs` `{mean, stddev, p50, p95, max}` — the pacing number and
+the point of the whole exercise; `summary.renderCountHistogram`; `summary.renderMs` (now a per-frame
+sum); `summary.uncoveredPx`; `summary.pxPerFrame`; `summary.scrollEventsHistogram`; the share of
+`scrollTopAtEvent[].afterRaf` that is `true` (§3 F2's own correction: this session's sandbox found
+`true` on essentially every event under a wheel-driven scroll in WebKit, the opposite of this
+module's original premise — a real-Mac `true` share is expected, not a bug signal, until this
+protocol's own first reading says otherwise); and one sentence on whether the motion *felt*
+different. The perceptual sentence is what answers the report; the numbers keep it honest.
+
+1. **Baseline, on a build with only the scrollTrace fix landed** (`fix(grid): per-frame render
+   accounting in __kiraScrollTrace`) **— no pacing fix yet.** This is the first trace in this
+   engine's history whose `renderMs` is a real per-frame sum rather than a sticky last-render value.
+   The decisive reading is `renderCountHistogram`: a substantial share of frames at 2 confirms the
+   doubling on real hardware. Refuting reading (a) above if it does not.
+2. **With the pacing fix landed**, same gesture. `renderCountHistogram` should be ~all-1 during the
+   fling; `frameMs.stddev` and `renderMs` p95 should both fall; `uncoveredPx` p95 must not rise
+   materially. Refuting reading (b) if the histogram clears but `frameMs.stddev` stays flat.
+3. **The chase-quiescence A/B, live, no rebuild:** `window.__kiraGridTuning.chaseQuietMsOverride = 0`
+   (pre-fix behaviour), then unset (24, the default), then `= 48`. Same flick each time. If
+   `frameMs.stddev` tracks this dial, that is the direct, decisive confirmation of the mechanism —
+   and whatever this step says is what re-sets `CHASE_QUIET_MS` (provisional, like every other
+   runway constant before it).
+4. **The runway-growth-cap A/B:** `window.__kiraGridTuning.maxNewLeadCellsPerRenderOverride = 600`
+   (neutral/today's default), then `= 200`, then `= 100`. Read `frameMs.stddev` **and**
+   `uncoveredPx` p95 *together* — this dial trades one against the other by design (smaller, more
+   even runway steps vs. slower convergence), and a setting that lowers stddev while pushing
+   `uncoveredPx` past the baseline is not an improvement. Set `MAX_NEW_LEAD_CELLS_PER_RENDER` from
+   whatever this step says, or leave it neutral (its shipped default) if it says nothing. Refuting
+   reading (c) if `uncoveredPx` regresses materially anywhere in this pass.
+5. **Re-run this section's own step 4** (`forceSyncScrollingOverride` true/false) — the chase fix
+   changes what synchronous scrolling costs per frame, so the earlier verdict recorded above does not
+   carry over.
+6. **A Safari Web Inspector Timeline recording alongside step 2**, same capture shape as the one that
+   found the `contain: layout` bug. Look specifically for whether the rAF-attributed script records
+   that used to sit adjacent to the scroll-attributed ones are gone — a confirmation of de-stacking
+   independent of the app's own instrumentation, worth having because refuting reading (a) is a real
+   possibility and the app's own trace is not a neutral witness to it.
+7. Update this section with the real numbers and verdict, and update
+   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §7/§10 to match. **This entry is
+   not that update** — it is the protocol, written before anyone has run it on real hardware, exactly
+   like `forceSyncScrolling`'s own history two sections above should be a reminder to keep it that
+   way until a real trace actually reports back.
+
+**The ceiling, restated so nobody re-derives it** (the plan's own §7.4): even the calmest frames in
+the post-`fce3e54` recording — before the heavy scroll-dispatch bursts start, with no chase firing —
+ran **23.5-24.5 ms**, past the 16.7 ms a 60 Hz budget allows, with composite + script together
+accounting for only a few ms of that. **~18-20 ms of even the best frame is in the GPU-process
+bucket**, invisible to `__kiraScrollTrace`, to a WebContent-process Timeline, and to this sandbox.
+Nothing in this pass — or the two before it — can reach it. This is a measured floor from the tools
+available, not a proven hard ceiling; Xcode Instruments, which this project does not have access to,
+is what would settle whether it's addressable at all. This is exactly why the pass optimises
+**variance**, per the user's own stated goal ("smooth, ideally 60fps, but it can be lower with proper
+pacing"), rather than average frame rate.
+
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails in this environment no matter what, on non-app-controllable process
