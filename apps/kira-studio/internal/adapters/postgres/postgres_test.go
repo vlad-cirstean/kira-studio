@@ -126,6 +126,51 @@ func TestPostgres_AuthFailure(t *testing.T) {
 	}
 }
 
+// 2a. P24: a fields-mode connection with no `database` (Validate, input.go, never requires one for
+// a non-file kind) must still connect — before client.go's buildConfig defaulted the primary
+// connection's database, an empty `database` left the Postgres wire protocol's own "database"
+// startup parameter unset, which the server defaults to the connecting *user* name (not something
+// this app ever chose) — a real least-privilege role's own name essentially never matches an
+// existing database, so this failed every such connection with FATAL 3D000 "database \"<user>\"
+// does not exist", surfacing as a plain E_QUERY that read exactly like the user-reported "fails to
+// authenticate". Reproduced against a real container before the fix (a role granted CONNECT on
+// kira_test only, no same-named database) and confirmed fixed after.
+func TestPostgres_ConnectWithNoDatabaseDefaultsToMaintenanceDB(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := newAdapter(t)
+
+	side, err := pgx.Connect(context.Background(), fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	defer side.Close(context.Background())
+	if _, err := side.Exec(context.Background(),
+		`CREATE ROLE app_user LOGIN PASSWORD 'app_pw'`); err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = side.Exec(context.Background(), `DROP ROLE IF EXISTS app_user`)
+	})
+	if _, err := side.Exec(context.Background(),
+		`GRANT CONNECT ON DATABASE kira_test TO app_user`); err != nil {
+		t.Fatalf("grant connect: %v", err)
+	}
+
+	cfg := fixture.Config
+	cfg.Database = nil // exactly what an empty "Database" field in the dialog sends
+	user, pw := "app_user", "app_pw"
+	cfg.Username, cfg.Password = &user, &pw
+
+	info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-2a"))
+	if err != nil {
+		t.Fatalf("Connect with no database: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+	if info.Details["database"] != "postgres" {
+		t.Errorf("connected database = %q, want the maintenance db \"postgres\"", info.Details["database"])
+	}
+}
+
 // 3. tree enumeration
 func TestPostgres_TreeEnumeration(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

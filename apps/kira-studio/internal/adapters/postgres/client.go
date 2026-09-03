@@ -50,8 +50,20 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 	}
 	if database != "" {
 		connConfig.Database = database
-	} else if cfg.Database != nil {
+	} else if cfg.Database != nil && *cfg.Database != "" {
 		connConfig.Database = *cfg.Database
+	} else if connConfig.Database == "" {
+		// P24: no explicit database anywhere (cfg.Database blank, and neither the URI's own path
+		// nor pgx.ParseConfig("")'s PGDATABASE fallback supplied one). Left alone, the Postgres
+		// wire protocol defaults an omitted "database" startup parameter to the connecting
+		// *user* name (pgconn's own SendStartupMessage — client.go's non-URI branch above never
+		// sets one either) — which fails outright with "database \"<user>\" does not exist" for
+		// any real least-privilege role whose name doesn't happen to match an existing database.
+		// "postgres" is the maintenance database every real server ships with, and the sane
+		// bootstrap target anyway: this connection's whole point is to enumerate every database
+		// on the server (docs/ARCHITECTURE.md's Postgres tree, database -> schema -> table), not
+		// to land in one particular one.
+		connConfig.Database = "postgres"
 	}
 
 	connConfig.ConnectTimeout = connectTimeout

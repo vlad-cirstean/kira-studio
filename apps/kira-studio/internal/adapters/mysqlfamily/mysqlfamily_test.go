@@ -161,6 +161,28 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P24: a fields-mode connection with no `database` (input.go's Validate never requires one for
+	// this kind) must still connect. Before adapter.go's Connect scanned DATABASE() into a plain
+	// Go string, an unset default schema (client.go's BuildConfig only sets mc.DBName when
+	// cfg.Database is non-empty) made DATABASE() return SQL NULL, and database/sql's Scan into a
+	// non-nullable string failed the whole probe with "converting NULL to string is unsupported" —
+	// 100% reproducible for every such connection, surfacing as a plain E_QUERY the instant a real
+	// user tried a database-less connection, which read exactly like the reported "fails to
+	// authenticate". Reproduced against a real container before the fix and confirmed fixed after.
+	t.Run("connect with no database", func(t *testing.T) {
+		a := newAdapter(t, kind)
+		noDB := cfg
+		noDB.Database = nil
+		info, err := a.Connect(context.Background(), noDB, adapters.NewOpCtx("op-2a"))
+		if err != nil {
+			t.Fatalf("Connect with no database: %v", err)
+		}
+		t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+		if info.Details["database"] != "" {
+			t.Errorf("connected database = %q, want \"\" (no default schema was selected)", info.Details["database"])
+		}
+	})
+
 	t.Run("tree enumeration", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)
 		ctx := context.Background()

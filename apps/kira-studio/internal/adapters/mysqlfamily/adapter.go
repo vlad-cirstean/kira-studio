@@ -61,7 +61,15 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 
 	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
-	var serverVersion, database, charset string
+	var serverVersion, charset string
+	// P24: DATABASE() is SQL NULL, not "", whenever the connection was opened with no default
+	// schema (client.go's BuildConfig only sets mc.DBName when cfg.Database is non-empty) — a
+	// completely ordinary case for a connection meant to browse every database on the server
+	// (docs/ARCHITECTURE.md's MariaDB/MySQL tree, database -> tables), and one Validate (input.go)
+	// deliberately allows. Scanning that NULL into a plain string panics-the-query with "converting
+	// NULL to string is unsupported", failing Connect outright for every such connection — a
+	// sql.NullString is what actually tolerates it.
+	var database sql.NullString
 	found := false
 	err = exec(ctx, "SELECT VERSION() AS version, DATABASE() AS `database`, @@character_set_server AS charset", nil,
 		func(rows *sql.Rows) error {
@@ -77,7 +85,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
 	}
 
-	a.primaryDatabase = database
+	a.primaryDatabase = database.String
 	a.readOnly = cfg.ReadOnly
 
 	// D6: pointing the MySQL adapter at a MariaDB server (or vice versa) works — same driver, same
@@ -88,7 +96,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 	return adapters.ConnectInfo{
 		ServerVersion: a.profile.ServerLabel + " " + serverVersion,
-		Details:       map[string]string{"database": database, "charset": charset},
+		Details:       map[string]string{"database": database.String, "charset": charset},
 	}, nil
 }
 
