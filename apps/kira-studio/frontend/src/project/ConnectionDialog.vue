@@ -500,9 +500,9 @@ const preconnectText = computed({
               </div>
             </div>
             <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
-            <div class="field-row">
+            <div v-if="isAwsStyle" class="field-row">
               <div class="field">
-                <label>{{ isAwsStyle ? 'Region' : 'Database' }}</label>
+                <label>Region</label>
                 <TextField
                   :model-value="draft.database ?? ''"
                   size="md"
@@ -511,7 +511,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="field">
-                <label>{{ isAwsStyle ? 'AWS profile (optional)' : 'User' }}</label>
+                <label>AWS profile (optional)</label>
                 <TextField
                   :model-value="draft.username ?? ''"
                   size="md"
@@ -520,27 +520,49 @@ const preconnectText = computed({
                 />
               </div>
             </div>
-            <div v-if="!isAwsStyle" class="field">
-              <label>Password</label>
-              <div class="password-row">
-                <div class="password-input">
-                  <TextField
-                    :model-value="draft.password ?? ''"
-                    :type="showPassword ? 'text' : 'password'"
-                    size="md"
-                    :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
-                    data-testid="connection-password"
-                    @update:model-value="onPasswordInput"
-                  />
-                </div>
-                <IconButton
-                  :icon="showPassword ? 'eye-closed' : 'eye'"
-                  v-tooltip="showPassword ? 'Hide password' : 'Show password'"
-                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                  @click="onEyeClick"
+            <template v-else>
+              <div class="field">
+                <label>Database</label>
+                <TextField
+                  :model-value="draft.database ?? ''"
+                  size="md"
+                  data-testid="connection-database"
+                  @update:model-value="draft.database = $event"
                 />
               </div>
-            </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>User</label>
+                  <TextField
+                    :model-value="draft.username ?? ''"
+                    size="md"
+                    data-testid="connection-username"
+                    @update:model-value="draft.username = $event"
+                  />
+                </div>
+                <div class="field">
+                  <label>Password</label>
+                  <div class="password-row">
+                    <div class="password-input">
+                      <TextField
+                        :model-value="draft.password ?? ''"
+                        :type="showPassword ? 'text' : 'password'"
+                        size="md"
+                        :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
+                        data-testid="connection-password"
+                        @update:model-value="onPasswordInput"
+                      />
+                    </div>
+                    <IconButton
+                      :icon="showPassword ? 'eye-closed' : 'eye'"
+                      v-tooltip="showPassword ? 'Hide password' : 'Show password'"
+                      :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                      @click="onEyeClick"
+                    />
+                  </div>
+                </div>
+              </div>
+            </template>
           </template>
           <template v-else>
             <div class="field">
