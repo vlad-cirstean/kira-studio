@@ -4,6 +4,7 @@ export type { IconAction } from "./icons/index.ts";
 export { ACTION_ICONS } from "./icons/index.ts";
 export type { MountHandle, MountOptions } from "./main.ts";
 export { mount } from "./main.ts";
+export { GEOMETRY, graphColumnWidth } from "./graph/geometry.ts";
 export type { LayoutClient, WorkerLike } from "./graph/layoutClient.ts";
 export { createLayoutClient, LayoutClientStaleError } from "./graph/layoutClient.ts";
 export type { EdgeSegment, RowVisual } from "./graph/layoutStore.ts";

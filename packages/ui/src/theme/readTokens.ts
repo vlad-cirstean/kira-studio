@@ -70,3 +70,20 @@ export class TokenReader {
     this.#listeners.clear();
   }
 }
+
+/** The default `--kv-row-height` (`density.css`) — the fallback `rowHeightPx` returns if the
+ *  token is unset or unparseable, which only happens outside a real browser (a unit test with no
+ *  stylesheet loaded), never in a mounted app. */
+const FALLBACK_ROW_HEIGHT = 22;
+
+/**
+ * `--kv-row-height` as an actual pixel number (W6, W8) — the one numeric read every consumer of
+ * this token needs, so the `parseFloat("22px")` lives in exactly one place rather than once per
+ * caller. A malformed or missing value (an environment with no theme CSS loaded) falls back to
+ * `density.css`'s own default rather than propagating `NaN` into SlickGrid's `rowHeight` option
+ * or the graph column's geometry.
+ */
+export function rowHeightPx(reader: TokenReader): number {
+  const parsed = Number.parseFloat(reader.tokens["--kv-row-height"]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT;
+}
