@@ -135,11 +135,15 @@ func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client
 	s.mu.Unlock()
 
 	opts := &goredis.Options{
-		Addr:        fmt.Sprintf("%s:%d", s.fields.host, s.fields.port),
-		Username:    s.fields.username,
-		Password:    s.fields.password,
-		DB:          dbIndex,
-		ClientName:  "kira-studio",
+		Addr:     fmt.Sprintf("%s:%d", s.fields.host, s.fields.port),
+		Username: s.fields.username,
+		Password: s.fields.password,
+		DB:       dbIndex,
+		// P25 §1.3: ClientName (CLIENT SETNAME, issued by go-redis on every new pooled connection)
+		// requires a privilege a least-privilege ACL user (~* +@read, or +@all -@dangerous before
+		// the fix above) may not have, and it only labels the connection in CLIENT LIST — go-redis
+		// offers no "tolerate a failed SETNAME" switch, so dropping the option entirely is the
+		// library-supported way to stop requiring the privilege.
 		DialTimeout: connectTimeout,
 		// C10: RESP2, not the client library's own RESP3 default — HGETALL/CONFIG GET and
 		// friends return a flat array under RESP2 and a map under RESP3, and this adapter's

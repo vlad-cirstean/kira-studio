@@ -41,19 +41,22 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		set.closeAll()
 		return adapters.ConnectInfo{}, err
 	}
-	serverInfo, err := primary.Info(ctx, "server").Result()
-	if err != nil {
-		set.closeAll()
-		return adapters.ConnectInfo{}, mapError(err)
-	}
 
 	a.set = set
 	a.defaultDbIndex = defaultDbIndex
 	a.readOnly = cfg.ReadOnly
 
 	version := "unknown"
-	if m := redisVersionRE.FindStringSubmatch(serverInfo); m != nil {
-		version = m[1]
+	// P25 §1.3: INFO is in Redis's own @dangerous ACL category, so a perfectly ordinary
+	// least-privilege user (~* +@all -@dangerous) cannot run it. The server version it yields is a
+	// tooltip detail — refusing the whole connection over it reported NOPERM as E_AUTH and read as
+	// a wrong password.
+	if serverInfo, err := primary.Info(ctx, "server").Result(); err == nil {
+		if m := redisVersionRE.FindStringSubmatch(serverInfo); m != nil {
+			version = m[1]
+		}
+	} else {
+		a.deps.Log("warn", "redis: INFO refused, server version unknown: "+err.Error())
 	}
 	return adapters.ConnectInfo{
 		ServerVersion: "Redis " + version,

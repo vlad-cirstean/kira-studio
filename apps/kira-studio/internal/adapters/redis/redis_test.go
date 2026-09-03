@@ -10,6 +10,7 @@ package redis_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -101,6 +102,39 @@ func TestRedis_Connect_WrongPasswordIsAuthError(t *testing.T) {
 	code, _ := adapters.CodeOf(err)
 	if code != adapters.CodeAuth {
 		t.Errorf("code = %v, want E_AUTH", code)
+	}
+}
+
+// P25 §1.3/§2.1(3): a least-privilege ACL user (~* +@all -@dangerous — the single most commonly
+// recommended application ACL) must be able to connect at all. Pins INFO's non-fatal handling by
+// asserting the *degraded* "Redis unknown" version string, not merely that Connect succeeds.
+func TestRedis_Connect_LeastPrivilegeAclUser(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	admin := goredis.NewClient(&goredis.Options{
+		Addr: fmt.Sprintf("%s:%d", fixture.Host, fixture.Port), Password: testsupport.RedisPassword, Protocol: 2,
+	})
+	defer admin.Close()
+
+	const username, password = "p25_least_priv", "p25_pw"
+	if err := admin.Do(context.Background(), "ACL", "SETUSER", username, "on", ">"+password,
+		"~*", "+@all", "-@dangerous").Err(); err != nil {
+		t.Fatalf("ACL SETUSER: %v", err)
+	}
+	t.Cleanup(func() { _ = admin.Do(context.Background(), "ACL", "DELUSER", username).Err() })
+
+	cfg := fixture.Config
+	cfg.Username = testsupport.Strp(username)
+	cfg.Password = testsupport.Strp(password)
+
+	a := newAdapter(t)
+	info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-acl"))
+	if err != nil {
+		t.Fatalf("Connect as ~* +@all -@dangerous: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+	if info.ServerVersion != "Redis unknown" {
+		t.Errorf("ServerVersion = %q, want %q (INFO must be non-fatal for a user without @dangerous)",
+			info.ServerVersion, "Redis unknown")
 	}
 }
 
