@@ -88,8 +88,8 @@ and how to run things wherever a session happens to be.
   permutation matrix per adapter (root vs. least-privilege user, with/without password, with/without
   the database-equivalent field) plus error-handling verification, deliberately comprehensive since
   it's opt-in rather than part of every local run. Extend the complete suite's own harness for new
-  functional coverage (load/write/delete/filter/DDL, per adapter, P26) rather than building a
-  parallel mechanism — it's designed for that.
+  functional coverage (load/write/delete/filter/DDL, per adapter) rather than building a parallel
+  mechanism — it's designed for that (P25's own `Scenario`/`Requires` seam, populated by P26).
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, with a `!` or `BREAKING CHANGE:` footer
   for breaking changes.

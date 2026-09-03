@@ -1064,6 +1064,23 @@ live (`AGENTS.md`'s Known open items). The version floor/ceiling this proves is 
 user: `packages/shared/domain/connection.ts`'s `MIN_SERVER_VERSION` map, rendered per kind by
 `apps/kira-studio/frontend/src/project/ConnectionDialog.vue`.
 
+**Each adapter's real-container coverage is two suites, by design (P25, populated P26).** A
+*general* suite (the `*_test.go` file named above) runs unconditionally under `bun run test:go` —
+connect/disconnect, tree, describe, read/filter/projection/count, mutate, DDL round trips where the
+engine has a DDL surface at all, and read-only refusal: the load-bearing per-capability behaviours,
+one assertion per capability a `caps.go` declares. A *complete* suite (each adapter's own
+`authmatrix_test.go`), gated behind `KIRA_TEST_MATRIX=1` and run by `scripts/test-matrix.sh`
+(`bun run test:matrix`), is the full auth/config permutation matrix per adapter — root vs.
+least-privilege principal, with/without password, with/without the database-equivalent field — with
+every connecting case's own functional consequences (a real read, a real write, a real permission
+refusal) attached via `testsupport.Scenario`/`RunMatrix`'s `Then`. `testsupport.RunScenarios` is the
+same `Scenario` body run outside a matrix table, which is what lets one scenario back both tiers
+instead of being written twice. A permission *refusal* getting the wrong `ErrorCode` — an
+authorization failure read as a wrong password (`E_AUTH`) rather than a query/permission failure — is
+the specific risk the complete suite is built to catch, and four adapters (clickhouse, mongo, redis,
+kafka) are known, pinned instances of exactly that conflation, each with a comment at the assertion
+naming it.
+
 **`tests/ipc/`** (P50) splits each adapter's former all-in-one UI spec at the app's real wire
 boundary — the control plane and the bulk-data plane (see Process model, above) — and **its backend
 half moved to Go in P58f M10 (D13)**, since the wire boundary it exercises is now Go-to-Go, not
