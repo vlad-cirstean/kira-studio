@@ -502,6 +502,7 @@
 
 .slick-grid-host .search-match-current {
   background: var(--kira-search-match-current);
+  color: var(--kira-bg);
 }
 
 /* P22 Pass B, C2/§5 D14 — the header parity rules: sort chevron + order badge, resize handle,

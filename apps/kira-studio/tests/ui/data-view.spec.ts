@@ -1423,6 +1423,23 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.click('[data-testid="search-next"]');
   await expect(page.locator('[data-testid="search-count"]')).toContainText('2 of 3');
   await expect(page.locator('.search-match-current')).toBeVisible();
+  // Contrast regression guard: `.search-match-current`'s bright `--kira-search-match-current`
+  // background needs `color: var(--kira-bg)` alongside it (ConsoleResultGrid.vue's own
+  // key-value branch carries the same pairing) or the inherited light-grey cell text sits at
+  // ~1.45:1 contrast on exactly the cell the user just navigated to — effectively unreadable.
+  const [matchColor, bgTokenColor] = await page.evaluate(() => {
+    const el = document.querySelector('.search-match-current');
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--kira-bg)';
+    document.body.appendChild(probe);
+    const resolved: [string | null, string] = [
+      el ? getComputedStyle(el).color : null,
+      getComputedStyle(probe).color,
+    ];
+    probe.remove();
+    return resolved;
+  });
+  expect(matchColor).toBe(bgTokenColor);
 
   // Keyboard navigation stays inside the visible set (D11): id=2 is page row 1; ArrowDown must
   // land on the next *visible* row (id=5, page row 4), not page row 2 (id=3, hidden).
