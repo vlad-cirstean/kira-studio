@@ -169,6 +169,11 @@ let lastOffset = 0;
 let lastOffsetT = 0;
 let prevOffset = 0;
 let prevOffsetT = 0;
+// P22 iter2-onset D2 — incremented by every native `scroll` event on the viewport, and read by
+// KiraSlickGrid's own per-frame chase gate (see `scheduleChase` there). A counter, not a
+// timestamp: the wall-clock gate it joins cannot tell "no scroll is driving this frame" from
+// "the scroll that is driving this frame arrived in the previous, long, frame".
+let scrollEventSeq = 0;
 const MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME = 800;
 
 function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
@@ -194,6 +199,7 @@ function onViewportScroll(): void {
   const now = performance.now();
   scrollTrace.noteScrollEvent(el.scrollTop, now);
   window.__kiraGridScrollWorkStart?.(now);
+  scrollEventSeq++;
   prevOffset = lastOffset;
   prevOffsetT = lastOffsetT;
   lastOffset = el.scrollTop;
@@ -342,6 +348,8 @@ onMounted(() => {
   // P22 iter2-pacing D1 — the chase's own quiescence gate. `lastOffsetT` is already
   // performance.now() at the last native scroll event (onViewportScroll, above); no new sampling.
   grid.lastScrollEventAt = () => lastOffsetT;
+  // P22 iter2-onset D2 — the chase's per-frame gate, beside the wall-clock one above.
+  grid.scrollEventSeq = () => scrollEventSeq;
 
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, onGridRendered);

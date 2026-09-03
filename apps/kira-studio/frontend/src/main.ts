@@ -204,6 +204,15 @@ declare global {
        *  behaviour change) pending a real-hardware A/B (docs/PERF.md §2.1c step 4) on the
        *  variance-vs-convergence trade lowering it makes. */
       maxNewLeadCellsPerRenderOverride?: number;
+      /** P22 iter2-onset D2: whether the catch-up render's *per-frame* gate is on — a chase may
+       *  only run when no native `scroll` event arrived between the previous animation frame and
+       *  this one. It joins `chaseQuietMsOverride`'s wall-clock gate because that one alone cannot
+       *  survive a frame longer than its own threshold (24ms against a measured real-Mac p50 of
+       *  32.1ms), which is precisely a frame the main thread is already behind on. Defaults to
+       *  `true`; `false` A/Bs the frame gate alone, while `chaseQuietMsOverride = 0` still disables
+       *  both at once and so keeps its documented "the pre-fix policy exactly" meaning. See
+       *  kiraSlickGrid.ts's own `scheduleChase` for the measurement behind it. */
+      chaseFrameGateOverride?: boolean;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can

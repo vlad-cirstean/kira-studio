@@ -71,6 +71,9 @@ declare global {
       chaseQuietMsOverride?: number;
       /** P22 iter2-pacing D2: overrides columns.ts's MAX_NEW_LEAD_CELLS_PER_RENDER. */
       maxNewLeadCellsPerRenderOverride?: number;
+      /** P22 iter2-onset D2: `false` drops the chase's per-frame gate, leaving only the
+       *  CHASE_QUIET_MS wall-clock one — i.e. the policy as shipped at a9dc570. */
+      chaseFrameGateOverride?: boolean;
     };
   }
 }

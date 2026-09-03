@@ -38,6 +38,11 @@ declare global {
       chaseQuietMsOverride?: number;
       /** P22 iter2-pacing D2: overrides columns.ts's MAX_NEW_LEAD_CELLS_PER_RENDER. */
       maxNewLeadCellsPerRenderOverride?: number;
+      /** P22 iter2-onset D2: `false` drops the chase's per-frame gate, leaving only the
+       *  CHASE_QUIET_MS wall-clock one. See `scheduleChase` below for why the ms gate alone is not
+       *  sufficient. `chaseQuietMsOverride = 0` still disables both at once, so that override keeps
+       *  its documented "the pre-fix policy exactly" meaning. */
+      chaseFrameGateOverride?: boolean;
     };
   }
 }
@@ -147,6 +152,13 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  field being `undefined` on the base constructor's own pre-field-init call. */
   lastScrollEventAt: () => number = () => Number.NEGATIVE_INFINITY;
 
+  /** Supplied by the host: a counter incremented by every native `scroll` event on the viewport.
+   *  P22 iter2-onset D2 — the chase's *per-frame* gate reads this rather than a wall clock; see
+   *  `scheduleChase` below. Defaults to a constant so a grid that hasn't wired a sampler still
+   *  chases, and like every other host-supplied field here every read tolerates it being
+   *  `undefined` on the base constructor's own pre-field-init call. */
+  scrollEventSeq: () => number = () => 0;
+
   /** P22 iter2-pacing D1 — replaces iter2-scroll-gaps' own `chasePending` boolean. `chaseHandle` is
    *  the live `requestAnimationFrame` id (0 when none is pending); `chaseWanted` is recomputed by
    *  every `getRenderedRange` call and read by the chase callback itself, so a call that lands
@@ -157,6 +169,9 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  first, pre-field-init call exactly like those two already do. */
   private chaseHandle = 0;
   private chaseWanted = false;
+  /** P22 iter2-onset D2 — `scrollEventSeq()` as of the previous chase callback, or -1 for "this is
+   *  the first callback of a chain, there is nothing to compare against yet". */
+  private chaseSeenSeq = -1;
 
   /** P22 iter2-pacing D1 — the fix itself. A catch-up render is gated on scroll *quiescence*, not
    *  on a frame token ("did a render already run this frame?"): that plan's own §3 F2 found the
@@ -168,22 +183,61 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  construction. Termination: `chaseWanted` is recomputed by every render and clears once a
    *  render reaches `target`; `target` itself shrinks as the grid goes quiet (the host's own
    *  `velocity()` reports zero 150ms after the last scroll sample), so the deficit this loop is
-   *  closing shrinks while it closes it — it cannot spin forever. */
+   *  closing shrinks while it closes it — it cannot spin forever.
+   *
+   *  P22 iter2-onset D2 — the wall-clock half of that gate is **not sufficient on its own**, and
+   *  this is a correction to the pacing pass, not a new requirement. `CHASE_QUIET_MS` is 24ms, but
+   *  the very recording that pass was written from reports a **p50 frame duration of 32.1ms** on
+   *  real hardware (docs/PERF.md §2.1c), and this sandbox's own wheel-fling harness measures p50 29
+   *  / p95 58 / max 65ms. Whenever a frame outlasts the threshold, "24ms since the last scroll
+   *  event" stops meaning "no scroll event is driving this frame" — the last event was simply in
+   *  the *previous*, long, frame — and the gate silently opens on a frame that does carry a
+   *  scroll-driven render. Measured: 7-9 doubled frames out of ~80 once a chase is actually wanted
+   *  on every frame. It went unnoticed because at `a9dc570` the host's velocity sampler was one
+   *  scroll event stale (P22 iter2-onset D1) and therefore reported *zero* on much of a fast fling,
+   *  which collapses `target` to the base runway and means no chase is wanted at all — the gate was
+   *  passing its own test by never being asked.
+   *
+   *  So the ms gate is joined by a **per-frame** one that cannot be outrun by a slow frame: a
+   *  catch-up render requires that **no native `scroll` event arrived between the previous
+   *  animation frame and this one**, read as a sequence number rather than a duration. That is the
+   *  refinement the pacing plan's own §10 anticipated ("deriving the threshold from the observed
+   *  rAF interval ... the obvious refinement"), and it keeps §3 F2's ordering-agnosticism intact —
+   *  it still never asks whether the scroll render or the chase ran first within a frame, only
+   *  whether a scroll event happened at all across the last one, which is true in every frame that
+   *  will carry a scroll-driven render under either ordering. Cost: after a fling stops the chase
+   *  now converges from the second quiet frame rather than the first. */
   private scheduleChase(): void {
     if (this.chaseHandle) return;
     this.chaseHandle = requestAnimationFrame(() => {
       this.chaseHandle = 0;
       if (!this.chaseWanted) return;
-      const quietMs = window.__kiraGridTuning?.chaseQuietMsOverride ?? CHASE_QUIET_MS;
+      const tuning = window.__kiraGridTuning;
+      const quietMs = tuning?.chaseQuietMsOverride ?? CHASE_QUIET_MS;
       const lastScroll = this.lastScrollEventAt
         ? this.lastScrollEventAt()
         : Number.NEGATIVE_INFINITY;
-      // Still scrolling: this frame already has (or is about to get) a scroll-driven render of its
-      // own. Re-arm — a rAF scheduled from inside a rAF callback always lands in a later frame, so
-      // this never re-enters the same frame it was just called from.
-      if (performance.now() - lastScroll < quietMs) {
-        this.scheduleChase();
-        return;
+      const seq = this.scrollEventSeq ? this.scrollEventSeq() : 0;
+      const seenSeq = this.chaseSeenSeq ?? -1;
+      this.chaseSeenSeq = seq;
+      // `chaseQuietMsOverride = 0` disables the gate *whole*, both halves — that override's
+      // documented contract (main.ts, docs/PERF.md §2.1c) is "restores the pre-fix fire-on-the-very-
+      // next-rAF behaviour exactly", and it has to keep meaning that for the real-Mac A/B and for
+      // slick-grid.spec.ts's own T3 to stay honest.
+      if (quietMs > 0) {
+        // Still scrolling: this frame already has (or is about to get) a scroll-driven render of
+        // its own. Re-arm — a rAF scheduled from inside a rAF callback always lands in a later
+        // frame, so this never re-enters the same frame it was just called from.
+        if (performance.now() - lastScroll < quietMs) {
+          this.scheduleChase();
+          return;
+        }
+        // The per-frame half. `seenSeq === -1` is the first callback of a chain, which has nothing
+        // to compare against and so must re-arm rather than guess.
+        if ((tuning?.chaseFrameGateOverride ?? true) && seq !== seenSeq) {
+          this.scheduleChase();
+          return;
+        }
       }
       this.render();
     });
@@ -199,6 +253,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     if (this.chaseHandle) cancelAnimationFrame(this.chaseHandle);
     this.chaseHandle = 0;
     this.chaseWanted = false;
+    this.chaseSeenSeq = -1;
     super.destroy(shouldDestroyAllElements);
   }
 
