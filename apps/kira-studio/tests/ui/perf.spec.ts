@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   BIG_ROWS_META,
@@ -152,7 +153,13 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes', asy
     })
     .toBeGreaterThan(0);
 
-  const { deltas, cellCounts } = await grid.evaluate((el) => {
+  // P22 Pass B: the actual scrollable element is SlickGrid's own right/data viewport
+  // (support/grid.ts's own GRID_SCROLLER_SELECTOR), not the outer `[data-testid="data-grid"]` host
+  // div — that div never scrolls itself, so driving `scrollTop` on `grid` moved nothing and this
+  // whole block silently measured idle rAF cadence over a static, unscrolled DOM (`total` was
+  // always ~0). `grid` stays above only for its own `.toBeVisible()` check.
+  const viewport = gridScroller(page);
+  const { deltas, cellCounts } = await viewport.evaluate((el) => {
     const STEPS = 20;
     const total = Math.max(0, el.scrollHeight - el.clientHeight);
     const deltas: number[] = [];

@@ -1,5 +1,6 @@
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { GRID_SCROLLER_SELECTOR } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   BIG_ROWS_META,
@@ -91,8 +92,14 @@ test('__kiraScrollTrace — inert until start(), documented shape on stop()', as
   const grid = page.locator('[data-testid="data-grid"]');
   await expect(grid).toBeVisible();
   await page.click('[data-testid="page-size-10000"]');
+  // P22 Pass B — the actual scrollable element is SlickGrid's own right/data viewport
+  // (support/grid.ts's own GRID_SCROLLER_SELECTOR), not the outer `[data-testid="data-grid"]`
+  // host div: that div never scrolls itself (C13 made this doubly true — it now also carries the
+  // empty-state overlays as siblings of the actual SlickGrid-owned mount node), so setting
+  // `scrollTop` on it moved nothing.
+  const viewport = page.locator(GRID_SCROLLER_SELECTOR);
   await expect
-    .poll(() => grid.evaluate((el) => el.scrollHeight), { timeout: 15_000 })
+    .poll(() => viewport.evaluate((el) => el.scrollHeight), { timeout: 15_000 })
     .toBeGreaterThan(200_000);
 
   // 1. The hook exists and has the documented start/stop shape.
@@ -114,7 +121,7 @@ test('__kiraScrollTrace — inert until start(), documented shape on stop()', as
   // main-thread scrollTop write — which is exactly the condition scrollTrace.ts's own header
   // comment says cannot reproduce the real symptom; this step proves the *plumbing*, not the fix.
   await page.evaluate(() => window.__kiraScrollTrace?.start());
-  const result = await grid.evaluate(async (el) => {
+  const result = await viewport.evaluate(async (el) => {
     const total = Math.max(0, el.scrollHeight - el.clientHeight);
     for (let i = 1; i <= 5; i++) {
       el.scrollTop = Math.round((total * i) / 20);

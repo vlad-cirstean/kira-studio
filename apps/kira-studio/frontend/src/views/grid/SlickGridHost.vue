@@ -21,6 +21,11 @@ import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickg
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
+import {
+  clearSelectedCellFor,
+  publishSelectedCell,
+  type SelectedCell,
+} from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
@@ -36,6 +41,7 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
@@ -49,7 +55,13 @@ import {
   rowsToTsv,
 } from './clipboardFormats';
 import { cellMenu, headerMenu, rowMenu } from './menu';
-import { addInsertRow, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
+import {
+  addInsertRow,
+  discardCellEdit,
+  pendingFor,
+  stageEdit,
+  stageInsertValue,
+} from './pendingChanges';
 import { matchedRows, searchState } from './search';
 import {
   createDisplayValueExtractor,
@@ -1901,6 +1913,73 @@ watch(rowHeight, (h) => {
 watch(canEditTableReactive, (editable) => {
   grid?.setOptions({ editable });
 });
+
+// P22 Pass B, C14 — DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the
+// cell editor's target"), ported: `onSelectedRangesChanged`/`onGridActiveCellChanged` above already
+// keep `rt().selection` current for the grid's own visual selection layer, but never told the cell
+// editor dock (`state/cellSelection.ts`) what's selected — a gap this migration left open, not a
+// deliberate omission (nothing DataGrid.vue-specific in the logic below; it was simply never
+// carried over when this host's own selection wiring was built at C4). `selectionTarget()` reads
+// only `rt()?.selection`, which both engines populate identically, so it ports unchanged.
+function selectionTarget(): { row: number; col: number } | null {
+  const sel = rt()?.selection;
+  if (!sel) return null;
+  if (sel.kind === 'cell') return { row: sel.row, col: sel.col };
+  if (sel.kind === 'range' && sel.anchorRow === sel.row && sel.anchorCol === sel.col) {
+    return { row: sel.row, col: sel.col };
+  }
+  return null;
+}
+watch(
+  [() => rt()?.selection, () => pageVersion.n, () => props.tabId],
+  () => {
+    const p = getPage(props.tabId);
+    const t = tab();
+    const target = selectionTarget();
+    if (!p || !t || !target || target.row < 0 || target.row >= p.rowCount) {
+      clearSelectedCellFor(props.tabId);
+      return;
+    }
+    const order = currentOrder();
+    const pageCol = pageColumnIndexFor(p, order, target.col);
+    if (pageCol < 0) {
+      clearSelectedCellFor(props.tabId);
+      return;
+    }
+    const view = displayCell(target.row, target.col);
+    const column = p.columns[pageCol];
+    if (!column) {
+      clearSelectedCellFor(props.tabId);
+      return;
+    }
+    const targetRow = target.row;
+    const selected: SelectedCell = {
+      tabId: props.tabId,
+      connectionId: t.connectionId,
+      path: t.path,
+      columnIndex: pageCol,
+      column,
+      row: targetRow,
+      value: view.isNull ? null : view.text,
+      truncated: view.truncated,
+      hasPrimaryKey: hasPrimaryKey(),
+      // Same eligibility as the grid's own inline (double-click) edit (D8/C8): writable connection,
+      // a primary key to identify the row, and the row isn't already staged for delete. Stages into
+      // the exact same pending-change set the inline editor already feeds, so the panel's save and
+      // the grid's own inline edit can never disagree about a cell's value.
+      onEdit:
+        canEditTable() && !isDeleted(targetRow)
+          ? (newValue: string) => stageEdit(props.tabId, targetRow, column.name, newValue)
+          : undefined,
+      onRevert:
+        canEditTable() && !isDeleted(targetRow)
+          ? () => discardCellEdit(props.tabId, targetRow, column.name)
+          : undefined,
+    };
+    publishSelectedCell(selected);
+  },
+  { immediate: true },
+);
 
 watch(
   () => appearanceVersion.n,

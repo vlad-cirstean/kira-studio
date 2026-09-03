@@ -4,6 +4,7 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { WIDE_TABLE_COLUMNS, WIDE_TABLE_ROWS } from './support/cellEditorCaptures';
+import { GRID_SCROLLER_SELECTOR, gridCellSelector, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   measureClickToDom,
@@ -427,13 +428,6 @@ const PORT: PortSnapshot[] = [
 // that both axes actually render this much buffer, not a re-statement of the app's own constant.
 const OVERSCAN_PX = 560;
 
-// Mirrors DataGrid.vue's own GUTTER_WIDTH — header/data cells are positioned in `.grid-sizer`'s
-// content-space coordinates (the same space `scrollLeft` operates over), and that space reserves
-// GUTTER_WIDTH px for the sticky row-number gutter before column 0's content begins. So even at
-// scrollLeft=0, the leftmost renderable column position can never be less than GUTTER_WIDTH — the
-// column-axis overscan check below clamps against that floor instead of 0.
-const GUTTER_WIDTH = 56;
-
 function logStats(label: string, values: number[]): void {
   const p50 = percentile(values, 50);
   const p95 = percentile(values, 95);
@@ -488,7 +482,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   relaunch,
   consoleErrors,
 }) => {
-  test.setTimeout(120_000);
+  // P22 Pass B: the column/row overscan-invariant loops below now poll (`expect.poll`, up to 2s
+  // each) instead of a fixed 50ms sleep, since the off-limits chase/budget mechanism paces the
+  // window's growth toward the overscan target across several rAF turns rather than filling it
+  // synchronously — that adds real, variable wall-clock time across 22 loop iterations that this
+  // budget needs headroom for, on top of everything else this single test already does.
+  test.setTimeout(90_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
 
   await page.click('[data-testid="add-connection"]');
@@ -518,6 +517,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await bigRowsRow.dblclick();
   const grid = page.locator('[data-testid="data-grid"]');
   await expect(grid).toBeVisible();
+  // P22 Pass B — the actual scrollable element is SlickGrid's own right/data viewport
+  // (support/grid.ts's own GRID_SCROLLER_SELECTOR/gridScroller), not `grid` (the outer host div,
+  // kept above only for the "is a grid on screen at all" visibility check) — that div never
+  // scrolls itself, so every `.scrollTop`/`.scrollLeft`/`.scrollWidth`/`.scrollHeight` read or
+  // write below goes through this one shared locator instead, re-resolved fresh (never cached)
+  // regardless of which tab is currently active.
+  const viewport = gridScroller(page);
   // Captured while big_rows is still the only open tab — 1b below opens scroll_grid in a second
   // tab and must switch back to this one before item 2 continues.
   const bigRowsFirstTabId = await page
@@ -526,12 +532,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     .getAttribute('data-tab-id');
   await page.click('[data-testid="page-size-10000"]');
   await expect
-    .poll(() => grid.evaluate((el) => el.scrollHeight), { timeout: 15_000 })
+    .poll(() => viewport.evaluate((el) => el.scrollHeight), { timeout: 15_000 })
     .toBeGreaterThan(200_000);
 
   const { workDeltas: scrollDeltas, e2eDeltas: scrollE2eDeltas } = await measureScrollResponses(
     page,
-    '[data-testid="data-grid"]',
+    GRID_SCROLLER_SELECTOR,
     20,
   );
   logStats('scroll response (work)', scrollDeltas);
@@ -557,16 +563,16 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // band still covers the viewport *while* scrolling continues, not just once it settles. Logged,
   // not gated (measureSustainedScroll's own comment says why a main-thread-scrolled tier can't
   // falsify this) — see docs/PERF.md §2.1a for what a real measurement needs instead.
-  await grid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
   for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
-    const { uncoveredPx } = await measureSustainedScroll(page, '[data-testid="data-grid"]', {
+    const { uncoveredPx } = await measureSustainedScroll(page, GRID_SCROLLER_SELECTOR, {
       pxPerFrame,
       frames: 20,
     });
     logCoverage('big_rows', pxPerFrame, uncoveredPx);
-    await grid.evaluate((el) => {
+    await viewport.evaluate((el) => {
       el.scrollTop = 0;
     });
   }
@@ -575,13 +581,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // slides to a new window position without any of its own content changing must not re-render —
   // gated at ≤ (rows entered + rows left + 2), a small constant absorbing the odd off-by-one rather
   // than a tight bound (this is a property of Vue's own reconciliation, not a timing measurement).
-  for (const step of await measureRowUpdatesDuringScroll(page, '[data-testid="data-grid"]', {
+  for (const step of await measureRowUpdatesDuringScroll(page, GRID_SCROLLER_SELECTOR, {
     pxPerFrame: 100,
     steps: 10,
   })) {
     expect(step.updates).toBeLessThanOrEqual(step.rowsEntered + step.rowsLeft + 2);
   }
-  await grid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
 
@@ -597,21 +603,21 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     .locator('[data-testid="tab"].is-active')
     .getAttribute('data-tab-id');
   await expect
-    .poll(() => scrollGrid.evaluate((el) => el.scrollWidth), { timeout: 15_000 })
+    .poll(() => viewport.evaluate((el) => el.scrollWidth), { timeout: 15_000 })
     .toBeGreaterThan(2000);
 
   const { workDeltas: horizontalDeltas, e2eDeltas: horizontalE2eDeltas } =
-    await measureScrollResponses(page, '[data-testid="data-grid"]', 20, 'horizontal');
+    await measureScrollResponses(page, GRID_SCROLLER_SELECTOR, 20, 'horizontal');
   logStats('scroll response (horizontal, work)', horizontalDeltas);
   logStats('scroll response (horizontal, end-to-end)', horizontalE2eDeltas);
   expect(percentile(horizontalDeltas, 50)).toBeLessThanOrEqual(1000);
   expect(Math.max(...horizontalDeltas)).toBeLessThanOrEqual(1000);
 
-  await scrollGrid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollLeft = 0;
   });
   const { workDeltas: wideVerticalDeltas, e2eDeltas: wideVerticalE2eDeltas } =
-    await measureScrollResponses(page, '[data-testid="data-grid"]', 20);
+    await measureScrollResponses(page, GRID_SCROLLER_SELECTOR, 20);
   logStats('scroll response (vertical, wide table, work)', wideVerticalDeltas);
   logStats('scroll response (vertical, wide table, end-to-end)', wideVerticalE2eDeltas);
   expect(percentile(wideVerticalDeltas, 50)).toBeLessThanOrEqual(1000);
@@ -620,48 +626,84 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // The rendered column window extends >= OVERSCAN_PX beyond both viewport edges at every
   // position, clamped at the table's own edges — this is the assertion that fails against the
   // pre-P29 code (zero column overscan) and passes once the buffer is symmetric with the row axis.
+  //
+  // P22 Pass B: this has to measure BODY cells (`[data-testid="grid-cell"]`), not header cells.
+  // SlickGrid never virtualizes the header row — `onHeaderCellRendered`'s own comment states it
+  // fires "once per column per setColumns call (never per scroll frame — headers aren't
+  // virtualized)" — so every one of the table's columns always has a header cell in the DOM
+  // regardless of scroll position; only body cells are windowed by the off-limits
+  // leftPx/rightPx clamp inside kiraSlickGrid.ts's getRenderedRange. Header cells are also
+  // positioned via a translated container (`.slick-header-columns-right`'s own `left` style)
+  // whose child `offsetLeft`s are fixed, unscrolled canvas coordinates, not a coordinate space
+  // directly comparable to `target`/`scrollLeft` — a second, independent reason a header-based
+  // measurement can't stand in for the real invariant here.
+  //
+  // Body cells are read via `getBoundingClientRect()` relative to the scrolling viewport itself
+  // (`viewport`) plus its current `scrollLeft`, converting each cell's page-relative position into
+  // the same content-space `target`/`scrollWidth` already operate in — robust to SlickGrid's own
+  // frozen-pane/translated-canvas positioning tricks, which raw `offsetLeft` is not.
   const colPositions = 10;
-  const { scrollWidth, clientWidth } = await scrollGrid.evaluate((el) => ({
+  const { scrollWidth, clientWidth } = await viewport.evaluate((el) => ({
     scrollWidth: el.scrollWidth,
     clientWidth: el.clientWidth,
   }));
   const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
-  for (let i = 0; i <= colPositions; i++) {
-    const target = Math.round((maxScrollLeft * i) / colPositions);
-    await scrollGrid.evaluate((el, t) => {
-      el.scrollLeft = t;
-    }, target);
-    await page.waitForTimeout(50);
-    const bounds = await page.evaluate(() => {
+  const readColBounds = () =>
+    page.evaluate((scrollerSelector) => {
+      const scroller = document.querySelector<HTMLElement>(scrollerSelector);
+      if (!scroller) return null;
+      const scrollerRect = scroller.getBoundingClientRect();
+      const scrollLeft = scroller.scrollLeft;
       const els = Array.from(
-        document.querySelectorAll('[data-testid="grid-header-cell"]'),
+        document.querySelectorAll('[data-testid="grid-cell"]'),
       ) as HTMLElement[];
       if (els.length === 0) return null;
       let left = Number.POSITIVE_INFINITY;
       let right = Number.NEGATIVE_INFINITY;
       let maxWidth = 0;
       for (const el of els) {
-        if (el.offsetLeft < left) left = el.offsetLeft;
-        if (el.offsetLeft + el.offsetWidth > right) right = el.offsetLeft + el.offsetWidth;
-        if (el.offsetWidth > maxWidth) maxWidth = el.offsetWidth;
+        const rect = el.getBoundingClientRect();
+        const contentLeft = rect.left - scrollerRect.left + scrollLeft;
+        const contentRight = rect.right - scrollerRect.left + scrollLeft;
+        if (contentLeft < left) left = contentLeft;
+        if (contentRight > right) right = contentRight;
+        if (rect.width > maxWidth) maxWidth = rect.width;
       }
       return { left, right, maxWidth };
-    });
-    if (!bounds) throw new Error('no header cells rendered');
-    expect(bounds.left).toBeLessThanOrEqual(
-      Math.max(GUTTER_WIDTH, target - OVERSCAN_PX) + bounds.maxWidth + 1,
-    );
-    expect(bounds.right).toBeGreaterThanOrEqual(
-      Math.min(scrollWidth, target + clientWidth + OVERSCAN_PX) - bounds.maxWidth - 1,
-    );
+    }, GRID_SCROLLER_SELECTOR);
+  for (let i = 0; i <= colPositions; i++) {
+    const target = Math.round((maxScrollLeft * i) / colPositions);
+    await viewport.evaluate((el, t) => {
+      el.scrollLeft = t;
+    }, target);
+    // Same chase-pacing rationale as the row-axis loop below: poll instead of a fixed sleep so this
+    // doesn't race the off-limits catch-up mechanism. Both edges are checked *inside* the same poll
+    // callback (not one polled, one read once after) — the two edges can catch up at different
+    // rates (e.g. a big jump can already satisfy the trailing edge, from where the window sat
+    // before, while the leading edge is still shrinking toward it frame by frame), so waiting on
+    // only one edge and reading the other once raced the same mechanism this poll exists to avoid
+    // racing.
+    await expect
+      .poll(
+        async () => {
+          const b = await readColBounds();
+          if (!b) return false;
+          return (
+            b.left <= Math.max(0, target - OVERSCAN_PX) + b.maxWidth + 1 &&
+            b.right >= Math.min(scrollWidth, target + clientWidth + OVERSCAN_PX) - b.maxWidth - 1
+          );
+        },
+        { timeout: 2000 },
+      )
+      .toBe(true);
   }
 
   // The same invariant on the row axis, so the two axes are provably symmetric.
-  await scrollGrid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollLeft = 0;
   });
   const rowPositions = 10;
-  const { scrollHeight, clientHeight } = await scrollGrid.evaluate((el) => ({
+  const { scrollHeight, clientHeight } = await viewport.evaluate((el) => ({
     scrollHeight: el.scrollHeight,
     clientHeight: el.clientHeight,
   }));
@@ -670,13 +712,8 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     return row ? row.offsetHeight : 0;
   });
   const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
-  for (let i = 0; i <= rowPositions; i++) {
-    const target = Math.round((maxScrollTop * i) / rowPositions);
-    await scrollGrid.evaluate((el, t) => {
-      el.scrollTop = t;
-    }, target);
-    await page.waitForTimeout(50);
-    const rowBounds = await page.evaluate(() => {
+  const readRowBounds = () =>
+    page.evaluate(() => {
       const els = Array.from(
         document.querySelectorAll('[data-testid="grid-row"]'),
       ) as HTMLElement[];
@@ -689,13 +726,35 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
       }
       return { top, bottom };
     });
-    if (!rowBounds) throw new Error('no grid rows rendered');
-    expect(rowBounds.top).toBeLessThanOrEqual(
-      Math.max(headerRowHeight, target - OVERSCAN_PX) + headerRowHeight + 1,
-    );
-    expect(rowBounds.bottom).toBeGreaterThanOrEqual(
-      Math.min(scrollHeight, target + clientHeight + OVERSCAN_PX) - headerRowHeight - 1,
-    );
+  for (let i = 0; i <= rowPositions; i++) {
+    const target = Math.round((maxScrollTop * i) / rowPositions);
+    await viewport.evaluate((el, t) => {
+      el.scrollTop = t;
+    }, target);
+    // The off-limits chase/budget mechanism (kiraSlickGrid.ts's own scheduleChase, never touched
+    // here) paces the row window's growth toward the full overscan target across several
+    // requestAnimationFrame turns rather than filling it synchronously in one call — a single fixed
+    // sleep raced it and this loop's own bottom-bound check flaked as a result. Both edges are
+    // checked *inside* the same poll callback (not one polled, one read once after): the two edges
+    // can catch up at different rates — e.g. a jump back to scrollTop 0 can already satisfy the
+    // bottom bound from rows still mounted at the *previous* scroll position, while the top bound
+    // (shrinking that stale window back down toward 0) is still catching up frame by frame — so
+    // waiting on only one edge and reading the other once would race the same mechanism this poll
+    // exists to avoid racing.
+    await expect
+      .poll(
+        async () => {
+          const b = await readRowBounds();
+          if (!b) return false;
+          return (
+            b.top <= Math.max(headerRowHeight, target - OVERSCAN_PX) + headerRowHeight + 1 &&
+            b.bottom >=
+              Math.min(scrollHeight, target + clientHeight + OVERSCAN_PX) - headerRowHeight - 1
+          );
+        },
+        { timeout: 2000 },
+      )
+      .toBe(true);
 
     const cellCount = await page.locator('[data-testid="grid-cell"]').count();
     expect(cellCount).toBeLessThan(2500);
@@ -706,16 +765,16 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // scroll_grid fixture only ever captures one pageSize=100 page (this file's own note below), so
   // the scrollable range is small; measureSustainedScroll clamps each write at the bottom, which
   // only turns trailing frames at the higher rungs into no-op (still-valid) samples, not failures.
-  await scrollGrid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
   for (const pxPerFrame of SCROLL_COVERAGE_LADDER) {
-    const { uncoveredPx } = await measureSustainedScroll(page, '[data-testid="data-grid"]', {
+    const { uncoveredPx } = await measureSustainedScroll(page, GRID_SCROLLER_SELECTOR, {
       pxPerFrame,
       frames: 20,
     });
     logCoverage('scroll_grid', pxPerFrame, uncoveredPx);
-    await scrollGrid.evaluate((el) => {
+    await viewport.evaluate((el) => {
       el.scrollTop = 0;
     });
   }
@@ -725,13 +784,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // cell bound here). A synthetic high velocity (well past anything §7.3's real-hardware protocol
   // is likely to report) drives the row axis's runway to its ceiling; the mounted cell count must
   // still stay under the same bound item 1b's own coverage-invariant loop asserts at rest.
-  await scrollGrid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await measureSustainedScroll(page, '[data-testid="data-grid"]', { pxPerFrame: 456, frames: 10 });
+  await measureSustainedScroll(page, GRID_SCROLLER_SELECTOR, { pxPerFrame: 456, frames: 10 });
   const cellCountAtSpeed = await page.locator('[data-testid="grid-cell"]').count();
   expect(cellCountAtSpeed).toBeLessThan(2500);
-  await scrollGrid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
 
@@ -747,12 +806,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // mid-scroll position" — true regardless of how large a range this tier's fixture happens to
   // mock, rather than asserting it via an unchecked magic number.
   const subRowBaseline = Math.round(maxScrollTop / 2);
-  await scrollGrid.evaluate((el, t) => {
+  await viewport.evaluate((el, t) => {
     el.scrollTop = t;
   }, subRowBaseline);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(500);
-  const subRowMutations = await scrollGrid.evaluate(async (el) => {
+  const subRowMutations = await viewport.evaluate(async (el) => {
     let count = 0;
     const observer = new MutationObserver((records) => {
       count += records.length;
@@ -765,7 +824,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   });
   expect(subRowMutations).toBe(0);
 
-  const rowHeight = await scrollGrid.evaluate((el) => {
+  const rowHeight = await viewport.evaluate((el) => {
     const row = el.querySelector('[data-testid="grid-row"]');
     return row ? row.getBoundingClientRect().height : 28;
   });
@@ -780,7 +839,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // — an uncapped delta from a baseline already close to that ceiling would itself clamp to
   // exactly where it started, i.e. a genuine positive control could silently see zero movement.
   const crossRowDelta = Math.min(rowHeight + OVERSCAN_PX + 100, maxScrollTop - subRowBaseline);
-  const crossRowMutations = await scrollGrid.evaluate(async (el, delta) => {
+  const crossRowMutations = await viewport.evaluate(async (el, delta) => {
     let count = 0;
     const observer = new MutationObserver((records) => {
       count += records.length;
@@ -806,15 +865,21 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // --- 2. cell selection -> editor populated, p95 <= 50ms -----------------------------------
   await page.click('[data-testid="page-size-100"]');
   await expect
-    .poll(() => grid.evaluate((el) => el.scrollHeight > 500 && el.scrollHeight < 10_000), {
+    .poll(() => viewport.evaluate((el) => el.scrollHeight > 500 && el.scrollHeight < 10_000), {
       timeout: 15_000,
     })
     .toBe(true);
-  await grid.evaluate((el) => {
+  await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
 
-  await page.click('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
+  // P22 Pass B: `[data-testid="grid-cell"][data-row="N"]` alone is never valid for SlickGrid's DOM
+  // shape — `data-row` is written on the `.slick-row` (SlickGridHost.vue's own `tagRenderedRows`),
+  // never on the cell — so this needs the row-scoped selector every other subsystem uses
+  // (support/grid.ts's own `gridCellSelector`), not a flat compound one. The unscoped version never
+  // matched anything, so this click waited forever (no `actionTimeout` is configured, so nothing
+  // short of the test's own global timeout ever stopped it).
+  await page.click(gridCellSelector(0, 'id'));
   await expect(page.locator('[data-testid="cell-editor-panel"]')).toBeVisible();
 
   const renderedRows: number[] = await page.evaluate(() =>
@@ -828,7 +893,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   const cellDeltas: number[] = [];
   for (let i = 0; i < 20; i++) {
     const row = renderedRows[i % renderedRows.length];
-    const cellSelector = `[data-testid="grid-cell"][data-row="${row}"][data-column="hash"]`;
+    const cellSelector = gridCellSelector(row, 'hash');
     const text = await page.locator(cellSelector).innerText();
     const delta = await measureClickToDom(page, {
       click: cellSelector,

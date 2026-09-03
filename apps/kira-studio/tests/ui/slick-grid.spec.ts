@@ -2,6 +2,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { cellNavButton, gridCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
@@ -11,6 +12,8 @@ import {
   bigRowsHugePage,
   connectAndExpandControl,
   DB_PATH,
+  ORDER_ITEMS_PATH,
+  orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
@@ -1088,4 +1091,99 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
   // driven render instead of staying self-contained (the actual regression this gate exists to
   // catch), not on ordinary sandbox timing noise.
   expect(after.p95).toBeLessThan(before.p95 * 3 + 5);
+});
+
+// P22 Pass B, C11/§9.2 T9 — the single host-owned nav button's own DOM invariant: exactly one
+// `[data-testid="cell-nav-button"]` in the whole document at any time (never one-per-cell the way
+// the incumbent's own pure-CSS-hover button was), it sits within the left 24px of whichever cell
+// currently owns it (§5 D11a — the user's own explicit "move it to the left" request), and it is
+// absent for a column with no nav affordance at all. `order_items` (product_id/order_id both FK,
+// quantity plain) is this suite's own smallest fixture with two independent FK columns on one
+// row — interaction.spec.ts's own FK/PK nav section already covers the NULL-source absence case
+// (employees.manager_id) end to end; nothing in this app's fixtures has a genuinely multi-column
+// FK to re-derive that scenario against a "composite" key specifically.
+test('P22 Pass B C11 T9 — the nav button is a single DOM node, positioned left, absent off a nav column', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-navbtn';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Nav Button DB', 'grey');
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Nav Button DB',
+        kind: 'postgres',
+        color: 'grey',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({
+    control,
+    stream: orderItemsFixture(CONNECTION_ID).port,
+  });
+  await forceSlickEngine(page);
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Nav Button DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-grey"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const row = await findRow(page, ORDER_ITEMS_PATH);
+  await row.dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="grid-header-cell"][data-column="product_id"]'),
+  ).toBeVisible();
+
+  const navButtons = page.locator('[data-testid="cell-nav-button"]');
+
+  // --- absent at rest, and off a non-nav column -------------------------------------------------
+  await expect(navButtons).toHaveCount(0);
+  await gridCell(page, 0, 'quantity').hover();
+  await expect(navButtons).toHaveCount(0);
+
+  // --- exactly one instance, left-positioned, on a genuine FK column -----------------------------
+  await gridCell(page, 0, 'product_id').hover();
+  await expect(navButtons).toHaveCount(1);
+  await expect(cellNavButton(page, 0, 'product_id')).toHaveAttribute('data-nav-kind', 'fk');
+  const cellBox = await gridCell(page, 0, 'product_id').boundingBox();
+  const btnBox = await navButtons.boundingBox();
+  if (!cellBox || !btnBox) throw new Error('missing bounding box');
+  expect(btnBox.x - cellBox.x).toBeGreaterThanOrEqual(0);
+  expect(btnBox.x - cellBox.x).toBeLessThanOrEqual(24);
+
+  // --- moving to a different nav cell moves the same single node, never adding a second ----------
+  await gridCell(page, 0, 'order_id').hover();
+  await expect(navButtons).toHaveCount(1);
+  await expect(cellNavButton(page, 0, 'order_id')).toHaveAttribute('data-nav-kind', 'fk');
+  await expect(cellNavButton(page, 0, 'product_id')).toHaveCount(0);
 });

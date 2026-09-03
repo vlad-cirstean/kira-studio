@@ -14,12 +14,20 @@ import type { Locator, Page } from '@playwright/test';
 
 const RIGHT_PANE = '.grid-canvas-top.grid-canvas-right';
 
+/** The raw CSS string behind `gridCell()` below — exported separately for the handful of call
+ *  sites (`measureClickToDom`'s own `click`/`until.selector` options, budgets.spec.ts) that need a
+ *  selector *string*, not a `Locator`. `[data-testid="grid-cell"][data-row="N"]` alone is never
+ *  valid for SlickGrid's DOM shape: `data-row` is written on the `.slick-row` (`SlickGridHost.vue`'s
+ *  own `tagRenderedRows`), never on the cell itself, so it has to be the row's own ancestor scope,
+ *  same as `gridCell()`. */
+export function gridCellSelector(row: number, column: string): string {
+  return `[data-testid="data-grid"] ${RIGHT_PANE} [data-testid="grid-row"][data-row="${row}"] [data-testid="grid-cell"][data-column="${column}"]`;
+}
+
 /** A data cell, addressed the way every other subsystem addresses one: a page row plus a display
  *  column name. */
 export function gridCell(page: Page, row: number, column: string): Locator {
-  return page.locator(
-    `[data-testid="data-grid"] ${RIGHT_PANE} [data-testid="grid-row"][data-row="${row}"] [data-testid="grid-cell"][data-column="${column}"]`,
-  );
+  return page.locator(gridCellSelector(row, column));
 }
 
 export async function cellText(page: Page, row: number, column: string): Promise<string> {
