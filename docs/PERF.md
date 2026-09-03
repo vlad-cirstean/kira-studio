@@ -852,6 +852,14 @@ miss if the match rule is naive. `apps/kira-studio/cmd/g1measure -match` account
 10 samples, 1 second apart, after the window is shown and idle, minimum taken — so these numbers
 are directly comparable in shape (not platform) to §2.2's table.
 
+**Configuration (1)'s scaffold was removed in P29.** `apps/kira-studio/blank/` and the
+`KIRA_G1_BLANK=1` swap in `main.go` were dead weight in the shipped binary years after this gate
+closed (§2.4 already recorded the verdict), and had bit-rotted since — the page's hand-copied
+`Call.ByID` numeric id predates `-names` bindings and could not be trusted without repair. The
+numbers below are kept as the historical record; rebuilding configuration (1) would need a fresh
+static page written against the current `-names`-generated bindings, not a restore of the deleted
+one.
+
 **Configuration (1) — blank** (`KIRA_G1_BLANK=1`, a static page making the one `AppService.Info()`
 call): **min of 10 samples = 616.3 MB.**
 

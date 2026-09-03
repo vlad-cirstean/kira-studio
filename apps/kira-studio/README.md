@@ -24,5 +24,5 @@ including the `GOTOOLCHAIN` pin and the bindings identity stamp — running
 `wails3 task common:generate:bindings` by hand works too, but skips the CLI-version/toolchain check
 `bun run setup` exists to add.
 
-`blank/` and `cmd/g1measure/` are P52 gate-G1 measurement scaffolding
-(`docs/PERF.md` §2.3), not part of the shipped app.
+`cmd/g1measure/` is P52 gate-G1 measurement scaffolding (`docs/PERF.md` §2.3), not part of the
+shipped app.

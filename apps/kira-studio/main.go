@@ -2,11 +2,8 @@ package main
 
 import (
 	"embed"
-	"io/fs"
 	"log"
 	"log/slog"
-	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -52,13 +49,6 @@ import (
 //
 //go:embed all:frontend/dist
 var assets embed.FS
-
-// blank is gate G1's configuration (1) (P52 §3.2): a static page making the one AppService.Info()
-// call, measuring the floor cost of Wails + the webview + Go with no app in it. Selected via
-// KIRA_G1_BLANK=1, never in normal operation.
-//
-//go:embed blank/index.html
-var blankAssets embed.FS
 
 // main's startup order mirrors src/main/index.ts (P52 §4.1), with the upgradeLegacySecrets step
 // deleted, not ported (P52 §6.4): config.EnsureLayout -> logging.Init/Sweep -> storage.Open
@@ -214,7 +204,7 @@ func main() {
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
-			Handler: assetHandler(),
+			Handler: application.AssetFileServerFS(assets),
 		},
 		Mac: application.MacOptions{
 			// P56 D10: closing the last window leaves the app running, matching Electron's
@@ -355,15 +345,4 @@ func main() {
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func assetHandler() http.Handler {
-	if os.Getenv("KIRA_G1_BLANK") == "1" {
-		sub, err := fs.Sub(blankAssets, "blank")
-		if err != nil {
-			log.Fatalf("kira-studio-shell: blank assets: %v", err)
-		}
-		return application.AssetFileServerFS(sub)
-	}
-	return application.AssetFileServerFS(assets)
 }
