@@ -679,6 +679,7 @@ const preconnectText = computed({
           class="test-chip p-chip"
           :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
           data-testid="connection-test-result"
+          v-tooltip="testState.status === 'error' ? (testState.message ?? '') : undefined"
         >
           {{
             testState.status === 'testing'

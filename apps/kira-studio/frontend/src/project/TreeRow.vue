@@ -147,6 +147,19 @@ function onContextMenu(e: MouseEvent): void {
     </span>
 
     <ErrorPopover v-if="row.error" :message="row.error" />
+    <!-- P24: a connect failure has no separate `row.error`/ErrorPopover of its own (tree.ts's
+         `error` field is a post-connect children-fetch failure only, never set when connect()
+         itself fails) — previously the reason lived nowhere but the status dot's own v-tooltip
+         (a 8px hit target), with no visible text at all. Truncated-with-hover-detail, matching
+         OperationsPanel.vue's own `error-text`/`v-tooltip` pattern for the same "errors are
+         truncated by default, full text on hover" shape. -->
+    <span
+      v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail"
+      class="detail error-text"
+      data-testid="connection-error-detail"
+      v-tooltip="row.statusDetail"
+      >{{ row.statusDetail }}</span
+    >
     <span v-else-if="row.detail" class="detail">{{ row.detail }}</span>
   </div>
 </template>
@@ -268,6 +281,10 @@ function onContextMenu(e: MouseEvent): void {
   text-overflow: ellipsis;
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-sm);
+}
+
+.error-text {
+  color: var(--kira-error);
 }
 
 </style>
