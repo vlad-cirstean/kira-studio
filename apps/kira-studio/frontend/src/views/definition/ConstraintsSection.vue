@@ -9,8 +9,9 @@ const props = defineProps<{
 }>();
 
 // PK/FK get the same yellow/blue letter badge the Columns section and the SQL grid header use
-// (DataGrid.vue's own FIX-8 law: "keys are labelled PK/FK, never inferred from colour alone") —
-// check/unique/exclusion have no such single-letter convention, so they stay a text label.
+// (FIX-8: "keys are labelled PK/FK, never inferred from colour alone" — SlickGridHost.vue's own
+// header carries the same law now, originally the deleted DataGrid.vue's) — check/unique/exclusion
+// have no such single-letter convention, so they stay a text label.
 const KEY_LABEL: Partial<Record<ConstraintRow['type'], 'PK' | 'FK'>> = {
   primaryKey: 'PK',
   foreignKey: 'FK',

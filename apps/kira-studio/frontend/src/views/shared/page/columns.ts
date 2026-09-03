@@ -8,13 +8,14 @@ const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;
 
-// P48 F9: DataGrid.vue's own gutter width and ConsoleResultGrid.vue's copy of it, spelled a
-// third way as a bare `56` in the latter's own CSS — one constant behind all three.
+// P48 F9: one constant behind what were three separate spellings of the same gutter width — the
+// deleted DataGrid.vue's own, ConsoleResultGrid.vue's now-deleted tabular-branch copy (a bare `56`
+// in its own CSS), and this one.
 export const GUTTER_WIDTH = 56;
 // P48 F9: the 96px fallback both grids' own widths computeds used when neither a stored width
 // nor a measured one is available yet.
 export const DEFAULT_COLUMN_WIDTH = 96;
-// P49 F9/D4: the pixel overscan budget DataGrid.vue's own column virtualizer used — kept for
+// P49 F9/D4: the pixel overscan budget the deleted DataGrid.vue's own column virtualizer used — kept for
 // KiraSlickGrid's own column-overscan clamp (kiraSlickGrid.ts's clampColumnOverscan); the per-side
 // column *count* cap it was paired with (MAX_OVERSCAN_COLUMNS) died with the tanstack-virtual
 // column axis it belonged to (P30 §3.6 C7) — SlickGrid clamps by canvas width instead.
@@ -44,7 +45,7 @@ export function resetMeasureCtx(): void {
   widthsCache = new WeakMap();
 }
 
-// P2 R1: DataGrid.vue's `widths` computed depends on the tab's stored columnWidths (so a resize
+// P2 R1: the deleted DataGrid.vue's `widths` computed depended on the tab's stored columnWidths (so a resize
 // drag's own patchDataTabState call invalidates it) *and* calls initialWidths(page) unconditionally
 // inside — every pointermove during a drag re-ran this canvas-measurement pass over every column
 // and up to 50 sample rows each, even though a resize never changes the page's own data. Pages are
@@ -120,10 +121,10 @@ export const CELL_BUDGET = 2200;
 // synchronous work well under a single frame's budget even on a 120 Hz display; re-set once the
 // real-Mac protocol (docs/PERF.md §2.1c) reports actual renderMs figures for a cold batch of this
 // size. Consumed by views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override — the
-// incumbent tanstack-virtual/DataGrid.vue grid has no equivalent single-call batch-size hazard
+// deleted tanstack-virtual/DataGrid.vue grid had no equivalent single-call batch-size hazard
 // (P22-slickgrid-migration-plan.md's own F2: SlickGrid's render() builds every newly-entering row
-// synchronously in one unconditional DOM-construction pass, unlike Vue's own patch, which this app's
-// incumbent grid goes through instead), so this constant is SlickGrid-only.
+// synchronously in one unconditional DOM-construction pass, unlike Vue's own patch, which that grid
+// went through instead), so this constant is SlickGrid-only.
 export const MAX_NEW_CELLS_PER_RENDER = 600;
 
 // P22 iter2-pacing D2: a separate, SEPARATELY-CAPPED per-render budget for *runway* (beyond
@@ -247,10 +248,11 @@ export function pageColumnIndexFor(page: TabularPage, order: string[], displayCo
   return nameIndexFor(page).get(name) ?? -1;
 }
 
-// P48 F7: the column-header tooltip object DataGrid.vue and ConsoleResultGrid.vue each built —
-// deliberately the same shape (P42 D19/D20's own comment), differing only in whether a DB
-// comment line is available to fold into `body`. `dataType` is passed in rather than read off
-// `col` directly: DataGrid.vue overlays a DESCRIBE-derived dataType where the console has none.
+// P48 F7: the column-header tooltip object the deleted DataGrid.vue and ConsoleResultGrid.vue's
+// own (now also deleted) tabular branch each built — deliberately the same shape (P42 D19/D20's
+// own comment), differing only in whether a DB comment line is available to fold into `body`.
+// `dataType` is passed in rather than read off `col` directly: DataGrid.vue overlaid a
+// DESCRIBE-derived dataType where the console has none.
 export function columnHeaderTooltip(
   col: { name: string; typeClass: TypeClass },
   dataType: string,

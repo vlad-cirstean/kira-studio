@@ -1,7 +1,8 @@
 import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 
 // P42 D39: a tab's currently-visible page-row window, reported by whichever view renders it
-// (DataGrid.vue's own visiblePageRowBounds watch, VirtualList.vue's visible-range emit) and read
+// (the deleted DataGrid.vue's own visiblePageRowBounds watch, VirtualList.vue's visible-range
+// emit — SlickGridHost.vue reports the same window its own way now) and read
 // by that same view's runSearch as the scan's priority window (scan.ts's opts.priority) — the
 // rows a search should highlight first, since they're the ones already on screen.
 //

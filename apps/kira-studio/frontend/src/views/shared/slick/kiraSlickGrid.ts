@@ -62,8 +62,8 @@ export interface KiraSlickVelocity {
 }
 
 /** `__kiraGridTuning`'s overrides, read fresh on every `getRenderedRange` call (never cached) —
- *  same contract as DataGrid.vue's own row-axis `rangeExtractor` closure, so the real-Mac A/B
- *  protocol (`docs/PERF.md` §2.1a) needs one build for both engines, not a rebuild per variant. */
+ *  the same contract the deleted DataGrid.vue's own row-axis `rangeExtractor` closure had, so the
+ *  real-Mac A/B protocol (`docs/PERF.md` §2.1a) needs one build, not a rebuild per variant. */
 function runwayConfig(): RowRangeExtractorConfig {
   const tuning = window.__kiraGridTuning;
   return {
@@ -114,16 +114,17 @@ export function clampColumnOverscan(
  * coupling to SlickGrid internals. SlickGrid's own runway (F4) is *smaller* than this app's at
  * rest — 3 rows/side (`minRowBuffer`) against this app's 560px (≈20 rows/side) — and not
  * velocity-scaled in motion; adopting it as-is would make the reported fast-scroll symptom worse,
- * not better. This reuses `rowRangeBounds` (the exact arithmetic `DataGrid.vue`'s own row axis
- * runs, C1's own refactor) rather than restating it, so both grids' at-rest window is provably the
- * same number — `tests/unit/row-range.spec.ts` covers that arithmetic; this file's own test covers
- * only the column-overscan clamp above.
+ * not better. This reuses `rowRangeBounds` (the exact arithmetic the deleted `DataGrid.vue`'s own
+ * row axis ran, C1's own refactor) rather than restating it — originally so both grids' at-rest
+ * window was provably the same number during the migration, and still the reason this arithmetic
+ * lives in its own shared function rather than inline here — `tests/unit/row-range.spec.ts`
+ * covers that arithmetic; this file's own test covers only the column-overscan clamp above.
  *
  * Every SlickGrid method called below is public and documented in the published `.d.ts`:
  * `getVisibleRange`, `getDataLength`, `getOptions`, `getCanvasNode`. `vScrollDir` (a protected
  * field) is deliberately never read — direction comes from the host's own velocity sampler
  * (`velocity`, below), which already discards a discrete jump as "at rest"
- * (`MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME`, mirrored from DataGrid.vue's own onScroll), a case a
+ * (`MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME`, mirrored from the deleted DataGrid.vue's own onScroll), a case a
  * raw sign test on `vScrollDir` would not. **On a `slickgrid` version bump, re-check that
  * `render()` still calls `this.getRenderedRange()` and that its return shape is still
  * `{ top, bottom, leftPx, rightPx }`** — F4's own citation, `dist/esm/index.mjs`'s `render()`.
@@ -134,14 +135,14 @@ export function clampColumnOverscan(
 // matching slickgrid's own escape hatch for exactly this case.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above.
 export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
-  /** Supplied by the host on every scroll sample (DataGrid.vue's own `rowVelocity()` analogue) —
+  /** Supplied by the host on every scroll sample (the deleted DataGrid.vue's own `rowVelocity()` analogue) —
    *  read fresh on every call below, never memoised (this runs *during* SlickGrid's own render).
    *  Defaults to "at rest" so a grid that hasn't wired a sampler yet still renders the baseline
    *  runway — D3(a)'s own "byte-identical to today at rest" guarantee. */
   velocity: () => KiraSlickVelocity = () => ({ pxPerFrame: 0, direction: 0 });
 
   /** The row axis's own budget divisor (D4's third bullet) — a plain variable the host updates
-   *  from `onRendered`, mirroring DataGrid.vue's own `mountedColumnCount` (columns.ts's own
+   *  from `onRendered`, mirroring the deleted DataGrid.vue's own `mountedColumnCount` (columns.ts's own
    *  comment: calling into the column virtualizer from *inside* the row-range computation itself
    *  measurably regressed the scroll budget; the same hazard applies here). */
   mountedColumnCount = 1;
@@ -456,8 +457,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       canvasWidth,
     );
     // The row axis's own budget divisor (D4's third bullet), self-maintained rather than supplied
-    // by the host: DataGrid.vue's own mountedColumnCount is read from a *separate* column
-    // virtualizer, and its own comment warns that calling into it from inside the row-range
+    // by the host: the deleted DataGrid.vue's own mountedColumnCount was read from a *separate* column
+    // virtualizer, and its own comment warned that calling into it from inside the row-range
     // computation regressed the scroll budget. SlickGrid has no separate column virtualizer to call
     // into — this approximates the mounted column count from this same render's own column window
     // and the grid's average column width, entirely locally, so the hazard that comment warns about

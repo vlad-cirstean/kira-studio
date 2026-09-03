@@ -36,7 +36,7 @@ export interface PageStore<P extends { rowCount: number; byteSize: number }> {
    *  (grid/page.ts's `cell()`, console/resultPages.ts's `cell()`/`documentRow()`/`keyValueRow()`,
    *  documents/page.ts's `documentRow()`, keyvalue/page.ts's `keyValueRow()`, stream/page.ts's
    *  `streamRow()`) still allocated a fresh return object on *every* call, even though the decoded
-   *  text underneath was already cached — and some of those accessors (`cellAt` in
+   *  text underneath was already cached — and some of those accessors (`cellAt` in the deleted
    *  DataGrid.vue/ConsoleResultGrid.vue in particular) get called several times per cell per
    *  render straight from a template. This memoizes the accessor's own built object the same way
    *  `cached` memoizes decoded text, so a repeat call for the same row/subKey returns the identical

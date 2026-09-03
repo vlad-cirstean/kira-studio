@@ -21,7 +21,7 @@ import {
 import { setFilter, setProjection, setSort } from './state';
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
-// discipline DataGrid.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
+// discipline SlickGridHost.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
 function qualifiedNameForPath(connectionId: string, path: string): string {
   return decodePath(connectionId, path)

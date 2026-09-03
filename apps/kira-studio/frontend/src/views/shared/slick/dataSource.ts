@@ -30,8 +30,9 @@ export interface RowHandle {
 }
 
 /** The display-position space this grid renders in: `displayRows` (ascending page-row indices)
- *  when a filter is hiding non-matching rows, `null` when unfiltered — DataGrid.vue's own
- *  `displayPositionOf`/`rowAtDisplayPosition` split (P24 D3/D4), reused rather than re-derived. */
+ *  when a filter is hiding non-matching rows, `null` when unfiltered — the
+ *  `displayPositionOf`/`rowAtDisplayPosition` split (P24 D3/D4), originally written against the
+ *  now-deleted DataGrid.vue and reused here rather than re-derived. */
 export interface DisplayRowIndex {
   readonly displayRows: readonly number[] | null;
   readonly pageRowCount: number;
@@ -48,8 +49,8 @@ export function dataLength(idx: DisplayRowIndex, insertCount: number): number {
 
 /**
  * Display position -> `RowHandle`, across the filter and into the pending-insert region past the
- * last display row — mirrors DataGrid.vue's `rowAtDisplayPosition` plus its own
- * `page.rowCount + idx` insert-identity rule (`onPaste`'s own comment). The one place this
+ * last display row — the arithmetic the deleted DataGrid.vue's own `rowAtDisplayPosition` used,
+ * plus its own `page.rowCount + idx` insert-identity rule (`onPaste`'s own comment). The one place this
  * translation lives for the Slick engine (D1 bullet 4): `getLength`/`getItem` below are its only
  * callers, replacing `displayPositionOf`/`rowAtDisplayPosition`'s use inside the old virtualizer.
  */
@@ -76,8 +77,9 @@ export function rowAtDisplayPosition(idx: DisplayRowIndex, pos: number): number 
   return pageRowAt(idx, pos);
 }
 
-/** The inverse of `rowAtDisplayPosition` — page row -> display position. Mirrors DataGrid.vue's
- *  own `displayPositionOf` (P24 D3/D5/D6/D11): `displayRows` is always ascending (matchedRows'
+/** The inverse of `rowAtDisplayPosition` — page row -> display position. The same
+ *  `displayPositionOf` arithmetic the deleted DataGrid.vue used (P24 D3/D5/D6/D11):
+ *  `displayRows` is always ascending (matchedRows'
  *  own contract), so an exact hit (the common case — the row is visible) is a binary search, and
  *  a miss (the row was just filtered out from under a live selection) falls through to the
  *  position it would sort into, landing on the nearest visible row instead of doing nothing. */

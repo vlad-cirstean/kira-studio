@@ -98,7 +98,7 @@ const readOnlyReason = computed(() =>
 
 // D4 (revised): editable only when the cell is genuinely writable (`readOnlyReason === null`)
 // *and* whoever published it handed over a way to stage the write (`cell.onEdit`, today set only
-// by `DataGrid.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
+// by `SlickGridHost.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
 // Console — keeps its cells read-only here even once `readOnlyReasonFor()` says nothing's wrong,
 // since there'd be nowhere for a save to go. `!viewerMode.value` is redundant with that (a viewer
 // mount never sets onEdit either) but stated explicitly so this can't drift if one ever did.
@@ -251,8 +251,8 @@ function saveEdit(): void {
   c.onEdit(doc.value);
 }
 
-// Auto-stages on blur, matching DataGrid.vue's own inline double-click edit (its `commitEdit`
-// fires on the same event) — no separate Save button needed since leaving the editor is already
+// Auto-stages on blur, matching the deleted DataGrid.vue's own inline double-click edit (its
+// `commitEdit` fired on the same event) — no separate Save button needed since leaving the editor is already
 // the "I'm done with this value" signal, and the grid's own pending-edit row highlighting is the
 // feedback that it landed. `focusout` (not `blur`, which doesn't bubble) on the wrapping div.
 //
@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
 // CodeMirror's own keymap binds Enter for newlines, never Ctrl/Cmd+Enter, so the event still
 // bubbles here unconsumed.
 //
-// P24 D26: Escape reverts the buffer, mirroring DataGrid.vue's own inline editor. CodeMirror's
+// P24 D26: Escape reverts the buffer, mirroring the deleted DataGrid.vue's own inline editor. CodeMirror's
 // defaultKeymap binds Escape to simplifySelection, which calls preventDefault but does not stop
 // propagation, so this handler still receives it — the same mechanism Ctrl/Cmd+Enter above
 // already relies on.
@@ -387,7 +387,7 @@ const targetLabel = computed(() => {
   return `${tail?.name ?? c.path}.${c.column.name}`;
 });
 
-// Same glossary the grid's own column header reads (headerTitleFor in DataGrid.vue) — hovering
+// Same glossary the grid's own column header reads (columnHeaderTooltip, SlickGridHost.vue) — hovering
 // the data-type badge here should explain the type exactly as hovering the header already does.
 const dataTypeHint = computed(
   () => typeDescription(selectedCell.value.column.dataType) ?? undefined,

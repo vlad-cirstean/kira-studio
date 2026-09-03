@@ -94,7 +94,8 @@ defineEmits<{ toggle: []; select: [] }>();
   box-shadow: inset 2px 0 0 var(--kira-accent);
 }
 
-/* P31 D20: the same color-mix tint / solid-current pair DataGrid.vue and KeyValueView.vue use —
+/* P31 D20: the same color-mix tint / solid-current pair KeyValueView.vue uses (and the deleted
+   DataGrid.vue used) —
    a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
    still reads through it) since a document match has no single cell to point at. */
 .doc-row.search-match {

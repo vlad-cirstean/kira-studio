@@ -93,7 +93,7 @@ export function createPageSearch<M extends { row: number }>(opts: {
   };
 }
 
-// P48 F8: DataGrid.vue, KeyValueView.vue and ConsoleResultGrid.vue each built this same
+// P48 F8: the deleted DataGrid.vue, KeyValueView.vue and ConsoleResultGrid.vue each built this same
 // plus current-match computed, rebuilt only when the search result changes (a completed scan or
 // prev/next), not per cell — differing only in `col`'s type ('field' | 'value' for a key/value row,
 // a page column index everywhere else). `tabId` is a function, not a plain string, so the computed

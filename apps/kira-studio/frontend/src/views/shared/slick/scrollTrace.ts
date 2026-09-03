@@ -11,8 +11,10 @@ import { nextTick } from 'vue';
 // trackpad fling, from inside the packaged app's own DevTools (View → Open DevTools, a dev build —
 // internal/shell/menutemplate.go). It is not a tests/ui/ instrument and is not gated in CI; it exists
 // so a human can capture a number nobody in this repo's history has ever measured. Reachable at
-// `window.__kiraScrollTrace` (wired here from DataGrid.vue's registerGrid/noteScrollEvent/noteNotify
-// calls, not from columns.ts's offset observer — see DataGrid.vue's own onScroll comment for why).
+// `window.__kiraScrollTrace` (wired from SlickGridHost.vue's registerGrid/noteScrollEvent/
+// noteRenderMs calls — noteNotify below is the deleted DataGrid.vue's own Vue-`nextTick`-based
+// equivalent, kept for its doc comment's reasoning but no longer called — not from columns.ts's
+// offset observer; see the deleted DataGrid.vue's own onScroll comment for why).
 //
 // Usage (Web Inspector console, one hard two-finger flick between the two calls):
 //   __kiraScrollTrace.start()
@@ -151,9 +153,11 @@ export interface ScrollTraceResult {
 let recording = false;
 let rafId = 0;
 let gridEl: HTMLElement | null = null;
-// P22 spike D9: the mounted-row selector `measureMountedBand` queries — defaults to the incumbent
-// grid's own testid so every existing caller (DataGrid.vue) is unaffected; SlickGridHost.vue passes
-// '.slick-row' so the same probe can A/B both engines on one build (§7.4(b)) without a rebuild.
+// P22 spike D9: the mounted-row selector `measureMountedBand` queries — the default was the
+// deleted DataGrid.vue's own `[data-testid="grid-row"]` (kept so the deleted caller was
+// unaffected, and still the correct value: SlickGridHost.vue's own rows carry the same testid, see
+// its own comment); it was originally overridable to '.slick-row' so the same probe could A/B both
+// engines on one build during the migration (§7.4(b)).
 let mountedRowSelector = '[data-testid="grid-row"]';
 
 let pendingEvents: { offset: number; t: number }[] = [];
@@ -170,10 +174,10 @@ let prevRafT = 0;
 let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
 
-/** DataGrid.vue's/SlickGridHost.vue's own onMounted/onUnmounted — at most one grid is ever mounted
- *  at a time (MainView.vue keys its DataView by tab id), so a single module-level target is
- *  enough. `rowSelector` (P22 spike D9) is the mounted-row query `measureMountedBand` below uses —
- *  defaults to the incumbent grid's own testid. */
+/** Called from SlickGridHost.vue's own onMounted/onUnmounted (and, before it was deleted,
+ *  DataGrid.vue's) — at most one grid is ever mounted at a time (MainView.vue keys its DataView by
+ *  tab id), so a single module-level target is enough. `rowSelector` (P22 spike D9) is the
+ *  mounted-row query `measureMountedBand` below uses — defaults to `[data-testid="grid-row"]`. */
 export function registerGrid(el: HTMLElement, rowSelector = '[data-testid="grid-row"]'): void {
   gridEl = el;
   mountedRowSelector = rowSelector;
@@ -183,16 +187,20 @@ export function unregisterGrid(el: HTMLElement): void {
   if (gridEl === el) gridEl = null;
 }
 
-/** DataGrid.vue's own onScroll, called on every native `scroll` event — a single array push behind
- *  a boolean when not recording, per D2's own "inert until start()" requirement. */
+/** Called from the grid's own onScroll (SlickGridHost.vue today; the deleted DataGrid.vue before
+ *  it) on every native `scroll` event — a single array push behind a boolean when not recording,
+ *  per D2's own "inert until start()" requirement. */
 export function noteScrollEvent(offset: number, t: number): void {
   if (!recording) return;
   pendingEvents.push({ offset, t });
 }
 
-/** DataGrid.vue's own markScrollWork, called from each virtualizer's onChange. P22 iter2-pacing D3:
- *  accumulates into pendingRenderMs/pendingRenderCount (drained by tick()) instead of overwriting a
- *  sticky last-value — see ScrollTraceFrame.renderMs's own comment for why that distinction is
+/** The deleted DataGrid.vue's own markScrollWork, called from its virtualizer's onChange —
+ *  SlickGridHost.vue calls `noteRenderMs` below instead (P22 iter2-scroll-gaps D1's own comment),
+ *  since its render pass is fully synchronous with no Vue nextTick to approximate through. Kept
+ *  for its own reasoning, not currently called. P22 iter2-pacing D3: accumulates into
+ *  pendingRenderMs/pendingRenderCount (drained by tick()) instead of overwriting a sticky
+ *  last-value — see ScrollTraceFrame.renderMs's own comment for why that distinction is
  *  load-bearing. */
 export function noteNotify(): void {
   if (!recording) return;
@@ -206,8 +214,8 @@ export function noteNotify(): void {
 
 /** P22 iter2-scroll-gaps D1: for an engine whose render pass is fully synchronous (SlickGrid — no
  *  Vue patch/flush involved on this path at all), the caller already has the duration in hand;
- *  report it directly instead of nextTick's Vue-specific approximation, which noteNotify() stays as,
- *  unchanged, for DataGrid.vue's own callers. Called from KiraSlickGrid's own `render()` override —
+ *  report it directly instead of nextTick's Vue-specific approximation, which noteNotify() above
+ *  stays as, unchanged, for the deleted DataGrid.vue's own reasoning. Called from KiraSlickGrid's own `render()` override —
  *  including a chase-scheduled catch-up render, so two calls landing in the same frame (the P22
  *  iter2-pacing bug, before D1's fix) both accumulate rather than one clobbering the other. */
 export function noteRenderMs(ms: number): void {

@@ -122,8 +122,8 @@ function rowAt(i: number) {
 // P49 F7/D5: `.stream-row` never had an explicit height before this view was virtualized — its
 // rows sized themselves off whichever cell had text (`.p-td`'s own line-height), which is why
 // `.stream-row`'s CSS rule below carries none — VirtualList needs one fixed pixel value for its
-// offset math, so this adopts the same density-driven height DataGrid.vue/ConsoleResultGrid.vue/
-// KeyValueView.vue already use rather than inventing a fourth number.
+// offset math, so this adopts the same density-driven height ConsoleResultGrid.vue/KeyValueView.vue
+// (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
@@ -139,7 +139,7 @@ function onRowClick(i: number): void {
 }
 
 // Item 6 (widened, task #75): publishes into cellSelection.ts's shared slot (the same one
-// DataGrid.vue uses) so CellEditorView.vue can show whichever column of the clicked row was
+// SlickGridHost.vue uses) so CellEditorView.vue can show whichever column of the clicked row was
 // actually clicked, read-only — not just the body. A synthetic single-column ColumnDescriptor
 // stands in for the grid's real per-table columns, since a stream row has no catalog-described
 // schema at all (§8.9 has no column navigation for streams).
@@ -170,7 +170,7 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
   publishSelectedCell(selected);
 }
 
-// P2 R2 (task #98): same closure-per-render problem DataGrid.vue found first (P2 R1) — a template
+// P2 R2 (task #98): same closure-per-render problem the deleted DataGrid.vue found first (P2 R1) — a template
 // handler that calls out with the v-for's `i` can never be cached by Vue's compiler (hasScopeRef),
 // so every visible row/cell got a fresh wrapper closure on every render, scroll included. These
 // recover `i` from the row's `data-row-index` (walking up from a cell to its ancestor `.stream-row`
@@ -475,8 +475,9 @@ function onVisibleRangeIndices(range: { start: number; end: number }): void {
   setVisibleWindow(props.tab.id, from, to + 1);
 }
 
-// Item 4: per-column resize for the four fixed-width columns (mirrors DataGrid.vue's own
-// resize-handle pattern) — the `body` column stays `flex: 1` and is never resizable. Defaults
+// Item 4: per-column resize for the four fixed-width columns (mirrors the deleted DataGrid.vue's
+// own resize-handle pattern — SlickGrid handles its own column resize natively, so this view is
+// now the only hand-rolled one left) — the `body` column stays `flex: 1` and is never resizable. Defaults
 // match the previous hardcoded inline widths exactly, so a tab that never resized anything renders
 // identically to before.
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
@@ -997,8 +998,8 @@ onUnmounted(() => {
   background: var(--kira-hover);
 }
 
-/* P31 D21: adopts the same color-mix tint / solid-current pair as DataGrid.vue and
-   KeyValueView.vue, replacing the inset bar so all four search-capable views agree. */
+/* P31 D21: adopts the same color-mix tint / solid-current pair as KeyValueView.vue (and the
+   deleted DataGrid.vue), replacing the inset bar so all four search-capable views agree. */
 .stream-row.search-match {
   background: var(--kira-search-match);
 }
@@ -1100,13 +1101,15 @@ onUnmounted(() => {
   background: var(--kira-hover);
 }
 
-/* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors
-   DataGrid.vue's own `.header-cell`/`.resize-handle` pair) — `.p-th` needs `position: relative`
-   as its positioning context, scoped here rather than in primitives.css since it's a stream-only
-   affordance (grid/keyvalue/console reuse `.p-th` too but never resize it this way). Unlike
-   DataGrid.vue's `.header-cell` (no overflow rule of its own), primitives.css's shared `.p-th`
-   sets `overflow: hidden` — `right: 0` (rather than DataGrid's `right: -2px`) keeps the whole
-   4px handle inside `.p-th`'s own box instead of half-clipped by that overflow. */
+/* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors the
+   deleted DataGrid.vue's own `.header-cell`/`.resize-handle` pair — SlickGrid resizes its own
+   columns natively now, so this hand-rolled pattern survives only here) — `.p-th` needs
+   `position: relative` as its positioning context, scoped here rather than in primitives.css
+   since it's a stream-only affordance (grid/keyvalue/console reuse `.p-th` too but never resize it
+   this way). Unlike the deleted DataGrid.vue's `.header-cell` (no overflow rule of its own),
+   primitives.css's shared `.p-th` sets `overflow: hidden` — `right: 0` (rather than DataGrid's
+   `right: -2px`) keeps the whole 4px handle inside `.p-th`'s own box instead of half-clipped by
+   that overflow. */
 .p-th {
   position: relative;
 }

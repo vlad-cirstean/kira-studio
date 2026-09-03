@@ -111,7 +111,7 @@ const canOpenConsole = computed(
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
 const connRecord = computed(() => connectionRecord(props.tab.connectionId));
-// Produced locally from the path — the same discipline DataGrid.vue's own qualifiedName()
+// Produced locally from the path — the same discipline SlickGridHost.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.
 const breadcrumb = computed(() => {

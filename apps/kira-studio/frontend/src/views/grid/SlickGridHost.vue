@@ -266,7 +266,7 @@ const showNoMatchingRows = computed(() => {
 });
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
-// discipline DataGrid.vue's own qualifiedName() and grid/menu.ts's qualifiedNameForPath use.
+// discipline grid/menu.ts's qualifiedNameForPath and project/menus.ts's qualifiedNameFor use.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
 function qualifiedName(): string {
   const t = tab();
