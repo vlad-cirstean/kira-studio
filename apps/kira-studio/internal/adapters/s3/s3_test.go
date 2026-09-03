@@ -96,6 +96,8 @@ func TestS3_ConnectDisconnect(t *testing.T) {
 }
 
 // 2. an unparseable URI is rejected at connect time.
+// P25 §1.5c/§2.8 row 3: this is a pre-connect configuration failure, not an ordinary query-time
+// condition — E_CONNECT, not E_QUERY.
 func TestS3_Connect_UnparseableURI(t *testing.T) {
 	fixture := testsupport.StartS3(t)
 	badCfg := fixture.Config
@@ -107,8 +109,31 @@ func TestS3_Connect_UnparseableURI(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
-		t.Errorf("code = %v, want E_QUERY", code)
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeConnect {
+		t.Errorf("code = %v, want E_CONNECT", code)
+	}
+}
+
+// P25 §1.5b/§2.1(6): a fields-mode connection naming a nonexistent shared-config profile must be
+// E_AUTH, not E_QUERY — the regression test for awscfg.Resolve routing LoadDefaultConfig's error
+// through MapError instead of stringifying it. Needs no container behaviour LocalStack cannot
+// provide: the failure happens before any request reaches it.
+func TestS3_Connect_ProfileNotFoundIsAuthError(t *testing.T) {
+	testsupport.StartS3(t) // Docker gate only — the connect below never reaches the container
+
+	a := newAdapter(t)
+	cfg := model.ResolvedConnectionConfig{
+		ID: "test-s3-profile-not-found", Kind: "s3", Mode: "fields",
+		Database: testsupport.Strp("us-east-1"),
+		Username: testsupport.Strp("kira-p25-nonexistent-profile"),
+		Options:  map[string]any{},
+	}
+	_, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-profile"))
+	if err == nil {
+		t.Fatal("want an error for a nonexistent profile")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeAuth {
+		t.Errorf("code = %v, want E_AUTH", code)
 	}
 }
 

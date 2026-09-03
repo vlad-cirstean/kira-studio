@@ -79,7 +79,8 @@ func TestSqs_ConnectDisconnect(t *testing.T) {
 	}
 }
 
-// 2. an unparseable URI is rejected at connect time.
+// 2. an unparseable URI is rejected at connect time. P25 §1.5c/§2.8 row 3: this is a pre-connect
+// configuration failure, not an ordinary query-time condition — E_CONNECT, not E_QUERY.
 func TestSqs_Connect_UnparseableURI(t *testing.T) {
 	fixture := testsupport.StartSqs(t)
 	badCfg := fixture.Config
@@ -91,8 +92,8 @@ func TestSqs_Connect_UnparseableURI(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error, got nil")
 	}
-	if code, _ := adapters.CodeOf(err); code != adapters.CodeQuery {
-		t.Errorf("code = %v, want E_QUERY", code)
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeConnect {
+		t.Errorf("code = %v, want E_CONNECT", code)
 	}
 }
 

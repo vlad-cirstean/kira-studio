@@ -37,7 +37,7 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 		// asymmetry for the same Go/JS gap.
 		u, err := url.Parse(*cfg.URI)
 		if err != nil || u.Hostname() == "" {
-			return Resolved{}, mapPlainError("could not parse the connection URI")
+			return Resolved{}, mapConfigError("could not parse the connection URI")
 		}
 		region = u.Hostname()
 		if u.User != nil {
@@ -50,7 +50,7 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 		}
 	} else {
 		if cfg.Database == nil || *cfg.Database == "" {
-			return Resolved{}, mapPlainError(`a region is required (the "database" field)`)
+			return Resolved{}, mapConfigError(`a region is required (the "database" field)`)
 		}
 		region = *cfg.Database
 		if cfg.Username != nil && *cfg.Username != "" {
@@ -61,7 +61,10 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return Resolved{}, mapPlainError(err.Error())
+		// P25 §1.5b: MapError already classifies SharedConfigProfileNotExistError as E_AUTH —
+		// routing this through mapPlainError(err.Error()) threw the typed error away and made that
+		// branch dead code, so a nonexistent profile reported E_QUERY instead.
+		return Resolved{}, MapError(err)
 	}
 
 	baseEndpoint := ""
@@ -75,6 +78,11 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 	return Resolved{AWS: awsCfg, BaseEndpoint: baseEndpoint}, nil
 }
 
-func mapPlainError(message string) *adapters.Error {
-	return adapters.New(adapters.CodeQuery, message, nil)
+// mapConfigError is for a pre-connect configuration failure — a malformed URI or a missing region
+// — that never reaches the network at all. P25 §1.5c: these were previously coded E_QUERY via
+// mapPlainError, indistinguishable from an ordinary query-time condition against a live
+// connection; E_CONNECT is the correct code for a failure that happens before any connection
+// attempt.
+func mapConfigError(message string) *adapters.Error {
+	return adapters.New(adapters.CodeConnect, message, nil)
 }
