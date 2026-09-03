@@ -66,7 +66,11 @@
   background: var(--kira-bg-elevated);
   color: var(--kira-fg-disabled);
   font-size: var(--kira-t-xs);
-  justify-content: flex-end;
+  /* P22 iter2-pacing D7 item 1: `justify-content: flex-end` (this rule's own value until now) is
+     inert — slick.grid.css declares no `display` on `.slick-cell`, so it computes to `display:
+     block` and the row number was left-aligned, unlike the incumbent's `.gutter-cell` (`display:
+     flex`). text-align is the fix that works on the actual (block) layout model. */
+  text-align: right;
   border-right: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
