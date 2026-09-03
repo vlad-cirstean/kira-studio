@@ -238,14 +238,18 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 	// (a very plausible thing to do) must not be folded into one merged, corrupted entry. The
 	// grouping logic itself (groupForeignKeys) has its own unconditional, engine-independent
 	// white-box coverage in catalog_internal_test.go; this is the live, end-to-end reproduction.
-	if kind == "mariadb" {
-		t.Skip("MariaDB's information_schema.REFERENTIAL_CONSTRAINTS doesn't surface a row for a " +
-			"schema the connected user only holds a db-level wildcard GRANT SELECT on (confirmed via " +
-			"a standalone probe: KEY_COLUMN_USAGE sees kira_analytics fine, REFERENTIAL_CONSTRAINTS " +
-			"returns zero rows for it) — a separate, pre-existing MariaDB limitation unrelated to this " +
-			"fix, not reproducible under this fixture's own deliberately-restricted `kira` user")
-	}
 	t.Run("describe: referencedBy from two databases with a colliding constraint name are not merged", func(t *testing.T) {
+		// P26: scoped to this one subtest, not the rest of runFamilySuite — moved in from a bare
+		// t.Skip() that used to sit directly in this function's own body just above this t.Run, which
+		// (a pre-existing bug this phase's own ×2-engine coverage goal surfaced) skipped every later
+		// t.Run in the whole suite for MariaDB, this phase's own new tests included.
+		if kind == "mariadb" {
+			t.Skip("MariaDB's information_schema.REFERENTIAL_CONSTRAINTS doesn't surface a row for a " +
+				"schema the connected user only holds a db-level wildcard GRANT SELECT on (confirmed via " +
+				"a standalone probe: KEY_COLUMN_USAGE sees kira_analytics fine, REFERENTIAL_CONSTRAINTS " +
+				"returns zero rows for it) — a separate, pre-existing MariaDB limitation unrelated to this " +
+				"fix, not reproducible under this fixture's own deliberately-restricted `kira` user")
+		}
 		a := connectedAdapter(t, kind, cfg)
 		ctx := context.Background()
 
@@ -432,6 +436,41 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		forwardAgainFirstID := cellAt(t, forwardAgainPage, 0, 0)
 		if forwardAgainFirstID == nil || *forwardAgainFirstID != "6" {
 			t.Errorf("page after page-before's NextToken: first id = %v, want 6", forwardAgainFirstID)
+		}
+	})
+
+	// P26 §3.2(1)/(2): mysql/caps.go and mariadb/caps.go both declare Projection/ServerFilter true;
+	// neither had a dedicated real-container test before this.
+	t.Run("read: filter and sort", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		filter := "region_id = 1"
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:   nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Filter: &filter, Sort: &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "name", Direction: "asc"}}},
+			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-10e"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if tp.RowCount != 1 {
+			t.Fatalf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
+		}
+	})
+
+	t.Run("read: projection", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:       nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Projection: []string{"name"},
+			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-10f"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
+			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
 		}
 	})
 
@@ -724,6 +763,155 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
+	// P26 §3.2(3): a DDL round trip through Execute, visible to Children/Describe/Definition on the
+	// same connection — closes the ✗ mark neither engine had, ×2 via runFamilySuite.
+	t.Run("execute: a DDL round trip is visible to the catalog", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		ctx := context.Background()
+		databasePath := nodePath(cfg.ID, seg("database", "kira_test"))
+		tablePath := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p26_scratch"))
+
+		probeDB, err := sql.Open("mysql", sideDSN(cfg))
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probeDB.Close()
+		probeDB.ExecContext(ctx, "DROP TABLE IF EXISTS kira_test.p26_scratch")
+		t.Cleanup(func() { probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS kira_test.p26_scratch") })
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"CREATE TABLE p26_scratch (id INT PRIMARY KEY, name VARCHAR(64))"},
+		}, adapters.NewOpCtx("op-ddl-1")); err != nil {
+			t.Fatalf("Execute(CREATE TABLE): %v", err)
+		}
+
+		children, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-2"))
+		if err != nil {
+			t.Fatalf("Children: %v", err)
+		}
+		if !containsName(childNames(t, children), "p26_scratch") {
+			t.Fatalf("Children(kira_test) = %v, want p26_scratch present", childNames(t, children))
+		}
+
+		meta, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-3"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		if len(meta.Columns) != 2 {
+			t.Fatalf("Columns = %+v, want exactly 2 (id, name)", meta.Columns)
+		}
+		if len(meta.PrimaryKey) != 1 || meta.PrimaryKey[0] != "id" {
+			t.Errorf("PrimaryKey = %v, want [id]", meta.PrimaryKey)
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"ALTER TABLE p26_scratch ADD COLUMN note VARCHAR(64)"},
+		}, adapters.NewOpCtx("op-ddl-4")); err != nil {
+			t.Fatalf("Execute(ALTER TABLE): %v", err)
+		}
+		meta2, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-5"))
+		if err != nil {
+			t.Fatalf("Describe after ALTER: %v", err)
+		}
+		if len(meta2.Columns) != 3 {
+			t.Fatalf("Columns after ALTER = %+v, want exactly 3", meta2.Columns)
+		}
+
+		// MySQL and MariaDB render SHOW CREATE TABLE differently — this is the one place the two
+		// engines' own Definition output is compared against DDL this test itself wrote, rather than
+		// only against the seeded `customers` table ("definition renders SHOW CREATE TABLE" above).
+		def, err := a.Definition(ctx, tablePath, adapters.NewOpCtx("op-ddl-6"))
+		if err != nil {
+			t.Fatalf("Definition: %v", err)
+		}
+		if len(def.Statements) != 1 || def.Statements[0] == "" {
+			t.Fatalf("Statements = %v, want exactly one non-empty CREATE TABLE", def.Statements)
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"DROP TABLE p26_scratch"},
+		}, adapters.NewOpCtx("op-ddl-7")); err != nil {
+			t.Fatalf("Execute(DROP TABLE): %v", err)
+		}
+		childrenAfter, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-8"))
+		if err != nil {
+			t.Fatalf("Children after DROP: %v", err)
+		}
+		if containsName(childNames(t, childrenAfter), "p26_scratch") {
+			t.Errorf("Children(kira_test) after DROP = %v, must not contain p26_scratch", childNames(t, childrenAfter))
+		}
+	})
+
+	// P26 §3.2(4): closes both the insert and the delete ✗ marks in one test, against a scratch
+	// table — no seeded table is touched (§2.4).
+	t.Run("mutate: insert then delete round-trips", func(t *testing.T) {
+		a := connectedAdapter(t, kind, cfg)
+		ctx := context.Background()
+		tablePath := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p26_insdel"))
+
+		probeDB, err := sql.Open("mysql", sideDSN(cfg))
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probeDB.Close()
+		if _, err := probeDB.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS p26_insdel (id INT PRIMARY KEY, name VARCHAR(64))"); err != nil {
+			t.Fatalf("create scratch table: %v", err)
+		}
+		t.Cleanup(func() { probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS p26_insdel") })
+
+		insertPlan := model.MutationPlan{
+			Path: tablePath,
+			Ops: []model.MutationRowOp{
+				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("1")}, {Name: "name", Value: strp("first")}}},
+				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("2")}, {Name: "name", Value: strp("second")}}},
+			},
+		}
+		if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-insdel-1")); err != nil {
+			t.Fatalf("Mutate(insert): %v", err)
+		}
+		countAfterInsert, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-2"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+		if countAfterInsert.Value != 2 {
+			t.Fatalf("Count after insert = %d, want 2", countAfterInsert.Value)
+		}
+
+		deletePlan := model.MutationPlan{
+			Path: tablePath,
+			Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: strp("1")}}}},
+		}
+		result, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-insdel-3"))
+		if err != nil {
+			t.Fatalf("Mutate(delete): %v", err)
+		}
+		if result.AffectedRows != 1 {
+			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+		}
+		countAfterDelete, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-4"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+		if countAfterDelete.Value != 1 {
+			t.Fatalf("Count after delete = %d, want 1", countAfterDelete.Value)
+		}
+
+		read, err := a.Read(ctx, adapters.ReadRequest{
+			Path: tablePath, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-insdel-5"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		readPage := read.(page.TabularPage)
+		id := cellAt(t, readPage, 0, 0)
+		if id == nil || *id != "2" {
+			t.Errorf("surviving row id = %v, want 2", id)
+		}
+	})
+
 	t.Run("read-only connection cannot write", func(t *testing.T) {
 		ro := cfg
 		ro.ReadOnly = true
@@ -773,6 +961,9 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			{"SET SESSION TRANSACTION READ WRITE", "DELETE FROM order_items"},
 			{"SET TRANSACTION READ WRITE", "DELETE FROM order_items"},
 			{"COMMIT", "START TRANSACTION", "DELETE FROM order_items"},
+			// P26 §3.2(5): a DDL statement takes a different server-side path than DELETE — untested
+			// before this.
+			{"CREATE TABLE p26_ro_escape (id INT)"},
 		}
 		for _, statements := range attempts {
 			_, err := a.Execute(context.Background(), model.ConsoleRequest{
@@ -792,6 +983,20 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 		if after.Value != before.Value {
 			t.Fatalf("order_items row count = %d after read-only Execute attempts, want unchanged %d", after.Value, before.Value)
+		}
+
+		probeDB, err := sql.Open("mysql", sideDSN(cfg))
+		if err != nil {
+			t.Fatalf("probe connect: %v", err)
+		}
+		defer probeDB.Close()
+		var exists int
+		if err := probeDB.QueryRowContext(context.Background(),
+			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'kira_test' AND table_name = 'p26_ro_escape'").Scan(&exists); err != nil {
+			t.Fatalf("information_schema check: %v", err)
+		}
+		if exists != 0 {
+			t.Errorf("p26_ro_escape exists after a read-only Execute attempt, want it never created")
 		}
 
 		if _, err := a.Execute(context.Background(), model.ConsoleRequest{

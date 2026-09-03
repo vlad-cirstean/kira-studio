@@ -90,6 +90,11 @@ func runFamilyAuthMatrix(t *testing.T, kind string, fixture any, cfg model.Resol
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				// The cross-database read the scoped role (SELECT on kira_test only) cannot reach —
+				// Children(root) already asserts visibility (P25); nothing asserted a read.
+				testsupport.ReadFirstPage(testsupport.NodePath(cfg.ID, testsupport.Seg("database", "kira_analytics"), testsupport.Seg("table", "events"))),
+			},
 		},
 		{
 			Name: "fresh SELECT-only-on-kira_test user, database unset",
@@ -113,6 +118,27 @@ func runFamilyAuthMatrix(t *testing.T, kind string, fixture any, cfg model.Resol
 						}
 					},
 				},
+				// A read-only grant must still read and filter — nothing proved that before this
+				// phase; the matrix's own least-privilege row only ever proved it could connect.
+				testsupport.ReadFirstPage(testsupport.NodePath(cfg.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "customers"))),
+				testsupport.FilterNarrowsResult(
+					testsupport.NodePath(cfg.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "customers")),
+					"region_id = 1", 1,
+				),
+				// errno 1142 ("command denied") is not in mapError's auth switch (errors.go:24-29),
+				// so this asserts the *correct* behaviour — a missing GRANT reads as E_QUERY, not
+				// E_AUTH — and pins it against a future "helpful" widening of that switch.
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(cfg.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "regions")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert", Values: model.RowValues{{Name: "id", Value: testsupport.Strp("71")}, {Name: "name", Value: testsupport.Strp("nope")}},
+					}},
+				}, adapters.CodeQuery),
+				testsupport.ExecuteIsRefused(
+					testsupport.NodePath(cfg.ID, testsupport.Seg("database", "kira_test")),
+					[]string{"CREATE TABLE p26_matrix_scratch (id INT)"},
+					adapters.CodeQuery,
+				),
 			},
 		},
 		{
