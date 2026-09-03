@@ -280,6 +280,119 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
+	// P26 §3.1(1): Projection/ServerFilter are both declared true in caps.go and, until this phase,
+	// neither had a real-container test at all.
+	t.Run("read: filter narrows the result", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		filter := "region_id = 1"
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Filter:   &filter,
+			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-19a"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if tp.RowCount != 1 {
+			t.Errorf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
+		}
+	})
+
+	t.Run("read: projection limits the columns", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:       nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			Projection: []string{"name"},
+			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-19b"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
+			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
+		}
+	})
+
+	// P26 §3.1(3), the phase's flagship test for this adapter: catalog.go's own parser is exercised
+	// only against strings this repo wrote (catalog_test.go); this is the one place it meets
+	// ClickHouse's own re-rendered create_table_query output for DDL this test itself issued.
+	t.Run("execute: a DDL round trip is visible to the catalog", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		databasePath := nodePath(cfg.ID, seg("database", "kira_test"))
+		tablePath := nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "p26_scratch"))
+
+		testsupport.AdminStatements(t, fixture, "DROP TABLE IF EXISTS kira_test.p26_scratch")
+		t.Cleanup(func() { testsupport.AdminStatements(t, fixture, "DROP TABLE IF EXISTS kira_test.p26_scratch") })
+
+		pages, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"CREATE TABLE kira_test.p26_scratch (id UInt32, name String) ENGINE = MergeTree ORDER BY id"},
+		}, adapters.NewOpCtx("op-ddl-1"))
+		if err != nil {
+			t.Fatalf("Execute(CREATE TABLE): %v", err)
+		}
+		created := pages[0].(page.TabularPage)
+		if len(created.Columns) != 1 || created.Columns[0].Name != "status" {
+			t.Errorf("CREATE TABLE page = %+v, want a status page, not a row page", created.Columns)
+		}
+
+		children, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-2"))
+		if err != nil {
+			t.Fatalf("Children: %v", err)
+		}
+		if !containsName(childNames(t, children), "p26_scratch") {
+			t.Fatalf("Children(kira_test) = %v, want p26_scratch present", childNames(t, children))
+		}
+
+		meta, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-3"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		if len(meta.Columns) != 2 {
+			t.Fatalf("Columns = %+v, want exactly 2 (id, name)", meta.Columns)
+		}
+		foundPrimary := false
+		for _, idx := range meta.Indexes {
+			if idx.Primary {
+				foundPrimary = true
+			}
+		}
+		if !foundPrimary {
+			t.Error("expected a synthesized primary sparse-index entry (D18), same as a seeded table's own")
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"ALTER TABLE kira_test.p26_scratch ADD COLUMN note String"},
+		}, adapters.NewOpCtx("op-ddl-4")); err != nil {
+			t.Fatalf("Execute(ALTER TABLE): %v", err)
+		}
+		meta2, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-5"))
+		if err != nil {
+			t.Fatalf("Describe after ALTER: %v", err)
+		}
+		if len(meta2.Columns) != 3 {
+			t.Fatalf("Columns after ALTER = %+v, want exactly 3", meta2.Columns)
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"DROP TABLE kira_test.p26_scratch"},
+		}, adapters.NewOpCtx("op-ddl-6")); err != nil {
+			t.Fatalf("Execute(DROP TABLE): %v", err)
+		}
+		childrenAfter, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-7"))
+		if err != nil {
+			t.Fatalf("Children after DROP: %v", err)
+		}
+		if containsName(childNames(t, childrenAfter), "p26_scratch") {
+			t.Errorf("Children(kira_test) after DROP = %v, must not contain p26_scratch", childNames(t, childrenAfter))
+		}
+	})
+
 	t.Run("preview never executes", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		plan := model.MutationPlan{

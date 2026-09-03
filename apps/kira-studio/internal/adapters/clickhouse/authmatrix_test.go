@@ -57,6 +57,9 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 						}
 					},
 				},
+				// The posture half of the cross product: kira_admin reaches what kira_ro's own
+				// system-table SELECT grant cannot (see the pinned read below).
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "system"), testsupport.Seg("table", "databases"))),
 			},
 		},
 		{
@@ -67,6 +70,40 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "customers"))),
+				// ClickHouse codes 164/242 (read-only/table-is-read-only) map to E_UNSUPPORTED
+				// (errors.go:60) — kira_ro's own grants are read-only, so this is the first place
+				// that mapping is exercised against a real server-side refusal, rather than this
+				// adapter's own readOnly flag (clickhouse_test.go's "read-only connection cannot
+				// write" test uses fixture.ReadOnlyConfig, a different principal from this row's).
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "regions")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert", Values: model.RowValues{{Name: "id", Value: testsupport.Strp("61")}, {Name: "name", Value: testsupport.Strp("nope")}},
+					}},
+				}, adapters.CodeUnsupported),
+				testsupport.ExecuteIsRefused(
+					testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test")),
+					[]string{"CREATE TABLE kira_test.p26_matrix_scratch (id UInt32) ENGINE = MergeTree ORDER BY id"},
+					adapters.CodeUnsupported,
+				),
+			},
+		},
+		{
+			// §1.4's pin for clickhouse. kira has plain SELECT on system.* but not the SHOW USERS
+			// access type system.users additionally requires — a real ClickHouse authorization
+			// refusal (accessDenied 497 / databaseAccessDeny 291), currently mapped to E_AUTH
+			// (errors.go:64), the same code a wrong password produces. Pinned as today's actual
+			// behaviour, not fixed here (§7): a correctly-authenticated, correctly-passworded
+			// connection with a missing privilege must not be told its password is wrong, and
+			// nothing anywhere exercised that past Connect() before this.
+			Name: "kira, a system table it has SELECT but not SHOW USERS on",
+			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig { return c },
+			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				testsupport.ReadIsRefused(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "system"), testsupport.Seg("table", "users")), adapters.CodeAuth),
+			},
 		},
 		{
 			Name: "kira, wrong password",
