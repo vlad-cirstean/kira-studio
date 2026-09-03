@@ -124,3 +124,20 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 		})
 	}
 }
+
+// RunScenarios applies the same Requires gate RunMatrix does, outside a matrix table (P26 §2.1) —
+// the one addition this phase makes to the harness, so a scenario written once against a live
+// (already-connected) adapter backs both the general (Tier-1, ungated) suite and the complete
+// (Tier-2, KIRA_TEST_MATRIX-gated) one instead of being written twice. Unlike RunMatrix, this does
+// not call RequireMatrix itself — a Tier-1 caller must run unconditionally, and a Tier-2 caller
+// already ran it via RunMatrix/RequireMatrix before a is connected.
+func RunScenarios(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig, scenarios ...Scenario) {
+	t.Helper()
+	for _, s := range scenarios {
+		s := s
+		if s.Requires != nil && !s.Requires(a.Caps()) {
+			continue
+		}
+		t.Run(s.Name, func(t *testing.T) { s.Run(t, a, cfg) })
+	}
+}

@@ -13,6 +13,9 @@ import (
 	mobynetwork "github.com/moby/moby/api/types/network"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/plain"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -172,4 +175,25 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 		Host: Strp(daemonHost), Port: intp(hostPort), Options: map[string]any{},
 	}
 	return &KafkaSaslFixture{Config: cfg, Host: daemonHost, Port: hostPort, container: container}, nil
+}
+
+// CreateTopicSasl is CreateTopic's (kafka.go) sibling for the SASL broker (P26 §3.8) — kafka.go's
+// own CreateTopic takes a *KafkaFixture and reaches its already-built Admin field directly, which
+// this fixture has no equivalent of (its Config carries no credentials of its own, a case sets them
+// — kafka_sasl.go's own doc comment), so this dials a short-lived, correctly-authenticated kadm
+// client rather than widening KafkaFixture/KafkaSaslFixture into one shared shape for two callers.
+func CreateTopicSasl(t *testing.T, f *KafkaSaslFixture, name string) {
+	t.Helper()
+	client, err := kgo.NewClient(
+		kgo.SeedBrokers(fmt.Sprintf("%s:%d", f.Host, f.Port)),
+		kgo.SASL(plain.Auth{User: kafkaSaslUsername, Pass: kafkaSaslPassword}.AsMechanism()),
+	)
+	if err != nil {
+		t.Fatalf("CreateTopicSasl: dial: %v", err)
+	}
+	defer client.Close()
+	admin := kadm.NewClient(client)
+	if _, err := admin.CreateTopics(context.Background(), 1, 1, nil, name); err != nil {
+		t.Fatalf("CreateTopicSasl %s: %v", name, err)
+	}
 }
