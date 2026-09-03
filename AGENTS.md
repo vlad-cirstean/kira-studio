@@ -82,6 +82,14 @@ and how to run things wherever a session happens to be.
   `packages/db-fixtures/*.spec.ts` files — nothing else exercises a Go adapter capability by
   capability (`tests/e2e-real/` only spot-checks a scenario or two per kind). Keep per-capability
   coverage there even where it reads like a CRUD round-trip; prune only genuine duplication.
+- **Real-container adapter tests split into two suites, by design (P25).** A *general* suite runs
+  frequently in the normal dev/CI loop — basic per-adapter connectivity sanity, not the full
+  permutation matrix. A *complete* suite runs only on-demand and in CI — the full auth/config
+  permutation matrix per adapter (root vs. least-privilege user, with/without password, with/without
+  the database-equivalent field) plus error-handling verification, deliberately comprehensive since
+  it's opt-in rather than part of every local run. Extend the complete suite's own harness for new
+  functional coverage (load/write/delete/filter/DDL, per adapter, P26) rather than building a
+  parallel mechanism — it's designed for that.
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, with a `!` or `BREAKING CHANGE:` footer
   for breaking changes.
