@@ -70,6 +70,32 @@
   border-right: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
+/* P22 iter2-pacing D6 — the dirty/deleted-row rails dataSource.ts's own pendingRowClasses has
+   emitted since Pass A, but which had no CSS anywhere in this file (a stale comment there claimed
+   otherwise). Harmless while Pass A never stages an edit/delete, but Pass B depends on this.
+   `kira-row-dirty`/`kira-row-deleted` land on `.slick-row` itself (SlickGrid's own
+   appendRowHtml folds getItemMetadata().cssClasses into the row's className, both panes), so the
+   rail is drawn on the frozen gutter cell inside that row — GridRow.vue's own
+   `.gutter-cell.dirty`/`.gutter-cell.deleted::before` rail, ported. */
+.slick-grid-host .slick-row.kira-row-dirty .kira-gutter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-warn);
+}
+.slick-grid-host .slick-row.kira-row-deleted .kira-gutter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-error);
+}
+
 .slick-grid-host .kira-align-right {
   text-align: right;
   font-variant-numeric: tabular-nums;

@@ -47,17 +47,29 @@ export function dataLength(idx: DisplayRowIndex, insertCount: number): number {
  * translation lives for the Slick engine (D1 bullet 4): `getLength`/`getItem` below are its only
  * callers, replacing `displayPositionOf`/`rowAtDisplayPosition`'s use inside the old virtualizer.
  */
+/** P22 iter2-pacing D6 — the row-identity arithmetic alone, without allocating/freezing a
+ *  RowHandle. `rowHandleAt` below is defined in terms of this so the two paths can never drift
+ *  apart; `getItemMetadata` (createGridDataSource, below) uses this directly so a rendered row
+ *  only pays for one frozen RowHandle allocation (getItem's), not two (§4.4 item 4 of that plan —
+ *  appendRowHtml calls getDataItem AND getItemMetadaWhenExists per newly-built row, and the latter
+ *  never needed a full handle, only the row number). */
+function pageRowAt(idx: DisplayRowIndex, pos: number): number {
+  const count = displayRowCount(idx);
+  if (pos >= count) return idx.pageRowCount + (pos - count);
+  return idx.displayRows ? (idx.displayRows[pos] ?? pos) : pos;
+}
+
 export function rowHandleAt(
   idx: DisplayRowIndex,
   inserts: readonly Pick<PendingInsert, 'id'>[],
   pos: number,
 ): RowHandle {
   const count = displayRowCount(idx);
+  const row = pageRowAt(idx, pos);
   if (pos >= count) {
     const insert = inserts[pos - count];
-    return Object.freeze({ row: idx.pageRowCount + (pos - count), pos, insertId: insert?.id });
+    return Object.freeze({ row, pos, insertId: insert?.id });
   }
-  const row = idx.displayRows ? (idx.displayRows[pos] ?? pos) : pos;
   return Object.freeze({ row, pos });
 }
 
@@ -131,8 +143,9 @@ export function createGridDataSource(
     },
     getItemMetadata(pos) {
       if (!state.rowClasses) return null;
-      const item = rowHandleAt(state.index, state.inserts, pos);
-      const cssClasses = state.rowClasses(item.row);
+      // P22 iter2-pacing D6: the row number alone, not a second frozen RowHandle allocation — see
+      // pageRowAt's own comment.
+      const cssClasses = state.rowClasses(pageRowAt(state.index, pos));
       return cssClasses ? { cssClasses } : null;
     },
     extractValue(item, field) {
