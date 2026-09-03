@@ -145,7 +145,15 @@ async function emitRange(
   });
 }
 
-function createHandlers(scenario: Scenario): ServerHandlers {
+/** `createHandlers`'s own `ServerHandlers` plus a way to read its private `activeRepoId` closure
+ *  variable from outside (P4 W12) — `createMockBridge`'s `triggerRefsChanged` hook needs to know
+ *  which repo, if any, is open, without duplicating that tracking at its own level. */
+interface MockHandlers {
+  readonly serverHandlers: ServerHandlers;
+  getActiveRepoId(): string | null;
+}
+
+function createHandlers(scenario: Scenario): MockHandlers {
   const sessions = new Map<string, RepoSession>();
   let activeRepoId: string | null = null;
 
@@ -236,26 +244,40 @@ function createHandlers(scenario: Scenario): ServerHandlers {
   };
 
   return {
-    requests: {
-      "app.init": appInit,
-      "repo.list": repoList,
-      "repo.pick": repoPick,
-      "repo.open": repoOpen,
-      "repo.close": repoClose,
-      "graph.status": graphStatus,
-      "graph.loadMore": graphLoadMore,
-      "graph.refresh": graphRefresh,
+    serverHandlers: {
+      requests: {
+        "app.init": appInit,
+        "repo.list": repoList,
+        "repo.pick": repoPick,
+        "repo.open": repoOpen,
+        "repo.close": repoClose,
+        "graph.status": graphStatus,
+        "graph.loadMore": graphLoadMore,
+        "graph.refresh": graphRefresh,
+      },
+      streams: {
+        "graph.stream": graphStream,
+      },
     },
-    streams: {
-      "graph.stream": graphStream,
-    },
+    getActiveRepoId: () => activeRepoId,
   };
 }
 
-export function createMockBridge(scenarioName: string): Transport {
+/** `Transport` plus one test-only hook (P4 W12) the harness's own `main.ts` wires to
+ *  `window.__kiraHarness.triggerRefsChanged` — `W13`'s Playwright suite asserts the Refresh
+ *  button's stale dot off this without waiting on (or building) a real filesystem watcher. */
+export interface MockBridge extends Transport {
+  /** Simulates the host noticing `.git/refs` changed underneath the currently open repo — a
+   *  no-op with no repo open, matching `RepoState`'s own `repo.changed` handling, which ignores
+   *  events for a repo that is not (or no longer) the active one. */
+  triggerRefsChanged(): void;
+}
+
+export function createMockBridge(scenarioName: string): MockBridge {
   const scenario = loadScenario(scenarioName);
   const [serverChannel, clientChannel] = createInMemoryChannelPair();
-  const server = createRpcServer(serverChannel, createHandlers(scenario));
+  const { serverHandlers, getActiveRepoId } = createHandlers(scenario);
+  const server = createRpcServer(serverChannel, serverHandlers);
   const client = createRpcClient(clientChannel);
 
   return {
@@ -263,6 +285,11 @@ export function createMockBridge(scenarioName: string): Transport {
     dispose(): void {
       client.dispose();
       server.dispose();
+    },
+    triggerRefsChanged(): void {
+      const repoId = getActiveRepoId();
+      if (repoId === null) return;
+      server.emit("repo.changed", { repoId, kind: "refsChanged" });
     },
   };
 }

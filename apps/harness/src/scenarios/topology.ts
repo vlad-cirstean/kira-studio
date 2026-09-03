@@ -11,8 +11,10 @@
  */
 import type { CommitRecord } from "@kira-version/core";
 
-const EPOCH_SECONDS = 1_700_000_000;
-const STEP_SECONDS = 3600;
+// Exported (P4 W12) so `main.ts` can pin the harness's own clock to a fixed point relative to
+// these same fixture timestamps — see `main.ts`'s "deterministic clock" comment for why.
+export const EPOCH_SECONDS = 1_700_000_000;
+export const STEP_SECONDS = 3600;
 const AUTHOR_NAME = "Kira Fixture";
 const AUTHOR_EMAIL = "fixture@kira-version.test";
 

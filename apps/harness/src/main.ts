@@ -10,7 +10,7 @@ import {
 } from "@kira-version/ui";
 import { createMockBridge } from "./mockBridge.ts";
 import { loadScenario } from "./scenarios/index.ts";
-import { topology } from "./scenarios/topology.ts";
+import { EPOCH_SECONDS, STEP_SECONDS, topology } from "./scenarios/topology.ts";
 import { applyThemeKind, isThemeKind, type ThemeKind } from "./themeSwitcher.ts";
 
 declare global {
@@ -19,9 +19,32 @@ declare global {
       setTheme(kind: ThemeKind): void;
       readTokens(): TokenMap;
       checkLayoutWorker(): Promise<boolean>;
+      triggerRefsChanged(): void;
     };
   }
 }
+
+/**
+ * A deterministic clock (P4 W12). `dateFormat.ts`'s own doc comment already anticipates this:
+ * `formatRelativeDate`'s `nowMs` is a parameter "precisely so a fixed-clock test... can assert an
+ * exact string instead of a moving target" — but nothing wired a frozen value into it yet.
+ * `CommitGrid.vue`'s `now: () => Date.now()` is the one call site that reads real wall-clock
+ * time for the date column's relative form; overriding the global `Date.now` here, once, reaches
+ * it (and every other relative-date consumer) with no change to `packages/ui` at all — this is a
+ * harness/test concern, not a UI one.
+ *
+ * Pinned relative to `topology.ts`'s own fixed timestamps (20 "hours" past the fixture epoch, in
+ * the same synthetic 3600s-per-commit units every scenario's commits are laid out in) rather
+ * than the real current time, so a relative-date cell renders the exact same text no matter when
+ * the harness actually runs — the plan's own "'2h' does not become '3h' and break a baseline an
+ * hour later." `EPOCH_SECONDS + 20 * STEP_SECONDS` sits comfortably past `clean`'s and `badges`'
+ * own newest commits (5 and 15 entries respectively), so both show a small, stable "Nh ago"
+ * rather than clamping to "now"; `hugeRepo`/`ceiling` run tens of thousands of "hours" past this
+ * frozen point and so show `"now"` for their newest rows — harmless, since neither is screenshot
+ * for its date column's exact text (W13 reads `.slick-row` counts and the graph column there).
+ */
+const HARNESS_FROZEN_NOW_MS = (EPOCH_SECONDS + 20 * STEP_SECONDS) * 1000;
+Date.now = (): number => HARNESS_FROZEN_NOW_MS;
 
 /**
  * P4 W4's own "Done when": an integration-style test drives the *real* module worker (not a
@@ -105,6 +128,13 @@ applyThemeKind(isThemeKind(themeParam) ? themeParam : "vscode-dark");
 const tokenReader = new TokenReader();
 tokenReader.watch();
 
+const container = document.getElementById("app");
+if (!container) {
+  throw new Error("harness: #app container missing from index.html");
+}
+
+const transport = createMockBridge(scenarioName);
+
 window.__kiraHarness = {
   setTheme(kind: ThemeKind): void {
     applyThemeKind(kind);
@@ -113,14 +143,10 @@ window.__kiraHarness = {
     return tokenReader.tokens;
   },
   checkLayoutWorker,
+  triggerRefsChanged(): void {
+    transport.triggerRefsChanged();
+  },
 };
-
-const container = document.getElementById("app");
-if (!container) {
-  throw new Error("harness: #app container missing from index.html");
-}
-
-const transport = createMockBridge(scenarioName);
 
 // There is no repo-picker UI yet (P4+) — `App.vue`'s own `bootstrap()` only opens a repo
 // automatically when `viewState.read()` returns a persisted, non-null `repoId`. Pre-seeding it
