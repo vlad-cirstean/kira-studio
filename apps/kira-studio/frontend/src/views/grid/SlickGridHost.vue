@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Column, CustomDataView } from 'slickgrid';
+import type { Column, CustomDataView, FormatterResultWithText } from 'slickgrid';
 import { SlickEventHandler } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { appearanceVersion, settingsState } from '../../state/settings';
@@ -81,29 +81,24 @@ function gutterFormatter(
   return String(formatterCtx.rowNumberBase + dataContext.row + 1);
 }
 
-// §6 D6 point 2 — structure is per-cell: a plain string for the common case (-> textContent, F6),
-// an HTMLElement/DocumentFragment for NULL and truncated. `value` is exactly what the grid's own
-// dataItemColumnValueExtractor (below) returned for this cell — the CellView the app's existing
-// decode/cache/staged-edit pipeline produced, never re-derived here.
-function cellFormatter(_row: number, _cell: number, value: unknown): string | DocumentFragment {
+// §6 D6 point 2 — structure is per-cell: a plain string for the common case (-> textContent, F6).
+// P22 iter2-pacing D5: NULL and truncated no longer build a DocumentFragment — SlickGrid's own
+// FormatterResultWithText.addClasses folds straight into the cell's own className
+// (appendCellHtml, dist/esm/index.js:9962), so `.cell-null`/`.cell-truncated` land on the
+// `.slick-cell` itself, and `.toolTip` becomes a `title` on the cell (:9969) — the truncation
+// tooltip is kept, not lost. slickTheme.css's own `.cell-truncated::after` restores the muted
+// ellipsis marker as a pseudo-element (zero DOM nodes) in place of the old child <span>. `value`
+// is exactly what the grid's own dataItemColumnValueExtractor (below) returned for this cell — the
+// CellView the app's existing decode/cache/staged-edit pipeline produced, never re-derived here.
+function cellFormatter(
+  _row: number,
+  _cell: number,
+  value: unknown,
+): string | FormatterResultWithText {
   const view = value as { text: string; isNull: boolean; truncated: boolean };
-  if (view.isNull) {
-    const span = document.createElement('span');
-    span.className = 'cell-null';
-    span.textContent = 'NULL';
-    const frag = document.createDocumentFragment();
-    frag.appendChild(span);
-    return frag;
-  }
+  if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
   if (view.truncated) {
-    const frag = document.createDocumentFragment();
-    frag.appendChild(document.createTextNode(view.text));
-    const marker = document.createElement('span');
-    marker.className = 'truncated-marker';
-    marker.title = 'value truncated at 64 KB';
-    marker.textContent = '…';
-    frag.appendChild(marker);
-    return frag;
+    return { text: view.text, addClasses: 'cell-truncated', toolTip: 'value truncated at 64 KB' };
   }
   return view.text;
 }

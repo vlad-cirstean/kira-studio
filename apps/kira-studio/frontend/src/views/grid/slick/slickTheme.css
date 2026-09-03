@@ -98,12 +98,16 @@
   color: var(--kira-fg);
 }
 
-.slick-grid-host .cell-null {
+/* P22 iter2-pacing D5: the NULL/truncated markers are now classes on the cell itself
+   (SlickGrid's own FormatterResultWithText.addClasses), not child nodes the formatter builds —
+   two fewer DOM operations and one fewer retained element per NULL cell, and the truncation
+   tooltip moves from a 6px span to the whole cell (appendCellHtml's own `toolTip` -> `title`). */
+.slick-grid-host .slick-cell.cell-null {
   color: var(--kira-fg-disabled);
   font-style: italic;
 }
-
-.slick-grid-host .truncated-marker {
+.slick-grid-host .slick-cell.cell-truncated::after {
+  content: "…";
   color: var(--kira-fg-muted);
   margin-left: var(--kira-s-1);
 }
