@@ -46,9 +46,10 @@ export function formatConnectionUri(input: Omit<ConnectionInput, 'uri' | 'mode'>
   return url.toString();
 }
 
-// False for: a non-postgres scheme, multi-host (comma in the host section), a unix-socket
-// path host, or userinfo that would not survive an encodeURIComponent round trip. When false,
-// the connection dialog stays in URI mode (§8.12) rather than silently dropping information.
+// False for: a scheme other than postgres/mongodb's own, multi-host (comma in the host
+// section), a unix-socket path host, or userinfo that would not survive an
+// encodeURIComponent round trip. When false, the connection dialog stays in URI mode
+// (§8.12) rather than silently dropping information.
 export function canRoundTripToFields(parsed: ParsedUri, kind: ConnectionKind): boolean {
   // P35 D13: `sqlite:////abs/path` -> pathname `//abs/path` -> parsed.database `/abs/path`
   // (formatConnectionUri/parseConnectionUri's existing four-slash round trip, F28) — there is no
