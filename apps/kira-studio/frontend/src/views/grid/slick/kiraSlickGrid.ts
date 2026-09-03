@@ -219,6 +219,13 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     const { pxPerFrame, direction } = this.velocity
       ? this.velocity()
       : { pxPerFrame: 0, direction: 0 as const };
+    // P22 iter2-onset D3 — report the runway's own velocity input, the one term in this whole
+    // computation no trace in this investigation's history could see. Reported here rather than in
+    // `render()` because this is where the number exists, and because `render()` is the *only*
+    // caller of this override in the shipped configuration (slickgrid's other three
+    // `getRenderedRange()` call sites, dist/esm/index.js:4760/:4776/:5620, are the RowDetailView and
+    // grouping plugins, neither of which this app registers) — so it stays 1:1 with a render pass.
+    scrollTrace.noteRunwayVelocity(pxPerFrame);
     const dataLength = this.getDataLength();
     const rowHeight = this.getOptions().rowHeight ?? 28;
 

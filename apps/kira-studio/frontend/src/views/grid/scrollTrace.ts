@@ -81,6 +81,22 @@ export interface ScrollTraceFrame {
    *  frame. Resets to 0 at the top of every tick, so a frame with `renderCount === 0` reports
    *  `renderMs === 0` rather than silently repeating whatever the previous render cost. */
   renderMs: number;
+  /**
+   * P22 iter2-onset D3: the largest velocity, in px/frame, that any of this frame's render passes
+   * actually fed into the runway arithmetic (`columns.ts`'s `rowRangeBounds`). 0 when nothing
+   * rendered this frame, and 0 when the render itself read "at rest".
+   *
+   * Deliberately *not* the same quantity as `pxPerFrame` above, which is what the viewport actually
+   * moved: the gap between the two is the runway's own **input lag**, and it is the one input to
+   * the whole runway computation that no trace in this investigation's history has ever been able
+   * to see. A frame that renders with `runwayVelocity === 0` while `pxPerFrame` is a plausible
+   * fling delta is a render that sized its runway as if the grid were standing still — the
+   * gesture-onset defect P22 iter2-onset exists to fix (`summary.staleVelocityFrames` tallies
+   * exactly those frames). Reported by `KiraSlickGrid.getRenderedRange`, the only place this app
+   * computes it; always 0 for the incumbent tanstack engine, whose own `rangeExtractor` has no
+   * equivalent reporting seam.
+   */
+  runwayVelocity: number;
   /** Mounted [data-testid="grid-row"] count. */
   rows: number;
 }
@@ -107,6 +123,24 @@ export interface ScrollTraceSummary {
    *  scrollEventsHistogram. A key >= 2 anywhere during a live scroll is the doubling this phase's
    *  D1 fix exists to remove — T1/T3 (tests/ui/slick-grid.spec.ts) gate exactly this field. */
   renderCountHistogram: Record<number, number>;
+  /** P22 iter2-onset D3: the runway's own velocity input, as a series — see
+   *  ScrollTraceFrame.runwayVelocity. Compare its `mean`/`p95` against `pxPerFrame`'s: the runway
+   *  is sized from the former while the viewport moves at the latter, so a persistent shortfall
+   *  here is a persistent runway shortfall. */
+  runwayVelocity: ScrollTraceStats;
+  /**
+   * P22 iter2-onset D3: how many frames rendered *while the viewport was measurably moving* but
+   * sized their runway at zero velocity (`renderCount > 0 && pxPerFrame > 0 && runwayVelocity ===
+   * 0`). The gesture-onset defect's own direct signal — before the fix this is ~one frame per
+   * rest-to-motion transition (the first render of every fling, which read a scroll sample taken
+   * before the gesture began); after it, it should be 0 for a real fling.
+   *
+   * One honest caveat for a real-Mac reading: the host's own sampler deliberately reports "at rest"
+   * for a delta above `MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME` (800 px/frame — a scrollbar click
+   * or a programmatic jump, not a fling), so a genuine discrete jump also lands in this count. Read
+   * it alongside `pxPerFrame.max`; a fling that never exceeds 800 px/frame has no such frames.
+   */
+  staleVelocityFrames: number;
 }
 
 export interface ScrollTraceResult {
@@ -130,6 +164,8 @@ let pendingNotified = false;
 // render's cost).
 let pendingRenderMs = 0;
 let pendingRenderCount = 0;
+// P22 iter2-onset D3: drained and reset by every tick(), exactly like the two accumulators above.
+let pendingRunwayVelocity = 0;
 let prevRafT = 0;
 let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
@@ -181,6 +217,16 @@ export function noteRenderMs(ms: number): void {
   pendingRenderCount++;
 }
 
+/** P22 iter2-onset D3 — called from `KiraSlickGrid.getRenderedRange` with the velocity that call
+ *  actually handed `rowRangeBounds`. Keeps the *largest* value seen this frame rather than the last:
+ *  a quiescent catch-up render legitimately reads 0, and a frame that contains both it and a
+ *  scroll-driven render must not report the runway as having been sized at rest. See
+ *  ScrollTraceFrame.runwayVelocity for what the number is and is not. */
+export function noteRunwayVelocity(pxPerFrame: number): void {
+  if (!recording) return;
+  if (pxPerFrame > pendingRunwayVelocity) pendingRunwayVelocity = pxPerFrame;
+}
+
 function measureMountedBand(el: HTMLElement): { top: number; bottom: number; rows: number } {
   const rows = el.querySelectorAll<HTMLElement>(mountedRowSelector);
   if (rows.length === 0) return { top: 0, bottom: 0, rows: 0 };
@@ -208,6 +254,8 @@ function tick(rafT: number): void {
   pendingRenderMs = 0;
   const renderCount = pendingRenderCount;
   pendingRenderCount = 0;
+  const runwayVelocity = pendingRunwayVelocity;
+  pendingRunwayVelocity = 0;
   const frameMs = prevRafT ? rafT - prevRafT : 0;
   prevRafT = rafT;
 
@@ -236,6 +284,7 @@ function tick(rafT: number): void {
     frameMs,
     renderCount,
     renderMs,
+    runwayVelocity,
     rows: band.rows,
   });
 
@@ -266,9 +315,11 @@ function stats(values: number[]): ScrollTraceStats {
 function summarize(fr: ScrollTraceFrame[]): ScrollTraceSummary {
   const scrollEventsHistogram: Record<number, number> = {};
   const renderCountHistogram: Record<number, number> = {};
+  let staleVelocityFrames = 0;
   for (const f of fr) {
     scrollEventsHistogram[f.scrollEvents] = (scrollEventsHistogram[f.scrollEvents] ?? 0) + 1;
     renderCountHistogram[f.renderCount] = (renderCountHistogram[f.renderCount] ?? 0) + 1;
+    if (f.renderCount > 0 && f.pxPerFrame > 0 && f.runwayVelocity === 0) staleVelocityFrames++;
   }
   return {
     pxPerFrame: stats(fr.map((f) => f.pxPerFrame)),
@@ -277,6 +328,8 @@ function summarize(fr: ScrollTraceFrame[]): ScrollTraceSummary {
     frameMs: stats(fr.map((f) => f.frameMs)),
     scrollEventsHistogram,
     renderCountHistogram,
+    runwayVelocity: stats(fr.map((f) => f.runwayVelocity)),
+    staleVelocityFrames,
   };
 }
 
@@ -287,6 +340,7 @@ export function start(): void {
   pendingNotified = false;
   pendingRenderMs = 0;
   pendingRenderCount = 0;
+  pendingRunwayVelocity = 0;
   prevRafT = 0;
   prevLiveScrollTop = gridEl?.scrollTop ?? 0;
   if (rafId) cancelAnimationFrame(rafId);
