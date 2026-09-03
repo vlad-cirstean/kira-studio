@@ -7,6 +7,7 @@ import type {
   CustomDataView,
   FormatterResultWithText,
   MultiColumnSort,
+  OnBeforeEditCellEventArgs,
   OnBeforeHeaderCellDestroyEventArgs,
   OnHeaderCellRenderedEventArgs,
   OnHeaderClickEventArgs,
@@ -51,6 +52,7 @@ import {
   type RowHandle,
   rowAtDisplayPosition,
 } from './slick/dataSource';
+import { editorCtx, KiraCellEditor } from './slick/editor';
 import { KiraSlickGrid } from './slick/kiraSlickGrid';
 import {
   type DisplayCellView,
@@ -174,6 +176,21 @@ function canEditTable(): boolean {
 function canDeleteRows(): boolean {
   return isWritable() && hasPrimaryKey() && !!caps()?.canDelete;
 }
+
+// §5 D8 — a `computed` purely to trigger the `editable`-sync watch below via `grid.setOptions`
+// (rowHeight's own computed+watch pair, just below, is the identical precedent); canEditTable()
+// itself deliberately stays a plain function, not a computed, since every other call site is an
+// event handler outside SlickGrid's synchronous render path (D0 is about that path specifically).
+// `pageVersion.n` is read explicitly (not just through hasPrimaryKey()'s own getPage() call)
+// because `page/store.ts`'s `pages` map is a plain `Map`, not `reactive()` — `pageVersion.n` is
+// that store's own dedicated reactive signal for "a page was set/dropped", the same one the
+// `pageVersion` watch below already keys its own page-dependent rebuild off of; without this read
+// here, a tab whose grid mounts before its first page arrives (the common case — connect, then
+// load) would stay permanently `editable: false`, since nothing would ever re-run this computed.
+const canEditTableReactive = computed(() => {
+  void pageVersion.n;
+  return canEditTable();
+});
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
 // discipline DataGrid.vue's own qualifiedName() and grid/menu.ts's qualifiedNameForPath use.
@@ -345,6 +362,10 @@ function buildColumns(
       sortable: true,
       cssClass: classes.join(' '),
       formatter: cellFormatter,
+      // D2/D8 — always present, gated by onBeforeEditCell's own veto, not by presence: a column
+      // this table can't currently write to still needs the same editor class the moment
+      // writability changes (a caps probe resolving after mount), never a rebuild to add one.
+      editor: KiraCellEditor,
       cellAttrs: {
         'data-testid': 'grid-cell',
         'data-column': name,
@@ -918,9 +939,9 @@ function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
   );
 }
 
-// C8/D8 owns the real edit trigger; for now this just moves the active cell there (harmless —
-// `editable: false` means `editActiveCell` is a no-op until C8 registers a real editor) so the
-// cell menu's own "Edit" item and a future editor share one entry point instead of two.
+// C8/D8 — the cell menu's own "Edit" item and double-click/Enter (SlickGrid's own default
+// `editable: true` handling, unported here) now share one real editor, gated by onBeforeEditCell
+// below rather than by `editable: false`'s old no-op.
 function startEditCell(row: number, displayCol: number): void {
   if (!grid || !dataSource) return;
   const idx = {
@@ -930,6 +951,24 @@ function startEditCell(row: number, displayCol: number): void {
   const pos = displayPositionOf(idx, row);
   grid.setActiveCell(pos, displayCol + 1, false, false, true);
   grid.editActiveCell();
+}
+
+// §5 D8 — exactly `startEdit`'s own guards (DataGrid.vue:810-818 mirror: not writable, row
+// deleted, value truncated) plus the two new predicates (the gutter column; a pending-insert row,
+// whose own inputs D9/C9 owns) — one function, so this veto and the cell menu's `Edit` item
+// (`disabled: editDisabled`, menu.ts) can never drift apart on what's editable.
+function onBeforeEditCell(_e: SlickEventData, args: OnBeforeEditCellEventArgs): boolean {
+  if (args.column.id === GUTTER_FIELD) return false;
+  const item = args.item as RowHandle | undefined;
+  if (item?.insertId !== undefined) return false;
+  const row = item?.row ?? args.row ?? -1;
+  if (!canEditTable() || isDeleted(row)) return false;
+  const displayCol = currentOrder().indexOf(String(args.column.field));
+  if (displayCol < 0) return false;
+  // P24 D27: a value the engine truncated is not editable — committing the buffer verbatim
+  // (stageEdit's own contract) would write the truncated text over the real value.
+  if (displayCell(row, displayCol).truncated) return false;
+  return true;
 }
 
 // D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
@@ -1227,6 +1266,14 @@ onMounted(() => {
       : () => ({ text: '', isNull: true, truncated: false }),
   });
 
+  // §5 D8 — editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
+  // comment says why: a grid-constructed `KiraCellEditor` cannot close over tabId/displayCell
+  // itself). Both callbacks re-resolve the display column / read state fresh on every call, so —
+  // unlike `dataItemColumnValueExtractor`'s own captured-closure trap noted just above — this
+  // assignment is correct for the tab's whole lifetime and needs no pageVersion-watch counterpart.
+  editorCtx.readValue = (row, name) => displayCell(row, currentOrder().indexOf(name));
+  editorCtx.commit = (row, name, value) => stageEdit(props.tabId, row, name, value);
+
   // getCellValue's return type is a compatibility shim only (F1's own insurance, never the real
   // render path — dataItemColumnValueExtractor, below, is) so it deliberately returns `unknown`
   // rather than CustomDataView<RowHandle>'s own narrower `T[keyof T]`; the cast reflects that.
@@ -1299,7 +1346,20 @@ onMounted(() => {
       // edit path (D8) come from this option, unported.
       enableCellNavigation: true,
       enableAddRow: false,
-      editable: false,
+      // §5 D8 — bound to canEditTable() at construction; the `editable` watch below (after
+      // writability-affecting reactive state can change post-mount, e.g. a caps probe resolving)
+      // keeps it live via `grid.setOptions`, the same pattern `rowHeight`'s own watch already uses.
+      // `isCellPotentiallyEditable`/`makeActiveCellEditable` both read `this._options.editable`
+      // fresh on every edit attempt (`slick.grid.ts`) rather than caching it, so `setOptions` alone
+      // is sufficient — no `invalidateAllRows`/`render()` call is needed alongside it.
+      editable: canEditTable(),
+      // F5 — a selected cell never opens its editor just by typing over it; only double-click or
+      // Enter does (SlickGrid's own default handling, unported here), matching DataGrid.vue's own
+      // `startEdit` trigger set exactly.
+      autoEdit: false,
+      autoCommitEdit: true,
+      asyncEditorLoading: false,
+      editorCellNavOnLRKeys: false,
       explicitInitialization: false,
       dataItemColumnValueExtractor: (item: RowHandle, columnDef: KiraColumn) =>
         dataSource?.extractValue(item, String(columnDef.field)),
@@ -1339,6 +1399,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
+  eventHandler.subscribe(grid.onBeforeEditCell, onBeforeEditCell);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
@@ -1428,6 +1489,14 @@ watch(rowHeight, (h) => {
   grid.render();
 });
 
+// §5 D8 — keeps the grid's own `editable` option live across a writability change that happens
+// after mount (a caps probe resolving, a connection flipping read-only). No invalidate/render
+// needed alongside it: `isCellPotentiallyEditable`/`makeActiveCellEditable` both read
+// `this._options.editable` fresh on every edit attempt, never a cached value.
+watch(canEditTableReactive, (editable) => {
+  grid?.setOptions({ editable });
+});
+
 watch(
   () => appearanceVersion.n,
   () => {
@@ -1457,6 +1526,12 @@ watch(
   },
 );
 
+// C8/§5 D8 addendum — every row this watch has ever seen staged, so a discard (which clears
+// `p.edits` entirely, outside any SlickGrid commit path) knows which *previously* staged rows
+// must be invalidated back to their real page value, not only the newly-staged ones a plain diff
+// against the current map would catch.
+let lastStagedRows = new Set<number>();
+
 // C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged.
 // `pendingFor(tabId)?.edits` is a reactive Map (pendingChanges.ts's own `pendingState`, a Vue
 // `reactive()`), so both Map iteration and each entry's own `changes` object track reactively —
@@ -1472,7 +1547,28 @@ watch(
     for (const [row, edit] of p.edits) sig += `${row}:${Object.keys(edit.changes).length};`;
     return sig;
   },
-  () => refreshStagedLayer(),
+  () => {
+    refreshStagedLayer();
+    // C8 — `dataItemColumnValueExtractor` already merges `stagedValue` over the page (D1), so a
+    // committed *edit* renders correctly for free (SlickGrid's own `commitCurrentEdit` calls
+    // `updateRow` after `applyValue`, `slick.grid.ts:4136`). Nothing calls that for a *discard*,
+    // though — `pendingChanges.ts`'s own discard clears `p.edits` entirely from outside any
+    // SlickGrid edit-commit path, so without this the cell keeps showing the just-discarded text
+    // until something else happens to re-render it. Invalidate the union of this row's newly- and
+    // previously-staged state (not just the new set — a discard's new set is empty) and re-render.
+    if (!grid || !dataSource) return;
+    const p = pendingFor(props.tabId);
+    const rows = new Set(p ? p.edits.keys() : []);
+    const touched = new Set<number>([...lastStagedRows, ...rows]);
+    lastStagedRows = rows;
+    if (touched.size === 0) return;
+    const idx = {
+      displayRows: currentDisplayRows(),
+      pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+    };
+    for (const row of touched) grid.invalidateRow(displayPositionOf(idx, row));
+    grid.render();
+  },
 );
 
 defineExpose({

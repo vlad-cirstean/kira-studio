@@ -41,12 +41,17 @@
      among other things), each cell's stacking context escapes to the far-away scroller ancestor
      instead of staying contained within its row, so every mounted cell paints independently
      (20,054 paints -> 3,399 restoring this line). Two things to remember before touching this:
-     (1) `.slick-cell.editable`'s z-index:11 (slick.grid.css) can no longer paint above a
-     *following* row's cells once a Pass-B editor exists — solve it the way GridRow.vue already
-     does, a single overlay `<input>` outside the row structure, not a z-index escape; (2) this
-     also makes `.slick-row` a containing block for `position: fixed` descendants — a future
-     cell-menu/tooltip must portal outside the row subtree, not rely on `position: fixed` inside
-     it. */
+     (1) §5 D8, decided (not the open question this comment used to flag): `.slick-cell.editable`'s
+     z-index:11 (slick.grid.css) can never escape this row's own containment to paint above a
+     *following* row's cells — and it does not need to. THE GRID'S EDITOR MUST FIT INSIDE ITS CELL.
+     `KiraCellEditor` (slick/editor.ts) is a single-line `<input>` sized to the cell by `.slick-
+     cell.editable`'s own retokenised rule below, which is exactly that: never taller than the row.
+     A future editor that genuinely needs more room has a sanctioned escape that does not touch
+     this line — the `Editor` interface's own `position()`/`hide()`/`show()` hooks with a
+     `document.body`-level container (`editor.interface.ts:36-42`), not a z-index fight with this
+     containment; (2) this also makes `.slick-row` a containing block for `position: fixed`
+     descendants — a future cell-menu/tooltip must portal outside the row subtree, not rely on
+     `position: fixed` inside it. */
   contain: layout;
 }
 
@@ -68,6 +73,30 @@
      change on every mounted cell, its own commit for that reason. */
   display: flex;
   align-items: center;
+}
+
+/* §5 D8 — retokenises slick.grid.css's own `.slick-cell.editable{z-index:11;overflow:visible;
+   background:#fff;border-color:#000;border-style:solid}`. `z-index: 11`/`overflow: visible` stay
+   (the row's own `contain: layout`, above, is why they're both harmless — see that rule's own
+   comment); only the hardcoded colours change, to DataGrid.vue's own `.cell-input` look
+   (`:2113-2124`): transparent, not opaque, since KiraCellEditor's `<input>` sits over a cell that
+   already carries its own selection/staged background, and an opaque fill here would blot that out
+   the instant you started typing. */
+.slick-grid-host .slick-cell.editable {
+  background: transparent;
+  border-color: var(--kira-accent);
+}
+
+.slick-grid-host .slick-cell.editable .cell-input {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--kira-fg);
+  font: inherit;
 }
 
 .slick-grid-host .kira-gutter {
