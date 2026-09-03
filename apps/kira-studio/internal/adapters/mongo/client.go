@@ -98,6 +98,15 @@ func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
 	if cfg.Database != nil && *cfg.Database != "" {
 		db = "/" + url.QueryEscape(*cfg.Database)
 	}
+	// P25 §1.2: the URI path is MongoDB's own *defaultauthdb* — it sets authSource as well as the
+	// default database. A user created in `admin` with roles on the application database (the most
+	// common real posture) therefore cannot authenticate in fields mode at all, and fails with a
+	// bare "Authentication failed" that names nothing the user could act on. authSource has to be
+	// separately expressible; URI mode already supports it via its own query string, fields mode
+	// did not.
+	if src, ok := cfg.Options["authSource"].(string); ok && src != "" {
+		db += "?authSource=" + url.QueryEscape(src)
+	}
 	return fmt.Sprintf("mongodb://%s%s:%d%s", auth, host, port, db)
 }
 

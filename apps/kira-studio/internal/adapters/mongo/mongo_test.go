@@ -116,6 +116,61 @@ func TestMongo_ConnectDisconnect(t *testing.T) {
 	}
 }
 
+// P25 §2.1(1): the missing auth-failure case — wrong password is E_AUTH.
+func TestMongo_Connect_AuthFailure(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	badCfg := fixture.Config
+	wrong := "definitely-wrong"
+	badCfg.Password = &wrong
+
+	a := newAdapter(t)
+	_, err := a.Connect(context.Background(), badCfg, adapters.NewOpCtx("op-auth"))
+	if err == nil {
+		t.Fatal("want an error for a wrong password")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeAuth {
+		t.Errorf("code = %v, want E_AUTH", code)
+	}
+}
+
+// P25 §1.2/§2.1(2): a user created in `admin` with roles on kira_test cannot authenticate in
+// fields mode without options.authSource — the URI path is MongoDB's own defaultauthdb, not merely
+// the browse target. Regression test for buildURIFromFields's authSource handling.
+func TestMongo_Connect_AuthSourceOption(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	root := rootClient(t, fixture)
+
+	const username, password = "p25_admin_scoped_user", "p25_pw"
+	if err := root.Database("admin").RunCommand(context.Background(), bson.D{
+		{Key: "createUser", Value: username},
+		{Key: "pwd", Value: password},
+		{Key: "roles", Value: bson.A{
+			bson.D{{Key: "role", Value: "readWrite"}, {Key: "db", Value: testsupport.MongoDatabase}},
+		}},
+	}).Err(); err != nil {
+		t.Fatalf("create admin-scoped user: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = root.Database("admin").RunCommand(context.Background(), bson.D{{Key: "dropUser", Value: username}}).Err()
+	})
+
+	cfg := fixture.Config
+	cfg.Username = strp(username)
+	cfg.Password = strp(password)
+	cfg.Database = strp(testsupport.MongoDatabase)
+	cfg.Options = map[string]any{"authSource": "admin"}
+
+	a := newAdapter(t)
+	info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-authsource"))
+	if err != nil {
+		t.Fatalf("Connect with options.authSource=admin: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+	if info.Details["database"] != testsupport.MongoDatabase {
+		t.Errorf("Details[database] = %q, want %q", info.Details["database"], testsupport.MongoDatabase)
+	}
+}
+
 // 3/4. tree: databases, excluding the three system databases
 func TestMongo_Children_ListDatabases(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
