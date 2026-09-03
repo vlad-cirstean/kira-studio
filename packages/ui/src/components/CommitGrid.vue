@@ -189,11 +189,14 @@ function moveSelection(row: number): void {
   grid?.scrollRowIntoView(clamped);
 }
 
-/** §6.6's own keyboard model, attached to the grid's host rather than to `grid.onKeyDown` —
- *  `enableCellNavigation: false` means SlickGrid tracks no active cell of its own to key that
- *  event off, and this list is row navigation, not cell navigation, by design (see this file's
- *  own doc comment on why `enableCellNavigation` is off). Listening on `host` rather than one of
- *  the library's internal viewport panes still sees every keydown, since it bubbles. */
+/** §6.6's own keyboard model. Wired through `grid.onKeyDown` (not a plain `host` DOM listener —
+ *  see `onMounted`'s subscription for why): SlickGrid's own `handleKeyDown`, bound directly to
+ *  its internal focus sink (what `grid.focus()` actually focuses), intercepts `PageUp`/`PageDown`
+ *  unconditionally — `handled = true` regardless of `enableCellNavigation` (`slick.grid.js`'s own
+ *  `e.which === keyCode.PAGE_DOWN ? (this.navigatePageDown(), handled = !0) : ...`) — and calls
+ *  `stopPropagation()`, so those two keys never reach a listener on `host` at all; `enableCellNavigation:
+ *  false` only spares the other keys this switch handles (Home/End/arrows fall through
+ *  `canCellBeActive`'s own `enableCellNavigation` guard and stay unhandled). */
 function handleKeyDown(event: KeyboardEvent): void {
   const loaded = props.graphView.loadedRows.value;
   const current = props.selection.row.value;
@@ -310,8 +313,15 @@ onMounted(() => {
       if (grid) emit("scroll", grid.getViewport().top);
     });
   });
+  // `stopImmediatePropagation()` on every key this grid sees (not just the ones our own switch
+  // recognizes) is deliberate: `enableCellNavigation: false` means *no* key here is ever
+  // SlickGrid's own cell-navigation model's to handle, so nothing is lost by always claiming the
+  // event — see `handleKeyDown`'s own doc comment for why a plain `host` listener cannot do this.
+  instance.onKeyDown.subscribe((event) => {
+    handleKeyDown(event.getNativeEvent<KeyboardEvent>());
+    event.stopImmediatePropagation();
+  });
 
-  host.value.addEventListener("keydown", handleKeyDown);
   host.value.addEventListener("contextmenu", handleContextMenu);
 
   resizeObserver = new ResizeObserver(scheduleResize);
@@ -370,7 +380,6 @@ onBeforeUnmount(() => {
   unsubscribeLayout?.();
   unsubscribeTokens?.();
   tokenReader.dispose();
-  host.value?.removeEventListener("keydown", handleKeyDown);
   host.value?.removeEventListener("contextmenu", handleContextMenu);
   grid?.destroy();
   grid = undefined;
@@ -388,7 +397,13 @@ defineExpose({ scrollToRow });
 </script>
 
 <template>
-  <div ref="host" class="kv-commit-grid" data-testid="commit-grid">
+  <div class="kv-commit-grid" data-testid="commit-grid">
+    <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was
+         inside its container the moment it constructs — including these resize handles, if they
+         were this element's own children. `host` is SlickGrid's *exclusive* DOM: the handles are
+         its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
+         relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
+    <div ref="host" class="kv-grid-host"></div>
     <div
       class="kv-resize-handle"
       role="separator"
@@ -441,6 +456,13 @@ defineExpose({ scrollToRow });
   font-family: var(--kv-font-family);
   font-size: var(--kv-font-size);
   color: var(--kv-row-fg);
+}
+
+/* SlickGrid's own container, sized to fill `.kv-commit-grid` exactly — see the template's own
+   comment on why this cannot be `.kv-commit-grid` itself. */
+.kv-grid-host {
+  height: 100%;
+  width: 100%;
 }
 
 .kv-commit-grid .slick-viewport,

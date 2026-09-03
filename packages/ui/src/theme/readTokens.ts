@@ -54,11 +54,23 @@ export class TokenReader {
     return () => this.#listeners.delete(listener);
   }
 
-  /** Watches <body>'s class/style attributes, the surface VS Code mutates on theme switch. */
+  /**
+   * Watches <body>'s class/style attributes, the surface VS Code mutates on theme switch. Only
+   * notifies listeners when a tracked token's *value* actually moved (P4 W13's own discovery):
+   * `CommitGrid.vue`'s one listener does a full `invalidateAllRows()` + `render()`, correct when
+   * `--kv-row-height` genuinely changed but wasted work on every other class/style mutation a
+   * theme switch also makes to `<body>` — which is most of them, since `--kv-row-height` is a
+   * fixed `density.css` literal today and no shipped theme touches it. A colour-only theme switch
+   * must re-render nothing in JavaScript at all (`palette.ts`'s own "no JavaScript executed"
+   * claim) — the SVGs already recolour purely through the CSS cascade; forcing every row's DOM
+   * node to be destroyed and rebuilt on top of that was pure overhead, worse the larger the repo.
+   */
   watch(body: HTMLElement = document.body): void {
     if (this.#observer) return;
     this.#observer = new MutationObserver(() => {
+      const previous = this.#cache;
       const next = this.refresh();
+      if (TOKEN_NAMES.every((name) => previous[name] === next[name])) return;
       for (const listener of this.#listeners) listener(next);
     });
     this.#observer.observe(body, { attributes: true, attributeFilter: ["class", "style"] });

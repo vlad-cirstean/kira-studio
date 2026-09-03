@@ -160,6 +160,18 @@ async function bootstrap(): Promise<void> {
     detailWidth.value = persisted.detailWidth;
     initialScrollRow.value = persisted.scrollRow;
 
+    // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
+    // wider session must not reopen the pane/drawer over a mount that starts narrower — without
+    // this, the line above would silently clobber the collapse the mount-time `breakpoint` watch
+    // (below) already applied moments earlier, since that watch runs synchronously during mount
+    // while this restore only lands later, after `bridge.init()`'s own await. Not gated on
+    // `breakpoint`'s *previous* value the way that watch is (there is no real "previous" at boot,
+    // only that watch's own initial-ref placeholder) — mounting directly into a narrow layout is
+    // exactly the case §6.3 describes, not merely a special case of resizing into one. A real
+    // selection still reopens it once `pendingSelectionSha` resolves, via the selection watch
+    // below — nothing here treats a boot with a pending selection any differently.
+    collapseIfNarrowWithNoSelection();
+
     if (persisted.repoId) {
       const outcome = await repo.open(persisted.repoId);
       if (outcome.kind === "ok") {
@@ -218,12 +230,19 @@ const breakpoint = ref<Breakpoint>("wide");
 let breakpointObserver: ResizeObserver | undefined;
 let breakpointRaf = 0;
 
+/** §6.3's "collapsed by default" below `wide`, with nothing selected — shared by the mount-time
+ *  restore in `bootstrap()` (see its own call site's comment) and the live-resize watch just
+ *  below, so both a fresh mount into a narrow layout and a later resize into one agree. */
+function collapseIfNarrowWithNoSelection(): void {
+  if (breakpoint.value !== "wide" && selection.row.value < 0) detailOpen.value = false;
+}
+
 // Entering a narrower breakpoint with nothing selected collapses the pane (§6.3's "collapsed by
 // default"); entering it *with* a selection, or widening back past 900px, leaves `detailOpen` as
 // it is — there is nothing in §6.3 asking a widen to force it back open, and forcing it closed
 // on every narrow-to-wide crossing would fight a user who just opened it deliberately.
 watch(breakpoint, (kind, previous) => {
-  if (kind !== "wide" && previous === "wide" && selection.row.value < 0) detailOpen.value = false;
+  if (kind !== "wide" && previous === "wide") collapseIfNarrowWithNoSelection();
 });
 
 // §6.3: "collapsed by default, opens on selection" for both sub-900px bands — at the wide

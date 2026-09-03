@@ -95,16 +95,43 @@ function createInMemoryChannelPair(): readonly [MessageChannelLike, MessageChann
   return [a, b];
 }
 
+/** Row 0 always packs from an empty dictionary — the one mark every session starts with, and
+ *  the one `#resetSession`-equivalent below restores on a refresh (`packages/git/src/
+ *  repoService.ts`'s own `initialDictionaryMarks`, mirrored here). */
+function initialDictionaryMarks(): Map<number, number> {
+  return new Map([[0, 0]]);
+}
+
 interface RepoSession {
   readonly repoId: string;
   readonly commits: Scenario["commits"];
   readonly store: CommitStore;
-  dictionaryCursor: number;
+  /** `packSlice`'s dictionary base for each row this session has ever emitted a chunk up to,
+   *  keyed by that row — never a single session-wide running cursor. A client that resets its
+   *  own store (the repo picker's "open a different candidate", `App.vue`'s `handleRepoOpened`,
+   *  W11) reopens `graph.stream` with `resumeThroughRow: 0` while this session's own `store`
+   *  still holds every previously-cached row — replaying that cache with whatever dictionary
+   *  cursor the *previous* stream had reached by then would pack row 0's chunk against a
+   *  dictionary base the fresh client's interner (size 0) has never seen, tripping
+   *  `CommitStore.appendPacked`'s ordering assert. Resolving the base from *this row's own* mark
+   *  instead means a replay from row 0 always resolves to the row-0 mark (always 0), regardless
+   *  of how far a previous stream over this same session had walked the dictionary forward —
+   *  `packages/git/src/repoService.ts`'s own `streamGraph`/`#emitRange` already carry this exact
+   *  fix (its doc comments call it out as "W2's fix"); this mock never had the equivalent until
+   *  P4 W13's Playwright suite exercised a repo-picker reopen against an already-cached session
+   *  for the first time and surfaced the gap. */
+  dictionaryMarks: Map<number, number>;
   nextSeq: number;
 }
 
 function createSession(repoId: string, commits: Scenario["commits"]): RepoSession {
-  return { repoId, commits, store: new CommitStore(), dictionaryCursor: 0, nextSeq: 0 };
+  return {
+    repoId,
+    commits,
+    store: new CommitStore(),
+    dictionaryMarks: initialDictionaryMarks(),
+    nextSeq: 0,
+  };
 }
 
 function requireSession(sessions: Map<string, RepoSession>, repoId: string): RepoSession {
@@ -123,15 +150,22 @@ function readPageIntoStore(session: RepoSession): void {
   session.store.appendPage(session.commits.slice(loaded, loaded + count));
 }
 
+/** Packs and emits exactly one chunk, `[from, to)`, using the caller-supplied dictionary base
+ *  for that specific row range, and records the resulting size as `to`'s mark — mirrors
+ *  `RepoService#emitRange`'s own doc comment almost verbatim. Returns the next base so a caller
+ *  walking forward through several ranges in one `graph.stream` call can thread it without a
+ *  second map lookup. */
 async function emitRange(
   session: RepoSession,
   from: number,
   to: number,
+  dictionaryBase: number,
   source: "git" | "cache",
   emit: (chunk: StreamChunkOf<"graph.stream">) => Promise<void>,
-): Promise<void> {
-  const commits = session.store.packSlice(from, to, session.dictionaryCursor);
-  session.dictionaryCursor += commits.dictionary.length;
+): Promise<number> {
+  const commits = session.store.packSlice(from, to, dictionaryBase);
+  const nextBase = dictionaryBase + commits.dictionary.length;
+  session.dictionaryMarks.set(to, nextBase);
   const remaining = session.commits.length - session.store.rowCount;
   await emit({
     repoId: session.repoId,
@@ -143,6 +177,7 @@ async function emitRange(
     exhausted: remaining === 0,
     commits,
   });
+  return nextBase;
 }
 
 /** `createHandlers`'s own `ServerHandlers` plus a way to read its private `activeRepoId` closure
@@ -165,7 +200,7 @@ function createHandlers(scenario: Scenario): MockHandlers {
   });
 
   const repoList: RequestHandler<"repo.list"> = async () => ({
-    candidates: [],
+    candidates: scenario.candidates ?? [],
     activeRepoId,
   });
 
@@ -210,7 +245,7 @@ function createHandlers(scenario: Scenario): MockHandlers {
     const session = sessions.get(repoId);
     if (!session) return { restarted: false };
     session.store.clear();
-    session.dictionaryCursor = 0;
+    session.dictionaryMarks = initialDictionaryMarks();
     return { restarted: true };
   };
 
@@ -220,13 +255,22 @@ function createHandlers(scenario: Scenario): MockHandlers {
   // service does — pull one page out of the scenario's fixture and stream the rows that adds.
   const graphStream: StreamHandler<"graph.stream"> = async ({ repoId, resumeThroughRow }, ctx) => {
     const session = requireSession(sessions, repoId);
-    let cursor = Math.min(resumeThroughRow ?? 0, session.store.rowCount);
+
+    // Clamped, not trusted verbatim (`RepoService.streamGraph`'s own comment): a caller-supplied
+    // `resumeThroughRow` from before a client-side reset would otherwise point past the (still
+    // fully cached) store. The dictionary base for that row is resolved from `dictionaryMarks`,
+    // not guessed — see this session field's own doc comment for why a running cursor is wrong
+    // here specifically.
+    const requestedRow = Math.min(resumeThroughRow ?? 0, session.store.rowCount);
+    const mark = session.dictionaryMarks.get(requestedRow);
+    let cursor = mark !== undefined ? requestedRow : 0;
+    let dictionaryBase = mark ?? 0;
     const cachedThrough = session.store.rowCount;
 
     while (cursor < cachedThrough) {
       if (ctx.signal.aborted) return;
       const to = Math.min(cursor + CHUNK_ROWS, cachedThrough);
-      await emitRange(session, cursor, to, "cache", ctx.emit);
+      dictionaryBase = await emitRange(session, cursor, to, dictionaryBase, "cache", ctx.emit);
       cursor = to;
     }
     if (ctx.signal.aborted) return;
@@ -238,7 +282,7 @@ function createHandlers(scenario: Scenario): MockHandlers {
     while (cursor < session.store.rowCount) {
       if (ctx.signal.aborted) return;
       const to = Math.min(cursor + CHUNK_ROWS, session.store.rowCount);
-      await emitRange(session, cursor, to, "git", ctx.emit);
+      dictionaryBase = await emitRange(session, cursor, to, dictionaryBase, "git", ctx.emit);
       cursor = to;
     }
   };
