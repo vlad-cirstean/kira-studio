@@ -52,6 +52,21 @@ func TestRedis_AuthMatrix(t *testing.T) {
 			// here — this row's own job is the matrix table's completeness, not a second copy of
 			// that assertion.
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"database": "db0"}},
+			Then: []testsupport.Scenario{
+				// P25 §1.3's headline "most commonly recommended application ACL" — P25 proved only
+				// that it can connect. A read and a write must both work under it too.
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "db0"), testsupport.Seg("key", "counter"))),
+				testsupport.MutateSucceeds(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "db0")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert",
+						Values: model.RowValues{
+							{Name: "_key", Value: testsupport.Strp("p26:matrix:acl-all-no-dangerous")},
+							{Name: "$value", Value: testsupport.Strp("hello")},
+						},
+					}},
+				}, 1),
+			},
 		},
 		{
 			// Deviation from the plan's own row: it asserts "~* +@read" connects post-fix. Verified
@@ -103,6 +118,20 @@ func TestRedis_AuthMatrix(t *testing.T) {
 						}
 					},
 				},
+				// The write half of the same pin: a user with no ~* keyspace grant is refused a
+				// write too, and that refusal is also coded E_AUTH today — the same conflation the
+				// read case above already pins, so a future errors.go fix breaks both halves
+				// together.
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "db0")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert",
+						Values: model.RowValues{
+							{Name: "_key", Value: testsupport.Strp("p26:matrix:no-keys")},
+							{Name: "$value", Value: testsupport.Strp("nope")},
+						},
+					}},
+				}, adapters.CodeAuth),
 			},
 		},
 		{

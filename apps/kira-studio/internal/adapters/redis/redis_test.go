@@ -670,6 +670,115 @@ func TestRedis_Console_Execute(t *testing.T) {
 	}
 }
 
+// P26 §3.6(1): Redis is the only adapter whose read-only enforcement is per-command, resolved
+// against the server's own COMMAND table (client.go's isReadOnlyCommand, console.go:132) — a
+// genuinely non-obvious mechanism with no container-backed test at all before this (console_test.go
+// is 70 lines of tokenizer unit tests only).
+func TestRedis_ReadOnlyConnection_ConsoleAllowsReadsRefusesWrites(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	ro := fixture.Config
+	ro.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), ro, adapters.NewOpCtx("op-ro-connect")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer a.Disconnect(context.Background())
+
+	path := nodePath(fixture, seg("database", "db0"))
+	getPages, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path: path, Statements: []string{"GET counter"},
+	}, adapters.NewOpCtx("op-ro-get"))
+	if err != nil {
+		t.Fatalf("Execute(GET) on a read-only connection: %v", err)
+	}
+	getPage, ok := getPages[0].(page.KeyValuePage)
+	if !ok {
+		t.Fatalf("pages[0] = %T, want page.KeyValuePage", getPages[0])
+	}
+	if v := kvValueAt(t, getPage, 0); v == nil || *v != "42" {
+		t.Errorf("GET counter = %v, want 42", v)
+	}
+
+	_, err = a.Execute(context.Background(), model.ConsoleRequest{
+		Path: path, Statements: []string{"SET counter 999"},
+	}, adapters.NewOpCtx("op-ro-set"))
+	if err == nil {
+		t.Fatal("Execute(SET) on a read-only connection: want an error, got nil")
+	}
+	code, _ := adapters.CodeOf(err)
+	if code != adapters.CodeUnsupported {
+		t.Errorf("code = %v, want E_UNSUPPORTED", code)
+	}
+
+	afterPages, err := a.Execute(context.Background(), model.ConsoleRequest{
+		Path: path, Statements: []string{"GET counter"},
+	}, adapters.NewOpCtx("op-ro-get-after"))
+	if err != nil {
+		t.Fatalf("Execute(GET) after refused SET: %v", err)
+	}
+	afterPage := afterPages[0].(page.KeyValuePage)
+	if v := kvValueAt(t, afterPage, 0); v == nil || *v != "42" {
+		t.Errorf("GET counter after refused SET = %v, want unchanged 42", v)
+	}
+}
+
+// P26 §3.6(2): Redis's implicit-creation analogue and the only place its four surfaces (console,
+// tree, read, mutate) are asserted to agree with each other.
+func TestRedis_ConsoleCreatedKeyAppearsInTreeAndReads(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	const key = "p26scratch"
+
+	side := goredis.NewClient(&goredis.Options{
+		Addr: fixture.Host + ":" + strconv.Itoa(fixture.Port), Password: testsupport.RedisPassword,
+		DB: testsupport.RedisPrimaryDbIndex, Protocol: 2,
+	})
+	defer side.Close()
+	t.Cleanup(func() { _ = side.Del(context.Background(), key).Err() })
+
+	if _, err := a.Execute(ctx, model.ConsoleRequest{
+		Path: nodePath(fixture, seg("database", "db0")), Statements: []string{"HSET p26scratch a 1"},
+	}, adapters.NewOpCtx("op-create")); err != nil {
+		t.Fatalf("Execute(HSET): %v", err)
+	}
+
+	children, err := a.Children(ctx, nodePath(fixture, seg("database", "db0")), adapters.NewOpCtx("op-children"))
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if !containsName(childNames(t, children), key) {
+		t.Fatalf("Children(db0) = %v, want %s present", childNames(t, children), key)
+	}
+
+	read, err := a.Read(ctx, adapters.ReadRequest{
+		Path: nodePath(fixture, seg("database", "db0"), seg("key", key)), PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-read"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	kvPage := read.(page.KeyValuePage)
+	pairs := kvPairs(t, kvPage)
+	if pairs["a"] != "1" {
+		t.Errorf("pairs = %v, want a=1", pairs)
+	}
+
+	deletePlan := model.MutationPlan{
+		Path: nodePath(fixture, seg("database", "db0")),
+		Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "_key", Value: strp(key)}}}},
+	}
+	if _, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-delete")); err != nil {
+		t.Fatalf("Mutate(delete): %v", err)
+	}
+	childrenAfter, err := a.Children(ctx, nodePath(fixture, seg("database", "db0")), adapters.NewOpCtx("op-children-after"))
+	if err != nil {
+		t.Fatalf("Children after delete: %v", err)
+	}
+	if containsName(childNames(t, childrenAfter), key) {
+		t.Errorf("Children(db0) after delete = %v, must not contain %s", childNames(t, childrenAfter), key)
+	}
+}
+
 // caps honesty.
 func TestRedis_Caps(t *testing.T) {
 	a := newAdapter(t)
