@@ -9,10 +9,11 @@ import type {
   MultiColumnSort,
   OnBeforeHeaderCellDestroyEventArgs,
   OnHeaderCellRenderedEventArgs,
+  OnHeaderClickEventArgs,
   SingleColumnSort,
   SlickEventData,
 } from 'slickgrid';
-import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
+import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { shortcutFor } from '../../shortcuts/keys';
 import { connectionRecord, connectionsState } from '../../state/connections';
@@ -746,6 +747,27 @@ function onSort(_e: unknown, args: SingleColumnSort | MultiColumnSort): void {
   });
 }
 
+// §4 item 6, §5 D6 — the corner cell selects everything, as a single `range` (never a `row`
+// selection, which `isSelected` would resolve with `Array.includes`, F14a's own O(rows) cost).
+// **Adopts the selection model** (pushes the full-page range through it, exactly like any other
+// drag/click) rather than D6's named bypass: F2's O(rows × cols) hash — ~61 000 iterations on the
+// spike_grid fixture (1 000 × 61), ~20 000 on the 10 000-row/2-column big_rows one — is well
+// inside T6's own 150ms sandbox gate (slick-grid.spec.ts), so the bypass is written down in the
+// plan (§5 D6) and in this comment, not built: nothing here needs it unless a real page size
+// someday fails that gate, at which point it's a swap of this one function's body, not a redesign.
+function onSelectAll(): void {
+  if (!grid || !selectionModel) return;
+  const p = getPage(props.tabId);
+  const rowCount = p?.rowCount ?? 0;
+  const colCount = grid.getColumns().length - 1; // minus the gutter
+  if (rowCount <= 0 || colCount <= 0) return;
+  selectionModel.setSelectedRanges([new SlickRange(0, 1, rowCount - 1, colCount)]);
+}
+
+function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
+  if (args.column.id === GUTTER_FIELD) onSelectAll();
+}
+
 // D3 — SlickGrid drags the handle and persists nothing on its own; this app reads the resulting
 // widths straight off getColumns() and patches them into tab state (F9). The echo guard is the
 // same shape DataGrid.vue's own dragProducedRange uses: without it, the columnWidths watch below
@@ -1063,6 +1085,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onHeaderCellRendered, onHeaderCellRendered);
   eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
   eventHandler.subscribe(grid.onSort, onSort);
+  eventHandler.subscribe(grid.onHeaderClick, onHeaderClick);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);

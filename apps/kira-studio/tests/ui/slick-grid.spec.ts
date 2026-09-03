@@ -6,6 +6,9 @@ import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
   APP_PATH,
+  BIG_ROWS_PATH,
+  bigRowsFixture,
+  bigRowsHugePage,
   connectAndExpandControl,
   DB_PATH,
   postgresConnectionSummary,
@@ -822,4 +825,110 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   expect(msGateOnly).not.toBeNull();
   const msGateHistogram = msGateOnly?.summary.renderCountHistogram ?? {};
   expect(Object.keys(msGateHistogram).some((count) => Number(count) >= 2)).toBe(true);
+});
+
+// P22 Pass B, C6/§5 D6, T6 — select-all's own cost gate. **Adopts** SlickHybridSelectionModel for
+// select-all (SlickGridHost.vue's own onSelectAll comment): F2's O(rows × cols) hash inside
+// `handleSelectedRangesChanged` is real, but this sandbox-provable measurement is what decides
+// whether that's actually a problem, rather than assuming either way (§5 D6). If this ever regresses
+// past 150ms, D6's own named bypass (rt().selection set directly, a `.kira-select-all` CSS class
+// painting every `.slick-cell`, no range pushed into the model) is the fix — written down in the
+// plan and in onSelectAll's own comment, not built speculatively.
+test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide and tall', async ({
+  relaunch,
+}) => {
+  test.setTimeout(60_000);
+
+  // --- wide: spike_grid, 1 000 rows x 61 columns -------------------------------------------------
+  const { window: wide } = await relaunch({ control: CONTROL, stream: PORT });
+  await forceSlickEngine(wide);
+  await connectAndOpenSpikeGrid(wide);
+  const wideElapsedMs = await wide.evaluate(() => {
+    const corner = document.querySelector<HTMLElement>('[data-testid="grid-select-all"]');
+    if (!corner) throw new Error('select-all corner not found');
+    const start = performance.now();
+    corner.click();
+    return performance.now() - start;
+  });
+  expect(wideElapsedMs).toBeLessThan(150);
+  await expect.poll(() => wide.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+
+  // --- tall: big_rows, 10 000 rows x 2 columns ----------------------------------------------------
+  const BIG_CONNECTION_ID = 'conn-slick-selectall-big';
+  const BIG_CONNECTION_SUMMARY = postgresConnectionSummary(
+    BIG_CONNECTION_ID,
+    'Select All Big DB',
+    'amber',
+  );
+  const bigControl: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Select All Big DB',
+        kind: 'postgres',
+        color: 'amber',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: BIG_CONNECTION_SUMMARY,
+    },
+    ...bigRowsFixture(BIG_CONNECTION_ID).control,
+  ];
+  const bigPort: PortSnapshot[] = [
+    ...bigRowsFixture(BIG_CONNECTION_ID).port, // pageSize=100 — the tab's own initial load
+    bigRowsHugePage(BIG_CONNECTION_ID), // pageSize=10000 — page-size-10000's own request
+  ];
+
+  const { window: tall } = await relaunch({ control: bigControl, stream: bigPort });
+  await forceSlickEngine(tall);
+  await tall.click('[data-testid="add-connection"]');
+  await tall.click('[data-testid="connection-kind-postgres"]');
+  await tall.fill('[data-testid="connection-name"]', 'Select All Big DB');
+  await tall.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await tall.fill('[data-testid="connection-port"]', '5432');
+  await tall.fill('[data-testid="connection-database"]', 'kira_test');
+  await tall.fill('[data-testid="connection-username"]', 'postgres');
+  await tall.click('[data-testid="color-amber"]');
+  await tall.click('[data-testid="connection-save"]');
+  await expect(tall.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = tall.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(tall, '');
+  await tall.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(tall, '');
+  await expandRow(tall, DB_PATH);
+  await expandRow(tall, APP_PATH);
+  const bigRowsRow = await findRow(tall, BIG_ROWS_PATH);
+  await bigRowsRow.dblclick();
+  await expect(tall.locator('[data-testid="data-grid"] .slick-cell')).not.toHaveCount(0);
+  await tall.click('[data-testid="page-size-10000"]');
+  await expect
+    .poll(async () => tall.locator('[data-testid="data-grid"] .slick-cell').count(), {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(0);
+
+  const tallElapsedMs = await tall.evaluate(() => {
+    const corner = document.querySelector<HTMLElement>('[data-testid="grid-select-all"]');
+    if (!corner) throw new Error('select-all corner not found');
+    const start = performance.now();
+    corner.click();
+    return performance.now() - start;
+  });
+  expect(tallElapsedMs).toBeLessThan(150);
+  await expect.poll(() => tall.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
 });
