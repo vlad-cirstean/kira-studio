@@ -783,11 +783,18 @@ function computeSelEdgeHashes(
     }
   } else if (sel.kind === 'column') {
     const cols = new Set(sel.cols);
-    const pageRowCount = getPage(props.tabId)?.rowCount ?? 0;
+    // Display row count, not the page's own row count (same fix as onSelectAll/
+    // onHeaderSelectClick's own `displayRowCount`, C12) — `pos` here is already a display
+    // position (RowHandle.pos, from dataSource.getItem below), so comparing it against the
+    // display-row bounds is correct with or without an active filter; comparing the underlying
+    // *page* row against `pageRowCount - 1` was not — under a filter the last row actually
+    // rendered can have a page-row index far short of `pageRowCount - 1` (or the filter can even
+    // exclude the true first/last page row), so the bottom (and top) selection-perimeter line
+    // would fail to draw at all.
+    const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
     for (let pos = start; pos <= end; pos++) {
-      const pageRow = dataSource.getItem(pos).row;
-      const isTop = pageRow === 0;
-      const isBottom = pageRow === pageRowCount - 1;
+      const isTop = pos === 0;
+      const isBottom = pos === displayRowCount - 1;
       for (const c of cols) {
         mark(pos, c, {
           selEdgeTop: isTop,
@@ -1205,11 +1212,16 @@ function cycleSortFor(name: string): void {
 // someday fails that gate, at which point it's a swap of this one function's body, not a redesign.
 function onSelectAll(): void {
   if (!grid || !selectionModel) return;
-  const p = getPage(props.tabId);
-  const rowCount = p?.rowCount ?? 0;
+  // Display row count, not the page's own row count — `SlickRange` below is position-space, and
+  // the two only coincide when nothing is filtered (same fix as onHeaderSelectClick/
+  // onHeaderContextMenuHandler's own `displayRowCount`, C12): under an active search filter this
+  // used to run the range past the last actually-displayed row into the pending-insert-row
+  // address space (`rowAtDisplayPosition` in dataSource.ts maps an out-of-range position to
+  // `pageRowCount + (pos - count)`), producing spurious extra lines on copy.
+  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
   const colCount = grid.getColumns().length - 1; // minus the gutter
-  if (rowCount <= 0 || colCount <= 0) return;
-  selectionModel.setSelectedRanges([new SlickRange(0, 1, rowCount - 1, colCount)]);
+  if (displayRowCount <= 0 || colCount <= 0) return;
+  selectionModel.setSelectedRanges([new SlickRange(0, 1, displayRowCount - 1, colCount)]);
 }
 
 function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {

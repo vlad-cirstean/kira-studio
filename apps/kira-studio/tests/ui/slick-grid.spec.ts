@@ -1100,6 +1100,131 @@ test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 
   await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
 });
 
+// Regression test — onSelectAll used to build its SlickRange with `p?.rowCount` (the PAGE row
+// count) as the display-position upper bound, instead of the filtered display-row count every
+// other caller in this file uses (onHeaderSelectClick/onHeaderContextMenuHandler's own
+// `displayRowCount`). Under an active "hide non-matching rows" filter, that ran the range past the
+// actual displayed rows into the pending-insert-row address space (`rowAtDisplayPosition` maps an
+// out-of-range display position to `pageRowCount + (pos - count)`), producing dozens/thousands of
+// spurious extra lines on copy — a page-row range far past the real, loaded data. `navigator.
+// clipboard` is stubbed the same way interaction.spec.ts's own `installClipboardShim` does
+// (WebKit refuses an ungestured `readText()` even with the permission granted).
+const CLIPBOARD_SHIM = `(() => {
+  let text = '';
+  const clip = {
+    writeText: (t) => { text = String(t); return Promise.resolve(); },
+    readText: () => Promise.resolve(text),
+  };
+  Object.defineProperty(navigator, 'clipboard', { value: clip, configurable: true });
+})();`;
+
+test('P22 Pass B follow-up — select-all under an active row filter copies only the visible rows', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-select-all-filter';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Select All Filter DB',
+    'magenta',
+  );
+  const FIXTURE = bigRowsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Select All Filter DB',
+        kind: 'postgres',
+        color: 'magenta',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await page.addInitScript(CLIPBOARD_SHIM);
+  await page.reload();
+  await page.waitForSelector('[data-testid="status-bar"]');
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Select All Filter DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-magenta"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const bigRowsRow = await findRow(page, BIG_ROWS_PATH);
+  await bigRowsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"] .slick-cell')).not.toHaveCount(0);
+
+  // Filter down to a contiguous 3-row prefix (ids 1-3 of the 100 loaded) — deliberately
+  // contiguous-from-the-top so a correct fix's copy is unambiguously "exactly these 3 rows", not
+  // entangled with the separate, wider question of whether a range copy also skips a NON-
+  // contiguous filtered gap (a `'range'`-kind selection's own corners-only shape, untouched by
+  // this fix). id/hash pairs are the well-known md5-of-decimal-string fixture values.
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await page.click('[data-testid="search-regex"]');
+  await page.fill('[data-testid="search-input"]', '^[1-3]$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 3');
+  await page.click('[data-testid="search-filter-rows"]');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3);
+
+  // A cell click first, so the grid canvas actually holds DOM focus (SlickGrid's own keydown
+  // listener is bound to its focus sink/canvas elements, not the document) — the select-all
+  // corner is a header button and clicking it alone leaves nothing focused for Ctrl+C to reach.
+  await gridCell(page, 1, 'id').click();
+  const corner = page.locator('[data-testid="grid-select-all"]');
+  await corner.click();
+  await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+
+  // The corner click above lands DOM focus on the header pane (SlickGrid's own header panes
+  // carry `tabIndex=0`) rather than the grid canvas — true of clicking any header cell, not
+  // specific to select-all, and not touched by this fix. `onKeyDown`'s Ctrl+C handling is bound
+  // to the canvas/focus-sink elements only (slick.grid.ts), so refocus the canvas directly
+  // (never via another cell click, which would collapse the very selection under test) before
+  // sending Ctrl+C.
+  await page.evaluate(() =>
+    (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
+  );
+  await page.keyboard.press('Control+c');
+  const tsv = await page.evaluate(() => navigator.clipboard.readText());
+  const lines = tsv.split('\n');
+  expect(lines).toHaveLength(3); // not the ~100 (page rowCount) the pre-fix range spanned
+  expect(lines).toEqual([
+    '1\tc4ca4238a0b923820dcc509a6f75849b',
+    '2\tc81e728d9d4c2f636f067f89cc14862c',
+    '3\teccbc87e4b5ce2fe28308fd9f2a7baf3',
+  ]);
+});
+
 // P22 Pass B, C9/§9.2 T8 — the pacing invariant (T1's own histogram-all-1 assertion, above) held
 // again with N staged insert rows on screen. D9's own §0.3 acknowledgement: this is the one place
 // this pass returns DOM from a formatter (the insert region's own `<input>`, self-contained and
