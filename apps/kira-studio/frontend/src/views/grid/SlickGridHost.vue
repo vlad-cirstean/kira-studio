@@ -705,10 +705,12 @@ const SEL_EDGE_LAYER_KEYS = ['kira-sel-t', 'kira-sel-r', 'kira-sel-b', 'kira-sel
  *  built-in layer, gated separately at C6). Page-row space in, translated once per rendered row via
  *  `dataSource.getItem(pos).row` — the same arithmetic `onGridRendered` already uses.
  */
-function computeSelEdgeHashes(): [EdgeHash, EdgeHash, EdgeHash, EdgeHash] {
+function computeSelEdgeHashes(
+  selOverride?: Selection | null,
+): [EdgeHash, EdgeHash, EdgeHash, EdgeHash] {
   const hashes: [EdgeHash, EdgeHash, EdgeHash, EdgeHash] = [{}, {}, {}, {}];
   if (!grid || !dataSource) return hashes;
-  const sel = rt()?.selection;
+  const sel = selOverride !== undefined ? selOverride : rt()?.selection;
   if (!sel) return hashes;
   const { start, end } = grid.lastRenderedRowBounds;
   if (end < start) return hashes;
@@ -781,12 +783,73 @@ function computeSelEdgeHashes(): [EdgeHash, EdgeHash, EdgeHash, EdgeHash] {
   return hashes;
 }
 
-function refreshSelEdges(): void {
+function refreshSelEdges(selOverride?: Selection | null): void {
   if (!grid) return;
-  const hashes = computeSelEdgeHashes();
+  const hashes = computeSelEdgeHashes(selOverride);
   SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
     grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
   });
+}
+
+// D4 (fix) — the drag-in-progress twin of the fill SlickGrid's own selection-model integration
+// draws at commit (`this.setCellCssStyles(this._options.selectedCellCssClass, hash)`,
+// `slick.grid.ts`'s own `selectedCellCssClass` handling — same layer key as the CSS class value
+// itself, `'kira-cell-selected'`, reused here so a commit's own real write and this preview's own
+// writes land on the identical `setCellCssStyles` layer and one replaces the other cleanly, never
+// both existing at once). Bounded by the rendered range the same way the edge layer already is.
+function computeCellFillHash(sel: Selection | null): EdgeHash {
+  const hash: EdgeHash = {};
+  if (!grid || !dataSource || !sel) return hash;
+  const { start, end } = grid.lastRenderedRowBounds;
+  if (end < start) return hash;
+  const cls = 'kira-cell-selected';
+  if (sel.kind === 'cell' || sel.kind === 'range') {
+    const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
+    const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
+    const r0 = Math.min(anchorRow, sel.row);
+    const r1 = Math.max(anchorRow, sel.row);
+    const c0 = Math.min(anchorCol, sel.col);
+    const c1 = Math.max(anchorCol, sel.col);
+    for (let pos = start; pos <= end; pos++) {
+      const pageRow = dataSource.getItem(pos).row;
+      if (pageRow < r0 || pageRow > r1) continue;
+      const row: Record<string, string> = {};
+      for (let c = c0; c <= c1; c++) {
+        const field = fieldAtDisplayCol(c);
+        if (field) row[field] = cls;
+      }
+      hash[pos] = row;
+    }
+  }
+  return hash;
+}
+
+// D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
+// `handleCellRangeSelected` intentionally no-ops for a CELL-mode `onCellRangeSelecting` call
+// (only `onCellRangeSelected`, at drag end, calls `setSelectedRanges` — §4.1 item 3's own
+// documented reasoning, but that reasoning is about the cell-editor dock's flicker specifically,
+// never about the grid's own selection highlight); `dragToSelect: true` (needed for the gutter's
+// own *row*-range drag — see its own branch below, which has no such early return and so already
+// updates live) also zeroes the stock `SlickCellRangeDecorator`'s own border
+// (`selectionCss: {border: 'none'}`), so nothing at all painted during a cell-range drag until
+// mouseup — confirmed live with a real mousedown -> mousemove(x2) -> mouseup sequence, not a
+// single programmatic selection call.
+//
+// This paints the SAME fill/edge layers the committed selection uses, from the drag's own
+// in-progress `SlickRange` — via `selectionFromRanges`/`toPageRowSelection` (identical translation
+// `onSelectedRangesChanged` itself uses) — but deliberately never touches `rt().selection` or the
+// cell-editor dock: writing `rt().selection` on every drag tick is exactly what DataGrid.vue's own
+// deleted `cellDragActive` flag existed to guard against (a drag passing back over its own anchor
+// cell transiently looks like a completed one-cell selection, flashing the dock open and shut),
+// and §4.1 item 3 is right that nothing needs it once `rt().selection` itself stays untouched until
+// the real commit. The committed `onSelectedRangesChanged` handler (unchanged) supersedes every
+// layer this writes the moment the drag actually ends.
+function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
+  if (!selectionModel || selectionModel.currentSelectionModeIsRow()) return;
+  const posSel = selectionFromRanges([args.range], false, null);
+  const pageSel = posSel ? toPageRowSelection(posSel) : null;
+  refreshSelEdges(pageSel);
+  grid?.setCellCssStyles('kira-cell-selected', computeCellFillHash(pageSel));
 }
 
 /** C5/§5 D5 — bounded by what the user staged (`pendingFor(tabId).edits`, a handful of rows in
@@ -1604,6 +1667,16 @@ onMounted(() => {
 
   dataSource = createGridDataSource(dataSourceState(p, order));
 
+  // Real-interaction fix (§5 D8's own header-height gap, found chasing the header interaction
+  // issues, not the original port): slickTheme.css's own `.slick-header-column` rule reads this
+  // custom property for its `height`/`line-height` — set here (mount) and in the `rowHeight` watch
+  // below (density changing later) so the header row tracks the same 28px/22px toggle the body
+  // rows do, matching the incumbent's own `.header-row`'s `:style="{height: rowHeight+'px'}"`.
+  // Set on `el` itself (the mount SlickGrid builds its own DOM inside) — ordinary CSS custom-
+  // property inheritance carries it down to every header column, wherever in that subtree it ends
+  // up.
+  el.style.setProperty('--kira-header-row-height', `${rowHeight.value}px`);
+
   // §5 D8 — editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
   // comment says why: a grid-constructed `KiraCellEditor` cannot close over tabId/displayCell
   // itself). Both callbacks re-resolve the display column / read state fresh on every call, so —
@@ -1743,6 +1816,10 @@ onMounted(() => {
   eventHandler.subscribe(grid.onActiveCellChanged, onGridActiveCellChanged);
   eventHandler.subscribe(grid.onClick, onGridClick);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
+  const cellRangeSelector = selectionModel.getCellRangeSelector();
+  if (cellRangeSelector) {
+    eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
+  }
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
@@ -1901,6 +1978,7 @@ watch(
 
 watch(rowHeight, (h) => {
   if (!grid) return;
+  rootRef.value?.style.setProperty('--kira-header-row-height', `${h}px`);
   grid.setOptions({ rowHeight: h });
   grid.updateRowCount();
   grid.render();

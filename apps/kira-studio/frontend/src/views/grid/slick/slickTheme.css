@@ -70,6 +70,31 @@
   color: var(--kira-fg-muted);
   border-right: var(--kira-border-width) solid var(--kira-border);
   font-size: var(--kira-t-sm);
+  /* Real-interaction fix, not in the original port: stock's own `.slick-header-column.ui-state-
+     default` carries `overflow: hidden` (its own pre-flex answer to a long column name, superseded
+     the moment `.slick-column-name` below got its own `overflow: hidden` + ellipsis) — with it
+     still in force, `.slick-resizable-handle`'s own `right: -2px` (F9's own note: intentionally
+     wider than the column's own edge, for an easier grab target) placed most of the handle's
+     hit-target *outside* this cell's own clipped overflow box. A clipped-away element paints
+     nothing there and receives no pointer events there either, so every resize drag silently
+     landed on the cell underneath instead of the handle — confirmed via a real mousedown at the
+     handle's own reported center, elementFromPoint there resolved to the cell, not the handle,
+     before this fix. `.header-cell`'s own incumbent rule never had this property at all
+     (`DataGrid.vue:2017-2031`) — `visible` here is the equivalent, not a new allowance. */
+  overflow: visible;
+  /* Real-interaction fix, not in the original port: stock's own `.slick-header-column.ui-state-
+     default` also carries a fixed `height: 16px; line-height: 16px`, never retokenised — the
+     incumbent's own `.header-cell` height instead tracks `rowHeight` (`DataGrid.vue`'s own
+     `:style="{height: rowHeight+'px'}"` on `.header-row`, the same 28px/22px density toggle the
+     body rows use), so its header row is exactly as tall as one data row; SlickGrid's stayed at
+     stock's own fixed, much shorter 16px regardless of density. `--kira-header-row-height` is set
+     from SlickGridHost.vue's own `rowHeight` (mount + the same density watch that already updates
+     the grid's own `rowHeight` option), on the mount element itself — inherited down to every
+     header column through ordinary CSS custom-property inheritance. The `28px` fallback only
+     matters before that first JS write lands (there is no meaningful flash — the property is set
+     before `grid.render()` ever runs). */
+  height: var(--kira-header-row-height, 28px);
+  line-height: var(--kira-header-row-height, 28px);
 }
 
 .slick-grid-host .slick-column-name {
@@ -127,13 +152,27 @@
 /* §5 D8 — retokenises slick.grid.css's own `.slick-cell.editable{z-index:11;overflow:visible;
    background:#fff;border-color:#000;border-style:solid}`. `z-index: 11`/`overflow: visible` stay
    (the row's own `contain: layout`, above, is why they're both harmless — see that rule's own
-   comment); only the hardcoded colours change, to DataGrid.vue's own `.cell-input` look
-   (`:2113-2124`): transparent, not opaque, since KiraCellEditor's `<input>` sits over a cell that
-   already carries its own selection/staged background, and an opaque fill here would blot that out
-   the instant you started typing. */
+   comment); the background changes to transparent for the same reason as always (KiraCellEditor's
+   `<input>` sits over a cell that already carries its own selection/staged background, and an
+   opaque fill here would blot that out the instant you started typing).
+   `border: none` — real-interaction fix, not in the original port: stock's own `border-style:
+   solid` with no explicit `border-width` resolves to the CSS-initial `medium` (~3px, browser-
+   dependent) the moment ANY border-color is set on this rule, which an earlier version of this
+   file did (`border-color: var(--kira-accent)`) — producing a thick, inset accent box unlike the
+   incumbent's own 1px edge-to-edge one. The incumbent's own `.cell-input-overlay` never had this
+   problem at all: it is a *sibling* overlay positioned from `editingCellRect` in JS, never a child
+   of `.grid-cell`, so its own accent ring (a 1px inset `outline`, `DataGrid.vue:2113-2124`) was
+   always the ONLY box drawn. `KiraCellEditor`'s own `<input>` genuinely is a child of `.slick-cell`
+   (§5 D8's own note: SlickGrid never calls a separate `.position()`/`document.body` mount for the
+   stock text editor), so the equivalent fix here is the same 1px `outline` moved onto the input
+   itself (below) with the cell's own border turned off entirely — never a cell-level border at any
+   width. `padding: 0` similarly turns off the inherited `.slick-cell` padding (`0 var(--kira-s-4)`)
+   for this state only: with it left in, the input's own `width: 100%` filled only the padding box,
+   leaving the accent ring visibly inset from the cell's real edges instead of flush with them. */
 .slick-grid-host .slick-cell.editable {
   background: transparent;
-  border-color: var(--kira-accent);
+  border: none;
+  padding: 0;
 }
 
 /* §5 D9 — the insert region's own input (`cellFormatter`'s insert branch, SlickGridHost.vue) is
@@ -142,6 +181,9 @@
    identical sizing, and the incumbent's own identical answer on the outline question:
    `.insert-cell .cell-input { outline: none; }` (`DataGrid.vue:2138-2140`) — the row's own
    `kira-row-inserted` tint (C10) already reads as "this is new" without every cell in it boxed. */
+.slick-grid-host [data-testid="grid-cell-insert"] {
+  padding: 0;
+}
 .slick-grid-host [data-testid="grid-cell-insert"] .cell-input,
 .slick-grid-host .slick-cell.editable .cell-input {
   width: 100%;
@@ -153,6 +195,15 @@
   background: transparent;
   color: var(--kira-fg);
   font: inherit;
+}
+/* The accent ring itself — DataGrid.vue's own `.cell-input` base rule (`:2113-2124`),
+   `outline: 1px solid var(--kira-accent); outline-offset: -1px`, ported verbatim. Declared after
+   the shared sizing rule above so its `outline: none` doesn't need `!important` to lose the
+   cascade — same declared-after-for-priority pattern the type-colour/priority-signal rules already
+   use elsewhere in this file. */
+.slick-grid-host .slick-cell.editable .cell-input {
+  outline: 1px solid var(--kira-accent);
+  outline-offset: -1px;
 }
 
 .slick-grid-host .kira-gutter {
