@@ -6,12 +6,14 @@ package mongo_test
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/testsupport"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -88,6 +90,51 @@ func TestMongo_AuthMatrix(t *testing.T) {
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"database": testsupport.MongoDatabase}},
+			Then: []testsupport.Scenario{
+				{
+					// P25 §1.2's fix is asserted only for the handshake there. This carries it one
+					// step further: the fixed fields-mode connection (username/database +
+					// options.authSource=admin) can actually write as the principal it authenticated,
+					// not merely connect as it.
+					Name: "the authSource-fixed connection can actually write",
+					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+						path := testsupport.NodePath(cfg.ID, testsupport.Seg("database", testsupport.MongoDatabase), testsupport.Seg("collection", "mutate_probe"))
+						plan := model.MutationPlan{Path: path, Ops: []model.MutationRowOp{{
+							Kind:   "insert",
+							Values: model.RowValues{{Name: "$document", Value: testsupport.Strp(`{ name: "matrix-authsource-write", n: 1 }`)}},
+						}}}
+						result, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("matrix-authsource-mutate"))
+						if err != nil {
+							t.Fatalf("Mutate: %v", err)
+						}
+						if result.AffectedRows != 1 {
+							t.Fatalf("AffectedRows = %d, want 1", result.AffectedRows)
+						}
+						read, err := a.Read(context.Background(), adapters.ReadRequest{
+							Path: path, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+						}, adapters.NewOpCtx("matrix-authsource-read"))
+						if err != nil {
+							t.Fatalf("Read: %v", err)
+						}
+						docPage := read.(page.DocumentPage)
+						var foundID *string
+						for row := 0; row < docPage.RowCount; row++ {
+							if body := testsupport.DocBodyAt(t, docPage, row); body != nil && strings.Contains(*body, "matrix-authsource-write") {
+								foundID = testsupport.DocIDAt(t, docPage, row)
+							}
+						}
+						if foundID == nil {
+							t.Fatal("the written document was not found on read-back")
+						}
+						if _, err := a.Mutate(context.Background(), model.MutationPlan{
+							Path: path,
+							Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "_id", Value: foundID}}}},
+						}, adapters.NewOpCtx("matrix-authsource-cleanup")); err != nil {
+							t.Errorf("cleanup delete: %v", err)
+						}
+					},
+				},
+			},
 		},
 		{
 			Name: "admin-scoped user, database unset",
@@ -119,6 +166,26 @@ func TestMongo_AuthMatrix(t *testing.T) {
 						}
 					},
 				},
+				// The "read" role must read and filter — nothing proved that before this phase.
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", testsupport.MongoDatabase), testsupport.Seg("collection", "widgets"))),
+				testsupport.FilterNarrowsResult(
+					testsupport.NodePath(f.Config.ID, testsupport.Seg("database", testsupport.MongoDatabase), testsupport.Seg("collection", "widgets")),
+					`{ name: "widget-3" }`, 1,
+				),
+				// §1.4's pin for mongo. CommandError code 13 (Unauthorized) shares errors.go:29-31's
+				// branch with 18 (AuthenticationFailed) — a missing role reads as a wrong password
+				// today. Pinned with this comment naming it, exactly as P25's redis matrix pinned its
+				// own NOPERM equivalent (redis/authmatrix_test.go:82-104).
+				// CountMatchesRead is deliberately not attached: mongo/caps.go sets ExactCount: false,
+				// so its own Requires would skip it anyway — noted so a reader does not read the
+				// omission as an oversight.
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", testsupport.MongoDatabase), testsupport.Seg("collection", "widgets")),
+					Ops: []model.MutationRowOp{{
+						Kind:   "insert",
+						Values: model.RowValues{{Name: "$document", Value: testsupport.Strp(`{ name: "matrix-nope" }`)}},
+					}},
+				}, adapters.CodeAuth),
 			},
 		},
 		{

@@ -779,6 +779,124 @@ func TestMongo_Mutate_DeleteZeroRowsIsError(t *testing.T) {
 	}
 }
 
+// P26 §3.5(1): mongo/adapter.go:60 sets a.readOnly from the config and nothing anywhere asserted
+// it — mongo and redis are the two writable adapters with no such test (every other writable
+// adapter has one: postgres, mysqlfamily, clickhouse, sqlite, s3). Preview is deliberately not
+// asserted here: unlike Mutate, no adapter's Preview ever consults readOnly — it is pure local text
+// generation that "never executes and never touches the network" by design (adapter.go's own Adapter
+// interface doc), so there is nothing for a read-only connection to change about its output.
+func TestMongo_ReadOnlyConnectionCannotWrite(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	ro := fixture.Config
+	ro.ReadOnly = true
+	a := newAdapter(t)
+	if _, err := a.Connect(context.Background(), ro, adapters.NewOpCtx("op-ro-connect")); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer a.Disconnect(context.Background())
+
+	// widget-0's own _id, per support/mongo.go's hexID(0) — unexported, so spelled out verbatim.
+	id, err := bson.ObjectIDFromHex("000000000000000000000000")
+	if err != nil {
+		t.Fatalf("ObjectIDFromHex: %v", err)
+	}
+	idText, err := mongoadapter.IDText(id)
+	if err != nil {
+		t.Fatalf("IDText: %v", err)
+	}
+
+	path := nodePath(fixture, seg("database", testsupport.MongoDatabase), seg("collection", "widgets"))
+	plan := model.MutationPlan{Path: path, Ops: []model.MutationRowOp{{
+		Kind:    "update",
+		Key:     model.RowValues{{Name: "_id", Value: &idText}},
+		Changes: model.RowValues{{Name: "$document", Value: strp(`{ name: "should-not-land", n: 999 }`)}},
+	}}}
+	_, err = a.Mutate(context.Background(), plan, adapters.NewOpCtx("op-ro-mutate"))
+	if err == nil {
+		t.Fatal("Mutate: want an error, got nil")
+	}
+	code, _ := adapters.CodeOf(err)
+	if code != adapters.CodeUnsupported {
+		t.Errorf("code = %v, want E_UNSUPPORTED", code)
+	}
+
+	root := rootClient(t, fixture)
+	var doc bson.D
+	if err := root.Database(testsupport.MongoDatabase).Collection("widgets").FindOne(context.Background(), bson.D{{Key: "_id", Value: id}}).Decode(&doc); err != nil {
+		t.Fatalf("FindOne: %v", err)
+	}
+	if name := mustLookup(t, doc, "name"); name != "widget-0" {
+		t.Errorf("name = %v, want unchanged widget-0 (a read-only Mutate must never land)", name)
+	}
+}
+
+// P26 §3.5(2): Mongo's whole DDL analogue (§1.2) — Mutate an insert into a collection name that
+// does not exist yet, then Children(database) lists it, then Read returns the document, then Mutate
+// deletes it. The closest thing Mongo has to "does DDL reach the catalog", exercising
+// catalog.go's ListCollectionSpecifications against an object created in the same test.
+func TestMongo_Mutate_InsertCreatesTheCollectionAndItAppearsInTheTree(t *testing.T) {
+	fixture := testsupport.StartMongo(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	const collectionName = "p26_scratch"
+	databasePath := nodePath(fixture, seg("database", testsupport.MongoDatabase))
+	collectionPath := nodePath(fixture, seg("database", testsupport.MongoDatabase), seg("collection", collectionName))
+
+	root := rootClient(t, fixture)
+	t.Cleanup(func() {
+		_ = root.Database(testsupport.MongoDatabase).Collection(collectionName).Drop(context.Background())
+	})
+
+	insertPlan := model.MutationPlan{Path: collectionPath, Ops: []model.MutationRowOp{{
+		Kind:   "insert",
+		Values: model.RowValues{{Name: "$document", Value: strp(`{ name: "scratch-1", n: 1 }`)}},
+	}}}
+	if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-ddl-1")); err != nil {
+		t.Fatalf("Mutate(insert): %v", err)
+	}
+
+	children, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-2"))
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if !containsName(childNames(t, children), collectionName) {
+		t.Fatalf("Children(%s) = %v, want %s present", testsupport.MongoDatabase, childNames(t, children), collectionName)
+	}
+
+	read, err := a.Read(ctx, adapters.ReadRequest{
+		Path: collectionPath, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-ddl-3"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	docPage := read.(page.DocumentPage)
+	if docPage.RowCount != 1 {
+		t.Fatalf("RowCount = %d, want 1", docPage.RowCount)
+	}
+	body := docBodyAt(t, docPage, 0)
+	if body == nil || !strings.Contains(*body, "scratch-1") {
+		t.Errorf("body = %v, want it to contain scratch-1", derefStr(body))
+	}
+	id := docIDAt(t, docPage, 0)
+	if id == nil {
+		t.Fatal("id is nil")
+	}
+
+	deletePlan := model.MutationPlan{Path: collectionPath, Ops: []model.MutationRowOp{{
+		Kind: "delete", Key: model.RowValues{{Name: "_id", Value: id}},
+	}}}
+	if _, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-ddl-4")); err != nil {
+		t.Fatalf("Mutate(delete): %v", err)
+	}
+	count, err := root.Database(testsupport.MongoDatabase).Collection(collectionName).CountDocuments(ctx, bson.D{})
+	if err != nil {
+		t.Fatalf("CountDocuments after delete: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("count after delete = %d, want 0", count)
+	}
+}
+
 // console: find / insertOne / countDocuments through the shell statement grammar
 func TestMongo_Console_Execute(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
