@@ -34,20 +34,44 @@ declare global {
           liveScrollTop: number;
           clientHeight: number;
           uncoveredPx: number;
+          /** P22 iter2-pacing D3. */
+          frameMs: number;
+          /** P22 iter2-pacing D3. */
+          renderCount: number;
           renderMs: number;
           rows: number;
         }[];
         summary: {
-          pxPerFrame: { p50: number; p95: number; max: number };
-          uncoveredPx: { p50: number; p95: number; max: number };
-          renderMs: { p50: number; p95: number; max: number };
+          pxPerFrame: { p50: number; p95: number; max: number; mean: number; stddev: number };
+          uncoveredPx: { p50: number; p95: number; max: number; mean: number; stddev: number };
+          renderMs: { p50: number; p95: number; max: number; mean: number; stddev: number };
+          /** P22 iter2-pacing D3. */
+          frameMs: { p50: number; p95: number; max: number; mean: number; stddev: number };
           scrollEventsHistogram: Record<number, number>;
+          /** P22 iter2-pacing D3. */
+          renderCountHistogram: Record<number, number>;
         };
       } | null;
     };
     /** P22 spike §7.2 (apps/kira-studio/frontend/src/views/grid/DataView.vue) — set before boot
      *  (page.addInitScript + a reload) to mount SlickGridHost.vue instead of DataGrid.vue. */
     __kiraGridEngine?: 'tanstack' | 'slick';
+    /** P22 iter2-pacing D1/D2 — runtime tuning for the SlickGrid engine's frame-pacing gate and
+     *  runway-growth cap, mirroring apps/kira-studio/frontend/src/main.ts's own `declare global`
+     *  (a separate TS program, D9's own re-declaration precedent — only the fields tests/ui/ specs
+     *  actually set are carried here, not the whole shape). */
+    __kiraGridTuning?: {
+      leadFramesOverride?: number;
+      maxLeadPxOverride?: number;
+      incrementalRows?: boolean;
+      maxNewCellsPerRenderOverride?: number;
+      forceSyncScrollingOverride?: boolean;
+      /** P22 iter2-pacing D1: 0 restores the pre-fix "fire on the very next rAF, unconditionally"
+       *  chase behaviour exactly. */
+      chaseQuietMsOverride?: number;
+      /** P22 iter2-pacing D2: overrides columns.ts's MAX_NEW_LEAD_CELLS_PER_RENDER. */
+      maxNewLeadCellsPerRenderOverride?: number;
+    };
   }
 }
 

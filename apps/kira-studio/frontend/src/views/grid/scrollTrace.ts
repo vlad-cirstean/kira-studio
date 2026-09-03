@@ -24,12 +24,21 @@ export interface ScrollTraceEvent {
   /** performance.now() at the moment this native `scroll` event was handled. */
   t: number;
   /**
-   * Whether this event's own timestamp falls after the rAF tick it got bucketed into. Per the
-   * HTML spec, `scroll` dispatches before "run the animation frame callbacks" in the *same*
-   * rendering update, so this should read false for essentially every event — a `t` value close
-   * to (or moderately past) the frame boundary is expected `requestAnimationFrame`-callback-
-   * timestamp jitter, not evidence of anything; only a *large*, *consistent* positive reading here
-   * is meaningful (F3's open question — whether a notify can ever slip a whole frame).
+   * Whether this event's own timestamp falls after the rAF tick it got bucketed into.
+   *
+   * P22 iter2-pacing §3 F2 correction: this field's ordering premise, as originally written here,
+   * was that `scroll` always dispatches *before* "run the animation frame callbacks" in the same
+   * rendering update (per the HTML spec's own step order), so `true` should be rare and only
+   * `requestAnimationFrame`-timestamp jitter. That premise does not hold universally — this
+   * investigation's own sandbox reproduction found `afterRaf: true` on essentially *every* event
+   * under a wheel/compositor-driven scroll in WebKit (the plan's own §1.2/§3 F2: `tick, chase,
+   * scrollEvent, scrollRender` in 131 of 131 doubled frames), the opposite ordering from a
+   * `scrollTop +=` write driven from inside a rAF callback. The ordering is engine- and
+   * input-path-dependent, not a fixed spec guarantee this app can rely on. P22 iter2-pacing's own
+   * fix (D1, `CHASE_QUIET_MS`) deliberately does not depend on which ordering a given frame has —
+   * see kiraSlickGrid.ts's own `scheduleChase` comment. A real-Mac trace's `afterRaf` values are
+   * therefore the first honest reading of this field on the real target platform; `true` there is
+   * expected, not a bug signal, until proven otherwise.
    */
   afterRaf: boolean;
 }
@@ -57,10 +66,20 @@ export interface ScrollTraceFrame {
    *  quantity, which cannot see the compositor-ahead condition that makes it non-zero — see this
    *  module's own header comment). */
   uncoveredPx: number;
-  /** Vue's own update duration for this frame — wall time from the row/column virtualizer's
-   *  notify to the end of the resulting reactive flush (measured via nextTick, since Vue's own
-   *  internal queuePostFlushCb is not part of its public/typed API in this version). 0 when
-   *  nothing notified this frame. */
+  /** P22 iter2-pacing D3: wall time since the previous rAF tick, in px-free ms — the frame-
+   *  duration series the "smooth, ideally 60fps, but it can be lower with proper pacing" goal is
+   *  stated in directly. 0 on the first frame of a recording (no previous tick to diff against). */
+  frameMs: number;
+  /** P22 iter2-pacing D3: how many render passes (Vue notify-and-flush cycles, or KiraSlickGrid
+   *  render() calls) completed since the previous tick. The pacing bug's own direct signal: a
+   *  self-scheduled catch-up render sharing a frame with a scroll-driven one shows up here as > 1
+   *  — invisible before this field existed. */
+  renderCount: number;
+  /** The SUM of this frame's render passes' own durations (Vue: nextTick wall time per notify;
+   *  SlickGrid: KiraSlickGrid.render()'s own performance.now() delta per call) — not, as before
+   *  P22 iter2-pacing, the most recent pass's duration carried forward unreset into every later
+   *  frame. Resets to 0 at the top of every tick, so a frame with `renderCount === 0` reports
+   *  `renderMs === 0` rather than silently repeating whatever the previous render cost. */
   renderMs: number;
   /** Mounted [data-testid="grid-row"] count. */
   rows: number;
@@ -70,14 +89,24 @@ export interface ScrollTraceStats {
   p50: number;
   p95: number;
   max: number;
+  /** P22 iter2-pacing D3: pacing is a statement about spread, not about a percentile — p50/p95/max
+   *  of a metric can't answer "how uneven is this", so both moments are reported alongside them. */
+  mean: number;
+  stddev: number;
 }
 
 export interface ScrollTraceSummary {
   pxPerFrame: ScrollTraceStats;
   uncoveredPx: ScrollTraceStats;
   renderMs: ScrollTraceStats;
+  /** P22 iter2-pacing D3: the frame-duration series' own stats — see ScrollTraceFrame.frameMs. */
+  frameMs: ScrollTraceStats;
   /** scrollEvents-per-frame → how many frames saw that count. F2's direct test, tallied. */
   scrollEventsHistogram: Record<number, number>;
+  /** P22 iter2-pacing D3: renderCount-per-frame → how many frames saw that count, mirroring
+   *  scrollEventsHistogram. A key >= 2 anywhere during a live scroll is the doubling this phase's
+   *  D1 fix exists to remove — T1/T3 (tests/ui/slick-grid.spec.ts) gate exactly this field. */
+  renderCountHistogram: Record<number, number>;
 }
 
 export interface ScrollTraceResult {
@@ -95,7 +124,13 @@ let mountedRowSelector = '[data-testid="grid-row"]';
 
 let pendingEvents: { offset: number; t: number }[] = [];
 let pendingNotified = false;
-let lastRenderMs = 0;
+// P22 iter2-pacing D3: accumulators, drained and reset by every tick() — see that function's own
+// comment for why this replaces the old sticky `lastRenderMs` (never reset, so a no-render frame
+// reported the *previous* frame's duration and a doubled-render frame reported only its second
+// render's cost).
+let pendingRenderMs = 0;
+let pendingRenderCount = 0;
+let prevRafT = 0;
 let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
 
@@ -119,24 +154,31 @@ export function noteScrollEvent(offset: number, t: number): void {
   pendingEvents.push({ offset, t });
 }
 
-/** DataGrid.vue's own markScrollWork, called from each virtualizer's onChange. */
+/** DataGrid.vue's own markScrollWork, called from each virtualizer's onChange. P22 iter2-pacing D3:
+ *  accumulates into pendingRenderMs/pendingRenderCount (drained by tick()) instead of overwriting a
+ *  sticky last-value — see ScrollTraceFrame.renderMs's own comment for why that distinction is
+ *  load-bearing. */
 export function noteNotify(): void {
   if (!recording) return;
   pendingNotified = true;
   const start = performance.now();
   void nextTick(() => {
-    lastRenderMs = performance.now() - start;
+    pendingRenderMs += performance.now() - start;
+    pendingRenderCount++;
   });
 }
 
 /** P22 iter2-scroll-gaps D1: for an engine whose render pass is fully synchronous (SlickGrid — no
  *  Vue patch/flush involved on this path at all), the caller already has the duration in hand;
  *  report it directly instead of nextTick's Vue-specific approximation, which noteNotify() stays as,
- *  unchanged, for DataGrid.vue's own callers. Called from KiraSlickGrid's own `render()` override. */
+ *  unchanged, for DataGrid.vue's own callers. Called from KiraSlickGrid's own `render()` override —
+ *  including a chase-scheduled catch-up render, so two calls landing in the same frame (the P22
+ *  iter2-pacing bug, before D1's fix) both accumulate rather than one clobbering the other. */
 export function noteRenderMs(ms: number): void {
   if (!recording) return;
   pendingNotified = true;
-  lastRenderMs = ms;
+  pendingRenderMs += ms;
+  pendingRenderCount++;
 }
 
 function measureMountedBand(el: HTMLElement): { top: number; bottom: number; rows: number } {
@@ -159,6 +201,15 @@ function tick(rafT: number): void {
   pendingEvents = [];
   const notified = pendingNotified;
   pendingNotified = false;
+  // P22 iter2-pacing D3: drain-and-reset, every tick, unconditionally — the fix for the sticky
+  // `lastRenderMs` bug. A frame with no render this tick sees renderCount 0 / renderMs 0, not
+  // whatever the previous frame happened to leave behind.
+  const renderMs = pendingRenderMs;
+  pendingRenderMs = 0;
+  const renderCount = pendingRenderCount;
+  pendingRenderCount = 0;
+  const frameMs = prevRafT ? rafT - prevRafT : 0;
+  prevRafT = rafT;
 
   const el = gridEl;
   const liveScrollTop = el?.scrollTop ?? 0;
@@ -182,7 +233,9 @@ function tick(rafT: number): void {
     liveScrollTop,
     clientHeight,
     uncoveredPx,
-    renderMs: lastRenderMs,
+    frameMs,
+    renderCount,
+    renderMs,
     rows: band.rows,
   });
 
@@ -197,21 +250,33 @@ function percentile(values: number[], p: number): number {
 }
 
 function stats(values: number[]): ScrollTraceStats {
+  const mean = values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
+  const variance = values.length
+    ? values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length
+    : 0;
   return {
     p50: percentile(values, 50),
     p95: percentile(values, 95),
     max: values.length ? Math.max(...values) : 0,
+    mean,
+    stddev: Math.sqrt(variance),
   };
 }
 
 function summarize(fr: ScrollTraceFrame[]): ScrollTraceSummary {
-  const histogram: Record<number, number> = {};
-  for (const f of fr) histogram[f.scrollEvents] = (histogram[f.scrollEvents] ?? 0) + 1;
+  const scrollEventsHistogram: Record<number, number> = {};
+  const renderCountHistogram: Record<number, number> = {};
+  for (const f of fr) {
+    scrollEventsHistogram[f.scrollEvents] = (scrollEventsHistogram[f.scrollEvents] ?? 0) + 1;
+    renderCountHistogram[f.renderCount] = (renderCountHistogram[f.renderCount] ?? 0) + 1;
+  }
   return {
     pxPerFrame: stats(fr.map((f) => f.pxPerFrame)),
     uncoveredPx: stats(fr.map((f) => f.uncoveredPx)),
     renderMs: stats(fr.map((f) => f.renderMs)),
-    scrollEventsHistogram: histogram,
+    frameMs: stats(fr.map((f) => f.frameMs)),
+    scrollEventsHistogram,
+    renderCountHistogram,
   };
 }
 
@@ -220,7 +285,9 @@ export function start(): void {
   frames = [];
   pendingEvents = [];
   pendingNotified = false;
-  lastRenderMs = 0;
+  pendingRenderMs = 0;
+  pendingRenderCount = 0;
+  prevRafT = 0;
   prevLiveScrollTop = gridEl?.scrollTop ?? 0;
   if (rafId) cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(tick);
