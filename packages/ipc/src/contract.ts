@@ -28,7 +28,8 @@ export type DecorationRef =
   | { readonly kind: "branch"; readonly name: string; readonly isHead: boolean }
   | { readonly kind: "remoteBranch"; readonly name: string }
   | { readonly kind: "tag"; readonly name: string }
-  | { readonly kind: "head" };
+  | { readonly kind: "head" }
+  | { readonly kind: "stash" };
 
 /** The settings schema's keys and value types (D25, W4) — a structural copy of `core`'s
  *  generated `Settings` type, kept in step by wireConformance.test.ts. */

@@ -64,6 +64,13 @@ describe("parseLogRecord", () => {
     const stashCommit = commits.find((c) => c.parents.length === 2);
     expect(stashCommit).toBeDefined();
   });
+
+  test("the stash tip decorates as {kind: 'stash'}, not a branch literally named refs/stash", async () => {
+    const records = await loadRecords("withStash");
+    const commits = records.map(parseLogRecord);
+    const stashCommit = commits.find((c) => c.parents.length === 2);
+    expect(stashCommit?.decoration).toEqual([{ kind: "stash" }]);
+  });
 });
 
 describe("parseLogRecord — hand-authored pathological cases", () => {

@@ -22,11 +22,29 @@
   -webkit-user-select: none;
 }
 
-/* Only the glyphs the P0 placeholder toolbar uses; the action -> codicon map grows in icons/index.ts. */
+/* Only the glyphs actually referenced; the action/badge -> codicon maps grow in icons/index.ts.
+   Codepoints copied from @vscode/codicons/dist/codicon.css, not invented. */
 .codicon-refresh::before {
   content: "\ea77";
 }
 
 .codicon-search::before {
   content: "\ea6d";
+}
+
+/* P4 W7: ref badges (refBadges.ts) — local/HEAD branch, remote branch, tag, stash. */
+.codicon-git-branch::before {
+  content: "\ec6f";
+}
+
+.codicon-cloud::before {
+  content: "\ebaa";
+}
+
+.codicon-tag::before {
+  content: "\ea66";
+}
+
+.codicon-archive::before {
+  content: "\ea98";
 }

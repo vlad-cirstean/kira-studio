@@ -154,4 +154,18 @@ describe("rowMetadata", () => {
     const meta = rowMetadata({ store, isSelected: () => true }, 0);
     expect(meta?.cssClasses).toBe("kv-row-selected kv-row-head");
   });
+
+  test("the refs/stash tip contributes kv-row-stash, keyed off decorationAt alone", () => {
+    const store = new CommitStore();
+    store.appendPage([record({ decoration: [{ kind: "stash" }] })]);
+    const meta = rowMetadata({ store, isSelected: () => false }, 0);
+    expect(meta?.cssClasses).toBe("kv-row-stash");
+  });
+
+  test("selected and stash combine into one space-separated class list", () => {
+    const store = new CommitStore();
+    store.appendPage([record({ decoration: [{ kind: "stash" }] })]);
+    const meta = rowMetadata({ store, isSelected: () => true }, 0);
+    expect(meta?.cssClasses).toBe("kv-row-selected kv-row-stash");
+  });
 });

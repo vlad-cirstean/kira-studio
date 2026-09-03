@@ -52,6 +52,12 @@
   --kv-badge-tag-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
   --kv-badge-fg: var(--vscode-badge-foreground, #ffffff);
   --kv-badge-bg: var(--vscode-badge-background, #4d4d4d);
+  /* Stash badge (P4 W7, §7.6): no workbench colour id names a stash specifically, so this
+     reuses the muted "ignored resource" tone VS Code already uses for things that sit outside
+     the normal history — a deliberate choice, not an oversight, documented so a later theme
+     pass does not "fix" it into a git-decoration colour that does not exist. */
+  --kv-badge-stash-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
+  --kv-badge-stash-border: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
 
   /* Status / diff colours reuse Git's own decoration tokens (§6.1) */
   --kv-diff-added-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);

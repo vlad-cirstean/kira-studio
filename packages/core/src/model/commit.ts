@@ -14,7 +14,11 @@ export type DecorationRef =
   | { readonly kind: "remoteBranch"; readonly name: string }
   | { readonly kind: "tag"; readonly name: string }
   /** Detached HEAD pointing directly at this commit, with no branch in the decoration list. */
-  | { readonly kind: "head" };
+  | { readonly kind: "head" }
+  /** The tip of `refs/stash` (P4 W7/W8: badge and node shape both key off this, the single
+   *  source `git/src/parse/log.ts`'s `parseDecorationToken` recognizes by name — never a second
+   *  heuristic over the subject line, which a normal commit could coincidentally match). */
+  | { readonly kind: "stash" };
 
 export interface CommitRecord {
   readonly sha: string;

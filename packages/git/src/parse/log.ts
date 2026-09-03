@@ -78,6 +78,10 @@ function parseDecorationToken(token: string): DecorationRef {
     const rest = token.slice("tag: ".length);
     return { kind: "tag", name: stripPrefix(rest, "refs/tags/") ?? rest };
   }
+  // `revSetArgs("all")` walks `refs/stash` explicitly (this file's own doc comment on why), and
+  // `--decorate=full` names it exactly this way — distinct from a `refs/heads/stash` branch,
+  // which would arrive as `refs/heads/stash` and fall through to the branch case below instead.
+  if (token === "refs/stash") return { kind: "stash" };
   const branch = stripPrefix(token, "refs/heads/");
   if (branch !== undefined) return { kind: "branch", name: branch, isHead: false };
   const remote = stripPrefix(token, "refs/remotes/");

@@ -4,15 +4,15 @@
  * the grid actually renders, each `CommitRecord` materialized and immediately discarded rather
  * than retained (`getItem` is never memoized here; see `createCommitDataView`'s doc comment).
  *
- * Two of the five columns below are deliberately minimal. The **graph** column returns an empty
- * `<svg>` — W8's `graphColumn.ts` replaces this formatter with the real one once `rowSvg.ts`
+ * One of the five columns below is still deliberately minimal. The **graph** column returns an
+ * empty `<svg>` — W8's `graphColumn.ts` replaces this formatter with the real one once `rowSvg.ts`
  * exists; until then (and forever, for a row whose layout hasn't arrived yet — W5: text lands
  * before lanes do) an empty graph cell is correct, not a placeholder that throws. The **message**
- * column renders the subject as plain text — W7's `refBadges.ts` extends this same formatter
- * with inline ref badges once the badge renderer exists. Splitting graph/message this way now
- * (rather than leaving both unwritten) is what lets W6's own "Done when" bullets — bounded row
- * count, `getItem` call counting, keyboard/scroll behaviour — be verified without waiting on W7
- * or W8, exactly as the plan's dependency table has it (W7 and W8 both depend on W6).
+ * column (W7) renders the subject plus, when the row has decorations, `refBadges.ts`'s inline
+ * badge strip ahead of it. Splitting graph/message this way at W6 (rather than leaving both
+ * unwritten) is what let W6's own "Done when" bullets — bounded row count, `getItem` call
+ * counting, keyboard/scroll behaviour — be verified without waiting on W7 or W8, exactly as the
+ * plan's dependency table has it (W7 and W8 both depend on W6, not the reverse).
  *
  * `enableHtmlRendering: false` (set by `CommitGrid.vue`) means every formatter here must return
  * a real `HTMLElement`/`SVGElement`, never a string — enforced by the library, not by discipline,
@@ -21,6 +21,7 @@
 import type { CommitRecord, CommitStore, DecorationRef } from "@kira-version/core";
 import type { Column, CustomDataView, Formatter, ItemMetadata } from "slickgrid";
 import { formatAbsoluteDate, formatRelativeDate } from "./dateFormat.ts";
+import { buildRefBadges } from "./refBadges.ts";
 import { graphColumnWidth } from "../graph/geometry.ts";
 import type { ColumnWidths, DateFormat } from "../state/viewState.ts";
 
@@ -38,6 +39,10 @@ export const SHA_COLUMN_ID = "sha";
 
 function isHeadDecoration(ref: DecorationRef): boolean {
   return ref.kind === "head" || (ref.kind === "branch" && ref.isHead);
+}
+
+function isStashDecoration(ref: DecorationRef): boolean {
+  return ref.kind === "stash";
 }
 
 function textCell(text: string, className: string): HTMLSpanElement {
@@ -63,10 +68,30 @@ const graphFormatter: Formatter<CommitRecord> = () => {
   return wrapper;
 };
 
-/** W7's placeholder: the subject alone, no ref badges yet. `text-overflow: ellipsis` is a CSS
- *  rule on the cell (`CommitGrid.vue`'s `<style>`), not something this formatter computes. */
-const messageFormatter: Formatter<CommitRecord> = (_row, _cell, _value, _columnDef, dataContext) =>
-  textCell(dataContext.subject, "kv-cell-message");
+/** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
+ *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
+ *  the subject, which alone gets `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`,
+ *  not something this formatter computes. */
+const messageFormatter: Formatter<CommitRecord> = (
+  _row,
+  _cell,
+  _value,
+  _columnDef,
+  dataContext,
+) => {
+  const cell = document.createElement("span");
+  cell.className = "kv-cell-message";
+
+  const badges = buildRefBadges(dataContext.decoration);
+  if (badges !== null) cell.appendChild(badges);
+
+  const subject = document.createElement("span");
+  subject.className = "kv-message-subject";
+  subject.textContent = dataContext.subject;
+  cell.appendChild(subject);
+
+  return cell;
+};
 
 const authorFormatter: Formatter<CommitRecord> = (_row, _cell, _value, _columnDef, dataContext) =>
   textCell(dataContext.author.name, "kv-cell-author");
@@ -186,11 +211,10 @@ export function buildColumns(
 }
 
 /** `getItemMetadata`'s `cssClasses`: `selected` from `SelectionState` (not SlickGrid's own
- *  `RowSelectionModel` — see `CommitGrid.vue`'s doc comment), `head` from `decorationAt`. Stash
- *  row styling is not here: `DecorationRef` has no `stash` kind yet (`packages/core`'s model
- *  covers branch/remoteBranch/tag/head only) — W7 extends the model and this function together,
- *  the single source `docs/plans/P4.md` W8 already promises ("the single source is
- *  `decorationAt`, not a second heuristic"). */
+ *  `RowSelectionModel` — see `CommitGrid.vue`'s doc comment), `head`/`stash` from `decorationAt` —
+ *  the single source `docs/plans/P4.md` W8 promises ("the single source is `decorationAt`, not a
+ *  second heuristic" — in particular, never a guess from the subject line, which an ordinary
+ *  commit could coincidentally match). */
 export interface RowMetadataContext {
   readonly store: CommitStore;
   readonly isSelected: (row: number) => boolean;
@@ -199,7 +223,9 @@ export interface RowMetadataContext {
 export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata | null {
   const classes: string[] = [];
   if (ctx.isSelected(row)) classes.push("kv-row-selected");
-  if (ctx.store.decorationAt(row).some(isHeadDecoration)) classes.push("kv-row-head");
+  const decoration = ctx.store.decorationAt(row);
+  if (decoration.some(isHeadDecoration)) classes.push("kv-row-head");
+  if (decoration.some(isStashDecoration)) classes.push("kv-row-stash");
   return classes.length > 0 ? { cssClasses: classes.join(" ") } : null;
 }
 

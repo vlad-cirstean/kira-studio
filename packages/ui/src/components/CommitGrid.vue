@@ -441,6 +441,13 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
+/* The stash tip (refs/stash — W7's DecorationRef "stash" kind): italic subject text is the row-
+   level cue; the badge itself (dashed square, codicon-archive) is refBadges.ts's job, rendered
+   inline in the message cell, not here. */
+.kv-commit-grid .slick-row.kv-row-stash .kv-message-subject {
+  font-style: italic;
+}
+
 .kv-commit-grid .slick-cell {
   border: none;
   padding: 0 var(--kv-space-2);
@@ -469,11 +476,107 @@ onBeforeUnmount(() => {
   overflow: visible;
 }
 
-.kv-cell-message,
+.kv-cell-message {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.kv-message-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .kv-cell-author {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* refBadges.ts's inline badge strip (P4 W7, §6.2): a row with no decorations never gets this
+   wrapper at all (buildRefBadges returns null), so this only ever costs layout on rows that
+   have something to show. flex-shrink: 0 keeps badges from squeezing to nothing before the
+   subject's own ellipsis kicks in. */
+.kv-ref-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.kv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 5px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 10px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.kv-badge-pill {
+  border-radius: 9px;
+}
+
+.kv-badge-square {
+  border-radius: 3px;
+}
+
+.kv-badge-dashed {
+  border-style: dashed;
+}
+
+.kv-badge-icon {
+  font-size: 11px;
+}
+
+/* §6.2's "badge text truncates at ~190px, full name in title" — the icon stays fixed size, only
+   the text label clips. */
+.kv-badge-label {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* §7's "no colour-only meaning" — every distinct token below pairs with a distinct shape/glyph
+   already chosen in refBadges.ts's badgeSpecFor, this file only supplies the colour. */
+.kv-badge-local {
+  background-color: var(--kv-badge-local-bg);
+  border-color: var(--kv-badge-local-bg);
+  color: var(--kv-badge-fg);
+}
+
+.kv-badge-remote {
+  color: var(--kv-badge-remote-fg);
+  border-color: var(--kv-badge-remote-fg);
+}
+
+.kv-badge-tag {
+  color: var(--kv-badge-tag-fg);
+  border-color: var(--kv-badge-tag-fg);
+}
+
+.kv-badge-stash {
+  color: var(--kv-badge-stash-fg);
+  border-color: var(--kv-badge-stash-border);
+}
+
+.kv-badge-overflow {
+  color: var(--kv-row-fg);
+  border-color: var(--kv-panel-border);
+}
+
+.kv-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--kv-focus-border);
 }
 
 .kv-cell-date {
