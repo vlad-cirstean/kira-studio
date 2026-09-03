@@ -1020,3 +1020,88 @@ document.
   update", which the histogram still supports), but the first real-Mac trace with D3 landed is the
   first honest reading of it, and `docs/PERF.md`'s Chromium-derived ordering claim at `:98-102`
   should be re-checked against it.
+
+---
+
+## 11. Postscript — the gesture-onset pass (P22 iter2-onset), and a correction to §5 D1
+
+Added after this plan's C1-C10 landed and were reported on from real macOS hardware. The verdict on
+this plan was positive — "feels really good", a consistent ~30 ms/frame — with one residual: **at
+the very start of a fast fling, before deceleration begins, a few frames in which content isn't
+fully rendered.** Recorded here rather than in a new document, per this repo's own preference for
+extending an existing plan over starting a fourth one mid-thread.
+
+### 11.1 The finding: the runway's velocity input is one scroll event stale, always
+
+`SlickGrid` binds its own viewport `scroll` listener in `finishInitialization()`
+(`dist/esm/index.js:7572`, reached from the constructor because `explicitInitialization: false`).
+`SlickGridHost.vue` binds `onViewportScroll` on the *same element* only after
+`new KiraSlickGrid(...)` returns (`:359` at `a9dc570`). Two non-capturing listeners on one target
+fire in registration order, so SlickGrid's `handleScroll` → `_handleScroll` (`:10589`) → `render()`
+→ `getRenderedRange()` → `velocity()` (`kiraSlickGrid.ts:219-221`) runs **before** the host samples
+the very event that triggered it.
+
+Measured, not inferred, with the `runwayVelocity` field this pass added to `__kiraScrollTrace`:
+under the pre-fix policy a frame's runway velocity is *exactly* the previous frame's measured
+`pxPerFrame` — `20/19, 25/20, 28/25, 31/28, 35/31, 36/35, 45/36, ...` — for the whole length of
+every burst.
+
+Mid-fling the lag is harmless. At **the first render of a fresh gesture** it is not: the only sample
+on hand predates the gesture, so `velocity()`'s own 150 ms at-rest test (`SlickGridHost.vue:176`)
+fires and it returns `{0, 0}`. `rowRangeBounds` then collapses `target` to `baseLeadPx`
+(`columns.ts`'s `leadPxWanted` clamp), the per-call budget of step 7 is left entirely unspent, and
+step 8 does not even set `chaseWanted` — the returned range *does* reach that collapsed target. One
+frame of runway-building is lost per gesture, at peak velocity.
+
+This corrects the framing this pass inherited: the defect is not that `prevOffsetT` is `0` on the
+first sample (true only for the first gesture in a tab's life), it is listener ordering, which
+applies to **every** gesture — matching the symptom.
+
+### 11.2 The fix, and the alternative rejected
+
+Sample at the point of consumption: `velocity()` reads `viewportEl.scrollTop` itself, deduped by
+offset, seeded once at mount. No render can then run on a sample older than the event that triggered
+it. `freshVelocitySampleOverride = false` restores the old behaviour exactly.
+
+**Rejected: a one-time onset bypass of `scheduleChase`'s quiescence gate.** It reintroduces exactly
+one doubled frame per gesture — the thing §5 D1 exists to prevent — at the moment the user is most
+sensitive, on a "was it idle?" heuristic a main-thread stall can false-positive mid-fling. Decisively,
+it also cannot help on the frame that matters: on the onset frame the pre-fix code does not *want* a
+chase at all (§11.1), so a bypass has nothing to release.
+
+### 11.3 The correction to §5 D1 — the quiescence gate cannot be wall-clock only
+
+**`CHASE_QUIET_MS = 24` is shorter than one frame on the hardware this plan measured.** §7.4's own
+figure is a p50 frame duration of 32.1 ms; this sandbox's wheel-fling harness measures p50 29 / p95
+58 / max 65 ms. When a frame outlasts the threshold, "24 ms since the last scroll event" no longer
+means "no scroll event is driving this frame" — the event was in the *previous, long* frame, which
+is precisely a frame the main thread is already behind on — and the gate opens on a frame that does
+carry a scroll-driven render. Measured, once a chase is genuinely wanted on every frame: **7-9
+doubled frames out of ~80.**
+
+§3 F3's own termination argument depended on the same blind spot, and §6 T1 passed at `a9dc570` for
+a reason worth stating plainly: the stale sampler of §11.1 reported *zero* velocity over much of a
+fast fling, which collapsed `target`, which meant no chase was ever wanted, which meant **the gate
+was passing its own test by never being asked**. Restoring real velocity is what exposed it.
+
+The gate therefore gains a second, per-frame half: a catch-up render additionally requires that no
+native `scroll` event arrived between the previous animation frame and this one, read as a
+**sequence number** rather than a duration. This is precisely the refinement §10 anticipated
+("deriving the threshold from the observed rAF interval ... the obvious refinement, deliberately not
+built up front"), and it preserves §3 F2's ordering-agnosticism: it never asks which of the two
+renders ran first inside a frame, only whether a scroll event happened across the last one — true in
+every frame that will carry a scroll-driven render, under either engine's ordering. It is strictly
+conservative (it can only *delay* a chase, never release one) and costs one extra quiet frame before
+the chase converges after a fling stops. `chaseQuietMsOverride = 0` still disables the gate whole,
+so §6 T3 and §7.3 step 3 keep their meaning; `chaseFrameGateOverride = false` A/Bs the new half.
+
+### 11.4 Status
+
+Sandbox-provable and proved (`tests/ui/slick-grid.spec.ts`, `P22 iter2-onset`): the one-sample lag;
+its absence after the fix across three rest-to-motion transitions; the pacing invariant still holding
+on that same recording; and doubled frames returning when the per-frame gate is switched off.
+**Nothing here claims the onset artifact is gone** — `docs/PERF.md` §2.1c carries the real-Mac
+protocol, its own refuting readings, and the named next candidate if the artifact survives (the
+per-call new-cell cap still costs roughly two budget-capped frames to converge from a standing
+start; this pass removes the *wasted* first frame, not the cap).
+

@@ -590,6 +590,113 @@ different. The perceptual sentence is what answers the report; the numbers keep 
    like `forceSyncScrolling`'s own history two sections above should be a reminder to keep it that
    way until a real trace actually reports back.
 
+**P22 iter2-onset: the gesture-onset artifact, a correction to the pacing gate, and how to A/B
+both.** After the pacing fix above landed, real-hardware feedback was that the grid "feels really
+good" at a consistent ~30ms/frame, with one small artifact left: at the very *start* of a fast
+fling — peak velocity, before deceleration begins — there is a brief, visible moment, a few frames
+long, where content isn't fully rendered. Once deceleration starts it is gone. This entry extends
+the protocol above (same setup, same build, same gesture); it is not a new section, and it does not
+supersede anything above.
+
+*What was wrong, and it was not the chase.* SlickGrid binds its own viewport `scroll` listener
+inside `finishInitialization()` (`slickgrid` `dist/esm/index.js:7572`, reached from the constructor
+because `explicitInitialization: false`). `SlickGridHost.vue` binds its own `onViewportScroll` on
+that same element only *after* `new KiraSlickGrid(...)` returns. Two non-capturing listeners on one
+target fire in registration order, so SlickGrid's `handleScroll` — and the synchronous `render()` →
+`getRenderedRange()` → `velocity()` it drives — **always ran one sample ahead of the host's own
+sampling of the very event that triggered it**. Mid-fling that is invisible (velocity barely moves
+frame to frame). At the first render of a fresh gesture it is not: the only sample on hand was taken
+*before* the gesture, so the sampler's own 150ms at-rest test fires and `velocity()` returns
+`{0, 0}`. The grid sizes its runway as if standing still — `target` collapses to the base runway,
+the per-call new-cell budget (~50 rows at 12 mounted columns) is left entirely unspent, and
+`getRenderedRange` does not even flag a deficit, because the range it returned *does* reach that
+collapsed target. One whole frame of runway-building is lost at the exact moment a fling needs it
+most, **on every gesture** — which is why the artifact appeared at the start of every fling and not
+only the first one in a tab. The fix samples the viewport at the point of consumption, so no render
+can run on a sample older than the event that triggered it.
+
+*The alternative that was considered and rejected, stated so nobody re-proposes it.* Letting the
+first catch-up render after a rest-to-motion transition bypass the quiescence gate. It reintroduces
+exactly one doubled frame per gesture, at the moment the user is most sensitive, on a "was it idle?"
+heuristic that a main-thread stall can false-positive mid-fling — and it cannot help on the frame
+that actually matters, because on the onset frame the pre-fix code does not *want* a chase at all
+(`chaseWanted` is false, since `target` collapsed), so there is nothing for a bypass to release. The
+shipped fix never touches the chase gate.
+
+*The correction to the pacing pass, found while measuring this one, and the more important half of
+this entry.* **`CHASE_QUIET_MS` is 24ms, and the real-Mac recording the pacing pass was written from
+reports a p50 frame duration of 32.1ms — the threshold is already shorter than one frame on the
+hardware it was designed for.** When a frame outlasts it, "24ms since the last scroll event" stops
+meaning "no scroll event is driving this frame": the event was simply in the previous, long, frame,
+which is precisely a frame the main thread is already behind on. The gate then opens on a frame that
+*does* carry a scroll-driven render. Measured here, once a chase is actually wanted on every frame:
+**7 to 9 doubled frames out of ~80** — the exact regime the pacing fix exists to prevent. It went
+unnoticed because the gate was never really being asked: the stale sampler above reported *zero*
+velocity on much of a fast fling, `target` collapsed, no chase was wanted, and the gate was passing
+its own test by not being exercised. So the wall-clock gate is now joined by a **per-frame** one a
+slow frame cannot outrun — a catch-up render additionally requires that no native `scroll` event
+arrived between the previous animation frame and this one, read as a sequence number rather than a
+duration (the refinement the plan's own §10 anticipated). It stays ordering-agnostic: it never asks
+whether the scroll render or the chase ran first inside a frame, only whether a scroll event
+happened across the last one. It is strictly conservative — it can only ever *delay* a chase, never
+release one — and its cost is that after a fling stops the chase converges from the second quiet
+frame rather than the first.
+
+*What the sandbox is allowed to claim here, and what it is not.* Provable here, and proved
+(`tests/ui/slick-grid.spec.ts`, the `P22 iter2-onset` test): that under the old policy a frame's
+runway velocity is *exactly* the previous frame's measured `pxPerFrame`, for the whole length of a
+fling (the one-sample lag is measured, not inferred); that after the fix no render sizes its runway
+at rest while the viewport is moving, across three rest-to-motion transitions; that the pacing
+invariant still holds on that same recording (no frame renders twice); and that removing the new
+per-frame gate re-introduces doubled frames on the same fling, so the invariant holds *because* of
+it. **Nothing here claims the onset artifact is gone. It is not confirmed fixed until a real Mac
+says so — this investigation's own history (`forceSyncScrolling`, `0865ef6` → `18a2cc4`) is the
+standing reason a sandbox-plausible fix does not get to certify itself.**
+
+*The readings that would refute this pass, stated before running.* **(a)** `staleVelocityFrames` on
+the baseline (with `freshVelocitySampleOverride = false`) is ~0 during a real fling — then the
+sampler was not stale on real hardware, the mechanism does not occur there, and the fix is aimed at
+nothing. **(b)** `staleVelocityFrames` goes to 0 and the onset artifact is still visible — then the
+runway's cold start was not what produced it; the remaining suspects are the per-call new-cell cap
+(the runway still needs ~2 budget-capped frames to converge, which this fix shortens but does not
+eliminate) and the GPU-process bucket §7.4 hands forward. **(c)** `renderCountHistogram` gains
+2-render frames after this pass — then the new per-frame gate is not doing what the sandbox says it
+does, and `chaseFrameGateOverride` is the first thing to A/B.
+
+**Protocol — same build, same table, same gesture as the pacing protocol above.** Report
+`summary.staleVelocityFrames`, `summary.runwayVelocity` `{mean, p50, p95, max}` **next to**
+`summary.pxPerFrame`'s own (the gap between the two is the runway's input lag, and it is what this
+pass closes), plus everything the pacing protocol above already asks for, and one sentence on
+whether the onset artifact is still there.
+
+1. **Baseline, live, no rebuild:** `window.__kiraGridTuning.freshVelocitySampleOverride = false`,
+   then one hard flick from a dead stop. Expect `staleVelocityFrames` >= 1 per gesture and
+   `runwayVelocity` visibly lagging `pxPerFrame`. Refuting reading (a) if it does not.
+2. **Unset it** (the shipped default) and repeat the same flick. `staleVelocityFrames` should be 0
+   and `runwayVelocity` should track `pxPerFrame`. **The reading that matters is the perceptual
+   one: is the few-frames-of-unrendered-content at the very start of the fling still there?**
+   Refuting reading (b) if the numbers move and the artifact does not.
+3. **The per-frame chase gate A/B:** `window.__kiraGridTuning.chaseFrameGateOverride = false`, same
+   flick, then unset. Read `renderCountHistogram` and `frameMs.stddev`. If the histogram gains
+   2-render frames with it off, the sandbox measurement reproduces on real hardware and the gate is
+   load-bearing; if it does not, the wall-clock gate was sufficient there and this half can be
+   reconsidered (do **not** simply delete it — a threshold shorter than a frame is wrong in
+   principle whether or not this particular gesture exposes it).
+4. **Re-run steps 3 and 4 of the pacing protocol above** (`chaseQuietMsOverride`,
+   `maxNewLeadCellsPerRenderOverride`) *after* this pass. Both dials now sit behind a different
+   chase gate and a different runway input, so their earlier verdicts — which were never actually
+   run — must not be inherited from the text above.
+5. **If the artifact survives step 2**, the next candidate is named and bounded: the per-call
+   new-cell cap means the runway still takes roughly two budget-capped frames to converge from a
+   standing start, and this fix removes the *wasted* first frame but not the cap itself. Raising
+   `maxNewCellsPerRenderOverride` for one run is the console-line experiment that says whether the
+   cap is the remaining term; **it trades directly against the single-frame batch cost the
+   iter2-scroll-gaps pass existed to bound**, so a win there is a re-opened trade-off, not a free
+   fix.
+6. Fold the result into this section and update
+   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §11. **This entry is not that
+   update** — it is the protocol, written before anyone has run it on real hardware.
+
 **The ceiling, restated so nobody re-derives it** (the plan's own §7.4): even the calmest frames in
 the post-`fce3e54` recording — before the heavy scroll-dispatch bursts start, with no chase firing —
 ran **23.5-24.5 ms**, past the 16.7 ms a 60 Hz budget allows, with composite + script together
