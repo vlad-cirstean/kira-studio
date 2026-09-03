@@ -186,6 +186,19 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     });
   }
 
+  /** P22 iter2-pacing D4 — SlickGrid's own `destroy()` never clears `this.initialized` and nulls
+   *  ~60 internal element references (dist/esm/index.js:7674-7700, :7723-7725), so a catch-up
+   *  render armed by `getRenderedRange` and still pending when the host unmounts would re-enter
+   *  `render()` against a torn-down grid, passing the `!this.initialized` guard because that flag
+   *  is still `true` and dereferencing a nulled element. Cancel the pending rAF (and stop it from
+   *  re-arming) before handing off to the real teardown. */
+  override destroy(shouldDestroyAllElements?: boolean): void {
+    if (this.chaseHandle) cancelAnimationFrame(this.chaseHandle);
+    this.chaseHandle = 0;
+    this.chaseWanted = false;
+    super.destroy(shouldDestroyAllElements);
+  }
+
   override getRenderedRange(
     viewportTop?: number,
     viewportLeft?: number,
