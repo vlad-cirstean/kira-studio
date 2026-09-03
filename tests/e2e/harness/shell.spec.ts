@@ -23,8 +23,18 @@ test.describe("app shell", () => {
     await expect(page.getByTestId("graph-region")).toBeVisible();
     await expect(page.getByTestId("detail-region")).toBeVisible();
     await expect(page.getByTestId("connection-state")).toHaveText("connected");
+    // P4 W10/W11: the live-data strip's placeholder toolbar is gone — this is the real toolbar
+    // (AppToolbar.vue), which owns only the repo picker and refresh for now (§6.2's scope
+    // table; no search box until P10, so no `.codicon-search` to assert on any more).
     await expect(page.locator(".codicon-refresh")).toBeVisible();
-    await expect(page.locator(".codicon-search")).toBeVisible();
+    // The real list, replacing the deleted strip's `commit-count`/`repo-root` testids (P4 W11):
+    // real rows exist and the first one's own content is visible.
+    await expect(page.locator(".slick-row").first()).toBeVisible();
+    await expect(page.locator(".kv-message-subject").first()).not.toBeEmpty();
+    await expect(page.locator(".kv-cell-sha").first()).not.toBeEmpty();
+    // `chunk-source` is the one strip testid kept — a real stream-chunk field (§5.4) with no
+    // other visible surface, not a test hook.
+    await expect(page.getByTestId("chunk-source")).toHaveText("git");
   });
 });
 

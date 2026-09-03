@@ -60,8 +60,11 @@ test.describe("electron shell", () => {
       await page.waitForSelector('[data-testid="connection-state"]');
 
       await expect(page.getByTestId("connection-state")).toHaveText("connected");
-      await expect(page.getByTestId("repo-root")).toHaveText(repo.dir);
-      await expect(page.getByTestId("commit-count")).toHaveText(String(repo.commits.length));
+      // P4 W11 deleted the live-data strip and its `repo-root`/`commit-count` testids — the real
+      // list is the replacement: every generated commit renders as a `.slick-row`, and the first
+      // row's own content (subject, sha) is real, not a placeholder.
+      await expect(page.locator(".slick-row")).toHaveCount(repo.commits.length);
+      await expect(page.locator(".kv-message-subject").first()).not.toBeEmpty();
       // The very first stream for a freshly opened repo has nothing cached yet — every row it
       // emits comes from `RepoService.streamGraph`'s one fresh page read (§5.4), never a replay.
       await expect(page.getByTestId("chunk-source")).toHaveText("git");

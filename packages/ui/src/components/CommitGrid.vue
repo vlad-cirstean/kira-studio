@@ -375,6 +375,16 @@ onBeforeUnmount(() => {
   grid?.destroy();
   grid = undefined;
 });
+
+/** `App.vue` (W11) calls this once a refresh's re-walk re-resolves a previously selected sha
+ *  back to a (possibly different) row — `initialScrollRow` only ever applies once, at mount
+ *  (see its own doc comment above), so a refresh that happens later needs an imperative path
+ *  back to the same underlying `scrollRowIntoView` call. */
+function scrollToRow(row: number): void {
+  grid?.scrollRowIntoView(row);
+}
+
+defineExpose({ scrollToRow });
 </script>
 
 <template>
@@ -423,6 +433,10 @@ onBeforeUnmount(() => {
   position: relative;
   height: 100%;
   width: 100%;
+  /* §6.3's own "Done when": a panel dragged to zero height is a real thing a user can do, and a
+     grid asked to lay out a zero-height viewport is where a division-by-viewport-height bug
+     would live. One row's worth of floor keeps that arithmetic away from zero. */
+  min-height: var(--kv-row-height);
   overflow: hidden;
   font-family: var(--kv-font-family);
   font-size: var(--kv-font-size);

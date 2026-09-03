@@ -226,6 +226,9 @@
           "correctness": {
             "noUnusedImports": "off",
             "noUnusedVariables": "off"
+          },
+          "style": {
+            "useImportType": "off"
           }
         }
       }

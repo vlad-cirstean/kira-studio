@@ -11,12 +11,14 @@
  * not auto-refresh — pulling the list out from under a mid-scroll user because a background
  * `git fetch` finished is exactly what §6.2 draws the line against.
  *
- * The keybinding listens on `document` rather than a specific "panel" element: P4 has no
- * dedicated focus-scoping container yet (W11 builds the shell), and a single-webview app has
- * nothing else competing for `F5`/`Ctrl+R` in practice. Revisit if a later phase adds a second
- * focus scope (e.g. a search box) that should swallow these keys instead.
+ * The `F5`/`Ctrl+R` keybinding itself is not attached here: `CommitGrid.vue` (W6) already owns a
+ * keydown listener scoped to its own host element and emits a `refresh` event from it, which is
+ * exactly "while the panel has focus" (§6.2) — precise focus scoping a second, independent
+ * document-level listener here could not match without duplicating it. `App.vue` (W11) wires
+ * that emit to this component's exposed `refresh()`, so both paths share one implementation and
+ * one `hasPendingChange` state.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { ACTION_ICONS } from "../icons/index.ts";
 import type { GraphViewState } from "../state/graphView.ts";
 import type { RepoState } from "../state/repo.ts";
@@ -45,24 +47,7 @@ async function doRefresh(): Promise<void> {
   await props.graphView.refresh();
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-  );
-}
-
-function onKeydown(event: KeyboardEvent): void {
-  if (isEditableTarget(event.target)) return;
-  const isRefreshKey =
-    event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r");
-  if (!isRefreshKey) return;
-  event.preventDefault();
-  void doRefresh();
-}
-
-onMounted(() => document.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
+defineExpose({ refresh: doRefresh });
 </script>
 
 <template>

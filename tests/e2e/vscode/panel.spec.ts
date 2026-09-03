@@ -98,8 +98,10 @@ test.describe("vscode panel", () => {
       const frame = graphFrame(page);
 
       await expect(frame.getByTestId("connection-state")).toHaveText("connected");
-      await expect(frame.getByTestId("repo-root")).toHaveText(repo.dir);
-      await expect(frame.getByTestId("commit-count")).toHaveText(String(repo.commits.length));
+      // P4 W11 deleted the live-data strip and its `repo-root`/`commit-count` testids — the real
+      // list is the replacement (same reasoning as the Electron spec's own update).
+      await expect(frame.locator(".slick-row")).toHaveCount(repo.commits.length);
+      await expect(frame.locator(".kv-message-subject").first()).not.toBeEmpty();
       // Same reasoning as the Electron spec's first test: nothing is cached before this
       // session's very first stream, so every row this load emits comes from git.
       await expect(frame.getByTestId("chunk-source")).toHaveText("git");
@@ -128,9 +130,7 @@ test.describe("vscode panel", () => {
     try {
       const page = await app.firstWindow();
       await openPanel(page);
-      await expect(graphFrame(page).getByTestId("commit-count")).toHaveText(
-        String(repo.commits.length),
-      );
+      await expect(graphFrame(page).locator(".slick-row")).toHaveCount(repo.commits.length);
 
       // Closing and reopening the panel disposes and recreates the webview view (panelView.ts's
       // own doc comment: `retainContextWhenHidden` is deliberately off), which is exactly the
@@ -141,7 +141,7 @@ test.describe("vscode panel", () => {
       await runCommand(page, "Kira Version: Focus Graph");
       const frame = graphFrame(page);
 
-      await expect(frame.getByTestId("commit-count")).toHaveText(String(repo.commits.length));
+      await expect(frame.locator(".slick-row")).toHaveCount(repo.commits.length);
       // The rehydration round trip replays every row the host still has cached — never a fresh
       // git read — so unlike the very first load, `chunk-source` must land on "cache".
       await expect(frame.getByTestId("chunk-source")).toHaveText("cache");

@@ -10,6 +10,7 @@
  * Metrics match the panel title bar's, not an invented toolbar height (§6.1): 35px
  * (`--kv-toolbar-height`), square corners (`--kv-radius: 0`), no shadow.
  */
+import { ref } from "vue";
 import type { GraphViewState } from "../state/graphView.ts";
 import type { RepoState } from "../state/repo.ts";
 import RefreshButton from "./RefreshButton.vue";
@@ -17,13 +18,21 @@ import RepoPicker from "./RepoPicker.vue";
 
 defineProps<{ graphView: GraphViewState; repoState: RepoState }>();
 const emit = defineEmits<(event: "repo-opened", repoId: string) => void>();
+
+const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
+
+// Forwarded so App.vue can drive the same refresh RefreshButton's own click uses from
+// CommitGrid.vue's "refresh" emit (F5/Ctrl+R while the grid has focus) — one implementation,
+// reached from two inputs, rather than App.vue reimplementing RefreshButton's own idempotency
+// and hasPendingChange bookkeeping a second time.
+defineExpose({ refresh: () => refreshButtonRef.value?.refresh() });
 </script>
 
 <template>
   <header class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
     <RepoPicker :repo-state="repoState" @repo-opened="(repoId) => emit('repo-opened', repoId)" />
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
-    <RefreshButton :graph-view="graphView" :repo-state="repoState" />
+    <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
   </header>
 </template>
 

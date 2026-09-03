@@ -76,6 +76,11 @@
   --kv-description-fg: var(--vscode-descriptionForeground, #9d9d9d);
   --kv-error-fg: var(--vscode-errorForeground, #f48771);
 
+  /* The <600px overlay drawer's backdrop (P4 W11, §6.3) — no workbench colour id names a modal
+     scrim specifically (the closest, --vscode-widget-shadow, is already used for drop shadows
+     above), so this is a second invented value, same as the lane palette above. */
+  --kv-overlay-bg: rgba(0, 0, 0, 0.35);
+
   /* Scrollbar */
   --kv-scrollbar-thumb-bg: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
   --kv-scrollbar-thumb-hover-bg: var(
