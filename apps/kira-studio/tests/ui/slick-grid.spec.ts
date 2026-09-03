@@ -932,3 +932,57 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
   expect(tallElapsedMs).toBeLessThan(150);
   await expect.poll(() => tall.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
 });
+
+// P22 Pass B, C9/§9.2 T8 — the pacing invariant (T1's own histogram-all-1 assertion, above) held
+// again with N staged insert rows on screen. D9's own §0.3 acknowledgement: this is the one place
+// this pass returns DOM from a formatter (the insert region's own `<input>`, self-contained and
+// never re-touched by SlickGrid once built — see `cellFormatter`'s own comment, SlickGridHost.vue)
+// against `-iter2-pacing` D5's measured "text, never DOM" rule, so it gets its own gate, landed in
+// the same commit that adds the exception (§9.2's own text) so a regression stays bisectable to it.
+test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on screen', async ({
+  relaunch,
+}) => {
+  test.setTimeout(60_000);
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await forceSlickEngine(page);
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+
+  async function fling(): Promise<{ histogram: Record<string, number>; p95: number }> {
+    await viewport.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await page.waitForTimeout(50);
+    await page.evaluate(() => window.__kiraScrollTrace?.start());
+    await wheelFling(page, viewport);
+    await page.waitForTimeout(300);
+    const result = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+    expect(result).not.toBeNull();
+    return {
+      histogram: result?.summary.renderCountHistogram ?? {},
+      p95: result?.summary.renderMs.p95 ?? 0,
+    };
+  }
+
+  const before = await fling();
+  for (const count of Object.keys(before.histogram)) {
+    expect(Number(count)).toBeLessThan(2);
+  }
+
+  // N staged insert rows — a handful, matching D9's own "typically 1-5, never scrolled past in
+  // bulk" scope note.
+  for (let i = 0; i < 5; i++) {
+    await page.click('[data-testid="toolbar-add-row"]');
+  }
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(5);
+
+  const after = await fling();
+  for (const count of Object.keys(after.histogram)) {
+    expect(Number(count)).toBeLessThan(2);
+  }
+  // Not a tight timing claim — this sandbox has no real compositor (§7.1's own line) — a generous
+  // same-run bound that only fails if the insert region's own DOM rode along on every scroll-
+  // driven render instead of staying self-contained (the actual regression this gate exists to
+  // catch), not on ordinary sandbox timing noise.
+  expect(after.p95).toBeLessThan(before.p95 * 3 + 5);
+});

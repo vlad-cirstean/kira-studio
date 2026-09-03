@@ -87,6 +87,13 @@
   border-color: var(--kira-accent);
 }
 
+/* §5 D9 — the insert region's own input (`cellFormatter`'s insert branch, SlickGridHost.vue) is
+   never opened through `.slick-cell.editable` (`onBeforeEditCell` vetoes it, `rowColumns` never
+   even offers it an editor), so it needs this rule's own selector, not that class — but wants the
+   identical sizing, and the incumbent's own identical answer on the outline question:
+   `.insert-cell .cell-input { outline: none; }` (`DataGrid.vue:2138-2140`) — the row's own
+   `kira-row-inserted` tint (C10) already reads as "this is new" without every cell in it boxed. */
+.slick-grid-host [data-testid="grid-cell-insert"] .cell-input,
 .slick-grid-host .slick-cell.editable .cell-input {
   width: 100%;
   height: 100%;

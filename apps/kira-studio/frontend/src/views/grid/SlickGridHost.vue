@@ -6,6 +6,7 @@ import type {
   Column,
   CustomDataView,
   FormatterResultWithText,
+  ItemMetadata,
   MultiColumnSort,
   OnBeforeEditCellEventArgs,
   OnBeforeHeaderCellDestroyEventArgs,
@@ -24,6 +25,7 @@ import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { type CellClassFlags, cellClass } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
+import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -48,6 +50,7 @@ import {
   createDisplayValueExtractor,
   createGridDataSource,
   displayPositionOf,
+  type GridDataSourceState,
   pendingRowClasses,
   type RowHandle,
   rowAtDisplayPosition,
@@ -137,8 +140,23 @@ function cellFormatter(
   _row: number,
   _cell: number,
   value: unknown,
-): string | FormatterResultWithText {
+  _columnDef: KiraColumn,
+  dataContext: RowHandle,
+): string | FormatterResultWithText | HTMLElement {
   const view = value as { text: string; isNull: boolean; truncated: boolean };
+  // C9/§5 D9 — the one place a formatter returns DOM, against `-iter2-pacing` D5's measured
+  // "text, never DOM" rule: bounded to the insert region alone (typically 1-5 rows), and the
+  // normal path just above/below is untouched. Self-contained once built: every keystroke stages
+  // straight into pendingChanges via the grid root's own delegated `input` listener (onMounted,
+  // below), never back through this formatter, so a value survives even if this cell is later
+  // invalidated and this branch simply rebuilds a fresh element from the same staged state.
+  if (dataContext.insertId !== undefined) {
+    const input = document.createElement('input');
+    input.className = 'cell-input';
+    input.dataset.testid = 'grid-cell-insert-input';
+    input.value = view.isNull ? '' : view.text;
+    return input;
+  }
   if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
   if (view.truncated) {
     return { text: view.text, addClasses: 'cell-truncated', toolTip: 'value truncated at 64 KB' };
@@ -382,6 +400,36 @@ function buildColumns(
   return cols;
 }
 
+// C9/§5 D9 — dataSource.ts's own `GridDataSourceState.rowColumns` header comment explains the
+// shape and the cost story; built once per column-order rebuild (matches
+// `createDisplayValueExtractor`'s own `fieldToPageCol` — cheap, but no reason to redo it per row).
+function insertRowColumns(order: readonly string[]): NonNullable<ItemMetadata['columns']> {
+  const columns: NonNullable<ItemMetadata['columns']> = {};
+  for (const name of order) columns[name] = { editor: null, focusable: false };
+  return columns;
+}
+
+// C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
+// mount-time-only object it was through C8: the pageVersion watch already rebuilt it wholesale on
+// every reload, and now an insert-count change (below) needs the identical shape for a narrower
+// reason. `p`/`order` are passed in rather than re-derived, since every call site has already
+// resolved them for its own other purposes (formatterCtx, buildColumns, ...).
+function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDataSourceState {
+  const inserts = pendingFor(props.tabId)?.inserts ?? [];
+  const insertColumns = inserts.length > 0 ? insertRowColumns(order) : undefined;
+  return {
+    index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
+    inserts,
+    rowClasses: (row) => pendingRowClasses(props.tabId, row),
+    rowColumns: insertColumns
+      ? (handle) => (handle.insertId !== undefined ? insertColumns : undefined)
+      : undefined,
+    extractValue: p
+      ? createDisplayValueExtractor(props.tabId, p, order)
+      : () => ({ text: '', isNull: true, truncated: false }),
+  };
+}
+
 const rootRef = ref<HTMLElement | null>(null);
 
 // Never a ref/shallowRef/reactive (CodeMirrorHost.vue's own rule, restated here — D3).
@@ -389,6 +437,11 @@ let grid: KiraSlickGrid | null = null;
 let eventHandler: SlickEventHandler | null = null;
 let dataSource: ReturnType<typeof createGridDataSource> | null = null;
 let viewportEl: HTMLElement | null = null;
+// C9 — the grid root, set at mount for the insert region's own delegated listeners' teardown
+// (below); `rootRef.value` is not used there since a template ref is not guaranteed to still
+// point at the mounted element by the time `onUnmounted` runs (`viewportEl`'s own identical
+// mount-time-capture pattern, just above, is why this follows it rather than `rootRef.value`).
+let gridRootEl: HTMLElement | null = null;
 // C4/§5 D0 rule 2 — never a ref/shallowRef/reactive, same as `grid` itself.
 let selectionModel: SlickHybridSelectionModel | null = null;
 // D4's own one-shot flag, set by the header select zone immediately before it pushes ranges into
@@ -971,6 +1024,36 @@ function onBeforeEditCell(_e: SlickEventData, args: OnBeforeEditCellEventArgs): 
   return true;
 }
 
+// C9/§5 D9 — one delegated listener each on the grid root for the insert region's own `<input>`s
+// (`cellFormatter`'s insert branch, above), rather than a per-element listener: the same
+// delegation discipline `-iter2-pacing` established for everything else, applied to the one place
+// this pass adds DOM. `data-column` already exists on the cell (`cellAttrs`, D2 — a per-column
+// constant, unrelated to this row being an insert) and `data-insert-id` on the row
+// (`tagRenderedRows`), so no extra data attribute needs baking onto the input itself beyond the
+// testid this scopes the delegation to.
+function insertInputTarget(
+  e: Event,
+): { insertId: string; column: string; input: HTMLInputElement } | null {
+  const input = e.target;
+  if (!(input instanceof HTMLInputElement) || input.dataset.testid !== 'grid-cell-insert-input') {
+    return null;
+  }
+  const insertId = input.closest<HTMLElement>('[data-insert-id]')?.dataset.insertId;
+  const column = input.closest<HTMLElement>('.slick-cell[data-column]')?.dataset.column;
+  return insertId && column ? { insertId, column, input } : null;
+}
+
+function onInsertGridInput(e: Event): void {
+  const hit = insertInputTarget(e);
+  if (!hit) return;
+  stageInsertValue(props.tabId, hit.insertId, hit.column, hit.input.value);
+}
+
+function onInsertGridKeydown(e: KeyboardEvent): void {
+  if (!insertInputTarget(e)) return;
+  wrapSelectionOnType(e);
+}
+
 // D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
 // outside it replaces the selection with just that row first (the "replace the selection first"
 // rule, §5 D7). Cell/header menus have no multi-target actions, so those two always collapse to a
@@ -1251,20 +1334,14 @@ function onKeydown(e: SlickEventData): void {
 onMounted(() => {
   const el = rootRef.value;
   if (!el) return;
+  gridRootEl = el;
 
   const t = tab();
   const p = getPage(props.tabId);
   const order = p ? resolveColumnOrder(p, t?.state.columnOrder ?? null) : [];
   formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
 
-  dataSource = createGridDataSource({
-    index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
-    inserts: pendingFor(props.tabId)?.inserts ?? [],
-    rowClasses: (row) => pendingRowClasses(props.tabId, row),
-    extractValue: p
-      ? createDisplayValueExtractor(props.tabId, p, order)
-      : () => ({ text: '', isNull: true, truncated: false }),
-  });
+  dataSource = createGridDataSource(dataSourceState(p, order));
 
   // §5 D8 — editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
   // comment says why: a grid-constructed `KiraCellEditor` cannot close over tabId/displayCell
@@ -1425,6 +1502,13 @@ onMounted(() => {
     viewportEl.addEventListener('scroll', onViewportScroll, { passive: true });
     viewportEl.addEventListener('scroll', onViewportScrollPersist, { passive: true });
   }
+
+  // C9/§5 D9 — the insert region's own delegated listeners, on the grid root rather than the
+  // viewport (an insert row's `<input>` needs `keydown` regardless of scroll position, and `el`
+  // is stable across a reload the way `viewportEl` — reassigned from `grid.getViewports()` — is
+  // not).
+  el.addEventListener('input', onInsertGridInput);
+  el.addEventListener('keydown', onInsertGridKeydown);
 });
 
 onUnmounted(() => {
@@ -1436,6 +1520,9 @@ onUnmounted(() => {
     viewportEl.removeEventListener('scroll', onViewportScrollPersist);
     scrollTrace.unregisterGrid(viewportEl);
   }
+  gridRootEl?.removeEventListener('input', onInsertGridInput);
+  gridRootEl?.removeEventListener('keydown', onInsertGridKeydown);
+  gridRootEl = null;
   eventHandler?.unsubscribeAll();
   eventHandler = null;
   // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
@@ -1462,14 +1549,7 @@ watch(
     const t = tab();
     const order = p ? resolveColumnOrder(p, t?.state.columnOrder ?? null) : [];
     formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
-    dataSource.setState({
-      index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
-      inserts: pendingFor(props.tabId)?.inserts ?? [],
-      rowClasses: (row) => pendingRowClasses(props.tabId, row),
-      extractValue: p
-        ? createDisplayValueExtractor(props.tabId, p, order)
-        : () => ({ text: '', isNull: true, truncated: false }),
-    });
+    dataSource.setState(dataSourceState(p, order));
     grid.setColumns(buildColumns(p, order, currentWidths(), rt()?.meta ?? null));
     grid.updateRowCount();
     grid.invalidateAllRows();
@@ -1479,6 +1559,29 @@ watch(
     lastCssLayerBand = { start: 0, end: -1 };
     grid.render();
     syncSortIndicators();
+  },
+);
+
+// C9/§5 D9 — an insert row's own count changes independent of `pageVersion` (Add Row, a discard,
+// a bulk paste past the loaded page's end, `duplicateAsInsert`), so this needs its own trigger.
+// Safe to fully invalidate the touched region unconditionally: `stageInsertValue` (every keystroke
+// into an insert's own input) mutates only that insert's `values` in place, never `p.inserts`
+// itself, so this watch never fires mid-typing — the only thing that CAN change `inserts.length`
+// is a user action outside any insert row's own input (a toolbar click, a menu item), so the
+// "never invalidate a focused insert row" rule (D9) has nothing to protect against on this path.
+let lastInsertCount = 0;
+watch(
+  () => pendingFor(props.tabId)?.inserts.length ?? 0,
+  (count) => {
+    if (!grid || !dataSource) return;
+    const p = getPage(props.tabId);
+    dataSource.setState(dataSourceState(p, currentOrder()));
+    grid.updateRowCount();
+    const base = currentDisplayRows()?.length ?? p?.rowCount ?? 0;
+    const end = base + Math.max(count, lastInsertCount) - 1;
+    lastInsertCount = count;
+    for (let pos = base; pos <= end; pos++) grid.invalidateRow(pos);
+    grid.render();
   },
 );
 

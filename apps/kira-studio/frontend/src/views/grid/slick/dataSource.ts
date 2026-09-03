@@ -1,4 +1,5 @@
 import type { TabularPage } from '@shared/protocol/page';
+import type { ItemMetadata } from 'slickgrid';
 import { pageColumnIndexFor } from '../../shared/page/columns';
 import { type CellView, cell } from '../page';
 import type { PendingInsert } from '../pendingChanges';
@@ -125,6 +126,16 @@ export interface GridDataSourceState {
   /** Per-page-row CSS classes (the dirty/deleted/inserted gutter rails, §5 item 18) — `undefined`
    *  renders no metadata for that row, matching `getItemMetadata`'s own `| null` contract. */
   rowClasses?: (row: number) => string | undefined;
+  /** C9/§5 D9 — per-row column metadata: `undefined` for a normal row (the overwhelming
+   *  majority), the insert region's own `{ editor: null, focusable: false }` override for the
+   *  handful of pending-insert rows (F11 — `getEditor`/`canCellBeActive` both consult this before
+   *  the column's own flag, which is what keeps SlickGrid's own editor from ever opening over the
+   *  insert row's real `<input>`, and keeps Tab/arrow-key cell navigation off the region). Takes
+   *  the handle, not just the row number `pageRowAt` alone could give `getItemMetadata` for free,
+   *  because it keys on `insertId` — a full RowHandle is the only thing that carries it.
+   *  SlickGridHost.vue only assigns this callback while there is at least one pending insert, so
+   *  the common (no staged insert) case never pays for the second handle allocation this adds. */
+  rowColumns?: (handle: RowHandle) => ItemMetadata['columns'] | undefined;
   /** The current `dataItemColumnValueExtractor` body — see this interface's own header comment. */
   extractValue: (item: RowHandle, field: string) => unknown;
 }
@@ -132,7 +143,7 @@ export interface GridDataSourceState {
 export interface KiraGridDataSource {
   getLength(): number;
   getItem(pos: number): RowHandle;
-  getItemMetadata(pos: number): { cssClasses?: string } | null;
+  getItemMetadata(pos: number): { cssClasses?: string; columns?: ItemMetadata['columns'] } | null;
   /**
    * The current state's own `extractValue`, keyed by `RowHandle` directly — the exact shape
    * SlickGrid's own `dataItemColumnValueExtractor` option calls with (`item`, not a position; that
@@ -173,10 +184,18 @@ export function createGridDataSource(
       return rowHandleAt(state.index, state.inserts, pos);
     },
     getItemMetadata(pos) {
-      if (!state.rowClasses) return null;
       // P22 iter2-pacing D6: the row number alone, not a second frozen RowHandle allocation — see
       // pageRowAt's own comment.
-      const cssClasses = state.rowClasses(pageRowAt(state.index, pos));
+      const cssClasses = state.rowClasses
+        ? state.rowClasses(pageRowAt(state.index, pos))
+        : undefined;
+      // C9/§5 D9 — the second handle allocation `rowColumns`'s own header comment describes,
+      // gated behind the callback actually being assigned (the common no-insert case never sets
+      // it, so this branch is a single `undefined` check there, not a RowHandle build).
+      if (state.rowColumns) {
+        const columns = state.rowColumns(rowHandleAt(state.index, state.inserts, pos));
+        if (columns) return cssClasses ? { cssClasses, columns } : { columns };
+      }
       return cssClasses ? { cssClasses } : null;
     },
     extractValue(item, field) {
