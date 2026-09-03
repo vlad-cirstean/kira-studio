@@ -295,6 +295,51 @@ function rightViewport(page: import('@playwright/test').Page) {
   return page.locator('[data-testid="data-grid"] .slick-viewport-top.slick-viewport-right');
 }
 
+// Counts only SlickGrid's OWN per-instance <style> element (F8's own createCssRules/
+// removeCssRules), not every <style> tag in <head> — opening a data tab also mounts
+// FilterToolbar.vue's CodeMirror-based WHERE/ORDER BY fields, and CodeMirror 6's own StyleModule
+// injects one *global*, content-hash-deduplicated <style> the first time any editor uses it, by
+// design never removed (confirmed empirically: its rules are `.ͼ1.cm-focused {...}`, nothing to do
+// with this grid). SlickGrid's own rules are always scoped `.<uid> .slick-header-column { ... }`
+// (createCssRules, dist/esm/index.mjs read this session) — a real signature the CodeMirror one can
+// never share. Module-scope (not nested in the exit-criteria test below) so P22 iter2-pacing's own
+// teardown test (T4) can reuse it without restating it.
+async function slickStyleTagCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      Array.from(document.querySelectorAll('style')).filter((s) => {
+        try {
+          return Array.from(s.sheet?.cssRules ?? []).some(
+            (r) =>
+              'selectorText' in r &&
+              (r as CSSStyleRule).selectorText?.includes('slick-header-column'),
+          );
+        } catch {
+          return false;
+        }
+      }).length,
+  );
+}
+
+// P22 iter2-pacing §1.2/§3 F2 — the doubling this phase's T1/T3 gate only reproduces under a
+// page.mouse.wheel-driven scroll, never a `scrollTop +=` write: the two input paths give
+// *different* intra-frame orderings between the scroll-driven render and a same-frame chase. No
+// artificial delay between wheel calls — a real fling delivers scroll events far faster than
+// CHASE_QUIET_MS (24ms), which is exactly the condition the pacing fix's re-arm loop is for.
+async function wheelFling(
+  page: import('@playwright/test').Page,
+  viewport: ReturnType<typeof rightViewport>,
+  steps = 60,
+  deltaY = 900,
+): Promise<void> {
+  const box = await viewport.boundingBox();
+  if (!box) throw new Error('wheelFling: viewport has no bounding box');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < steps; i++) {
+    await page.mouse.wheel(0, deltaY);
+  }
+}
+
 test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", async ({
   relaunch,
   consoleErrors,
@@ -499,31 +544,6 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   const { window: teardownPage } = await relaunch({ control: CONTROL, stream: PORT });
   await forceSlickEngine(teardownPage);
 
-  // Counts only SlickGrid's OWN per-instance <style> element (F8's own createCssRules/
-  // removeCssRules), not every <style> tag in <head> — opening a data tab also mounts
-  // FilterToolbar.vue's CodeMirror-based WHERE/ORDER BY fields, and CodeMirror 6's own
-  // StyleModule injects one *global*, content-hash-deduplicated <style> the first time any editor
-  // uses it, by design never removed (confirmed empirically: its rules are `.ͼ1.cm-focused {...}`,
-  // nothing to do with this grid). SlickGrid's own rules are always scoped `.<uid> .slick-header-
-  // column { ... }` (createCssRules, dist/esm/index.mjs read this session) — a real signature the
-  // CodeMirror one can never share.
-  async function slickStyleTagCount(page: import('@playwright/test').Page): Promise<number> {
-    return page.evaluate(
-      () =>
-        Array.from(document.querySelectorAll('style')).filter((s) => {
-          try {
-            return Array.from(s.sheet?.cssRules ?? []).some(
-              (r) =>
-                'selectorText' in r &&
-                (r as CSSStyleRule).selectorText?.includes('slick-header-column'),
-            );
-          } catch {
-            return false;
-          }
-        }).length,
-    );
-  }
-
   const baselineStyles = await slickStyleTagCount(teardownPage);
   const baselineRetention = await teardownPage.evaluate(() =>
     JSON.stringify((window as unknown as { __kiraRetention: () => unknown }).__kiraRetention()),
@@ -552,4 +572,133 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   expect(closedBytes).toBe(baselineBytes);
 
   expect(consoleErrors).toEqual([]);
+});
+
+// P22 iter2-pacing §6 — the frame-pacing fix's own sandbox-provable gates (T1/T3/T5). D1's whole
+// premise is a real WebKit measurement (§1.2 of that plan: two render() passes in 131 of 140
+// frames of a wheel-driven fling, reproduced with the exact pre-fix policy) — see wheelFling's own
+// comment for why page.mouse.wheel, not a scrollTop write, is load-bearing here.
+test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-driven one', async ({
+  relaunch,
+}) => {
+  test.setTimeout(120_000);
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await forceSlickEngine(page);
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+
+  // --- T1: at rest, the default policy never doubles a frame ------------------------------------
+  // This gates the *policy* — never render twice in a frame while scroll events are arriving —
+  // which is engine-independent; it is not a timing claim about WKWebView, which this sandbox has
+  // none of (§7.1's own line between what's provable here and what needs real hardware).
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(50);
+  await page.evaluate(() => window.__kiraScrollTrace?.start());
+  await wheelFling(page, viewport);
+  // Trailing quiescent frames, so any chase still converging the runway gets to run and clear.
+  await page.waitForTimeout(300);
+  const defaultResult = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  expect(defaultResult).not.toBeNull();
+  const defaultHistogram = defaultResult?.summary.renderCountHistogram ?? {};
+  for (const count of Object.keys(defaultHistogram)) {
+    expect(Number(count)).toBeLessThan(2);
+  }
+
+  // --- T5: the trace's per-frame accounting resets (D3) ------------------------------------------
+  // From frames[] directly, on this same recording: a frame with renderCount === 0 must report
+  // renderMs === 0 (before D3, it reported the *previous* frame's value), a multi-render frame's
+  // renderMs must be positive (it's a sum, not the sticky last value), and frameMs must show up
+  // once ticks are actually spaced (not every frame is guaranteed non-zero — a genuine same-
+  // timestamp double rAF tick is possible — so this checks the series as a whole, not one frame).
+  const frames = defaultResult?.frames ?? [];
+  const noRenderFrame = frames.find((f) => f.renderCount === 0);
+  expect(noRenderFrame).toBeDefined();
+  expect(noRenderFrame?.renderMs).toBe(0);
+  for (const f of frames) {
+    if (f.renderCount > 1) expect(f.renderMs).toBeGreaterThan(0);
+  }
+  expect(frames.some((f) => f.frameMs > 0)).toBe(true);
+
+  // --- T3: chaseQuietMsOverride = 0 reproduces the pre-fix behaviour exactly ---------------------
+  // The self-verifying half of T1: if this run does NOT show a doubled frame, the harness is not
+  // reproducing the doubling condition at all and T1 above would be a tautology, not a real gate.
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(50);
+  await page.evaluate(() => {
+    window.__kiraGridTuning ??= {};
+    window.__kiraGridTuning.chaseQuietMsOverride = 0;
+  });
+  await page.evaluate(() => window.__kiraScrollTrace?.start());
+  await wheelFling(page, viewport);
+  await page.waitForTimeout(300);
+  const zeroResult = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  await page.evaluate(() => {
+    if (window.__kiraGridTuning) window.__kiraGridTuning.chaseQuietMsOverride = undefined;
+  });
+  expect(zeroResult).not.toBeNull();
+  const zeroHistogram = zeroResult?.summary.renderCountHistogram ?? {};
+  const hasDoubledFrame = Object.keys(zeroHistogram).some((count) => Number(count) >= 2);
+  expect(hasDoubledFrame).toBe(true);
+});
+
+// P22 iter2-pacing D4 — a chase armed just before teardown, and still pending (not yet fired) at
+// the moment `grid.destroy(true)` runs, must not re-enter render() afterwards. Against fce3e54
+// this throws: the pending rAF fires one frame later, re-enters render() past destroy(), and
+// dereferences an element SlickGrid's own destroy() already nulled — `!this.initialized` doesn't
+// catch it because destroy() never clears that flag.
+//
+// Timing, deliberately engineered rather than raced: `chaseQuietMsOverride` (300ms) is set long
+// enough that the scroll-triggered chase is still armed (re-arming, not yet rendering) by the time
+// the tab-close click resolves — Playwright's own action + assertion round-trip reliably takes
+// tens of ms, well under 300 — and short enough that the wait *after* close reliably crosses it,
+// so the previously-armed callback's quiet check flips true and it attempts to render.
+test('P22 iter2-pacing — tearing down the grid with a catch-up render still armed', async ({
+  relaunch,
+}) => {
+  test.setTimeout(60_000);
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await forceSlickEngine(page);
+
+  const pageErrors: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(String(err)));
+
+  const baselineStyles = await slickStyleTagCount(page);
+  const baselineRetention = await page.evaluate(() =>
+    JSON.stringify((window as unknown as { __kiraRetention: () => unknown }).__kiraRetention()),
+  );
+  const baselineBytes = await page.evaluate(() =>
+    (window as unknown as { __kiraRetainedBytes: () => number }).__kiraRetainedBytes(),
+  );
+
+  await connectAndOpenSpikeGrid(page);
+  await page.evaluate(() => {
+    window.__kiraGridTuning ??= {};
+    window.__kiraGridTuning.chaseQuietMsOverride = 300;
+  });
+  await rightViewport(page).evaluate((el) => {
+    el.scrollTop = el.scrollHeight; // never-before-mounted territory — guarantees a runway deficit
+  });
+  await page.waitForTimeout(30); // arm the chase, stay well inside the 300ms quiet window
+
+  await page.locator('[data-testid="tab"].is-active [data-testid="tab-close"]').click();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+  // Past the 300ms quiet window: the previously-armed callback (if D4 didn't cancel it) fires and
+  // attempts to render against the now-torn-down grid.
+  await page.waitForTimeout(500);
+
+  expect(pageErrors).toEqual([]);
+  await expect(page.locator('.slick-viewport')).toHaveCount(0);
+  expect(await slickStyleTagCount(page)).toBe(baselineStyles);
+  const closedRetention = await page.evaluate(() =>
+    JSON.stringify((window as unknown as { __kiraRetention: () => unknown }).__kiraRetention()),
+  );
+  expect(closedRetention).toBe(baselineRetention);
+  const closedBytes = await page.evaluate(() =>
+    (window as unknown as { __kiraRetainedBytes: () => number }).__kiraRetainedBytes(),
+  );
+  expect(closedBytes).toBe(baselineBytes);
 });
