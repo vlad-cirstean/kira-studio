@@ -498,6 +498,17 @@ let viewportEl: HTMLElement | null = null;
 let gridRootEl: HTMLElement | null = null;
 // C4/§5 D0 rule 2 — never a ref/shallowRef/reactive, same as `grid` itself.
 let selectionModel: SlickHybridSelectionModel | null = null;
+// P22 postscript §14.2's "cell-editor dock panel is sometimes missing its header" investigation
+// (below, onMounted) surfaced a real, adjacent bug while chasing it: SlickGrid never self-observes
+// its own container's size (confirmed reading slick.grid.ts — no ResizeObserver anywhere in the
+// library; `resizeCanvas()` is the caller's job entirely). This app never called it when the
+// container's *own* size changed post-mount, only implicitly at construction — so opening/closing
+// the cell-editor dock (a sibling flex item that shrinks `.grid-area`, CellEditorDock.vue) left the
+// grid's internal `.slick-pane`/`.slick-viewport` elements at their stale, pre-shrink inline height,
+// genuinely overlapping the dock panel now painted below and intercepting its own clicks — the
+// concrete mechanism behind `cell-editor.spec.ts`'s pre-existing "Target page ... has been closed"
+// timeouts (a `.grid-canvas` element, still full-height, sat on top of the dock's own controls).
+let resizeObserver: ResizeObserver | null = null;
 // D4's own one-shot flag, set by the header select zone immediately before it pushes ranges into
 // the model — mirrors DataGrid.vue's own `dragProducedRange` shape.
 let pendingSelectionKind: 'column' | null = null;
@@ -1915,11 +1926,25 @@ onMounted(() => {
   // not).
   el.addEventListener('input', onInsertGridInput);
   el.addEventListener('keydown', onInsertGridKeydown);
+
+  // See `resizeObserver`'s own declaration for why this exists. `el` (`.slick-grid-mount`) is
+  // exactly the container SlickGrid measures itself against (`getViewportHeight`/`getViewportWidth`,
+  // `resizeCanvas` — slick.grid.ts), so observing it directly, rather than `.grid-area` a level up,
+  // needs no extra plumbing to find the right element. `resizeCanvas()` itself is cheap to call
+  // unconditionally (a real height/width remeasure plus one render pass) and is guarded by SlickGrid
+  // itself (`!this.initialized` returns immediately) — no debounce needed for a ResizeObserver
+  // callback, which already coalesces synchronous layout thrash into one notification per frame.
+  resizeObserver = new ResizeObserver(() => {
+    grid?.resizeCanvas();
+  });
+  resizeObserver.observe(el);
 });
 
 onUnmounted(() => {
   // Order matters (§6 D3): stop everything that could still fire into a half-torn-down grid before
   // tearing it down.
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
   if (viewportEl) {
     viewportEl.removeEventListener('scroll', onViewportScroll);
