@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { clampColumnOverscan } from '../../frontend/src/views/grid/slick/kiraSlickGrid';
+import { clampColumnOverscan } from '../../frontend/src/views/shared/slick/kiraSlickGrid';
 
 // P22 spike C4: KiraSlickGrid.getRenderedRange's own row-bounds arithmetic is rowRangeBounds,
 // already covered by row-range.spec.ts (C1) — this file covers only what that one doesn't: the

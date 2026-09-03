@@ -244,7 +244,7 @@ export const CELL_BUDGET = 2200;
 // window across calls, not any one call's own new-row batch). Sized to keep one render() call's
 // synchronous work well under a single frame's budget even on a 120 Hz display; re-set once the
 // real-Mac protocol (docs/PERF.md §2.1c) reports actual renderMs figures for a cold batch of this
-// size. Consumed by views/grid/slick/kiraSlickGrid.ts's own getRenderedRange override — the
+// size. Consumed by views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override — the
 // incumbent tanstack-virtual/DataGrid.vue grid has no equivalent single-call batch-size hazard
 // (P22-slickgrid-migration-plan.md's own F2: SlickGrid's render() builds every newly-entering row
 // synchronously in one unconditional DOM-construction pass, unlike Vue's own patch, which this app's
@@ -260,7 +260,7 @@ export const MAX_NEW_CELLS_PER_RENDER = 600;
 // identical to today's emitted range — because nobody has a real-hardware number for it yet;
 // docs/PERF.md §2.1c step 4 is the A/B that sets it. Same precedent as forceSyncScrollingOverride
 // (main.ts): a dial with a documented default, not a silent behaviour change. Consumed by
-// views/grid/slick/kiraSlickGrid.ts's own getRenderedRange override, step 7.
+// views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override, step 7.
 export const MAX_NEW_LEAD_CELLS_PER_RENDER = MAX_NEW_CELLS_PER_RENDER;
 
 // P22 iter2-pacing D1. Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
@@ -287,7 +287,7 @@ export interface RowRangeExtractorConfig {
  * `rowRangeExtractor` wrapper shaped for `@tanstack/vue-virtual`'s own `rangeExtractor` API
  * (DataGrid.vue's own consumer, deleted with it at P22 Pass B's cutover — this function's own
  * general arithmetic had no dependency on that API and so needed no counterpart) so
- * `views/grid/slick/kiraSlickGrid.ts`'s `getRenderedRange` override could reuse the exact same
+ * `views/shared/slick/kiraSlickGrid.ts`'s `getRenderedRange` override could reuse the exact same
  * arithmetic instead of restating it — see that file's own comment. `direction`/
  * `velocityPxPerFrame` come from the caller's own scroll-velocity sampler (KiraSlickGrid's own,
  * today the only caller); `mountedColumnCount` is the row axis's own budget divisor, read from the

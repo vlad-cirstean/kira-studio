@@ -15,7 +15,7 @@ declare global {
      *  probe. Left untyped (`unknown`) here — this file is a separate TS program from
      *  frontend/src's own, and leaks.spec.ts only ever compares it whole with `toEqual`. */
     __kiraRetention?: () => unknown;
-    /** P22 iter2 D2 — a real-fling scroll trace (apps/kira-studio/frontend/src/views/grid/scrollTrace.ts).
+    /** P22 iter2 D2 — a real-fling scroll trace (apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts).
      *  Not a Playwright hook in intent (a human on real hardware is meant to drive it), but
      *  scroll-trace.spec.ts exercises its start()/stop() plumbing sandboxed — see that file's own
      *  header comment for what it can and cannot prove from here. Shape redeclared, not imported,

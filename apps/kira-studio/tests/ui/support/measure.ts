@@ -204,7 +204,7 @@ export interface SustainedScrollResult {
  * position the main thread hasn't rendered yet, since WebKit's scrolling thread moves the composited
  * layer independently of the main thread during a momentum scroll) cannot occur here, at any
  * velocity (P22 iter2 F4). Logged, not gated, for exactly that reason — a real measurement needs
- * `window.__kiraScrollTrace` on real hardware (views/grid/scrollTrace.ts, the plan's §7.3).
+ * `window.__kiraScrollTrace` on real hardware (views/shared/slick/scrollTrace.ts, the plan's §7.3).
  */
 export function measureSustainedScroll(
   page: Page,

@@ -14,7 +14,7 @@ import {
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // P22 iter2 D2: window.__kiraScrollTrace is a real-hardware field probe, not a tests/ui/ instrument
-// (its own header comment, views/grid/scrollTrace.ts) — nothing here can drive a real macOS
+// (its own header comment, views/shared/slick/scrollTrace.ts) — nothing here can drive a real macOS
 // momentum scroll or observe the compositor-ahead condition that produces the user's actual
 // symptom. What this file *can* prove, sandboxed: the probe exists, is inert until start(), and
 // start()/stop() produce the documented shape when driven by ordinary (main-thread) scrolling —

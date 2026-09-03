@@ -43,6 +43,7 @@ import {
   resolveColumnOrder,
 } from '../shared/page/columns';
 import { setSearchFiltering } from '../shared/page/searchFilter';
+import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import {
   columnsToTsv,
@@ -70,7 +71,6 @@ import {
   rowAtDisplayPosition,
 } from './slick/dataSource';
 import { editorCtx, KiraCellEditor } from './slick/editor';
-import { KiraSlickGrid } from './slick/kiraSlickGrid';
 import {
   type CellNavEntry,
   type DisplayCellView,
@@ -82,11 +82,11 @@ import {
   rowSnapshot as rvRowSnapshot,
   rowsForColumnOps as rvRowsForColumnOps,
 } from './slick/rowValues';
-import './slick/slickTheme.css';
+import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { setVisibleRows } from '../shared/page/visibleRows';
+import * as scrollTrace from '../shared/slick/scrollTrace';
 import { getPage, pageVersion, setVisibleWindow } from './page';
-import * as scrollTrace from './scrollTrace';
 import { rangesFromSelection, selectionFromRanges } from './slick/selection';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, type Selection, setSort } from './state';

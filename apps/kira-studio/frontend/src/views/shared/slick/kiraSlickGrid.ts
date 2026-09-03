@@ -12,9 +12,15 @@ import {
   OVERSCAN_PX,
   type RowRangeExtractorConfig,
   rowRangeBounds,
-} from '../../shared/page/columns';
-import * as scrollTrace from '../scrollTrace';
+} from '../page/columns';
 import type { RowHandle } from './dataSource';
+import * as scrollTrace from './scrollTrace';
+
+// P30 §3 prerequisite: relocated here (with dataSource.ts's generic core and slickTheme.css) from
+// views/grid/slick/ — SPEC §11 forbids a views/<kind>/* file importing another views/<kind>/*, and
+// this class (plus the scroll mechanism it carries) is exactly what views/console/ConsoleSlickGrid.vue
+// needs to inherit unmodified (P30 §3.5 rule 1). views/grid/SlickGridHost.vue's own import of it
+// moved with it, mechanically — nothing about this file's own logic changed.
 
 // main.ts's own `declare global` (the real source of truth for this shape, D9) lives in a
 // different TS program from tests/unit/tsconfig.json's — mirrors tests/ui/global.d.ts's own

@@ -1,15 +1,19 @@
-// dataSource.ts transitively imports pendingChanges.ts -> bridge/data.ts -> bridge/port.ts, which
-// reaches '/wails/runtime.js' at module scope — see support/window.ts's own comment for why this
-// import must come first, and why dataSource.ts itself is a dynamic import below rather than a
-// static one (sigma-count-refresh.spec.ts's own precedent for the same hazard).
-import './support/window';
-
 import { describe, expect, test } from 'bun:test';
+import {
+  type DisplayRowIndex,
+  dataLength,
+  displayPositionOf,
+  rowAtDisplayPosition,
+  rowHandleAt,
+} from '../../frontend/src/views/shared/slick/dataSource';
 
-const { dataLength, rowHandleAt, rowAtDisplayPosition, displayPositionOf } = await import(
-  '../../frontend/src/views/grid/slick/dataSource'
-);
-type DisplayRowIndex = Parameters<typeof rowHandleAt>[0];
+// P30 §3 prerequisite: this file's subject moved from views/grid/slick/dataSource.ts to
+// views/shared/slick/dataSource.ts — the generic display-position/RowHandle core split out of
+// that one file so views/console/ConsoleSlickGrid.vue could import it without reaching into
+// views/grid/* (SPEC §11). The split also drops this test's old dynamic-import workaround: the
+// grid-specific half left behind (createDisplayValueExtractor/pendingRowClasses, which transitively
+// reach pendingChanges.ts -> bridge/data.ts -> '/wails/runtime.js' at module scope) is what forced
+// it, and this file never exercised that half — a plain static import is correct here now.
 
 // P22 spike C3: display-position <-> page-row translation across a filter, the insert-row region
 // past the page end, and the "handle must be truthy" invariant — exactly AGENTS.md's own bar for a
