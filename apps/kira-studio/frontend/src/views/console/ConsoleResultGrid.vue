@@ -394,6 +394,7 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
     </div>
     <ConsoleSlickGrid
       v-else-if="ENABLE_SLICK_TABULAR && page.kind === 'tabular'"
+      :key="pageKey"
       ref="tabularGridRef"
       :page-key="pageKey"
       :tab-id="tabId"
