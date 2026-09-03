@@ -16,7 +16,7 @@
  * invalidates exactly the two affected rows (`#watchSelection` below), never the whole grid.
  */
 import type { CommitRecord } from "@kira-version/core";
-import type { Column } from "slickgrid";
+import type { Column, OnRenderedEventArgs } from "slickgrid";
 import { SlickGrid } from "slickgrid";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createGraphFormatter } from "../graph/graphColumn.ts";
@@ -26,6 +26,8 @@ import type { SelectionState } from "../state/selection.ts";
 import type { ColumnWidths, DateFormat } from "../state/viewState.ts";
 import { rowHeightPx, TokenReader } from "../theme/readTokens.ts";
 import { buildColumns, createCommitDataView, DATE_COLUMN_ID } from "./columns.ts";
+import { formatAbsoluteDate, formatRelativeDate } from "./dateFormat.ts";
+import { composeRowLabel } from "./rowAccessibility.ts";
 
 const props = defineProps<{
   graphView: GraphViewState;
@@ -53,6 +55,7 @@ const emit = defineEmits<{
 }>();
 
 const MIN_COLUMN_WIDTH = 40;
+const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
 const HANDLE_KEY_STEP = 8;
 
@@ -84,6 +87,41 @@ let resizeRaf = 0;
 let scrollRaf = 0;
 let previousSelectedRow = -1;
 
+// W14: the row a click or a keyboard move just selected, so the accessibility pass below can
+// move real DOM focus onto it the moment it next renders (`selection scrolls it into view first,
+// focuses second` — the plan's own words). Never set for a selection that changes for a reason
+// other than this component's own click/keyboard handling (e.g. App.vue re-resolving a selection
+// by sha after a refresh) — those must not steal focus from wherever the user actually is.
+let pendingFocusRow: number | null = null;
+
+// W14: the row index that currently, genuinely holds real DOM focus, independent of
+// `pendingFocusRow` above. A row's DOM node is destroyed and recreated by *any*
+// `invalidateRows`/`render()` call that touches it, not only the selection-driven one
+// `moveSelection`/`handleClick` trigger — `handleChunkLayout` (graph layout streaming in from
+// the layout worker, W5) does the same for whatever range it touches, entirely independently and
+// asynchronously of any selection change. When a `hugeRepo`-sized scenario's layout worker is
+// still delivering chunks well after the grid is already interactable, one of those chunks can
+// touch the very row the user just tabbed onto or selected — recreating its DOM node moments
+// after `applyAccessibility` already focused it once, which the browser resolves by silently
+// reverting focus to `<body>` (an element *removal*, not a user-driven `Tab`; a genuine, observed
+// race, not a hypothetical one). `pendingFocusRow` alone only re-focuses a row on the *one*
+// render immediately following a selection change, so it cannot catch this: by the time the
+// second, unrelated render arrives, it has already been consumed. `focusedRowIndex` instead
+// tracks "the row the user is actually on" persistently, refreshed by every genuine `focusin`
+// (`handleFocusIn` below) and cleared only when focus genuinely lands somewhere that is not a
+// row — never by the implicit, targetless bounce to `<body>` a DOM removal causes, which fires no
+// `focusin` at all. `applyAccessibility` re-focuses this row on *every* render that recreates it,
+// for as long as it remains the one the user is on, closing the race `pendingFocusRow` alone
+// leaves open.
+let focusedRowIndex: number | null = null;
+
+function handleFocusIn(event: FocusEvent): void {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const rowAttr = target.closest(".slick-row")?.getAttribute("data-row");
+  focusedRowIndex = rowAttr != null ? Number(rowAttr) : null;
+}
+
 function computeMessageWidth(hostWidth: number, laneCount: number): number {
   const fixed =
     graphColumnWidth(laneCount) + widths.value.author + widths.value.date + widths.value.sha;
@@ -114,7 +152,7 @@ function rebuildColumns(): void {
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
-  const clamped = Math.max(MIN_COLUMN_WIDTH, Math.round(next));
+  const clamped = Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(next)));
   if (widths.value[column] === clamped) return;
   widths.value = { ...widths.value, [column]: clamped };
   rebuildColumns();
@@ -164,7 +202,7 @@ function handleClick(row: number, cell: number): void {
 
   const wasSelected = props.selection.row.value === row;
   props.selection.select(row);
-  grid?.focus();
+  pendingFocusRow = row;
   if (wasSelected) emit("toggleDetail");
 }
 
@@ -186,78 +224,82 @@ function moveSelection(row: number): void {
   const clamped = Math.max(0, Math.min(row, loaded - 1));
   if (clamped < 0) return;
   props.selection.select(clamped);
+  pendingFocusRow = clamped;
   grid?.scrollRowIntoView(clamped);
 }
 
-/** §6.6's own keyboard model. Wired through `grid.onKeyDown` (not a plain `host` DOM listener —
- *  see `onMounted`'s subscription for why): SlickGrid's own `handleKeyDown`, bound directly to
- *  its internal focus sink (what `grid.focus()` actually focuses), intercepts `PageUp`/`PageDown`
- *  unconditionally — `handled = true` regardless of `enableCellNavigation` (`slick.grid.js`'s own
- *  `e.which === keyCode.PAGE_DOWN ? (this.navigatePageDown(), handled = !0) : ...`) — and calls
- *  `stopPropagation()`, so those two keys never reach a listener on `host` at all; `enableCellNavigation:
- *  false` only spares the other keys this switch handles (Home/End/arrows fall through
- *  `canCellBeActive`'s own `enableCellNavigation` guard and stay unhandled). */
-function handleKeyDown(event: KeyboardEvent): void {
+/**
+ * §6.6's own keyboard model. Wired through `grid.onKeyDown` (not a plain `host` DOM listener —
+ * see `onMounted`'s subscription for why): SlickGrid's own `handleKeyDown`, bound to its internal
+ * focus sink *and* to the canvas every row lives in (so it also runs when a row itself — W14's own
+ * roving-`tabindex` target — holds real DOM focus, not only the sink), intercepts `PageUp`/
+ * `PageDown` unconditionally — `handled = true` regardless of `enableCellNavigation`
+ * (`slick.grid.js`'s own `e.which === keyCode.PAGE_DOWN ? (this.navigatePageDown(), handled = !0)
+ * : ...`) — and calls `stopPropagation()`, so those two keys never reach a listener on `host` at
+ * all; `enableCellNavigation: false` spares every *other* key SlickGrid's own switch would
+ * otherwise claim, `Tab`/`Shift+Tab` included (`navigateNext`/`navigatePrev` both bottom out in
+ * `navigate()`'s own `!this._options.enableCellNavigation` guard, an unconditional `false`).
+ *
+ * Returns whether this function actually acted on the key — `onMounted`'s subscription calls
+ * `event.stopImmediatePropagation()` only when it did (see that call site's own comment for why
+ * this matters for `Tab` specifically: this function's caller is exactly where SlickGrid decides
+ * whether to `preventDefault()` a keydown, so claiming a key we did nothing with would silently
+ * block the browser's own default behaviour for it — `Tab` leaving the grid, most of all).
+ */
+function handleKeyDown(event: KeyboardEvent): boolean {
   const loaded = props.graphView.loadedRows.value;
   const current = props.selection.row.value;
   switch (event.key) {
     case "ArrowUp":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection(current < 0 ? 0 : current - 1);
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection(current < 0 ? 0 : current - 1);
+      return true;
     case "ArrowDown":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection(current < 0 ? 0 : current + 1);
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection(current < 0 ? 0 : current + 1);
+      return true;
     case "Home":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection(0);
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection(0);
+      return true;
     case "End":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection(loaded - 1);
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection(loaded - 1);
+      return true;
     case "PageUp":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection((current < 0 ? 0 : current) - pageSize());
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection((current < 0 ? 0 : current) - pageSize());
+      return true;
     case "PageDown":
-      if (loaded > 0) {
-        event.preventDefault();
-        moveSelection((current < 0 ? 0 : current) + pageSize());
-      }
-      break;
+      if (loaded === 0) return false;
+      event.preventDefault();
+      moveSelection((current < 0 ? 0 : current) + pageSize());
+      return true;
     case "Enter":
       event.preventDefault();
       emit("toggleDetail");
-      break;
+      return true;
     case "Escape":
       event.preventDefault();
       emit("closeDetail");
-      break;
+      return true;
     case "F5":
       event.preventDefault();
       emit("refresh");
-      break;
+      return true;
     case "r":
     case "R":
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        emit("refresh");
-      }
-      break;
+      if (!event.ctrlKey && !event.metaKey) return false;
+      event.preventDefault();
+      emit("refresh");
+      return true;
     default:
-      break;
+      return false;
   }
 }
 
@@ -280,6 +322,87 @@ function scheduleResize(): void {
     grid?.resizeCanvas();
     rebuildColumns();
   });
+}
+
+/**
+ * `docs/plans/P4.md` W14, "the whole of the above is one function called from
+ * `onRendered({startRow, endRow})`, applied to the rows in that range": counts, selection,
+ * roving focus and each row's composed accessible name, all from state this component already
+ * holds. Cheap by construction — it only ever touches rows SlickGrid just built (a handful of
+ * `setAttribute` calls per row, the same order as the row's own construction), never the whole
+ * loaded history.
+ *
+ * `container`/rendered-row lookups go through `grid.getContainerNode()` rather than `host.value`
+ * directly — they are the same element (SlickGrid's own `_container`, the constructor's first
+ * argument), but reading it back off the grid instance keeps this function honest about only ever
+ * touching DOM the library itself owns and rendered, not assuming anything about this component's
+ * own template.
+ */
+function applyAccessibility(range: { startRow: number; endRow: number }): void {
+  if (!grid) return;
+  const container = grid.getContainerNode();
+  const totalRows = props.graphView.loadedRows.value;
+  const columns = grid.getColumns();
+  container.setAttribute("aria-rowcount", String(totalRows));
+  container.setAttribute("aria-colcount", String(columns.length));
+
+  const selectedRow = props.selection.row.value;
+  // No row selected yet (a fresh mount with nothing persisted): row 0, if it exists, is the one
+  // tab stop into the grid — the ARIA grid pattern's own answer to "what receives focus before
+  // anything has been chosen" (a plain `Tab` must land somewhere real, never nothing at all, once
+  // `_focusSink`/`_focusSink2` below are taken out of the tab order).
+  const tabbableRow = selectedRow >= 0 ? selectedRow : 0;
+
+  const from = Math.max(0, range.startRow);
+  const to = Math.min(range.endRow, totalRows - 1);
+  for (let row = from; row <= to; row++) {
+    const rowNode = container.querySelector<HTMLElement>(`.slick-row[data-row="${row}"]`);
+    if (!rowNode) continue;
+
+    rowNode.setAttribute("aria-rowindex", String(row + 1));
+    const isSelected = row === selectedRow;
+    rowNode.setAttribute("aria-selected", isSelected ? "true" : "false");
+    rowNode.tabIndex = row === tabbableRow ? 0 : -1;
+
+    const commit = props.graphView.store.commitAt(row);
+    const dateText =
+      dateFormatRef.value === "absolute"
+        ? formatAbsoluteDate(commit.author.timestamp)
+        : formatRelativeDate(commit.author.timestamp, Date.now());
+    rowNode.setAttribute("aria-label", composeRowLabel(commit, dateText));
+
+    const cells = rowNode.querySelectorAll<HTMLElement>(".slick-cell");
+    for (const [index, cellNode] of cells.entries()) {
+      cellNode.setAttribute("aria-colindex", String(index + 1));
+    }
+    // The graph column carries no information the row's own aria-label does not (§7.9) — lane
+    // colour is decorative, and HEAD/stash/branch-vs-tag are all named in the label already.
+    rowNode.querySelector(".kv-cell-graph")?.setAttribute("aria-hidden", "true");
+
+    // Either this row was just explicitly selected (`pendingFocusRow`) or it is the row the user
+    // was already on (`focusedRowIndex`) and this render just recreated its DOM node out from
+    // under it — both cases need the *new* node focused; `focusedRowIndex`'s own doc comment
+    // above explains why a one-shot `pendingFocusRow` check alone is not enough.
+    //
+    // `{ preventScroll: true }` is load-bearing, not a micro-optimisation: a freshly re-appended
+    // row is added at the *end* of its DOM sibling list (its own doc comment on `handleClick`'s
+    // sibling, `pendingFocusRow`, plus `commitList.spec.ts`'s own `rowByIndex` doc comment — "DOM
+    // order no longer matches row order") and only *visually* placed back at the right spot via
+    // its `transform: translateY(...)` inline style. A bare `.focus()` triggers the browser's own
+    // implicit scroll-into-view, which was directly observed (via a `Node.prototype.removeChild`
+    // trace) to use the row's untransformed *layout* position rather than its transformed visual
+    // one — scrolling the real viewport to wherever the row landed in raw DOM order, not where it
+    // is drawn. That scroll fires SlickGrid's own `handleScroll`, which runs its usual
+    // `cleanupRows()` pass against the *new* (wrong) scroll position and evicts the very row this
+    // function just focused — a real, reproduced keyboard-trap-adjacent bug on `hugeRepo`-sized
+    // scenarios, where the eviction lands on no later `onRendered` pass to recover it, leaving
+    // focus stranded on `<body>`. This grid already scrolls the target row into view correctly
+    // itself (`moveSelection`'s own `grid.scrollRowIntoView` call, run *before* this ever fires) —
+    // the browser's own heuristic has nothing left to usefully do here, only harm to avoid.
+    const wasPendingFocus = pendingFocusRow === row;
+    if (wasPendingFocus) pendingFocusRow = null;
+    if (wasPendingFocus || row === focusedRowIndex) rowNode.focus({ preventScroll: true });
+  }
 }
 
 onMounted(() => {
@@ -305,6 +428,43 @@ onMounted(() => {
   });
   grid = instance;
 
+  // W14/V2: SlickGrid's own internal structural elements — `_focusSink`/`_focusSink2` (two
+  // invisible divs it binds its own keyboard handling to) and, less obviously, six `.slick-pane`,
+  // four `.slick-viewport` and four `.grid-canvas` wrapper divs it always constructs regardless of
+  // this grid's single-pane, unfrozen configuration — are *all* created with a literal
+  // `tabindex="0"` (confirmed against the compiled source, not assumed from the `.d.ts`, which
+  // types `_focusSink`/`_focusSink2` `protected` despite them being genuine public JS fields at
+  // runtime). Most of those fourteen sit at 0×0 (no frozen columns/rows means their right/bottom
+  // counterparts render empty) and a real browser already skips a zero-area stop, but
+  // `.slick-pane-top-left`/`.slick-viewport-top-left` are not zero-sized — they are exactly as
+  // large as the grid itself and sit in the DOM before any row, so without this sweep `Tab` lands
+  // on one of *them*, never on a row. The row-level roving `tabindex` `applyAccessibility`
+  // maintains below is the real tab stop this grid wants; this sweep is only the precondition —
+  // none of these fourteen may still carry a `tabindex="0"` once it runs. Done once, right after
+  // construction and before any row has been given a `tabindex` of its own, so it can safely
+  // target every remaining `[tabindex="0"]` under the container without also catching a row.
+  // Removing an element from the tab order does not stop a script-invoked `.focus()` from still
+  // reaching it (`tabIndex` only governs `Tab`-key reachability) — moot here regardless, since
+  // this grid no longer calls `grid.focus()` anywhere (`handleClick`/`moveSelection`'s own
+  // `pendingFocusRow` focuses a row directly instead). Removing the `tabindex` attribute outright
+  // (rather than setting the `.tabIndex` IDL property to `-1`, which leaves a literal
+  // `tabindex="-1"` in the DOM) matters for more than tidiness: axe's `aria-required-children`
+  // check for `role="grid"` containers treats *any* child bearing an explicit `tabindex` attribute
+  // — any value — as a non-transparent element that must itself be a valid grid child, which these
+  // plain structural wrapper divs are not. Removing the attribute keeps them transparent for that
+  // computation.
+  for (const el of instance.getContainerNode().querySelectorAll<HTMLElement>('[tabindex="0"]')) {
+    el.removeAttribute("tabindex");
+  }
+
+  instance.onRendered.subscribe((_event, args: OnRenderedEventArgs) => applyAccessibility(args));
+  // The constructor above already performed the grid's first render (`explicitInitialization:
+  // false`) before this subscription existed to hear about it — `onRendered` is a plain
+  // publish/subscribe event, not a replayed one, so that first pass gets the accessibility
+  // attributes applied here explicitly rather than by waiting for whatever render happens next.
+  const initialRange = instance.getRenderedRange();
+  applyAccessibility({ startRow: initialRange.top, endRow: initialRange.bottom });
+
   instance.onClick.subscribe((_event, args) => handleClick(args.row, args.cell));
   instance.onScroll.subscribe(() => {
     if (scrollRaf !== 0) return;
@@ -313,16 +473,25 @@ onMounted(() => {
       if (grid) emit("scroll", grid.getViewport().top);
     });
   });
-  // `stopImmediatePropagation()` on every key this grid sees (not just the ones our own switch
-  // recognizes) is deliberate: `enableCellNavigation: false` means *no* key here is ever
-  // SlickGrid's own cell-navigation model's to handle, so nothing is lost by always claiming the
-  // event — see `handleKeyDown`'s own doc comment for why a plain `host` listener cannot do this.
+  // `stopImmediatePropagation()` only for a key `handleKeyDown` actually claimed — see that
+  // function's own doc comment. Claiming *every* key unconditionally (this project's own earlier
+  // approach, before W14) was safe for every key our own switch names, but not for `Tab`:
+  // SlickGrid's `handleKeyDown` calls `e.preventDefault()` whenever `handled` ends up `true` by
+  // the time it finishes, regardless of *which* code path set it there, so an unconditional
+  // `stopImmediatePropagation()` here silently blocked the browser's own `Tab`-key focus
+  // navigation the moment a row (rather than the inert `_focusSink`) could hold real DOM focus —
+  // exactly the "no keyboard trap" failure W14's own keyboard-only pass exists to catch.
   instance.onKeyDown.subscribe((event) => {
-    handleKeyDown(event.getNativeEvent<KeyboardEvent>());
-    event.stopImmediatePropagation();
+    const handled = handleKeyDown(event.getNativeEvent<KeyboardEvent>());
+    if (handled) event.stopImmediatePropagation();
   });
 
   host.value.addEventListener("contextmenu", handleContextMenu);
+  // `document`, not `host.value`: `focusedRowIndex`'s own doc comment above needs to know when
+  // focus lands anywhere that is *not* a row, including this grid's own resize handles (siblings
+  // of `host`, not descendants — a plain SVG/DOM-tree ancestor listener would miss those) and
+  // every other focusable element in the panel (the toolbar, the detail pane).
+  document.addEventListener("focusin", handleFocusIn);
 
   resizeObserver = new ResizeObserver(scheduleResize);
   resizeObserver.observe(host.value);
@@ -381,6 +550,7 @@ onBeforeUnmount(() => {
   unsubscribeTokens?.();
   tokenReader.dispose();
   host.value?.removeEventListener("contextmenu", handleContextMenu);
+  document.removeEventListener("focusin", handleFocusIn);
   grid?.destroy();
   grid = undefined;
 });
@@ -409,6 +579,10 @@ defineExpose({ scrollToRow });
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize author column"
+      :aria-valuenow="widths.author"
+      :aria-valuemin="MIN_COLUMN_WIDTH"
+      :aria-valuemax="MAX_COLUMN_WIDTH"
+      :aria-valuetext="`${widths.author} pixels`"
       tabindex="0"
       :style="{ left: `${handleLeftAuthor}px` }"
       @mousedown="startDrag('author', $event)"
@@ -419,6 +593,10 @@ defineExpose({ scrollToRow });
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize date column"
+      :aria-valuenow="widths.date"
+      :aria-valuemin="MIN_COLUMN_WIDTH"
+      :aria-valuemax="MAX_COLUMN_WIDTH"
+      :aria-valuetext="`${widths.date} pixels`"
       tabindex="0"
       :style="{ left: `${handleLeftDate}px` }"
       @mousedown="startDrag('date', $event)"
@@ -429,6 +607,10 @@ defineExpose({ scrollToRow });
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize sha column"
+      :aria-valuenow="widths.sha"
+      :aria-valuemin="MIN_COLUMN_WIDTH"
+      :aria-valuemax="MAX_COLUMN_WIDTH"
+      :aria-valuetext="`${widths.sha} pixels`"
       tabindex="0"
       :style="{ left: `${handleLeftSha}px` }"
       @mousedown="startDrag('sha', $event)"
@@ -481,6 +663,13 @@ defineExpose({ scrollToRow });
 .kv-commit-grid .slick-row.kv-row-selected {
   background-color: var(--kv-row-selected-bg);
   color: var(--kv-row-selected-fg);
+}
+
+/* W14's roving tabindex focuses a real row node (not a hidden sink) — it needs a visible
+   indicator of its own, the same token every other focusable edge in this grid already uses. */
+.kv-commit-grid .slick-row:focus-visible {
+  outline: 1px solid var(--kv-focus-border);
+  outline-offset: -1px;
 }
 
 .kv-commit-grid .slick-row.kv-row-head {

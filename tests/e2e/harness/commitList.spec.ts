@@ -40,6 +40,46 @@ async function readyToLoadMore(page: Page): Promise<void> {
   await expect(page.locator(".kv-load-more-button:not([disabled])")).toBeVisible();
 }
 
+/** What `document.activeElement` actually is, in a form a test can match against without caring
+ *  about SlickGrid's per-instance-id `aria-describedby` values or exact class ordering. */
+interface FocusInfo {
+  tag: string;
+  classList: string[];
+  dataRow: string | null;
+}
+
+async function focusInfo(page: Page): Promise<FocusInfo> {
+  return page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      tag: el?.tagName.toLowerCase() ?? "",
+      classList: el ? Array.from(el.classList) : [],
+      dataRow: el?.getAttribute("data-row") ?? null,
+    };
+  });
+}
+
+/**
+ * Presses real `Tab` keys — the same input a keyboard-only user sends — until `document
+ * .activeElement` matches `predicate`, rather than hard-coding a step count: the exact number of
+ * tab stops between two points in the panel is an implementation detail of what else the toolbar
+ * currently renders (P4 only builds part of §6.2's toolbar — see `AppToolbar.vue`'s own doc
+ * comment), not something this test should have to track. What is under test is that the
+ * predicate's target is reachable by `Tab` *at all*, in order, with nothing un-skippable in
+ * front of it — a SlickGrid focus sink, in particular (W14/V2).
+ */
+async function tabUntil(
+  page: Page,
+  predicate: (info: FocusInfo) => boolean,
+  maxPresses = 25,
+): Promise<void> {
+  for (let i = 0; i < maxPresses; i++) {
+    if (predicate(await focusInfo(page))) return;
+    await page.keyboard.press("Tab");
+  }
+  throw new Error(`tabUntil: condition not met within ${maxPresses} Tab presses`);
+}
+
 test.describe("rows and columns", () => {
   test("the clean scenario's tip row renders real subject, author, date and sha text", async ({
     page,
@@ -163,6 +203,100 @@ test.describe("selection and keyboard", () => {
 
     await page.keyboard.press("Escape");
     await expect(detail).toBeHidden();
+  });
+
+  // `docs/plans/P4.md` W14's own "Done when": every one of these steps — tab in, pick a repo,
+  // move selection, open and close the pane, resize a column, load more, refresh — possible
+  // without a mouse, scripted here rather than merely asserted piecemeal by the tests above (each
+  // of which still uses `.click()` to get to the behaviour it actually tests). No `page.mouse.*`
+  // call and no `.click()` appears anywhere in this test.
+  test("keyboard-only pass: tab in, pick a repo, move selection, open/close the pane, resize a column, load more, refresh", async ({
+    page,
+  }) => {
+    await page.goto("/?scenario=hugeRepo");
+    await ready(page);
+    await readyToLoadMore(page);
+
+    // Tab in: the very first Tab press from a blank focus state lands on the repo trigger — the
+    // panel's first real interactive element (`AppToolbar.vue`'s own child order) — never a
+    // SlickGrid focus sink, which would sit ahead of it in the DOM if W14's tabindex sweep
+    // (`CommitGrid.vue`'s `onMounted`) had not neutralised it.
+    await page.keyboard.press("Tab");
+    expect((await focusInfo(page)).classList).toContain("kv-repo-trigger");
+
+    // Pick a repo: Enter opens the dropdown (a native <button>'s default activation), Tab reaches
+    // its first option, Enter selects it.
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".kv-repo-list")).toBeVisible();
+    await tabUntil(page, (info) => info.classList.includes("kv-repo-item"));
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".kv-repo-list")).toBeHidden();
+    // Picking a repo resets `GraphViewState` and re-opens the stream (App.vue's handleRepoOpened,
+    // W11) — the mock answers with the same one repo either way (`commitList.spec.ts`'s own "the
+    // repo picker opens a candidate" test carries the identical reasoning), so this is still
+    // `hugeRepo`'s 20,000-commit history, freshly re-streamed.
+    await ready(page);
+    await readyToLoadMore(page);
+
+    // Tabbing on into the panel from here lands on a row — never a focus sink — and specifically
+    // on row 0, the roving tabindex's default target with nothing selected yet (`applyAccessibility`,
+    // CommitGrid.vue: `selectedRow >= 0 ? selectedRow : 0`). This is W14's own last "Done when"
+    // clause, exercised with real Tab presses rather than inferred from the sweep alone.
+    await tabUntil(page, (info) => info.classList.includes("slick-row"));
+    const onRow = await focusInfo(page);
+    expect(onRow.classList).toContain("slick-row");
+    expect(onRow.dataRow).toBe("0");
+
+    // Move selection: real keydowns on the row that already holds DOM focus, not a synthetic
+    // dispatch. Nothing is selected yet at this point (row 0 is only the *tabbable* default, not
+    // a selection — `applyAccessibility`'s own `tabbableRow` comment), so the first ArrowDown
+    // moves selection from "none" to row 0, same as `moveSelection`'s clamp does for any other
+    // unselected grid; a second ArrowDown is what actually advances it to row 1.
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator(".slick-row.kv-row-selected")).toHaveAttribute("data-row", "0");
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator(".slick-row.kv-row-selected")).toHaveAttribute("data-row", "1");
+
+    // Open/close the pane: `detailOpen` (App.vue) defaults to `true` at the `wide` breakpoint
+    // this viewport uses (§6.3), so it is already open from the two `ArrowDown` presses above —
+    // `Enter` toggles it, same as a second click on an already-selected row does
+    // (`commitList.spec.ts`'s own first test), so it closes here rather than opens.
+    const detail = page.getByTestId("detail-region");
+    await expect(detail).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(detail).toBeHidden();
+    await page.keyboard.press("Enter");
+    await expect(detail).toBeVisible();
+    // `Escape` unconditionally closes it (`closeDetail`, App.vue), regardless of how it got open.
+    await page.keyboard.press("Escape");
+    await expect(detail).toBeHidden();
+
+    // Resize a column: Tab from the row on to the next real tab stop after it — the
+    // message|author resize handle, its own template's own DOM order in `CommitGrid.vue` — and
+    // nudge it with the arrow keys (`handleHandleKeydown`).
+    await tabUntil(page, (info) => info.classList.includes("kv-resize-handle"));
+    const widthBefore = await page.locator(":focus").getAttribute("aria-valuenow");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator(":focus")).not.toHaveAttribute("aria-valuenow", widthBefore ?? "");
+
+    // Load more: Tab on to the Load more button, activate it with Space (a native <button>'s
+    // other default activation key, distinct from Enter, already used above).
+    await tabUntil(page, (info) => info.classList.includes("kv-load-more-button"));
+    await page.keyboard.press("Space");
+    await expect(page.locator(".kv-load-more-button")).toContainText("10,000 remaining");
+    // `GraphViewState.refresh()`'s own idempotency guard ("a second press while running is a
+    // no-op", `graphView.ts`) silently no-ops unless `loading` is back to `"idle"` — the label
+    // text above updates before that settles, so F5 immediately after it is a real, once-observed
+    // race that made the refresh below silently do nothing. `readyToLoadMore`'s own "button not
+    // disabled" check is this file's established signal that a load has actually finished.
+    await readyToLoadMore(page);
+
+    // Refresh: F5 while the grid has focus (`CommitGrid.vue`'s own `handleKeyDown`) reaches the
+    // same action the toolbar's refresh button does (`AppToolbar.vue`'s `defineExpose`) — tab
+    // back onto a row first, since the button just pressed re-renders once its own click resolves.
+    await tabUntil(page, (info) => info.classList.includes("slick-row"));
+    await page.keyboard.press("F5");
+    await expect(page.getByTestId("chunk-source")).toHaveText("git");
   });
 });
 

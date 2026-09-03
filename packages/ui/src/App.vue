@@ -21,6 +21,10 @@ import GitBlockedPanel from "./components/GitBlockedPanel.vue";
 import LoadMoreButton from "./components/LoadMoreButton.vue";
 import NoRepositoryPanel from "./components/NoRepositoryPanel.vue";
 import { GraphViewState } from "./state/graphView.ts";
+import {
+  composeLoadMoreAnnouncement,
+  composeRefreshAnnouncement,
+} from "./state/liveAnnouncements.ts";
 import { RepoState } from "./state/repo.ts";
 import { SelectionState } from "./state/selection.ts";
 import { SettingsState } from "./state/settings.ts";
@@ -118,6 +122,36 @@ watch(graphView.loadedRows, () => {
   if (!found && !graphView.exhausted.value) return;
   pendingSelectionSha.value = null;
   if (selection.selectBySha(sha)) commitGridRef.value?.scrollToRow(selection.row.value);
+});
+
+// ---------------------------------------------------------------------------------------
+// W14's own live region: "the Load-more result and Refresh completion are announced through one
+// polite live region" — deferred here from W9 (`LoadMoreButton.vue`'s own doc comment: "a second
+// region [t]here would fight it"), since both events are really about `GraphViewState.loading`
+// leaving `"loadingMore"`/`"refreshing"`, which this file is already the one place watching. The
+// row count *before* the operation started is captured on the way *into* one of those two states
+// so the completion message can report how many rows the operation itself actually added, not
+// just the total the store now holds.
+// ---------------------------------------------------------------------------------------
+const liveAnnouncement = ref("");
+let loadedRowsBeforeLoad = 0;
+
+watch(graphView.loading, (state, previous) => {
+  if (state === "loadingMore" || state === "refreshing") {
+    loadedRowsBeforeLoad = graphView.loadedRows.value;
+    return;
+  }
+  if (state !== "idle") return;
+  if (previous === "loadingMore") {
+    const added = graphView.loadedRows.value - loadedRowsBeforeLoad;
+    liveAnnouncement.value = composeLoadMoreAnnouncement(
+      added,
+      graphView.remaining.value,
+      graphView.exhausted.value,
+    );
+  } else if (previous === "refreshing") {
+    liveAnnouncement.value = composeRefreshAnnouncement(graphView.loadedRows.value);
+  }
 });
 
 onMounted(() => {
@@ -383,6 +417,17 @@ onBeforeUnmount(() => {
          toolbar), and it is a genuine e2e wait/assert target across all three hosts' specs, not
          merely cosmetic duplicate of the root's own data-connection-state attribute above. -->
     <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
+    <!-- W14's one polite live region (see the `liveAnnouncement` watch above) — unconditional and
+         present from first paint, same as connection-state above, since Load-more/Refresh can
+         both complete while this file's own v-if chain is on any branch that renders the toolbar. -->
+    <div
+      class="kv-visually-hidden"
+      role="status"
+      aria-live="polite"
+      data-testid="live-announcements"
+    >
+      {{ liveAnnouncement }}
+    </div>
     <template v-if="repoState">
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
 
@@ -443,6 +488,10 @@ onBeforeUnmount(() => {
               role="separator"
               aria-orientation="vertical"
               aria-label="Resize detail pane"
+              :aria-valuenow="detailWidth"
+              :aria-valuemin="MIN_DETAIL_WIDTH"
+              :aria-valuemax="MAX_DETAIL_WIDTH"
+              :aria-valuetext="`${detailWidth} pixels`"
               tabindex="0"
               @mousedown="startDetailResize"
               @keydown="handleDetailHandleKeydown"
