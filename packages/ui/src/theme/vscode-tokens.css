@@ -72,6 +72,10 @@
   --kv-mono-font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
   --kv-mono-font-size: var(--vscode-editor-font-size, 12px);
 
+  /* Secondary text / status accents (P4 W10: the "no graph" panels) */
+  --kv-description-fg: var(--vscode-descriptionForeground, #9d9d9d);
+  --kv-error-fg: var(--vscode-errorForeground, #f48771);
+
   /* Scrollbar */
   --kv-scrollbar-thumb-bg: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
   --kv-scrollbar-thumb-hover-bg: var(

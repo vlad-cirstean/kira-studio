@@ -14,3 +14,15 @@ export const BADGE_ICONS = {
   tag: "codicon-tag",
   stash: "codicon-archive",
 } as const;
+
+/** Icons for `RepoPicker.vue` and the P4 W10 "no graph" panels — kept separate from
+ *  `ACTION_ICONS` for the same reason `BADGE_ICONS` is: these decorate a surface, not an
+ *  action a click performs. */
+export const STATE_ICONS = {
+  repo: "codicon-repo",
+  chevronDown: "codicon-chevron-down",
+  check: "codicon-check",
+  openFolder: "codicon-folder-opened",
+  warning: "codicon-warning",
+  commit: "codicon-git-commit",
+} as const;

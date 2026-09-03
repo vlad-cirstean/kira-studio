@@ -1,0 +1,113 @@
+<script setup lang="ts">
+/**
+ * §6.2's refresh action: the leftmost operation button, `F5`/`Ctrl+R` (`Cmd+R` on macOS). Calls
+ * `GraphViewState.refresh()`, which already carries its own "second press while running is a
+ * no-op" idempotency (§6.2) — the `disabled` attribute here is belt-and-braces, not the only
+ * guard. Spins only while `loading === "refreshing"`, not for an unrelated `loadMore`/`loadAll`
+ * in flight, so the icon never implies a re-walk that is not happening.
+ *
+ * The one piece of watcher UI P4 owns (§6.2): a `repo.changed` event with `kind: "refsChanged"`
+ * shows a small dot and changes the tooltip, cleared again once a refresh actually runs. P4 does
+ * not auto-refresh — pulling the list out from under a mid-scroll user because a background
+ * `git fetch` finished is exactly what §6.2 draws the line against.
+ *
+ * The keybinding listens on `document` rather than a specific "panel" element: P4 has no
+ * dedicated focus-scoping container yet (W11 builds the shell), and a single-webview app has
+ * nothing else competing for `F5`/`Ctrl+R` in practice. Revisit if a later phase adds a second
+ * focus scope (e.g. a search box) that should swallow these keys instead.
+ */
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { ACTION_ICONS } from "../icons/index.ts";
+import type { GraphViewState } from "../state/graphView.ts";
+import type { RepoState } from "../state/repo.ts";
+
+const props = defineProps<{ graphView: GraphViewState; repoState: RepoState }>();
+
+const hasPendingChange = ref(false);
+
+watch(
+  () => props.repoState.lastChange.value,
+  (change) => {
+    if (change?.kind === "refsChanged") hasPendingChange.value = true;
+  },
+);
+
+const isBusy = computed(() => props.graphView.loading.value !== "idle");
+const isRefreshing = computed(() => props.graphView.loading.value === "refreshing");
+
+const tooltip = computed(() =>
+  hasPendingChange.value ? "The history changed on disk — refresh to see it" : "Refresh (F5)",
+);
+
+async function doRefresh(): Promise<void> {
+  if (isBusy.value) return;
+  hasPendingChange.value = false;
+  await props.graphView.refresh();
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  );
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (isEditableTarget(event.target)) return;
+  const isRefreshKey =
+    event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r");
+  if (!isRefreshKey) return;
+  event.preventDefault();
+  void doRefresh();
+}
+
+onMounted(() => document.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
+</script>
+
+<template>
+  <button
+    type="button"
+    class="kv-icon-button kv-refresh-button"
+    :class="{ 'kv-refresh-spinning': isRefreshing }"
+    :disabled="isBusy"
+    :title="tooltip"
+    aria-label="Refresh"
+    @click="doRefresh"
+  >
+    <span class="codicon" :class="ACTION_ICONS.refresh" aria-hidden="true"></span>
+    <span v-if="hasPendingChange" class="kv-refresh-dot" aria-hidden="true"></span>
+  </button>
+</template>
+
+<style>
+.kv-refresh-button {
+  position: relative;
+}
+
+.kv-refresh-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.kv-refresh-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--kv-focus-border);
+}
+
+.kv-refresh-spinning .codicon {
+  display: inline-block;
+  animation: kv-refresh-spin 1.5s steps(30) infinite;
+}
+
+@keyframes kv-refresh-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+</style>

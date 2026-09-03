@@ -48,3 +48,28 @@
 .codicon-archive::before {
   content: "\ea98";
 }
+
+/* P4 W10: RepoPicker.vue / the states with no graph. */
+.codicon-repo::before {
+  content: "\ea62";
+}
+
+.codicon-chevron-down::before {
+  content: "\eab4";
+}
+
+.codicon-check::before {
+  content: "\eab2";
+}
+
+.codicon-folder-opened::before {
+  content: "\eaf7";
+}
+
+.codicon-warning::before {
+  content: "\ea6c";
+}
+
+.codicon-git-commit::before {
+  content: "\eafc";
+}
