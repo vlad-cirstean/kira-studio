@@ -363,10 +363,19 @@ principals (`kira_admin`, `kira`, `kira_ro`), so no new `Principal` is needed:
 | Attach to existing row | Scenario | Why |
 |---|---|---|
 | `kira_ro` | `ReadFirstPage` | the read-only principal's reads must work; `ReadOnlyConfig` exists and only the write tests use it today |
-| `kira_ro` | `MutateIsRefused(plan, adapters.CodeUnsupported)` | ClickHouse codes 164/242 → `E_UNSUPPORTED` (`errors.go:60`). This is **the only place in the tree that exercises that mapping against a real server-side refusal** rather than the adapter's own `readOnly` flag |
-| `kira_ro` | `ExecuteIsRefused(ddl, adapters.CodeUnsupported)` | same mapping, DDL path |
-| `kira, database=system (no grant)` | `ReadIsRefused(path, adapters.CodeAuth)` | **§1.4's pin for clickhouse.** Code 497/291 → `E_AUTH` today. Comment names it as a pinned conflation, not an endorsement |
+| `kira_ro` | `MutateIsRefused(plan, adapters.CodeAuth)` | **§1.4's pin for clickhouse, corrected against a real container (implementer finding).** This row's own draft expected ClickHouse's readonlyCode/tableIsReadOnly (164/242 → `E_UNSUPPORTED`, `errors.go:60`) here. Measured instead: a missing `INSERT` grant is a plain authorization refusal — "Not enough privileges … (ACCESS_DENIED)", numeric code 497 — which `errors.go:64` maps to `E_AUTH`, the same code a wrong password produces. There is no "correct mapping" case for a missing-grant `Mutate`/`Execute` refusal on this adapter; both are the conflation |
+| `kira_ro` | `ExecuteIsRefused(ddl, adapters.CodeAuth)` | same measured mapping, DDL path |
 | `kira_admin, database unset` | `ReadFirstPage` on a `system` table | proves the admin principal reaches what the scoped one cannot — the posture half of the cross product |
+
+**Implementer finding, not planned:** the separate "`kira`, a `system` table it has `SELECT` but not
+`SHOW USERS` on" row this section originally planned does not exist as a refusal — measured against
+a real container, `kira`'s plain `GRANT SELECT ON system.*` (`CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`
+is set) is sufficient to read `system.users` on this image (26.3), so that assumed extra-privilege
+gate was wrong. Dropped in favor of the `kira_ro` rows above, which are a real, exercised instance of
+the same conflation. Also: `kira`'s own grants needed `CREATE TABLE`/`DROP TABLE` added (ClickHouse's
+`ALTER` privilege does not itself cover object creation/deletion) for §3.1(3)'s Tier-1 DDL round trip
+to run at all — `testsupport/clickhouse.go`'s grants now read `SELECT, INSERT, ALTER, CREATE TABLE,
+DROP TABLE`, up from `SELECT, INSERT, ALTER DELETE`.
 
 ### 3.2 mysqlfamily — the same two gaps, doubled
 
