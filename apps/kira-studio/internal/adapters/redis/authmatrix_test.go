@@ -66,6 +66,27 @@ func TestRedis_AuthMatrix(t *testing.T) {
 						},
 					}},
 				}, 1),
+				// finding 10: the write above left its key behind in the shared container —
+				// mongo's own equivalent write scenario cleans up after itself
+				// (mongo/authmatrix_test.go's "the authSource-fixed connection can actually
+				// write"); mirrored here as a plain delete rather than folded into the write
+				// scenario's own Run, since MutateSucceeds is the shared constructor (also backing
+				// Tier 1 via RunScenarios) and this key's cleanup is redis-specific.
+				{
+					Name: "cleanup: delete the key the write above left behind",
+					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+						plan := model.MutationPlan{
+							Path: testsupport.NodePath(cfg.ID, testsupport.Seg("database", "db0")),
+							Ops: []model.MutationRowOp{{
+								Kind: "delete",
+								Key:  model.RowValues{{Name: "_key", Value: testsupport.Strp("p26:matrix:acl-all-no-dangerous")}},
+							}},
+						}
+						if _, err := a.Mutate(context.Background(), plan, adapters.NewOpCtx("matrix-acl-all-no-dangerous-cleanup")); err != nil {
+							t.Errorf("cleanup delete: %v", err)
+						}
+					},
+				},
 			},
 		},
 		{
