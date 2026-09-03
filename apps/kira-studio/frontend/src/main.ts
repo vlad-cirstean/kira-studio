@@ -190,6 +190,13 @@ declare global {
        *  runway overrides above (read fresh on every call), this is a SlickGrid construction-time
        *  option — read once, at `new KiraSlickGrid(...)`, not live thereafter. */
       forceSyncScrollingOverride?: boolean;
+      /** P22 iter2-pacing D1: how long (ms) the viewport must go without a native scroll event
+       *  before a self-scheduled catch-up render is allowed to run — overrides columns.ts's
+       *  CHASE_QUIET_MS. Read fresh on every chase callback, never cached. `0` restores the pre-fix
+       *  "fire on the very next rAF, unconditionally" behaviour exactly, so the real-Mac A/B
+       *  (docs/PERF.md §2.1c) is a console line, not a rebuild. See kiraSlickGrid.ts's own
+       *  `scheduleChase` for why the gate is scroll quiescence, not a same-frame-render token. */
+      chaseQuietMsOverride?: number;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can

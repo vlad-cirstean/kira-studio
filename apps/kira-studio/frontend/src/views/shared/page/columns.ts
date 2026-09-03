@@ -251,6 +251,16 @@ export const CELL_BUDGET = 2200;
 // incumbent grid goes through instead), so this constant is SlickGrid-only.
 export const MAX_NEW_CELLS_PER_RENDER = 600;
 
+// P22 iter2-pacing D1. Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
+// MAX_NEW_CELLS_PER_RENDER: how long the viewport must go without a native scroll event before a
+// self-scheduled catch-up render is allowed to run. A catch-up that fires while a fling is still
+// delivering scroll events lands in the same animation frame as that frame's scroll-driven
+// render, doubling the frame's work (docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md
+// §1.2: 131 of 140 frames in a WebKit repro). ~1.5 frames at 60 Hz, ~3 at 120 Hz. 0 restores the
+// pre-fix "fire on the very next rAF, unconditionally" behaviour exactly — which is what makes the
+// real-Mac A/B a console line (docs/PERF.md §2.1c). Re-set from that A/B, not from here.
+export const CHASE_QUIET_MS = 24;
+
 export interface RowRangeExtractorConfig {
   baseLeadPx: number;
   baseTrailPx: number;

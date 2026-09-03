@@ -4,6 +4,7 @@ import {
   BASE_LEAD_PX,
   BASE_TRAIL_PX,
   CELL_BUDGET,
+  CHASE_QUIET_MS,
   LEAD_FRAMES,
   MAX_LEAD_PX,
   MAX_NEW_CELLS_PER_RENDER,
@@ -29,6 +30,11 @@ declare global {
        *  — declared here too only because this program's declaration merging requires an identical
        *  shape to main.ts's own. See main.ts's own doc comment for what it does. */
       forceSyncScrollingOverride?: boolean;
+      /** P22 iter2-pacing D1: overrides columns.ts's CHASE_QUIET_MS. Read fresh on every chase
+       *  callback, never cached — 0 restores the pre-fix "fire on the very next rAF,
+       *  unconditionally" behaviour exactly, so the real-Mac A/B (docs/PERF.md §2.1c) is a console
+       *  line, not a rebuild. */
+      chaseQuietMsOverride?: number;
     };
   }
 }
@@ -131,13 +137,54 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  memoisation for the whole overscan band. */
   lastRenderedRowBounds: { start: number; end: number } = { start: 0, end: -1 };
 
-  /** P22 iter2-scroll-gaps D2 step 8 — set while a self-scheduled `requestAnimationFrame` catch-up
-   *  render is already in flight, so a call arriving before it fires does not schedule a second one.
-   *  Re-entrancy note (this file's own existing comment, above, on `velocity`/`mountedColumnCount`):
-   *  reads of this field must tolerate `undefined` on the very first, pre-field-init call exactly
-   *  like those two already do — `!this.chasePending` is falsy (i.e. "not pending") for `undefined`
-   *  without needing a separate default. */
-  chasePending = false;
+  /** Supplied by the host: performance.now() at the last native `scroll` event on the viewport.
+   *  P22 iter2-pacing D1's own gate — a catch-up render never fires while this is recent. Defaults
+   *  to "never scrolled" so a grid that hasn't wired a sampler still chases immediately — and, like
+   *  `velocity`/`mountedColumnCount`/`chaseWanted` above/below, every read below tolerates this
+   *  field being `undefined` on the base constructor's own pre-field-init call. */
+  lastScrollEventAt: () => number = () => Number.NEGATIVE_INFINITY;
+
+  /** P22 iter2-pacing D1 — replaces iter2-scroll-gaps' own `chasePending` boolean. `chaseHandle` is
+   *  the live `requestAnimationFrame` id (0 when none is pending); `chaseWanted` is recomputed by
+   *  every `getRenderedRange` call and read by the chase callback itself, so a call that lands
+   *  after the deficit has already closed (by a later, non-chase render) is a correctly-cheap no-op
+   *  instead of an unconditional extra render. See `scheduleChase` below for the re-arm loop this
+   *  drives. Re-entrancy note (this file's own existing comment, above, on
+   *  `velocity`/`mountedColumnCount`): reads of these fields must tolerate `undefined` on the very
+   *  first, pre-field-init call exactly like those two already do. */
+  private chaseHandle = 0;
+  private chaseWanted = false;
+
+  /** P22 iter2-pacing D1 — the fix itself. A catch-up render is gated on scroll *quiescence*, not
+   *  on a frame token ("did a render already run this frame?"): that plan's own §3 F2 found the
+   *  intra-frame ordering of the scroll-driven render and a same-frame chase differs between
+   *  engines and between input paths (opposite orderings from two different sandbox harnesses), so
+   *  a fix that depends on which one ran first is correct in one environment and wrong in another.
+   *  "Is a scroll still live?" is true in every frame that will carry a scroll-driven render,
+   *  regardless of where in the frame that render actually sits — ordering-agnostic by
+   *  construction. Termination: `chaseWanted` is recomputed by every render and clears once a
+   *  render reaches `target`; `target` itself shrinks as the grid goes quiet (the host's own
+   *  `velocity()` reports zero 150ms after the last scroll sample), so the deficit this loop is
+   *  closing shrinks while it closes it — it cannot spin forever. */
+  private scheduleChase(): void {
+    if (this.chaseHandle) return;
+    this.chaseHandle = requestAnimationFrame(() => {
+      this.chaseHandle = 0;
+      if (!this.chaseWanted) return;
+      const quietMs = window.__kiraGridTuning?.chaseQuietMsOverride ?? CHASE_QUIET_MS;
+      const lastScroll = this.lastScrollEventAt
+        ? this.lastScrollEventAt()
+        : Number.NEGATIVE_INFINITY;
+      // Still scrolling: this frame already has (or is about to get) a scroll-driven render of its
+      // own. Re-arm — a rAF scheduled from inside a rAF callback always lands in a later frame, so
+      // this never re-enters the same frame it was just called from.
+      if (performance.now() - lastScroll < quietMs) {
+        this.scheduleChase();
+        return;
+      }
+      this.render();
+    });
+  }
 
   override getRenderedRange(
     viewportTop?: number,
@@ -150,8 +197,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     // that first, base-constructor-triggered call; every read of a subclass field here has to
     // tolerate that, not just default it once at the field declaration (confirmed empirically —
     // `TypeError: this.velocity is not a function` from inside the `super(...)` call otherwise).
-    // `this.chasePending`/`this.lastRenderedRowBounds` (P22 iter2-scroll-gaps D2) are read the same
-    // defensive way below, for the identical reason.
+    // `this.chaseWanted`/`this.lastRenderedRowBounds` (P22 iter2-scroll-gaps D2, P22 iter2-pacing
+    // D1) are read the same defensive way below, for the identical reason.
     const range = super.getVisibleRange(viewportTop, viewportLeft);
     const { pxPerFrame, direction } = this.velocity
       ? this.velocity()
@@ -246,17 +293,15 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       }
     }
 
-    // Step 8: if the returned range is narrower than `target` on either side, self-schedule a
-    // catch-up render — every call (real-scroll- or catch-up-driven) recomputes `must`/`target` fresh
-    // from the grid's *current* scroll position, so there is no queue of stale ranges to reconcile,
-    // only "how far is `prev` from `target`, right now."
-    if ((start > target.start || end < target.end) && end >= start && !this.chasePending) {
-      this.chasePending = true;
-      requestAnimationFrame(() => {
-        this.chasePending = false;
-        this.render();
-      });
-    }
+    // Step 8: if the returned range is narrower than `target` on either side, want a catch-up
+    // render — every call (real-scroll- or catch-up-driven) recomputes `must`/`target` fresh from
+    // the grid's *current* scroll position, so there is no queue of stale ranges to reconcile, only
+    // "how far is `prev` from `target`, right now." P22 iter2-pacing D1: `chaseWanted` is
+    // recomputed on every call (not just latched true once), so a call that lands after the deficit
+    // has already closed clears it again; `scheduleChase()` is the gate that decides *when* a
+    // wanted chase is actually allowed to render (see its own comment).
+    this.chaseWanted = end >= start && (start > target.start || end < target.end);
+    if (this.chaseWanted) this.scheduleChase();
 
     // Step 9: the range actually returned this call — read by step 3 on the *next* call.
     this.lastRenderedRowBounds = { start, end };

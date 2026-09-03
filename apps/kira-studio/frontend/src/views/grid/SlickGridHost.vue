@@ -344,6 +344,9 @@ onMounted(() => {
     },
   );
   grid.velocity = velocity;
+  // P22 iter2-pacing D1 — the chase's own quiescence gate. `lastOffsetT` is already
+  // performance.now() at the last native scroll event (onViewportScroll, above); no new sampling.
+  grid.lastScrollEventAt = () => lastOffsetT;
 
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, onGridRendered);
