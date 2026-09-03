@@ -18,8 +18,9 @@ const themeParam = params.get("theme") ?? "vscode-dark";
 
 applyThemeKind(isThemeKind(themeParam) ? themeParam : "vscode-dark");
 
-// Exercises the same getComputedStyle bridge the canvas renderer will use from P4 on —
-// re-read on every theme switch via the same MutationObserver path, not a fresh instance.
+// Exercises the same getComputedStyle bridge the grid/graph row geometry reads --kv-row-height
+// through (P4 W1 on) — re-read on every theme switch via the same MutationObserver path, not a
+// fresh instance.
 const tokenReader = new TokenReader();
 tokenReader.watch();
 

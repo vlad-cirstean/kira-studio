@@ -10,7 +10,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "check": "bun run format:check && bun run lint && bun run check:types && bun run check:tokens && bun run check:settings && bun run check:theme-palettes",
+    "check": "bun run format:check && bun run lint && bun run check:types && bun run check:tokens && bun run check:settings && bun run check:theme-palettes && bun run check:lane-palette",
     "check:types": "tsc --build --force && bun run --filter '@kira-version/ui' check:vue",
     "format:check": "biome format .",
     "format": "biome format --write .",
@@ -20,6 +20,8 @@
     "gen:settings": "bun run scripts/gen-settings.ts",
     "check:theme-palettes": "bun run scripts/gen-theme-palettes.ts --check",
     "gen:theme-palettes": "bun run scripts/gen-theme-palettes.ts",
+    "check:lane-palette": "bun run scripts/gen-lane-palette.ts --check",
+    "gen:lane-palette": "bun run scripts/gen-lane-palette.ts",
     "build": "bun run scripts/build.ts",
     "test": "bun test packages tests/fixtures tests/integration tests/unit",
     "test:e2e": "playwright test",

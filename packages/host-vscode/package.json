@@ -83,6 +83,88 @@
           ]
         }
       }
-    }
+    },
+    "colors": [
+      {
+        "id": "kiraVersion.graphLane0",
+        "description": "Kira Version: commit graph lane colour 0.",
+        "defaults": {
+          "dark": "#096db3",
+          "light": "#1b99f3",
+          "highContrast": "#0a78c7",
+          "highContrastLight": "#0a78c7"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane1",
+        "description": "Kira Version: commit graph lane colour 1.",
+        "defaults": {
+          "dark": "#c2380a",
+          "light": "#f56738",
+          "highContrast": "#d53e0b",
+          "highContrastLight": "#d53e0b"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane2",
+        "description": "Kira Version: commit graph lane colour 2.",
+        "defaults": {
+          "dark": "#3196dd",
+          "light": "#1d72af",
+          "highContrast": "#50a5e2",
+          "highContrastLight": "#155684"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane3",
+        "description": "Kira Version: commit graph lane colour 3.",
+        "defaults": {
+          "dark": "#e16d47",
+          "light": "#bd461f",
+          "highContrast": "#e58261",
+          "highContrastLight": "#913618"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane4",
+        "description": "Kira Version: commit graph lane colour 4.",
+        "defaults": {
+          "dark": "#7fb2d7",
+          "light": "#285b80",
+          "highContrast": "#96c0de",
+          "highContrastLight": "#1c4059"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane5",
+        "description": "Kira Version: commit graph lane colour 5.",
+        "defaults": {
+          "dark": "#da9f8b",
+          "light": "#88422b",
+          "highContrast": "#e2b2a2",
+          "highContrastLight": "#612f1f"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane6",
+        "description": "Kira Version: commit graph lane colour 6.",
+        "defaults": {
+          "dark": "#aec5d5",
+          "light": "#2f495b",
+          "highContrast": "#c6d6e2",
+          "highContrastLight": "#1d2e39"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane7",
+        "description": "Kira Version: commit graph lane colour 7.",
+        "defaults": {
+          "dark": "#d9beb5",
+          "light": "#623e32",
+          "highContrast": "#e3d0c9",
+          "highContrastLight": "#3d271f"
+        }
+      }
+    ]
   }
 }

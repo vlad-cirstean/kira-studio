@@ -1,36 +1,17 @@
 /**
- * The getComputedStyle bridge for the one surface that cannot consume CSS variables: a
- * `<canvas>` needs real colour strings, not custom properties (§3.4, §5.3). This resolves
- * the --kv-* token layer once, caches it, and re-reads on theme change via a MutationObserver
- * on <body> — otherwise the graph would keep its old colours after a theme switch while
- * everything else re-cascaded for free.
+ * The getComputedStyle bridge for the one thing the --kv-* token layer holds that JavaScript
+ * still needs as a number, not a CSS string: `--kv-row-height` (§6.1) has to reach SlickGrid's
+ * `rowHeight` option and `rowSvg.ts`'s per-row geometry (W6, W8) as an actual pixel value, since
+ * neither is something the cascade can hand a value to on its own. Every *colour* token, by
+ * contrast, is consumed purely through CSS classes now (W1, §3.4) — `packages/ui/src/graph/`
+ * never holds a colour string, so this file has no reason to resolve one. Re-reads on theme
+ * change via a MutationObserver on <body>, in case a density setting ever changes the row height
+ * live rather than only at startup.
  *
- * Implemented fully in P0, ahead of anything that paints to canvas, because it is easy to
- * get subtly wrong and P4 would otherwise write it in a hurry while also writing a renderer.
+ * Implemented fully in P0, ahead of anything that consumes it, because it is easy to get subtly
+ * wrong and a later phase would otherwise write it in a hurry while also writing a renderer.
  */
-const TOKEN_NAMES = [
-  "--kv-app-bg",
-  "--kv-app-fg",
-  "--kv-panel-bg",
-  "--kv-panel-border",
-  "--kv-row-fg",
-  "--kv-row-hover-bg",
-  "--kv-row-selected-bg",
-  "--kv-row-selected-fg",
-  "--kv-focus-border",
-  "--kv-graph-lane-0",
-  "--kv-graph-lane-1",
-  "--kv-graph-lane-2",
-  "--kv-graph-lane-3",
-  "--kv-graph-lane-4",
-  "--kv-graph-lane-5",
-  "--kv-graph-lane-6",
-  "--kv-graph-lane-7",
-  "--kv-diff-added-fg",
-  "--kv-diff-modified-fg",
-  "--kv-diff-deleted-fg",
-  "--kv-mono-font-family",
-] as const;
+const TOKEN_NAMES = ["--kv-row-height"] as const;
 
 export type TokenName = (typeof TOKEN_NAMES)[number];
 export type TokenMap = Readonly<Record<TokenName, string>>;

@@ -28,31 +28,22 @@ test.describe("app shell", () => {
 });
 
 test.describe("theming", () => {
-  test("switching theme kind changes both the computed token and what readTokens reports", async ({
-    page,
-  }) => {
+  // P4 W1 narrowed `readTokens()` to the one thing JavaScript still needs as a number
+  // (`--kv-row-height`, §6.1) — every colour token is now consumed purely through CSS classes
+  // (W1, §3.4), so there is nothing left for readTokens() to report that a theme switch would
+  // change; that claim moved to the visual baselines below instead. This just checks the bridge
+  // itself reports what the cascade actually resolved, independent of theme.
+  test("readTokens reports the live computed value of --kv-row-height", async ({ page }) => {
     await page.goto("/?scenario=clean&theme=vscode-dark");
 
     const readComputed = () =>
       page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue("--kv-app-bg").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--kv-row-height").trim(),
       );
     const readFromReader = () =>
-      page.evaluate(() => window.__kiraHarness.readTokens()["--kv-app-bg"]);
+      page.evaluate(() => window.__kiraHarness.readTokens()["--kv-row-height"]);
 
-    const darkComputed = await readComputed();
-    const darkFromReader = await readFromReader();
-    expect(darkComputed).toBe(darkFromReader);
-
-    await page.evaluate(() => window.__kiraHarness.setTheme("vscode-light"));
-    // TokenReader re-reads via a MutationObserver on <body>'s class/style attributes, which
-    // fires asynchronously — poll rather than assume a synchronous update.
-    await expect.poll(() => readFromReader()).not.toBe(darkFromReader);
-
-    const lightComputed = await readComputed();
-    const lightFromReader = await readFromReader();
-    expect(lightComputed).toBe(lightFromReader);
-    expect(lightComputed).not.toBe(darkComputed);
+    expect(await readFromReader()).toBe(await readComputed());
   });
 
   for (const kind of THEME_KINDS) {

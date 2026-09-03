@@ -32,16 +32,19 @@
   --kv-focus-border: var(--vscode-focusBorder, #007fd4);
 
   /* Graph lanes — the one invented palette (no workbench colour id means "branch lane N").
-     Contrast-checked against --kv-app-bg per theme kind; generation is a P4 concern. These
-     eight are a placeholder progression, not yet contrast-validated. */
-  --kv-graph-lane-0: var(--vscode-charts-blue, #3794ff);
-  --kv-graph-lane-1: var(--vscode-charts-green, #89d185);
-  --kv-graph-lane-2: var(--vscode-charts-orange, #d18616);
-  --kv-graph-lane-3: var(--vscode-charts-purple, #b180d7);
-  --kv-graph-lane-4: var(--vscode-charts-red, #f14c4c);
-  --kv-graph-lane-5: var(--vscode-charts-yellow, #cca700);
-  --kv-graph-lane-6: var(--vscode-charts-foreground, #cccccc);
-  --kv-graph-lane-7: var(--vscode-terminal-ansiCyan, #29b8db);
+     Contrast- and CVD-checked against each theme kind's editor.background by
+     scripts/gen-lane-palette.ts (P4 W1); the literal fallback below is the "dark" kind's
+     colour (see that script's own doc comment for why only one kind's literal is possible). */
+  /* kv-lane-tokens:start (scripts/gen-lane-palette.ts) — do not hand-edit */
+  --kv-graph-lane-0: var(--vscode-kiraVersion-graphLane0, #096db3);
+  --kv-graph-lane-1: var(--vscode-kiraVersion-graphLane1, #c2380a);
+  --kv-graph-lane-2: var(--vscode-kiraVersion-graphLane2, #3196dd);
+  --kv-graph-lane-3: var(--vscode-kiraVersion-graphLane3, #e16d47);
+  --kv-graph-lane-4: var(--vscode-kiraVersion-graphLane4, #7fb2d7);
+  --kv-graph-lane-5: var(--vscode-kiraVersion-graphLane5, #da9f8b);
+  --kv-graph-lane-6: var(--vscode-kiraVersion-graphLane6, #aec5d5);
+  --kv-graph-lane-7: var(--vscode-kiraVersion-graphLane7, #d9beb5);
+  /* kv-lane-tokens:end */
 
   /* Badges */
   --kv-badge-local-bg: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
@@ -77,4 +80,51 @@ body.vscode-high-contrast,
 body.vscode-high-contrast-light {
   --kv-row-selected-border: var(--vscode-contrastActiveBorder, #f38518);
   --kv-focus-border: var(--vscode-focusBorder, #f38518);
+
+  /* High-contrast kinds get explicit node outlines rather than relying on fill alone (§6.1) —
+     defined only here so nothing at runtime branches on theme kind: every node always carries
+     the .kv-node rule below, and it is a no-op (none / 0) outside these two selectors. */
+  /* kv-lane-outline:start (scripts/gen-lane-palette.ts) — do not hand-edit */
+  --kv-graph-node-outline: var(--vscode-contrastActiveBorder, #f38518);
+  --kv-graph-node-outline-width: 1.5px;
+  /* kv-lane-outline:end */
 }
+
+/* kv-lane-rules:start (scripts/gen-lane-palette.ts) — do not hand-edit */
+.kv-lane-0 {
+  stroke: var(--kv-graph-lane-0);
+  fill: var(--kv-graph-lane-0);
+}
+.kv-lane-1 {
+  stroke: var(--kv-graph-lane-1);
+  fill: var(--kv-graph-lane-1);
+}
+.kv-lane-2 {
+  stroke: var(--kv-graph-lane-2);
+  fill: var(--kv-graph-lane-2);
+}
+.kv-lane-3 {
+  stroke: var(--kv-graph-lane-3);
+  fill: var(--kv-graph-lane-3);
+}
+.kv-lane-4 {
+  stroke: var(--kv-graph-lane-4);
+  fill: var(--kv-graph-lane-4);
+}
+.kv-lane-5 {
+  stroke: var(--kv-graph-lane-5);
+  fill: var(--kv-graph-lane-5);
+}
+.kv-lane-6 {
+  stroke: var(--kv-graph-lane-6);
+  fill: var(--kv-graph-lane-6);
+}
+.kv-lane-7 {
+  stroke: var(--kv-graph-lane-7);
+  fill: var(--kv-graph-lane-7);
+}
+.kv-node {
+  stroke: var(--kv-graph-node-outline, none);
+  stroke-width: var(--kv-graph-node-outline-width, 0);
+}
+/* kv-lane-rules:end */
