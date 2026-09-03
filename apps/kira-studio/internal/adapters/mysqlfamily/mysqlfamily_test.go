@@ -443,18 +443,42 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 	// neither had a dedicated real-container test before this.
 	t.Run("read: filter and sort", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)
-		filter := "region_id = 1"
+		// finding 9: "region_id = 1" narrowed to Acme Co alone, so the requested sort order was
+		// never actually observable — the test would pass even with Sort silently dropped.
+		// "region_id IS NOT NULL" keeps both seeded customers (Acme Co, Globex both have a
+		// region), so descending-name order is a real, checkable assertion.
+		filter := "region_id IS NOT NULL"
 		p, err := a.Read(context.Background(), adapters.ReadRequest{
 			Path:   nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
-			Filter: &filter, Sort: &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "name", Direction: "asc"}}},
+			Filter: &filter, Sort: &model.SortSpec{Kind: "structured", Terms: []model.SortTerm{{Column: "name", Direction: "desc"}}},
 			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
 		}, adapters.NewOpCtx("op-10e"))
 		if err != nil {
 			t.Fatalf("Read: %v", err)
 		}
 		tp := p.(page.TabularPage)
-		if tp.RowCount != 1 {
-			t.Fatalf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
+		if tp.RowCount != 2 {
+			t.Fatalf("RowCount = %d, want 2 (both customers have a region)", tp.RowCount)
+		}
+		nameCol := -1
+		for i, c := range tp.Columns {
+			if c.Name == "name" {
+				nameCol = i
+				break
+			}
+		}
+		if nameCol < 0 {
+			t.Fatalf("no name column in %+v", tp.Columns)
+		}
+		first, second := cellAt(t, tp, nameCol, 0), cellAt(t, tp, nameCol, 1)
+		deref := func(s *string) string {
+			if s == nil {
+				return "<nil>"
+			}
+			return *s
+		}
+		if first == nil || second == nil || *first != "Globex" || *second != "Acme Co" {
+			t.Errorf("sorted names = [%s, %s], want [Globex, Acme Co] (name desc)", deref(first), deref(second))
 		}
 	})
 
