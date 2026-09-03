@@ -313,6 +313,18 @@ unit-tested but its effect on an actual first launch is unverified on any platfo
 
 ### 2.1c P22 spike — the SlickGrid A/B, and how to run it on real hardware
 
+**Superseded 2026-09 (P29 §3.1): the two-engine comparison below can no longer be run as written.**
+`window.__kiraGridEngine` and the incumbent `DataGrid.vue`/`@tanstack/vue-virtual` grid it switched
+away from are both deleted — the SlickGrid cutover this section's own A/B fed into is complete
+(`bd6c369`, `402f42e`), and there is exactly one grid engine in the tree now. The recorded numbers,
+the finding (SlickGrid's own wheel handler ate trackpad momentum), and the reasoning below stay as
+the evidence for that cutover; steps 1-5's two-engine comparison itself is history, not a protocol to
+re-run. Step 6's `window.__kiraGridTuning` A/B, and every A/B further down this section, still work
+standalone and are rewritten below to drop the now-dead engine-switch step. **Run any of them from a
+build where the hooks are actually compiled in** (P29 F1 gates `window.__kira*` behind
+`__KIRA_DEBUG_HOOKS__`): `bun run dev` (`wails3 task dev`)'s Vite dev server, or a native build via
+`build:dev`/`build:test` — **never** a packaged `.dmg`, where they're gone by design.
+
 **What this section is not: it does not say the fast-scroll lag is fixed.** Pass A
 (`docs/v1.1/plans/P22-slickgrid-migration-plan.md`) built a second, additive grid —
 `views/grid/SlickGridHost.vue`, wrapping `6pac/SlickGrid`'s core engine — behind
@@ -335,9 +347,11 @@ conclusion that no DOM grid can help — see that section for the reasoning). **
 is not yet known — it has never been run.** Whoever runs it should update this section, and the
 plan's own §7.4(b)/§8.6, with the real numbers and the real verdict once it has been.
 
-**Protocol — one build, both engines, the same real fling twice.** This is §2.1a's own protocol
-(above), doubled: run it once against the incumbent grid, once against the spike, same window size,
-same table, same page size, same hard two-finger flick.
+**Protocol — one build, both engines, the same real fling twice (superseded, kept verbatim as the
+historical record of the A/B this ran; step 3's engine switch no longer exists — see the note at
+this section's head).** This is §2.1a's own protocol (above), doubled: run it once against the
+incumbent grid, once against the spike, same window size, same table, same page size, same hard
+two-finger flick.
 
 1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density — exactly §2.1a
    step 1.
@@ -355,10 +369,11 @@ same table, same page size, same hard two-finger flick.
    whether the lag was *perceptibly* different between the two — the perceptual read is what actually
    answers the original report; the numbers are what keep that read honest (§9's own discipline,
    restated in the plan's own §7.4(b) header).
-6. If the result is inconclusive by the numbers alone, `window.__kiraGridTuning.maxLeadPxOverride =
-   4000` on **both** engines (§7.3 step 6's own cheap next experiment) is a five-minute test that
-   costs nothing and separates "the renderer is too slow" from "the runway is too short" — see the
-   plan's §7.4(b) INCONCLUSIVE branch for the full reasoning.
+6. **Still directly runnable today** (a live console line, no rebuild — the two-engine comparison
+   above is not a prerequisite): `window.__kiraGridTuning.maxLeadPxOverride = 4000` (§7.3 step 6's
+   own cheap next experiment) is a five-minute test that costs nothing and separates "the renderer
+   is too slow" from "the runway is too short" — see the plan's §7.4(b) INCONCLUSIVE branch for the
+   full reasoning.
 
 **Found and fixed on a real-hardware run of this protocol: SlickGrid's own wheel handler ate
 trackpad momentum.** `enableMouseWheelScrollHandler` (default `true`) quantizes every wheel/trackpad
@@ -542,10 +557,11 @@ considers most likely if (a) passes but the numbers stay flat. **(c)** `uncovere
 materially — the runway is now too thin during a fling; lower `chaseQuietMsOverride` or raise the
 per-frame runway cap, both console lines.
 
-**Protocol — same build, same 50 000+-row table at page size 10 000, comfortable density,
-`window.__kiraGridEngine = 'slick'` with a tab reload, one hard two-finger flick per run, momentum
-allowed to die, `copy(JSON.stringify(__kiraScrollTrace.stop()))`.** Extends §2.1c's own protocol
-above (same setup) rather than replacing it.
+**Protocol — same build, same 50 000+-row table at page size 10 000, comfortable density, one hard
+two-finger flick per run, momentum allowed to die,
+`copy(JSON.stringify(__kiraScrollTrace.stop()))`.** Extends §2.1c's own protocol above (same setup,
+minus its now-dead engine-switch step — there is one engine now, so no reload-to-switch is needed)
+rather than replacing it.
 
 **Report for every run:** `summary.frameMs` `{mean, stddev, p50, p95, max}` — the pacing number and
 the point of the whole exercise; `summary.renderCountHistogram`; `summary.renderMs` (now a per-frame
