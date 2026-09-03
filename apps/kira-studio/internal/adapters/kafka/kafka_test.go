@@ -130,6 +130,44 @@ func TestKafka_ConnectDisconnect(t *testing.T) {
 	}
 }
 
+// P25 §2.1(4): the missing auth-failure case — a wrong password against a real SASL_PLAINTEXT/
+// PLAIN broker is E_AUTH.
+func TestKafka_Connect_AuthFailure(t *testing.T) {
+	sf := testsupport.StartKafkaSasl(t)
+	badCfg := sf.Config
+	user, wrong := "kira", "definitely-wrong"
+	badCfg.Username, badCfg.Password = &user, &wrong
+
+	a := newAdapter(t)
+	_, err := a.Connect(context.Background(), badCfg, adapters.NewOpCtx("op-auth"))
+	if err == nil {
+		t.Fatal("want an error for a wrong password")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeAuth {
+		t.Errorf("code = %v, want E_AUTH", code)
+	}
+}
+
+// P25 §1.4/§2.1(5): the regression test — a non-empty username with an empty password must still
+// offer SASL/PLAIN (and fail as a real, correctly-coded auth failure against a SASL-requiring
+// broker) rather than silently connecting anonymously and reporting the broker's transport-level
+// refusal as E_QUERY.
+func TestKafka_Connect_UsernameWithoutPasswordIsAuthError(t *testing.T) {
+	sf := testsupport.StartKafkaSasl(t)
+	cfg := sf.Config
+	user, empty := "kira", ""
+	cfg.Username, cfg.Password = &user, &empty
+
+	a := newAdapter(t)
+	_, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-half"))
+	if err == nil {
+		t.Fatal("want an error for a username with no password")
+	}
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeAuth {
+		t.Errorf("code = %v, want E_AUTH", code)
+	}
+}
+
 // 2. cap honesty. Collapses to a plain caps assertion (§5.3) — no container needed.
 func TestKafka_Caps(t *testing.T) {
 	a := newAdapter(t)

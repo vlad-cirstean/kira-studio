@@ -99,8 +99,25 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 	if ssl {
 		opts = append(opts, kgo.DialTLSConfig(&tls.Config{}))
 	}
+	// P25 §1.4: SASL/PLAIN was configured only when username *and* password were both non-empty —
+	// with only one of the pair present, the whole mechanism was silently dropped and the client
+	// connected anonymously; against a SASL-requiring broker that surfaced as a transport-level
+	// refusal (E_QUERY, "is SASL missing?"), blaming the broker for a credential this app chose not
+	// to send. A half-filled pair now fails up front as E_AUTH instead of connecting anonymously.
+	//
+	// Deviation from the plan's own prescribed fix, found implementing against the real driver:
+	// franz-go's plain.Auth.AsMechanism() (pkg/sasl/plain/plain.go) refuses locally — before ever
+	// contacting the broker — the instant either User or Pass is empty ("PLAIN user and pass must
+	// be non-empty"), an error kafka/errors.go's mapError has no reason to classify as auth. The
+	// plan's own fix only special-cased "password with no username"; reproduced against a real
+	// SASL_PLAINTEXT broker, "username with no password" still surfaced as E_QUERY through that
+	// client-side refusal, not the E_AUTH the plan's own §2.7 matrix asserts for it. Both halves of
+	// a half-filled pair are equally unusable by this mechanism, so both are guarded symmetrically.
 	if username != "" && password != "" {
 		opts = append(opts, kgo.SASL(plain.Auth{User: username, Pass: password}.AsMechanism()))
+	} else if username != "" || password != "" {
+		return nil, nil, nil, adapters.New(adapters.CodeAuth,
+			"kafka: SASL/PLAIN needs both a username and a password", nil)
 	}
 
 	cl, err := kgo.NewClient(opts...)
