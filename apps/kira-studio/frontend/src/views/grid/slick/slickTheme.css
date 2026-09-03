@@ -60,17 +60,29 @@
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   color: var(--kira-fg);
   padding: 0 var(--kira-s-4);
+  /* P22 iter2-pacing D7 item 2: slick.grid.css leaves `.slick-cell` at `display: block`, so cell
+     text sat at the top of the box (line-height: normal, no vertical centring) — unlike the
+     incumbent's `.grid-cell` (`display: flex; align-items: center`), the measured-good baseline
+     this whole spike is compared against. Exact parity with it, chosen over a `line-height` hack
+     because that would have to track the 22/28px density setting; this doesn't. A layout-model
+     change on every mounted cell, its own commit for that reason. */
+  display: flex;
+  align-items: center;
 }
 
 .slick-grid-host .kira-gutter {
   background: var(--kira-bg-elevated);
   color: var(--kira-fg-disabled);
   font-size: var(--kira-t-xs);
-  /* P22 iter2-pacing D7 item 1: `justify-content: flex-end` (this rule's own value until now) is
-     inert — slick.grid.css declares no `display` on `.slick-cell`, so it computes to `display:
-     block` and the row number was left-aligned, unlike the incumbent's `.gutter-cell` (`display:
-     flex`). text-align is the fix that works on the actual (block) layout model. */
+  /* P22 iter2-pacing D7 item 1: `text-align: right` is what makes this work under `.slick-cell`'s
+     own `display: block` (as it was until the next rule below landed). D7 item 2's `display: flex`
+     on `.slick-cell` makes `text-align` alone insufficient again — a lone text child becomes an
+     anonymous flex item that hugs its own content and sits at the flex default (flex-start,
+     unaffected by the container's text-align) unless the main axis is told otherwise, so
+     `justify-content: flex-end` is restored here too, keeping both fixes correct together under
+     the layout model D7 item 2 switched to. */
   text-align: right;
+  justify-content: flex-end;
   border-right: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
@@ -101,7 +113,12 @@
 }
 
 .slick-grid-host .kira-align-right {
+  /* justify-content is the one that actually positions a lone-text-node cell under
+     `.slick-cell`'s own `display: flex` (see `.kira-gutter`'s own comment above for why
+     text-align alone stopped being enough once that landed) — kept alongside text-align so
+     nothing regresses if a future formatter ever returns more than a single text node here. */
   text-align: right;
+  justify-content: flex-end;
   font-variant-numeric: tabular-nums;
 }
 
