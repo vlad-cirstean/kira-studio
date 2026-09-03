@@ -1,6 +1,5 @@
 import type { ColumnDescriptor, TabularPage, TypeClass } from '@shared/protocol/page';
 import { cellText, isNull } from '@shared/protocol/page';
-import type { Range } from '@tanstack/vue-virtual';
 import { typeClassColor } from '../../../theme/icons';
 import { typeDescription } from '../typeGlossary';
 
@@ -15,11 +14,11 @@ export const GUTTER_WIDTH = 56;
 // P48 F9: the 96px fallback both grids' own widths computeds used when neither a stored width
 // nor a measured one is available yet.
 export const DEFAULT_COLUMN_WIDTH = 96;
-// P49 F9/D4: the pixel overscan budget and per-side column cap DataGrid.vue's own column
-// virtualizer used, now shared with ConsoleResultGrid.vue's own column axis too.
+// P49 F9/D4: the pixel overscan budget DataGrid.vue's own column virtualizer used — kept for
+// KiraSlickGrid's own column-overscan clamp (kiraSlickGrid.ts's clampColumnOverscan); the per-side
+// column *count* cap it was paired with (MAX_OVERSCAN_COLUMNS) died with the tanstack-virtual
+// column axis it belonged to (P30 §3.6 C7) — SlickGrid clamps by canvas width instead.
 export const OVERSCAN_PX = 560;
-/** Per side. Bounds the DOM when columns are narrow enough that 560 px is a dozen of them. */
-export const MAX_OVERSCAN_COLUMNS = 12;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 
@@ -78,135 +77,11 @@ export function initialWidths(page: TabularPage): Record<string, number> {
   return widths;
 }
 
-/**
- * Prefix sums over `order`, recomputed only when widths or order change (a computed() in the
- * caller) — not per scroll frame, which columnRangeExtractor() below is cheap enough for.
- */
-export function columnOffsets(order: string[], widths: Record<string, number>): number[] {
-  const offsets: number[] = [0];
-  let cursor = 0;
-  for (const name of order) {
-    cursor += widths[name] ?? DEFAULT_COLUMN_WIDTH;
-    offsets.push(cursor);
-  }
-  return offsets;
-}
-
-// P47 D5: @tanstack/vue-virtual's own `rangeExtractor` seam, replacing visibleColumnRange (P29).
-// TanStack already computes the exact visible range (range.startIndex/endIndex, the latter
-// **inclusive**, unlike this function's old {startIndex, endIndex} contract where endIndex was
-// exclusive) — only the pixel-budget expansion below is this app's own. The row axis has had
-// overscan since P12; the column axis had none (F3 in P29's plan) — the asymmetry the "worse
-// horizontally" report traces to. Buffer in pixels, not a column count: a column is 40-480 px
-// wide, so "N columns of overscan" is a different distance on every table.
-export function columnRangeExtractor(
-  range: Pick<Range, 'startIndex' | 'endIndex'>,
-  offsets: number[],
-  /** Extra rendered width on each side. */
-  overscanPx: number,
-  /** Hard cap per side, so a table of narrow columns can't multiply the DOM without bound. */
-  maxOverscanColumns: number,
-): number[] {
-  const n = offsets.length - 1;
-  if (n <= 0) return [];
-
-  // Expand each side by columns whose combined width covers overscanPx, capped independently.
-  let startIndex = range.startIndex;
-  let leftPx = 0;
-  let leftCount = 0;
-  while (startIndex > 0 && leftPx < overscanPx && leftCount < maxOverscanColumns) {
-    startIndex--;
-    leftPx += offsets[startIndex + 1] - offsets[startIndex];
-    leftCount++;
-  }
-  let last = range.endIndex;
-  let rightPx = 0;
-  let rightCount = 0;
-  while (last < n - 1 && rightPx < overscanPx && rightCount < maxOverscanColumns) {
-    last++;
-    rightPx += offsets[last + 1] - offsets[last];
-    rightCount++;
-  }
-
-  const out: number[] = [];
-  for (let i = startIndex; i <= last; i++) out.push(i);
-  return out;
-}
-
-// P49 F3/D4: TanStack's default observeElementRect reports the scroll element's border-box size
-// (ResizeObserver's borderBoxSize/getBoundingClientRect), which does NOT subtract a visible
-// scrollbar's own thickness the way clientWidth/clientHeight do — on a wide table that discrepancy
-// put a virtualizer's overscan boundary on a knife's edge (P47 F3). Measuring clientWidth/
-// clientHeight instead is DataGrid.vue's own fix, hoisted here so ConsoleResultGrid.vue's column
-// virtualizer shares it rather than growing its own copy.
-export function observeScrollElementRect(
-  instance: { scrollElement: Element | null },
-  cb: (rect: { width: number; height: number }) => void,
-): (() => void) | undefined {
-  const el = instance.scrollElement as HTMLElement | null;
-  if (!el) return undefined;
-  const handler = () => cb({ width: el.clientWidth, height: el.clientHeight });
-  handler();
-  const observer = new ResizeObserver(handler);
-  observer.observe(el);
-  return () => observer.disconnect();
-}
-
-// P22 iter2 D1: reverted from pass 1's rAF-deferred notify (P22 D1, f28b25a/57d2f1a) — see
-// docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §2 for the full evidence.
-// Pass 1's premise was that a fling can fire many native `scroll` events inside a single animation
-// frame, so it deferred this observer's notify into one requestAnimationFrame per burst. That
-// premise is false in every modern engine: HTML's *run the scroll steps* dispatches a scrolled
-// element's `scroll` event at most once per rendering update, before *run the animation frame
-// callbacks* runs in that same update — already documented at docs/PERF.md:98-102 for Chromium, and
-// independently in f28b25a's own commit message for WebKit ("WebKit coalesces any number of
-// synchronous writes into exactly one native `scroll` event"). So the deferral coalesced a burst
-// that never happens, changed nothing a user could see, and cost two rAF schedules plus two timer
-// resets per scroll event per grid (one of each per virtualizer) for no benefit — worse, it risked
-// slipping a notify to the *next* frame whenever the browser delivers `scroll` to the main thread
-// after that update's own rAF phase has already run, which is exactly the wrong direction for a
-// "rows lag behind a fling" symptom. This restores @tanstack/virtual-core@3.17.8's own stock timing
-// (observeElementOffset in its index.ts): `cb` runs synchronously on `scroll`, with only the stock
-// observer's own isScrollingResetDelay debounce (default 150ms) kept for the trailing
-// `isScrolling: false` notify — this app never sets useScrollendEvent, so that alternate stock path
-// is not reproduced here. DataGrid.vue's own onScroll (not this function) is where a velocity
-// estimate and the real-fling trace hook are now derived, off the same native `scroll` event this
-// observer also listens for — see its own comment for why that seam is kept separate from this one.
-export function observeScrollElementOffset(
-  instance: {
-    scrollElement: Element | null;
-    options: { horizontal?: boolean; isRtl?: boolean; isScrollingResetDelay?: number };
-  },
-  cb: (offset: number, isScrolling: boolean) => void,
-): (() => void) | undefined {
-  const el = instance.scrollElement as HTMLElement | null;
-  if (!el) return undefined;
-
-  const readOffset = () => {
-    const { horizontal, isRtl } = instance.options;
-    return horizontal ? el.scrollLeft * ((isRtl && -1) || 1) : el.scrollTop;
-  };
-
-  let resetTimer: ReturnType<typeof setTimeout> | undefined;
-  const scheduleEnd = () => {
-    clearTimeout(resetTimer);
-    resetTimer = setTimeout(
-      () => cb(readOffset(), false),
-      instance.options.isScrollingResetDelay ?? 150,
-    );
-  };
-
-  const handler = () => {
-    scheduleEnd();
-    cb(readOffset(), true);
-  };
-
-  el.addEventListener('scroll', handler, { passive: true });
-  return () => {
-    el.removeEventListener('scroll', handler);
-    clearTimeout(resetTimer);
-  };
-}
+// P30 §3.6 C7: columnOffsets/columnRangeExtractor/observeScrollElementRect/
+// observeScrollElementOffset/MAX_OVERSCAN_COLUMNS — the tanstack-vue-virtual column axis these
+// four served — retired with @tanstack/vue-virtual itself once ConsoleResultGrid.vue's tabular
+// branch (their only remaining caller after P22 Pass B's own cutover) moved onto SlickGrid's own
+// native column virtualization (P30 §3). See git history for the deleted implementations.
 
 // P22 iter2 D3: velocity-adaptive, direction-biased row overscan ("runway") — see the plan's §5 D3.
 // The row axis's overscan was symmetric and direction-blind (`overscan: Math.ceil(OVERSCAN_PX /
@@ -286,16 +161,18 @@ export interface RowRangeExtractorConfig {
  * cell-capped) reduced to a pair of inclusive row bounds. Originally split out from a
  * `rowRangeExtractor` wrapper shaped for `@tanstack/vue-virtual`'s own `rangeExtractor` API
  * (DataGrid.vue's own consumer, deleted with it at P22 Pass B's cutover — this function's own
- * general arithmetic had no dependency on that API and so needed no counterpart) so
+ * general arithmetic had no dependency on that API and so needed no counterpart), so
  * `views/shared/slick/kiraSlickGrid.ts`'s `getRenderedRange` override could reuse the exact same
- * arithmetic instead of restating it — see that file's own comment. `direction`/
+ * arithmetic instead of restating it — see that file's own comment. `range` keeps that API's own
+ * three-field shape structurally (P30 §3.6 C7 dropped the `@tanstack/vue-virtual` import itself,
+ * the library being long gone from this arithmetic's only remaining caller). `direction`/
  * `velocityPxPerFrame` come from the caller's own scroll-velocity sampler (KiraSlickGrid's own,
  * today the only caller); `mountedColumnCount` is the row axis's own budget divisor, read from the
  * column virtualizer so a wide table's cap tightens with however many columns are actually mounted
  * right now, not the table's total column count.
  */
 export function rowRangeBounds(
-  range: Pick<Range, 'startIndex' | 'endIndex' | 'count'>,
+  range: { startIndex: number; endIndex: number; count: number },
   rowHeight: number,
   /** |Δoffset| since the previous scroll event, in px. 0 at rest. */
   velocityPxPerFrame: number,
