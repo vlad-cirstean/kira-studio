@@ -2154,6 +2154,14 @@ watch(
 // (onColumnsResized's echo guard) rebuilds the header/cell width bag; loadMeta (state.ts) resolves
 // after the page itself, so the header tooltip/PK-FK badges need their own watch too, independent
 // of pageVersion.
+// `flush: 'sync'` (not the default 'pre') is load-bearing for the echo guard: `patchDataTabState`
+// mutates reactive state synchronously inside onColumnsResized's `suppressWidthEcho = true; ...;
+// suppressWidthEcho = false` bracket, but a default-flush watcher runs on Vue's next pre-render
+// microtask — strictly after that synchronous reset — so `suppressWidthEcho` always reads back
+// `false` by the time this callback runs. That made the guard a no-op: every column-resize drag
+// rebuilt the whole grid (setColumns, header/CSS rebuild, resizeCanvas, closing any open inline
+// editor) on every echoed width patch. Sync flush runs this callback from inside that same
+// Object.assign, while the flag is still `true`.
 watch(
   () => tab()?.state.columnWidths,
   () => {
@@ -2161,6 +2169,7 @@ watch(
     rebuildAndSetColumns();
     grid?.render();
   },
+  { flush: 'sync' },
 );
 watch(
   () => rt()?.meta,

@@ -1475,3 +1475,109 @@ test('P22 postscript — PK/FK header badge and select-zone survive a tab switch
   await expect(productHeader.locator('.header-select-zone')).toHaveCount(1);
   await expect(cellNavButton(page, 0, 'product_id')).toHaveCount(1);
 });
+
+// Regression test — `suppressWidthEcho` (SlickGridHost.vue) is set true, patchDataTabState is
+// called, then reset false SYNCHRONOUSLY on the very next line, but the `columnWidths` watch
+// checking that flag ran on Vue's default `flush: 'pre'` (a microtask *after* that reset), so it
+// always read `false` and the guard never actually suppressed anything: every column-resize drag
+// triggered a full `grid.setColumns(...)` rebuild — invalidating every row, recreating every
+// header/cell DOM node, rebuilding CSS rules, calling `resizeCanvas` — the exact cost the guard
+// exists to avoid, per its own comment.
+//
+// Verified by tagging the LIVE header DOM node with a marker attribute (setColumns's own
+// createColumnHeaders empties and rebuilds `.slick-header-column` nodes from scratch, discarding
+// any such marker) rather than the "editor survives the resize" idea a marker-free version of
+// this test might reach for first: SlickGrid's own `onResizeStart` unconditionally calls
+// `commitCurrentEdit()` (slick.interactions.ts's `Resizable`, slick.grid.ts:2303) the instant a
+// resize drag *starts*, closing any open cell editor regardless of this fix — so an editor-based
+// check can't tell the fixed and pre-fix code apart.
+test('P22 Pass B follow-up — a column-resize drag does not force a full grid rebuild (finding 5)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-resize-echo';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Resize Echo DB', 'cyan');
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Resize Echo DB',
+        kind: 'postgres',
+        color: 'cyan',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({
+    control,
+    stream: orderItemsFixture(CONNECTION_ID).port,
+  });
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Resize Echo DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-cyan"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const row = await findRow(page, ORDER_ITEMS_PATH);
+  await row.dblclick();
+
+  const header = page.locator('[data-testid="grid-header-cell"][data-column="quantity"]');
+  await expect(header).toBeVisible();
+  const handle = header.locator('.slick-resizable-handle');
+  await expect(handle).toHaveCount(1);
+
+  await header.evaluate((el) => el.setAttribute('data-rebuild-probe', '1'));
+  const widthBefore = await header.evaluate((el) => el.getBoundingClientRect().width);
+
+  const box = await handle.boundingBox();
+  if (!box) throw new Error('resize handle has no bounding box');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  // The drag itself resized the column (SlickGrid's own live-drag DOM write, independent of this
+  // app's patch/rebuild round trip) — confirms the gesture actually did something before
+  // asserting on the *absence* of a further rebuild below.
+  await expect
+    .poll(() => header.evaluate((el) => el.getBoundingClientRect().width))
+    .toBeGreaterThan(widthBefore + 30);
+
+  // Give the columnWidths echo (patchDataTabState -> the watch under test) a full macrotask to
+  // fire on the old, broken default-flush timing before asserting the probe survived — a
+  // regression back to that timing would otherwise still coincidentally pass on the very first
+  // poll of an unguarded assertion.
+  await page.waitForTimeout(200);
+  await expect(
+    page.locator(
+      '[data-testid="grid-header-cell"][data-column="quantity"][data-rebuild-probe="1"]',
+    ),
+  ).toHaveCount(1);
+});
