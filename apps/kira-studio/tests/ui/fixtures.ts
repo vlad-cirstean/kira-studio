@@ -78,15 +78,10 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
       const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
       const stream = await installMockStream(page, options?.stream ?? []);
 
-      // P22 Pass B — SlickGrid is the only grid engine this suite ever boots (the user's own
-      // call: "any issue will be fixed on slickgrid, no turning back" — no incumbent left to
-      // fall back to, so nothing to A/B). Same addInitScript pattern slick-grid.spec.ts's own
-      // (now-retired) forceSlickEngine used, installed here once for every spec, before the
-      // app's first navigation.
-      await page.addInitScript(() => {
-        (window as unknown as { __kiraGridEngine?: string }).__kiraGridEngine = 'slick';
-      });
-
+      // P22 Pass B, C17 — SlickGrid is the ONLY grid engine now (DataGrid.vue/GridRow.vue and the
+      // `__kiraGridEngine` flag this file used to set before boot are deleted — the user's own
+      // call: "any issue will be fixed on slickgrid, no turning back"). DataView.vue mounts
+      // SlickGridHost.vue unconditionally, so there is nothing left to select here.
       await page.goto(uiServer.url);
       await page.waitForSelector('[data-testid="status-bar"]');
 

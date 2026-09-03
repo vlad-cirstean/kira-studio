@@ -24,7 +24,6 @@ declare global {
     __kiraGridTuning?: {
       leadFramesOverride?: number;
       maxLeadPxOverride?: number;
-      incrementalRows?: boolean;
       /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER. */
       maxNewCellsPerRenderOverride?: number;
       /** P22 iter2-scroll-gaps D3: read by SlickGridHost.vue at grid construction, not by this file

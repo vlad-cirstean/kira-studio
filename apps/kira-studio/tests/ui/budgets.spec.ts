@@ -8,7 +8,6 @@ import { GRID_SCROLLER_SELECTOR, gridCellSelector, gridScroller } from './suppor
 import { IPC } from './support/ipcChannels';
 import {
   measureClickToDom,
-  measureRowUpdatesDuringScroll,
   measureScrollResponses,
   measureSustainedScroll,
   percentile,
@@ -577,19 +576,11 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     });
   }
 
-  // --- 1a2. D4's own render-count property (P22 iter2 D4, last paragraph): a row that merely
-  // slides to a new window position without any of its own content changing must not re-render —
-  // gated at ≤ (rows entered + rows left + 2), a small constant absorbing the odd off-by-one rather
-  // than a tight bound (this is a property of Vue's own reconciliation, not a timing measurement).
-  for (const step of await measureRowUpdatesDuringScroll(page, GRID_SCROLLER_SELECTOR, {
-    pxPerFrame: 100,
-    steps: 10,
-  })) {
-    expect(step.updates).toBeLessThanOrEqual(step.rowsEntered + step.rowsLeft + 2);
-  }
-  await viewport.evaluate((el) => {
-    el.scrollTop = 0;
-  });
+  // 1a2's own D4 render-count gate (a row sliding to a new position without content changing
+  // must not re-render) was a property of DataGrid.vue's own Vue-reconciliation render path,
+  // measured via GridRow.vue's onUpdated hook — deleted at P22 Pass B's cutover (C17) along with
+  // that hook; see support/measure.ts's own comment. SlickGrid manages its own DOM directly, with
+  // no equivalent "did this row's Vue props change" question to ask.
 
   // --- 1b. scroll_grid (60 cols x 5000 rows, P29 D14): the wide-AND-tall shape neither big_rows
   // nor wide_table alone can show (F8) — horizontal response, vertical response on a wide table,

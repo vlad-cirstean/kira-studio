@@ -175,9 +175,6 @@ declare global {
       leadFramesOverride?: number;
       /** Overrides columns.ts's MAX_LEAD_PX. */
       maxLeadPxOverride?: number;
-      /** `false` disables D4's per-row memoisation (renderRows always allocates fresh RowVMs).
-       *  Default (undefined) is "on". */
-      incrementalRows?: boolean;
       /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER — the SlickGrid
        *  engine's per-call new-cell batch cap, read fresh on every `getRenderedRange` call. */
       maxNewCellsPerRenderOverride?: number;
@@ -223,21 +220,6 @@ declare global {
        *  the source citations behind the ordering claim. */
       freshVelocitySampleOverride?: boolean;
     };
-    /**
-     * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
-     * count real Vue re-renders per scroll step and assert D4's own render-count property (P22
-     * iter2 D4's last paragraph) without needing real-hardware timing.
-     */
-    __kiraGridRowUpdates?: () => void;
-    /**
-     * P22 spike §7.2 — DataView.vue's engine switch: 'slick' mounts SlickGridHost.vue instead of
-     * DataGrid.vue for that tab's grid. Read once per mount, not reactively; unset (the default)
-     * keeps the incumbent tanstack-virtual grid. Not a Playwright hook in the usual sense (no test
-     * sets it directly) — it exists for the same real-hardware A/B protocol
-     * `__kiraGridTuning`/`__kiraScrollTrace` already serve, and `tests/ui/slick-grid.spec.ts` sets it
-     * via `page.addInitScript` before boot to exercise the spike build in this sandbox.
-     */
-    __kiraGridEngine?: 'tanstack' | 'slick';
   }
 }
 window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };

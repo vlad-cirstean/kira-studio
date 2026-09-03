@@ -253,83 +253,11 @@ export function measureSustainedScroll(
   );
 }
 
-export interface RowUpdateStep {
-  /** Distinct `[data-testid="grid-row"][data-row]` values mounted after this step that weren't
-   *  mounted before it. */
-  rowsEntered: number;
-  /** The reverse — mounted before, gone after. */
-  rowsLeft: number;
-  /** GridRow.vue's own onUpdated count during this step (window.__kiraGridRowUpdates). */
-  updates: number;
-}
-
-/**
- * P22 iter2 D4's own sandbox-provable proof (the plan's §5 D4, last paragraph): a genuinely
- * reference-stable RowVM makes Vue skip re-rendering a GridRow whose props didn't change — a row
- * that merely slides to a new window position without any of its own content changing should not
- * update at all, and a row entering or leaving the window mounts or unmounts rather than updating
- * (Vue's keyed diff, not this mechanism). This is a property of the app's own JS/DOM reconciliation,
- * fully settleable in this sandbox — it says nothing about whether skipping those re-renders is
- * *enough* to fix the perceived lag on real hardware, which is a different question (§7.3).
- */
-export function measureRowUpdatesDuringScroll(
-  page: Page,
-  gridSelector: string,
-  opts: { pxPerFrame: number; steps: number },
-): Promise<RowUpdateStep[]> {
-  const { pxPerFrame, steps } = opts;
-  return page.evaluate(
-    ({ gridSelector, pxPerFrame, steps }) => {
-      const found = document.querySelector<HTMLElement>(gridSelector);
-      if (!found) throw new Error(`measureRowUpdatesDuringScroll: ${gridSelector} not found`);
-      const el = found;
-      const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-
-      function mountedRows(): Set<number> {
-        const out = new Set<number>();
-        for (const rowEl of document.querySelectorAll<HTMLElement>('[data-testid="grid-row"]')) {
-          const row = Number(rowEl.dataset.row);
-          if (!Number.isNaN(row)) out.add(row);
-        }
-        return out;
-      }
-
-      const w = window as unknown as { __kiraGridRowUpdates?: () => void };
-      const prevHook = w.__kiraGridRowUpdates;
-
-      return new Promise<RowUpdateStep[]>((resolve) => {
-        const results: RowUpdateStep[] = [];
-        let prev = mountedRows();
-        let updatesThisStep = 0;
-        w.__kiraGridRowUpdates = () => {
-          updatesThisStep++;
-        };
-
-        function afterSettle(): void {
-          const now = mountedRows();
-          let rowsEntered = 0;
-          for (const row of now) if (!prev.has(row)) rowsEntered++;
-          let rowsLeft = 0;
-          for (const row of prev) if (!now.has(row)) rowsLeft++;
-          results.push({ rowsEntered, rowsLeft, updates: updatesThisStep });
-          prev = now;
-          if (results.length < steps) step();
-          else {
-            w.__kiraGridRowUpdates = prevHook;
-            resolve(results);
-          }
-        }
-
-        function step(): void {
-          updatesThisStep = 0;
-          el.scrollTop = Math.min(maxScrollTop, el.scrollTop + pxPerFrame);
-          // Two rAFs: Vue's own reactive flush runs on the microtask checkpoint well before even
-          // one elapses, so this is a conservative margin, not a tuned minimum.
-          requestAnimationFrame(() => requestAnimationFrame(afterSettle));
-        }
-        step();
-      });
-    },
-    { gridSelector, pxPerFrame, steps },
-  );
-}
+// measureRowUpdatesDuringScroll and its own `window.__kiraGridRowUpdates` hook (GridRow.vue's own
+// onUpdated count) were P22 iter2 D4's sandbox-provable proof that a reference-stable RowVM made
+// Vue skip re-rendering a row whose props didn't change — a property of DataGrid.vue's own Vue-
+// reconciliation render path specifically. Deleted at P22 Pass B's cutover (C17) along with
+// DataGrid.vue/GridRow.vue/rowVm.ts: SlickGrid builds and updates its own DOM directly, never
+// through Vue's prop-diffing, so this hook was never called under the SlickGrid engine at all —
+// its own gate in budgets.spec.ts was vacuously true (`updates` always 0) the whole time this
+// suite has run against SlickGrid exclusively, and had no SlickGrid-side equivalent to measure.

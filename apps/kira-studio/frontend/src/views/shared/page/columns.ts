@@ -217,9 +217,9 @@ export function observeScrollElementOffset(
 // actually needed.
 //
 // BASE_LEAD_PX/BASE_TRAIL_PX both equal OVERSCAN_PX so that at zero velocity this produces *exactly*
-// the row window `overscan: Math.ceil(OVERSCAN_PX / rowHeight)` did — see rowRangeExtractor's own
-// comment for the arithmetic that guarantees this. Every existing at-rest budget (the overscan-
-// coverage invariants, the DOM-cell bounds) must see zero change from this file.
+// the row window `overscan: Math.ceil(OVERSCAN_PX / rowHeight)` did — see rowRangeBounds' own
+// comment, below, for the arithmetic that guarantees this. Every existing at-rest budget (the
+// overscan-coverage invariants, the DOM-cell bounds) must see zero change from this file.
 //
 // LEAD_FRAMES/MAX_LEAD_PX are provisional: nobody in this repo has measured a real macOS momentum
 // scroll's velocity (the plan's F5) — these are a defensible first guess, to be re-set once
@@ -283,11 +283,14 @@ export interface RowRangeExtractorConfig {
 
 /**
  * The row axis's own budget arithmetic — a pixel budget (velocity-adaptive, direction-biased,
- * cell-capped) reduced to a pair of inclusive row bounds. Split out from `rowRangeExtractor` below
- * (P22 spike C1) so `views/grid/slick/kiraSlickGrid.ts`'s `getRenderedRange` override can reuse the
- * exact same arithmetic instead of restating it — see that file's own comment. `direction`/
- * `velocityPxPerFrame` come from the caller's own scroll-velocity sampler (DataGrid.vue's onScroll,
- * or KiraSlickGrid's own); `mountedColumnCount` is the row axis's own budget divisor, read from the
+ * cell-capped) reduced to a pair of inclusive row bounds. Originally split out from a
+ * `rowRangeExtractor` wrapper shaped for `@tanstack/vue-virtual`'s own `rangeExtractor` API
+ * (DataGrid.vue's own consumer, deleted with it at P22 Pass B's cutover — this function's own
+ * general arithmetic had no dependency on that API and so needed no counterpart) so
+ * `views/grid/slick/kiraSlickGrid.ts`'s `getRenderedRange` override could reuse the exact same
+ * arithmetic instead of restating it — see that file's own comment. `direction`/
+ * `velocityPxPerFrame` come from the caller's own scroll-velocity sampler (KiraSlickGrid's own,
+ * today the only caller); `mountedColumnCount` is the row axis's own budget divisor, read from the
  * column virtualizer so a wide table's cap tightens with however many columns are actually mounted
  * right now, not the table's total column count.
  */
@@ -329,34 +332,6 @@ export function rowRangeBounds(
   const start = Math.max(range.startIndex - startRows, 0);
   const end = Math.min(range.endIndex + endRows, range.count - 1);
   return { start, end };
-}
-
-/**
- * The row axis's own `rangeExtractor`, following columnRangeExtractor's own precedent (a pixel
- * budget expanded into item counts, capped) rather than virtual-core's item-count `overscan`. A
- * two-line wrapper over `rowRangeBounds` above, expanding its `{ start, end }` into the `number[]`
- * @tanstack/vue-virtual wants — behaviour-preserving by construction (P22 spike C1); see the plan's
- * §5 D3 and §5 D4 for why the arithmetic itself lives in `rowRangeBounds` now.
- */
-export function rowRangeExtractor(
-  range: Pick<Range, 'startIndex' | 'endIndex' | 'count'>,
-  rowHeight: number,
-  velocityPxPerFrame: number,
-  direction: 1 | -1 | 0,
-  mountedColumnCount: number,
-  cfg: RowRangeExtractorConfig,
-): number[] {
-  const { start, end } = rowRangeBounds(
-    range,
-    rowHeight,
-    velocityPxPerFrame,
-    direction,
-    mountedColumnCount,
-    cfg,
-  );
-  const out: number[] = [];
-  for (let i = start; i <= end; i++) out.push(i);
-  return out;
 }
 
 // §8.5's type-aware right-alignment for numerics.

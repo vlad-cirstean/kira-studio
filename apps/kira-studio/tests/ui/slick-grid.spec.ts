@@ -18,15 +18,15 @@ import {
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
-// P22 spike, C6 — §7.4(a)'s eight sandbox-provable exit criteria, gated against a build with
-// window.__kiraGridEngine forced to 'slick' before boot. This does NOT re-gate the existing
-// budgets/perf suite (those keep running against the default 'tanstack' engine, unmodified — §7.1)
-// and does NOT and cannot answer §7.4(b) — the real-Mac perceptual/latency verdict, which needs a
-// live compositor this environment has no way to produce (see docs/PERF.md's own §2.1c/§7.4(b)
+// P22 spike, C6 — §7.4(a)'s eight sandbox-provable exit criteria. SlickGrid is the only engine
+// `relaunch()` ever boots (P22 Pass B, C17's cutover — the `window.__kiraGridEngine` flag this
+// file used to force before boot, via `forceSlickEngine`, no longer exists to force). This does
+// NOT and cannot answer §7.4(b) — the real-Mac perceptual/latency verdict, which needs a live
+// compositor this environment has no way to produce (see docs/PERF.md's own §2.1c/§7.4(b)
 // pointer). What this file proves is narrower and mechanical: the bridge decodes real data
-// correctly, the runway matches or exceeds the incumbent's, the DOM stays bounded, a sub-row scroll
-// touches nothing, and — the single item the brief singled out — closing the tab actually tears the
-// grid down.
+// correctly, the runway matches or exceeds what the incumbent once did, the DOM stays bounded, a
+// sub-row scroll touches nothing, and — the single item the brief singled out — closing the tab
+// actually tears the grid down.
 //
 // The fixture: a synthetic 61-column, 1000-row table ("spike_grid") — wide (like scroll_grid,
 // budgets.spec.ts) AND tall (unlike scroll_grid's own 100-row mock, which never scrolls), and
@@ -236,20 +236,9 @@ const CONTROL: ControlSnapshot[] = [
 
 const PORT: PortSnapshot[] = [readSnapshot(100), readSnapshot(1000)];
 
-/** page.addInitScript + reload — the same pattern interaction.spec.ts's own installClipboardShim
- *  uses for a hazard that must be in place *before* the app's first script runs, not merely before
- *  it's used: relaunch()'s own navigation already happened by the time this spec gets the page. */
-async function forceSlickEngine(page: import('@playwright/test').Page): Promise<void> {
-  await page.addInitScript(() => {
-    (window as unknown as { __kiraGridEngine?: string }).__kiraGridEngine = 'slick';
-  });
-  await page.reload();
-  await page.waitForSelector('[data-testid="status-bar"]');
-}
-
-/** The connect/expand/open flow shared by both engines — `readySelector` is the one thing that
- *  differs: SlickGridHost.vue's own `.slick-cell`/`.slick-viewport-top.slick-viewport-right` vs.
- *  DataGrid.vue's own `[data-testid="grid-cell"]`. */
+/** The connect/expand/open flow — SlickGridHost.vue's own `.slick-cell`/
+ *  `.slick-viewport-top.slick-viewport-right` DOM shape, the only engine `relaunch()` (fixtures.ts)
+ *  ever boots since P22 Pass B's cutover (C17), so `readySelector` no longer needs to vary. */
 async function connectAndOpenSpikeGrid(
   page: import('@playwright/test').Page,
   readySelector = '[data-testid="data-grid"] .slick-cell',
@@ -350,11 +339,10 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   relaunch,
   consoleErrors,
 }) => {
-  // Three full connect/expand/navigate cycles (this run, the tanstack A/B comparison, the teardown
-  // loop's own initial open) plus 5 bare reopen cycles — comfortably past Playwright's 30s default.
+  // Two full connect/expand/navigate cycles (this run, the teardown loop's own initial open) plus
+  // 5 bare reopen cycles — comfortably past Playwright's 30s default.
   test.setTimeout(300_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(page);
   await connectAndOpenSpikeGrid(page);
 
   // --- 1. correct decoded text, cell for cell, across the first mounted window ------------------
@@ -502,7 +490,14 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
     el.scrollTop = 0;
   });
 
-  // --- 5. at rest, the mounted row band covers at least as much as the incumbent's does ----------
+  // --- 5. at rest, the mounted row band covers at least the strictly-visible viewport -------------
+  // Originally an A/B against a second, freshly-relaunched page running the incumbent tanstack
+  // engine ("matches or exceeds the incumbent's own coverage") — dropped at P22 Pass B's cutover
+  // (C17): `relaunch()` no longer has an incumbent to boot at all (DataView.vue mounts
+  // SlickGridHost.vue unconditionally now), so a second `relaunch()` here would just open another
+  // SlickGrid page and compare it to itself. The real invariant this was standing in for — the
+  // mounted row band must cover at least the viewport's own visible height, with no gap a user
+  // could scroll into and see blank rows — is asserted directly instead.
   await page.waitForTimeout(100);
   const slickBand = await page.evaluate(() => {
     const els = Array.from(
@@ -521,34 +516,11 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   });
   expect(slickBand.rows).toBeGreaterThan(0);
   const slickCoveragePx = slickBand.bottom - slickBand.top;
-
-  // The incumbent's own at-rest coverage, same fixture, same window, measured in a fresh page —
-  // `relaunch()` closes the Slick page above, which is fine: `slickCoveragePx` is already captured.
-  // Item 6 below calls `relaunch()` again for its own fresh, unrelated page.
-  const tanstack = await relaunch({ control: CONTROL, stream: PORT });
-  await connectAndOpenSpikeGrid(tanstack.window, '[data-testid="grid-cell"]');
-  await tanstack.window.locator('[data-testid="data-grid"]').evaluate((el) => {
-    el.scrollTop = 0;
-  });
-  await tanstack.window.waitForTimeout(100);
-  const tanstackBand = await tanstack.window.evaluate(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="grid-row"]'));
-    let top = Number.POSITIVE_INFINITY;
-    let bottom = Number.NEGATIVE_INFINITY;
-    for (const el of els) {
-      if (el.offsetTop < top) top = el.offsetTop;
-      const end = el.offsetTop + el.offsetHeight;
-      if (end > bottom) bottom = end;
-    }
-    return { top, bottom, rows: els.length };
-  });
-  expect(tanstackBand.rows).toBeGreaterThan(0);
-  const tanstackCoveragePx = tanstackBand.bottom - tanstackBand.top;
-  expect(slickCoveragePx).toBeGreaterThanOrEqual(tanstackCoveragePx);
+  const viewportHeightPx = await rightViewport(page).evaluate((el) => el.clientHeight);
+  expect(slickCoveragePx).toBeGreaterThanOrEqual(viewportHeightPx);
 
   // --- 6. tab-close teardown (D3's own three-part assertion) — the one item this brief singled out
   const { window: teardownPage } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(teardownPage);
 
   const baselineStyles = await slickStyleTagCount(teardownPage);
   const baselineRetention = await teardownPage.evaluate(() =>
@@ -589,7 +561,6 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
 }) => {
   test.setTimeout(120_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(page);
   await connectAndOpenSpikeGrid(page);
   const viewport = rightViewport(page);
 
@@ -667,7 +638,6 @@ test('P22 iter2-pacing — tearing down the grid with a catch-up render still ar
 }) => {
   test.setTimeout(60_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(page);
 
   const pageErrors: string[] = [];
   page.on('pageerror', (err) => pageErrors.push(String(err)));
@@ -753,7 +723,6 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
 }) => {
   test.setTimeout(120_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(page);
   await connectAndOpenSpikeGrid(page);
   const viewport = rightViewport(page);
 
@@ -844,7 +813,6 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
 
   // --- wide: spike_grid, 1 000 rows x 61 columns -------------------------------------------------
   const { window: wide } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(wide);
   await connectAndOpenSpikeGrid(wide);
   const wideElapsedMs = await wide.evaluate(() => {
     const corner = document.querySelector<HTMLElement>('[data-testid="grid-select-all"]');
@@ -894,7 +862,6 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
   ];
 
   const { window: tall } = await relaunch({ control: bigControl, stream: bigPort });
-  await forceSlickEngine(tall);
   await tall.click('[data-testid="add-connection"]');
   await tall.click('[data-testid="connection-kind-postgres"]');
   await tall.fill('[data-testid="connection-name"]', 'Select All Big DB');
@@ -986,7 +953,6 @@ test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 
   ];
 
   const { window: page } = await relaunch({ control: bigControl, stream: bigPort });
-  await forceSlickEngine(page);
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'Search Big DB');
@@ -1050,7 +1016,6 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
 }) => {
   test.setTimeout(60_000);
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await forceSlickEngine(page);
   await connectAndOpenSpikeGrid(page);
   const viewport = rightViewport(page);
 
@@ -1136,7 +1101,6 @@ test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, posit
     control,
     stream: orderItemsFixture(CONNECTION_ID).port,
   });
-  await forceSlickEngine(page);
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'Nav Button DB');

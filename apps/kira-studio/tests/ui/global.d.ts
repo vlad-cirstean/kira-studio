@@ -60,9 +60,6 @@ declare global {
         };
       } | null;
     };
-    /** P22 spike §7.2 (apps/kira-studio/frontend/src/views/grid/DataView.vue) — set before boot
-     *  (page.addInitScript + a reload) to mount SlickGridHost.vue instead of DataGrid.vue. */
-    __kiraGridEngine?: 'tanstack' | 'slick';
     /** P22 iter2-pacing D1/D2 — runtime tuning for the SlickGrid engine's frame-pacing gate and
      *  runway-growth cap, mirroring apps/kira-studio/frontend/src/main.ts's own `declare global`
      *  (a separate TS program, D9's own re-declaration precedent — only the fields tests/ui/ specs
@@ -70,7 +67,6 @@ declare global {
     __kiraGridTuning?: {
       leadFramesOverride?: number;
       maxLeadPxOverride?: number;
-      incrementalRows?: boolean;
       maxNewCellsPerRenderOverride?: number;
       forceSyncScrollingOverride?: boolean;
       /** P22 iter2-pacing D1: 0 restores the pre-fix "fire on the very next rAF, unconditionally"
