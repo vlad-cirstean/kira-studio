@@ -1099,18 +1099,19 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(draggedRowsTsv).toContain('tenant 1 / entity 2');
   expect(draggedRowsTsv).toContain('tenant 2 / entity 1');
 
-  // Same drag gesture over grid cells instead of the gutter (onCellMouseDown/onCellMouseEnter) —
-  // a same-column, multi-row drag keeps the resulting .selected count unambiguous: exactly one
-  // cell per row.
+  // Same drag gesture over grid cells instead of the gutter (SlickHybridSelectionModel's own
+  // dragToSelect) — a same-column, multi-row drag keeps the resulting `kira-cell-selected` count
+  // unambiguous: exactly one cell per row. P22 Pass B — `kira-cell-selected` (§5 D4), not the
+  // incumbent's own bare `.selected`.
   await gridCell(page, 0, 'name').hover();
   await page.mouse.down();
   await gridCell(page, 1, 'name').hover();
   await gridCell(page, 2, 'name').hover();
   await page.mouse.up();
-  await expect(page.locator('[data-testid="grid-cell"].selected')).toHaveCount(3);
-  await expect(gridCell(page, 0, 'name')).toHaveClass(/selected/);
-  await expect(gridCell(page, 1, 'name')).toHaveClass(/selected/);
-  await expect(gridCell(page, 2, 'name')).toHaveClass(/selected/);
+  await expect(page.locator('[data-testid="grid-cell"].kira-cell-selected')).toHaveCount(3);
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/kira-cell-selected/);
+  await expect(gridCell(page, 1, 'name')).toHaveClass(/kira-cell-selected/);
+  await expect(gridCell(page, 2, 'name')).toHaveClass(/kira-cell-selected/);
 
   // D6: Duplicate row(s) — non-PK columns copied, PK columns left blank.
   await gutterCell(page, 0).click();
@@ -1170,7 +1171,12 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   await rightClick(headerCell(page, 'entity_id'));
   await page.click('[data-testid="menu-item-clear-sort"]');
-  await expect(page.locator('.sort-indicator')).toHaveCount(0);
+  // P22 Pass B — `.slick-sort-indicator` (F8) is always present on every sortable header (its own
+  // modifier classes, not its own presence, say whether a column is actively sorted); the
+  // incumbent's bare `.sort-indicator` never matched anything under this engine either way.
+  await expect(page.locator('.slick-sort-indicator-asc, .slick-sort-indicator-desc')).toHaveCount(
+    0,
+  );
 
   await rightClick(headerCell(page, 'name'));
   await page.click('[data-testid="menu-item-copy-column-name"]');
@@ -1223,8 +1229,15 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // P2 R2 regression: pasting again onto that same staged insert row (selected via its gutter,
   // a 'row'-kind selection) must update the row already staged there, not append a second one.
+  // P22 Pass B — the gutter lives in the frozen LEFT pane's own clone of this row (F4), a
+  // different DOM subtree than `pastedInsertRow` (the right pane's clone, the only one carrying
+  // `data-testid="grid-row-insert"`, D10) — `gutterCell`'s own page-row-scoped locator reaches it
+  // regardless of which pane it's actually in. SlickGrid also marks an insert row's own identity
+  // on the row (`kira-row-inserted`), not a per-cell `.gutter-cell.inserted` combo like the
+  // incumbent did.
+  const pastedRow = Number(await pastedInsertRow.getAttribute('data-row'));
   await page.evaluate(() => navigator.clipboard.writeText('3\t3\tupdated brand new row'));
-  await pastedInsertRow.locator('.gutter-cell.inserted').click();
+  await gutterCell(page, pastedRow).click();
   await grid.focus();
   await page.keyboard.press('Control+v');
   await expect(pastedInsertRow).toHaveCount(1);
@@ -1343,10 +1356,14 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'name')).toBe('Acme Co');
 
   // customers.id is referenced by exactly one table (orders.customer_id) — a "pk"-kind button,
-  // single candidate, direct nav to the filtered referencing rows.
+  // single candidate, direct nav to the filtered referencing rows. P22 Pass B — D11b's single
+  // button only lives in a cell once it's hovered or selected (never a pure-CSS always-in-the-
+  // DOM affordance the way the incumbent's own per-cell button was), so this needs its own
+  // explicit selection first, same as `clickCellNav`'s own first step just below.
+  await gridCell(page, 0, 'id').click();
   await expect(cellNavButton(page, 0, 'id')).toHaveAttribute('data-nav-kind', 'pk');
   tabCount = await page.locator('[data-testid="tab"]').count();
-  await clickCellNav(page, 0, 'id');
+  await cellNavButton(page, 0, 'id').click();
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'customer_id')).toBeVisible();

@@ -8,8 +8,10 @@ import type {
   FormatterResultWithText,
   ItemMetadata,
   MultiColumnSort,
+  OnActiveCellChangedEventArgs,
   OnBeforeEditCellEventArgs,
   OnBeforeHeaderCellDestroyEventArgs,
+  OnClickEventArgs,
   OnHeaderCellRenderedEventArgs,
   OnHeaderClickEventArgs,
   SingleColumnSort,
@@ -58,7 +60,9 @@ import {
 import { editorCtx, KiraCellEditor } from './slick/editor';
 import { KiraSlickGrid } from './slick/kiraSlickGrid';
 import {
+  type CellNavEntry,
   type DisplayCellView,
+  type NavColumns,
   navColumnsFor,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
@@ -140,7 +144,7 @@ function cellFormatter(
   _row: number,
   _cell: number,
   value: unknown,
-  _columnDef: KiraColumn,
+  columnDef: KiraColumn,
   dataContext: RowHandle,
 ): string | FormatterResultWithText | HTMLElement {
   const view = value as { text: string; isNull: boolean; truncated: boolean };
@@ -157,11 +161,25 @@ function cellFormatter(
     input.value = view.isNull ? '' : view.text;
     return input;
   }
+  // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` this
+  // column's real button computes lazily on hover): whether this column is fk-or-pk and this
+  // cell isn't NULL. `.has-nav`'s padding reserve rides on this predicate; `.fk`'s colour class
+  // is narrower (fk only, matching DataGrid.vue's own `isForeignKeyDisplayCol` — a PK column's
+  // own value isn't "a reference", so it never gets the reference colour, only the padding for a
+  // button that may or may not turn out to have any referencing rows on hover).
+  const name = String(columnDef.field);
+  const isFk = !view.isNull && navColumns.fk.has(name);
+  const hasNav = isFk || (!view.isNull && navColumns.pk.has(name));
+  const navClasses = hasNav ? (isFk ? 'fk has-nav' : 'has-nav') : '';
   if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
   if (view.truncated) {
-    return { text: view.text, addClasses: 'cell-truncated', toolTip: 'value truncated at 64 KB' };
+    return {
+      text: view.text,
+      addClasses: navClasses ? `cell-truncated ${navClasses}` : 'cell-truncated',
+      toolTip: 'value truncated at 64 KB',
+    };
   }
-  return view.text;
+  return navClasses ? { text: view.text, addClasses: navClasses } : view.text;
 }
 
 function rt() {
@@ -450,6 +468,20 @@ let pendingSelectionKind: 'column' | null = null;
 // Shift-range anchor for the header select zone's own click cycle — DataGrid.vue's own `colAnchor`
 // ref, kept as a plain variable here since nothing renders from it.
 let colAnchor: number | null = null;
+
+// C11/§5 D11b — the single, host-owned FK/PK nav button: created once (onMounted), moved into
+// whichever cell currently wants it, never a ref/reactive (D0) — a plain DOM node this file owns
+// and moves directly, the same discipline the header select-zone's own `zone` element uses.
+let navButton: HTMLButtonElement | null = null;
+let navIcon: HTMLElement | null = null;
+// D11c's own cheap precheck's Set membership, cached across the whole meta lifetime — recomputed
+// only where `rt()?.meta`'s own watch already rebuilds columns (rebuildAndSetColumns's own call
+// site, below), never per cell or per hover.
+let navColumns: NavColumns = navColumnsFor(null);
+// The cell the mouse is currently over, if any — `onMouseEnter`/`onMouseLeave` are the only two
+// writers. `null` (not hovering) falls back to the grid's own active cell (`refreshNavButton`),
+// matching D11b's own `place(activeCellIfNav())` on mouseleave.
+let hoveredCell: { pos: number; cellIdx: number } | null = null;
 
 // Mirrors DataGrid.vue's own onScroll velocity sampler (rowVelocity()) verbatim — plain variables,
 // not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only from inside
@@ -766,6 +798,113 @@ function onGridRendered(): void {
     refreshSelEdges();
     refreshStagedLayer();
   }
+  // D11b — "the previous host node may have been rebuilt": a render can replace the very cell
+  // node `navButton` is currently a child of (an invalidated row rebuilds its cells from scratch),
+  // silently detaching the button from anything visible even though it's still logically "showing"
+  // for the same hovered/active cell. Re-placing on every render is what keeps it attached.
+  refreshNavButton();
+}
+
+// C11/§5 D11b — one button, not one per nav cell (§4.1 item 5's own cost note: `cellNavEntry`
+// itself, which builds `navValuesFor` for the row, now runs once per hover/active-cell-change
+// instead of once per rendered cell per render, the strict reduction the plan promised).
+function buildNavButton(): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'cell-nav-btn';
+  btn.dataset.testid = 'cell-nav-button';
+  navIcon = document.createElement('span');
+  navIcon.setAttribute('aria-hidden', 'true');
+  navIcon.style.fontSize = '13px';
+  btn.appendChild(navIcon);
+  return btn;
+}
+
+// `pos`/`cellIdx` are SlickGrid's own display position / column index (incl. the gutter at 0) —
+// `getCellFromEvent`'s and `getActiveCell`'s own shape, not page-row/display-col (D7's own split);
+// translated to the latter only here, at the one call site `rowValues.ts`'s `cellNavEntry` needs.
+function navEntryAt(pos: number, cellIdx: number): CellNavEntry | null {
+  if (!dataSource || cellIdx === 0) return null; // the gutter itself is never navigable
+  const handle = dataSource.getItem(pos);
+  if (handle.insertId !== undefined) return null; // D9's insert region has no real row to jump to
+  return rvCellNavEntry(
+    props.tabId,
+    getPage(props.tabId),
+    currentOrder(),
+    rt()?.meta ?? null,
+    tab()?.connectionId ?? null,
+    currentDialect(),
+    navColumns,
+    handle.row,
+    cellIdx - 1,
+  );
+}
+
+function placeNavButton(target: { pos: number; cellIdx: number } | null): void {
+  if (!grid) return;
+  if (!navButton) navButton = buildNavButton();
+  const entry = target && navEntryAt(target.pos, target.cellIdx);
+  const cellNode = entry && target ? grid.getCellNode(target.pos, target.cellIdx) : null;
+  if (!entry || !cellNode) {
+    navButton.remove();
+    return;
+  }
+  navButton.dataset.navKind = entry.kind;
+  navButton.setAttribute(
+    'aria-label',
+    entry.kind === 'fk' ? 'Go to referenced row' : 'Referenced by',
+  );
+  if (navIcon)
+    navIcon.className = `codicon codicon-${entry.kind === 'fk' ? 'arrow-right' : 'references'}`;
+  if (navButton.parentElement !== cellNode) cellNode.appendChild(navButton);
+}
+
+// Hover wins over the active cell while hovering (`hoveredCell` set); mouseleave clears it and
+// falls back to `grid.getActiveCell()` — D11b's own `place(activeCellIfNav())`.
+function refreshNavButton(): void {
+  if (!grid) return;
+  if (hoveredCell) {
+    placeNavButton(hoveredCell);
+    return;
+  }
+  const active = grid.getActiveCell();
+  placeNavButton(active ? { pos: active.row, cellIdx: active.cell } : null);
+}
+
+function onGridMouseEnter(e: SlickEventData): void {
+  if (!grid) return;
+  const hit = grid.getCellFromEvent(e);
+  hoveredCell = hit ? { pos: hit.row, cellIdx: hit.cell } : null;
+  refreshNavButton();
+}
+
+function onGridMouseLeave(): void {
+  hoveredCell = null;
+  refreshNavButton();
+}
+
+function onGridActiveCellChanged(): void {
+  refreshNavButton();
+}
+
+// F13 — a click on `navButton` (a real child of the `.slick-cell` it's currently living in)
+// resolves through SlickGrid's own `getCellFromEvent` exactly like any other cell click, so
+// `args.row`/`args.cell` already name the right cell without this file tracking anything of its
+// own; `stopImmediatePropagation` (checked by `handleClick` right after triggering `onClick`,
+// `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the active cell there.
+function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
+  if (!navButton || !e.target?.closest('.cell-nav-btn')) return;
+  e.stopImmediatePropagation();
+  const entry = navEntryAt(args.row, args.cell);
+  if (!entry) return;
+  // D6: exactly one candidate navigates immediately; more than one opens the same ContextMenu
+  // popup the right-click cell menu uses, anchored at the click — onCellNavClick's body, verbatim.
+  if (entry.items.length === 1) {
+    const only = entry.items[0];
+    if (only?.type === 'item') void only.run();
+    return;
+  }
+  openContextMenu(e.getNativeEvent<MouseEvent>(), entry.items);
 }
 
 function currentWidths(): Record<string, number> {
@@ -790,6 +929,13 @@ function rebuildAndSetColumns(): void {
 function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs): void {
   const name = String(args.column.field ?? '');
   if (name === GUTTER_FIELD) return;
+  // D10 — the fresh-render half of the `data-sort` mirror; `syncSortIndicators`'s own direct
+  // write (below) covers a plain sort change, which never rebuilds this header cell at all
+  // (D2's own point: `setSortColumns` toggles SlickGrid's own indicator classes without a
+  // `setColumns` rebuild) — this half only fires when a rebuild (a page reload, a meta/appearance
+  // change) discards whatever this node already had and needs it set fresh.
+  const sortTerm = currentSortTerms().find((t) => t.column === name);
+  if (sortTerm) args.node.dataset.sort = sortTerm.direction;
   const p = getPage(props.tabId);
   const descriptor = p?.columns.find((c) => c.name === name);
   const label = keyLabelFor(descriptor, name, foreignKeyNamesFor(rt()?.meta ?? null));
@@ -841,6 +987,18 @@ function syncSortIndicators(): void {
   grid.setSortColumns(
     terms.map((term) => ({ columnId: term.column, sortAsc: term.direction === 'asc' })),
   );
+  // D10 — the direct-write half of the `data-sort` mirror (`onHeaderCellRendered`'s own comment
+  // explains the split): `setSortColumns` only toggles the chevron's own CSS classes, never
+  // rebuilds the header cell, so a plain sort change (no page reload) needs this file to write
+  // the attribute itself rather than waiting for a render that isn't coming.
+  for (const col of grid.getColumns()) {
+    if (col.id === GUTTER_FIELD) continue;
+    const node = grid.getHeaderColumn(col.id as string);
+    if (!node) continue;
+    const term = terms.find((t) => t.column === col.id);
+    if (term) node.dataset.sort = term.direction;
+    else delete node.dataset.sort;
+  }
 }
 
 // tristateMultiColumnSort + multiColumnSort: false (grid options) is what makes a header click
@@ -1244,6 +1402,24 @@ async function onPaste(): Promise<void> {
       }
     }
   }
+
+  // C9/§5 D9 rule 1 — a paste landing on an *existing* staged insert row updates its `values` in
+  // place via `stageInsertValue`, which never changes `inserts.length` and so never reaches the
+  // insert-count watch below; that row's own `<input>` would otherwise keep showing its
+  // pre-paste text forever. This is exactly D9's own "the change came from outside the grid"
+  // case (a paste, not a keystroke into that row's own input), so invalidating it here is safe —
+  // nothing about a paste could be holding focus inside the very input being overwritten.
+  // `dataSource.setState` covers the one edge case rebuilding wouldn't otherwise reach until the
+  // insert-count watch's own next tick: the tab's *first* ever insert, created moments ago by
+  // `addInsertRow` above, whose `state.inserts` this closure captured as a plain `[]` before that
+  // row's tab-scoped `TabPending` (and its own real, reactive `inserts` array) existed at all.
+  if (insertIds.size > 0 && grid && dataSource) {
+    dataSource.setState(dataSourceState(p, currentOrder()));
+    grid.updateRowCount();
+    const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
+    for (const row of insertIds.keys()) grid.invalidateRow(displayPositionOf(idx, row));
+    grid.render();
+  }
 }
 
 // F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
@@ -1340,6 +1516,9 @@ onMounted(() => {
   const p = getPage(props.tabId);
   const order = p ? resolveColumnOrder(p, t?.state.columnOrder ?? null) : [];
   formatterCtx.rowNumberBase = t ? t.state.pageIndex * t.state.pageSize : 0;
+  // C11/§5 D11c — meta may already be loaded by mount time (a reopened tab); the `rt()?.meta`
+  // watch (below) only fires on a *change*, so the first value needs setting here too.
+  navColumns = navColumnsFor(rt()?.meta ?? null);
 
   dataSource = createGridDataSource(dataSourceState(p, order));
 
@@ -1477,6 +1656,10 @@ onMounted(() => {
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(grid.onBeforeEditCell, onBeforeEditCell);
+  eventHandler.subscribe(grid.onMouseEnter, onGridMouseEnter);
+  eventHandler.subscribe(grid.onMouseLeave, onGridMouseLeave);
+  eventHandler.subscribe(grid.onActiveCellChanged, onGridActiveCellChanged);
+  eventHandler.subscribe(grid.onClick, onGridClick);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
@@ -1539,6 +1722,12 @@ onUnmounted(() => {
   grid = null;
   dataSource = null;
   viewportEl = null;
+  // C11 — `grid.destroy(true)` already tears down the `.slick-cell` navButton may still be a
+  // child of; these three just drop this file's own references so a later remount (a reopened
+  // tab reuses this same module scope) starts from a clean slate, not a stale hover/button/Set.
+  navButton = null;
+  navIcon = null;
+  hoveredCell = null;
 });
 
 watch(
@@ -1624,6 +1813,11 @@ watch(
 watch(
   () => rt()?.meta,
   () => {
+    // C11/§5 D11c — the cheap precheck's own Set membership, recomputed exactly on a meta change
+    // and nowhere else (not per cell, not per hover): `navColumnsFor` is a plain function, so this
+    // is the one place that needs to call it, not `rebuildAndSetColumns` itself (also called by
+    // the appearance/columnWidths watches below, neither of which changes what's navigable).
+    navColumns = navColumnsFor(rt()?.meta ?? null);
     rebuildAndSetColumns();
     grid?.render();
   },

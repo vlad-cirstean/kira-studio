@@ -176,6 +176,49 @@
   opacity: 0.5;
 }
 
+/* §5 D11 — the user's own explicit request (item 3): GridRow.vue's own `.cell-nav-btn`/`.has-nav`
+   pair, ported with `right`/`padding-right` flipped to `left`/`padding-left`. On a right-aligned
+   numeric column the left placement is strictly better — the button no longer sits where the
+   value's last digits are. `.slick-cell` is already `position: absolute` (slick.grid.css), so it
+   is a containing block on its own; no `position: relative` needed here.
+   Unlike the incumbent's own always-in-the-DOM-but-`display:none`-until-hover button (one per nav
+   cell, revealed by a pure-CSS `:hover`/`.selected` rule), this is the single host-owned element
+   D11b moves between cells in JS — its mere presence in a cell already means "show it", so no
+   hide/reveal rule is needed here at all. */
+.slick-grid-host .slick-cell.has-nav {
+  padding-left: calc(var(--kira-s-4) + 18px);
+}
+
+.slick-grid-host .cell-nav-btn {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-elevated);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.slick-grid-host .cell-nav-btn:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+
+/* GridRow.vue's own `.grid-cell.fk` rule, unchanged (D11c): FK-only, narrower than `.has-nav`'s
+   own fk-or-pk precheck — a PK column's own value isn't itself "a reference" to color. */
+.slick-grid-host .slick-cell.fk {
+  color: var(--kira-info);
+}
+
 .slick-grid-host .kira-align-right {
   /* justify-content is the one that actually positions a lone-text-node cell under
      `.slick-cell`'s own `display: flex` (see `.kira-gutter`'s own comment above for why
