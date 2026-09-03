@@ -22,6 +22,16 @@ team works, and how to run things in whichever box a session happens to be on.
   genuinely independent and parallelizable** (e.g. several unrelated adapters, or research/fixes
   that don't touch the same files or depend on each other's output) — never split a single
   continuous, order-dependent piece of work across subagents just to run it concurrently.
+- **Within a phase, implement the whole plan first, then test once and fix what's found** — don't
+  gate every intermediate commit on the full test suite. Cheap, fast checks (typecheck, lint, a
+  build) are fine to run as you go, since they're nearly free and catch obvious breaks immediately,
+  but an expensive suite (end-to-end/UI, a real-hardware check, anything that takes real wall-clock
+  time) runs once, near the end of the phase's implementation, not after every commit. This is a
+  cadence change only — the "best practices, no shortcuts" bar below still applies to the result,
+  and a phase isn't done until that one full run is green and whatever it turned up is fixed and
+  committed. Landing intermediate commits as the plan's own work is completed is still expected,
+  for a legible history — this only changes when the expensive verification happens, not whether
+  commits stay granular.
 - **The loop per phase:** check for a plan → spawn an Opus subagent to write one if missing →
   spawn a Sonnet subagent (or several, only if the work is genuinely parallelizable) to implement
   the whole phase, and wait for it to finish before moving on. Phases are done one at a time, in
@@ -56,6 +66,28 @@ team works, and how to run things in whichever box a session happens to be on.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`,
   no skipped validation to make something demo. Scope left out of a phase is left out entirely,
   not half-implemented.
+- **Reach for an existing, well-maintained library before hand-rolling non-trivial infrastructure**
+  — a parser, a virtualizer, a positioning/layout engine, retry/backoff, and similar. Check whether
+  a mature library already solves it and prefer adopting it over carrying a hand-rolled equivalent,
+  the way this repo already relies on CodeMirror, zod, sql-formatter and SlickGrid rather than
+  reimplementing them. A hand-rolled version earns its keep only against a real requirement no
+  general library meets (e.g. spelling-preserving timestamp re-encoding, a wire format the codebase
+  controls end to end) — name that requirement when declining a library, not just that the existing
+  code already works.
+- **Only fully open-source libraries** — no "community edition" of a dual-licensed product, no
+  non-commercial-only free tier, no functionality gated behind a paid/Enterprise tier. Check the
+  license at the package level *and* for the specific feature being used, not just the headline
+  badge (AG Grid Community's own license is fine; the context menu, range selection and clipboard
+  features this app would have needed are Enterprise-only, which is why it was declined instead).
+  Applies to every new dependency, not only grid libraries.
+- **Measure when there's a real, concrete question at stake — not as a default ritual for every
+  decision.** A real-hardware trace, CDP/paint tracing, or a byte-for-byte bundle comparison earns
+  its keep when a claimed fix, regression, or cost genuinely can't be checked any other way (a
+  scroll-performance investigation, a paint-fragmentation bug, a library adoption whose bundle cost
+  is the deciding factor). Don't extend that same rigor to routine changes or to every option
+  considered and declined along the way — a short, honest estimate or a plain read of the code's or
+  library's own stated behavior is enough there. If a measurement wouldn't change the decision,
+  skip it.
 - **Comments: very concise, and only where truly necessary.** Add one only when the code cannot
   say it for itself — a non-obvious *why*, a constraint, a workaround. Never restate what the code
   already shows.
