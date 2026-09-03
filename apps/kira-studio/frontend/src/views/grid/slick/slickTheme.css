@@ -148,6 +148,34 @@
   background: var(--kira-error);
 }
 
+/* C10/§4 item 18 — the third rail `pendingRowClasses`' own comment already promised: a
+   pending-insert row is not "edited" (nothing existing changed), same 2px treatment coloured
+   ok/green instead of warn/yellow so the two staged-change kinds read apart at a glance —
+   GridRow.vue's own `.gutter-cell.inserted::before`, ported. */
+.slick-grid-host .slick-row.kira-row-inserted .kira-gutter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-ok);
+}
+
+/* C10 — GridRow.vue's own `.grid-row.pending-insert` background tint, ported verbatim; drawn on
+   `.slick-row` itself (the same class this file's own three rails above key off), not per cell. */
+.slick-grid-host .slick-row.kira-row-inserted {
+  background: color-mix(in srgb, var(--kira-accent) 8%, transparent);
+}
+
+/* C10 — GridRow.vue's own `.grid-row.pending-delete` rule, ported verbatim: the whole-row
+   strike-through, alongside (not instead of) `.kira-row-deleted`'s own gutter rail above — the
+   two are independent mechanisms this pass ports both of (`pendingRowClasses`' own comment). */
+.slick-grid-host .slick-row.pending-delete {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 .slick-grid-host .kira-align-right {
   /* justify-content is the one that actually positions a lone-text-node cell under
      `.slick-cell`'s own `display: flex` (see `.kira-gutter`'s own comment above for why

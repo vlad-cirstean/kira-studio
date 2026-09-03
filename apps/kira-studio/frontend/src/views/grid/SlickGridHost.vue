@@ -420,7 +420,7 @@ function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDa
   return {
     index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
     inserts,
-    rowClasses: (row) => pendingRowClasses(props.tabId, row),
+    rowClasses: (row) => pendingRowClasses(props.tabId, row, p?.rowCount ?? 0),
     rowColumns: insertColumns
       ? (handle) => (handle.insertId !== undefined ? insertColumns : undefined)
       : undefined,
@@ -1629,25 +1629,31 @@ watch(
   },
 );
 
-// C8/§5 D8 addendum — every row this watch has ever seen staged, so a discard (which clears
-// `p.edits` entirely, outside any SlickGrid commit path) knows which *previously* staged rows
-// must be invalidated back to their real page value, not only the newly-staged ones a plain diff
-// against the current map would catch.
-let lastStagedRows = new Set<number>();
+// C8/§5 D8 addendum, extended at C10 for `p.deletes`: every row this watch has ever seen staged
+// (edited OR marked for delete), so a discard (which clears `p.edits`/`p.deletes` entirely,
+// outside any SlickGrid commit path) knows which *previously* staged rows must be invalidated
+// back to their real page value/rails, not only the newly-staged ones a plain diff against the
+// current map/set would catch.
+let lastPendingRows = new Set<number>();
 
-// C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged.
-// `pendingFor(tabId)?.edits` is a reactive Map (pendingChanges.ts's own `pendingState`, a Vue
-// `reactive()`), so both Map iteration and each entry's own `changes` object track reactively —
-// no reference-identity trap the way the TabPending object itself would be (created once per tab
-// and mutated in place, never reassigned). The signature is row -> staged *column count*, not
-// values: refreshStagedLayer only needs to know *which* cells are staged, never what they hold,
-// so a same-column value edit (no key added/removed) correctly does not re-trigger this.
+// C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged. C10 extends the
+// same watch to `p.deletes` too (§4 item 18's own "the pending-changes watch's invalidateRows
+// set"), since `pendingRowClasses`' rail/strike-through classes need the same re-render a staged
+// edit already gets — one watch, not two, since both `p.edits` and `p.deletes` land on the same
+// row-invalidation need and `toggleDelete` already keeps them mutually exclusive per row.
+// `pendingFor(tabId)?.edits`/`.deletes` are a reactive Map/Set (pendingChanges.ts's own
+// `pendingState`, a Vue `reactive()`), so both track reactively without a reference-identity trap
+// the way the TabPending object itself would be (created once per tab, mutated in place, never
+// reassigned). The signature is row -> staged *column count* / delete flag, not values:
+// refreshStagedLayer only needs to know *which* cells are staged, never what they hold, so a
+// same-column value edit (no key added/removed) correctly does not re-trigger this.
 watch(
   () => {
     const p = pendingFor(props.tabId);
     if (!p) return '';
     let sig = '';
-    for (const [row, edit] of p.edits) sig += `${row}:${Object.keys(edit.changes).length};`;
+    for (const [row, edit] of p.edits) sig += `e${row}:${Object.keys(edit.changes).length};`;
+    for (const row of p.deletes) sig += `d${row};`;
     return sig;
   },
   () => {
@@ -1655,15 +1661,20 @@ watch(
     // C8 — `dataItemColumnValueExtractor` already merges `stagedValue` over the page (D1), so a
     // committed *edit* renders correctly for free (SlickGrid's own `commitCurrentEdit` calls
     // `updateRow` after `applyValue`, `slick.grid.ts:4136`). Nothing calls that for a *discard*,
-    // though — `pendingChanges.ts`'s own discard clears `p.edits` entirely from outside any
-    // SlickGrid edit-commit path, so without this the cell keeps showing the just-discarded text
-    // until something else happens to re-render it. Invalidate the union of this row's newly- and
-    // previously-staged state (not just the new set — a discard's new set is empty) and re-render.
+    // a delete toggle, or a commit's own reload-free path, though — those all change
+    // `pendingRowClasses`' own answer for a row from outside any SlickGrid edit-commit path, so
+    // without this the row keeps showing its stale rails/strike-through/text until something else
+    // happens to re-render it. Invalidate the union of this row's newly- and previously-staged
+    // state (not just the new set — a discard's new set is empty) and re-render.
     if (!grid || !dataSource) return;
     const p = pendingFor(props.tabId);
-    const rows = new Set(p ? p.edits.keys() : []);
-    const touched = new Set<number>([...lastStagedRows, ...rows]);
-    lastStagedRows = rows;
+    const rows = new Set<number>();
+    if (p) {
+      for (const row of p.edits.keys()) rows.add(row);
+      for (const row of p.deletes) rows.add(row);
+    }
+    const touched = new Set<number>([...lastPendingRows, ...rows]);
+    lastPendingRows = rows;
     if (touched.size === 0) return;
     const idx = {
       displayRows: currentDisplayRows(),

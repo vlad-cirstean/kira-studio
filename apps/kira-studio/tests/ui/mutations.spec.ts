@@ -1,7 +1,7 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { cellText, gridCell } from './support/grid';
+import { cellText, gridCell, gutterCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   COMPOSITE_PK_COLUMNS,
@@ -275,7 +275,10 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await expect(insertRow).toHaveCount(0);
 
   // --- scenario 5: delete-row marks a row struck-through, non-committed until commit -------
-  await page.locator('[data-testid="grid-gutter-cell"]').nth(1).click();
+  // P22 Pass B — page-row-scoped (support/grid.ts's own gutterCell), not a raw DOM-order `.nth(1)`:
+  // SlickGrid recycles row DOM nodes as it renders (F2), so their physical DOM order does not
+  // track visual/page-row order the way the incumbent's own always-append-in-order rows did.
+  await gutterCell(page, 1).click();
   await page.click('[data-testid="toolbar-delete-row"]');
   const deletedRow = page.locator('[data-testid="grid-row"][data-row="1"]');
   await expect(deletedRow).toHaveClass(/pending-delete/);

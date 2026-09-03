@@ -244,10 +244,22 @@ export function createDisplayValueExtractor(
 /** The dirty/deleted-rail source for `GridDataSourceState.rowClasses` (§5 item 18) — a page row
  *  index in, the same two mutually-exclusive rail classes GridRow.vue's own CSS already draws
  *  (`.gutter-cell.dirty`/`.gutter-cell.deleted`, ported verbatim in `slickTheme.css`). */
-export function pendingRowClasses(tabId: string, row: number): string | undefined {
+// C10/§4 item 18 — the third case Pass A's own stale comment already promised, checked first: a
+// pending-insert row is never simultaneously a real, deleted, or dirty page row (it has no page
+// row at all — `row` here is `pageRowAt`'s own pseudo-row-number past `pageRowCount`, D1's insert
+// region), so it can never collide with the other two. `pending-delete` is DataGrid.vue's own
+// literal class name (`GridRow.vue:41` — the strike-through/opacity rule), added alongside
+// `kira-row-deleted` (this file's own rail-only class, `slickTheme.css`'s `.kira-gutter::before`
+// selector) rather than replacing it — the two mechanisms are independent and this pass ports both.
+export function pendingRowClasses(
+  tabId: string,
+  row: number,
+  pageRowCount: number,
+): string | undefined {
+  if (row >= pageRowCount) return 'kira-row-inserted';
   const p = pendingFor(tabId);
   if (!p) return undefined;
-  if (p.deletes.has(row)) return 'kira-row-deleted';
+  if (p.deletes.has(row)) return 'kira-row-deleted pending-delete';
   if (p.edits.has(row)) return 'kira-row-dirty';
   return undefined;
 }
