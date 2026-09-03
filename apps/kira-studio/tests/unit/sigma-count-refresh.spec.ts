@@ -4,15 +4,6 @@
 // that line over: every call always sent refresh as undefined/false, so once their cached count
 // went stale, clicking Σ could never force a real recount — it kept re-reading the same stale L3
 // entry until it fell out of cache entirely. This file pins the fix across all three.
-//
-// Filename note: importing state/tabs.ts here pulls in bridge/control.ts, which (like bridge/
-// data.ts) reaches bridge/port.ts's module-scope `Stream('engine')` singleton call — the same
-// shared-module-registry hazard wailsRuntime.ts's own comment documents for bridge-port.spec.ts.
-// Several candidate names for this file (view-state-count-refresh.spec.ts, count-refresh.spec.ts)
-// were empirically found to perturb bun test's file-loading order enough to make bridge-port.
-// spec.ts's own socket wiring lose that race — every one of its 8 tests then failed or hung.
-// "sigma-count-refresh.spec.ts" was verified stable across 15+ full-suite runs; keep this name
-// (or re-verify a new one the same way) rather than assuming any name is safe.
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';

@@ -1,17 +1,18 @@
 import { describe, expect, test } from 'bun:test';
 import { encodeFrame, type FrameSpec } from '../support/encodeFrame';
-import { createFakeSocket, type FakeSocket } from './support/fakeSocket';
-import { setSocketFactory } from './support/wailsRuntime';
+import type { FakeSocket } from './support/fakeSocket';
+import { getStream } from './support/wailsRuntime';
 
 // port.ts calls Stream('engine') once at module scope (P57 §4.1), so every test in this file
 // drives the one resulting connection through the same fake — matching how the real module
-// actually uses the runtime, rather than one fresh socket per test. The factory must be set
-// before the dynamic import below: that import is what actually triggers port.ts's module-scope
-// Stream('engine') call, for the whole test process (see support/wailsRuntime.ts).
-const socket: FakeSocket = createFakeSocket();
-setSocketFactory(() => socket);
-
+// actually uses the runtime, rather than one fresh socket per test. The dynamic import below is
+// what triggers that module-scope Stream('engine') call *if* no earlier spec in this run already
+// has (Bun's module registry caches port.ts itself for the whole test process) — either way,
+// `getStream('engine')` after the import hands back whichever socket port.ts actually ended up
+// holding, so this file's own assertions never depend on winning a load-order race against
+// whatever other spec's import chain also reaches port.ts (see support/wailsRuntime.ts).
 const { ready, request, onPortEvent } = await import('../../frontend/src/bridge/port');
+const socket: FakeSocket = getStream('engine');
 
 // request() gates its send on `ready` via a .then() registered synchronously but resolved on a
 // later microtask; awaiting `ready` itself is not enough to guarantee that .then has *also* run,

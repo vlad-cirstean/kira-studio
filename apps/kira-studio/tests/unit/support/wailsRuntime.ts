@@ -23,20 +23,55 @@ import { createFakeSocket, type FakeSocket } from './fakeSocket';
 // Most specs never touch any of this: they override `data`'s or `control`'s own methods above
 // the transport (view-state.spec.ts's `(data as any).read = ...`), so `Call`/`Events` only need
 // to exist as real named exports, never actually get invoked, and don't need to do anything
-// useful. bridge-port.spec.ts is the one spec that drives the Stream transport directly; it
-// calls `setSocketFactory` before its own dynamic `import('.../bridge/port')` to swap in a fake
-// it can open/close/message from the test body. port.ts's `const socket = Stream('engine')`
-// runs once, ever, for the whole test process (module caching) — whichever factory is installed
-// at that moment is what every spec's cached copy of port.ts holds afterwards, which is harmless
-// for every spec except bridge-port.spec.ts, the one spec that actually exercises it.
-let factory: (name: string) => FakeSocket = () => createFakeSocket();
-
-export function setSocketFactory(f: (name: string) => FakeSocket): void {
-  factory = f;
-}
+// useful. bridge-port.spec.ts is the one spec that drives the Stream transport directly.
+//
+// port.ts's `const socket = Stream('engine')` runs once, ever, for the whole test process (Bun's
+// module registry caches port.ts itself across every spec file that imports it, whichever comes
+// first in bun test's own file-discovery order — not necessarily, and empirically not always,
+// alphabetical or CLI-argument order). An earlier design here tried to *pre-register* the fake
+// socket bridge-port.spec.ts wanted (`setSocketFactory` before its own dynamic import), betting
+// that its dynamic `import('.../bridge/port')` would always be the first thing in the whole run to
+// evaluate port.ts's module body. That bet is exactly the race: any other spec whose import chain
+// reaches port.ts first (bridge/data.ts, workbench/state/engine.ts) locks in a *different* fake
+// socket — created by whatever factory was installed at that earlier moment — and
+// bridge-port.spec.ts's later `setSocketFactory` call is too late to matter, since port.ts's
+// module-scope `Stream('engine')` never runs a second time. The test then drives a socket object
+// port.ts never sees, so every response/open/close it injects is silently inert (a request that
+// never gets `send()`'d "isn't sent" only because nothing reaches the real transport at all, and
+// `ready` times out instead of resolving) — which reads as 5 s test timeouts and JSON-parsing
+// garbage a request or two later, depending on exactly which tests happened to still have pending
+// promises when the mismatch set in. `sigma-count-refresh.spec.ts`'s filename-note comment records
+// one attempt to dodge this by picking a spec name that empirically sorted the "right" way — a
+// naming hack, not a fix, and it stopped working the moment another spec's name (or bun's own
+// discovery order) shifted again.
+//
+// The actual fix: stop betting on load order entirely. `Stream(name)` memoizes one socket per
+// name the first time it's asked for that name, by *whichever* caller asks first — a later call
+// for the same name is a no-op that just returns the same instance, by design, since the
+// module-scope call it would need to affect has already happened. `getStream(name)` (below) is
+// that same lookup, exposed so a spec can ask for the real transport's socket *after* importing
+// port.ts — for whatever socket port.ts actually ended up holding, rather than trying to inject
+// one in advance and hoping to win a race it has no way to guarantee winning.
+const streams = new Map<string, FakeSocket>();
 
 export function Stream(name: string): FakeSocket {
-  return factory(name);
+  let socket = streams.get(name);
+  if (!socket) {
+    socket = createFakeSocket();
+    streams.set(name, socket);
+  }
+  return socket;
+}
+
+/**
+ * Returns the fake socket a name's `Stream(name)` call actually resolved to — creating and
+ * memoizing one if nothing has called `Stream(name)` yet. Since `Stream` memoizes per name
+ * (above), this is always the exact same object port.ts's own module-scope
+ * `const socket = Stream('engine')` is holding, regardless of which spec file's import chain
+ * triggered that call first.
+ */
+export function getStream(name: string): FakeSocket {
+  return Stream(name);
 }
 
 // Deliberately never settles, rather than rejecting: state/tabs.ts's own module-scope code fires
