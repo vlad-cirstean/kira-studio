@@ -129,7 +129,7 @@ func probe(goos, insecureEnv string, loadKey func() ([]byte, error)) (Status, []
 		}
 		return Status{Available: true, Backend: BackendKeychain}, key
 	case "linux":
-		if insecureEnv != "" {
+		if insecureEnv != "" && insecureEnv != "0" && insecureEnv != "false" {
 			sum := sha256.Sum256([]byte(insecureKeyMaterial))
 			return Status{Available: true, Backend: BackendBasicText, InsecureFallback: true}, sum[:]
 		}

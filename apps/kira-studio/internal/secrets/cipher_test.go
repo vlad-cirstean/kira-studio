@@ -14,6 +14,43 @@ import (
 
 func fakeLoadOK() ([]byte, error) { return bytes.Repeat([]byte{0x01}, 32), nil }
 
+func fakeLoadErr() ([]byte, error) { return nil, errors.New("no keychain") }
+
+// TestProbe covers probe's three goos branches against the insecureEnv values a user might
+// plausibly set — in particular P29 F5's regression: "0" and "false" must read as *off*, matching
+// config.IsDev()'s own parsing convention for KIRA_DEV, not silently enable the insecure fallback.
+func TestProbe(t *testing.T) {
+	tests := []struct {
+		name        string
+		goos        string
+		insecureEnv string
+		loadKey     func() ([]byte, error)
+		wantBackend string
+	}{
+		{"darwin ignores insecureEnv, key available", "darwin", "1", fakeLoadOK, BackendKeychain},
+		{"darwin ignores insecureEnv, key unavailable", "darwin", "1", fakeLoadErr, BackendUnavailable},
+		{"linux unset", "linux", "", fakeLoadOK, BackendUnavailable},
+		{"linux empty stays unset", "linux", "", fakeLoadErr, BackendUnavailable},
+		{`linux "0" is off`, "linux", "0", fakeLoadOK, BackendUnavailable},
+		{`linux "false" is off`, "linux", "false", fakeLoadOK, BackendUnavailable},
+		{`linux "1" is on`, "linux", "1", fakeLoadOK, BackendBasicText},
+		{`linux any non-empty is on`, "linux", "yes", fakeLoadOK, BackendBasicText},
+		{"other platform", "windows", "1", fakeLoadOK, BackendUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			status, _ := probe(tt.goos, tt.insecureEnv, tt.loadKey)
+			if status.Backend != tt.wantBackend {
+				t.Errorf("probe(%q, %q) backend = %v, want %v", tt.goos, tt.insecureEnv, status.Backend, tt.wantBackend)
+			}
+			wantInsecure := tt.wantBackend == BackendBasicText
+			if status.InsecureFallback != wantInsecure {
+				t.Errorf("probe(%q, %q) InsecureFallback = %v, want %v", tt.goos, tt.insecureEnv, status.InsecureFallback, wantInsecure)
+			}
+		})
+	}
+}
+
 func availableCipher(t *testing.T) *Cipher {
 	t.Helper()
 	status, key := probe("darwin", "", fakeLoadOK)
