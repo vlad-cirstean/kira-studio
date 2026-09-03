@@ -39,6 +39,9 @@ declare global {
           /** P22 iter2-pacing D3. */
           renderCount: number;
           renderMs: number;
+          /** P22 iter2-onset D3 — the velocity this frame's render(s) actually sized the runway
+           *  from, as opposed to `pxPerFrame` above (what the viewport actually moved). */
+          runwayVelocity: number;
           rows: number;
         }[];
         summary: {
@@ -50,6 +53,10 @@ declare global {
           scrollEventsHistogram: Record<number, number>;
           /** P22 iter2-pacing D3. */
           renderCountHistogram: Record<number, number>;
+          /** P22 iter2-onset D3. */
+          runwayVelocity: { p50: number; p95: number; max: number; mean: number; stddev: number };
+          /** P22 iter2-onset D3. */
+          staleVelocityFrames: number;
         };
       } | null;
     };
@@ -74,6 +81,9 @@ declare global {
       /** P22 iter2-onset D2: `false` drops the chase's per-frame gate, leaving only the
        *  CHASE_QUIET_MS wall-clock one — i.e. the policy as shipped at a9dc570. */
       chaseFrameGateOverride?: boolean;
+      /** P22 iter2-onset D1: `false` restores the pre-fix "a render reads whatever the host's own
+       *  scroll listener last recorded, which is always one event behind" behaviour exactly. */
+      freshVelocitySampleOverride?: boolean;
     };
   }
 }

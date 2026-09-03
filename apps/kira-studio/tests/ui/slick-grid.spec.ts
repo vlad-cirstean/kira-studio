@@ -702,3 +702,124 @@ test('P22 iter2-pacing — tearing down the grid with a catch-up render still ar
   );
   expect(closedBytes).toBe(baselineBytes);
 });
+
+// P22 iter2-onset §6 — the gesture-onset defect's own sandbox-provable gates.
+//
+// What this proves, and what it does not. It gates the *mechanism*: no render pass sizes its
+// runway as if the grid were standing still while the viewport is measurably moving. That is a
+// property of this app's own sampling policy plus DOM event-listener ordering (spec-defined
+// registration order on one target), so it is engine-independent and provable here — unlike the
+// perceived "content isn't fully rendered for a few frames at the start of a fling" symptom that
+// motivated it, which needs the real macOS compositor and is docs/PERF.md §2.1c's job.
+//
+// Three separate rest-to-motion transitions per recording, not one: the defect is one frame per
+// gesture, so a single fling gives a one-frame margin and a flaky gate.
+async function flingFromRest(
+  page: import('@playwright/test').Page,
+  viewport: ReturnType<typeof rightViewport>,
+): Promise<void> {
+  // Well past the sampler's own 150ms at-rest threshold (SlickGridHost.vue's velocity()), so each
+  // burst below really does start from "at rest" and not from the tail of the previous one. 500ms,
+  // not 150-250: `page.mouse.wheel` returns before WebKit's own scroll animation finishes, and that
+  // animation's trailing 2-3px scroll events kept arriving ~95ms after the last wheel call resolved
+  // here — enough to warm the sampler and hide the defect on bursts 2 and 3 of a 250ms-gap run.
+  await page.waitForTimeout(500);
+  // deltaY is deliberately small: the sampler discards a delta above
+  // MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME (800) as a discrete jump rather than a fling, and
+  // page.mouse.wheel's CDP round-trips can stack several ticks into one frame.
+  await wheelFling(page, viewport, 40, 60);
+}
+
+/** The gate itself: frames that rendered while the viewport was measurably moving at a plausible
+ *  fling speed, yet fed zero velocity into the runway arithmetic. `summary.staleVelocityFrames` is
+ *  the same tally without the 800px guard — applied here so a stacked-wheel frame that the sampler
+ *  legitimately treats as a discrete jump cannot be read as the defect. */
+function staleRunwayFrames(
+  frames: NonNullable<ReturnType<NonNullable<Window['__kiraScrollTrace']>['stop']>>['frames'],
+): number {
+  return frames.filter(
+    (f) => f.renderCount > 0 && f.pxPerFrame > 0 && f.pxPerFrame <= 800 && f.runwayVelocity === 0,
+  ).length;
+}
+
+test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, not from before it', async ({
+  relaunch,
+}) => {
+  test.setTimeout(120_000);
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await forceSlickEngine(page);
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+
+  // --- (a) with the fix: no render sizes its runway at rest while the viewport is moving ---------
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.evaluate(() => window.__kiraScrollTrace?.start());
+  for (let burst = 0; burst < 3; burst++) await flingFromRest(page, viewport);
+  await page.waitForTimeout(300);
+  const fixed = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  expect(fixed).not.toBeNull();
+  const fixedFrames = fixed?.frames ?? [];
+  // The instrument reports something at all — otherwise the zero below would be vacuous.
+  expect(fixed?.summary.runwayVelocity.max ?? 0).toBeGreaterThan(0);
+  expect(staleRunwayFrames(fixedFrames)).toBe(0);
+
+  // --- (b) THE REGRESSION GATE: the pacing fix still holds, on this same recording ---------------
+  // P22 iter2-pacing's own invariant — at most one render pass per animation frame while a scroll
+  // is live. The onset fix deliberately never touches `scheduleChase`'s quiescence gate (it widens
+  // the *target* an already-scheduled render aims at, it does not let an extra render through), and
+  // this is what proves that: three continuous, gapless wheel bursts, zero doubled frames.
+  const fixedHistogram = fixed?.summary.renderCountHistogram ?? {};
+  for (const count of Object.keys(fixedHistogram)) {
+    expect(Number(count)).toBeLessThan(2);
+  }
+
+  // --- (c) freshVelocitySampleOverride = false reproduces the pre-fix behaviour ------------------
+  // The self-verifying half of (a), exactly as T3 is for T1: if the pre-fix run does NOT show
+  // stale-velocity frames, this harness is not reproducing the condition at all and (a) is a
+  // tautology. Two of the three onsets, not three, so a burst that happens to start below the
+  // dy > 20 render threshold (slickgrid dist/esm/index.js:10589) doesn't flake the gate.
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.evaluate(() => {
+    window.__kiraGridTuning ??= {};
+    window.__kiraGridTuning.freshVelocitySampleOverride = false;
+  });
+  await page.evaluate(() => window.__kiraScrollTrace?.start());
+  for (let burst = 0; burst < 3; burst++) await flingFromRest(page, viewport);
+  await page.waitForTimeout(300);
+  const preFix = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  await page.evaluate(() => {
+    if (window.__kiraGridTuning) window.__kiraGridTuning.freshVelocitySampleOverride = undefined;
+  });
+  expect(preFix).not.toBeNull();
+  expect(staleRunwayFrames(preFix?.frames ?? [])).toBeGreaterThanOrEqual(2);
+
+  // --- (d) the per-frame chase gate is what makes (b) hold, not the wall-clock one --------------
+  // P22 iter2-onset D2. CHASE_QUIET_MS is 24ms and frames here run p50 ~28 / p95 ~55 / max ~70ms
+  // (and p50 32.1ms on the real Mac, docs/PERF.md §2.1c) — so "24ms since the last scroll event"
+  // routinely stops meaning "no scroll event is driving this frame". With the frame gate removed,
+  // leaving the shipped-at-a9dc570 wall-clock policy alone, this same fling doubles frames. This
+  // is the load-bearing half of (b): without it, (b) would be passing on a gate that only holds
+  // by accident. Uses wheelFling's own faster defaults — the harness the pacing pass's T1/T3 use.
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(50);
+  await page.evaluate(() => {
+    window.__kiraGridTuning ??= {};
+    window.__kiraGridTuning.chaseFrameGateOverride = false;
+  });
+  await page.evaluate(() => window.__kiraScrollTrace?.start());
+  await wheelFling(page, viewport);
+  await page.waitForTimeout(300);
+  const msGateOnly = await page.evaluate(() => window.__kiraScrollTrace?.stop());
+  await page.evaluate(() => {
+    if (window.__kiraGridTuning) window.__kiraGridTuning.chaseFrameGateOverride = undefined;
+  });
+  expect(msGateOnly).not.toBeNull();
+  const msGateHistogram = msGateOnly?.summary.renderCountHistogram ?? {};
+  expect(Object.keys(msGateHistogram).some((count) => Number(count) >= 2)).toBe(true);
+});
