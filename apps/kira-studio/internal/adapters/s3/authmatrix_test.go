@@ -81,6 +81,24 @@ func TestS3_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{FailWith: adapters.CodeAuth},
 		},
 		{
+			// Every functional s3 test today runs URI mode (testsupport/s3.go's own config is
+			// URI-only). Fields mode otherwise reaches Connect and stops — awscfg's fields branch
+			// (Resolve, fields-mode arm) had never served a data-plane request before this. Relies on
+			// the sandbox's own ambient placeholder AWS_* env (AGENTS.md), which LocalStack accepts
+			// unconditionally (P25 §2.3, measured) — no clearAwsEnv Principal here.
+			Name: "fields mode, region set, ambient credentials",
+			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
+				c.Mode = "fields"
+				c.Database = testsupport.Strp(testsupport.LocalStackRegion)
+				c.Username, c.URI = nil, nil
+				return c
+			},
+			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("bucket", testsupport.S3MainBucket), testsupport.Seg("object", testsupport.S3RootObjectKey))),
+			},
+		},
+		{
 			Name: "fields mode, region unset",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Mode = "fields"
@@ -111,6 +129,12 @@ func TestS3_AuthMatrix(t *testing.T) {
 						}
 					},
 				},
+				// P25 §1.5d: this is the code path written specifically for a single-bucket IAM
+				// policy — the least-privilege shape — and P25 asserted only Children(root) on it.
+				// Its Read, Count and download were untested under the scoped posture until now.
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("bucket", testsupport.S3MainBucket), testsupport.Seg("object", testsupport.S3NestedObjectKey))),
+				testsupport.CountMatchesRead(testsupport.NodePath(f.Config.ID, testsupport.Seg("bucket", testsupport.S3MainBucket), testsupport.Seg("object", testsupport.S3RootObjectKey))),
+				testsupport.DownloadRoundTrips(testsupport.NodePath(f.Config.ID, testsupport.Seg("bucket", testsupport.S3MainBucket), testsupport.Seg("object", testsupport.S3NestedObjectKey))),
 			},
 		},
 		{
