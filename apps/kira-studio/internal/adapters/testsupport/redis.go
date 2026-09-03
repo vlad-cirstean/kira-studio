@@ -138,6 +138,47 @@ func startRedis() (*RedisFixture, error) {
 	return &RedisFixture{Config: cfg, Host: host, Port: port, container: container}, nil
 }
 
+// RedisAclUser is a Principal that creates a Redis ACL user with the given rule tokens (bare ACL
+// SETUSER tokens, e.g. "~*", "+@all", "-@dangerous") over a side admin connection, torn down when
+// the test ends. Optional sugar over ACL SETUSER for the complete matrix's own Redis cases (P25
+// §2.3) — every rule is passed through to the server verbatim, so the matrix table stays the
+// source of truth for which ACL shape each case exercises.
+func RedisAclUser(name, password string, rules ...string) *Principal {
+	return &Principal{
+		Name: name,
+		Setup: func(t *testing.T, f any) {
+			t.Helper()
+			fx, ok := f.(*RedisFixture)
+			if !ok {
+				t.Fatalf("RedisAclUser: fixture is %T, want *RedisFixture", f)
+			}
+			admin := goredis.NewClient(&goredis.Options{
+				Addr: fmt.Sprintf("%s:%d", fx.Host, fx.Port), Password: RedisPassword, Protocol: 2,
+			})
+			defer admin.Close()
+			args := append([]any{"ACL", "SETUSER", name, "on", ">" + password}, rulesToAny(rules)...)
+			if err := admin.Do(context.Background(), args...).Err(); err != nil {
+				t.Fatalf("ACL SETUSER %s: %v", name, err)
+			}
+			t.Cleanup(func() {
+				side := goredis.NewClient(&goredis.Options{
+					Addr: fmt.Sprintf("%s:%d", fx.Host, fx.Port), Password: RedisPassword, Protocol: 2,
+				})
+				defer side.Close()
+				_ = side.Do(context.Background(), "ACL", "DELUSER", name).Err()
+			})
+		},
+	}
+}
+
+func rulesToAny(rules []string) []any {
+	out := make([]any, len(rules))
+	for i, r := range rules {
+		out[i] = r
+	}
+	return out
+}
+
 func seedRedis(ctx context.Context, conn *goredis.Client) error {
 	// A root-level key with no ':' — namespace splitting must still surface it as a 'key' leaf
 	// directly under the db, not swallow it while walking namespaces.

@@ -128,6 +128,16 @@ func startClickHouse() (*ClickHouseFixture, error) {
 	return &ClickHouseFixture{Config: config, ReadOnlyConfig: readOnlyConfig, BaseURL: baseURL, container: container}, nil
 }
 
+// AdminStatements runs sql as ClickHouse's own admin user (kira_admin) — for a matrix case's own
+// runtime role/grant statements, reusing the same statement splitter and HTTP path the fixture's
+// own seed step already goes through.
+func AdminStatements(t *testing.T, f *ClickHouseFixture, sql string) {
+	t.Helper()
+	if err := runClickHouseStatements(context.Background(), f.BaseURL, clickhouseAdminUser, clickhouseAdminPass, clickhouseDatabase, sql); err != nil {
+		t.Fatalf("AdminStatements: %v", err)
+	}
+}
+
 // firstTopLevelSemicolon mirrors sqlite/query.go's own scanner (comments and quoted literals are
 // skipped over so a semicolon inside a string value never counts) — generalized here to find every
 // boundary rather than just the first, since this fixture's own job (unlike the adapter's B9 guard)
