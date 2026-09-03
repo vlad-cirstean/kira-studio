@@ -1602,3 +1602,154 @@ construction at `:611-660`, listener binding at `:945-991`, `createDraggable` at
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md`,
 `docs/v1.1/plans/P5-ram-usage.md`, `docs/ARCHITECTURE.md`, `docs/PERF.md`,
 `docs/WEBVIEW-SCROLL-MEMORY.md`, `docs/v1.1/SPEC.md`, `AGENTS.md`.
+
+---
+
+## 14. Postscript — visual/interaction parity, real-interaction verification, and the cutover
+
+Written at the end of the pass, after several further rounds of real hands-on testing against
+`DataGrid.vue` beyond what §7-§9 originally scoped, and after C14-C17 (the whole-suite gate and the
+incumbent deletion) actually landed. `-iter2-scroll-gaps.md`'s own §10 is the precedent for this
+section's shape: findings after the plan's own numbered stages closed, real enough to write down,
+not real enough (or not safe enough to touch blind) to fold back into the sections above as if they
+had been known from the start.
+
+### 14.1 What the extra rounds found and fixed
+
+Beyond C1-C14's own parity map, hands-on testing against `DataGrid.vue` (still in the tree through
+all of this, exactly for that comparison) turned up a second wave of real, SlickGrid-specific
+defects — a header-column CSS specificity tie masking the PK/FK badge and the header height; a
+resize-handle hit area clipped by `overflow: hidden`; an inline editor's box model (a stray 3px
+default border where none was ever set explicitly, an inset instead of flush accent ring); cell-
+range drag-select showing no live preview because `SlickHybridSelectionModel`'s own cell-mode
+`onCellRangeSelecting` deliberately no-ops mid-drag; a stray 1px light-grey `border-top` stock
+`slick.grid.css` still carried on `.slick-header`; a row-selection's own perimeter layer only
+marking the two edge columns' top/bottom edge instead of every column's; and the PK/FK nav button's
+hover-driven single-node design fighting itself via bubbling `mouseover`/`mouseout` re-dispatch the
+moment the cursor sat over the very button it had just placed. Each is described in full, with its
+real-interaction verification, in the commit that fixed it (`3ff0cc5`, `f1a61f4`, `e2d3b87`,
+`c7a3f22` — `git log --oneline` on this file's own directory finds the rest).
+
+A separate, later round asked for several **deliberate departures** from `DataGrid.vue`, not parity
+with it — recorded here because §4/§5 above describe the pre-departure design as if it were final:
+- The PK/FK nav button (§5 D11's own "one button, hover-driven, on the left") is now always
+  visible — one real button per rendered nav-eligible cell, built by a per-render DOM pass
+  (`SlickGridHost.vue`'s `placeNavButtonsForRenderedCells`), overlaying the cell's text instead of
+  reserving padding for it. This is a real cost trade against §4.1 item 5's own cited reduction
+  (`cellNavEntry` running once per hover instead of once per rendered cell) — accepted at the
+  user's own explicit request, and it happens to also remove the hover-flicker bug above at the
+  root, since nothing is appended/removed on hover any more.
+- A header body's left-click now selects the column instead of sorting; sorting moved to a
+  dedicated arrow control (the `.slick-sort-indicator` div SlickGrid already built for every
+  column, now a real click target of its own). `grid.onSort` is no longer reachable from a click
+  and its subscription is gone; the header context menu's Sort asc/desc/Clear items, unaffected,
+  still call `setSort` directly, as they always did.
+- The `.fk` cell class (a foreign-key column's own value) no longer carries the `--kira-info` blue
+  text colour, in both `slickTheme.css` and `GridRow.vue` (the request named the primary key; the
+  only such mechanism in this codebase is `.fk` — see the commit message for the full note on why
+  that's the most defensible reading).
+
+### 14.2 Known-open, not fixed — for whoever picks this up next
+
+**The residual horizontal-scroll header flicker.** Confirmed, by the user on real hardware, to be
+*reduced but not gone* by the header CSS fixes in 14.1 above — so this is not purely the
+architectural gap it first looked like (see §7.3's own real-Mac line). What's ruled out: extensive
+`requestAnimationFrame`-sampled multi-step scroll traces in this sandbox found zero frame-to-frame
+positional or timing defect at the property level, on either engine. What's still true and
+un-investigated further: SlickGrid never virtualizes header columns at all (confirmed from
+`onHeaderCellRendered`'s own "fires once per column per `setColumns` call... headers aren't
+virtualized" comment) — every header cell, however many columns the table has, repaints in full on
+every horizontal scroll tick, unlike the incumbent's own column-virtualized header. That is a
+plausible real-compositor cost this sandbox's WebKit has no way to surface (no real GPU compositor
+timing — the same limit §7.3 already names for the fling-lag question). **Best guess at the cause,
+for a future pass**: either that per-tick full-header repaint itself (in which case the fix is
+header-column virtualization — a real feature, not a CSS tweak, and worth a real-Mac measurement
+first to confirm it's the actual cost before building it), or something in the flex-layout header
+CSS fix from this pass causing a style recalculation the pre-fix `display: inline-block` header
+didn't (untested hypothesis — a real macOS Safari Web Inspector Timeline recording, the same tool
+`-iter2-scroll-gaps.md`'s own postscript used to find its `contain: layout` finding, is the next
+step, not more sandboxed scroll traces).
+
+**Elastic/rubber-band overscroll bounce, asymmetric between edges on real hardware.** No CSS or JS
+in this codebase sets `overscroll-behavior`, `-webkit-overflow-scrolling`, or intercepts
+`wheel`/`touchmove` anywhere near the grid's scroll path (checked directly, this pass) — native
+bounce is already fully unconstrained by anything this app does, on every edge, so there is no
+"only two edges are enabled" switch to flip. The most plausible structural explanation found:
+stock `slick.grid.css`'s own `.slick-pane { overflow: hidden }` (unmodified by this app, wraps the
+actual `overflow: auto` viewport) could clip a bounce's visual escape asymmetrically, per a real
+WebKit compositor-stacking quirk where a trailing-edge (bottom/right) overscroll can visually
+escape a parent's `overflow: hidden` in a way a leading-edge (top/left) one does not — but this is
+an unverified hypothesis, not a confirmed mechanism, and changing `.slick-pane`'s own clipping
+without a way to watch real trackpad physics in this sandbox risked silently breaking row/column
+virtualization's own clipping for a fix that might not even be the right one. Left alone rather
+than guessed at blind. A real-Mac trace (or simply trying `overflow: visible` on `.slick-pane` and
+watching for any row/cell spilling outside its own box during a fast fling) is the next step.
+
+**Two dock/badge symptoms reported but not reproduced.** "The cell-editor dock panel is sometimes
+missing its header" (after a multi-row selection) and "PK/FK header badges disappear after
+switching a tab away and back" were each chased with several *different* real-interaction
+sequences — shift-click multi-row-select then a single-cell click (twice), a genuine mouse-down/
+move/up drag-select across the gutter followed by an immediate click with ~20ms frame sampling for
+600ms, arrow-key navigation out of a row selection, and (for the badge report) a forced full
+component unmount/remount via tab close+reopen, which is *at least as aggressive* as a mere tab
+switch since `MainView.vue`'s own `:key="activeTab.id"` on the active tab's view already unmounts/
+remounts on every switch regardless of a close. None reproduced anything wrong: the dock's own
+height/header stayed present and stable across every sequence, and PK/FK badges rebuilt correctly
+every time, consistent with reading `state.ts`'s `loadMeta`/`registerTabRuntimeCleanup` — a tab's
+`meta` survives in its own runtime record until the tab actually closes, never merely on a switch.
+Neither is being called fixed, since neither was ever confirmed broken here — flagged instead in
+case the real repro needs something this sandbox's synchronous, instant-response mocks structurally
+cannot reproduce (a genuine network-latency race between a remount and an in-flight `describe`
+call, the same category of gap already named for the header-flicker and overscroll items above).
+
+**The `_viewport.includes` uncaught exception.** Found opportunistically in an earlier round of this
+same testing (chasing the density-toggle bug, below), from `slick.grid.ts`'s own
+`bindAncestorScrollEvents` — a document-level scroll listener firing with a null `_viewport`.
+`KiraSlickGrid.destroy(true)` is confirmed to run on unmount, and stock `destroy()` does call
+`_bindingEventService.unbindAll()` first, which should unbind this — so the leak's actual source
+was not found, only its symptom. Not fixed.
+
+### 14.3 Confirmed NOT a SlickGrid issue — checked, not touched
+
+Four things repeatedly flagged as "SlickGrid looks broken here" turned out, on inspection, to be
+either pre-existing and engine-agnostic or not owned by the grid engine at all:
+
+- **The status bar's selection summary never updates** ("no selection", always). Not a wiring gap
+  this migration introduced — `workbench/StatusBar.vue`'s own comment ("Not yet wired per-view;
+  'no selection' is the honest default") and `git log -S` both trace this literal line back to the
+  P16 design-system-foundation commit, long before either grid engine existed in this form. Neither
+  engine has ever fed it.
+- **Boolean cell values' display text.** Both engines read the identical decoded text through the
+  same shared `views/grid/page.ts` `cell()` function — `SlickGridHost.vue`'s own
+  `createDisplayValueExtractor` and `DataGrid.vue`'s own cell read both called it, with no per-
+  engine branch anywhere in that path. Whatever a boolean currently renders as is controlled
+  entirely upstream (the adapter/protocol layer), identical for both engines by construction, and
+  was never in this migration's own reach.
+- **The row-density toggle not updating an already-open tab's row/header height.** Reproduced
+  identically on `DataGrid.vue` before it was deleted (forced via the flag this pass's own C17
+  removed) — pre-existing, not a regression.
+- **The empty-state message not clearing when the search input is cleared directly** (as opposed to
+  the dedicated "show all rows" button, which works and is what `data-view.spec.ts` already
+  exercises). Also reproduced identically on `DataGrid.vue` before deletion — pre-existing.
+
+### 14.4 The cutover itself (C15/C17, folded into one pass)
+
+`DataView.vue`'s own engine switch (`window.__kiraGridEngine === 'slick' ? 'slick' : 'tanstack'`,
+defaulting to the incumbent) was still live when this postscript's own testing rounds started —
+stage 2 (C15, "SlickGrid is the default") had never actually landed; only `tests/ui/fixtures.ts`
+forced every UI spec to boot SlickGrid regardless of the real app's own default. Given the explicit
+instruction to finish rather than wait for another round, C15 and C17 landed together as one
+change rather than as separate commits: `DataView.vue` now mounts `SlickGridHost.vue`
+unconditionally, and `DataGrid.vue`/`GridRow.vue`/`rowVm.ts` (2 593 lines), `__kiraGridEngine`,
+`__kiraGridRowUpdates` (and `measureRowUpdatesDuringScroll`, its own test-side consumer — a
+property of Vue's own reconciliation with no SlickGrid equivalent to measure), `__kiraGridTuning`'s
+`incrementalRows`, `columns.ts`'s `rowRangeExtractor` wrapper (`rowRangeBounds`, the arithmetic
+`views/grid/slick/kiraSlickGrid.ts` also uses, stays), `slick-grid.spec.ts`'s own `forceSlickEngine`
+helper, and the two now-orphaned unit spec files (`row-sig.spec.ts`, `row-range.spec.ts`) are all
+deleted in the same pass. `@tanstack/vue-virtual` stays, per §6 — `ConsoleResultGrid.vue` is its
+only remaining consumer and was never part of this deletion. Full suite after: unchanged from
+before the deletion — 79 passed, the same 3 pre-existing `cell-editor.spec.ts` failures (bisected,
+in an earlier session, to before commit `bf000be`, unrelated to any grid work), a `bun run
+test:unit` run confirmed the 8 failing `bridge-port.spec.ts` cases are also pre-existing and
+unrelated (isolated re-run of that file alone: 8/8 pass; identical failures reproduce at the
+pre-deletion commit via `git stash`) — nothing this pass's own changes touch.
