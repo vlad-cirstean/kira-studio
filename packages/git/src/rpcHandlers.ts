@@ -37,7 +37,7 @@ import type { GitStatus, GraphChunkPayload, RepoOpenOutcome, RepoService } from 
  *  standing up a real repo (`RepoService`'s `#`-private fields make the class itself nominal). */
 export type RepoServicePort = Pick<
   RepoService,
-  "git" | "open" | "close" | "status" | "loadMore" | "streamGraph"
+  "git" | "open" | "close" | "status" | "loadMore" | "streamGraph" | "refresh"
 >;
 
 export interface RepoHandlersDeps {
@@ -144,11 +144,15 @@ export function createRepoHandlers(deps: RepoHandlersDeps): ServerHandlers {
   const graphStatusImpl: RequestHandler<"graph.status"> = async ({ repoId }) =>
     deps.service.status(repoId);
 
-  const graphLoadMoreImpl: RequestHandler<"graph.loadMore"> = async ({ repoId, pages }) => {
+  const graphLoadMoreImpl: RequestHandler<"graph.loadMore"> = async ({ repoId, pages }, ctx) => {
     if (deps.service.status(repoId).exhausted) return { started: false };
-    await deps.service.loadMore(repoId, pages);
+    await deps.service.loadMore(repoId, pages, ctx.signal);
     return { started: true };
   };
+
+  const graphRefreshImpl: RequestHandler<"graph.refresh"> = async ({ repoId }) => ({
+    restarted: deps.service.refresh(repoId),
+  });
 
   const graphStreamImpl: StreamHandler<"graph.stream"> = async (
     { repoId, resumeThroughRow },
@@ -170,6 +174,7 @@ export function createRepoHandlers(deps: RepoHandlersDeps): ServerHandlers {
       "repo.close": logged("repo.close", repoCloseImpl),
       "graph.status": logged("graph.status", graphStatusImpl),
       "graph.loadMore": logged("graph.loadMore", graphLoadMoreImpl),
+      "graph.refresh": logged("graph.refresh", graphRefreshImpl),
     },
     streams: {
       "graph.stream": logged("graph.stream", graphStreamImpl),

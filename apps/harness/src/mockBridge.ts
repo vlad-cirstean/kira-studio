@@ -193,6 +193,19 @@ function createHandlers(scenario: Scenario): ServerHandlers {
     return { started: true };
   };
 
+  // Mirrors `RepoService.refresh`'s observable effect (§6.2), simplified for a fixture-backed
+  // session with no watcher and no lazy "next stream re-walks" staging: there is nothing to
+  // re-query here (`Scenario.commits` is static), so the mock resets the store eagerly rather
+  // than through a `staleReason` latch consumed on the next stream — the client sees the same
+  // "next stream starts at `from: 0` with `source: git`" either way.
+  const graphRefresh: RequestHandler<"graph.refresh"> = async ({ repoId }) => {
+    const session = sessions.get(repoId);
+    if (!session) return { restarted: false };
+    session.store.clear();
+    session.dictionaryCursor = 0;
+    return { restarted: true };
+  };
+
   // Mirrors `RepoService.streamGraph`'s cache-then-fresh-page split (see this file's own doc
   // comment): replay whatever this session's store already holds in `CHUNK_ROWS` chunks
   // (`source: "cache"`), then — only on this repo's very first stream, exactly as the real
@@ -231,6 +244,7 @@ function createHandlers(scenario: Scenario): ServerHandlers {
       "repo.close": repoClose,
       "graph.status": graphStatus,
       "graph.loadMore": graphLoadMore,
+      "graph.refresh": graphRefresh,
     },
     streams: {
       "graph.stream": graphStream,

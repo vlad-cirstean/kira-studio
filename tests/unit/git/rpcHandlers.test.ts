@@ -73,7 +73,13 @@ class FakeRepoService implements RepoServicePort {
     exhausted: false,
   };
   readonly closedRepoIds: string[] = [];
-  readonly loadMoreCalls: Array<{ repoId: string; pages: number | undefined }> = [];
+  readonly loadMoreCalls: Array<{
+    repoId: string;
+    pages: number | undefined;
+    signal: AbortSignal | undefined;
+  }> = [];
+  readonly refreshCalls: string[] = [];
+  refreshResult = true;
   streamError: unknown;
   streamChunks: readonly StreamChunkOf<"graph.stream">[] = [];
 
@@ -93,8 +99,13 @@ class FakeRepoService implements RepoServicePort {
     return this.statusResult;
   }
 
-  async loadMore(repoId: string, pages?: number): Promise<void> {
-    this.loadMoreCalls.push({ repoId, pages });
+  async loadMore(repoId: string, pages?: number, signal?: AbortSignal): Promise<void> {
+    this.loadMoreCalls.push({ repoId, pages, signal });
+  }
+
+  refresh(repoId: string): boolean {
+    this.refreshCalls.push(repoId);
+    return this.refreshResult;
   }
 
   async streamGraph(
@@ -152,6 +163,7 @@ describe("createRepoHandlers", () => {
       "repo.close",
       "graph.status",
       "graph.loadMore",
+      "graph.refresh",
     ];
     for (const key of expectedRequests) expect(typeof handlers.requests[key]).toBe("function");
     expect(typeof handlers.streams["graph.stream"]).toBe("function");
@@ -163,7 +175,7 @@ describe("createRepoHandlers", () => {
     try {
       const result = await client.request("app.init", {});
       expect(result.host).toBe("harness");
-      expect(result.contractVersion).toBe(2);
+      expect(result.contractVersion).toBe(3);
       expect(result.settings).toEqual(defaultSettings());
       expect(result.git).toEqual({ kind: "ok", path: "/usr/bin/git", version: "2.40.0" });
     } finally {
@@ -349,7 +361,44 @@ describe("createRepoHandlers", () => {
       expect(await client.request("graph.loadMore", { repoId: "r1", pages: 2 })).toEqual({
         started: true,
       });
-      expect(service.loadMoreCalls).toEqual([{ repoId: "r1", pages: 2 }]);
+      expect(service.loadMoreCalls).toHaveLength(1);
+      expect(service.loadMoreCalls[0]?.repoId).toBe("r1");
+      expect(service.loadMoreCalls[0]?.pages).toBe(2);
+    } finally {
+      client.dispose();
+      server.dispose();
+    }
+  });
+
+  test("graph.loadMore forwards the request's own AbortSignal to RepoService.loadMore", async () => {
+    const service = new FakeRepoService({ kind: "ok", path: "git", version: "2.40.0" });
+    service.statusResult = { loaded: 3, remaining: 7, exhausted: false };
+    const { client, server } = setup(service);
+    try {
+      await client.request("graph.loadMore", { repoId: "r1" });
+      expect(service.loadMoreCalls[0]?.signal).toBeInstanceOf(AbortSignal);
+      expect(service.loadMoreCalls[0]?.signal?.aborted).toBe(false);
+    } finally {
+      client.dispose();
+      server.dispose();
+    }
+  });
+
+  test("graph.refresh calls RepoService.refresh and reports its restarted result", async () => {
+    const service = new FakeRepoService({ kind: "ok", path: "git", version: "2.40.0" });
+    const { client, server } = setup(service);
+    try {
+      service.refreshResult = true;
+      expect(await client.request("graph.refresh", { repoId: "r1" })).toEqual({
+        restarted: true,
+      });
+      expect(service.refreshCalls).toEqual(["r1"]);
+
+      service.refreshResult = false;
+      expect(await client.request("graph.refresh", { repoId: "r2" })).toEqual({
+        restarted: false,
+      });
+      expect(service.refreshCalls).toEqual(["r1", "r2"]);
     } finally {
       client.dispose();
       server.dispose();

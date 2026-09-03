@@ -119,6 +119,7 @@ function stubHandlers(
       "repo.close": notImplemented,
       "graph.status": notImplemented,
       "graph.loadMore": notImplemented,
+      "graph.refresh": notImplemented,
       ...requestOverrides,
     },
     streams: {

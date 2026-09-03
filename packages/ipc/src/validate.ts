@@ -4,7 +4,7 @@ import type { EventKey, RequestKey, StreamKey } from "./contract.ts";
  * Boundary validation. Per §3.5, a contract mismatch must fail loudly rather than
  * half-work — so this throws, it does not degrade.
  */
-export const CONTRACT_VERSION = 2;
+export const CONTRACT_VERSION = 3;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -53,6 +53,7 @@ const REQUEST_KEYS: ReadonlySet<RequestKey> = new Set([
   "repo.close",
   "graph.status",
   "graph.loadMore",
+  "graph.refresh",
 ]);
 const EVENT_KEYS: ReadonlySet<EventKey> = new Set(["repo.changed", "settings.changed"]);
 const STREAM_KEYS: ReadonlySet<StreamKey> = new Set(["graph.stream"]);

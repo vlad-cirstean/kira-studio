@@ -124,12 +124,22 @@ interface RepoSession {
   logSession: LogSession;
   readonly store: CommitStore;
   readonly watcher: RepoWatcher;
-  dictionaryCursor: number;
-  staleReason: "refsChanged" | undefined;
+  /** Boundary row -> interner size after that row (W2). A mark exists for every row a stream
+   *  has ever emitted a chunk up to — exactly the set of rows a client's `loadedRows` can equal,
+   *  since a client only ever advances by whole chunks — plus `0 -> 0` at session start. Never a
+   *  single running cursor: two streams (or one stream resuming after a reconnect) can resume
+   *  from different rows, and each row's correct dictionary base is a fixed fact about that row,
+   *  not about whichever caller last packed a chunk. */
+  dictionaryMarks: Map<number, number>;
+  staleReason: "refsChanged" | "refresh" | undefined;
   lastRemaining: number;
   nextSeq: number;
   evictTimer: ReturnType<typeof setTimeout> | undefined;
   readonly subscriptions: Disposable[];
+}
+
+function initialDictionaryMarks(): Map<number, number> {
+  return new Map([[0, 0]]);
 }
 
 export class RepoService {
@@ -216,14 +226,27 @@ export class RepoService {
     await this.#ensureFresh(session);
 
     // Clamped, not trusted verbatim: a caller-supplied `resumeThroughRow` from before a stale
-    // reset would otherwise point past the (now empty) store.
-    let cursor = Math.min(opts.resumeThroughRow ?? 0, session.store.rowCount);
+    // reset would otherwise point past the (now empty) store. The dictionary base for that row
+    // is then resolved from `dictionaryMarks`, not guessed: a row this session never emitted a
+    // chunk up to (W2's fix) has no mark, and replays from row 0 with base 0 rather than risking
+    // a receiver whose interner does not actually match `dictionaryBase`.
+    const requestedRow = Math.min(opts.resumeThroughRow ?? 0, session.store.rowCount);
+    const mark = session.dictionaryMarks.get(requestedRow);
+    let cursor = mark !== undefined ? requestedRow : 0;
+    let dictionaryBase = mark ?? 0;
     const cachedThrough = session.store.rowCount;
 
     while (cursor < cachedThrough) {
       if (opts.signal?.aborted) return;
       const to = Math.min(cursor + CHUNK_ROWS, cachedThrough);
-      await this.#emitRange(session, cursor, to, "cache", opts.onChunk);
+      dictionaryBase = await this.#emitRange(
+        session,
+        cursor,
+        to,
+        dictionaryBase,
+        "cache",
+        opts.onChunk,
+      );
       cursor = to;
     }
     if (opts.signal?.aborted) return;
@@ -239,17 +262,38 @@ export class RepoService {
     while (cursor < session.store.rowCount) {
       if (opts.signal?.aborted) return;
       const to = Math.min(cursor + CHUNK_ROWS, session.store.rowCount);
-      await this.#emitRange(session, cursor, to, "git", opts.onChunk);
+      dictionaryBase = await this.#emitRange(
+        session,
+        cursor,
+        to,
+        dictionaryBase,
+        "git",
+        opts.onChunk,
+      );
       cursor = to;
     }
   }
 
-  async loadMore(repoId: string, pages = 1): Promise<void> {
+  async loadMore(repoId: string, pages = 1, signal?: AbortSignal): Promise<void> {
     const session = this.#requireSession(repoId);
     await this.#ensureFresh(session);
     for (let i = 0; i < pages && !session.logSession.exhausted; i++) {
-      await this.#readPageIntoStore(session);
+      if (signal?.aborted) return;
+      await this.#readPageIntoStore(session, signal);
     }
+  }
+
+  /** §6.2: forces the next stream to re-walk from scratch, bypassing every cache — distinct
+   *  from the automatic invalidation a watcher's `refsChanged` performs, which is incremental.
+   *  Idempotent: marking an already-stale session stale again is a no-op past this call, since
+   *  the next `streamGraph`/`loadMore` consumes the flag exactly once regardless of which reason
+   *  set it. Returns `false` — the honest answer, not a throw — when `repoId` has no open
+   *  session. */
+  refresh(repoId: string): boolean {
+    const session = this.#sessions.get(repoId);
+    if (!session) return false;
+    session.staleReason = "refresh";
+    return true;
   }
 
   onChanged(
@@ -292,7 +336,7 @@ export class RepoService {
       logSession: this.#openLogSession(identity),
       store: new CommitStoreImpl(),
       watcher,
-      dictionaryCursor: 0,
+      dictionaryMarks: initialDictionaryMarks(),
       staleReason: undefined,
       lastRemaining: 0,
       nextSeq: 0,
@@ -339,21 +383,27 @@ export class RepoService {
 
   #resetSession(session: RepoSession): void {
     session.store.clear();
-    session.dictionaryCursor = 0;
+    session.dictionaryMarks = initialDictionaryMarks();
     session.lastRemaining = 0;
     session.logSession.dispose();
     session.logSession = this.#openLogSession(session.identity);
   }
 
-  async #readPageIntoStore(session: RepoSession): Promise<void> {
-    const outcome = await session.logSession.readPage((record) => session.store.append(record));
+  async #readPageIntoStore(session: RepoSession, signal?: AbortSignal): Promise<void> {
+    const outcome = await session.logSession.readPage(
+      (record) => session.store.append(record),
+      signal ? { signal } : {},
+    );
     if (outcome.kind === "stale") {
       // P2's spliced-page guard: refs moved while this session was paused. Reset exactly as a
       // watcher-observed refsChanged would, then retry once against the now-current refs — the
       // caller sees the resulting rows as part of the same page read, starting over at row 0.
       this.#handleSignal(session, "refsChanged");
       await this.#ensureFresh(session);
-      await session.logSession.readPage((record) => session.store.append(record));
+      await session.logSession.readPage(
+        (record) => session.store.append(record),
+        signal ? { signal } : {},
+      );
     }
     // `loadMore()` calls this without ever emitting a chunk (#emitRange is the only other
     // place `lastRemaining` gets refreshed) — status() would otherwise report a remaining
@@ -361,15 +411,21 @@ export class RepoService {
     session.lastRemaining = await session.logSession.remaining();
   }
 
+  /** Packs and emits exactly one chunk, `[from, to)`, using the caller-supplied dictionary base
+   *  for that specific row range — never a session-wide running cursor (W2's fix) — and records
+   *  the resulting size as `to`'s mark. Returns the next base, so a caller walking forward
+   *  through several ranges can thread it without a second map lookup. */
   async #emitRange(
     session: RepoSession,
     from: number,
     to: number,
+    dictionaryBase: number,
     source: "git" | "cache",
     onChunk: (chunk: GraphChunkPayload) => Promise<void>,
-  ): Promise<void> {
-    const commits = session.store.packSlice(from, to, session.dictionaryCursor);
-    session.dictionaryCursor += commits.dictionary.length;
+  ): Promise<number> {
+    const commits = session.store.packSlice(from, to, dictionaryBase);
+    const nextBase = dictionaryBase + commits.dictionary.length;
+    session.dictionaryMarks.set(to, nextBase);
     // Cached internally by `LogSession` after its first call ("run once per refresh") — this
     // does not spawn a process on every chunk, or on a cache-only replay after the first stream.
     const remaining = await session.logSession.remaining();
@@ -384,6 +440,7 @@ export class RepoService {
       exhausted: session.logSession.exhausted,
       commits,
     });
+    return nextBase;
   }
 
   #armEvictTimer(session: RepoSession): void {

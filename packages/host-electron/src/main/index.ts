@@ -89,8 +89,11 @@ function withRecentRepos(service: RepoService, recentRepos: RecentRepos): RepoSe
     status(repoId) {
       return service.status(repoId);
     },
-    async loadMore(repoId, pages) {
-      await service.loadMore(repoId, pages);
+    async loadMore(repoId, pages, signal) {
+      await service.loadMore(repoId, pages, signal);
+    },
+    refresh(repoId) {
+      return service.refresh(repoId);
     },
     async streamGraph(repoId, opts) {
       await service.streamGraph(repoId, opts);

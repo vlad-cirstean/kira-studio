@@ -151,6 +151,10 @@ export type Contract = {
       params: { repoId: string; pages?: number };
       result: { started: boolean };
     };
+    "graph.refresh": {
+      params: { repoId: string };
+      result: { restarted: boolean };
+    };
   };
   events: {
     "repo.changed": { repoId: string; kind: "refsChanged" | "worktreeChanged" };
