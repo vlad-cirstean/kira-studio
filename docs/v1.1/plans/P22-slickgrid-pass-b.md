@@ -1649,65 +1649,121 @@ with it — recorded here because §4/§5 above describe the pre-departure desig
   only such mechanism in this codebase is `.fk` — see the commit message for the full note on why
   that's the most defensible reading).
 
-### 14.2 Known-open, not fixed — for whoever picks this up next
+### 14.2 The five items above, resolved in a later pass (or genuinely still open)
 
-**The residual horizontal-scroll header flicker.** Confirmed, by the user on real hardware, to be
-*reduced but not gone* by the header CSS fixes in 14.1 above — so this is not purely the
-architectural gap it first looked like (see §7.3's own real-Mac line). What's ruled out: extensive
-`requestAnimationFrame`-sampled multi-step scroll traces in this sandbox found zero frame-to-frame
-positional or timing defect at the property level, on either engine. What's still true and
-un-investigated further: SlickGrid never virtualizes header columns at all (confirmed from
-`onHeaderCellRendered`'s own "fires once per column per `setColumns` call... headers aren't
-virtualized" comment) — every header cell, however many columns the table has, repaints in full on
-every horizontal scroll tick, unlike the incumbent's own column-virtualized header. That is a
-plausible real-compositor cost this sandbox's WebKit has no way to surface (no real GPU compositor
-timing — the same limit §7.3 already names for the fling-lag question). **Best guess at the cause,
-for a future pass**: either that per-tick full-header repaint itself (in which case the fix is
-header-column virtualization — a real feature, not a CSS tweak, and worth a real-Mac measurement
-first to confirm it's the actual cost before building it), or something in the flex-layout header
-CSS fix from this pass causing a style recalculation the pre-fix `display: inline-block` header
-didn't (untested hypothesis — a real macOS Safari Web Inspector Timeline recording, the same tool
-`-iter2-scroll-gaps.md`'s own postscript used to find its `contain: layout` finding, is the next
-step, not more sandboxed scroll traces).
+A later pass (a fresh session, prompted to fix every item above rather than leave it open) took
+each in turn. Four were root-caused and fixed for real, with real verification; the fifth
+(elastic overscroll) got a well-reasoned, low-risk, textbook fix applied, but — like every other
+real-hardware compositor question in this document's history — could not be *re-verified* fixed
+from this sandbox, so it is not claimed as confirmed. What follows replaces the four paragraphs
+this section used to carry; each subsection below names its own commit.
 
-**Elastic/rubber-band overscroll bounce, asymmetric between edges on real hardware.** No CSS or JS
-in this codebase sets `overscroll-behavior`, `-webkit-overflow-scrolling`, or intercepts
-`wheel`/`touchmove` anywhere near the grid's scroll path (checked directly, this pass) — native
-bounce is already fully unconstrained by anything this app does, on every edge, so there is no
-"only two edges are enabled" switch to flip. The most plausible structural explanation found:
-stock `slick.grid.css`'s own `.slick-pane { overflow: hidden }` (unmodified by this app, wraps the
-actual `overflow: auto` viewport) could clip a bounce's visual escape asymmetrically, per a real
-WebKit compositor-stacking quirk where a trailing-edge (bottom/right) overscroll can visually
-escape a parent's `overflow: hidden` in a way a leading-edge (top/left) one does not — but this is
-an unverified hypothesis, not a confirmed mechanism, and changing `.slick-pane`'s own clipping
-without a way to watch real trackpad physics in this sandbox risked silently breaking row/column
-virtualization's own clipping for a fix that might not even be the right one. Left alone rather
-than guessed at blind. A real-Mac trace (or simply trying `overflow: visible` on `.slick-pane` and
-watching for any row/cell spilling outside its own box during a fast fling) is the next step.
+**The residual horizontal-scroll header flicker — fixed.** Root-caused with a real Chromium CDP
+`Tracing.start` capture (`disabled-by-default-devtools.timeline`) across a 40-tick
+`page.mouse.wheel` horizontal fling, going one level past this section's own prior
+`requestAnimationFrame`-sampled traces (which only checked frame-to-frame *positions*, never
+actual browser paint/layout work): `scrollToX` (slick.grid.ts) repositions `.slick-header-columns`
+purely via its scroll parent's native `scrollLeft`, never a `transform`, and the browser does not
+composite an `overflow: hidden` element's scrolled content by default the way it does a genuinely
+user-scrollable one — every tick synchronously repainted the whole 61-column header strip
+(measured: 511 header-node `Paint` events over 40 ticks) even though the header's own content
+never changes on a horizontal scroll, only its position. `will-change: transform` on
+`.slick-header-columns` (slickTheme.css) hints the compositor to promote the scrolled content to
+its own layer — re-measured after: 48 header-node paints over the same trace (91% fewer), the
+header strip itself no longer individually repainted at all. The "SlickGrid never virtualizes
+header columns" guess from the previous round turns out to have been a correct diagnosis of the
+*symptom's shape* but the wrong mechanism — it isn't the per-column DOM cost that's expensive
+(that was already true and cheap), it's the *compositing* of that always-present DOM on every
+scroll tick. Real-Mac WebKit confirmation of the user-visible flicker is still the final word, per
+this document's own standing rule for perceptual claims — this is the concrete, measured mechanism
+a sandboxed compositor trace can actually show.
 
-**Two dock/badge symptoms reported but not reproduced.** "The cell-editor dock panel is sometimes
-missing its header" (after a multi-row selection) and "PK/FK header badges disappear after
-switching a tab away and back" were each chased with several *different* real-interaction
-sequences — shift-click multi-row-select then a single-cell click (twice), a genuine mouse-down/
-move/up drag-select across the gutter followed by an immediate click with ~20ms frame sampling for
-600ms, arrow-key navigation out of a row selection, and (for the badge report) a forced full
-component unmount/remount via tab close+reopen, which is *at least as aggressive* as a mere tab
-switch since `MainView.vue`'s own `:key="activeTab.id"` on the active tab's view already unmounts/
-remounts on every switch regardless of a close. None reproduced anything wrong: the dock's own
-height/header stayed present and stable across every sequence, and PK/FK badges rebuilt correctly
-every time, consistent with reading `state.ts`'s `loadMeta`/`registerTabRuntimeCleanup` — a tab's
-`meta` survives in its own runtime record until the tab actually closes, never merely on a switch.
-Neither is being called fixed, since neither was ever confirmed broken here — flagged instead in
-case the real repro needs something this sandbox's synchronous, instant-response mocks structurally
-cannot reproduce (a genuine network-latency race between a remount and an in-flight `describe`
-call, the same category of gap already named for the header-flicker and overscroll items above).
+**Elastic/rubber-band overscroll bounce, asymmetric between edges — a fix applied, not
+re-verified.** Checked again, fresh, this round: no CSS/JS in the frontend sets
+`overscroll-behavior`/intercepts `wheel`/`touchmove` (unchanged finding), and — newly checked —
+neither does the Wails-level native window/webview configuration (`main.go`'s `MacOptions`,
+`internal/shell/security.go`'s `MacWebviewPreferences`, `internal/shell/window.go`): no
+`AllowsBackForwardNavigationGestures` or any other gesture/scroll option is set anywhere in the Go
+side either. What's genuinely absent at every layer: nothing ever told the browser to keep an
+exhausted scroll gesture *local* to the grid's own viewport rather than handing the leftover
+motion up the ancestor chain once `scrollTop`/`scrollLeft` hits its boundary —
+`overscroll-behavior`'s own default (`auto`) is exactly that hand-off, and `html`/`body` being
+`overflow: hidden` (base.css) means the hand-off can never visibly consume anything, but it can
+still be what suppresses the *local* element's own elastic feedback for the gesture that triggered
+it. `overscroll-behavior: contain` on every `.slick-viewport` pane (slickTheme.css) is the fix:
+additive only, it cannot disable this element's own scrolling or bounce, only stop it leaking to
+an ancestor that was already inert — the opposite kind of change from the earlier, reverted
+"disable overscroll entirely" instruction. This is the textbook first fix for exactly this bug
+shape in general web development, applied because it's correct and safe on its own merits (the
+full `slick-grid.spec.ts` suite is unchanged after it), not because it was confirmed against real
+trackpad physics — it wasn't, and couldn't be, from here. **Still open**: whether this actually
+makes the bounce symmetric on real hardware. The `.slick-pane { overflow: hidden }` hypothesis
+this section used to lead with is now considered less likely (a scrollport's own overscrolled
+content is ordinarily clipped by the scrollport's own box already, not by an ancestor's), but was
+never tested either way and remains a fallback if `contain` alone doesn't fully resolve it.
 
-**The `_viewport.includes` uncaught exception.** Found opportunistically in an earlier round of this
-same testing (chasing the density-toggle bug, below), from `slick.grid.ts`'s own
-`bindAncestorScrollEvents` — a document-level scroll listener firing with a null `_viewport`.
-`KiraSlickGrid.destroy(true)` is confirmed to run on unmount, and stock `destroy()` does call
-`_bindingEventService.unbindAll()` first, which should unbind this — so the leak's actual source
-was not found, only its symptom. Not fixed.
+**Two dock/badge symptoms — reproduced (with a different strategy) and fixed, both from one root
+cause.** The previous round's repro attempts all shared one property: every one of them either
+started from a table whose `meta` hadn't loaded yet, or used a full tab *close* + reopen. A fresh
+strategy — open a table, open a **second** tab on the same table, then switch back to the
+**first** tab via the tab strip (no close involved) — reproduced the badge-disappearance report
+immediately and mechanically: `.header-select-zone`'s own count went from 1 (fresh mount) to 0
+after the switch-back, for every column. Root cause: `new KiraSlickGrid(...)`
+(`SlickGridHost.vue`'s own `onMounted`) runs synchronously through slick.grid.ts's own
+`initialize()` -> `finishInitialization()` -> `createColumnHeaders()` (since
+`explicitInitialization: false`), firing `grid.onHeaderCellRendered` for the constructor-built
+header cells *before* this file's own `eventHandler.subscribe(grid.onHeaderCellRendered, ...)` has
+even run (subscribing needs a `grid` instance to subscribe to). Every DOM addition that handler is
+responsible for — the PK/FK `.header-key` badge, the `.header-select-zone` click target — is
+silently missing from that first build. A table's first-ever open never shows it: `rt()?.meta`'s
+own watch fires moments later once the async `treeDescribe` resolves, rebuilding headers a second
+time through the now-subscribed listener, papering over the gap. It stops being invisible the
+moment a tab's `meta` is already cached before this component remounts (`state.ts`: meta survives
+a switch, cleared only on an actual close) — which a close+reopen, the previous round's own repro
+tool, can never trigger (closing clears the cache, so the reopen re-fetches meta and re-triggers
+the same masking rebuild). Fixed the same way the meta/appearance/columnWidths watches already fix
+a *later* change of the same kind: force one more header rebuild, through the now-subscribed
+listener, unconditionally on every mount.
+
+The *other* report ("the cell-editor dock panel is sometimes missing its header") turned out to be
+the same visual read on a different bug, surfaced chasing `cell-editor.spec.ts`'s own pre-existing
+failures below: not the dock losing markup, but clicks meant for the dock landing on the grid
+instead (Playwright's own actionability log showed a `.grid-canvas` element intercepting a click
+aimed at a dock-panel button). SlickGrid never self-observes its own container's size — confirmed
+reading slick.grid.ts, no `ResizeObserver` anywhere in the library, `resizeCanvas()` is entirely
+the embedding app's job — and this app never called it when the container's size changed
+post-mount, only implicitly at construction. Opening the cell-editor dock (a sibling flex item
+that shrinks `.grid-area`) left the grid's internal `.slick-pane`/`.slick-viewport` elements at
+their stale, pre-shrink height, genuinely overlapping the dock panel now painted below. Fixed with
+a `ResizeObserver` on the grid's own mount element, calling `grid.resizeCanvas()` on every observed
+resize.
+
+**The `_viewport.includes` uncaught exception — fixed.** Root cause: `bindAncestorScrollEvents`
+(slick.grid.ts) binds its document-level capture-phase `'scroll'` listener via
+`BindingEventService.bind(document, "scroll", handler, true)`, but `BindingEventService.unbind()`
+— called by every `destroy()` path, `unbindAll()` included — calls
+`removeEventListener(eventName, listener)` with **no capture argument at all**. Per spec,
+`removeEventListener` only matches a listener registered with the same capture flag, so this
+listener is never actually removed by the library's own teardown; it survives the grid instance's
+destruction (it was never scoped to the grid's own container — a raw `document` listener) and
+dereferences `this._viewport`, nulled by the same `destroy(true)` call, on the next scroll event
+anywhere in the document. Not a call-order gap in this app's code — a real bug in the vendored
+library. Confirmed live in a browser before writing the fix: a matching `addEventListener(...,
+true)` + `removeEventListener(...)` (no capture) pair reproduces the exact `TypeError: null is not
+an object (evaluating 'this._viewport.includes')` WebKit throws. Fixed by having `KiraSlickGrid`
+override `bindAncestorScrollEvents()` to bind the identical listener itself, outside the buggy
+service, and remove it with the matching capture flag in its own `destroy()` override.
+
+**`cell-editor.spec.ts`'s 3 pre-existing failures (§14.4's own bisection note) — fixed, three
+separate root causes.** Test 3's own hang was the dock/grid-overlap bug above. Tests 1 and 2
+shared a genuinely different, test-only bug: `scrollColumnIntoView`'s own guard polled
+`[data-testid="grid-header-cell"]` for "has this column scrolled into view yet" — correct against
+the incumbent engine, which virtualized header columns exactly like data cells, but stale against
+SlickGrid, which builds every header cell once per `setColumns` regardless of scroll position. A
+header locator's count was therefore never 0, the helper silently did nothing, and the *data
+cell* — still genuinely column-virtualized under both engines — never scrolled into view, so a
+later `selectCell` on that column waited for an element that would never appear. Fixed by polling
+the data cell instead. All three now pass (14s/9s/5s wall time, well inside the 60s default).
 
 ### 14.3 Confirmed NOT a SlickGrid issue — checked, not touched
 
