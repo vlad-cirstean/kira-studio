@@ -12,6 +12,7 @@ declare global {
     __kiraHarness: {
       setTheme(kind: (typeof THEME_KINDS)[number]): void;
       readTokens(): Record<string, string>;
+      checkLayoutWorker(): Promise<boolean>;
     };
   }
 }

@@ -104,6 +104,11 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     `style-src ${webview.cspSource} 'unsafe-inline'`,
     `font-src ${webview.cspSource}`,
     `script-src 'nonce-${csNonce}'`,
+    // P4 W4: the layout module worker (`packages/ui/src/graph/layoutClient.ts`) is constructed
+    // via `new Worker(new URL(...), { type: "module" })`; Vite's built module-worker bundling
+    // for that form loads through a `blob:` URL in a webview, not the extension's own origin, so
+    // both sources are needed. V1 confirms this holds on a real webview.
+    `worker-src ${webview.cspSource} blob:`,
   ].join("; ");
 
   return `<!doctype html>
