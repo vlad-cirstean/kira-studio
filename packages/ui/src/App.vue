@@ -6,7 +6,12 @@ import { ACTION_ICONS } from "./icons/index.ts";
 import { GraphViewState } from "./state/graphView.ts";
 import { RepoState } from "./state/repo.ts";
 import { SettingsState } from "./state/settings.ts";
-import type { ViewStateStore } from "./state/viewState.ts";
+import {
+  DEFAULT_COLUMN_WIDTHS,
+  DEFAULT_DETAIL_WIDTH,
+  type PersistedViewState,
+  type ViewStateStore,
+} from "./state/viewState.ts";
 
 const props = defineProps<{
   transport: Transport;
@@ -80,6 +85,22 @@ onMounted(() => {
   void bootstrap();
 });
 
+// W6-W11 own scrollRow/selectedSha/columnWidths/dateFormat/detailWidth (grid, selection and
+// column UI that does not exist yet); this shell only ever reads/writes repoId/loadedRows/
+// detailOpen, so every write merges onto whatever was last read/written rather than
+// clobbering the other fields back to their defaults.
+let lastPersisted: PersistedViewState = {
+  version: 2,
+  repoId: null,
+  loadedRows: 0,
+  detailOpen: true,
+  scrollRow: 0,
+  selectedSha: null,
+  columnWidths: DEFAULT_COLUMN_WIDTHS,
+  dateFormat: "relative",
+  detailWidth: DEFAULT_DETAIL_WIDTH,
+};
+
 async function bootstrap(): Promise<void> {
   const init = await bridge.init();
   settingsState.value = new SettingsState(bridge, init.settings);
@@ -88,6 +109,7 @@ async function bootstrap(): Promise<void> {
 
   const persisted = props.viewState.read();
   if (persisted) {
+    lastPersisted = persisted;
     detailOpen.value = persisted.detailOpen;
     if (persisted.repoId) {
       const outcome = await repo.open(persisted.repoId);
@@ -101,12 +123,8 @@ async function bootstrap(): Promise<void> {
   watch(
     [() => repoState.value?.activeRepo.value?.repoId ?? null, graphView.loadedRows, detailOpen],
     ([repoId, loadedRows, isDetailOpen]) => {
-      props.viewState.write({
-        version: 1,
-        repoId,
-        loadedRows,
-        detailOpen: isDetailOpen,
-      });
+      lastPersisted = { ...lastPersisted, repoId, loadedRows, detailOpen: isDetailOpen };
+      props.viewState.write(lastPersisted);
     },
   );
 }

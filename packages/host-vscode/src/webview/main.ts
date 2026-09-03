@@ -12,7 +12,13 @@
 import type { MessageChannelLike } from "@kira-version/ipc";
 import { createRpcClient } from "@kira-version/ipc";
 import type { ViewStateStore } from "@kira-version/ui";
-import { mount, type PersistedViewState, parsePersistedViewState } from "@kira-version/ui";
+import {
+  DEFAULT_COLUMN_WIDTHS,
+  DEFAULT_DETAIL_WIDTH,
+  mount,
+  type PersistedViewState,
+  parsePersistedViewState,
+} from "@kira-version/ui";
 
 declare function acquireVsCodeApi<T = unknown>(): {
   getState(): T | undefined;
@@ -80,7 +86,17 @@ const viewState = new VsCodeApiViewStateStore(vscodeApi);
 // destroyed and recreated on every hide/reveal, §2.1) must never re-seed over real persisted
 // state — that would defeat the rehydration this same state exists to prove.
 if (bootstrap.repo && !viewState.read()) {
-  viewState.write({ version: 1, repoId: bootstrap.repo, loadedRows: 0, detailOpen: true });
+  viewState.write({
+    version: 2,
+    repoId: bootstrap.repo,
+    loadedRows: 0,
+    detailOpen: true,
+    scrollRow: 0,
+    selectedSha: null,
+    columnWidths: DEFAULT_COLUMN_WIDTHS,
+    dateFormat: "relative",
+    detailWidth: DEFAULT_DETAIL_WIDTH,
+  });
 }
 
 mount(container, {

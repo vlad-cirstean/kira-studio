@@ -23,7 +23,12 @@
  */
 import type { MessageChannelLike, SettingsSnapshot } from "@kira-version/ipc";
 import { createRpcClient } from "@kira-version/ipc";
-import { InMemoryViewStateStore, mount } from "@kira-version/ui";
+import {
+  DEFAULT_COLUMN_WIDTHS,
+  DEFAULT_DETAIL_WIDTH,
+  InMemoryViewStateStore,
+  mount,
+} from "@kira-version/ui";
 
 interface KiraBridge {
   onPort(cb: () => void): void;
@@ -132,7 +137,17 @@ window.kiraBridge.onPort(async () => {
   // other way.
   const initialRepoPath = new URLSearchParams(location.search).get("repo");
   if (initialRepoPath) {
-    viewState.setRaw({ version: 1, repoId: initialRepoPath, loadedRows: 0, detailOpen: true });
+    viewState.setRaw({
+      version: 2,
+      repoId: initialRepoPath,
+      loadedRows: 0,
+      detailOpen: true,
+      scrollRow: 0,
+      selectedSha: null,
+      columnWidths: DEFAULT_COLUMN_WIDTHS,
+      dateFormat: "relative",
+      detailWidth: DEFAULT_DETAIL_WIDTH,
+    });
   }
 
   mount(container, { transport, viewState, host: "electron" });

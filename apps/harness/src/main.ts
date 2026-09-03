@@ -1,6 +1,8 @@
 import { CommitStore, layoutAppend } from "@kira-version/core";
 import {
   createLayoutClient,
+  DEFAULT_COLUMN_WIDTHS,
+  DEFAULT_DETAIL_WIDTH,
   InMemoryViewStateStore,
   mount,
   type TokenMap,
@@ -134,6 +136,16 @@ try {
   // property access by design — leave repoId null and let bootstrap() run without opening a
   // repo, rather than crash the page before the shell itself has a chance to render.
 }
-viewState.setRaw({ version: 1, repoId, loadedRows: 0, detailOpen: true });
+viewState.setRaw({
+  version: 2,
+  repoId,
+  loadedRows: 0,
+  detailOpen: true,
+  scrollRow: 0,
+  selectedSha: null,
+  columnWidths: DEFAULT_COLUMN_WIDTHS,
+  dateFormat: "relative",
+  detailWidth: DEFAULT_DETAIL_WIDTH,
+});
 
 mount(container, { transport, viewState, host: "harness" });
