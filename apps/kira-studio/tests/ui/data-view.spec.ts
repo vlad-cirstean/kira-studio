@@ -1526,7 +1526,13 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   });
   let lastMatchRow = -1;
   for (let i = 0; i < 3; i++) {
-    const row = Number(await page.locator('.search-match-current').getAttribute('data-row'));
+    // P22 Pass B — `data-row` lives on the row (`.slick-row`, D10), not the cell:
+    // `.search-match-current` (kira-search-current, C12) is a `setCellCssStyles` class on the
+    // `.slick-cell` itself, so the row number comes from its own closest row ancestor.
+    const row = await page.locator('.search-match-current').evaluate((el) => {
+      const rowEl = el.closest('[data-testid="grid-row"]');
+      return Number(rowEl?.getAttribute('data-row') ?? Number.NaN);
+    });
     expect(row).toBeGreaterThan(lastMatchRow);
     lastMatchRow = row;
     await page.click('[data-testid="search-next"]');

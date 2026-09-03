@@ -27,6 +27,8 @@ import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { type CellClassFlags, cellClass } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
   alignmentFor,
@@ -37,6 +39,7 @@ import {
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
+import { setSearchFiltering } from '../shared/page/searchFilter';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import {
   columnsToTsv,
@@ -226,6 +229,31 @@ function canDeleteRows(): boolean {
 const canEditTableReactive = computed(() => {
   void pageVersion.n;
   return canEditTable();
+});
+
+// C13/§5 D13 — the two empty states, overlaid as absolutely-positioned siblings over the always-
+// mounted grid root (template, below) rather than swapping it out: this host's own root div IS
+// what SlickGrid holds references to, and `v-if`-ing it away would unmount the element mid-life.
+// Reactive `computed`s are fine here, unlike `currentDisplayRows()`'s own deliberately-plain twin
+// above — the template is outside SlickGrid's synchronous render path entirely (D0 is about that
+// path specifically), the same reasoning the row-coloring class binding already relies on.
+// `pageVersion.n` is read explicitly for the identical reason `canEditTableReactive` reads it,
+// just above: `getPage()` itself is not reactive (`page/store.ts`'s own plain `Map`).
+const showNoRows = computed(() => {
+  void pageVersion.n;
+  const p = getPage(props.tabId);
+  return !!p && p.rowCount === 0;
+});
+// P24 D8: filtering to zero matches is a distinct empty state from "the table is empty" (LAW 15
+// names both by name) — but a pending insert row is work in progress, not a search result, so its
+// presence keeps the grid itself on screen even with zero real matches (DataGrid.vue's own
+// identical guard, ported verbatim).
+const showNoMatchingRows = computed(() => {
+  void pageVersion.n;
+  const p = getPage(props.tabId);
+  if (!p) return false;
+  const rows = matchedRows(props.tabId);
+  return rows !== null && rows.length === 0 && (pendingFor(props.tabId)?.inserts.length ?? 0) === 0;
 });
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
@@ -1984,13 +2012,37 @@ defineExpose({
 </script>
 
 <template>
-  <!-- §6 D6 point 1: the P9 rowColoring setting is one class toggle on the host root — Vue's own
-       reactivity on this binding (not a watch) is what keeps it live, since settingsState is a
-       reactive object and this is the template's own ordinary :class binding. -->
+  <!-- C13/§5 D13 — the outer div is now the empty-states' own positioning context
+       (`.no-rows { position: absolute; inset: 0 }`, slickTheme.css) and `data-testid="data-grid"`'s
+       new home; `rootRef` moves to the inner `.slick-grid-mount`, the one div SlickGrid itself ever
+       touches, so an empty state overlaying it can never be wiped out by SlickGrid's own DOM writes
+       the way a *child* of `rootRef` would be. §6 D6 point 1: the P9 rowColoring setting is one
+       class toggle on the host root — Vue's own reactivity on this binding (not a watch) is what
+       keeps it live, since settingsState is a reactive object and this is the template's own
+       ordinary :class binding. -->
   <div
-    ref="rootRef"
     class="slick-grid-host"
     data-testid="data-grid"
     :class="{ 'kira-grid--row-coloring': settingsState.appearance.rowColoring }"
-  ></div>
+  >
+    <div ref="rootRef" class="slick-grid-mount"></div>
+    <EmptyState
+      v-if="showNoRows"
+      class="no-rows"
+      icon="table"
+      label="No rows"
+      data-testid="grid-no-rows"
+    />
+    <EmptyState
+      v-else-if="showNoMatchingRows"
+      class="no-rows"
+      icon="search"
+      label="No matching rows"
+      data-testid="grid-no-matching-rows"
+    >
+      <AppButton data-testid="grid-show-all-rows" @click="setSearchFiltering(props.tabId, false)">
+        Show all rows
+      </AppButton>
+    </EmptyState>
+  </div>
 </template>

@@ -17,6 +17,24 @@
   color: var(--kira-fg);
 }
 
+/* C13/§5 D13 — the div SlickGrid itself is constructed against (`rootRef`, SlickGridHost.vue);
+   `.slick-grid-host` above stays the outer positioning context (unchanged size/position) so an
+   empty-state overlay's own `.no-rows { position: absolute; inset: 0 }` still covers exactly the
+   same box it did before this div existed. */
+.slick-grid-mount {
+  height: 100%;
+  width: 100%;
+}
+
+/* C13/§5 D13 — DataGrid.vue's own `.no-rows` rule, ported verbatim: the two empty states overlay
+   the always-mounted grid root as absolutely-positioned siblings rather than replacing it (this
+   host's own root div is what SlickGrid holds references to — `v-if`-ing it away would unmount
+   the element mid-life). */
+.no-rows {
+  position: absolute;
+  inset: 0;
+}
+
 /* slick.grid.css's own header/row/cell borders and backgrounds, retokenised. */
 .slick-grid-host .slick-header,
 .slick-grid-host .slick-headerrow {
