@@ -42,11 +42,42 @@
   border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
 }
 
-.slick-grid-host .slick-header-column {
+/* P22 Pass B, visual-parity fix — GridRow.vue's own header cell (`.header-cell`, DataGrid.vue) is a
+   flex row so a long column name can ellipsis on its own (`.header-label`'s own overflow/
+   text-overflow) while `PK`/`FK` (`.header-key`'s own `flex-shrink: 0`) always stays fully
+   visible. `.slick-header-column` never got the matching `display: flex` — with no flex context,
+   `flex-shrink: 0` on `.header-key`/`.slick-sort-indicator*` was inert, and slick.grid.css's own
+   `overflow: hidden` on the cell fell back to clipping whatever didn't fit at the cell's raw pixel
+   edge, mid-glyph — a `narrow column + PK/FK badge` cut a "P"/"F" down to what read on screen as a
+   stray dot. `color`/`font-size` also now match `.header-cell`'s own base (`--kira-fg-muted`/
+   `--kira-t-sm`) rather than the body cell's; `.slick-column-name` below carries the incumbent's
+   `.header-label`'s own full-`--kira-fg` override, its own ellipsis, and the `min-width: 0` a flex
+   item needs before `overflow: hidden` can shrink it below its content's natural width at all.
+   The extra `.ui-state-default` on the selector isn't decorative: stock slick.grid.css's own
+   `.slick-header-column.ui-state-default{display:inline-block;...}` is the same two-class
+   specificity as a bare `.slick-grid-host .slick-header-column` would be, and — cascade order,
+   not specificity, breaking the tie — slick.grid.css is `@import`ed *after* this file
+   (SlickGridHost.vue's own import order), so a same-specificity override here loses silently.
+   Every element below actually carries `ui-state-default` (`onHeaderCellRendered`'s own class
+   list, confirmed by reading the rendered DOM), so this is a real, always-present selector, not a
+   speculative escape hatch. */
+.slick-grid-host .slick-header-column.ui-state-default {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-4);
   background: var(--kira-bg-elevated);
-  color: var(--kira-fg);
+  color: var(--kira-fg-muted);
   border-right: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-md);
+  font-size: var(--kira-t-sm);
+}
+
+.slick-grid-host .slick-column-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kira-fg);
 }
 
 .slick-grid-host .slick-row {
@@ -125,6 +156,12 @@
 }
 
 .slick-grid-host .kira-gutter {
+  /* GridRow.vue's own `.gutter-cell` sets only `padding-right` (flush against the row's own left
+     edge) — `.slick-cell`'s own shared `padding: 0 var(--kira-s-4)` above gives every cell left
+     padding too, gutter included, invisible today only because a 1-2 digit right-aligned number
+     never gets close to that edge. Zeroed here for the same reason every other property in this
+     rule exists: matching the incumbent's box model, not just its paint. */
+  padding-left: 0;
   background: var(--kira-bg-elevated);
   color: var(--kira-fg-disabled);
   font-size: var(--kira-t-xs);
@@ -352,17 +389,32 @@
 /* F8: two divs when sortColNumberInSeparateSpan is on — `.slick-sort-indicator` (the chevron,
    codicon-arrow-up/-down at --kira-accent, CodiconIcon.vue's own glyph reproduced as a
    font-family + content pseudo-element rather than an <i> node) and `.slick-sort-indicator-
-   numbered` (DataGrid.vue's own `.sort-order` badge). */
+   numbered` (DataGrid.vue's own `.sort-order` badge).
+   Unlike the incumbent's own `.sort-indicator`/`.sort-order` (`v-if`, so an inactive column's
+   header carries neither at all), SlickGrid always builds both divs, for every column, whether or
+   not it's sorted — only their *content* (an `::before` glyph, a text node) is conditional. Zero
+   width/margin at rest, growing only under the `-asc`/`-desc` modifier or when the numbered badge
+   is non-empty, is what keeps an inactive sort indicator from permanently eating flex-row space a
+   narrow column's header (`.slick-header-column`'s own comment) doesn't have to spare — confirmed
+   the hard way: at rest they otherwise silently starved `.slick-column-name` down to 0 width on
+   `order_items`' own `id` column (64px, PK badge, real capture) before this fix. */
 .slick-grid-host .slick-sort-indicator {
-  width: 13px;
+  flex-shrink: 0;
+  width: 0;
   height: 13px;
-  margin: 0 0 0 var(--kira-s-2);
+  margin: 0;
   border: none;
   background: none;
   font-family: "codicon", monospace;
   font-size: 13px;
   line-height: 1;
   color: var(--kira-accent);
+  overflow: hidden;
+}
+.slick-grid-host .slick-sort-indicator-asc,
+.slick-grid-host .slick-sort-indicator-desc {
+  width: 13px;
+  margin: 0 0 0 var(--kira-s-2);
 }
 .slick-grid-host .slick-sort-indicator-asc::before {
   content: "\eaa1";
@@ -371,10 +423,12 @@
   content: "\ea9a";
 }
 .slick-grid-host .slick-sort-indicator-numbered {
-  margin: 0 0 0 2px;
-  min-width: 12px;
+  flex-shrink: 0;
+  margin: 0;
+  width: 0;
+  min-width: 0;
   height: 12px;
-  padding: 0 2px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -386,6 +440,16 @@
   font-weight: 400;
   font-size: var(--kira-t-xs);
   line-height: 1;
+}
+/* SlickGrid never removes this div, but does leave it text-empty until a multi-column sort
+   actually assigns it a number (`sortColNumberInSeparateSpan`) — `:empty` is what tells "no badge
+   right now" apart from "badge showing 1", the same distinction the `-asc`/`-desc` classes make
+   for the chevron above. */
+.slick-grid-host .slick-sort-indicator-numbered:not(:empty) {
+  margin: 0 0 0 2px;
+  width: auto;
+  min-width: 12px;
+  padding: 0 2px;
 }
 
 /* F9 — the app's own 4px handle, DataGrid.vue's own `.resize-handle` retokenised (the shipped
