@@ -67,6 +67,24 @@ type KiraColumn = Column<any>;
 
 const GUTTER_FIELD = '__kira_gutter';
 
+// P30 §3 follow-up fix — a console result comes from ad-hoc SQL (a JOIN where both tables have an
+// `id` column, `SELECT 1 AS x, 2 AS x`, ...), so `page.columns[i].name` is routinely NOT unique.
+// Every SlickGrid column needs a unique `id`/`field` regardless — addressing columns by an
+// index-derived field (rather than by `col.name`, as the tabular branch this migrated off of never
+// did: it addressed cells by column INDEX) keeps duplicate-named columns distinct throughout;
+// `col.name` is used only for the header's own display text/tooltip below.
+function colField(index: number): string {
+  return `col_${index}`;
+}
+
+// The inverse of colField — parses the page-column index back out of a SlickGrid field/column id.
+// Returns -1 for the gutter or anything else that isn't one of this file's own data-column fields.
+function colIndexFromField(field: string): number {
+  if (!field.startsWith('col_')) return -1;
+  const idx = Number(field.slice(4));
+  return Number.isInteger(idx) && idx >= 0 ? idx : -1;
+}
+
 function gutterFormatter(
   _row: number,
   _cell: number,
@@ -139,8 +157,8 @@ function buildColumns(page: TabularPage): KiraColumn[] {
     if (alignmentFor(col) === 'right') classes.push('kira-align-right');
     const tooltip = columnHeaderTooltip(col, col.dataType);
     cols.push({
-      id: col.name,
-      field: col.name,
+      id: colField(i),
+      field: colField(i),
       name: col.name,
       width: measured[col.name] ?? DEFAULT_COLUMN_WIDTH,
       minWidth: 40,
@@ -175,7 +193,6 @@ let dataSource: ReturnType<typeof createGridDataSource> | null = null;
 let viewportEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let page: TabularPage | null = null;
-let fieldToCol = new Map<string, number>();
 
 // Mirrors SlickGridHost.vue's own onScroll velocity sampler verbatim (`:528-603`) — plain
 // variables, not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only
@@ -273,8 +290,8 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   if (!grid || !dataSource || !page || args.cell === 0) return; // the gutter selects nothing
   const field = fieldAtCol(args.cell);
   if (!field) return;
-  const pageCol = fieldToCol.get(field);
-  if (pageCol === undefined) return;
+  const pageCol = colIndexFromField(field);
+  if (pageCol < 0) return;
   const column = page.columns[pageCol];
   if (!column) return;
   const handle = dataSource.getItem(args.row);
@@ -303,7 +320,7 @@ function dataSourceState(): GridDataSourceState {
   return {
     index: { displayRows: matchedRows(props.tabId), pageRowCount: page?.rowCount ?? 0 },
     inserts: [],
-    extractValue: (item, field) => cell(props.pageKey, item.row, fieldToCol.get(field) ?? -1),
+    extractValue: (item, field) => cell(props.pageKey, item.row, colIndexFromField(field)),
   };
 }
 
@@ -328,7 +345,7 @@ function refreshSearchLayer(): void {
   const [matchHash, currentHash] = searchCellLayers(
     entry?.matches ?? [],
     entry?.index ?? -1,
-    (col) => page?.columns[col]?.name,
+    (col) => (page && col >= 0 && col < page.columns.length ? colField(col) : undefined),
     () => true,
     (row) => displayPositionOf(idx, row),
     classesFrom({ searchMatch: true })[0] ?? 'search-match',
@@ -363,7 +380,6 @@ onMounted(() => {
   // `page.kind === 'tabular'` gate) — this narrows the type, it never fires in practice.
   if (p?.kind !== 'tabular') return;
   page = p;
-  fieldToCol = new Map(p.columns.map((c, i) => [c.name, i]));
 
   dataSource = createGridDataSource(dataSourceState());
 

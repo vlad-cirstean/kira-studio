@@ -510,3 +510,94 @@ test('Query console — result-tab right-click: close, close others, close to th
   await page.click('[data-testid="menu-item-close"]');
   await expect(page.locator('[data-testid="console-results"]')).toHaveCount(0);
 });
+
+// Regression test — duplicate column names in an ad-hoc result (routine for a JOIN where both
+// sides have an `id` column, or `SELECT 1 AS x, 2 AS x`). ConsoleSlickGrid.vue used to address
+// cells with a `Map<string, number>` keyed by `column.name`, which collapses duplicate names onto
+// the LAST matching index — every "dup" cell would have rendered/selected column 1's value, never
+// column 0's. Fixed by addressing SlickGrid columns by an index-derived field instead of by name.
+function dupColumnPage(values: [string, string]): LogicalPage {
+  const columns: ColumnDescriptor[] = [
+    {
+      name: 'dup',
+      dataType: 'int4',
+      typeClass: 'number',
+      nullable: true,
+      isPrimaryKey: false,
+      generated: false,
+    },
+    {
+      name: 'dup',
+      dataType: 'int4',
+      typeClass: 'number',
+      nullable: true,
+      isPrimaryKey: false,
+      generated: false,
+    },
+  ];
+  return {
+    kind: 'tabular',
+    columns,
+    rows: [values],
+    position: {
+      offset: 0,
+      pageSize: 1,
+      hasMore: false,
+      nextToken: null,
+      prevToken: null,
+      strategy: 'offset',
+    },
+    truncatedCells: 0,
+  };
+}
+
+test('Query console — two duplicate-named columns render and select their own distinct values', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-dup-cols';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Console Dup DB', 'blue');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Console Dup DB', 'blue'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    executeSnap(CONNECTION_ID, ['SELECT 111 AS dup, 222 AS dup'], [dupColumnPage(['111', '222'])]),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Console Dup DB', 'blue');
+
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  await typeInto(consoleView, page, 'SELECT 111 AS dup, 222 AS dup;');
+  await page.click('[data-testid="console-run-statement"]');
+
+  const row0 = results.locator('[data-testid="console-result-row"][data-row="0"]');
+  const firstDupCell = row0.locator('[data-testid="console-result-cell"][data-col-index="0"]');
+  const secondDupCell = row0.locator('[data-testid="console-result-cell"][data-col-index="1"]');
+
+  // --- rendering: each same-named column shows its own value, not both collapsed onto one ----
+  await expect(firstDupCell).toHaveText('111');
+  await expect(secondDupCell).toHaveText('222');
+
+  // --- selection: clicking each publishes its own distinct value to the cell-editor dock -----
+  const cellEditorText = () =>
+    page.locator('[data-testid="cell-editor-panel"] .cm-content').innerText();
+
+  await firstDupCell.click();
+  await expect(page.locator('[data-testid="cell-editor"]')).toBeVisible();
+  await expect.poll(cellEditorText).toBe('111');
+
+  await secondDupCell.click();
+  await expect.poll(cellEditorText).toBe('222');
+});
