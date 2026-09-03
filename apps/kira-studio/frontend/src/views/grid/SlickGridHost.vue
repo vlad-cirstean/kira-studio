@@ -15,9 +15,10 @@ import type {
 } from 'slickgrid';
 import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { runMenuShortcut } from '../../state/contextMenu';
+import { openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { type CellClassFlags, cellClass } from '../../theme/cellClass';
@@ -28,12 +29,19 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
-  pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
-import type { RowSnapshot } from './clipboardFormats';
-import { rowMenu } from './menu';
+import { sqlDialectFor } from '../shared/sqlIdent';
+import {
+  columnsToTsv,
+  parseDelimited,
+  type RowSnapshot,
+  rangeToTsv,
+  rowsToTsv,
+} from './clipboardFormats';
+import { cellMenu, headerMenu, rowMenu } from './menu';
+import { addInsertRow, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
 import { matchedRows } from './search';
 import {
   createDisplayValueExtractor,
@@ -44,11 +52,19 @@ import {
   rowAtDisplayPosition,
 } from './slick/dataSource';
 import { KiraSlickGrid } from './slick/kiraSlickGrid';
+import {
+  type DisplayCellView,
+  navColumnsFor,
+  cellNavEntry as rvCellNavEntry,
+  columnValuesFor as rvColumnValuesFor,
+  displayCell as rvDisplayCell,
+  rowSnapshot as rvRowSnapshot,
+  rowsForColumnOps as rvRowsForColumnOps,
+} from './slick/rowValues';
 import './slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { cell, getPage, pageVersion, setVisibleWindow } from './page';
-import { pendingFor, stagedValue } from './pendingChanges';
+import { getPage, pageVersion, setVisibleWindow } from './page';
 import * as scrollTrace from './scrollTrace';
 import { rangesFromSelection, selectionFromRanges } from './slick/selection';
 import { parseTextSortTerms } from './sortTerms';
@@ -171,39 +187,50 @@ function qualifiedName(): string {
     .join('.');
 }
 
-// Merges a staged edit over the real page value for display — DataGrid.vue's own displayCell,
-// content (not mechanism, §1) so it moves into rowValues.ts unchanged at C7 once the menus/
-// clipboard land there too; needed now for rowMenu's own row-copy/duplicate snapshot.
-function displayCell(
-  row: number,
-  displayCol: number,
-): { text: string; isNull: boolean; truncated: boolean; staged: boolean } {
+// C7/§5 D7 — the current display column order, read fresh (not a computed: nothing here may
+// create a Vue reactive dependency this file's own imperative calls could re-enter, D0). Every
+// menu/clipboard/nav function below takes it as a plain parameter, matching rowValues.ts's own
+// signatures (content, no SlickGrid API, §1).
+function currentOrder(): string[] {
   const p = getPage(props.tabId);
-  if (!p) return { text: '', isNull: true, truncated: false, staged: false };
-  const order = resolveColumnOrder(p, tab()?.state.columnOrder ?? null);
-  const name = order[displayCol];
-  const staged = name ? stagedValue(props.tabId, row, name) : undefined;
-  if (staged !== undefined) {
-    return { text: staged ?? '', isNull: staged === null, truncated: false, staged: true };
-  }
-  const pageCol = pageColumnIndexFor(p, order, displayCol);
-  if (pageCol < 0) return { text: '', isNull: true, truncated: false, staged: false };
-  const view = cell(props.tabId, row, pageCol);
-  return { ...view, staged: false };
+  return p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
 }
 
-// The row's effective values across the whole display column order — DataGrid.vue's own
-// rowSnapshot, reused by rowMenu's own copy/duplicate items.
+// Thin, tabId/page/order-bound wrappers over rowValues.ts's own pure functions — every call site
+// in this file already has props.tabId and currentOrder() on hand, so binding them here once
+// keeps those call sites reading exactly like DataGrid.vue's own did.
+function displayCell(row: number, displayCol: number): DisplayCellView {
+  return rvDisplayCell(props.tabId, getPage(props.tabId), currentOrder(), row, displayCol);
+}
 function rowSnapshot(row: number): RowSnapshot {
-  const p = getPage(props.tabId);
-  const order = p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
-  const values: Record<string, string | null> = {};
-  for (let c = 0; c < order.length; c++) {
-    const name = order[c];
-    const dc = displayCell(row, c);
-    values[name] = dc.isNull ? null : dc.text;
-  }
-  return { columns: [...order], values };
+  return rvRowSnapshot(props.tabId, getPage(props.tabId), currentOrder(), row);
+}
+
+function currentDialect() {
+  return sqlDialectFor(connectionRecord(tab()?.connectionId)?.kind);
+}
+
+function isDeleted(row: number): boolean {
+  return !!pendingFor(props.tabId)?.deletes.has(row);
+}
+
+function columnDescriptor(name: string): ColumnDescriptor | undefined {
+  return getPage(props.tabId)?.columns.find((c) => c.name === name);
+}
+
+// C7/§5 D7 — rowsForColumnOps/columnValuesFor bound to this file's own displayRows/tabId/page/
+// order, mirroring the displayCell/rowSnapshot wrappers above.
+function rowsForColumnOps(rowCount: number): number[] {
+  return rvRowsForColumnOps(currentDisplayRows(), rowCount);
+}
+function columnValuesFor(displayCol: number): string[] {
+  return rvColumnValuesFor(
+    props.tabId,
+    getPage(props.tabId),
+    currentOrder(),
+    currentDisplayRows(),
+    displayCol,
+  );
 }
 
 // FIX-8: PK/FK stated as a label, never inferred from colour alone — mirrors DataGrid.vue's own
@@ -509,9 +536,19 @@ function fieldAtDisplayCol(displayCol: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-function classesFrom(flags: CellClassFlags): string {
-  return Object.keys(cellClass(flags)).join(' ');
+// One class name per FLAG_CLASS_NAMES entry actually set — `setCellCssStyles`'s own hash value
+// ultimately reaches a single `classList.add(value)` call (SlickGrid's own
+// updateCellCssStylesOnRenderedRows), which throws InvalidCharacterError for a multi-token string
+// (the DOM spec's own "no whitespace in one token" rule) — so a cell needing more than one edge
+// class can never be expressed as one merged string in one layer. Four separate keyed layers
+// below (one per edge) are what keep every hash value a lone token while still letting one cell
+// carry all four edges at once.
+function classesFrom(flags: CellClassFlags): string[] {
+  return Object.keys(cellClass(flags));
 }
+
+type EdgeHash = Record<number, Record<string, string>>;
+const SEL_EDGE_LAYER_KEYS = ['kira-sel-t', 'kira-sel-r', 'kira-sel-b', 'kira-sel-l'] as const;
 
 /** C5/§5 D5 — the selection's own perimeter, O(perimeter ∩ rendered) by construction: only the
  *  two edge columns (c0/c1, or every selected row's own two edge columns for a row selection, or
@@ -522,22 +559,24 @@ function classesFrom(flags: CellClassFlags): string {
  *  built-in layer, gated separately at C6). Page-row space in, translated once per rendered row via
  *  `dataSource.getItem(pos).row` — the same arithmetic `onGridRendered` already uses.
  */
-function computeSelEdgesHash(): Record<number, Record<string, string>> {
-  const hash: Record<number, Record<string, string>> = {};
-  if (!grid || !dataSource) return hash;
+function computeSelEdgeHashes(): [EdgeHash, EdgeHash, EdgeHash, EdgeHash] {
+  const hashes: [EdgeHash, EdgeHash, EdgeHash, EdgeHash] = [{}, {}, {}, {}];
+  if (!grid || !dataSource) return hashes;
   const sel = rt()?.selection;
-  if (!sel) return hash;
+  if (!sel) return hashes;
   const { start, end } = grid.lastRenderedRowBounds;
-  if (end < start) return hash;
+  if (end < start) return hashes;
 
   const mark = (pos: number, displayCol: number, flags: CellClassFlags): void => {
     const field = fieldAtDisplayCol(displayCol);
     if (!field) return;
-    const cls = classesFrom(flags);
-    if (!cls) return;
-    hash[pos] ??= {};
-    const row = hash[pos] as Record<string, string>;
-    row[field] = row[field] ? `${row[field]} ${cls}` : cls;
+    for (const cls of classesFrom(flags)) {
+      const i = SEL_EDGE_LAYER_KEYS.indexOf(`kira-${cls}` as (typeof SEL_EDGE_LAYER_KEYS)[number]);
+      if (i < 0) continue;
+      const hash = hashes[i] as EdgeHash;
+      hash[pos] ??= {};
+      (hash[pos] as Record<string, string>)[field] = cls;
+    }
   };
 
   if (sel.kind === 'cell' || sel.kind === 'range') {
@@ -593,11 +632,15 @@ function computeSelEdgesHash(): Record<number, Record<string, string>> {
       }
     }
   }
-  return hash;
+  return hashes;
 }
 
 function refreshSelEdges(): void {
-  grid?.setCellCssStyles('kira-sel-edges', computeSelEdgesHash());
+  if (!grid) return;
+  const hashes = computeSelEdgeHashes();
+  SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
+    grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
+  });
 }
 
 /** C5/§5 D5 — bounded by what the user staged (`pendingFor(tabId).edits`, a handful of rows in
@@ -609,7 +652,7 @@ function computeStagedHash(): Record<number, Record<string, string>> {
   if (!p || p.edits.size === 0) return hash;
   const { start, end } = grid.lastRenderedRowBounds;
   if (end < start) return hash;
-  const cls = classesFrom({ pendingEdit: true });
+  const cls = classesFrom({ pendingEdit: true })[0] ?? 'pending-edit';
   for (let pos = start; pos <= end; pos++) {
     const pageRow = dataSource.getItem(pos).row;
     const edit = p.edits.get(pageRow);
@@ -875,6 +918,212 @@ function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
   );
 }
 
+// C8/D8 owns the real edit trigger; for now this just moves the active cell there (harmless —
+// `editable: false` means `editActiveCell` is a no-op until C8 registers a real editor) so the
+// cell menu's own "Edit" item and a future editor share one entry point instead of two.
+function startEditCell(row: number, displayCol: number): void {
+  if (!grid || !dataSource) return;
+  const idx = {
+    displayRows: currentDisplayRows(),
+    pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+  };
+  const pos = displayPositionOf(idx, row);
+  grid.setActiveCell(pos, displayCol + 1, false, false, true);
+  grid.editActiveCell();
+}
+
+// D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
+// outside it replaces the selection with just that row first (the "replace the selection first"
+// rule, §5 D7). Cell/header menus have no multi-target actions, so those two always collapse to a
+// single-item selection. Pushed via `grid.setActiveCell` on the gutter column, not a direct
+// `rangesFromSelection`/`setSelectedRanges` call — landing the active cell on a
+// `rowSelectColumnIds` column is what makes `SlickHybridSelectionModel` itself compute and notify
+// the single-row range (`handleActiveCellChange`, F1's own `selectActiveRow` branch), which is
+// also what keeps `_activeSelectionIsRow` (and so `onSelectedRangesChanged`'s own `rowMode` read)
+// correct — calling `setSelectedRanges` directly here, before anything told the model this is a
+// *row* push, would leave it reading whatever mode the *previous* selection left behind.
+function onGutterContextMenu(row: number, e: MouseEvent): void {
+  const p = getPage(props.tabId);
+  if (!p || row >= p.rowCount) return; // pending insert rows have no row menu yet (D9/C9)
+  const sel = rt()?.selection;
+  const inSelection = sel?.kind === 'row' && sel.rows.includes(row);
+  if (!inSelection && grid) {
+    const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
+    grid.setActiveCell(displayPositionOf(idx, row), 0, false, false, false);
+  }
+  const rows = inSelection && sel.kind === 'row' ? sel.rows : [row];
+  openContextMenu(
+    e,
+    rowMenu({
+      tabId: props.tabId,
+      rows,
+      qualifiedName: qualifiedName(),
+      snapshot: rowSnapshot,
+      canEdit: canEditTable(),
+      canDelete: canDeleteRows(),
+    }),
+  );
+}
+
+function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void {
+  const order = currentOrder();
+  if (grid && dataSource) {
+    const idx = {
+      displayRows: currentDisplayRows(),
+      pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+    };
+    grid.setActiveCell(displayPositionOf(idx, row), displayCol + 1, false, false, false);
+  }
+  const dc = displayCell(row, displayCol);
+  const name = order[displayCol] ?? '';
+  const t = tab();
+  openContextMenu(
+    e,
+    cellMenu({
+      tabId: props.tabId,
+      row,
+      columnName: name,
+      isNull: dc.isNull,
+      text: dc.text,
+      dialect: currentDialect(),
+      canEdit: canEditTable(),
+      canDelete: canDeleteRows(),
+      isDeleted: isDeleted(row),
+      startEdit: () => startEditCell(row, displayCol),
+      onPaste: () => void onPaste(),
+      meta: rt()?.meta ?? null,
+      connectionId: t?.connectionId ?? '',
+      rowValues: rowSnapshot(row).values,
+    }),
+  );
+}
+
+function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
+  const order = currentOrder();
+  const name = order[displayCol] ?? '';
+  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
+  const colCount = (grid?.getColumns().length ?? 1) - 1;
+  if (selectionModel) {
+    pendingSelectionKind = 'column';
+    selectionModel.setSelectedRanges(
+      rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
+    );
+  }
+  openContextMenu(
+    e,
+    headerMenu({
+      tabId: props.tabId,
+      columnName: name,
+      currentSort: currentSortTerms().find((t) => t.column === name)?.direction ?? null,
+      currentProjection: tab()?.state.projection ?? null,
+      allColumnNames: getPage(props.tabId)?.columns.map((c) => c.name) ?? [],
+      columnValues: () => columnValuesFor(displayCol),
+    }),
+  );
+}
+
+// F7 — `handleContextMenu` resolves nothing itself and does not prevent the native menu; the
+// event args are `{}` (resolve the cell with getCellFromEvent), and a right-click on the cell
+// currently being edited is deliberately swallowed by SlickGrid itself before this ever fires.
+function onGridContextMenu(e: SlickEventData): void {
+  if (!grid || !dataSource) return;
+  e.preventDefault();
+  const hit = grid.getCellFromEvent(e);
+  if (!hit) return;
+  const pageRow = dataSource.getItem(hit.row).row;
+  const nativeLike = e as unknown as MouseEvent;
+  if (hit.cell === 0) onGutterContextMenu(pageRow, nativeLike);
+  else onCellContextMenu(pageRow, hit.cell - 1, nativeLike);
+}
+
+function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }): void {
+  if (args.column.id === GUTTER_FIELD) return;
+  e.preventDefault();
+  const displayCol = currentOrder().indexOf(String(args.column.field));
+  if (displayCol < 0) return;
+  onHeaderContextMenuHandler(displayCol, e as unknown as MouseEvent);
+}
+
+// D1: local, DOM-focus-scoped copy/paste — never a native Electron accelerator.
+function onCopy(): void {
+  const sel = rt()?.selection;
+  const p = getPage(props.tabId);
+  if (!sel || !p) return;
+  if (sel.kind === 'cell') {
+    const dc = displayCell(sel.row, sel.col);
+    void copyText(dc.isNull ? '' : dc.text);
+    return;
+  }
+  if (sel.kind === 'range') {
+    // F14/§4.1 item 1: anchorRow/anchorCol is always the top-left corner now (SlickRange
+    // normalises), so this needs no min/max sort the way the incumbent's own drag-anchor did.
+    void copyText(rangeToTsv(sel.anchorRow, sel.row, sel.anchorCol, sel.col, displayCell));
+    return;
+  }
+  if (sel.kind === 'row') {
+    void copyText(rowsToTsv(sel.rows.map(rowSnapshot)));
+    return;
+  }
+  void copyText(columnsToTsv(rowsForColumnOps(p.rowCount), sel.cols, displayCell));
+}
+
+// D13: TSV-if-tab-else-CSV, applied column-by-column from the selection's anchor across the
+// current display column order — existing rows become stageEdit calls, rows past the loaded page
+// become pending inserts (reusing one already staged at that row, else a fresh addInsertRow).
+async function onPaste(): Promise<void> {
+  if (!canEditTable()) return;
+  const sel = rt()?.selection;
+  const p = getPage(props.tabId);
+  if (!sel || !p) return;
+  if (sel.kind !== 'cell' && sel.kind !== 'range' && sel.kind !== 'row') return;
+
+  let clipboardText: string;
+  try {
+    clipboardText = await navigator.clipboard.readText();
+  } catch {
+    return;
+  }
+  if (!clipboardText) return;
+
+  const parsed = parseDelimited(clipboardText);
+  const startRow =
+    sel.kind === 'row' ? Math.min(...sel.rows) : sel.kind === 'range' ? sel.anchorRow : sel.row;
+  const startCol = sel.kind === 'row' ? 0 : sel.kind === 'range' ? sel.anchorCol : sel.col;
+  const columns = currentOrder();
+  // P36 D28: the server computes a generated column's value — an explicit paste into one is
+  // silently dropped rather than staged into an insert the server would then reject outright.
+  const insertColumns = columns.filter((name) => !columnDescriptor(name)?.generated);
+  const insertIds = new Map<number, string>();
+  const pending = pendingFor(props.tabId);
+
+  for (let ri = 0; ri < parsed.length; ri++) {
+    const row = startRow + ri;
+    if (row < 0) continue;
+    const isNewRow = row >= p.rowCount;
+    let insertId = insertIds.get(row);
+    if (isNewRow && insertId === undefined) {
+      // P2 R2: reuse the PendingInsert already staged at this display row instead of always
+      // appending a fresh one — insertRows' identity is positional (pending.inserts[row -
+      // p.rowCount]), so a paste landing on an existing staged row must update it, not create a
+      // sibling.
+      insertId = pending?.inserts[row - p.rowCount]?.id ?? addInsertRow(props.tabId, insertColumns);
+      insertIds.set(row, insertId);
+    }
+    const cols = parsed[ri] as string[];
+    for (let ci = 0; ci < cols.length; ci++) {
+      const name = columns[startCol + ci];
+      if (!name) continue;
+      if (isNewRow) {
+        if (insertId && !columnDescriptor(name)?.generated) {
+          stageInsertValue(props.tabId, insertId, name, cols[ci] as string);
+        }
+      } else {
+        stageEdit(props.tabId, row, name, cols[ci] as string);
+      }
+    }
+  }
+}
+
 // F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
 // (`isImmediatePropagationStopped()`, checked right after this fires): the app's own handler runs
 // before SlickGrid's own default key handling and wins simply by calling it on the branches it
@@ -888,13 +1137,13 @@ function onKeydown(e: SlickEventData): void {
   if ((e.ctrlKey || e.metaKey) && key === 'c') {
     e.preventDefault();
     e.stopImmediatePropagation();
-    // C7 lands the body (onCopy) — this commit only claims the key.
+    onCopy();
     return;
   }
   if ((e.ctrlKey || e.metaKey) && key === 'v') {
     e.preventDefault();
     e.stopImmediatePropagation();
-    // C7 lands the body (onPaste) — this commit only claims the key.
+    void onPaste();
     return;
   }
 
@@ -1086,6 +1335,8 @@ onMounted(() => {
   eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
   eventHandler.subscribe(grid.onSort, onSort);
   eventHandler.subscribe(grid.onHeaderClick, onHeaderClick);
+  eventHandler.subscribe(grid.onContextMenu, onGridContextMenu);
+  eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
