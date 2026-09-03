@@ -333,6 +333,41 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P26 §3.3(1)/(2): caps.go declares ServerFilter/Projection both true; there was no Filter test
+	// at all before this, and Projection appeared only inside a value-codec test.
+	t.Run("read: filter", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		filter := "region_id = 1"
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:     nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+			Filter:   &filter,
+			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-12a"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if tp.RowCount != 1 {
+			t.Errorf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
+		}
+	})
+
+	t.Run("read: projection", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		p, err := a.Read(context.Background(), adapters.ReadRequest{
+			Path:       nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+			Projection: []string{"name"},
+			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-12b"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		tp := p.(page.TabularPage)
+		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
+			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
+		}
+	})
+
 	t.Run("count", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		result, err := a.Count(context.Background(), adapters.CountRequest{
@@ -433,6 +468,157 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P26 §3.3(3), including the CREATE INDEX step (worth taking here and nowhere else: SQLite is
+	// the engine where Describe's index list is cheapest to assert). One implementer trap from this
+	// package's own suite (query.go rejects a smuggled second statement in one string, ":494"): each
+	// DDL statement here is its own Statements element, never one semicolon-joined string.
+	t.Run("execute: a DDL round trip is visible to the catalog", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		databasePath := nodePath(cfg.ID, seg("database", "main"))
+		tablePath := nodePath(cfg.ID, seg("database", "main"), seg("table", "p26_scratch"))
+		t.Cleanup(func() {
+			_, _ = a.Execute(context.Background(), model.ConsoleRequest{
+				Path: databasePath, Statements: []string{"DROP TABLE IF EXISTS p26_scratch"},
+			}, adapters.NewOpCtx("op-ddl-cleanup"))
+		})
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"CREATE TABLE p26_scratch (id INTEGER PRIMARY KEY, name TEXT)"},
+		}, adapters.NewOpCtx("op-ddl-1")); err != nil {
+			t.Fatalf("Execute(CREATE TABLE): %v", err)
+		}
+
+		children, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-2"))
+		if err != nil {
+			t.Fatalf("Children: %v", err)
+		}
+		if !containsName(childNames(t, children), "p26_scratch") {
+			t.Fatalf("Children(main) = %v, want p26_scratch present", childNames(t, children))
+		}
+
+		meta, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-3"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		if len(meta.Columns) != 2 {
+			t.Fatalf("Columns = %+v, want exactly 2 (id, name)", meta.Columns)
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"ALTER TABLE p26_scratch ADD COLUMN note TEXT"},
+		}, adapters.NewOpCtx("op-ddl-4")); err != nil {
+			t.Fatalf("Execute(ALTER TABLE): %v", err)
+		}
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"CREATE INDEX p26_scratch_name ON p26_scratch(name)"},
+		}, adapters.NewOpCtx("op-ddl-5")); err != nil {
+			t.Fatalf("Execute(CREATE INDEX): %v", err)
+		}
+
+		meta2, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-6"))
+		if err != nil {
+			t.Fatalf("Describe after ALTER/CREATE INDEX: %v", err)
+		}
+		if len(meta2.Columns) != 3 {
+			t.Fatalf("Columns after ALTER = %+v, want exactly 3", meta2.Columns)
+		}
+		foundIndex := false
+		for _, idx := range meta2.Indexes {
+			if idx.Name == "p26_scratch_name" {
+				foundIndex = true
+			}
+		}
+		if !foundIndex {
+			t.Errorf("Indexes = %+v, want p26_scratch_name present", meta2.Indexes)
+		}
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       databasePath,
+			Statements: []string{"DROP TABLE p26_scratch"},
+		}, adapters.NewOpCtx("op-ddl-7")); err != nil {
+			t.Fatalf("Execute(DROP TABLE): %v", err)
+		}
+		childrenAfter, err := a.Children(ctx, databasePath, adapters.NewOpCtx("op-ddl-8"))
+		if err != nil {
+			t.Fatalf("Children after DROP: %v", err)
+		}
+		if containsName(childNames(t, childrenAfter), "p26_scratch") {
+			t.Errorf("Children(main) after DROP = %v, must not contain p26_scratch", childNames(t, childrenAfter))
+		}
+	})
+
+	// P26 §3.3(4): a scratch table, so no seeded table is touched (§2.4).
+	t.Run("mutate: insert then delete round-trips", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+		tablePath := nodePath(cfg.ID, seg("database", "main"), seg("table", "p26_insdel"))
+		t.Cleanup(func() {
+			_, _ = a.Execute(context.Background(), model.ConsoleRequest{
+				Path: nodePath(cfg.ID, seg("database", "main")), Statements: []string{"DROP TABLE IF EXISTS p26_insdel"},
+			}, adapters.NewOpCtx("op-insdel-cleanup"))
+		})
+
+		if _, err := a.Execute(ctx, model.ConsoleRequest{
+			Path:       nodePath(cfg.ID, seg("database", "main")),
+			Statements: []string{"CREATE TABLE p26_insdel (id INTEGER PRIMARY KEY, name TEXT)"},
+		}, adapters.NewOpCtx("op-insdel-setup")); err != nil {
+			t.Fatalf("Execute(CREATE TABLE): %v", err)
+		}
+
+		insertPlan := model.MutationPlan{
+			Path: tablePath,
+			Ops: []model.MutationRowOp{
+				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("1")}, {Name: "name", Value: strp("first")}}},
+				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("2")}, {Name: "name", Value: strp("second")}}},
+			},
+		}
+		if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-insdel-1")); err != nil {
+			t.Fatalf("Mutate(insert): %v", err)
+		}
+		countAfterInsert, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-2"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+		if countAfterInsert.Value != 2 {
+			t.Fatalf("Count after insert = %d, want 2", countAfterInsert.Value)
+		}
+
+		deletePlan := model.MutationPlan{
+			Path: tablePath,
+			Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: strp("1")}}}},
+		}
+		result, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-insdel-3"))
+		if err != nil {
+			t.Fatalf("Mutate(delete): %v", err)
+		}
+		if result.AffectedRows != 1 {
+			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+		}
+		countAfterDelete, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-4"))
+		if err != nil {
+			t.Fatalf("Count: %v", err)
+		}
+		if countAfterDelete.Value != 1 {
+			t.Fatalf("Count after delete = %d, want 1", countAfterDelete.Value)
+		}
+
+		read, err := a.Read(ctx, adapters.ReadRequest{
+			Path: tablePath, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+		}, adapters.NewOpCtx("op-insdel-5"))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		readPage := read.(page.TabularPage)
+		id := cellAt(t, readPage, 0, 0)
+		if id == nil || *id != "2" {
+			t.Errorf("surviving row id = %v, want 2", id)
+		}
+	})
+
 	t.Run("read-only connection cannot write", func(t *testing.T) {
 		ro := cfg
 		ro.ReadOnly = true
@@ -449,6 +635,59 @@ func TestSqlite(t *testing.T) {
 		var ae *adapters.Error
 		if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
 			t.Fatalf("got %v, want E_UNSUPPORTED", err)
+		}
+	})
+
+	// P26 §3.3(5): a read-only connection's DSN carries mode=ro (client.go) — the honest
+	// SQLite-specific property of a refused write, extending the file-level assertion ":742" already
+	// makes for reads to a refused write: no -wal/-shm sidecar appears either.
+	t.Run("read-only connection cannot run DDL, and creates no sidecar", func(t *testing.T) {
+		ro := cfg
+		ro.ReadOnly = true
+		a := newAdapter(t)
+		if _, err := a.Connect(context.Background(), ro, adapters.NewOpCtx("op-ro-ddl-connect")); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		defer a.Disconnect(context.Background())
+
+		before, err := os.ReadFile(fixture.Path)
+		if err != nil {
+			t.Fatalf("read before: %v", err)
+		}
+
+		_, err = a.Execute(context.Background(), model.ConsoleRequest{
+			Path:       nodePath(cfg.ID, seg("database", "main")),
+			Statements: []string{"CREATE TABLE p26_ro_ddl (id INTEGER PRIMARY KEY)"},
+		}, adapters.NewOpCtx("op-ro-ddl"))
+		var ae *adapters.Error
+		if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
+			t.Fatalf("got %v, want E_UNSUPPORTED (sqlite/errors.go:44-45: primary code 8, readOnly)", err)
+		}
+
+		after, err := os.ReadFile(fixture.Path)
+		if err != nil {
+			t.Fatalf("read after: %v", err)
+		}
+		if len(before) != len(after) || string(before) != string(after) {
+			t.Error("a refused read-only DDL attempt modified the database file")
+		}
+		for _, suffix := range []string{"-wal", "-shm"} {
+			if _, statErr := os.Stat(fixture.Path + suffix); statErr == nil {
+				t.Errorf("a refused read-only DDL attempt left a %s sidecar behind", suffix)
+			}
+		}
+
+		side, err := sql.Open("sqlite", "file:"+fixture.Path+"?mode=ro")
+		if err != nil {
+			t.Fatalf("side connect: %v", err)
+		}
+		defer side.Close()
+		var exists int
+		if err := side.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'p26_ro_ddl'").Scan(&exists); err != nil {
+			t.Fatalf("sqlite_master check: %v", err)
+		}
+		if exists != 0 {
+			t.Errorf("p26_ro_ddl exists after a read-only Execute attempt, want it never created")
 		}
 	})
 

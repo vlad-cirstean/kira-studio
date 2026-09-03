@@ -5,6 +5,7 @@
 package sqlite_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +42,23 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				// A read-only connection still reads.
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main"), testsupport.Seg("table", "customers"))),
+				// sqlite/errors.go:44-45 maps primary code 8 (SQLITE_READONLY) to E_UNSUPPORTED —
+				// nothing exercised that from a real refusal before this phase's own Tier-1 test.
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main"), testsupport.Seg("table", "regions")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert", Values: model.RowValues{{Name: "id", Value: testsupport.Strp("81")}, {Name: "name", Value: testsupport.Strp("nope")}},
+					}},
+				}, adapters.CodeUnsupported),
+				testsupport.ExecuteIsRefused(
+					testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main")),
+					[]string{"CREATE TABLE p26_ro_matrix_scratch (id INTEGER)"},
+					adapters.CodeUnsupported,
+				),
+			},
 		},
 		{
 			Name: "a missing file",
@@ -94,6 +112,51 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 				return c
 			},
 			Expect: testsupport.Outcome{FailWith: adapters.CodeConnect},
+		},
+		{
+			// SQLite is the only engine where "two connections, one file" is an ordinary user
+			// situation (two windows on the same database) — and the only adapter for which the DDL
+			// catalog round trip §3.3(3) already proves is also a *file* round trip: a second, wholly
+			// independent connection must see what the first one's own Execute created.
+			Name:   "the seeded file, read-write (two connections)",
+			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig { return c },
+			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{
+				{
+					Name: "a second connection sees what the first's Execute created",
+					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+						ctx := context.Background()
+						databasePath := testsupport.NodePath(cfg.ID, testsupport.Seg("database", "main"))
+						t.Cleanup(func() {
+							_, _ = a.Execute(context.Background(), model.ConsoleRequest{
+								Path: databasePath, Statements: []string{"DROP TABLE IF EXISTS p26_two_conn"},
+							}, adapters.NewOpCtx("matrix-two-conn-cleanup"))
+						})
+						if _, err := a.Execute(ctx, model.ConsoleRequest{
+							Path: databasePath, Statements: []string{"CREATE TABLE p26_two_conn (id INTEGER PRIMARY KEY)"},
+						}, adapters.NewOpCtx("matrix-two-conn-create")); err != nil {
+							t.Fatalf("Execute(CREATE TABLE): %v", err)
+						}
+
+						second, err := adapters.CreateAdapter("sqlite", adapters.Deps{Log: func(level, message string) {}})
+						if err != nil {
+							t.Fatalf("CreateAdapter: %v", err)
+						}
+						if _, err := second.Connect(ctx, cfg, adapters.NewOpCtx("matrix-two-conn-connect")); err != nil {
+							t.Fatalf("second Connect: %v", err)
+						}
+						defer second.Disconnect(context.Background())
+
+						children, err := second.Children(ctx, databasePath, adapters.NewOpCtx("matrix-two-conn-children"))
+						if err != nil {
+							t.Fatalf("second Children: %v", err)
+						}
+						if !testsupport.ContainsName(testsupport.ChildNames(t, children), "p26_two_conn") {
+							t.Errorf("second connection's Children(main) = %v, want p26_two_conn present", testsupport.ChildNames(t, children))
+						}
+					},
+				},
+			},
 		},
 	})
 }
