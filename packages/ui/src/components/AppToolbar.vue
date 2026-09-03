@@ -29,11 +29,15 @@ defineExpose({ refresh: () => refreshButtonRef.value?.refresh() });
 </script>
 
 <template>
-  <header class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
+  <!-- W14 (axe `aria-allowed-role`): `role="toolbar"` is not among the roles the ARIA spec
+       allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
+       no implicit role of its own to conflict with the explicit one, which is all this element
+       ever wanted (§6.2's own layout, not a page banner). -->
+  <div class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
     <RepoPicker :repo-state="repoState" @repo-opened="(repoId) => emit('repo-opened', repoId)" />
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
     <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
-  </header>
+  </div>
 </template>
 
 <style>

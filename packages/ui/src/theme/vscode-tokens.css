@@ -46,8 +46,12 @@
   --kv-graph-lane-7: var(--vscode-kiraVersion-graphLane7, #d9beb5);
   /* kv-lane-tokens:end */
 
-  /* Badges */
-  --kv-badge-local-bg: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+  /* Badges. --kv-badge-local-bg's fallback is a self-contained fill (white text of its own,
+     never measured against the surrounding panel), so one darkened literal — WCAG-checked at
+     5.32:1 against white — satisfies all four theme kinds at once; the border-only badges below
+     it, by contrast, are measured against the panel background they sit on and so need the
+     light-kind override block further down for the two light kinds specifically. */
+  --kv-badge-local-bg: var(--vscode-gitDecoration-untrackedResourceForeground, #1f7a4d);
   --kv-badge-remote-fg: var(--vscode-gitDecoration-submoduleResourceForeground, #8db9e2);
   --kv-badge-tag-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
   --kv-badge-fg: var(--vscode-badge-foreground, #ffffff);
@@ -103,6 +107,26 @@ body.vscode-high-contrast-light {
   --kv-graph-node-outline: var(--vscode-contrastActiveBorder, #f38518);
   --kv-graph-node-outline-width: 1.5px;
   /* kv-lane-outline:end */
+}
+
+/* WCAG AA (4.5:1) fallback overrides for the two light theme kinds. A single fallback literal
+   per token cannot satisfy both light-on-dark and dark-on-light at once for a foreground-only
+   colour (text/border with no fill of its own) — the :root literals above were chosen against
+   the dark/high-contrast kinds' panel backgrounds and fail contrast on a light one. This block
+   supplies light-appropriate values for exactly those tokens, following the high-contrast block
+   above's own precedent of branching only on the theme-kind class VS Code stamps on <body>
+   (§3.4); a real --vscode-* value from an actual host still wins over every literal here, since
+   each --kv-* token is still a var(--vscode-*, fallback) chain — this block only replaces the
+   fallback half. Values verified with a standalone WCAG contrast-ratio script against both
+   --vscode-panel-background's light fallback (#f3f3f3) and pure white. */
+body.vscode-light,
+body.vscode-high-contrast-light {
+  --kv-description-fg: var(--vscode-descriptionForeground, #606060);
+  --kv-badge-remote-fg: var(--vscode-gitDecoration-submoduleResourceForeground, #0e5a99);
+  --kv-badge-tag-fg: var(--vscode-gitDecoration-addedResourceForeground, #256b3a);
+  --kv-badge-stash-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #5a5a5a);
+  --kv-badge-stash-border: var(--vscode-gitDecoration-ignoredResourceForeground, #5a5a5a);
+  --kv-error-fg: var(--vscode-errorForeground, #a1260d);
 }
 
 /* kv-lane-rules:start (scripts/gen-lane-palette.ts) — do not hand-edit */
