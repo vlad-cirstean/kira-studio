@@ -27,11 +27,11 @@ var mysqlMemo fixture[MysqlFixture]
 
 const (
 	mysqlImage        = "mysql:8.4"
-	mysqlRootPassword = "kira"
+	mysqlRootPassword = FixturePassword
 	mysqlDatabase     = "kira_test"
 	mysqlAnalyticsDB  = "kira_analytics"
 	mysqlUsername     = "kira"
-	mysqlPassword     = "kira"
+	mysqlPassword     = FixturePassword
 )
 
 // StartMysql is support/mysql.ts's startMysql. See fixture.go's own doc comment for why

@@ -22,11 +22,11 @@ import (
 const (
 	MongoImage             = "mongo:8.3"
 	mongoRootUsername      = "root"
-	mongoRootPassword      = "kira"
+	mongoRootPassword      = FixturePassword
 	MongoDatabase          = "kira_test"
 	MongoAnalyticsDatabase = "kira_analytics"
 	mongoUsername          = "kira"
-	mongoPassword          = "kira"
+	mongoPassword          = FixturePassword
 	mongoPort              = "27017/tcp"
 	mongoStartupTimeout    = 120 * time.Second
 

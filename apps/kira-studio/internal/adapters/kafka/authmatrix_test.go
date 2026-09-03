@@ -36,7 +36,7 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			// handshake shape itself).
 			Name: "PLAINTEXT broker, username and password both set",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
-				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp("kira")
+				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp(testsupport.FixturePassword)
 				return c
 			},
 			Expect: testsupport.Outcome{NotCode: adapters.CodeAuth},
@@ -77,7 +77,7 @@ func TestKafka_AuthMatrix(t *testing.T) {
 		{
 			Name: "SASL broker, kira/kira",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
-				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp("kira")
+				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp(testsupport.FixturePassword)
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"brokers": "1"}},
@@ -218,7 +218,7 @@ func TestKafka_AuthMatrix(t *testing.T) {
 		{
 			Name: "SASL broker, nil username, password set",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
-				c.Username, c.Password = nil, testsupport.Strp("kira")
+				c.Username, c.Password = nil, testsupport.Strp(testsupport.FixturePassword)
 				return c
 			},
 			Expect: testsupport.Outcome{FailWith: adapters.CodeAuth},

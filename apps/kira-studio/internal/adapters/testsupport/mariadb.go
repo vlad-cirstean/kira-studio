@@ -27,11 +27,11 @@ var mariaMemo fixture[MariaFixture]
 
 const (
 	mariaImage        = "mariadb:11.4"
-	mariaRootPassword = "kira"
+	mariaRootPassword = FixturePassword
 	mariaDatabase     = "kira_test"
 	mariaAnalyticsDB  = "kira_analytics"
 	mariaUsername     = "kira"
-	mariaPassword     = "kira"
+	mariaPassword     = FixturePassword
 	mariaBigRowsCount = 1_000_000
 )
 

@@ -30,12 +30,12 @@ var clickhouseMemo fixture[ClickHouseFixture]
 const (
 	clickhouseImage      = "clickhouse/clickhouse-server:26.3"
 	clickhouseAdminUser  = "kira_admin"
-	clickhouseAdminPass  = "kira"
+	clickhouseAdminPass  = FixturePassword
 	clickhouseDatabase   = "kira_test"
 	clickhouseUsername   = "kira"
-	clickhousePassword   = "kira"
+	clickhousePassword   = FixturePassword
 	clickhouseROUsername = "kira_ro"
-	clickhouseROPassword = "kira"
+	clickhouseROPassword = FixturePassword
 )
 
 // StartClickHouse is support/clickhouse.ts's startClickHouse. See fixture.go's own doc comment for

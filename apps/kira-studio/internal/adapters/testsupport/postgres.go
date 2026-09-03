@@ -54,7 +54,7 @@ func repoRoot() string {
 
 const (
 	defaultPostgresImage = "postgres:17-alpine"
-	password             = "kira"
+	password             = FixturePassword
 	database             = "kira_test"
 )
 

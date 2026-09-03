@@ -18,7 +18,7 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 	f := testsupport.StartClickHouse(t)
 
 	database := *f.Config.Database
-	uri := fmt.Sprintf("clickhouse://kira:kira@%s:%d/%s", *f.Config.Host, *f.Config.Port, database)
+	uri := fmt.Sprintf("clickhouse://kira:%s@%s:%d/%s", testsupport.FixturePassword, *f.Config.Host, *f.Config.Port, database)
 
 	testsupport.RunMatrix(t, "clickhouse", f, f.Config, []testsupport.Case{
 		{
@@ -38,7 +38,7 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 			Name: "kira_admin, database unset",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Username = testsupport.Strp("kira_admin")
-				c.Password = testsupport.Strp("kira")
+				c.Password = testsupport.Strp(testsupport.FixturePassword)
 				c.Database = nil
 				return c
 			},
@@ -66,7 +66,7 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 			Name: "kira_ro, database=kira_test",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Username = testsupport.Strp("kira_ro")
-				c.Password = testsupport.Strp("kira")
+				c.Password = testsupport.Strp(testsupport.FixturePassword)
 				return c
 			},
 			Expect: testsupport.Outcome{Succeed: true},

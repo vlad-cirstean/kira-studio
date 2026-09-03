@@ -27,7 +27,7 @@ import (
 // client listener is SASL_PLAINTEXT/PLAIN, with one user baked in at boot.
 const (
 	kafkaSaslUsername       = "kira"
-	kafkaSaslPassword       = "kira"
+	kafkaSaslPassword       = FixturePassword
 	kafkaSaslClusterID      = "kira-sasl-test-cluster"
 	kafkaSaslContainerPort  = "9095/tcp"
 	kafkaSaslControllerPort = "9094/tcp"

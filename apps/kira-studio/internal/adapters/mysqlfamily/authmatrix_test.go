@@ -50,7 +50,7 @@ func runFamilyAuthMatrix(t *testing.T, kind string, fixture any, cfg model.Resol
 	mustExecSQL(t, root, "GRANT SELECT ON kira_test.* TO '"+roleName+"'@'%'")
 	mustExecSQL(t, root, "FLUSH PRIVILEGES")
 
-	uri := fmt.Sprintf("%s://kira:kira@%s:%d/kira_test", kind, host, port)
+	uri := fmt.Sprintf("%s://kira:%s@%s:%d/kira_test", kind, testsupport.FixturePassword, host, port)
 
 	testsupport.RunMatrix(t, kind, fixture, cfg, []testsupport.Case{
 		{
@@ -85,7 +85,7 @@ func runFamilyAuthMatrix(t *testing.T, kind string, fixture any, cfg model.Resol
 			// produces.
 			Name: "root, database unset",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
-				c.Username, c.Password = testsupport.Strp("root"), testsupport.Strp("kira")
+				c.Username, c.Password = testsupport.Strp("root"), testsupport.Strp(testsupport.FixturePassword)
 				c.Database = nil
 				return c
 			},

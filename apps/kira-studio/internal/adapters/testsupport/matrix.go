@@ -16,6 +16,21 @@ import (
 
 const matrixEnv = "KIRA_TEST_MATRIX"
 
+// FixturePassword is the shared default password every container fixture's baked-in principal
+// uses (postgres.go, mariadb.go, mysql.go, mongo.go, clickhouse.go, redis.go, kafka_sasl.go) —
+// exported so a per-adapter authmatrix_test.go that needs the real credential (rather than an
+// intentionally-wrong one) references this instead of re-typing the literal, the exact drift this
+// constant exists to prevent. Deliberately not "kira": that used to be the shared default, and
+// "kira" is a substring of several fixture identifiers a driver can legitimately echo in error
+// text — the database names kira_test/kira_analytics/kira_admin, kafka's own "kira-studio" client
+// id and "kira-sasl-test-cluster" cluster id — so a passing case's incidental error text could
+// satisfy this file's own password-leak assertion below by accident, on a message that never
+// actually echoed the password. No case triggers that today (every failing case already overrides
+// the password to something else distinctive), but the hazard is real for future additions
+// (finding 7). A fixture's own password must never collide as a substring with any other fixture
+// identifier.
+const FixturePassword = "kira-fixture-pw"
+
 // RequireMatrix skips unless the complete suite was explicitly asked for. Call it before starting
 // any fixture (StartX), not just before RunMatrix — an ordinary `go test ./...` must never pay for
 // a container this tier alone needs.
