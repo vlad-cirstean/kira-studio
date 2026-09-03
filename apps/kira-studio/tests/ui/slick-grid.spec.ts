@@ -679,6 +679,49 @@ test('P22 iter2-pacing — tearing down the grid with a catch-up render still ar
   expect(closedBytes).toBe(baselineBytes);
 });
 
+// P22 Pass B postscript §14.2 — root cause: stock `bindAncestorScrollEvents` (slick.grid.ts) binds
+// a capture-phase 'scroll' listener directly on `document` via `BindingEventService.bind(document,
+// "scroll", handler, true)`, but `BindingEventService.unbind()` (called by every `destroy()` path)
+// calls `removeEventListener(eventName, listener)` with no capture argument — a spec-defined no-op
+// against a capture-phase listener, so it is never actually removed. It survives the grid's own
+// teardown and throws `_viewport.includes` (`_viewport` nulled by the same `destroy(true)`) on the
+// next scroll event ANYWHERE in the document, not just the grid's own viewport. kiraSlickGrid.ts's
+// own `bindAncestorScrollEvents`/`destroy` overrides bind and remove it directly, bypassing the
+// buggy service. Reproduced against the pre-fix code before writing this test: the exact
+// `TypeError: null is not an object (evaluating 'this._viewport.includes')` WebKit throws.
+test('P22 postscript — a scroll event anywhere in the document after grid teardown never throws', async ({
+  relaunch,
+}) => {
+  test.setTimeout(60_000);
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  const pageErrors: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(String(err)));
+
+  await connectAndOpenSpikeGrid(page);
+  await rightViewport(page).evaluate((el) => {
+    el.scrollTop = 500;
+    el.scrollLeft = 300;
+  });
+  await page.waitForTimeout(50);
+
+  await page.locator('[data-testid="tab"].is-active [data-testid="tab-close"]').click();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+  await expect(page.locator('.slick-viewport')).toHaveCount(0);
+
+  // A document-level scroll — not scoped to the (now-gone) grid's own viewport at all, matching
+  // bindAncestorScrollEvents' own global-capture reach — plus one from an unrelated scrollable
+  // element (bubbling through document), the two ways this listener could ever be invoked.
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('scroll'));
+    document
+      .querySelector('[data-testid="tree"]')
+      ?.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  await page.waitForTimeout(50);
+
+  expect(pageErrors).toEqual([]);
+});
+
 // P22 iter2-onset §6 — the gesture-onset defect's own sandbox-provable gates.
 //
 // What this proves, and what it does not. It gates the *mechanism*: no render pass sizes its

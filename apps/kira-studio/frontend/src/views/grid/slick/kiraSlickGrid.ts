@@ -246,6 +246,40 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     });
   }
 
+  /** P22 Pass B postscript §14.2 — root-caused the "`_viewport.includes` uncaught exception from
+   *  `bindAncestorScrollEvents`" item, confirmed with a real browser (`removeEventListener` without
+   *  a matching `capture` flag is a documented no-op per spec, verified live via
+   *  `document.dispatchEvent(new Event('scroll'))` after the exact call shape below). Stock
+   *  `bindAncestorScrollEvents` (slick.grid.ts) does:
+   *    `this._bindingEventService.bind(document, "scroll", handler, true)`
+   *  — the trailing `true` is `useCapture`. `BindingEventService.unbind()` (called by `destroy()`'s
+   *  own `unbindAll()`, and by every other per-element unbind in `destroy()`) calls
+   *  `element.removeEventListener(eventName, listener)` with **no capture argument at all** —
+   *  `removeEventListener` only removes a listener registered with the *same* capture flag, so this
+   *  capture-phase, document-level listener is never actually removed by any destroy path in the
+   *  library. It survives the grid instance's own teardown, keeps firing on every scroll event
+   *  anywhere in the document (it was never scoped to this grid's own container), and dereferences
+   *  `this._viewport` — nulled by `destroyAllElements()` in the same `destroy(true)` call — on the
+   *  very next one. Not a call-order gap in this app's own code (`destroy()`/`unbindAll()` do run in
+   *  the order this file's own next comment already relies on) — a real bug in the vendored
+   *  library's own capture-flag handling. Fixed the same way `getRenderedRange`/`render` are
+   *  overridden: bind it ourselves, outside the buggy service, so it can be removed correctly. */
+  private ancestorScrollHandler: ((e: Event) => void) | null = null;
+
+  override bindAncestorScrollEvents(): void {
+    const handler = (e: Event): void => {
+      const target = e.target;
+      if (
+        this._viewport?.includes(target as HTMLDivElement) ||
+        (target instanceof Node && this._container && target.contains(this._container))
+      ) {
+        this.handleActiveCellPositionChange();
+      }
+    };
+    this.ancestorScrollHandler = handler;
+    document.addEventListener('scroll', handler, true);
+  }
+
   /** P22 iter2-pacing D4 — SlickGrid's own `destroy()` never clears `this.initialized` and nulls
    *  ~60 internal element references (dist/esm/index.js:7674-7700, :7723-7725), so a catch-up
    *  render armed by `getRenderedRange` and still pending when the host unmounts would re-enter
@@ -253,6 +287,12 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  is still `true` and dereferencing a nulled element. Cancel the pending rAF (and stop it from
    *  re-arming) before handing off to the real teardown. */
   override destroy(shouldDestroyAllElements?: boolean): void {
+    // The fix above's other half — remove with the exact capture flag it was added with, before
+    // `super.destroy()` ever gets a chance to null `_viewport`/`_container` out from under it.
+    if (this.ancestorScrollHandler) {
+      document.removeEventListener('scroll', this.ancestorScrollHandler, true);
+      this.ancestorScrollHandler = null;
+    }
     if (this.chaseHandle) cancelAnimationFrame(this.chaseHandle);
     this.chaseHandle = 0;
     this.chaseWanted = false;
