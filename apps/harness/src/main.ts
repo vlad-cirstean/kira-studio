@@ -1,15 +1,15 @@
 import { CommitStore, layoutAppend } from "@kira-version/core";
 import {
-  createLayoutClient,
   DEFAULT_COLUMN_WIDTHS,
   DEFAULT_DETAIL_WIDTH,
-  InMemoryViewStateStore,
+  createLayoutClient,
   mount,
   type TokenMap,
   TokenReader,
 } from "@kira-version/ui";
 import { createMockBridge } from "./mockBridge.ts";
 import { loadScenario } from "./scenarios/index.ts";
+import { SessionStorageViewStateStore } from "./sessionViewStateStore.ts";
 import { EPOCH_SECONDS, STEP_SECONDS, topology } from "./scenarios/topology.ts";
 import { applyThemeKind, isThemeKind, type ThemeKind } from "./themeSwitcher.ts";
 
@@ -148,30 +148,37 @@ window.__kiraHarness = {
   },
 };
 
-// There is no repo-picker UI yet (P4+) — `App.vue`'s own `bootstrap()` only opens a repo
-// automatically when `viewState.read()` returns a persisted, non-null `repoId`. Pre-seeding it
-// here (via `setRaw`, the store's documented test-only injection hook) exploits that existing
-// logic to get every scenario auto-loading on mount.
-const viewState = new InMemoryViewStateStore();
-let repoId: string | null = null;
-try {
-  const scenario = loadScenario(scenarioName);
-  if (scenario.repoOpen.kind === "ok") repoId = scenario.repoOpen.repo.repoId;
-} catch {
-  // An unimplemented scenario stub (dirty/conflicted, see their own files) throws on any
-  // property access by design — leave repoId null and let bootstrap() run without opening a
-  // repo, rather than crash the page before the shell itself has a chance to render.
+// `App.vue`'s own `bootstrap()` only opens a repo automatically when `viewState.read()` returns
+// a persisted, non-null `repoId` — exploited here to get every scenario auto-loading on mount,
+// same as before `SessionStorageViewStateStore` (P4 W13) replaced the old in-memory store. The
+// difference that matters now: seed a default state only when nothing is there yet. The old
+// in-memory store started empty on every navigation by construction, so writing fresh defaults
+// unconditionally was a no-op difference; `sessionStorage` genuinely survives a `page.reload()`,
+// and unconditionally overwriting it here would silently discard whatever `App.vue`'s own
+// persistence watch (a column resize, say) had just written — defeating the one thing this
+// store swap exists to let a Playwright spec exercise.
+const viewState = new SessionStorageViewStateStore();
+if (viewState.read() === null) {
+  let repoId: string | null = null;
+  try {
+    const scenario = loadScenario(scenarioName);
+    if (scenario.repoOpen.kind === "ok") repoId = scenario.repoOpen.repo.repoId;
+  } catch {
+    // An unimplemented scenario stub (dirty/conflicted, see their own files) throws on any
+    // property access by design — leave repoId null and let bootstrap() run without opening a
+    // repo, rather than crash the page before the shell itself has a chance to render.
+  }
+  viewState.write({
+    version: 2,
+    repoId,
+    loadedRows: 0,
+    detailOpen: true,
+    scrollRow: 0,
+    selectedSha: null,
+    columnWidths: DEFAULT_COLUMN_WIDTHS,
+    dateFormat: "relative",
+    detailWidth: DEFAULT_DETAIL_WIDTH,
+  });
 }
-viewState.setRaw({
-  version: 2,
-  repoId,
-  loadedRows: 0,
-  detailOpen: true,
-  scrollRow: 0,
-  selectedSha: null,
-  columnWidths: DEFAULT_COLUMN_WIDTHS,
-  dateFormat: "relative",
-  detailWidth: DEFAULT_DETAIL_WIDTH,
-});
 
 mount(container, { transport, viewState, host: "harness" });

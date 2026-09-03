@@ -25,4 +25,10 @@ export const clean: Scenario = {
     },
   },
   commits,
+  // A second entry so the repo picker (P4 W13) has something to click besides the active repo's
+  // own already-checkmarked row — `repo.open` ignores which one, per this file's own type doc.
+  candidates: [
+    { path: "/repos/clean", label: "clean" },
+    { path: "/repos/other", label: "other-repo" },
+  ],
 };

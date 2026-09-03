@@ -126,16 +126,33 @@ export function chain(count: number, prefix: string): CommitRecord[] {
   for (let i = count - 1; i >= 0; i--) {
     const name = `${prefix}-${i}`;
     const parentName = i > 0 ? `${prefix}-${i - 1}` : undefined;
-    const timestamp = EPOCH_SECONDS + i * STEP_SECONDS;
-    const identity = { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp };
-    records.push({
-      sha: shaFor(name),
-      parents: parentName ? [shaFor(parentName)] : [],
-      author: identity,
-      committer: identity,
-      subject: name,
-      decoration: [],
-    });
+    records.push(commitByName(name, parentName ? [parentName] : [], i));
   }
   return records;
+}
+
+/**
+ * One `CommitRecord` by name, exactly as `chain()` and `topology()` each build one internally —
+ * exported (P4 W13) so a scenario that needs a *shaped* history no O(1) generator here already
+ * covers (e.g. `pagedBranch`'s trunk-plus-one-open-side-branch, where the two chains must
+ * interleave in a specific row order) can still avoid `topology()`'s spec-string parsing at
+ * multi-thousand-commit scale. `index` only ever feeds the timestamp — callers needing a stable
+ * `EPOCH_SECONDS`-relative ordering across two independently-generated chains should pick indices
+ * from one shared, monotonic sequence, the same way this file's own two generators already do.
+ */
+export function commitByName(
+  name: string,
+  parentNames: readonly string[],
+  index: number,
+): CommitRecord {
+  const timestamp = EPOCH_SECONDS + index * STEP_SECONDS;
+  const identity = { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp };
+  return {
+    sha: shaFor(name),
+    parents: parentNames.map(shaFor),
+    author: identity,
+    committer: identity,
+    subject: name,
+    decoration: [],
+  };
 }

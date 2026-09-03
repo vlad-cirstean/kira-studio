@@ -1,5 +1,5 @@
 import type { CommitRecord } from "@kira-version/core";
-import type { GitStatus, RepoOpenResult } from "@kira-version/ipc";
+import type { GitStatus, RepoCandidate, RepoOpenResult } from "@kira-version/ipc";
 
 /**
  * A named, deep-linkable state the harness can render (`?scenario=<name>`). P3 W14 grows this
@@ -19,4 +19,11 @@ export interface Scenario {
   /** Newest-first, exactly as `git log` and `CommitStore.append`/`appendPage` both expect.
    *  Empty for a scenario whose `repoOpen` never succeeds. */
   readonly commits: readonly CommitRecord[];
+  /** `repo.list`'s answer for this scenario (P4 W13) — absent (equivalent to `[]`) for every
+   *  scenario that does not care about the repo picker's candidate list. Real git-repo discovery
+   *  is not modelled; a scenario simply states the candidates it wants `RepoPicker.vue` to show,
+   *  independent of `repoOpen`'s own "ignores `path`, one repo per scenario" behaviour (its own
+   *  doc comment) — clicking a candidate here still opens *this* scenario's one repo, which is
+   *  enough to exercise the picker's own open/close/emit flow. */
+  readonly candidates?: readonly RepoCandidate[];
 }
