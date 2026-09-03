@@ -251,6 +251,18 @@ export const CELL_BUDGET = 2200;
 // incumbent grid goes through instead), so this constant is SlickGrid-only.
 export const MAX_NEW_CELLS_PER_RENDER = 600;
 
+// P22 iter2-pacing D2: a separate, SEPARATELY-CAPPED per-render budget for *runway* (beyond
+// strictly-visible) growth only — MAX_NEW_CELLS_PER_RENDER above stays the absolute per-pass
+// ceiling and the step-6 floor short-circuit unchanged. Lowering this makes the runway grow in
+// small even steps instead of one large step followed by a cliff (a variance reduction, not a
+// total-work reduction), and it trades directly against how fast the runway converges
+// (uncoveredPx). Defaulted EQUAL to MAX_NEW_CELLS_PER_RENDER — i.e. behaviourally neutral, byte-
+// identical to today's emitted range — because nobody has a real-hardware number for it yet;
+// docs/PERF.md §2.1c step 4 is the A/B that sets it. Same precedent as forceSyncScrollingOverride
+// (main.ts): a dial with a documented default, not a silent behaviour change. Consumed by
+// views/grid/slick/kiraSlickGrid.ts's own getRenderedRange override, step 7.
+export const MAX_NEW_LEAD_CELLS_PER_RENDER = MAX_NEW_CELLS_PER_RENDER;
+
 // P22 iter2-pacing D1. Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
 // MAX_NEW_CELLS_PER_RENDER: how long the viewport must go without a native scroll event before a
 // self-scheduled catch-up render is allowed to run. A catch-up that fires while a fling is still

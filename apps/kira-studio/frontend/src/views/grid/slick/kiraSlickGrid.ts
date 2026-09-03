@@ -8,6 +8,7 @@ import {
   LEAD_FRAMES,
   MAX_LEAD_PX,
   MAX_NEW_CELLS_PER_RENDER,
+  MAX_NEW_LEAD_CELLS_PER_RENDER,
   OVERSCAN_PX,
   type RowRangeExtractorConfig,
   rowRangeBounds,
@@ -35,6 +36,8 @@ declare global {
        *  unconditionally" behaviour exactly, so the real-Mac A/B (docs/PERF.md §2.1c) is a console
        *  line, not a rebuild. */
       chaseQuietMsOverride?: number;
+      /** P22 iter2-pacing D2: overrides columns.ts's MAX_NEW_LEAD_CELLS_PER_RENDER. */
+      maxNewLeadCellsPerRenderOverride?: number;
     };
   }
 }
@@ -271,7 +274,17 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       // until either `target` is reached or the remaining budget is exhausted. A row already inside
       // `prev` costs nothing to add (SlickGrid skips it — it's already in rowsCache); only a genuinely
       // new row spends budget, so growth only stalls when it actually reaches un-cached territory.
-      let remaining = budgetRows - mustNewRows;
+      //
+      // P22 iter2-pacing D2: the *runway* portion of this budget is additionally capped by
+      // MAX_NEW_LEAD_CELLS_PER_RENDER (or its override), separately from budgetRows above (which
+      // stays the absolute per-pass ceiling and step 6's own floor short-circuit). Defaulted equal
+      // to MAX_NEW_CELLS_PER_RENDER, so `leadBudgetRows` never binds tighter than `budgetRows -
+      // mustNewRows` unless a real-hardware A/B (docs/PERF.md §2.1c step 4) overrides it — this
+      // `min` is then a no-op and `remaining` is byte-identical to iter2-scroll-gaps' own value.
+      const maxLeadCells =
+        tuning?.maxNewLeadCellsPerRenderOverride ?? MAX_NEW_LEAD_CELLS_PER_RENDER;
+      const leadBudgetRows = Math.floor(maxLeadCells / Math.max(1, this.mountedColumnCount || 1));
+      let remaining = Math.min(budgetRows - mustNewRows, leadBudgetRows);
       start = mustStart;
       end = mustEnd;
       const growEnd = (limit: number) => {

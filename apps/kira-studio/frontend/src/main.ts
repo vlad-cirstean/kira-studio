@@ -197,6 +197,13 @@ declare global {
        *  (docs/PERF.md §2.1c) is a console line, not a rebuild. See kiraSlickGrid.ts's own
        *  `scheduleChase` for why the gate is scroll quiescence, not a same-frame-render token. */
       chaseQuietMsOverride?: number;
+      /** P22 iter2-pacing D2: a per-render cap on *runway* (beyond strictly-visible) growth,
+       *  separate from maxNewCellsPerRenderOverride above (which stays the absolute per-pass
+       *  ceiling and the floor short-circuit) — overrides columns.ts's
+       *  MAX_NEW_LEAD_CELLS_PER_RENDER. Defaulted equal to MAX_NEW_CELLS_PER_RENDER (neutral, no
+       *  behaviour change) pending a real-hardware A/B (docs/PERF.md §2.1c step 4) on the
+       *  variance-vs-convergence trade lowering it makes. */
+      maxNewLeadCellsPerRenderOverride?: number;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
