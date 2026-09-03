@@ -176,7 +176,58 @@ let prevOffsetT = 0;
 let scrollEventSeq = 0;
 const MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME = 800;
 
+/**
+ * P22 iter2-onset D1 — the gesture-onset fix. `false` restores the pre-fix behaviour *exactly*
+ * (sampling only from `onViewportScroll` below, with no dedupe), so the real-Mac A/B is a console
+ * line and not a rebuild — the same contract `chaseQuietMsOverride = 0` already has.
+ */
+function freshVelocitySample(): boolean {
+  return window.__kiraGridTuning?.freshVelocitySampleOverride ?? true;
+}
+
+/**
+ * P22 iter2-onset D1. The sampler's single write point, so it can be driven from *either* the
+ * scroll listener below or — the fix — from `velocity()` itself, at the moment the value is
+ * actually consumed.
+ *
+ * Why the fix is needed at all, read from source this session: SlickGrid binds its own viewport
+ * `scroll` listener inside `finishInitialization()` (slickgrid dist/esm/index.js:7572, reached from
+ * the constructor because `explicitInitialization: false`), and this host binds `onViewportScroll`
+ * on that same element only *after* `new KiraSlickGrid(...)` returns. Two non-capturing listeners
+ * on one target fire in registration order, so SlickGrid's `handleScroll` — and the synchronous
+ * `render()` → `getRenderedRange()` → `velocity()` it drives (`_handleScroll`, :10589) — always ran
+ * one sample *ahead* of this host's own sampling of the very event that triggered it. Mid-fling
+ * that staleness is harmless (velocity barely changes frame to frame). At the first render of a
+ * fresh gesture it is not: the only sample on hand is the one taken *before* the gesture began, so
+ * `performance.now() - lastOffsetT > 150` fires and `velocity()` returns `{0, 0}` — the grid sizes
+ * its runway as if standing still, `target` collapses to the base runway, the per-call budget is
+ * left entirely unspent, and `getRenderedRange` does not even flag a deficit (`chaseWanted` is
+ * false, because the range it returned *does* reach that collapsed target). One whole frame of
+ * runway-building is lost at the exact moment a fling needs it most, on every gesture.
+ *
+ * The dedupe is what makes pulling safe: a scroll event that did not move the vertical offset is
+ * not a velocity sample (a *horizontal* scroll fires this same listener), and without it a
+ * listener-driven sample landing after a pull of the same position would shift `prev` up to
+ * `last` and read the next frame's delta as 0.
+ */
+function recordOffsetSample(offset: number, now: number): void {
+  if (freshVelocitySample() && offset === lastOffset) return;
+  prevOffset = lastOffset;
+  prevOffsetT = lastOffsetT;
+  lastOffset = offset;
+  lastOffsetT = now;
+}
+
 function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
+  // P22 iter2-onset D1 — sample at the point of consumption, not one listener too late (see
+  // recordOffsetSample above). This adds one `scrollTop` read per render pass; it is inside the
+  // envelope getRenderedRange already works in, which does its own layout read
+  // (`getCanvasNode(1)?.clientWidth`) and is reached from `_handleScroll`, which has just read
+  // scrollHeight/clientHeight/scrollWidth/clientWidth off the same element (dist/esm/index.js:10576)
+  // — layout is already flushed at this point on the scroll path.
+  if (freshVelocitySample() && viewportEl) {
+    recordOffsetSample(viewportEl.scrollTop, performance.now());
+  }
   const dt = lastOffsetT - prevOffsetT;
   if (!prevOffsetT || dt <= 0 || performance.now() - lastOffsetT > 150) {
     return { pxPerFrame: 0, direction: 0 };
@@ -200,10 +251,10 @@ function onViewportScroll(): void {
   scrollTrace.noteScrollEvent(el.scrollTop, now);
   window.__kiraGridScrollWorkStart?.(now);
   scrollEventSeq++;
-  prevOffset = lastOffset;
-  prevOffsetT = lastOffsetT;
-  lastOffset = el.scrollTop;
-  lastOffsetT = now;
+  // P22 iter2-onset D1: still the sampler's other driver, unchanged in effect — but now a no-op
+  // whenever velocity() already pulled this very position a moment earlier, from inside the
+  // render this same event drove (see recordOffsetSample's own comment).
+  recordOffsetSample(el.scrollTop, now);
 }
 
 let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -358,6 +409,16 @@ onMounted(() => {
   if (viewportEl && t) {
     viewportEl.scrollTop = t.state.scrollTop;
     viewportEl.scrollLeft = t.state.scrollLeft;
+  }
+  if (viewportEl) {
+    // P22 iter2-onset D1 — seed the sampler's baseline at mount (after the restored scroll position
+    // is applied, before the first render), so the *first* gesture in a tab's life has a `prev`
+    // sample to diff against. Without it `prevOffsetT` is still 0 when that gesture's first render
+    // pulls, velocity() takes its own `!prevOffsetT` branch, and the exact defect this fix exists
+    // for survives on one gesture per tab. `grid.render()` just below pulls the same position and
+    // dedupes, so this seeding costs nothing and changes nothing at rest.
+    lastOffset = viewportEl.scrollTop;
+    lastOffsetT = performance.now();
   }
   grid.render();
   applyStaticCssLayers();

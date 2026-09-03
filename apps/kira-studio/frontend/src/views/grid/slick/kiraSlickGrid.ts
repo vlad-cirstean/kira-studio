@@ -43,6 +43,10 @@ declare global {
        *  sufficient. `chaseQuietMsOverride = 0` still disables both at once, so that override keeps
        *  its documented "the pre-fix policy exactly" meaning. */
       chaseFrameGateOverride?: boolean;
+      /** P22 iter2-onset D1: read by SlickGridHost.vue's own velocity sampler, not by this file —
+       *  declared here too only because this program's declaration merging requires an identical
+       *  shape to main.ts's own. See main.ts's own doc comment for what it does. */
+      freshVelocitySampleOverride?: boolean;
     };
   }
 }

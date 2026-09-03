@@ -213,6 +213,15 @@ declare global {
        *  both at once and so keeps its documented "the pre-fix policy exactly" meaning. See
        *  kiraSlickGrid.ts's own `scheduleChase` for the measurement behind it. */
       chaseFrameGateOverride?: boolean;
+      /** P22 iter2-onset D1: whether a render pass samples the viewport's scroll offset itself, at
+       *  the moment it needs the velocity, instead of relying on the host's own `scroll` listener —
+       *  which SlickGrid's constructor-registered listener always beats to the same event, leaving
+       *  every render one sample behind and the *first* render of every fresh gesture reading "at
+       *  rest" outright. Defaults to `true` (the fix on); `false` restores the pre-fix behaviour
+       *  exactly, so the real-Mac A/B (docs/PERF.md §2.1c) is a console line, not a rebuild. Read
+       *  fresh on every sample, never cached. See SlickGridHost.vue's own `recordOffsetSample` for
+       *  the source citations behind the ordering claim. */
+      freshVelocitySampleOverride?: boolean;
     };
     /**
      * Playwright-only hook (tests/ui/budgets.spec.ts) — GridRow.vue's own onUpdated, so a test can
