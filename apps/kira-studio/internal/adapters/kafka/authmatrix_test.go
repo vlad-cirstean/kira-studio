@@ -42,6 +42,20 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{NotCode: adapters.CodeAuth},
 		},
 		{
+			// finding 6: a half-filled username/password pair must not hard-fail against a broker
+			// that never asked for SASL at all — ConnectionDialog.vue pairs the two fields on one
+			// row, so a stray, half-typed credential is a common state to leave a PLAINTEXT
+			// connection in. client.go's own guard only applies when the anonymous dial itself
+			// fails the way a SASL-requiring broker does; against this PLAINTEXT broker the dial
+			// just succeeds, ignoring the stray field, exactly as it did before P25 §1.4.
+			Name: "PLAINTEXT broker, username set, password unset (half-filled)",
+			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
+				c.Username, c.Password = testsupport.Strp("kira"), nil
+				return c
+			},
+			Expect: testsupport.Outcome{Succeed: true},
+		},
+		{
 			Name: "PLAINTEXT broker, options.sslmode garbage",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Options = map[string]any{"sslmode": "garbage"}
