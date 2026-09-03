@@ -60,6 +60,29 @@
   border-top: none;
 }
 
+/* P22 residual header-scroll flicker (postscript §14.2, "better but there is still some"),
+   root-caused with a real Chromium CDP `Tracing.start` capture (`disabled-by-default-devtools.
+   timeline`) across a 40-tick `page.mouse.wheel` horizontal fling — the "headers aren't
+   virtualized" guess turned out to be a proxy for the real, narrower mechanism: `scrollToX`
+   (slick.grid.ts) repositions `.slick-header-columns` purely via its *scroll parent*'s native
+   `scrollLeft` (`_headerScrollContainer.scrollLeft = x`), never a `transform`, and the browser
+   does not composite an `overflow: hidden` element's own scrolled content by default the way it
+   does a user-scrollable `overflow: auto` one — each tick synchronously repainted the WHOLE
+   61-column strip (measured: 511 header-node `Paint` events over 40 ticks, i.e. every column
+   individually plus the strip itself, ~12.8/tick) even though nothing about the header's own
+   content ever changes on a horizontal scroll, only its position (`onHeaderCellRendered` only
+   ever rebuilds this DOM on a `setColumns` call, confirmed unchanged by this fix). `will-change:
+   transform` hints the compositor to promote this element's scrolled content to its own layer, the
+   standard fix for exactly this "synchronize a secondly-scrolled strip with the primary scroll,
+   cheaply" case — re-measured after: 48 header-node paints over the same 40-tick trace (91% fewer),
+   with `.slick-header-columns` itself no longer individually repainted at all. Real-Mac WebKit
+   confirmation (docs/PERF.md §2.1c) is still the final word on the user-visible flicker, same
+   caveat as every other item in that postscript section — this is the concrete, measured mechanism
+   this sandbox's compositor can actually show, not a guess. */
+.slick-grid-host .slick-header-columns {
+  will-change: transform;
+}
+
 /* P22 Pass B, visual-parity fix — GridRow.vue's own header cell (`.header-cell`, DataGrid.vue) is a
    flex row so a long column name can ellipsis on its own (`.header-label`'s own overflow/
    text-overflow) while `PK`/`FK` (`.header-key`'s own `flex-shrink: 0`) always stays fully
