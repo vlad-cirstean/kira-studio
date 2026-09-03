@@ -17,7 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
-import { gridCell, gridScroller } from './support/grid';
+import { gridCell, gridCellSelector, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import type { ControlLogEntry } from './support/mockRuntime';
 import type { SeenPortRequest } from './support/mockStream';
@@ -185,12 +185,27 @@ async function selectCell(
 // visibleColumnIndices) — a column not currently scrolled into view simply has no DOM node, so a
 // wide_table column past the first screenful must be scrolled into view before it can be selected
 // or asserted on.
+//
+// P22 postscript-follow-up: this used to poll `[data-testid="grid-header-cell"]` for the guard —
+// correct against the incumbent engine (DataGrid.vue), which virtualized header columns exactly
+// like data cells, but stale against SlickGrid: `SlickGridHost.vue`'s own `buildColumns` sets
+// `headerCellAttrs` on every `Column` up front, and SlickGrid builds every header cell once per
+// `setColumns` call regardless of scroll position (`onHeaderCellRendered`'s own comment — "headers
+// aren't virtualized"), so a header locator's count is never 0, the `if` below never entered its
+// own scroll loop, and the function silently did nothing while the *data cell* (still genuinely
+// column-virtualized) stayed off-DOM — the real mechanism behind three `cell-editor.spec.ts`
+// failures bisected to before this whole migration started (they never depended on which grid
+// engine was live; only this helper's own guard did). Root-caused and fixed here rather than
+// worked around: poll the data cell itself, the thing that's actually gated on scroll position
+// under both engines, with `row` (default 0, matching every call site but the two `big_text` ones)
+// naming which row's cell has to exist.
 async function scrollColumnIntoView(
   page: import('@playwright/test').Page,
   column: string,
+  row = 0,
 ): Promise<void> {
   const grid = gridScroller(page);
-  const target = page.locator(`[data-testid="grid-header-cell"][data-column="${column}"]`);
+  const target = page.locator(gridCellSelector(row, column));
   if ((await target.count()) === 0) {
     await grid.evaluate((el) => {
       el.scrollLeft = 0;
@@ -568,7 +583,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await selectCell(page, 1, 'label');
   await expect(page.locator('[data-testid="cell-editor-badge-empty"]')).toBeVisible();
 
-  await scrollColumnIntoView(page, 'big_text');
+  await scrollColumnIntoView(page, 'big_text', 3);
   await selectCell(page, 3, 'big_text');
   await expect(page.locator('[data-testid="cell-editor-badge-truncated"]')).toBeVisible();
   await expect(page.locator('[data-testid="cell-editor-status"]')).toContainText('64 KB');
@@ -1055,7 +1070,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // --- a truncated value refuses both editors (D27/F7f) -----------------------------------------
   const nullsRow2 = await findRow(page, NULLS_PATH);
   await nullsRow2.dblclick();
-  await scrollColumnIntoView(page, 'big_text');
+  await scrollColumnIntoView(page, 'big_text', 3);
   await selectCell(page, 3, 'big_text');
   await panel.waitFor();
   await expect(panel).toHaveAttribute('data-read-only-reason', 'value-truncated');
