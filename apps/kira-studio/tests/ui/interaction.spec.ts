@@ -4,6 +4,15 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import {
+  cellNavButton,
+  cellText,
+  clickCellNav,
+  gridCell,
+  gutterCell,
+  headerCell,
+  nullMarker,
+} from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -913,34 +922,6 @@ async function openSubmenu(page: Page, triggerId: string): Promise<void> {
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
 }
 
-function gridCell(page: Page, row: number, column: string): Locator {
-  return page.locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`);
-}
-
-async function cellText(page: Page, row: number, column: string): Promise<string> {
-  return (await gridCell(page, row, column)).innerText();
-}
-
-function cellNavButton(page: Page, row: number, column: string): Locator {
-  return gridCell(page, row, column).locator('[data-testid="cell-nav-button"]');
-}
-
-// P7 D6: a cell's nav button only appears while its .grid-cell carries .selected (pure-CSS
-// hover/selection gate, D5) — select it first the same way a real user's click would, then act
-// on the now-visible button.
-async function clickCellNav(page: Page, row: number, column: string): Promise<void> {
-  await gridCell(page, row, column).click();
-  await cellNavButton(page, row, column).click();
-}
-
-function gutterCell(page: Page, row: number): Locator {
-  return page.locator('[data-testid="grid-gutter-cell"]').nth(row);
-}
-
-function headerCell(page: Page, column: string): Locator {
-  return page.locator(`[data-testid="grid-header-cell"][data-column="${column}"]`);
-}
-
 async function clipboardText(page: Page): Promise<string> {
   return page.evaluate(() => navigator.clipboard.readText());
 }
@@ -1040,7 +1021,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await rightClick(gridCell(page, 0, 'name'));
   await page.click('[data-testid="menu-item-set-null"]');
   await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
-  await expect(gridCell(page, 0, 'name').locator('.cell-null')).toHaveText('NULL');
+  await expect(nullMarker(gridCell(page, 0, 'name'))).toHaveText('NULL');
 
   // Filter by this value on the now-null cell exercises the "IS NULL" branch — no fixture row
   // has a real NULL name, so 0 rows matching proves the generated clause is IS NULL, not = ''.
@@ -1383,7 +1364,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'manager_id')).toBeVisible();
   expect(await cellText(page, 0, 'name')).toBe('Ada');
-  await expect(gridCell(page, 0, 'manager_id').locator('.cell-null')).toHaveText('NULL');
+  await expect(nullMarker(gridCell(page, 0, 'manager_id'))).toHaveText('NULL');
   await gridCell(page, 0, 'manager_id').click();
   await expect(cellNavButton(page, 0, 'manager_id')).toHaveCount(0);
 

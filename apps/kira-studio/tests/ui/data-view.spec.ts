@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { cellText, gridCell, gridRow, gridScroller, nullMarker } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -1116,20 +1117,12 @@ const PORT: PortSnapshot[] = [
   },
 ];
 
-function gridCell(page: Page, row: number, column: string) {
-  return page.locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`);
-}
-
-async function cellText(page: Page, row: number, column: string): Promise<string> {
-  return (await gridCell(page, row, column)).innerText();
-}
-
-// The grid is virtualized (DataGrid.vue) — only the scrolled-into-view + overscan rows exist in
-// the DOM at any moment, so "N rows loaded" is asserted by scrolling to each end and reading the
-// gutter, not by counting DOM nodes (ported from tests/e2e/data-view.spec.ts unchanged — real
-// Electron hit the identical virtualization).
+// The grid is virtualized — only the scrolled-into-view + overscan rows exist in the DOM at any
+// moment, so "N rows loaded" is asserted by scrolling to each end and reading the gutter, not by
+// counting DOM nodes (ported from tests/e2e/data-view.spec.ts unchanged — real Electron hit the
+// identical virtualization).
 async function scrollGridToBottom(page: Page): Promise<void> {
-  const grid = page.locator('[data-testid="data-grid"]');
+  const grid = gridScroller(page);
   await grid.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
@@ -1137,7 +1130,7 @@ async function scrollGridToBottom(page: Page): Promise<void> {
 }
 
 async function firstGutterNumber(page: Page): Promise<string> {
-  const grid = page.locator('[data-testid="data-grid"]');
+  const grid = gridScroller(page);
   await grid.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -1420,9 +1413,12 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   // Keyboard navigation stays inside the visible set (D11): id=2 is page row 1; ArrowDown must
   // land on the next *visible* row (id=5, page row 4), not page row 2 (id=3, hidden).
-  await page.click('[data-testid="grid-cell"][data-row="1"][data-column="id"]');
+  await gridCell(page, 1, 'id').click();
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('[data-testid="grid-cell"].selected')).toHaveAttribute('data-row', '4');
+  await expect(
+    page.locator('[data-testid="grid-row"] [data-testid="grid-cell"].selected'),
+  ).toBeVisible();
+  await expect(gridRow(page, 4).locator('[data-testid="grid-cell"].selected')).toHaveCount(1);
 
   // Copy column values follows the filter (D10): one clipboard line per visible row, not per
   // loaded row. `installClipboardSpy` (header comment) stands in for the original's real OS
@@ -1562,11 +1558,15 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // --- NULL vs '' -------------------------------------------------------------------------
   await (await findRow(page, NULLS_PATH)).dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
-  const nullCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="label"]');
-  const emptyCell = page.locator('[data-testid="grid-cell"][data-row="1"][data-column="label"]');
-  await expect(nullCell).toHaveAttribute('data-null', 'true');
+  const nullCell = gridCell(page, 0, 'label');
+  const emptyCell = gridCell(page, 1, 'label');
+  // P22 Pass B, C1/§5 D10, F3: `data-null` is retired in favour of the `.cell-null` marker the
+  // formatter already carries on both engines (nullMarker: a child span under the incumbent, the
+  // cell's own class under SlickGrid, F10) — an implementation-detail rewrite, not a coverage loss
+  // (§7.3).
+  await expect(nullMarker(nullCell)).toHaveCount(1);
   await expect(nullCell).toContainText('NULL');
-  await expect(emptyCell).toHaveAttribute('data-null', 'false');
+  await expect(nullMarker(emptyCell)).toHaveCount(0);
   await expect(emptyCell).toHaveText('');
 
   // Both errors this test deliberately triggers (the invalid-filter syntax error, the mid-flight

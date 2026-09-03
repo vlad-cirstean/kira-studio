@@ -78,6 +78,15 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
       const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
       const stream = await installMockStream(page, options?.stream ?? []);
 
+      // P22 Pass B §7.2 — `KIRA_GRID_ENGINE=slick bun run test:ui` runs the WHOLE suite against the
+      // SlickGrid engine, not just slick-grid.spec.ts's own forceSlickEngine: the same addInitScript
+      // pattern, installed here once for every spec, before the app's first navigation.
+      if (process.env.KIRA_GRID_ENGINE === 'slick') {
+        await page.addInitScript(() => {
+          (window as unknown as { __kiraGridEngine?: string }).__kiraGridEngine = 'slick';
+        });
+      }
+
       await page.goto(uiServer.url);
       await page.waitForSelector('[data-testid="status-bar"]');
 

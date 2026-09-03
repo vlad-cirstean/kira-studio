@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { defaultSettings } from '@shared/domain/settings';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { gridCell as gridCellAt } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   BIG_ROWS_PATH,
@@ -72,7 +73,7 @@ async function connectAndOpenBigRows(page: Page): Promise<void> {
 }
 
 function gridCell(page: Page, column: string) {
-  return page.locator(`[data-testid="grid-cell"][data-row="0"][data-column="${column}"]`);
+  return gridCellAt(page, 0, column);
 }
 
 async function computedColor(page: Page, column: string): Promise<string> {

@@ -126,12 +126,20 @@ function buildColumns(
       selectable: false,
       cssClass: 'kira-gutter',
       formatter: gutterFormatter,
+      // P22 Pass B, C1/§5 D10 — F3: cellAttrs/headerCellAttrs are per-column static attribute
+      // bags, applied once per cell/header BUILD (alongside SlickGrid's own role/tabIndex/
+      // aria-describedby), never per retained row — the whole `data-testid`/`data-*` surface
+      // this app's tests/ui/ suite needs is free at this granularity; only the row's own
+      // `data-row` correction (below, tagRenderedRows) needs an actual per-render pass, and rows
+      // are ~200, not ~2 400 cells.
+      cellAttrs: { 'data-testid': 'grid-gutter-cell' },
+      headerCellAttrs: { 'data-testid': 'grid-select-all' },
     },
   ];
   if (!page) return cols;
   const measured = initialWidths(page);
   const byName = new Map(page.columns.map((c) => [c.name, c]));
-  for (const name of order) {
+  order.forEach((name, displayIndex) => {
     const descriptor = byName.get(name);
     const classes = [`tc-${descriptor ? categoryForTypeClass(descriptor.typeClass) : 'other'}`];
     if (descriptor && alignmentFor(descriptor) === 'right') classes.push('kira-align-right');
@@ -148,8 +156,18 @@ function buildColumns(
       sortable: false,
       cssClass: classes.join(' '),
       formatter: cellFormatter,
+      cellAttrs: {
+        'data-testid': 'grid-cell',
+        'data-column': name,
+        'data-col-index': String(displayIndex),
+      },
+      headerCellAttrs: {
+        'data-testid': 'grid-header-cell',
+        'data-column': name,
+        'data-col-index': String(displayIndex),
+      },
     });
-  }
+  });
   return cols;
 }
 
@@ -271,6 +289,47 @@ function onViewportScrollPersist(): void {
 // the *rendered* (overscanned) range, not the strictly-visible one grid.onRendered's own
 // {startRow, endRow} carries (see kiraSlickGrid.ts's own comment on why the difference matters) —
 // this reads the wider one so a row still inside the runway keeps its decode cache alive.
+// P22 Pass B, C1/§5 D10 — the one per-render DOM pass this migration still needs: a row's own
+// `data-row` (SlickGrid writes the *display position* there, `src/slick.grid.ts`'s own
+// `appendRowHtml`) has to be corrected to the *page* row every other subsystem (selection,
+// pending changes, search, the gutter number) addresses a row by. The two differ only while a
+// search filter is hiding non-matching rows — a trap commented at both ends (D10's own note).
+//
+// Idempotent by construction, not by re-deriving "did the rendered range change": a `.slick-row`
+// already carrying `data-kira-row-tagged` is skipped outright, so a sub-row scroll (no new row
+// entering the DOM) touches nothing at all — `slick-grid.spec.ts`'s existing zero-mutation gate
+// enforces that for free. A row div SlickGrid later discards and rebuilds (`invalidateRow`) comes
+// back with no marker, correctly re-tagged from its own fresh (display-position) `data-row`.
+function tagRenderedRows(): void {
+  const root = rootRef.value;
+  if (!root || !dataSource) return;
+  const rowEls = root.querySelectorAll<HTMLElement>('.slick-row:not([data-kira-row-tagged])');
+  for (const el of rowEls) {
+    const pos = Number(el.dataset.row);
+    if (!Number.isFinite(pos)) continue;
+    const handle = dataSource.getItem(pos);
+    el.dataset.row = String(handle.row);
+    el.dataset.kiraRowTagged = '1';
+    // F4 — the row div is cloned per frozen pane; only the right (data) pane's clone gets
+    // `data-testid="grid-row"` (or `"grid-row-insert"`), so `[data-testid="grid-row"]` counts
+    // stay exactly what they were under the incumbent (one per rendered row, not two).
+    if (el.closest('.grid-canvas-right')) {
+      el.dataset.testid = handle.insertId !== undefined ? 'grid-row-insert' : 'grid-row';
+    }
+    if (handle.insertId !== undefined) {
+      el.dataset.insertId = handle.insertId;
+      // `cellAttrs` (buildColumns, D2) is a per-COLUMN constant — it cannot vary per row, so an
+      // insert row's own cells (D9's own region) are the one place a per-row cell pass still
+      // earns its keep, matching the incumbent's own `data-testid="grid-cell-insert"`.
+      for (const cellEl of el.querySelectorAll<HTMLElement>(
+        '.slick-cell[data-testid="grid-cell"]',
+      )) {
+        cellEl.dataset.testid = 'grid-cell-insert';
+      }
+    }
+  }
+}
+
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
   const { start, end } = grid.lastRenderedRowBounds;
@@ -403,6 +462,7 @@ onMounted(() => {
   grid.scrollEventSeq = () => scrollEventSeq;
 
   eventHandler = new SlickEventHandler();
+  eventHandler.subscribe(grid.onRendered, tagRenderedRows);
   eventHandler.subscribe(grid.onRendered, onGridRendered);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;

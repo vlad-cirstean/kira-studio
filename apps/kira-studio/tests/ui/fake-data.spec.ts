@@ -1,6 +1,7 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { gridCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   COMPOSITE_PK_COLUMNS,
@@ -175,10 +176,6 @@ const PORT: PortSnapshot[] = [
   },
   ...RO_FIXTURE.port,
 ];
-
-function gridCell(page: import('@playwright/test').Page, row: number, column: string) {
-  return page.locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`);
-}
 
 test('fake data generator — gate, defaults, preview, generate, failure', async ({ relaunch }) => {
   const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });

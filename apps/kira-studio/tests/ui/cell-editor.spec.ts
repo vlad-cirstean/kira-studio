@@ -17,6 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
+import { gridCell, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import type { ControlLogEntry } from './support/mockRuntime';
 import type { SeenPortRequest } from './support/mockStream';
@@ -169,9 +170,7 @@ async function cellText(
   row: number,
   column: string,
 ): Promise<string> {
-  return (
-    await page.locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`)
-  ).innerText();
+  return (await gridCell(page, row, column)).innerText();
 }
 
 async function selectCell(
@@ -179,9 +178,7 @@ async function selectCell(
   row: number,
   column: string,
 ): Promise<void> {
-  await page
-    .locator(`[data-testid="grid-cell"][data-row="${row}"][data-column="${column}"]`)
-    .click();
+  await gridCell(page, row, column).click();
 }
 
 // The data grid virtualizes columns the same way the tree virtualizes rows (DataGrid.vue's
@@ -192,7 +189,7 @@ async function scrollColumnIntoView(
   page: import('@playwright/test').Page,
   column: string,
 ): Promise<void> {
-  const grid = page.locator('[data-testid="data-grid"]');
+  const grid = gridScroller(page);
   const target = page.locator(`[data-testid="grid-header-cell"][data-column="${column}"]`);
   if ((await target.count()) === 0) {
     await grid.evaluate((el) => {
@@ -603,7 +600,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   // to show — same-column shift-click included — the same as a row/column selection, rather than
   // resolving to its focus end. Only a degenerate one-cell range (the click landing back on the
   // already-selected cell) still counts as "one cell selected".
-  await page.locator('[data-testid="grid-cell"][data-row="2"][data-column="sample"]').click({
+  await gridCell(page, 2, 'sample').click({
     modifiers: ['Shift'],
   });
   await expect(page.locator('[data-testid="cell-editor"]')).toBeHidden();
@@ -644,18 +641,14 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   // Blur by moving focus to the format select, still inside the panel but outside the editor.
   await page.locator('[data-testid="cell-editor-format"]').focus();
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
-  ).toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'sample')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'sample')).toBe('"edited from the cell editor"');
 
   // Discard before moving on: scenario 10 below asserts zero DB operations for everything the
   // cell editor itself did, and a lingering pending edit has no business surviving into the
   // read-only-connection scenario that follows.
   await page.click('[data-testid="toolbar-discard-changes"]');
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'sample')).not.toHaveClass(/pending-edit/);
 
   // Bug fix: clicking Revert straight from the editor (no deliberate blur first) used to *commit*
   // the edit instead of discarding it — the click moves focus off the editor, which fires the
@@ -668,9 +661,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.keyboard.type('"edited then reverted"');
   await page.click('[data-testid="cell-editor-beautify-reset"]');
   expect(await editorText(page)).toBe(originalSample);
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'sample')).not.toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'sample')).toBe(originalSample);
   await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
 
@@ -679,9 +670,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited via ctrl-enter"');
   await page.keyboard.press('Control+Enter');
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
-  ).toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'sample')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'sample')).toBe('"edited via ctrl-enter"');
   await page.click('[data-testid="toolbar-discard-changes"]');
 
@@ -817,9 +806,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // is enabled anyway.
   const generateTrigger = page.locator('[data-testid="cell-editor-generate"]');
   await expect(generateTrigger).toBeEnabled();
-  const plainTextCell = page.locator(
-    `[data-testid="grid-cell"][data-row="${plainTextRow}"][data-column="sample"]`,
-  );
+  const plainTextCell = gridCell(page, plainTextRow, 'sample');
 
   await generateTrigger.click();
   await page.click('[data-testid="cell-editor-generate-uuid"]');
@@ -873,13 +860,9 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('2030');
   expect(Math.abs(pickedEpoch - Date.UTC(2030, 5, 15, 12, 30, 15) / 1000)).toBeLessThan(24 * 3600);
   // Nothing staged yet — the field alone doesn't blur the editor.
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 5, 'sample')).not.toHaveClass(/pending-edit/);
   await page.locator('[data-testid="cell-editor-format"]').focus();
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="5"][data-column="sample"]'),
-  ).toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 5, 'sample')).toHaveClass(/pending-edit/);
   await page.click('[data-testid="toolbar-discard-changes"]');
 
   // No translate pane for a non-timestamp format.
@@ -923,9 +906,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
     tsFieldValue,
   );
   await expect(page.locator('[data-testid="cell-editor-timestamp-relative"]')).not.toHaveText('');
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
-  ).not.toHaveClass(/pending-edit/); // exploring/typing-then-reverting stages nothing
+  await expect(gridCell(page, 0, 'ts_a')).not.toHaveClass(/pending-edit/); // exploring/typing-then-reverting stages nothing
 
   // --- zone switch preserves the value (D19): toggling Local -> UTC -> Local must leave the
   // encoded buffer byte-identical. -----------------------------------------------------------
@@ -942,9 +923,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await page.click('[data-testid="datetime-picker-next-month"]');
   await page.keyboard.press('Escape');
   await expect(calendarPopover).toHaveCount(0);
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'ts_a')).not.toHaveClass(/pending-edit/);
 
   // --- month/year jump navigation (D33a/D33b): the label cycles days -> months -> years;
   // picking a month or year moves only the *view* — never stages anything, same as the
@@ -973,9 +952,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(monthLabel).toContainText(pickedYear);
 
   // Nothing staged — only the view moved, exactly like the plain prev/next paging above.
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'ts_a')).not.toHaveClass(/pending-edit/);
   await page.keyboard.press('Escape');
   await expect(calendarPopover).toHaveCount(0);
 
@@ -992,9 +969,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // its full-viewport backdrop keeps intercepting every later click in this scenario.
   await page.keyboard.press('Escape');
   await page.locator('[data-testid="cell-editor-format"]').focus();
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="ts_a"]'),
-  ).toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'ts_a')).toHaveClass(/pending-edit/);
   await page.click('[data-testid="toolbar-discard-changes"]');
 
   // Back to the formats table for the remaining scenarios.
@@ -1016,9 +991,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(encoded).toHaveText(btoa('Goodbye!'));
   // Blurring stages the re-encoded value, not the plaintext — the grid must show base64.
   await page.locator('[data-testid="cell-editor-format"]').focus();
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="3"][data-column="sample"]'),
-  ).toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 3, 'sample')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 3, 'sample')).toBe(btoa('Goodbye!'));
   await page.click('[data-testid="toolbar-discard-changes"]');
 
@@ -1077,9 +1050,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
   await expect(panel).toHaveAttribute('data-dirty', 'false');
   expect(await editorText(page)).toBe(originalJson);
-  await expect(
-    page.locator('[data-testid="grid-cell"][data-row="0"][data-column="sample"]'),
-  ).not.toHaveClass(/pending-edit/);
+  await expect(gridCell(page, 0, 'sample')).not.toHaveClass(/pending-edit/);
 
   // --- a truncated value refuses both editors (D27/F7f) -----------------------------------------
   const nullsRow2 = await findRow(page, NULLS_PATH);
@@ -1094,7 +1065,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   );
   // The value stays fully readable — only writing it back is refused.
   await expect(page.locator('[data-testid="cell-editor-encoded"] .cm-content')).not.toBeEmpty();
-  await page.locator('[data-testid="grid-cell"][data-row="3"][data-column="big_text"]').dblclick();
+  await gridCell(page, 3, 'big_text').dblclick();
   await expect(page.locator('[data-testid="grid-cell-input"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
