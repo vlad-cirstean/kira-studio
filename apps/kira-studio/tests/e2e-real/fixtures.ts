@@ -47,10 +47,10 @@ async function acquireBuildLock(): Promise<() => Promise<void>> {
 
 // Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/setup.sh` (pinned
 // wails3, generated bindings — no vendored Node runtime or bundled engine to check for since P58f)
-// plus `bun run build` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
-// all:frontend/dist` picks up), then the one step that script doesn't do — `go build -tags
-// server`. Memoized per worker process so a spec file with multiple tests builds once, not once
-// per test.
+// plus `bun run build:test` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
+// all:frontend/dist` picks up — the hooks-enabled build, same as test:ui/test:ipc:fe, P29 F1),
+// then the one step that script doesn't do — `go build -tags server`. Memoized per worker process
+// so a spec file with multiple tests builds once, not once per test.
 let prerequisitesReady: Promise<void> | undefined;
 
 function buildPrerequisites(): Promise<void> {
@@ -62,7 +62,7 @@ function buildPrerequisites(): Promise<void> {
       // `build:wails` (a separate `vite.wails.config.ts`) was folded into the main `vite build`
       // once P57 removed Electron — this repo's own `vite.config.ts` already outputs straight to
       // `apps/kira-studio/frontend/dist`, main.go's `//go:embed` target.
-      execFileSync('bun', ['run', 'build'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
+      execFileSync('bun', ['run', 'build:test'], { cwd: ROOT_DIR, env, stdio: 'inherit' });
       await mkdir(resolve(APP_DIR, 'bin'), { recursive: true });
       execFileSync('go', ['build', '-tags', 'server', '-o', SERVER_BINARY, '.'], {
         cwd: APP_DIR,

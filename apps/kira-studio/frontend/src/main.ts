@@ -222,50 +222,57 @@ declare global {
     };
   }
 }
-window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
-window.__kiraGridTuning = {};
-window.__kiraGridRetainedBytes = totalRetainedBytes;
-window.__kiraRetainedBytes = () =>
-  totalRetainedBytes() +
-  consoleRetainedBytes() +
-  documentRetainedBytes() +
-  keyValueRetainedBytes() +
-  streamRetainedBytes();
-window.__kiraRetention = () => {
-  const gridEntries = gridPageStoreEntries();
-  const documentEntries = documentPageStoreEntries();
-  const keyValueEntries = keyValuePageStoreEntries();
-  const streamEntries = streamPageStoreEntries();
-  const consoleEntries = consolePageStoreEntries();
-  return {
-    stores: {
-      grid: storeStats(gridEntries),
-      documents: storeStats(documentEntries),
-      keyvalue: storeStats(keyValueEntries),
-      stream: storeStats(streamEntries),
-      console: storeStats(consoleEntries),
-    },
-    documentRows: documentRowsRetention(),
-    searchMatches: {
-      grid: sumMatches(gridSearchState),
-      documents: sumMatches(documentSearchState),
-      keyvalue: sumMatches(keyValueSearchState),
-      console: sumMatches(consoleSearchState),
-      stream: sumMatches(streamSearchState),
-    },
-    frameBuffers: frameBufferStats([
-      ...gridEntries,
-      ...documentEntries,
-      ...keyValueEntries,
-      ...streamEntries,
-      ...consoleEntries,
-    ]),
-    explainPlans: consolePlanCount(),
+// P29 F1: every window.__kira* assignment below is Playwright- or DevTools-only (see each
+// field's own doc comment above) and must never reach a packaged build — __KIRA_DEBUG_HOOKS__ is
+// a vite.config.ts `define`, so a shipped build cannot be talked into enabling it at runtime the
+// way the deleted window.__kiraGridEngine once could. scripts/verify-packaging.sh's S6/S7 guard
+// this from regressing.
+if (__KIRA_DEBUG_HOOKS__) {
+  window.__kiraScrollTrace = { start: startScrollTrace, stop: stopScrollTrace };
+  window.__kiraGridTuning = {};
+  window.__kiraGridRetainedBytes = totalRetainedBytes;
+  window.__kiraRetainedBytes = () =>
+    totalRetainedBytes() +
+    consoleRetainedBytes() +
+    documentRetainedBytes() +
+    keyValueRetainedBytes() +
+    streamRetainedBytes();
+  window.__kiraRetention = () => {
+    const gridEntries = gridPageStoreEntries();
+    const documentEntries = documentPageStoreEntries();
+    const keyValueEntries = keyValuePageStoreEntries();
+    const streamEntries = streamPageStoreEntries();
+    const consoleEntries = consolePageStoreEntries();
+    return {
+      stores: {
+        grid: storeStats(gridEntries),
+        documents: storeStats(documentEntries),
+        keyvalue: storeStats(keyValueEntries),
+        stream: storeStats(streamEntries),
+        console: storeStats(consoleEntries),
+      },
+      documentRows: documentRowsRetention(),
+      searchMatches: {
+        grid: sumMatches(gridSearchState),
+        documents: sumMatches(documentSearchState),
+        keyvalue: sumMatches(keyValueSearchState),
+        console: sumMatches(consoleSearchState),
+        stream: sumMatches(streamSearchState),
+      },
+      frameBuffers: frameBufferStats([
+        ...gridEntries,
+        ...documentEntries,
+        ...keyValueEntries,
+        ...streamEntries,
+        ...consoleEntries,
+      ]),
+      explainPlans: consolePlanCount(),
+    };
   };
-};
-window.__kiraCount = data.count;
-window.__kiraCacheStats = data.cacheStats;
-window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
+  window.__kiraCount = data.count;
+  window.__kiraCacheStats = data.cacheStats;
+  window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
+}
 
 async function bootstrap(): Promise<void> {
   initCacheStats();

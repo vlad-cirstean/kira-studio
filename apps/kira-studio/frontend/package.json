@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:dev": "vite build --mode development --minify false"
+    "build:dev": "KIRA_DEBUG_HOOKS=1 vite build --mode development --minify false",
+    "build:test": "KIRA_DEBUG_HOOKS=1 vite build"
   }
 }
