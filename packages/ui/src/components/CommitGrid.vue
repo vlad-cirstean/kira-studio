@@ -19,6 +19,7 @@ import type { CommitRecord } from "@kira-version/core";
 import type { Column } from "slickgrid";
 import { SlickGrid } from "slickgrid";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { createGraphFormatter } from "../graph/graphColumn.ts";
 import { graphColumnWidth } from "../graph/geometry.ts";
 import type { GraphViewState, LayoutRange } from "../state/graphView.ts";
 import type { SelectionState } from "../state/selection.ts";
@@ -62,6 +63,14 @@ const tokenReader = new TokenReader();
 const widths = ref<ColumnWidths>({ ...props.columnWidths });
 const dateFormatRef = ref<DateFormat>(props.dateFormat);
 
+// Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
+// (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
+// this component rather than swapping graphView underneath it) and a rowHeight accessor so a
+// `--kv-row-height` change is picked up on the next render without rebuilding this formatter.
+const graphFormatter = createGraphFormatter(props.graphView.layout, props.graphView.store, () =>
+  rowHeightPx(tokenReader),
+);
+
 // Positions of the three drag handles (message|author, author|date, date|sha), recomputed
 // whenever the widths behind them change — see `updateHandlePositions`.
 const handleLeftAuthor = ref(0);
@@ -87,6 +96,7 @@ function currentColumns(): Column<CommitRecord>[] {
   return buildColumns(
     { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth, laneCount) },
     { dateFormat: () => dateFormatRef.value, now: () => Date.now() },
+    graphFormatter,
   );
 }
 

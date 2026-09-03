@@ -15,6 +15,13 @@ import {
 } from "../../../packages/ui/src/components/columns.ts";
 import { topology } from "../../fixtures/topology.ts";
 
+// buildColumns takes the graph formatter as a caller-supplied argument (W8: it is built once per
+// grid instance, closed over a LayoutStore/CommitStore this module never sees) — a never-invoked
+// stub is all these tests need, since none of them render a cell. Typed off buildColumns's own
+// third parameter rather than importing "slickgrid" directly (not resolvable from this
+// directory's own module scope — it is packages/ui's dependency, not the tests package's).
+const stubGraphFormatter: Parameters<typeof buildColumns>[2] = () => document.createElement("div");
+
 function record(overrides: Partial<CommitRecord> = {}): CommitRecord {
   return {
     sha: "a".repeat(40),
@@ -34,6 +41,7 @@ describe("buildColumns", () => {
     const columns = buildColumns(
       { ...DEFAULT_COLUMN_WIDTHS, laneCount: 2, messageWidth: 300 },
       dateCtx,
+      stubGraphFormatter,
     );
     expect(columns.map((column) => column.id)).toEqual([
       GRAPH_COLUMN_ID,
@@ -48,6 +56,7 @@ describe("buildColumns", () => {
     const columns = buildColumns(
       { ...DEFAULT_COLUMN_WIDTHS, laneCount: 5, messageWidth: 300 },
       dateCtx,
+      stubGraphFormatter,
     );
     const graph = columns.find((column) => column.id === GRAPH_COLUMN_ID);
     expect(graph?.width).toBe(graphColumnWidth(5));
@@ -58,6 +67,7 @@ describe("buildColumns", () => {
     const columns = buildColumns(
       { author: 111, date: 222, sha: 333, laneCount: 0, messageWidth: 444 },
       dateCtx,
+      stubGraphFormatter,
     );
     const widthOf = (id: string) => columns.find((column) => column.id === id)?.width;
     expect(widthOf(MESSAGE_COLUMN_ID)).toBe(444);
@@ -70,6 +80,7 @@ describe("buildColumns", () => {
     const columns = buildColumns(
       { ...DEFAULT_COLUMN_WIDTHS, laneCount: 1, messageWidth: 200 },
       dateCtx,
+      stubGraphFormatter,
     );
     for (const column of columns) {
       expect(column.resizable).toBe(false);

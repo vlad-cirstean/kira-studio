@@ -4,15 +4,11 @@
  * the grid actually renders, each `CommitRecord` materialized and immediately discarded rather
  * than retained (`getItem` is never memoized here; see `createCommitDataView`'s doc comment).
  *
- * One of the five columns below is still deliberately minimal. The **graph** column returns an
- * empty `<svg>` — W8's `graphColumn.ts` replaces this formatter with the real one once `rowSvg.ts`
- * exists; until then (and forever, for a row whose layout hasn't arrived yet — W5: text lands
- * before lanes do) an empty graph cell is correct, not a placeholder that throws. The **message**
- * column (W7) renders the subject plus, when the row has decorations, `refBadges.ts`'s inline
- * badge strip ahead of it. Splitting graph/message this way at W6 (rather than leaving both
- * unwritten) is what let W6's own "Done when" bullets — bounded row count, `getItem` call
- * counting, keyboard/scroll behaviour — be verified without waiting on W7 or W8, exactly as the
- * plan's dependency table has it (W7 and W8 both depend on W6, not the reverse).
+ * The **graph** column's formatter is supplied by the caller (`CommitGrid.vue`, via W8's
+ * `graphColumn.ts`'s `createGraphFormatter`) rather than built here: it needs a `LayoutStore` and
+ * a `CommitStore` closed over per grid instance, which this module — shared column-definition
+ * logic with no state of its own — does not hold. The **message** column (W7) renders the subject
+ * plus, when the row has decorations, `refBadges.ts`'s inline badge strip ahead of it.
  *
  * `enableHtmlRendering: false` (set by `CommitGrid.vue`) means every formatter here must return
  * a real `HTMLElement`/`SVGElement`, never a string — enforced by the library, not by discipline,
@@ -24,8 +20,6 @@ import { formatAbsoluteDate, formatRelativeDate } from "./dateFormat.ts";
 import { buildRefBadges } from "./refBadges.ts";
 import { graphColumnWidth } from "../graph/geometry.ts";
 import type { ColumnWidths, DateFormat } from "../state/viewState.ts";
-
-const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** Every field a column's `field:` must name is a valid dotted path into `CommitRecord`
  *  (SlickGrid's `Column<T>.field` is typed against `T`'s own leaf paths); formatters here read
@@ -51,22 +45,6 @@ function textCell(text: string, className: string): HTMLSpanElement {
   span.textContent = text;
   return span;
 }
-
-/** W8's placeholder: an empty graph cell, sized to the column so the row's height/width never
- *  jumps once `graphColumn.ts` starts drawing into it. No lanes, no edges — see this file's own
- *  doc comment for why that is correct now rather than temporary. Wrapped in a plain `<div>`
- *  because `Formatter`'s return type is `HTMLElement`, which an `SVGSVGElement` is not (SVG
- *  elements implement a separate DOM interface) — W8's real formatter keeps the same wrapper. */
-const graphFormatter: Formatter<CommitRecord> = () => {
-  const wrapper = document.createElement("div");
-  wrapper.className = "kv-graph-cell";
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("class", "kv-graph-svg");
-  svg.setAttribute("width", "100%");
-  svg.setAttribute("height", "100%");
-  wrapper.appendChild(svg);
-  return wrapper;
-};
 
 /** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
  *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
@@ -140,15 +118,18 @@ export interface ColumnWidthInputs extends ColumnWidths {
 }
 
 /** Builds the five column definitions in display order. Not user-resizable: `graph` (its width
- *  is derived from `laneCount`, not a user choice — W8 owns its formatter and its geometry) and
- *  `message` (it is "remaining width", recomputed by `CommitGrid.vue` on every resize rather than
- *  dragged). `author`/`date`/`sha` are resizable via `CommitGrid.vue`'s own drag handles (§6.1:
- *  `showColumnHeader: false` costs SlickGrid's built-in header resize handles, so this repo keeps
- *  its own), which write back through `grid.setColumns(...)` — this function, called again with
- *  the new widths, is the single source of the column model either way. */
+ *  is derived from `laneCount`, not a user choice — its `graphFormatter` and geometry are W8's
+ *  `graphColumn.ts`/`rowSvg.ts`, built once per grid instance and passed in here rather than
+ *  built by this stateless module) and `message` (it is "remaining width", recomputed by
+ *  `CommitGrid.vue` on every resize rather than dragged). `author`/`date`/`sha` are resizable via
+ *  `CommitGrid.vue`'s own drag handles (§6.1: `showColumnHeader: false` costs SlickGrid's built-in
+ *  header resize handles, so this repo keeps its own), which write back through
+ *  `grid.setColumns(...)` — this function, called again with the new widths, is the single source
+ *  of the column model either way. */
 export function buildColumns(
   widths: ColumnWidthInputs,
   dateCtx: DateFormatterContext,
+  graphFormatter: Formatter<CommitRecord>,
 ): Column<CommitRecord>[] {
   return [
     {
