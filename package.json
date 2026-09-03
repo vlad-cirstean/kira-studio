@@ -29,6 +29,7 @@
     "verify:packaging": "sh scripts/verify-packaging.sh",
     "test:go": "go test ./...",
     "test:compat": "sh scripts/db-compat.sh",
+    "test:matrix": "sh scripts/test-matrix.sh",
     "generate:wire": "sh scripts/generate-wire.sh"
   },
   "devDependencies": {
