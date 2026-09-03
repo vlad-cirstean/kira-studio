@@ -334,39 +334,19 @@ func TestSqlite(t *testing.T) {
 	})
 
 	// P26 §3.3(1)/(2): caps.go declares ServerFilter/Projection both true; there was no Filter test
-	// at all before this, and Projection appeared only inside a value-codec test.
-	t.Run("read: filter", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		filter := "region_id = 1"
-		p, err := a.Read(context.Background(), adapters.ReadRequest{
-			Path:     nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
-			Filter:   &filter,
-			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-12a"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		tp := p.(page.TabularPage)
-		if tp.RowCount != 1 {
-			t.Errorf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
-		}
-	})
-
-	t.Run("read: projection", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		p, err := a.Read(context.Background(), adapters.ReadRequest{
-			Path:       nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
-			Projection: []string{"name"},
-			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-12b"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		tp := p.(page.TabularPage)
-		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
-			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
-		}
-	})
+	// at all before this, and Projection appeared only inside a value-codec test. Wired through
+	// scenarios.go's shared constructors (P26 §2.2/P26 review F3) rather than hand-rolled, so this
+	// scenario also backs Tier 2 via RunMatrix's own Then slices for the same capability.
+	testsupport.RunScenarios(t, connectedAdapter(t, cfg), cfg,
+		testsupport.FilterNarrowsResult(
+			nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+			"region_id = 1", 1, // only Acme Co is in region 1
+		),
+		testsupport.ProjectionLimitsColumns(
+			nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
+			[]string{"name"},
+		),
+	)
 
 	t.Run("count", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)

@@ -458,21 +458,14 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
-	t.Run("read: projection", func(t *testing.T) {
-		a := connectedAdapter(t, kind, cfg)
-		p, err := a.Read(context.Background(), adapters.ReadRequest{
-			Path:       nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
-			Projection: []string{"name"},
-			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-10f"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		tp := p.(page.TabularPage)
-		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
-			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
-		}
-	})
+	// Wired through scenarios.go's shared constructor (P26 §2.2/P26 review F3) rather than
+	// hand-rolled, so this scenario also backs Tier 2 via RunMatrix's own Then slices.
+	testsupport.RunScenarios(t, connectedAdapter(t, kind, cfg), cfg,
+		testsupport.ProjectionLimitsColumns(
+			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			[]string{"name"},
+		),
+	)
 
 	t.Run("count", func(t *testing.T) {
 		a := connectedAdapter(t, kind, cfg)

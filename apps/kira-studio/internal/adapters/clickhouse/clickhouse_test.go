@@ -281,39 +281,19 @@ func TestClickHouse(t *testing.T) {
 	})
 
 	// P26 §3.1(1): Projection/ServerFilter are both declared true in caps.go and, until this phase,
-	// neither had a real-container test at all.
-	t.Run("read: filter narrows the result", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		filter := "region_id = 1"
-		p, err := a.Read(context.Background(), adapters.ReadRequest{
-			Path:     nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
-			Filter:   &filter,
-			PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-19a"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		tp := p.(page.TabularPage)
-		if tp.RowCount != 1 {
-			t.Errorf("RowCount = %d, want 1 (only Acme Co is in region 1)", tp.RowCount)
-		}
-	})
-
-	t.Run("read: projection limits the columns", func(t *testing.T) {
-		a := connectedAdapter(t, cfg)
-		p, err := a.Read(context.Background(), adapters.ReadRequest{
-			Path:       nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
-			Projection: []string{"name"},
-			PageSize:   10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-19b"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		tp := p.(page.TabularPage)
-		if len(tp.Columns) != 1 || tp.Columns[0].Name != "name" {
-			t.Errorf("Columns = %+v, want exactly [name]", tp.Columns)
-		}
-	})
+	// neither had a real-container test at all. Wired through scenarios.go's shared constructors
+	// (P26 §2.2/P26 review F3) rather than hand-rolled, so this scenario also backs Tier 2 via
+	// RunMatrix's own Then slices for the same capability.
+	testsupport.RunScenarios(t, connectedAdapter(t, cfg), cfg,
+		testsupport.FilterNarrowsResult(
+			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			"region_id = 1", 1, // only Acme Co is in region 1
+		),
+		testsupport.ProjectionLimitsColumns(
+			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
+			[]string{"name"},
+		),
+	)
 
 	// P26 §3.1(3), the phase's flagship test for this adapter: catalog.go's own parser is exercised
 	// only against strings this repo wrote (catalog_test.go); this is the one place it meets
