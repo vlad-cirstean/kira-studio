@@ -207,6 +207,47 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await expect(page.locator('.p-toolbar-rail')).toHaveAttribute('style', /--kira-conn-magenta/);
 });
 
+// P23: the Color submenu's own trigger was ContextMenu.vue's `.submenu` CSS — `left: 100%; top:
+// -4px`, no flip, no clamp at all — so a submenu opened near the window's right edge rendered
+// partly or wholly offscreen. A narrow viewport plus a right-click near the trigger row's own
+// right edge (rather than its center) reproduces exactly that geometry: the top-level menu still
+// fits, but a naive "open 160px further right" submenu would not.
+test('a submenu near the right edge flips to open on the left instead of running offscreen (P23)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  const viewport = { width: 420, height: 720 };
+  await page.setViewportSize(viewport);
+  await createAndConnect(page);
+
+  const row = connectionRow(page);
+  const rowBox = await row.boundingBox();
+  if (!rowBox) throw new Error('expected the connection row to have a bounding box');
+  // Right-click 10px in from the row's own right edge, not its center — a top-level menu opened
+  // that far right already leaves no 160px+ of room to its own right for a submenu.
+  await page.mouse.click(rowBox.x + rowBox.width - 10, rowBox.y + rowBox.height / 2, {
+    button: 'right',
+  });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+
+  await page.hover('[data-testid="menu-item-color"]');
+  const submenu = page.locator('[data-testid="context-submenu"]');
+  await expect(submenu).toBeVisible();
+
+  const submenuBox = await submenu.boundingBox();
+  const triggerBox = await page.locator('[data-testid="menu-item-color"]').boundingBox();
+  if (!submenuBox || !triggerBox) throw new Error('expected bounding boxes for submenu/trigger');
+
+  // The bug: the submenu's right edge used to run past the viewport's own right edge here.
+  expect(submenuBox.x + submenuBox.width).toBeLessThanOrEqual(viewport.width);
+  expect(submenuBox.x).toBeGreaterThanOrEqual(0);
+  // The fix is flip(), not just a clamp: the submenu opens to the trigger's *left*, not merely
+  // squeezed to still fit on the right.
+  expect(submenuBox.x + submenuBox.width).toBeLessThanOrEqual(triggerBox.x + 1);
+  // Every item in the flipped submenu is still reachable, not just its container box.
+  await expect(page.locator('[data-testid="menu-item-color-magenta"]')).toBeVisible();
+});
+
 // P31 item 2/D6/D7: WorkbenchShell's own class name used to collide with TabStrip's identically
 // named root under scoped CSS's "child inherits the parent's scope id too" rule, so the outer
 // overflow: hidden always won regardless of what TabStrip.vue itself declared (F7). D6 renames the

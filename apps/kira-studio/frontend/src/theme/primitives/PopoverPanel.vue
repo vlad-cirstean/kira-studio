@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { anchoredPosition } from '../anchoredPosition';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { autoUpdate, computeFloatPosition } from '../floatingPosition';
 
 // Shared chrome for every trigger-anchored popover/menu (ColumnsMenu, FilterHistoryMenu,
 // ConsoleSavedMenu, PreviewCommandPanel): a full-viewport transparent backdrop that closes the
@@ -8,8 +8,9 @@ import { anchoredPosition } from '../anchoredPosition';
 // sized here (anchor + width) — each consumer wraps its own list/content in an inner element
 // that owns its own max-height/overflow/flex-direction, since those vary per menu.
 //
-// Not for workbench/ContextMenu.vue: that menu is anchored to the mouse click point with its
-// own positioning math, not to a trigger element — a different model, left untouched.
+// Not for workbench/ContextMenu.vue: that menu is anchored to the mouse click point, not to a
+// trigger element — a different reference shape (../floatingPosition.ts's own `pointReference`),
+// even though P23 moved both onto the same underlying computePosition call.
 const props = withDefaults(
   defineProps<{
     anchor?: 'left' | 'right';
@@ -45,20 +46,18 @@ const popoverPosition = ref<{ top: string; left: string }>({ top: '0px', left: '
 // below its trigger (the timestamp calendar button, in particular) routinely has nowhere to
 // grow into and rendered off the bottom of the viewport. Opening upward instead when there
 // isn't room below fixes that generically for every PopoverPanel consumer, not just that one.
-function reposition(): void {
+//
+// P23: computePosition reads the floating element's own real getBoundingClientRect, so — unlike
+// the old anchoredPosition.ts call this replaced — there is no "guess with offsetHeight, then
+// correct after nextTick" two-pass dance: the very first reposition() already sees the popover's
+// real, laid-out size.
+async function reposition(): Promise<void> {
   const anchorEl = backdropEl.value?.parentElement;
-  if (!anchorEl) return;
-  const rect = anchorEl.getBoundingClientRect();
-  // Before the popover has ever rendered, popoverEl has no height to measure yet — reposition()
-  // runs again once it does (see the nextTick call in onMounted below), so the first paint's
-  // guess is corrected before the user can see it.
-  const popoverHeight = popoverEl.value?.offsetHeight ?? 0;
-  const { left, top } = anchoredPosition(
-    rect,
-    { width: props.width, height: popoverHeight },
-    { width: window.innerWidth, height: window.innerHeight },
-    { align: props.anchor, strategy: 'menu' },
-  );
+  const el = popoverEl.value;
+  if (!anchorEl || !el) return;
+  const { left, top } = await computeFloatPosition(anchorEl, el, {
+    placement: props.anchor === 'right' ? 'bottom-end' : 'bottom-start',
+  });
   popoverPosition.value = { top: `${top}px`, left: `${left}px` };
 }
 
@@ -94,20 +93,28 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+let stopAutoUpdate: (() => void) | null = null;
+
 onMounted(() => {
-  reposition();
-  // The first reposition() runs before popoverEl has ever painted, so its offsetHeight read
-  // above is 0 and the upward-flip decision cannot yet be made — this second pass, after the
-  // real content has laid out, corrects it before the user can see the wrong placement.
-  void nextTick(reposition);
   document.addEventListener('keydown', onKeydown, true);
-  // The window is resizable and this menu can stay open across a resize — recomputing keeps it
-  // pinned to its trigger instead of drifting toward whichever corner it started near.
-  window.addEventListener('resize', reposition);
+  const anchorEl = backdropEl.value?.parentElement;
+  const el = popoverEl.value;
+  if (anchorEl && el) {
+    // A first synchronous call so the popover never paints at its (0,0) default even for one
+    // frame — autoUpdate's own ResizeObserver setup fires its first callback asynchronously.
+    void reposition();
+    // P23: autoUpdate, not a bare resize listener — several consumers (CellEditorView's
+    // TimestampPane docked at the window's bottom edge; any menu whose trigger sits in a
+    // scrollable tree/list row) can have their trigger move under them while the popover stays
+    // open, not just the window resize the old listener covered. autoUpdate also repositions on
+    // the popover's own content changing size (a ResizeObserver on the floating element), which
+    // is what used to need the manual nextTick(reposition) pass above.
+    stopAutoUpdate = autoUpdate(anchorEl, el, reposition);
+  }
 });
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown, true);
-  window.removeEventListener('resize', reposition);
+  stopAutoUpdate?.();
 });
 </script>
 

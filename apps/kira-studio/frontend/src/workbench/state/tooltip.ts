@@ -67,11 +67,12 @@ let openTimer: ReturnType<typeof setTimeout> | null = null;
 let lastCloseAt = 0;
 let lastPointerTarget: EventTarget | null = null;
 
-/** AppTooltip.vue's own placement maths (mirroring ErrorPopover.vue, F8) needs the live trigger
- *  rect at render time, not a value computed ahead of it — the tooltip's own size depends on text
- *  that just changed, so there is nothing useful the controller could precompute here. */
-export function getAnchorRect(): DOMRect | null {
-  return openHostEl ? openHostEl.getBoundingClientRect() : null;
+/** AppTooltip.vue's own placement (P23: @floating-ui/dom's computePosition, mirroring
+ *  ErrorPopover.vue) reads the live trigger element at render time, not a rect computed ahead of
+ *  it — the tooltip's own size depends on text that just changed, so there is nothing useful the
+ *  controller could precompute here. */
+export function getAnchorElement(): HTMLElement | null {
+  return openHostEl;
 }
 
 function clearOpenTimer(): void {

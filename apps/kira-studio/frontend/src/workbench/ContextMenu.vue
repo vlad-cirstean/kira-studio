@@ -1,16 +1,38 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import {
+  type ComponentPublicInstance,
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
 import { closeContextMenu, contextMenuState, type MenuItem } from '../state/contextMenu';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
+import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
 
 const SUBMENU_OPEN_DELAY_MS = 150;
 
 const menuRef = ref<HTMLElement | null>(null);
+const submenuRef = ref<HTMLElement | null>(null);
 const openSubmenuId = ref<string | null>(null);
 const style = ref({ left: '0px', top: '0px' });
+const submenuStyle = ref({ left: '0px', top: '0px' });
 let submenuTimer: ReturnType<typeof setTimeout> | null = null;
+
+// A plain `ref="submenuRef"` on this element would silently do the wrong thing: it sits inside
+// this template's own `v-for="item in contextMenuState.items"`, and Vue collects any `ref` bound
+// inside a `v-for` scope into an array — regardless of the inner `v-if` ever mounting at most one
+// of them — so `submenuRef.value` would be `[HTMLDivElement]`, not the element, and every DOM
+// read below it (`.parentElement` included) would silently return `undefined`. A function ref
+// sidesteps the array-collection rule entirely: Vue calls it directly with the element (or `null`
+// on unmount) instead of pushing into a list.
+function setSubmenuRef(el: Element | ComponentPublicInstance | null): void {
+  submenuRef.value = el as HTMLElement | null;
+}
 
 // P43 iter3 D43/D44/F32: roving keyboard focus. `activeIndex` is -1 until the first arrow key, so
 // a menu opened by mouse looks exactly as it does today until the keyboard is used.
@@ -56,17 +78,40 @@ function stepIndex(current: number, delta: 1 | -1, length: number): number {
   return (current + delta + length) % length;
 }
 
+// P23: anchored to the mouse click point, not an element (theme/floatingPosition.ts's own
+// pointReference) — flip is off because a point has no "other side" to flip to, only the
+// viewport edges shift() already keeps it clear of. This menu only opens briefly (a click,
+// choose, close), so — unlike the submenu below and PopoverPanel/ErrorPopover — it does not
+// track the window resizing while it's open, matching this component's own pre-existing
+// behaviour (there was never a resize listener here).
 async function position(): Promise<void> {
   await nextTick();
   const el = menuRef.value;
   if (!el) return;
-  const rect = el.getBoundingClientRect();
-  let left = contextMenuState.x;
-  let top = contextMenuState.y;
-  if (left + rect.width > window.innerWidth) left = Math.max(0, window.innerWidth - rect.width - 4);
-  if (top + rect.height > window.innerHeight)
-    top = Math.max(0, window.innerHeight - rect.height - 4);
+  const { left, top } = await computeFloatPosition(
+    pointReference(contextMenuState.x, contextMenuState.y),
+    el,
+    { offset: 0, flip: false },
+  );
   style.value = { left: `${left}px`, top: `${top}px` };
+}
+
+// P23: the submenu used to be pure CSS (`left: 100%; top: -4px`, this file's own style block) —
+// no flip and no clamp at all, so a submenu near the right or bottom edge of the window rendered
+// partly or wholly offscreen (e.g. the row context menu's Color submenu, or the grid row menu's
+// Copy row(s) submenu). `right-start` is the CSS's own placement restated in floating-ui terms;
+// `crossAxis: -4` is the CSS's `top: -4px`; flip (default on) is what actually fixes the bug —
+// falling back to `left-start` when the right edge has no room and the left side has more.
+async function positionSubmenu(): Promise<void> {
+  await nextTick();
+  const el = submenuRef.value;
+  const trigger = el?.parentElement;
+  if (!el || !trigger) return;
+  const { left, top } = await computeFloatPosition(trigger, el, {
+    placement: 'right-start',
+    offset: { mainAxis: 0, crossAxis: -4 },
+  });
+  submenuStyle.value = { left: `${left}px`, top: `${top}px` };
 }
 
 watch(
@@ -79,6 +124,10 @@ watch(
     void position();
   },
 );
+
+watch(openSubmenuId, (id) => {
+  if (id) void positionSubmenu();
+});
 
 function onDocMouseDown(e: MouseEvent): void {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) closeContextMenu();
@@ -236,7 +285,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
           <span class="label">{{ item.label }}</span>
           <span class="icon-box"><CodiconIcon name="chevron-right" :size="13" class="caret" /></span>
 
-          <div v-if="openSubmenuId === item.id" class="submenu p-float" data-testid="context-submenu">
+          <div
+            v-if="openSubmenuId === item.id"
+            :ref="setSubmenuRef"
+            class="submenu p-float"
+            data-testid="context-submenu"
+            :style="submenuStyle"
+          >
             <template v-for="(sub, subIdx) in item.items" :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id">
               <div v-if="sub.type === 'separator'" class="p-sep" />
               <div
@@ -276,10 +331,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
 </template>
 
 <style scoped>
-/* P16 design system: every floating surface is the same primitive (Menus.html) —
-   .p-float supplies bg-elevated / border-strong / radius / shadow. Its own
-   overflow: hidden is overridden here because a submenu pops out past this
-   surface's edge (left: 100%) and must not be clipped by it. */
+/* P16 design system: every floating surface is the same primitive (Menus.html) — .p-float
+   supplies bg-elevated / border-strong / radius / shadow, overflow: hidden included. P23: the
+   submenu below used to be an absolutely-positioned child (`left: 100%`) that had to escape this
+   element's own box, which is what the `overflow: visible` override here used to be for; now
+   that the submenu is its own `position: fixed` floating surface (theme/floatingPosition.ts),
+   it no longer nests inside this box at all, so this menu keeps .p-float's default clipping like
+   every other floating surface in the app. */
 .context-menu {
   position: fixed;
   min-width: 180px;
@@ -287,7 +345,6 @@ async function onItemClick(item: MenuItem): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  overflow: visible;
   z-index: 200;
 }
 
@@ -353,14 +410,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
   color: var(--kira-fg-muted);
 }
 
-.submenu-trigger {
-  position: relative;
-}
-
 .submenu {
-  position: absolute;
-  left: 100%;
-  top: -4px;
+  /* left/top are set inline above, computed by positionSubmenu() — P23's flip+shift fix for the
+     offscreen bug this was: a plain `left: 100%; top: -4px` here (with no flip and no clamp at
+     all) rendered a submenu near the right or bottom edge of the window partly or wholly
+     offscreen. */
+  position: fixed;
+  z-index: 200;
   min-width: 160px;
   padding: var(--kira-s-2);
   display: flex;

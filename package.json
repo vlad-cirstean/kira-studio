@@ -69,6 +69,7 @@
     "vue-tsc": "3.3.11"
   },
   "dependencies": {
+    "@floating-ui/dom": "1.8.0",
     "flatbuffers": "25.9.23",
     "slickgrid": "5.20.0",
     "zod": "4.5.4"

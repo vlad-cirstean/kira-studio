@@ -4,8 +4,8 @@
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
-import { anchoredPosition } from '../theme/anchoredPosition';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { autoUpdate, computeFloatPosition } from '../theme/floatingPosition';
 import AppButton from '../theme/primitives/AppButton.vue';
 
 const props = defineProps<{ message: string }>();
@@ -14,18 +14,13 @@ const open = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const popoverRef = ref<HTMLElement | null>(null);
 const style = ref({ left: '0px', top: '0px' });
+let stopAutoUpdate: (() => void) | null = null;
 
 async function position(): Promise<void> {
-  await nextTick();
   const trigger = triggerRef.value;
   const popover = popoverRef.value;
   if (!trigger || !popover) return;
-  const t = trigger.getBoundingClientRect();
-  const p = popover.getBoundingClientRect();
-  const { left, top } = anchoredPosition(t, p, {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+  const { left, top } = await computeFloatPosition(trigger, popover);
   style.value = { left: `${left}px`, top: `${top}px` };
 }
 
@@ -38,8 +33,20 @@ function close(): void {
   open.value = false;
 }
 
-watch(open, (isOpen) => {
-  if (isOpen) void position();
+// P23: unlike AppTooltip (closes on scroll), this popover has no backdrop and stays open across
+// a page interaction — its trigger is often a row's own error text (TreeRow.vue among others),
+// which can sit inside a scrolling panel. autoUpdate keeps it pinned to that trigger instead of
+// drifting away from it the moment the panel scrolls.
+watch(open, async (isOpen) => {
+  stopAutoUpdate?.();
+  stopAutoUpdate = null;
+  if (!isOpen) return;
+  await nextTick();
+  const trigger = triggerRef.value;
+  const popover = popoverRef.value;
+  if (!trigger || !popover) return;
+  void position();
+  stopAutoUpdate = autoUpdate(trigger, popover, position);
 });
 
 function onDocMouseDown(e: MouseEvent): void {
@@ -57,6 +64,7 @@ document.addEventListener('keydown', onKeydown);
 onUnmounted(() => {
   document.removeEventListener('mousedown', onDocMouseDown, true);
   document.removeEventListener('keydown', onKeydown);
+  stopAutoUpdate?.();
 });
 </script>
 

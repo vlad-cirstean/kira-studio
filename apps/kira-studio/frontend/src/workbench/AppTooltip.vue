@@ -1,25 +1,25 @@
 <script setup lang="ts">
 // P22 D4/D5: the app-owned tooltip singleton, mounted once beside <ContextMenu /> in App.vue.
-// Placement is theme/anchoredPosition.ts's default 'callout' strategy (P49 D12), the same one
-// ErrorPopover.vue uses: below-left of the trigger, clamped into the viewport, flipped above on
-// overflow.
+// P23: placement is theme/floatingPosition.ts's default computeFloatPosition() (below-left of
+// the trigger, clamped into the viewport, flipped above on overflow) — the same call
+// ErrorPopover.vue makes, replacing the two's former shared 'callout' strategy in the deleted
+// anchoredPosition.ts.
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { anchoredPosition } from '../theme/anchoredPosition';
-import { getAnchorRect, tooltipState } from './state/tooltip';
+import { computeFloatPosition } from '../theme/floatingPosition';
+import { getAnchorElement, tooltipState } from './state/tooltip';
 
 const tipRef = ref<HTMLElement | null>(null);
 const style = ref({ left: '0px', top: '0px' });
 
+// D6 (state/tooltip.ts's own onScroll) closes the tooltip on any scroll, so — unlike
+// PopoverPanel/ErrorPopover — the anchor never moves out from under an open tooltip and autoUpdate
+// buys nothing here; only a resize (below) can still invalidate a placement while one is open.
 async function position(): Promise<void> {
   await nextTick();
   const el = tipRef.value;
-  const anchor = getAnchorRect();
+  const anchor = getAnchorElement();
   if (!el || !anchor) return;
-  const p = el.getBoundingClientRect();
-  const { left, top } = anchoredPosition(anchor, p, {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+  const { left, top } = await computeFloatPosition(anchor, el);
   style.value = { left: `${left}px`, top: `${top}px` };
 }
 
