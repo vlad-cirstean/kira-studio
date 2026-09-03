@@ -434,6 +434,94 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
 });
 
+// Finding 6 — the one-cell selection highlight (ConsoleSlickGrid.vue) used to be keyed straight
+// off the DISPLAY position at click time, which goes stale the moment `matchedRows` changes what
+// that position means. Reproduced here concretely: click row n=2 (page row 1) while unfiltered
+// (display position == page row, so the layer keys on position 1); then filter to rows n=2 and
+// n=4 (page rows 1 and 3), which re-numbers n=4 down onto display position 1 — exactly the slot
+// the stale layer entry still points at. Pre-fix, the highlight visibly jumps onto n=4's row
+// instead of staying on n=2's. The gutter-click half (clearing a stale highlight instead of
+// leaving it behind) is covered in the same test, at the end.
+test('Query console — the one-cell selection highlight tracks its row through a filter change and a gutter click (finding 6)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-select-filter';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Console Select Filter DB',
+    'amber',
+  );
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Console Select Filter DB', 'amber'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    executeSnap(
+      CONNECTION_ID,
+      [
+        'SELECT 1 AS n UNION ALL SELECT 2 AS n UNION ALL SELECT 3 AS n UNION ALL SELECT 4 AS n UNION ALL SELECT 5 AS n ORDER BY n',
+      ],
+      [intColumnPage('n', ['1', '2', '3', '4', '5'])],
+    ),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Console Select Filter DB', 'amber');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  await typeInto(
+    consoleView,
+    page,
+    'SELECT 1 AS n UNION ALL SELECT 2 AS n UNION ALL SELECT 3 AS n UNION ALL SELECT 4 AS n UNION ALL SELECT 5 AS n ORDER BY n;',
+  );
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(5);
+
+  const cellAt = (row: number) =>
+    results.locator(
+      `[data-testid="console-result-row"][data-row="${row}"] [data-testid="console-result-cell"][data-column="n"]`,
+    );
+  // The gutter (frozenColumn: 0) renders in a separate left-pane row clone from the data columns
+  // — `tagRenderedRows` (ConsoleSlickGrid.vue) only tags the right-pane clone with
+  // `data-testid="console-result-row"`, but both clones carry the same corrected `data-row`, so
+  // this reaches the gutter cell via that shared attribute rather than the right-pane testid.
+  const gutterAt = (row: number) =>
+    results.locator(`.slick-row[data-row="${row}"] [data-testid="console-result-gutter-cell"]`);
+
+  // --- click n=2 (page row 1) while unfiltered — display position 1 == page row 1 --------------
+  await cellAt(1).click();
+  await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
+
+  // --- filter to n=2/n=4 (page rows 1 and 3): n=4 now renders at display position 1, the exact
+  // slot a stale, position-keyed highlight would still be pointing at ------------------------
+  await page.click('[data-testid="console-search"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.click('[data-testid="console-search-regex"]');
+  await page.fill('[data-testid="console-search-input"]', '^[24]$');
+  await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText('of 2');
+  await page.click('[data-testid="console-search-filter-rows"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
+
+  // The highlight followed n=2 (page row 1), not the display slot it used to occupy.
+  await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(3)).not.toHaveClass(/kira-cell-selected/);
+
+  // --- a gutter click clears the highlight instead of leaving it stuck on n=2 -------------------
+  await gutterAt(1).click();
+  await expect(cellAt(1)).not.toHaveClass(/kira-cell-selected/);
+});
+
 // P42 D8: a result chip's own right-click menu — Close, Close others, Close to the right, each
 // acting on the clicked chip and disabled (never hidden) when it would be a no-op.
 test('Query console — result-tab right-click: close, close others, close to the right (P42)', async ({

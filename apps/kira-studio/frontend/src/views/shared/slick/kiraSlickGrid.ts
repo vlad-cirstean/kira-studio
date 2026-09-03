@@ -491,8 +491,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
   /** P22 iter2-scroll-gaps D1 — `render()` is fully synchronous (§1.1 of that plan: no `await`, no
    *  `setTimeout`, no `requestIdleCallback` anywhere between `_handleScroll` and `onRendered`
    *  firing), so the caller already has the duration in hand; report it straight to
-   *  `scrollTrace.noteRenderMs` instead of Vue's `nextTick`-based `noteNotify` (meaningless here —
-   *  there is no Vue patch on this render path at all). This is also D2's own seam: the batch-
+   *  `scrollTrace.noteRenderMs` instead of approximating it through a Vue `nextTick` (meaningless
+   *  here — there is no Vue patch on this render path at all). This is also D2's own seam: the batch-
    *  capping/chase logic lives in `getRenderedRange`, called from inside `super.render()` below, so
    *  timing wraps the whole call, chase-scheduled catch-ups included. */
   override render(): void {

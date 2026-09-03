@@ -282,12 +282,40 @@ function fieldAtCol(colIdx: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
+// Finding 6 — the one-cell selection layer used to be keyed directly by DISPLAY position
+// (`args.row`, below), which goes stale the moment `matchedRows(tabId)` changes what that
+// position means (e.g. toggling "hide non-matching rows" after a click): the highlight can end
+// up sitting on the wrong row. Tracked here as the underlying page row/field instead (never a
+// display position) so the matchedRows watch below can recompute and reapply the layer on a
+// filter change, the same way refreshSearchLayer already does for search matches.
+let selectedRow: number | null = null;
+let selectedField: string | null = null;
+
+function refreshSelectionLayer(): void {
+  if (!grid || !page) return;
+  if (selectedRow === null || selectedField === null) return;
+  const idx: DisplayRowIndex = {
+    displayRows: matchedRows(props.tabId),
+    pageRowCount: page.rowCount,
+  };
+  const pos = displayPositionOf(idx, selectedRow);
+  grid.setCellCssStyles('kira-cell-selected', { [pos]: { [selectedField]: 'kira-cell-selected' } });
+}
+
 // §3.4: no `SlickHybridSelectionModel` (a console result never has more than one cell selected at
 // once — P43 iter2 D22's own finding, carried over) — `enableCellNavigation: true` (below) plus
 // this click handler plus a single-entry `setCellCssStyles` layer give the same visual result at
 // O(1) instead of registering the full selection-range plugin for a shape it never needs.
 function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
-  if (!grid || !dataSource || !page || args.cell === 0) return; // the gutter selects nothing
+  if (!grid || !dataSource || !page) return;
+  if (args.cell === 0) {
+    // Finding 6 — the gutter selects nothing, but a stale highlight from an earlier cell click
+    // must not linger on screen implying that cell is still selected.
+    selectedRow = null;
+    selectedField = null;
+    grid.setCellCssStyles('kira-cell-selected', {});
+    return;
+  }
   const field = fieldAtCol(args.cell);
   if (!field) return;
   const pageCol = colIndexFromField(field);
@@ -295,7 +323,9 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   const column = page.columns[pageCol];
   if (!column) return;
   const handle = dataSource.getItem(args.row);
-  grid.setCellCssStyles('kira-cell-selected', { [args.row]: { [field]: 'kira-cell-selected' } });
+  selectedRow = handle.row;
+  selectedField = field;
+  refreshSelectionLayer();
   const view = cell(props.pageKey, handle.row, pageCol);
   publishSelectedCell({
     tabId: props.tabId,
@@ -485,6 +515,7 @@ watch(
     grid.invalidateAllRows();
     grid.render();
     refreshSearchLayer();
+    refreshSelectionLayer(); // finding 6 — keep the one-cell highlight on the right row too.
   },
 );
 

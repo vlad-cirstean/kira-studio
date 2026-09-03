@@ -1,5 +1,3 @@
-import { nextTick } from 'vue';
-
 // P22 iter2 D2: a real-fling scroll trace, driven by a human on real hardware — see
 // docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §5 D2/§7.3. Every scroll
 // measurement anywhere else in this repo (tests/ui/support/measure.ts included) drives `scrollTop`
@@ -12,9 +10,8 @@ import { nextTick } from 'vue';
 // internal/shell/menutemplate.go). It is not a tests/ui/ instrument and is not gated in CI; it exists
 // so a human can capture a number nobody in this repo's history has ever measured. Reachable at
 // `window.__kiraScrollTrace` (wired from SlickGridHost.vue's registerGrid/noteScrollEvent/
-// noteRenderMs calls — noteNotify below is the deleted DataGrid.vue's own Vue-`nextTick`-based
-// equivalent, kept for its doc comment's reasoning but no longer called — not from columns.ts's
-// offset observer; see the deleted DataGrid.vue's own onScroll comment for why).
+// noteRenderMs calls — not from columns.ts's offset observer; see the deleted DataGrid.vue's own
+// onScroll comment for why).
 //
 // Usage (Web Inspector console, one hard two-finger flick between the two calls):
 //   __kiraScrollTrace.start()
@@ -195,27 +192,10 @@ export function noteScrollEvent(offset: number, t: number): void {
   pendingEvents.push({ offset, t });
 }
 
-/** The deleted DataGrid.vue's own markScrollWork, called from its virtualizer's onChange —
- *  SlickGridHost.vue calls `noteRenderMs` below instead (P22 iter2-scroll-gaps D1's own comment),
- *  since its render pass is fully synchronous with no Vue nextTick to approximate through. Kept
- *  for its own reasoning, not currently called. P22 iter2-pacing D3: accumulates into
- *  pendingRenderMs/pendingRenderCount (drained by tick()) instead of overwriting a sticky
- *  last-value — see ScrollTraceFrame.renderMs's own comment for why that distinction is
- *  load-bearing. */
-export function noteNotify(): void {
-  if (!recording) return;
-  pendingNotified = true;
-  const start = performance.now();
-  void nextTick(() => {
-    pendingRenderMs += performance.now() - start;
-    pendingRenderCount++;
-  });
-}
-
 /** P22 iter2-scroll-gaps D1: for an engine whose render pass is fully synchronous (SlickGrid — no
  *  Vue patch/flush involved on this path at all), the caller already has the duration in hand;
- *  report it directly instead of nextTick's Vue-specific approximation, which noteNotify() above
- *  stays as, unchanged, for the deleted DataGrid.vue's own reasoning. Called from KiraSlickGrid's own `render()` override —
+ *  report it directly rather than approximating it through a Vue `nextTick` the way the deleted
+ *  DataGrid.vue's own markScrollWork did. Called from KiraSlickGrid's own `render()` override —
  *  including a chase-scheduled catch-up render, so two calls landing in the same frame (the P22
  *  iter2-pacing bug, before D1's fix) both accumulate rather than one clobbering the other. */
 export function noteRenderMs(ms: number): void {

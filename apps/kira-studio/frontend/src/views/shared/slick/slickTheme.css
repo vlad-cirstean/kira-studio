@@ -453,9 +453,6 @@
 .slick-grid-host .kira-cell-selected {
   background: var(--kira-select);
 }
-.slick-grid-host .kira-cell-search-match {
-  background: var(--kira-search-match);
-}
 
 /* P42 D21/F15, ported verbatim from GridRow.vue's own `.grid-cell.selected` rule (C5) — an inset
    box-shadow per side, switched on only when that side sits on the selection's own outer
