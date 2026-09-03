@@ -11,6 +11,7 @@ import { SlickEventHandler } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { publishSelectedCell } from '../../state/cellSelection';
 import { appearanceVersion, settingsState } from '../../state/settings';
+import { type CellClassFlags, cellClass } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import {
   alignmentFor,
@@ -22,6 +23,8 @@ import {
 } from '../shared/page/columns';
 import {
   createGridDataSource,
+  type DisplayRowIndex,
+  displayPositionOf,
   type GridDataSourceState,
   type RowHandle,
 } from '../shared/slick/dataSource';
@@ -29,6 +32,7 @@ import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { cell, getPage } from './resultPages';
+import { type Match, matchedRows, searchState } from './search';
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
@@ -272,13 +276,70 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   });
 }
 
+// P40 D10/D17: the same "hide non-matching rows" toggle grid/documents/keyvalue share (P24 D2) —
+// `matchedRows(tabId)` is the filter *and* the data source (C12/§5 D12's own precedent in
+// SlickGridHost.vue): a filtered row keeps its real page-row number in the gutter.
 function dataSourceState(): GridDataSourceState {
   return {
-    index: { displayRows: null, pageRowCount: page?.rowCount ?? 0 },
+    index: { displayRows: matchedRows(props.tabId), pageRowCount: page?.rowCount ?? 0 },
     inserts: [],
     extractValue: (item, field) => cell(props.pageKey, item.row, fieldToCol.get(field) ?? -1),
   };
 }
+
+function classesFrom(flags: CellClassFlags): string[] {
+  return Object.keys(cellClass(flags));
+}
+
+// §3.5: "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
+// current one. Not clipped to the rendered band (unlike the one-cell selection layer's neighbour
+// in SlickGridHost.vue, `kira-search` there is deliberately unclipped too — D5's own table): a
+// search result is not bounded the way a rendered band is.
+function refreshSearchLayer(): void {
+  if (!grid || !page) return;
+  const entry = searchState[props.tabId];
+  const matches = entry?.matches ?? [];
+  const matchHash: Record<number, Record<string, string>> = {};
+  const currentHash: Record<number, Record<string, string>> = {};
+  if (matches.length > 0) {
+    const idx: DisplayRowIndex = {
+      displayRows: matchedRows(props.tabId),
+      pageRowCount: page.rowCount,
+    };
+    const matchClass = classesFrom({ searchMatch: true })[0] ?? 'search-match';
+    const currentClass = classesFrom({ searchMatchCurrent: true })[0] ?? 'search-match-current';
+    for (const m of matches) {
+      const name = page.columns[m.col]?.name;
+      if (!name) continue;
+      const pos = displayPositionOf(idx, m.row);
+      matchHash[pos] ??= {};
+      (matchHash[pos] as Record<string, string>)[name] = matchClass;
+    }
+    const current = entry && entry.index >= 0 ? matches[entry.index] : undefined;
+    const currentName = current && page.columns[current.col]?.name;
+    if (current && currentName) {
+      currentHash[displayPositionOf(idx, current.row)] = { [currentName]: currentClass };
+    }
+  }
+  grid.setCellCssStyles('kira-search', matchHash);
+  grid.setCellCssStyles('kira-search-current', currentHash);
+}
+
+// The find toolbar's go-to-match (P40 D10) — ConsoleResultGrid.vue delegates here for the tabular
+// branch. `rowIndices`' own position lookup (the incumbent VirtualList's approach) has no
+// counterpart here: SlickGrid addresses a row by display *position*, so this goes straight through
+// the same displayPositionOf arithmetic the search layer above uses.
+function goToMatch(match: Match): void {
+  if (!grid || !page) return;
+  const idx: DisplayRowIndex = {
+    displayRows: matchedRows(props.tabId),
+    pageRowCount: page.rowCount,
+  };
+  const pos = displayPositionOf(idx, match.row);
+  grid.scrollRowIntoView(pos);
+  grid.setActiveCell(pos, match.col + 1); // +1: the frozen gutter occupies display column 0
+}
+defineExpose({ goToMatch });
 
 onMounted(() => {
   const el = rootRef.value;
@@ -338,6 +399,9 @@ onMounted(() => {
     viewportEl.addEventListener('scroll', onViewportScroll, { passive: true });
   }
   grid.render();
+  // C12/§5 D12 precedent (SlickGridHost.vue) — a tab switch (not a fresh run) can remount this
+  // component onto a result that already has a completed search from before it was last hidden.
+  refreshSearchLayer();
 
   resizeObserver = new ResizeObserver(() => grid?.resizeCanvas());
   resizeObserver.observe(el);
@@ -378,6 +442,31 @@ watch(
     grid.setColumns(buildColumns(page));
     grid.render();
   },
+);
+
+// C12/§5 D12 precedent — the filter *is* the data source: `matchedRows(tabId)` tracks both the
+// search toolbar's own scan result and its "filter to matches" toggle reactively.
+watch(
+  () => matchedRows(props.tabId),
+  () => {
+    if (!grid || !dataSource) return;
+    dataSource.setState(dataSourceState());
+    grid.updateRowCount();
+    grid.invalidateAllRows();
+    grid.render();
+    refreshSearchLayer();
+  },
+);
+
+// C12/§5 D5 precedent — `kira-search`'s own trigger: a scan publishing a new/updated result, or
+// goNext/goPrev moving the current match. The signature is result identity + current index +
+// pending, not the matches themselves — rebuilding the whole hash is refreshSearchLayer's own job.
+watch(
+  () => {
+    const entry = searchState[props.tabId];
+    return entry ? `${entry.matches.length}:${entry.index}:${entry.pending ? 1 : 0}` : '';
+  },
+  () => refreshSearchLayer(),
 );
 </script>
 

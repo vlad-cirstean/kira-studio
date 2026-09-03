@@ -123,6 +123,10 @@ const totalWidth = computed(() => {
 // element since it isn't a stable containerRef the way DataGrid.vue's own is).
 const listRef = ref<{ scrollToIndex: (index: number) => void; $el: HTMLElement } | null>(null);
 
+// P30 §3.6 C2 — ConsoleSlickGrid.vue's own defineExpose contract (§3.5), a separate ref from
+// listRef since it isn't a <VirtualList> and exposes no `scrollToIndex`/`$el`.
+const tabularGridRef = ref<{ goToMatch: (match: Match) => void } | null>(null);
+
 // P49 F9/D4: a console result never persists a reorder the way a data tab's columnOrder does —
 // this is just page.columns' own natural order, kept as its own computed so columnOffsets has the
 // same `order` shape DataGrid.vue's own columnOrder computed gives it.
@@ -290,6 +294,12 @@ function isCurrentSearchMatch(row: number, col: number): boolean {
 // toggle is on, so a match's page-row number has to be looked up by position rather than assumed
 // to equal it, same as DocumentView.vue's own onGoToMatch.
 function goToMatch(match: Match): void {
+  // P30 §3.6 C2 — the tabular branch delegates to ConsoleSlickGrid.vue's own contract; it
+  // addresses a row by display *position*, not by an index into this file's own `rowIndices`.
+  if (ENABLE_SLICK_TABULAR && page.value?.kind === 'tabular') {
+    tabularGridRef.value?.goToMatch(match);
+    return;
+  }
   const index = rowIndices.value.indexOf(match.row);
   if (index >= 0) listRef.value?.scrollToIndex(index);
 }
@@ -384,6 +394,7 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
     </div>
     <ConsoleSlickGrid
       v-else-if="ENABLE_SLICK_TABULAR && page.kind === 'tabular'"
+      ref="tabularGridRef"
       :page-key="pageKey"
       :tab-id="tabId"
       :connection-id="connectionId"
