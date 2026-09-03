@@ -17,6 +17,34 @@
   color: var(--kira-fg);
 }
 
+/* P22 postscript §14.2 — the elastic-overscroll edge asymmetry (native macOS rubber-band bouncing
+   only on the bottom/right edges of the grid, real hardware). Real-Mac trackpad physics are
+   unobservable in this sandbox (no compositor capable of it, same limit this doc's own §7.3/§9.3
+   already name for the fling-lag question) — this is not re-verified fixed here, and the
+   postscript's own line stays open pending a real-Mac check. What changed this round: no code
+   anywhere in this app (frontend or the Wails-level `MacWebviewPreferences`/window options,
+   checked fresh this session) sets `overscroll-behavior`, intercepts `wheel`/`touchmove`, or
+   enables any gesture recognizer that would explain a leading-vs-trailing-edge difference — same
+   negative finding the postscript already recorded, now additionally covering the native-webview
+   config layer. The one thing genuinely absent, and the textbook first fix for "some edges bounce,
+   differently than others" in general (not SlickGrid-specific): nothing here ever told the browser
+   to keep an exhausted scroll gesture *local* to this element rather than handing the leftover
+   motion up the ancestor chain once `scrollTop`/`scrollLeft` hits its boundary (`overscroll-
+   behavior`'s own default, `auto`, is exactly that hand-off) — `html`/`body` are `overflow: hidden`
+   (base.css) and so can never visibly consume a handed-off scroll, but the hand-off itself can
+   still be what suppresses the *local* element's own elastic feedback for the gesture that
+   triggered it, independent of whether the ancestor has anything to show for it. `contain` is
+   additive only — it cannot disable this element's own scrolling or its own bounce, only stop it
+   leaking to an ancestor that was already inert here — so it is not a re-application of the
+   earlier, reverted "disable overscroll entirely" instruction (`overscroll-behavior: none` would
+   be that; `contain` is the opposite kind of change, keeping the bounce rather than removing it).
+   Applied to every real SlickGrid viewport (both frozen-pane panes; `hasFrozenRows` is false here
+   so only the two `-top-` ones exist, but the selector covers all four for free) since chaining is
+   a property of the DOM, not of which specific pane a gesture happens to start on. */
+.slick-grid-host .slick-viewport {
+  overscroll-behavior: contain;
+}
+
 /* C13/§5 D13 — the div SlickGrid itself is constructed against (`rootRef`, SlickGridHost.vue);
    `.slick-grid-host` above stays the outer positioning context (unchanged size/position) so an
    empty-state overlay's own `.no-rows { position: absolute; inset: 0 }` still covers exactly the
