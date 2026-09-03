@@ -484,7 +484,18 @@ gaps are narrow and specific.
 | least-privilege role, `database=kira_test` | `ReadFirstPage`, `FilterNarrowsResult`, `CountMatchesRead` | the role has `SELECT`; reads must work under it, and nothing proves that today |
 | least-privilege role | `MutateIsRefused(plan, adapters.CodeQuery)` | SQLSTATE 42501 → `E_QUERY` (`errors.go:32-37`). **The single most valuable new assertion in the phase**: it pins that a missing `GRANT` does *not* read as a wrong password, which is the property P24 and P25 were both about, asserted for the first time past `Connect()` |
 | least-privilege role | `ExecuteIsRefused(ddl, adapters.CodeQuery)` | the DDL half of the same |
-| superuser, `database` unset | `ReadIsRefused(kira_test-table-path, adapters.CodeQuery)` | P24's maintenance-database fallback lands the connection on `postgres`, not `kira_test`. P25 asserted the fallback at the connect boundary only; this asserts its *consequence* — a read against a `kira_test` table fails honestly rather than silently reading something else |
+
+**Implementer finding, not planned:** the fifth row this section originally planned — superuser,
+`database` unset, `ReadIsRefused(kira_test-table-path, adapters.CodeQuery)` — does not hold. Measured
+against a real container: `postgres/adapter.go`'s `Read` opens its own per-database connection keyed
+off the request path's own `database` segment (`client.go`'s `ConnSet`, an 8-entry LRU keyed by
+`(connection, database)`), reusing the same credentials Connect() was given — it does not stay pinned
+to whatever database the initial probe landed on. A superuser has full rights on `kira_test`
+regardless, so this read *succeeds*, the same way `least-privilege role, a database it has no CONNECT
+on` (row 6, existing) already proves the failure path for a role that genuinely lacks access. The
+"read against a table outside the fallback database" consequence P24/P25 cared about only bites a
+role with restricted database-level access, which row 6 already covers; a superuser has none to hit.
+Dropped rather than asserted incorrectly.
 
 ### 3.5 mongo — read-only is entirely unasserted, and its DDL analogue is implicit creation
 

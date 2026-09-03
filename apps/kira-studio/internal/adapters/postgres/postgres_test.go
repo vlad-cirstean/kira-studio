@@ -604,6 +604,9 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 		{"SET default_transaction_read_only = off", "DELETE FROM app.order_items"},
 		{"SET TRANSACTION READ WRITE", "DELETE FROM app.order_items"},
 		{"COMMIT", "BEGIN", "DELETE FROM app.order_items"},
+		// P26 §3.4(3): a DDL statement takes a different server-side path than DELETE — untested
+		// before this.
+		{"CREATE TABLE app.p26_ro_escape (id int)"},
 	}
 	for _, statements := range attempts {
 		_, err := a.Execute(context.Background(), model.ConsoleRequest{
@@ -623,6 +626,20 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 	}
 	if after.Value != before.Value {
 		t.Fatalf("order_items row count = %d after read-only Execute attempts, want unchanged %d", after.Value, before.Value)
+	}
+
+	side, err := pgx.Connect(context.Background(), fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	defer side.Close(context.Background())
+	var exists bool
+	if err := side.QueryRow(context.Background(),
+		"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'app' AND table_name = 'p26_ro_escape')").Scan(&exists); err != nil {
+		t.Fatalf("information_schema check: %v", err)
+	}
+	if exists {
+		t.Error("app.p26_ro_escape exists after a read-only Execute attempt, want it never created")
 	}
 
 	// The wrapping transaction must actually end after each attempt — a genuine, ordinary
@@ -685,6 +702,152 @@ func TestPostgres_MutateUpdate(t *testing.T) {
 	}
 	if result.AffectedRows != 1 {
 		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+}
+
+// P26 §3.4(1): the phase's flagship test for this adapter — does an object DDL created become
+// visible to Children/Describe on the same connection, the one Postgres ✗ that isn't a write.
+func TestPostgres_ExecuteDDLRoundTrip(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	schemaPath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"))
+	tablePath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "p26_scratch"))
+
+	side, err := pgx.Connect(ctx, fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	defer side.Close(context.Background())
+	// TestPostgres_TreeEnumeration (:175) enumerates app's own child set — a leaked scratch table
+	// from a failed run must not break it.
+	t.Cleanup(func() { _, _ = side.Exec(context.Background(), "DROP TABLE IF EXISTS app.p26_scratch") })
+
+	if _, err := a.Execute(ctx, model.ConsoleRequest{
+		Path:       schemaPath,
+		Statements: []string{"CREATE TABLE app.p26_scratch (id serial PRIMARY KEY, name text, region_id int)"},
+	}, adapters.NewOpCtx("op-ddl-1")); err != nil {
+		t.Fatalf("Execute(CREATE TABLE): %v", err)
+	}
+
+	children, err := a.Children(ctx, schemaPath, adapters.NewOpCtx("op-ddl-2"))
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if !containsName(childNames(t, children), "p26_scratch") {
+		t.Fatalf("Children(app) = %v, want p26_scratch present", childNames(t, children))
+	}
+
+	meta, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-3"))
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	if len(meta.Columns) != 3 {
+		t.Fatalf("Columns = %+v, want exactly 3 (id, name, region_id)", meta.Columns)
+	}
+	if len(meta.PrimaryKey) != 1 || meta.PrimaryKey[0] != "id" {
+		t.Errorf("PrimaryKey = %v, want [id]", meta.PrimaryKey)
+	}
+
+	if _, err := a.Execute(ctx, model.ConsoleRequest{
+		Path:       schemaPath,
+		Statements: []string{"ALTER TABLE app.p26_scratch ADD COLUMN note text"},
+	}, adapters.NewOpCtx("op-ddl-4")); err != nil {
+		t.Fatalf("Execute(ALTER TABLE): %v", err)
+	}
+	meta2, err := a.Describe(ctx, tablePath, adapters.NewOpCtx("op-ddl-5"))
+	if err != nil {
+		t.Fatalf("Describe after ALTER: %v", err)
+	}
+	if len(meta2.Columns) != 4 {
+		t.Fatalf("Columns after ALTER = %+v, want exactly 4", meta2.Columns)
+	}
+
+	if _, err := a.Execute(ctx, model.ConsoleRequest{
+		Path:       schemaPath,
+		Statements: []string{"DROP TABLE app.p26_scratch"},
+	}, adapters.NewOpCtx("op-ddl-6")); err != nil {
+		t.Fatalf("Execute(DROP TABLE): %v", err)
+	}
+	childrenAfter, err := a.Children(ctx, schemaPath, adapters.NewOpCtx("op-ddl-7"))
+	if err != nil {
+		t.Fatalf("Children after DROP: %v", err)
+	}
+	if containsName(childNames(t, childrenAfter), "p26_scratch") {
+		t.Errorf("Children(app) after DROP = %v, must not contain p26_scratch", childNames(t, childrenAfter))
+	}
+}
+
+// P26 §3.4(2): the only ✗ in Postgres's own §1.3 row — a delete that actually lands.
+func TestPostgres_MutateDeleteRemovesTheRow(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+	tablePath := nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "p26_delete"))
+
+	side, err := pgx.Connect(ctx, fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	defer side.Close(context.Background())
+	if _, err := side.Exec(ctx, "CREATE TABLE IF NOT EXISTS app.p26_delete (id int PRIMARY KEY, name text)"); err != nil {
+		t.Fatalf("create scratch table: %v", err)
+	}
+	t.Cleanup(func() { _, _ = side.Exec(context.Background(), "DROP TABLE IF EXISTS app.p26_delete") })
+
+	insertPlan := model.MutationPlan{
+		Path: tablePath,
+		Ops: []model.MutationRowOp{
+			{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("1")}, {Name: "name", Value: strp("a")}}},
+			{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("2")}, {Name: "name", Value: strp("b")}}},
+			{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("3")}, {Name: "name", Value: strp("c")}}},
+		},
+	}
+	if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-del-1")); err != nil {
+		t.Fatalf("Mutate(insert): %v", err)
+	}
+	before, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-del-2"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if before.Value != 3 {
+		t.Fatalf("Count after insert = %d, want 3", before.Value)
+	}
+
+	deletePlan := model.MutationPlan{
+		Path: tablePath,
+		Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: strp("2")}}}},
+	}
+	result, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-del-3"))
+	if err != nil {
+		t.Fatalf("Mutate(delete): %v", err)
+	}
+	if result.AffectedRows != 1 {
+		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+
+	after, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-del-4"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if after.Value != 2 {
+		t.Fatalf("Count after delete = %d, want 2", after.Value)
+	}
+
+	read, err := a.Read(ctx, adapters.ReadRequest{
+		Path: tablePath, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-del-5"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	readPage := read.(page.TabularPage)
+	if readPage.RowCount != 2 {
+		t.Fatalf("RowCount = %d, want 2", readPage.RowCount)
+	}
+	for row := 0; row < readPage.RowCount; row++ {
+		if id := cellAt(t, readPage, 0, row); id != nil && *id == "2" {
+			t.Error("row with id=2 is still present after delete")
+		}
 	}
 }
 

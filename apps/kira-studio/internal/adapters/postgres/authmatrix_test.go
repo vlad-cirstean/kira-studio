@@ -89,6 +89,29 @@ func TestPostgres_AuthMatrix(t *testing.T) {
 						}
 					},
 				},
+				// The role has SELECT via GRANT SELECT ON ALL TABLES IN SCHEMA app; reads must work
+				// under it, and nothing proved that before this phase.
+				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "customers"))),
+				testsupport.FilterNarrowsResult(
+					testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "customers")),
+					"region_id = 1", 1,
+				),
+				testsupport.CountMatchesRead(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "customers"))),
+				// SQLSTATE 42501 (insufficient_privilege) is not in mapError's auth switch
+				// (errors.go:32-37) — the single most valuable new assertion in the phase: it pins
+				// that a missing GRANT does *not* read as a wrong password, the property P24/P25 were
+				// both about, asserted for the first time past Connect().
+				testsupport.MutateIsRefused(model.MutationPlan{
+					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "regions")),
+					Ops: []model.MutationRowOp{{
+						Kind: "insert", Values: model.RowValues{{Name: "id", Value: testsupport.Strp("91")}, {Name: "name", Value: testsupport.Strp("nope")}},
+					}},
+				}, adapters.CodeQuery),
+				testsupport.ExecuteIsRefused(
+					testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test")),
+					[]string{"CREATE TABLE app.p26_matrix_scratch (id int)"},
+					adapters.CodeQuery,
+				),
 			},
 		},
 		{
