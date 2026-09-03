@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -123,6 +124,80 @@ func TestPostgres_AuthFailure(t *testing.T) {
 	var ae *adapters.Error
 	if !errors.As(err, &ae) || ae.Code != adapters.CodeAuth {
 		t.Fatalf("got %v, want an E_AUTH *adapters.Error", err)
+	}
+}
+
+// F1: a probe-query failure after a successful auth must not deadlock Connect. The probe runs
+// while still holding connSet's primary connEntry lock (acquired by connSet.Primary); the
+// error-handling path used to call Disconnect synchronously from the same call frame, which
+// re-locks that same non-reentrant mutex via ConnSet.CloseAll and hangs forever. Reproduced here
+// by letting auth succeed but revoking the probe query's own privilege, so the failure happens
+// exactly where the deadlock used to live — after Primary() returns, before release() runs.
+func TestPostgres_ConnectProbeFailureDoesNotDeadlock(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+
+	side, err := pgx.Connect(context.Background(), fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	// Registered first, so its LIFO position is last: every cleanup below runs against a still-open
+	// connection (authmatrix_test.go's own pattern).
+	t.Cleanup(func() { _ = side.Close(context.Background()) })
+
+	const roleName, rolePassword = "p1_probe_fail", "p1_probe_pw"
+	mustExec(t, side, fmt.Sprintf(`CREATE ROLE %s LOGIN PASSWORD '%s'`, roleName, rolePassword))
+	t.Cleanup(func() {
+		mustExec(t, side, `DROP OWNED BY `+roleName)
+		mustExec(t, side, `REVOKE CONNECT ON DATABASE kira_test FROM `+roleName)
+		mustExec(t, side, `DROP ROLE IF EXISTS `+roleName)
+	})
+	mustExec(t, side, `GRANT CONNECT ON DATABASE kira_test TO `+roleName)
+
+	// Breaks adapter.go's connect probe (`current_setting('server_encoding')`) for every
+	// non-superuser role, so auth succeeds but the probe fails with a permission error. No other
+	// test in this package runs concurrently (no t.Parallel here), and the grant is restored
+	// below and in cleanup, so this doesn't leak into any other test.
+	mustExec(t, side, `REVOKE EXECUTE ON FUNCTION pg_catalog.current_setting(text) FROM PUBLIC`)
+	t.Cleanup(func() {
+		mustExec(t, side, `GRANT EXECUTE ON FUNCTION pg_catalog.current_setting(text) TO PUBLIC`)
+	})
+
+	cfg := fixture.Config
+	cfg.Username, cfg.Password = testsupport.Strp(roleName), testsupport.Strp(rolePassword)
+
+	a := newAdapter(t)
+
+	failDone := make(chan error, 1)
+	go func() {
+		_, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-probe-fail"))
+		failDone <- err
+	}()
+	select {
+	case err := <-failDone:
+		if err == nil {
+			t.Fatal("expected Connect to fail when the post-connect probe query fails")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Connect did not return within 5s for a failing probe — probable self-deadlock")
+	}
+
+	// Restore the probe's privilege and retry on the very same *Adapter: the earlier failure
+	// must not have left the primary connEntry's lock permanently held.
+	mustExec(t, side, `GRANT EXECUTE ON FUNCTION pg_catalog.current_setting(text) TO PUBLIC`)
+
+	retryDone := make(chan error, 1)
+	go func() {
+		_, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("op-probe-fail-retry"))
+		retryDone <- err
+	}()
+	select {
+	case err := <-retryDone:
+		if err != nil {
+			t.Fatalf("retry Connect after a probe failure: %v", err)
+		}
+		t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+	case <-time.After(5 * time.Second):
+		t.Fatal("retry Connect did not return within 5s — entry left locked after the probe failure")
 	}
 }
 

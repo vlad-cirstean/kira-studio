@@ -56,7 +56,6 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, err
 	}
-	defer release()
 
 	var serverVersion, database, encoding string
 	found := false
@@ -68,13 +67,19 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 			return rows.Scan(&serverVersion, &database, &encoding)
 		})
 	if execErr != nil {
+		// release() must run before Disconnect: Disconnect->ConnSet.CloseAll takes this same
+		// entry's lock, and sync.Mutex isn't reentrant — calling Disconnect while still holding
+		// the lock this call frame acquired above deadlocks the goroutine permanently (F1).
+		release()
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, execErr
 	}
 	if !found {
+		release()
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
 	}
+	release()
 
 	a.primaryDatabase = database
 	a.readOnly = cfg.ReadOnly
