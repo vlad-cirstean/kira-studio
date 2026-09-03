@@ -722,6 +722,58 @@ test('P22 postscript — a scroll event anywhere in the document after grid tear
   expect(pageErrors).toEqual([]);
 });
 
+// P22 postscript follow-up — the "no exception" test above proves the listener's *effects* are
+// harmless once it's still attached wrongly (its target refs happen to be non-null this run), but
+// says nothing about whether `destroy()` actually calls `removeEventListener` at all. It previously
+// didn't: `ancestorScrollHandler`'s class-field initializer (`= null`) ran *after* `super()` — i.e.
+// after `bindAncestorScrollEvents()` already set the real handler during construction — clobbering
+// it back to `null` every time, so `destroy()`'s `if (this.ancestorScrollHandler)` guard was always
+// false and the real capture-phase `document` listener was never removed, leaking the grid (and
+// everything its closure retains) for the life of the process. This test counts the actual
+// `document`-level capture-phase `'scroll'` listeners SlickGrid's own binding path adds and
+// removes, so a regression back to the clobbering pattern fails here even if it stops throwing.
+test('P22 postscript follow-up — grid teardown actually removes the document scroll listener, not just avoids throwing', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+
+  // Installed before the grid ever mounts (SPA navigation below, no further page.goto — the patch
+  // stays in effect) so it sees every add/remove this grid instance makes, not just a snapshot.
+  await page.evaluate(() => {
+    const w = window as unknown as { __kiraScrollListenerNet: () => number };
+    let net = 0;
+    w.__kiraScrollListenerNet = () => net;
+    const isCapture = (options: boolean | AddEventListenerOptions | undefined) =>
+      options === true || (typeof options === 'object' && options?.capture === true);
+    const originalAdd = document.addEventListener.bind(document);
+    const originalRemove = document.removeEventListener.bind(document);
+    document.addEventListener = ((type: string, listener: unknown, options?: unknown) => {
+      if (type === 'scroll' && isCapture(options as boolean | AddEventListenerOptions | undefined))
+        net++;
+      return originalAdd(type, listener as EventListenerOrEventListenerObject, options as never);
+    }) as typeof document.addEventListener;
+    document.removeEventListener = ((type: string, listener: unknown, options?: unknown) => {
+      if (type === 'scroll' && isCapture(options as boolean | AddEventListenerOptions | undefined))
+        net--;
+      return originalRemove(type, listener as EventListenerOrEventListenerObject, options as never);
+    }) as typeof document.removeEventListener;
+  });
+
+  const netListeners = () =>
+    page.evaluate(() =>
+      (window as unknown as { __kiraScrollListenerNet: () => number }).__kiraScrollListenerNet(),
+    );
+
+  expect(await netListeners()).toBe(0);
+
+  await connectAndOpenSpikeGrid(page);
+  expect(await netListeners()).toBe(1); // bindAncestorScrollEvents' own listener, actually retained.
+
+  await page.locator('[data-testid="tab"].is-active [data-testid="tab-close"]').click();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
+  expect(await netListeners()).toBe(0); // destroy() must see the real handler and remove it.
+});
+
 // P22 iter2-onset §6 — the gesture-onset defect's own sandbox-provable gates.
 //
 // What this proves, and what it does not. It gates the *mechanism*: no render pass sizes its

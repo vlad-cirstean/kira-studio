@@ -270,8 +270,25 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  very next one. Not a call-order gap in this app's own code (`destroy()`/`unbindAll()` do run in
    *  the order this file's own next comment already relies on) — a real bug in the vendored
    *  library's own capture-flag handling. Fixed the same way `getRenderedRange`/`render` are
-   *  overridden: bind it ourselves, outside the buggy service, so it can be removed correctly. */
-  private ancestorScrollHandler: ((e: Event) => void) | null = null;
+   *  overridden: bind it ourselves, outside the buggy service, so it can be removed correctly.
+   *
+   *  P22 postscript follow-up: this field must NOT carry a `= null` initializer. `SlickGrid`'s own
+   *  constructor (`super()`) calls `initialize()` synchronously, which calls this class's own
+   *  `bindAncestorScrollEvents()` override *from inside* `super()` — before `super()` has returned
+   *  and therefore before this subclass's own field initializers run (standard JS: field
+   *  initializers run in declaration order immediately after `super()` returns, per spec, same
+   *  hazard `getRenderedRange`'s comment documents for `velocity`/`mountedColumnCount` below). A
+   *  `= null` initializer here doesn't just leave the field transiently unset for one read — it
+   *  unconditionally OVERWRITES the real handler `bindAncestorScrollEvents()` already wrote during
+   *  `super()`, back to `null`, every single time. `destroy()` then finds `null` and never calls
+   *  `removeEventListener`, leaking the capture-phase document listener (and everything its closure
+   *  retains) for the life of the process. `declare` tells TS to skip emitting any field
+   *  initialization for this property at all — construction-time assignment inside
+   *  `bindAncestorScrollEvents()` is the only writer, and it survives `super()` returning.
+   *  Confirmed empirically: without `declare`, `this.ancestorScrollHandler` is `null` immediately
+   *  after `super()` returns even though `bindAncestorScrollEvents()` just set it; with `declare`,
+   *  it holds the real handler. */
+  private declare ancestorScrollHandler: ((e: Event) => void) | null;
 
   override bindAncestorScrollEvents(): void {
     const handler = (e: Event): void => {
