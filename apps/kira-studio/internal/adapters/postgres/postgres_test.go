@@ -218,18 +218,21 @@ func TestPostgres_ConnectWithNoDatabaseDefaultsToMaintenanceDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("side connect: %v", err)
 	}
-	defer side.Close(context.Background())
-	if _, err := side.Exec(context.Background(),
-		`CREATE ROLE app_user LOGIN PASSWORD 'app_pw'`); err != nil {
-		t.Fatalf("create role: %v", err)
-	}
+	// Registered first, so its LIFO position is last: the DROP ROLE cleanup below must run
+	// against a still-open connection — a plain `defer side.Close(...)` would close it before
+	// t.Cleanup callbacks even start (authmatrix_test.go's own pattern, mustExec included).
+	t.Cleanup(func() { _ = side.Close(context.Background()) })
+	mustExec(t, side, `CREATE ROLE app_user LOGIN PASSWORD 'app_pw'`)
 	t.Cleanup(func() {
-		_, _ = side.Exec(context.Background(), `DROP ROLE IF EXISTS app_user`)
+		// DROP ROLE fails while any privilege is still granted to it (here, just the
+		// database-level CONNECT below) — GRANT CONNECT leaves a pg_shdepend entry, so a
+		// swallowed failure here left the role behind for good on a rerun (`go test -count=2`),
+		// since CREATE ROLE above has no IF NOT EXISTS (authmatrix_test.go's own pattern).
+		mustExec(t, side, `DROP OWNED BY app_user`)
+		mustExec(t, side, `REVOKE CONNECT ON DATABASE kira_test FROM app_user`)
+		mustExec(t, side, `DROP ROLE IF EXISTS app_user`)
 	})
-	if _, err := side.Exec(context.Background(),
-		`GRANT CONNECT ON DATABASE kira_test TO app_user`); err != nil {
-		t.Fatalf("grant connect: %v", err)
-	}
+	mustExec(t, side, `GRANT CONNECT ON DATABASE kira_test TO app_user`)
 
 	cfg := fixture.Config
 	cfg.Database = nil // exactly what an empty "Database" field in the dialog sends
