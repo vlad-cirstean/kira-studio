@@ -7,6 +7,7 @@ package testsupport
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -114,6 +115,16 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 			if err == nil {
 				t.Fatal("Connect: want an error, got nil")
 			}
+			// P29 F6: the op log persists this exact error text to disk for
+			// advanced.opLogRetentionDays — verify a failed connect never echoes the password
+			// back, in either config shape. The failure message deliberately does not print the
+			// error itself, so a real leak doesn't also land in CI logs.
+			if p := cfg.Password; p != nil && *p != "" && strings.Contains(err.Error(), *p) {
+				t.Error("Connect error text contains the connection password verbatim")
+			}
+			if p := passwordFromURI(cfg.URI); p != "" && strings.Contains(err.Error(), p) {
+				t.Error("Connect error text contains the URI-embedded password verbatim")
+			}
 			code, _ := adapters.CodeOf(err)
 			if c.Expect.FailWith != "" && code != c.Expect.FailWith {
 				t.Errorf("code = %v, want %v (err: %v)", code, c.Expect.FailWith, err)
@@ -123,6 +134,34 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 			}
 		})
 	}
+}
+
+// passwordFromURI extracts a uri-mode case's embedded password from its userinfo segment (a
+// read-only sibling of internal/connections' own unexported stripURIPassword, kept local since
+// that one isn't exported) — P29 F6's leak assertion needs it because a uri-mode Case carries the
+// password inside cfg.URI rather than cfg.Password.
+func passwordFromURI(uri *string) string {
+	if uri == nil {
+		return ""
+	}
+	idx := strings.Index(*uri, "://")
+	if idx < 0 {
+		return ""
+	}
+	authority := (*uri)[idx+3:]
+	if i := strings.IndexAny(authority, "/?#"); i >= 0 {
+		authority = authority[:i]
+	}
+	at := strings.LastIndex(authority, "@")
+	if at < 0 {
+		return ""
+	}
+	userinfo := authority[:at]
+	colon := strings.IndexByte(userinfo, ':')
+	if colon < 0 {
+		return ""
+	}
+	return userinfo[colon+1:]
 }
 
 // RunScenarios applies the same Requires gate RunMatrix does, outside a matrix table (P26 §2.1) —

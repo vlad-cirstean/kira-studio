@@ -403,6 +403,13 @@ and every adapter's `authmatrix_test.go` already contains wrong-password cases (
 - Ten adapters × their whole wrong-password/least-privilege permutation set, from ~12 lines in one
   file, under the already-opt-in `KIRA_TEST_MATRIX=1` (`scripts/test-matrix.sh`).
 
+**Verdict: verified clean.** `KIRA_TEST_MATRIX=1 sh scripts/test-matrix.sh --mirror` was run against
+real containers for all nine adapters in the matrix (postgres, mysqlfamily, clickhouse, mongo,
+redis, kafka, sqs, s3, sqlite) with the assertion above in place — every adapter passed, meaning no
+driver's failed-connect error text echoed the password back, in either password- or uri-mode cases.
+No redaction layer was built (§7 already says not to build one speculatively); the assertion now
+guards the invariant going forward.
+
 **Then decide.** If the run is clean, this finding closes as "verified, no redaction layer needed,
 and now guarded against regression" — which is a genuinely better outcome than adding a redactor
 nobody can justify. If any adapter fails, the fix is a single scrubbing pass applied at the
