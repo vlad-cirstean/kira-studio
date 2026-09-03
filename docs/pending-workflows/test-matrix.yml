@@ -1,0 +1,42 @@
+name: Auth/config test matrix (on demand + nightly)
+
+# P25 §2.10 (docs/v1.1/plans/P25-connection-auth-test-matrix.md): workflow_dispatch, exactly like
+# db-compat.yml's own precedent, PLUS a nightly schedule on the default branch — the one
+# deliberate difference from db-compat.yml, which is dispatch-only. A nightly schedule gives this
+# suite real CI coverage without putting ten containers and a role matrix on every pull request.
+# ci.yml is not edited and does not reference this file — ordinary CI stays byte-identical, the
+# same "no push, no pull_request" posture P16 D6 required of db-compat.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'Single kind (postgres, mysqlfamily, clickhouse, mongo, redis, kafka, sqs, s3, sqlite), or "all"'
+        default: 'all'
+  schedule:
+    - cron: '0 7 * * *' # nightly, well off the hour so it doesn't contend with other scheduled jobs
+
+permissions:
+  contents: read
+
+jobs:
+  test-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Run the auth/config permutation matrix
+        # GitHub's own runners reach Docker Hub directly — --mirror is a sandbox-only workaround
+        # for the outbound proxy documented in AGENTS.md, so it is deliberately omitted here,
+        # matching db-compat.yml's own comment for the identical reason. A scheduled run has no
+        # workflow_dispatch inputs at all, so `inputs.kind` reads empty rather than its declared
+        # default — treated the same as "all".
+        run: |
+          set -eu
+          ARGS=""
+          if [ -n "${{ inputs.kind }}" ] && [ "${{ inputs.kind }}" != "all" ]; then
+            ARGS="--only ${{ inputs.kind }}"
+          fi
+          sh scripts/test-matrix.sh $ARGS
