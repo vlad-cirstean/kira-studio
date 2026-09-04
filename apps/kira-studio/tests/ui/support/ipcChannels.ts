@@ -103,6 +103,17 @@ export const IPC = {
   historyClear: 'kira:history:clear',
   historyAdopt: 'kira:history:adopt',
 
+  grpcDescribe: 'kira:grpc:describe',
+  grpcCall: 'kira:grpc:call',
+  grpcHistoryList: 'kira:grpcHistory:list',
+  grpcHistoryGet: 'kira:grpcHistory:get',
+  grpcHistoryDelete: 'kira:grpcHistory:delete',
+  grpcHistoryClear: 'kira:grpcHistory:clear',
+  grpcHistoryAdopt: 'kira:grpcHistory:adopt',
+  collectionsGetGrpcRequest: 'kira:collections:getGrpcRequest',
+  collectionsSaveGrpcRequest: 'kira:collections:saveGrpcRequest',
+  collectionsCreateGrpcItem: 'kira:collections:createGrpcItem',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',

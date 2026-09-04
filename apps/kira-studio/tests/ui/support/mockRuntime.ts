@@ -108,6 +108,17 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   historyDelete: 'ResponseHistoryService.Delete',
   historyClear: 'ResponseHistoryService.Clear',
   historyAdopt: 'ResponseHistoryService.Adopt',
+
+  grpcDescribe: 'GrpcService.Describe',
+  grpcCall: 'GrpcService.Call',
+  grpcHistoryList: 'GrpcHistoryService.List',
+  grpcHistoryGet: 'GrpcHistoryService.Get',
+  grpcHistoryDelete: 'GrpcHistoryService.Delete',
+  grpcHistoryClear: 'GrpcHistoryService.Clear',
+  grpcHistoryAdopt: 'GrpcHistoryService.Adopt',
+  collectionsGetGrpcRequest: 'CollectionsService.GetGrpcRequest',
+  collectionsSaveGrpcRequest: 'CollectionsService.SaveGrpcRequest',
+  collectionsCreateGrpcItem: 'CollectionsService.CreateGrpcItem',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -432,4 +443,25 @@ export async function installControlMocks(
   });
 
   return { log: () => log };
+}
+
+/**
+ * P11 F20: delivers a pushed Wails event into a page that has real runtime.js loaded — the piece
+ * `installControlMocks` above deliberately does not cover (it intercepts only the `Call` RPC
+ * endpoint, D13). The bundle exposes `window._wails.dispatchWailsEvent({name, data})` for exactly
+ * this shape (confirmed by reading the pinned `runtime.js` itself): `name` is the same channel
+ * string `control.ts`'s `on(...)` subscribes `Events.On` to (e.g. `CHANNEL.grpcCall`), `data` is
+ * whatever that channel's own `cb(ev.data)` expects — D8's coalesced `GrpcCallEvent`, here.
+ */
+export async function emitWailsEvent(page: Page, name: string, data: unknown): Promise<void> {
+  await page.evaluate(
+    ({ name, data }) => {
+      (
+        window as unknown as {
+          _wails: { dispatchWailsEvent(e: { name: string; data: unknown }): void };
+        }
+      )._wails.dispatchWailsEvent({ name, data });
+    },
+    { name, data },
+  );
 }
