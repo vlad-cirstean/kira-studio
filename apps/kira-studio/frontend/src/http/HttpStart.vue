@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { openHttpRequestTab } from '../state/tabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { importCollection } from './state/collections';
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one p-dlgbtn primary button), the same `http/ -> state/` edge
 // CollectionsPanel.vue's own New request action uses (D7).
+//
+// P4 C9 adds a secondary action beside it: on a first run there is nothing to open, and importing
+// an existing collection is the other thing someone arriving here wants to do. The primary
+// button's `new-request-start` testid is untouched — two existing specs click it (F11).
+function onImport(): void {
+  void importCollection();
+}
 </script>
 
 <template>
@@ -13,10 +21,16 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
       <span class="start-mark dim"><CodiconIcon name="globe" :size="32" /></span>
       <div class="start-title">No request open</div>
       <div class="start-sub muted">Send an HTTP request and see its response here.</div>
-      <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openHttpRequestTab">
-        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
-        New request
-      </button>
+      <div class="start-actions">
+        <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openHttpRequestTab">
+          <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+          New request
+        </button>
+        <button type="button" class="p-dlgbtn" data-testid="import-collection-start" @click="onImport">
+          <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
+          Import collection…
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -49,5 +63,11 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 .start-sub {
   font-size: var(--kira-t-md);
   line-height: 1.5;
+}
+
+.start-actions {
+  display: flex;
+  gap: var(--kira-s-2);
+  align-items: center;
 }
 </style>

@@ -376,6 +376,38 @@ export async function saveRequest(
   await loadCollections();
 }
 
+// ---- import (D11/D12) ----
+
+/** Opens the native file dialog and imports the chosen path. **Only the path crosses the bridge**
+ *  — Go opens the file (F16: a 10-50 MB collection through the control plane is 20-100 serial
+ *  round trips, and above 64 MiB an unattributable refusal). Returns false when cancelled. */
+export async function importCollection(): Promise<boolean> {
+  const chosen = await control.filesChooseOpen({
+    title: 'Import Postman collection',
+    filters: [{ name: 'Postman collection', extensions: ['json'] }],
+  });
+  if (chosen.canceled || !chosen.file) return false;
+
+  // D11: the panel's header action is disabled with a spinner for the duration rather than joining
+  // the op log — that machinery is per tab (ViewChrome + useRunState) and an import started from
+  // the left panel has no tab, so a row there would buy nothing the user is looking at.
+  collectionsState.busy = true;
+  try {
+    const report = await control.collectionsImport(chosen.file.path);
+    collectionsState.report = { ...report, warnings: report.warnings ?? [] };
+    await loadCollections();
+    collectionsState.expanded.add(collectionKey(report.collectionId));
+    collectionsState.selected = collectionKey(report.collectionId);
+    return true;
+  } finally {
+    collectionsState.busy = false;
+  }
+}
+
+export function dismissReport(): void {
+  collectionsState.report = null;
+}
+
 // ---- lookups the panel, the menus and the request view all share ----
 
 export function itemRecord(itemId: string): CollectionItemSummary | undefined {

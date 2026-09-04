@@ -18,6 +18,7 @@ export interface CollectionMenuActions {
   duplicate(row: CollectionRowVm): void;
   remove(row: CollectionRowVm): void;
   copyUrl(row: CollectionRowVm): void;
+  importCollection(): void;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -129,6 +130,13 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       label: 'New collection',
       icon: 'add',
       run: () => actions.newCollection(),
+    },
+    {
+      type: 'item',
+      id: 'import-collection',
+      label: 'Import collection…',
+      icon: 'cloud-download',
+      run: () => actions.importCollection(),
     },
   ];
 }

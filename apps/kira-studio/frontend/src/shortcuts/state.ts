@@ -26,6 +26,9 @@ export const paletteCommands: PaletteCommand[] = [
   // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like
   // view.run below, so it is a no-op when no request tab is mounted.
   { id: 'http.save', label: 'Save request', run: () => runCommand('http.save') },
+  // Registered by CollectionsPanel.vue, which is mounted for the whole of Http mode — an import
+  // is not tab-scoped the way Save is.
+  { id: 'http.import', label: 'Import collection…', run: () => runCommand('http.import') },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },

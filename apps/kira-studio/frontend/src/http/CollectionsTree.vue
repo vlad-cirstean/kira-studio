@@ -21,6 +21,7 @@ import {
   duplicateRow,
   expandRow,
   fetchSavedRequest,
+  importCollection,
   renameRow,
   selectRow,
   toggleRow,
@@ -73,6 +74,7 @@ const actions: CollectionMenuActions = {
   duplicate: (row) => void duplicateRow(row),
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) => void copyText(row.url),
+  importCollection: () => void importCollection(),
 };
 
 /** Creating *into* a collection row means the root; into a folder row means that folder. */
