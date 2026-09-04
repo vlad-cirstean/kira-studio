@@ -1,7 +1,7 @@
-// matrix.go is P25 §3's harness for the complete (Tier 2) permutation suite — auth/config cases
-// only in this phase; Scenario exists as the seam a later functional-testing phase populates,
-// deliberately unused beyond a Then slice that stays empty here. Case/Outcome/RunMatrix live here,
-// once, so a per-adapter authmatrix_test.go only ever declares its own table.
+// matrix.go is P25 §3's harness for the complete (Tier 2) permutation suite — auth/config cases,
+// plus the Scenario/Then seam P26 populated with real functional coverage per adapter.
+// Case/Outcome/RunMatrix live here, once, so a per-adapter authmatrix_test.go only ever declares
+// its own table.
 package testsupport
 
 import (
@@ -69,12 +69,11 @@ type Case struct {
 	Principal *Principal // nil = the fixture's own base config needs no extra principal
 	Config    func(base model.ResolvedConnectionConfig) model.ResolvedConnectionConfig
 	Expect    Outcome
-	Then      []Scenario // empty in P25 — the seam a functional-testing phase populates
+	Then      []Scenario // empty in P25; P26 populated it per adapter for a Succeed case
 }
 
-// Scenario is one thing to do with a connection that came up — the extension point a later,
-// functional-testing phase populates. P25 plants none; RunMatrix already drives Then correctly for
-// whenever one exists.
+// Scenario is one thing to do with a connection that came up — the extension point P26 populated
+// per adapter with real functional coverage (load/write/delete/filter/DDL) atop this same harness.
 type Scenario struct {
 	Name     string
 	Requires func(adapters.Caps) bool // skip where the adapter does not claim the capability

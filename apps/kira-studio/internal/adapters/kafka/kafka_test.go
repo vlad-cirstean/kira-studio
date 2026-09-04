@@ -149,9 +149,12 @@ func TestKafka_Connect_AuthFailure(t *testing.T) {
 }
 
 // P25 §1.4/§2.1(5): the regression test — a non-empty username with an empty password must still
-// offer SASL/PLAIN (and fail as a real, correctly-coded auth failure against a SASL-requiring
-// broker) rather than silently connecting anonymously and reporting the broker's transport-level
-// refusal as E_QUERY.
+// fail as a real, correctly-coded auth failure against a SASL-requiring broker, not report the
+// broker's transport-level refusal as E_QUERY. Round 1's finding-6 fix changed *how*: a half-filled
+// pair deliberately does NOT offer SASL/PLAIN any more (client.go dials anonymously, same as an
+// empty pair, since franz-go's own plain.Auth.AsMechanism() refuses locally on a half-filled pair
+// before ever contacting the broker) — the resulting transport-level refusal is then reclassified
+// as E_AUTH by client.go's own ErrFirstReadEOF heuristic instead.
 func TestKafka_Connect_UsernameWithoutPasswordIsAuthError(t *testing.T) {
 	sf := testsupport.StartKafkaSasl(t)
 	cfg := sf.Config
