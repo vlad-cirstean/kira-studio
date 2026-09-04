@@ -13,7 +13,7 @@ import {
   openStreamTab,
 } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
-import VirtualList from '../theme/primitives/VirtualList.vue';
+import TreeHost from '../theme/primitives/TreeHost.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import {
   collapse,
@@ -27,7 +27,6 @@ import {
   treeState,
   visibleRows,
 } from './state/tree';
-import { STICKY_MAX_ROWS, stickyBand, stickyInsetFor } from './stickyBand';
 import TreeRow from './TreeRow.vue';
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
@@ -53,45 +52,22 @@ function isKeyBrowserRow(row: TreeRowVm): boolean {
 }
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
-const virtualListRef = ref<{ scrollToIndex: (index: number, inset?: number) => void } | null>(null);
+const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
 
 onMounted(() => {
   initTreeSync();
   initSchemaSync();
 });
 
-// P28 D2: published by VirtualList's own scrollstate emit — ProjectTree is the only component
-// that understands what an ancestor is, so the band's geometry lives here, not in VirtualList.
-const scrollTop = ref(0);
-const viewportHeight = ref(0);
-function onScrollState(state: { scrollTop: number; viewportHeight: number }): void {
-  scrollTop.value = state.scrollTop;
-  viewportHeight.value = state.viewportHeight;
-}
-
-// D5: three rows, further clamped so a deliberately short panel never spends more of its own
-// height on the band than it has rows to spare.
-const stickyMaxRows = computed(() =>
-  Math.max(0, Math.min(STICKY_MAX_ROWS, Math.floor(viewportHeight.value / rowHeight.value) - 2)),
-);
-
-const band = computed(() =>
-  stickyBand(visibleRows.value, scrollTop.value, rowHeight.value, stickyMaxRows.value),
-);
-
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
-// scrolling happens here, one tick later, once visibleRows reflects the newly expanded nodes.
-// The inset (P28 D6) keeps the revealed row clear of the band it would otherwise land behind.
+// scrolling happens here, one tick later, once visibleRows reflects the newly expanded nodes —
+// TreeHost.revealKey() does the animation-frame wait, the index lookup and the band-inset scroll.
 watch(
   () => treeState.pendingScrollKey,
   async (key) => {
     if (!key) return;
     treeState.pendingScrollKey = null;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    const index = visibleRows.value.findIndex((row) => row.key === key);
-    if (index < 0) return;
-    const inset = stickyInsetFor(visibleRows.value, index, rowHeight.value, stickyMaxRows.value);
-    virtualListRef.value?.scrollToIndex(index, inset);
+    await treeHostRef.value?.revealKey(key);
   },
 );
 
@@ -200,47 +176,29 @@ function onTreeKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="project-tree">
-    <div
+    <TreeHost
+      ref="treeHostRef"
       class="tree-body"
-      data-testid="tree-background"
-      @contextmenu.prevent="onBackgroundContextMenu"
+      :rows="visibleRows"
+      :row-height="rowHeight"
+      :selected-key="treeState.selected"
+      @background-contextmenu="onBackgroundContextMenu"
       @keydown="onTreeKeydown"
     >
-      <VirtualList
-        ref="virtualListRef"
-        :items="visibleRows"
-        :row-height="rowHeight"
-        @scrollstate="onScrollState"
-      >
-        <template #default="{ item }">
-          <TreeRow
-            :row="item"
-            :selected="treeState.selected === item.key"
-            @select="onSelect"
-            @toggle="onToggle"
-            @open="onOpen"
-            @contextmenu="onContextMenu"
-          />
-        </template>
-        <template #sticky>
-          <div data-testid="tree-sticky-band">
-            <TreeRow
-              v-for="slot in band"
-              :key="slot.row.key"
-              class="sticky-row"
-              :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
-              :row="slot.row"
-              :selected="treeState.selected === slot.row.key"
-              sticky
-              @select="onSelect"
-              @toggle="onToggle"
-              @open="onOpen"
-              @contextmenu="onContextMenu"
-            />
-          </div>
-        </template>
-      </VirtualList>
-    </div>
+      <template #row="{ row, sticky, top }">
+        <TreeRow
+          :class="{ 'sticky-row': sticky }"
+          :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
+          :row="row"
+          :selected="treeState.selected === row.key"
+          :sticky="sticky"
+          @select="onSelect"
+          @toggle="onToggle"
+          @open="onOpen"
+          @contextmenu="onContextMenu"
+        />
+      </template>
+    </TreeHost>
     <div
       v-if="searchIncomplete"
       class="p-strip note search-incomplete-note"
