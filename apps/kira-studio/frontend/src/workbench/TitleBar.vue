@@ -148,7 +148,10 @@ function onClick(mode: AppMode): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  /* A real (transparent) border at rest, not `border: none` — so .is-on below only swaps the
+     border's colour, never adds one, and the button never resizes/shifts between the two
+     states. Same technique .p-tab uses for the identical reason (primitives.css:365). */
+  border: var(--kira-border-width) solid transparent;
   border-radius: var(--kira-radius-sm);
   background: none;
   color: var(--kira-fg-muted);
@@ -157,15 +160,20 @@ function onClick(mode: AppMode): void {
 .title-action:hover {
   background: var(--kira-hover);
 }
-/* A real highlight, not a background tint alone (the status-bar version's own .is-on was just
-   `background: var(--kira-bg-input)` — close enough to the bar's own colour to miss at a
-   glance): full-brightness accent colour on top of the filled-vs-"-off" glyph swap in the
-   template, so "this panel is open" reads from icon shape AND colour, not one subtle wash. */
+/* This app's own established "active" treatment — .p-tab.is-active's exact combination
+   (primitives.css:372-376): a visible border, a background lift, full-brightness text/icon
+   colour. Not blue/accent-tinted (a first attempt at this was, and read as an unrelated "info"
+   colour rather than "this button is on") and not a background tint alone (the original
+   status-bar .is-on was just `background: var(--kira-bg-input)`, too close to the bar's own
+   colour to register as a highlight at a glance) — it's the filled-vs-"-off" glyph swap in the
+   template PLUS this, together, the same "shape and colour both change" redundancy .p-tab's own
+   active state already relies on. */
 .title-action.is-on {
-  background: rgba(0, 120, 212, 0.16);
-  color: var(--kira-accent);
+  background: var(--kira-bg-elevated);
+  border-color: var(--kira-border-strong);
+  color: var(--kira-fg);
 }
 .title-action.is-on:hover {
-  background: rgba(0, 120, 212, 0.24);
+  background: var(--kira-hover);
 }
 </style>
