@@ -398,28 +398,115 @@ expensive `test:ui` suite runs once near the end, per `AGENTS.md`.
 
 Verified by running them, not by inspection:
 
-- [ ] `go build ./apps/kira-studio/...` and `go test ./apps/kira-studio/internal/gitclient/...` green.
-- [ ] `bun run typecheck`, `bun run lint`, `bun run test:unit` green.
-- [ ] `bun run test:ui` green — Studio's and Api's existing specs unchanged, plus `tests/ui/git/`.
-- [ ] A real repository opens through the real bridge and reports its identity (root, git dir,
-      common dir, bare, linked-worktree, HEAD) in Git mode.
-- [ ] A git older than 2.38, and a machine with no git on `PATH`, each produce their blocking state
+- [x] `go build ./apps/kira-studio/...` and `go test ./apps/kira-studio/internal/gitclient/...`
+      green (also `go vet`, and every other `internal/...` package's own tests, unaffected).
+- [x] `bun run typecheck`, `bun run lint`, `bun run test:unit` green (386 tests, up from 252 studio
+      + 134 packages).
+- [x] `bun run test:ui` green — Studio's and Api's existing specs unchanged (one spec,
+      `mode-switch.spec.ts`, needed its own hardcoded "two mode tabs" count updated to three — an
+      intentional, documented consequence of the third mode existing, not a behaviour change to
+      Studio or Http), plus `tests/ui/git/` (9 specs, both tiers). Full suite: 113 passed, 2 failed
+      on unrelated pre-existing sandbox timing flakiness (`budgets.spec.ts`/`perf.spec.ts`'s own
+      cross-worker-contention caveat, already documented in those specs' own comments) — both pass
+      cleanly in isolation, confirmed by rerunning them alone.
+- [x] A real repository opens through the real bridge and reports its identity (root, git dir,
+      common dir, bare, linked-worktree, HEAD) in Git mode — proven at two levels: `gitclient`'s
+      own tests run `identify()` against real `git init`-produced repos in every shape (ordinary,
+      unborn, detached, bare, linked worktree); `bridge`'s own tests
+      (`TestGitStream_GraphStream_OpenRepoThenStreamEndsCleanly`) drive a real `repo.open` through
+      the real frame protocol (`gitstream.go`) against a real repository end to end. No automated
+      test in this sandbox drives the full real-git + real-UI stack together in one process (that
+      would need `-tags server` e2e tooling this plan's own file list never named for P1) — the Go
+      tests prove the backend against real git, the UI tests (both tiers) prove the frontend
+      against a scripted backend; together they cover every seam, not one seam twice.
+- [x] A git older than 2.38, and a machine with no git on `PATH`, each produce their blocking state
       in the UI rather than a broken panel — **driven entirely by `git-ui` code this phase did not
-      touch** (D4).
-- [ ] `git-ui` mounts against the mock `Transport` with no Wails present, and the harness spec
-      passes.
-- [ ] The module-worker CSP question (F3) is answered either way, in writing, with the fallback
-      taken if needed.
-- [ ] **`git diff --stat` shows zero changes under `packages/git-core/`, `packages/git-ipc/` and
-      `packages/git-ui/`.** This is the phase's headline claim and the one criterion that cannot be
-      satisfied by anything other than the architecture actually working. If a change there proves
-      genuinely necessary, record it here with its reasoning rather than making it silently — an
-      honest exception is a finding; an unrecorded one invalidates the claim.
+      touch** (D4). Covered at three levels: `discovery_test.go` (faked locator/runner, Go-only),
+      `tests/ui/git/harness.spec.ts` (`git-too-old`/`git-not-found` scenarios, no Wails present),
+      `tests/ui/git/real-runtime.spec.ts` (the same discriminants through the real stream).
+- [x] `git-ui` mounts against the mock `Transport` with no Wails present, and the harness spec
+      passes — 6 specs, one asserting zero `/wails/*` requests were even possible.
+- [x] The module-worker CSP question (F3) is answered either way, in writing, with the fallback
+      taken if needed. **Answered: yes, cleanly, no fallback needed** — see §8's own finding below.
+- [x] **`git diff --stat` shows zero changes under `packages/git-core/`, `packages/git-ipc/` and
+      `packages/git-ui/`.** Checked directly (`git status --short packages` — empty) after every
+      commit that could plausibly have touched them, not assumed. No change was ever made or found
+      necessary to any of the three.
 
 ---
 
 ## 8. Findings
 
-_Recorded during implementation: the CSP answer (F3), the harness-location decision (OQ-1), the
-`packages/git-*` diff stat proving the port boundary held, and any decision made at the keyboard
-this plan did not anticipate. Later phases read this section as part of the context they inherit._
+**F3 (the module-worker CSP question) — answered: yes, cleanly, no fallback needed.** Built
+`git-dev.html`/`frontend/src/git/harness/` (also C7/C10's own dev-only route and D5's harness) via
+`bun run build:test` (which does emit `layout.worker.ts` as its own chunk under this app's real
+Vite config, confirming F2 again) and drove it with both real webkit (the actual packaged target —
+WKWebView on macOS, WebKitGTK on Linux) and chromium through Playwright: zero console errors, zero
+page errors, exactly one `page.workers().length` entry in both, for any scenario that reaches
+`GraphViewState`'s default `LayoutClient` construction (every scenario does, since `App.vue`
+constructs it unconditionally at mount, not gated behind a repo being open). A negative control —
+the identical page under a deliberately tightened `script-src 'none'` — reproduced the real
+"Refused to load … because it does not appear in the script-src directive of the Content Security
+Policy" violation and zero workers, which is what confirms the positive result is a genuine pass
+rather than a silent detection gap. `createLayoutClient`'s `workerFactory` fallback (a main-thread
+chunked pass) is therefore not needed as of P1.
+
+**OQ-1 (where the mock-`Transport` harness lives) — resolved: the cheaper option.** A `?scenario=`
+query parameter on the existing `build:test` bundle (`git-dev.html?scenario=<name>`,
+`frontend/src/git/harness/{scenarios,mockTransport,main}.ts`), not a second Vite app — this also
+subsumed C7's own `devMountStub.ts` (deleted at C10), since any scenario mounting `git-ui` answers
+F3's own question too; there was never a reason to keep two separate dev-only mount points once the
+harness existed. Six named scenarios (`git-not-found`/`git-too-old`/`git-unusable`/`no-repository`/
+`repo-open-unborn`/`repo-open-branch`) cover every `GitStatus` discriminant plus both reachable
+`RepoOpenResult.ok` head shapes; `tests/ui/git/harness.spec.ts` drives all six.
+
+**`packages/git-core`/`git-ipc`/`git-ui` diff stat: zero changes, confirmed by running `git status
+--short packages` after every commit that could plausibly have touched them** — the phase's own
+headline claim, and it held throughout without needing a single exception.
+
+**Deviations from the plan as written, each with its own reasoning:**
+
+1. **§0.1's file list anticipated `tests/ui/support/ipcChannels.ts`/`mockRuntime.ts` gaining
+   `GitService`'s bound-call FQNs — they were left unchanged.** `bridge.GitService`'s methods are
+   real, bound, and reachable via `$Call.ByName` (registered in `main.go`, real generated
+   bindings) — but the frontend never actually calls them that way: `frontend/src/git/
+   transport.ts` talks exclusively over `Stream('git')`, and `bridge/gitstream.go`'s frame
+   dispatcher calls the same Go methods directly, in-process, to fulfil each contract request. So
+   nothing in the shipped path ever issues a bound call to `GitService`, and adding FQN entries no
+   test would ever exercise would be dead registry entries, not real coverage. This is a design
+   decision made at the keyboard while writing C4/C5 (§3's own "the frontend writes no protocol
+   logic" already implied it, but the plan's file list hadn't caught up) — recorded here rather
+   than silently deviated from.
+2. **C8 and C9 landed as one commit, not two.** `workbench/modes.ts`'s `MODES` is a total
+   `Record<AppMode, ModeDef>`, so C8's own mode-seam edits cannot type-check without real `panel`/
+   `start` components for `'git'` to reference — `GitPanel.vue`/`GitStart.vue` (C9's own file
+   list) are a compile-time requirement of C8, not an optional follow-up. Splitting them would
+   have meant either a broken intermediate commit or a placeholder component thrown away one
+   commit later; landing them together is the same reasoning §5 already gives for keeping C8's own
+   five edits in one commit (a type-enforced dependency, not a stylistic choice).
+3. **`internal/gitclient`'s three D2 interfaces (`Runner`/`Watcher`/`Clock`) all ship with a real
+   implementation from C1, but `Watcher`'s real implementation (`os.Stat` polling) has no
+   production caller in P1.** D2 says "one real implementation each" without saying every one
+   needs a P1 consumer, and SPEC.md's own phasing table is explicit that debouncing a real watch
+   into `repo.changed` is P2's row, not P1's — building the interface (and a real, if simple,
+   implementation) now is what P2's first real write has somewhere to go without a refactor,
+   matching D2's own stated reason for writing these as interfaces from the first commit rather
+   than after the fact. `fsnotify` was considered and declined for this same reason: nothing in
+   P1 depends on the watcher's latency or CPU cost, so reaching for a kernel-notification library
+   against a requirement nothing in this phase states would be exactly the "hand-rolling against a
+   requirement no library meets" AGENTS.md warns against — inverted (a library *without* a stated
+   requirement). P2, the first real consumer, is free to replace the polling implementation
+   outright once it knows what the debounce latency actually needs to be.
+4. **`Repo`'s write-queue/read-pool mechanism (repo.go) is not literally "a write queue plus a
+   read pool" as two independent structures — it is one reader-writer gate.** A first design (two
+   separate token channels, one of size 1 for writes and one of size `maxConcurrentReads` for
+   reads) was written, unit-tested, and found to have no way to make a `Write` mutually exclusive
+   with a concurrent `Read` without either deadlocking (two writers each acquiring some but not
+   all of a shared N-slot pool) or adding a second layer of locking on top. The shipped design — a
+   `sync.Mutex`-guarded `{writing, readers}` pair with a broadcast-and-recheck channel waiters
+   retry against — satisfies the same requirement (bounded concurrent reads, exclusive writes,
+   ctx-cancellable) without that hazard; `repo_test.go`'s own concurrency tests are what surfaced
+   the deadlock risk in the first design before it shipped.
+
+No other deviation from the plan's own decisions (D1–D8) or implementation order (C1–C11) was
+found necessary. Later phases read this section as part of the context they inherit.

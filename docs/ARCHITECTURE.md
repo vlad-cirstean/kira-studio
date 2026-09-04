@@ -828,6 +828,145 @@ to remove; partial adoption would also ship both runtimes for one component, and
 A future Vue 3.6 upgrade keeps VDOM mode — see the plan's §6 for the conditions under which this
 should be re-evaluated.
 
+## Git module
+
+v1.3's third top-level mode (`docs/v1.3/SPEC.md`, `docs/v1.3/plans/P1-host-and-go-git-client.md`).
+P1 lands the whole host/transport/mode seam and opens a real repository, reporting its identity —
+**no porcelain parser, no commit walk, no rendered graph**: `internal/gitclient` reads only
+`git --version` and `rev-parse` output (line-based, not a parser), and `graph.stream` always ends
+with zero chunks. The paged `git log` walk, the porcelain parsers and the graph UI are P2/P3's own
+rows; nothing here is half-built toward them.
+
+**Three workspace packages carry the module's domain/transport/UI logic, and depend on nothing of
+this app's.** `packages/git-core` (pure domain: commit store, graph layout, pre-flight analysis —
+none of it exercised yet), `packages/git-ipc` (the `Transport` interface, the request/event/stream
+contract, the `createRpcClient`/`createRpcServer` frame-protocol machinery) and `packages/git-ui`
+(the Vue 3 app, `mount(container, {transport, viewState, host})` its entire host-facing surface)
+were ported from a previously-independent project (`origin/import/kira-version-vscode-kickoff`,
+reference material only, never merged into this repo's history) at chapter kickoff, unmodified
+since — P1's own exit criterion is `git status --short packages` staying empty under all three,
+checked directly rather than assumed, and it does. The dependency direction is one-way and
+lint-checkable (`biome.json`'s `apps/kira-studio/frontend/src/git/**` override): only
+`apps/kira-studio` depends on any of the three; none of them depends on it, on Wails, or on each
+other transitively beyond `git-ui → {git-core, git-ipc}`. A future second host (there is exactly
+one precedent for this shape actually happening — the source project's own VS Code host, dropped
+per "What deliberately does not come across" in the SPEC) would sit behind the same `Transport`
+seam these packages already define.
+
+**`internal/gitclient` is the Node → Go port of the source's process-spawning half** — spawn
+discipline, discovery, identity, capabilities — structured the way `internal/httpclient` already
+is (dependency-free, one real implementation behind a small interface per capability), not a new
+paradigm:
+- **`Runner`** (`runner.go`) is the one spawn path: `os/exec.CommandContext`, env hygiene appended
+  onto the inherited environment (`GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`), `-c
+  core.quotepath=false` always first in argv, `--no-optional-locks` appended for a
+  `Spec.ReadOnly` call, and a graceful `Cmd.WaitDelay` (2s) before an OS-level kill on
+  cancellation. `Classify` (`errors.go`) turns an exit code + stderr into one of a small
+  `ErrorKind` set (`notARepository`/`permissionDenied`/`cancelled`/`timeout`/`unknown`), checking
+  `ctx.Err()` before the exit code so a caller's own cancellation is never misread as whatever the
+  killed process happened to leave behind.
+- **Discovery is macOS-only, a named strategy selected on `runtime.GOOS`** (`discovery.go`;
+  Windows/Linux return an explicit "not implemented yet" `notFound`, never a probe attempt). The
+  probe order is `git.path` setting → `PATH` → `/opt/homebrew/bin` → `/usr/local/bin` →
+  `/usr/bin/git`, with one hard rule: **the Xcode Command Line Tools shim (`/usr/bin/git`) is
+  never touched — not even accepted as a `PATH` hit — until `xcode-select -p` confirms CL Tools
+  are actually installed.** Running that shim blind pops a system install dialog; a `PATH`
+  resolution that happens to land on it is deliberately *not* accepted at the `PATH` step and
+  falls through to the final, gated step instead, so the gate is the one thing between any code
+  path and that dialog. The 2.38 floor (`RequiredVersion`) is enforced by parsing `git --version`'s
+  first three dot-separated version segments; a result below it, or discovery finding nothing, or
+  a resolved binary that won't run, produces `GitStatus.Kind` `tooOld`/`notFound`/`unusable`
+  respectively — one of D4's own blocking discriminants, cached per `git.path` value for 30s via
+  an injected `Clock` (not wall time directly), so `app.init` and a `repo.open` moments later share
+  one real spawn.
+- **`Repo` (`repo.go`) is a reader-writer gate, not two independent pools.** A per-repository write
+  queue with a bounded (4) concurrent read pool is the SPEC's own P1 requirement; the actual
+  mechanism is a `sync.Mutex`-guarded `{writing bool, readers int}` pair with a
+  closed-and-replaced broadcast channel waiters retry against, not literal channel *tokens* — a
+  naive "Write grabs every Read slot from the same pool Read draws from" design deadlocks two
+  concurrent writers against each other, which is why this shape exists instead. `RepoID` is the
+  absolute git-dir (unique per linked worktree, even when several share one `commonDir`);
+  `IsLinkedWorktree` falls straight out of `gitDir != commonDir` with no extra spawn. `HeadState`
+  distinguishes branch/detached/unborn from `symbolic-ref --short -q HEAD`'s exit code plus one
+  `rev-parse --verify` (unborn: the ref resolves, the commit doesn't).
+- **`Watcher` (`watcher.go`) is declared and given a real implementation (`os.Stat` polling, no
+  OS-specific notification API) from this phase's first commit, per D2 — but has no production
+  caller yet.** Debouncing a real watch into `repo.changed` (`refsChanged`/`worktreeChanged`) is
+  explicitly P2's own row; building the interface now (rather than after P2 needs it) is what a
+  later phase's first real write has somewhere to go without a refactor.
+
+**`bridge.GitService` and the second named Wails stream, `"git"`, are how the renderer reaches all
+of the above — two surfaces, one set of Go methods, never duplicated.** `GitService`'s methods
+(`Init`/`ListRepos`/`PickRepo`/`OpenRepo`/`CloseRepo`/`GraphStatus`/`GraphLoadMore`/`GraphRefresh`)
+are a thin adapter over `gitclient.Client`, registered as an ordinary bound service
+(`main.go`, real generated bindings) the same shape every other service has — but **the frontend
+never calls them that way**: `frontend/src/git/transport.ts` talks exclusively over `Stream('git')`,
+and `bridge/gitstream.go`'s frame dispatcher calls `GitService`'s methods directly, as plain Go
+function calls, to fulfil each of `@kira/git-ipc`'s contract request/stream keys. `HandleStream` is
+a map insert (`shell.RegisterGitStream` sits beside `RegisterEngineStream` as a sibling, `main.go`),
+so the second stream costs nothing structurally and needed no change to the first.
+- **`gitstream.go` is a Go transcription of `@kira/git-ipc`'s `createRpcServer`
+  (`packages/git-ipc/src/rpc.ts`)** — the versioned envelope, `req`/`res`/`evt`/`open`/`chunk`/
+  `end`/`credit`/`cancel`, a real `creditGate` (unused by P1's own stream handler, correct for
+  P2's first real emit loop), and the `removeActiveWork` idiom that keeps a completing request
+  from racing its own `cancel` frame and sending a stray response. One writer goroutine per
+  session (`*application.StreamConn.Send` is not documented safe for concurrent callers, and each
+  inbound `req`/`open` runs on its own goroutine) — the same "one writer" discipline the engine
+  stream's own `adapterhost.Session` already established.
+- **The stream is a raw-bytes carrier; the payload encoding is chosen per data kind, not tied to
+  one codec.** P1's own envelope crosses as UTF-8 JSON text both directions (`frontend/src/git/
+  transport.ts`'s `MessageChannelLike.post` sends a `JSON.stringify`'d string, exactly like
+  `bridge/port.ts`'s own `request()` already does for the engine stream's *requests*; Go's own
+  `gitFrame`/`gitEnvelope` structs `encoding/json`-marshal the same shape both ways) — this is
+  *not* a commitment to JSON as the stream's wire format going forward. `PackedCommitChunk`
+  (`graph.stream`'s real payload, still undesigned as of P1 — the stream handler ends with zero
+  chunks) crosses as FlatBuffers once P2 designs its byte framing, standardizing with this app's
+  existing FlatBuffers data plane (the engine stream's own frame codec) rather than the source
+  project's hand-framed plain-typed-array packing — a decision made after P1 landed, OQ-3's
+  resolution. A reader of this file should not assume every frame this stream ever carries is
+  JSON; only P1's own request/response and event frames are, because that is all P1 needed to
+  prove the envelope crosses at all.
+- **`repo.pick` needed a directory picker, not a file picker** — `bridge.Dialogs` gained
+  `OpenDirectory` alongside `SaveFile`/`OpenFile` (`shell/app.go`, Wails'
+  `CanChooseDirectories(true).CanChooseFiles(false)` on the same `OpenFileDialogStruct` builder
+  `FilesService` already uses), rather than a new dialog mechanism.
+
+**The frontend seam is the mode registry, exactly like Http's** (`workbench/modes.ts`'s `git`
+entry: `GitPanel.vue`/`GitStart.vue`, both `EmptyState`-based — Git mode adds no panel content of
+its own, since `git-ui` itself is the whole surface, mounted per tab). `'git-graph'` is the one
+Git-mode `TabKind` (`packages/shared/domain/tabs.ts`), reused (not duplicated) per window the same
+way a Studio data tab reuses by identity; its session state, `gitGraphTabStateSchema`, is a
+structural copy of `git-ui`'s own `PersistedViewState` (D7) — `frontend/src/git/
+viewStateStore.ts`'s `ViewStateStore` is therefore a near-direct passthrough onto the tab's own
+persisted `state` field via the same find-then-patch-then-debounced-save path
+`state/tabs.ts` already gives every other kind, not a new storage table.
+
+**Two test tiers, proving different things, both against real WebKit through Playwright.**
+`tests/ui/git/harness.spec.ts` mounts `git-ui` at `/git-dev.html?scenario=<name>`
+(`frontend/src/git/harness/`) against a hand-written `Transport` with **no Wails runtime loaded on
+the page at all** — one spec asserts zero `/wails/*` requests were even possible — proving the
+package boundary is real, the same property the source project's own `apps/harness` existed to
+prove. `tests/ui/git/real-runtime.spec.ts` drives the real bundle, real bindings, and the real
+frame codec instead, against `tests/ui/support/mockGitStream.ts` — a `window._wails.streamFactory`
+responder that **composes with**, rather than replaces, `mockStream.ts`'s existing `'engine'`
+factory (`mockGitStreamBrowser.js`'s own tail: both must answer from the one factory `Stream()`
+calls, since this app opens `'engine'` unconditionally at boot and `'git'` only once a
+`GitGraphView` mounts). `tests/ui/fixtures.ts`'s shared `relaunch()` installs it for every test —
+a no-op for a spec that never opens Git mode.
+
+**The module worker (`layout.worker.ts`, `git-ui`'s lane-layout pass) loads cleanly under this
+app's real CSP — confirmed, not assumed.** The source project's own confirmation was against a VS
+Code webview's CSP, which does not carry over to this app's Wails/WKWebView asset server and its
+own `<meta http-equiv="Content-Security-Policy">` (`frontend/index.html`). Built via
+`bun run build:test` (which does emit the worker as its own chunk under this app's real Vite
+config) and driven with both real webkit (the actual packaged target) and chromium through
+Playwright: zero console errors, zero page errors, exactly one `page.workers()` entry in both. A
+negative control (the identical page under a deliberately tightened `script-src 'none'`)
+reproduced a real "Refused to load … because it does not appear in the script-src directive"
+violation and zero workers, confirming the positive result was not a silent detection gap.
+`createLayoutClient`'s `workerFactory` fallback (a main-thread chunked pass) is therefore not
+needed, at least as of P1.
+
 ## Process model
 
 Two processes: the **webview** running the Vue renderer, and the **Go shell** that owns the window,
