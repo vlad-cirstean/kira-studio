@@ -15,6 +15,7 @@ import {
   RAW_LANGUAGE_OPTIONS,
   userContentTypeHeader,
 } from './body';
+import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
 
 // P3 C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the
@@ -118,6 +119,7 @@ const caption = computed(() =>
       @update:doc="onBodyChange"
     />
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
+    <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" />
   </div>
 </template>
 
