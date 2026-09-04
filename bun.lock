@@ -50,6 +50,11 @@
     "apps/kira-studio/frontend": {
       "name": "@kira/kira-studio-frontend",
       "version": "0.0.0",
+      "dependencies": {
+        "@kira/git-core": "workspace:*",
+        "@kira/git-ipc": "workspace:*",
+        "@kira/git-ui": "workspace:*",
+      },
     },
     "packages/git-core": {
       "name": "@kira/git-core",
