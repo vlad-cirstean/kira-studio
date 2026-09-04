@@ -3,7 +3,7 @@ import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { activeTab } from '../state/mode';
 import { settingsOpen } from '../state/settings';
-import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
+import { activateNextTab, activatePrevTab, closeTab, openHttpRequestTab } from '../state/tabs';
 import { runCommand } from './commands';
 
 export interface PaletteCommand {
@@ -18,6 +18,9 @@ export interface PaletteCommand {
 // for "minimal").
 export const paletteCommands: PaletteCommand[] = [
   { id: 'new-connection', label: 'New connection', run: () => openCreateDialog() },
+  // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
+  // or accelerator change (HttpStart.vue/CollectionsPanel.vue's own buttons are the other two).
+  { id: 'http.newRequest', label: 'New request', run: () => void openHttpRequestTab() },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
