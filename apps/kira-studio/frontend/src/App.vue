@@ -3,8 +3,10 @@ import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
 import DynamicValuesDialog from './http/DynamicValuesDialog.vue';
 import EnvironmentsDialog from './http/EnvironmentsDialog.vue';
+import ImportCurlDialog from './http/ImportCurlDialog.vue';
 import SaveRequestDialog from './http/SaveRequestDialog.vue';
 import { saveDialogState } from './http/state/collections';
+import { importCurlDialogState } from './http/state/curl';
 import { dynamicValuesDialogState } from './http/state/dynamicValues';
 import { environmentsDialogState, variablesDialogState } from './http/state/variables';
 import VariablesDialog from './http/VariablesDialog.vue';
@@ -74,6 +76,7 @@ onUnmounted(() => {
   <VariablesDialog v-if="variablesDialogState.open" />
   <EnvironmentsDialog v-if="environmentsDialogState.open" />
   <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
+  <ImportCurlDialog v-if="importCurlDialogState.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />

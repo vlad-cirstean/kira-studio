@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import { computed } from 'vue';
 import { formatBytes } from '../../format';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -11,6 +12,15 @@ import { chooseBodyFile } from './files';
 // file row uses (D15) and UploadObjectDialog.vue established (D4's precedent). The caption in
 // RequestBodyPane.vue already reads "No Content-Type (binary)" for this mode (C5/F3/D7).
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
+
+// P7 F15: an imported `--data-binary @path` has no size to supply (the renderer never reads a
+// file's bytes, P3 D4) — `size: 0` is that "unknown" state, and formatBytes(0) would print a
+// misleading "(0 B)" for it, so the parenthetical is omitted entirely rather than lying about it.
+const caption = computed(() => {
+  const file = props.tab.state.binaryFile;
+  if (!file) return '';
+  return file.size > 0 ? `${file.name} (${formatBytes(file.size)})` : file.name;
+});
 
 async function onChooseFile(): Promise<void> {
   const file = await chooseBodyFile('Choose file');
@@ -28,7 +38,7 @@ function onClearFile(): void {
     <AppButton data-testid="http-binary-choose-file" @click="onChooseFile">Choose file…</AppButton>
     <template v-if="tab.state.binaryFile">
       <span class="p-sm muted binary-file-caption" data-testid="http-binary-file-caption">
-        {{ tab.state.binaryFile.name }} ({{ formatBytes(tab.state.binaryFile.size) }})
+        {{ caption }}
       </span>
       <IconButton
         icon="close"

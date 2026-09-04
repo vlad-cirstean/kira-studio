@@ -40,6 +40,8 @@ export const paletteCommands: PaletteCommand[] = [
     label: 'Dynamic values…',
     run: () => runCommand('http.dynamicValues'),
   },
+  // P7 D12: same "registered by CollectionsPanel.vue, mounted for the whole of Http mode" shape.
+  { id: 'http.importCurl', label: 'Import from curl…', run: () => runCommand('http.importCurl') },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },

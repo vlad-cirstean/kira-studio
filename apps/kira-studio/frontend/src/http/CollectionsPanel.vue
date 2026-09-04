@@ -15,6 +15,7 @@ import {
   initCollections,
   itemRecord,
 } from './state/collections';
+import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
 
@@ -75,9 +76,15 @@ function onDynamicValues(): void {
   openDynamicValuesDialog();
 }
 
-// D15: the palette's Import collection…, Variables…, Environments… and (P6) Dynamic values…
-// entries. Registered by the panel rather than a view, since the panel is mounted for the whole
-// of Http mode — none is tab-scoped.
+// P7 D12: the palette's own "Import from curl…" entry — same shape as the three above, not
+// tab-scoped.
+function onImportCurl(): void {
+  openImportCurlDialog();
+}
+
+// D15: the palette's Import collection…, Variables…, Environments…, (P6) Dynamic values… and
+// (P7) Import from curl… entries. Registered by the panel rather than a view, since the panel is
+// mounted for the whole of Http mode — none is tab-scoped.
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   unregisterCommands = [
@@ -85,6 +92,7 @@ onMounted(() => {
     registerCommand('http.variables', onVariablesCommand),
     registerCommand('http.environments', onEnvironments),
     registerCommand('http.dynamicValues', onDynamicValues),
+    registerCommand('http.importCurl', onImportCurl),
   ];
 });
 onUnmounted(() => {

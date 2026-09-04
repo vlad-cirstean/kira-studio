@@ -2,6 +2,7 @@
 import { openHttpRequestTab } from '../state/tabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { importCollection } from './state/collections';
+import { openImportCurlDialog } from './state/curl';
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one p-dlgbtn primary button), the same `http/ -> state/` edge
@@ -12,6 +13,12 @@ import { importCollection } from './state/collections';
 // button's `new-request-start` testid is untouched — two existing specs click it (F11).
 function onImport(): void {
   void importCollection();
+}
+
+// P7 D12: a third front-door button — pasting a curl command is the other common way someone
+// arrives with a request already in hand.
+function onImportCurl(): void {
+  openImportCurlDialog();
 }
 </script>
 
@@ -29,6 +36,10 @@ function onImport(): void {
         <button type="button" class="p-dlgbtn" data-testid="import-collection-start" @click="onImport">
           <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
           Import collection…
+        </button>
+        <button type="button" class="p-dlgbtn" data-testid="import-curl-start" @click="onImportCurl">
+          <span class="icon-box"><CodiconIcon name="terminal" :size="13" /></span>
+          Import from curl…
         </button>
       </div>
     </div>

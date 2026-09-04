@@ -19,6 +19,9 @@ export interface CollectionMenuActions {
   remove(row: CollectionRowVm): void;
   copyUrl(row: CollectionRowVm): void;
   importCollection(): void;
+  /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
+   *  dialog, always into a fresh tab (never row-scoped, unlike importCollection above). */
+  importCurl(): void;
   exportCollection(row: CollectionRowVm): void;
   /** P5 D11: the collection row's own "Variables…" item — opens VariablesDialog scoped to it. */
   variables(row: CollectionRowVm): void;
@@ -163,6 +166,13 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       label: 'Import collection…',
       icon: 'cloud-download',
       run: () => actions.importCollection(),
+    },
+    {
+      type: 'item',
+      id: 'import-curl',
+      label: 'Import from curl…',
+      icon: 'terminal',
+      run: () => actions.importCurl(),
     },
     { type: 'separator' },
     {

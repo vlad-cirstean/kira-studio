@@ -28,6 +28,7 @@ import {
   toggleRow,
   visibleRows,
 } from './state/collections';
+import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
 
@@ -78,6 +79,7 @@ const actions: CollectionMenuActions = {
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) => void copyText(row.url),
   importCollection: () => void importCollection(),
+  importCurl: () => openImportCurlDialog(),
   exportCollection: (row) => void exportCollection(row.id, row.name),
   variables: (row) => void openVariablesDialog('collection', row.id, `Variables — ${row.name}`),
   environments: () => openEnvironmentsDialog(),
