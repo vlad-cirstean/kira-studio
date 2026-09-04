@@ -45,16 +45,6 @@ and how to run things wherever a session happens to be.
   item (see "Known open items"), never a running narrative of what each round found.
 - No per-phase PRs. One feature branch per chapter (`claude/feature-v1-2`, `claude/feature-v1-3`,
   and so on).
-- **`claude/feature-v1-3` (and any later chapter branch forked from an earlier one) gets rebased
-  onto its parent chapter's current tip after each of its own phases lands, if that parent branch
-  has moved in the meantime.** v1.3 forked from v1.2's tip once; v1.2 keeps progressing through its
-  own phases in parallel, so v1.3 drifting behind it compounds the eventual reconciliation instead
-  of catching up incrementally. Do this at a clean boundary — no subagent actively mid-flight on
-  the branch being rebased — since it force-pushes rewritten history and would collide with a
-  subagent's own fetch/rebase/push cycle if done concurrently. Verify the rebase is trivial (v1.3's
-  own commits touch only Git-module paths, so it shouldn't conflict with v1.2's own phases) before
-  force-pushing; if it isn't trivial, stop and treat the conflict as a real finding, not something
-  to force through.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
   skipped validation to make something demo. Scope left out of a phase is left out entirely, not
   half-implemented.
