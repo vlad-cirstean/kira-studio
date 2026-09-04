@@ -70,6 +70,51 @@ export function rowsForColumnOps(
   return displayRows ? [...displayRows] : Array.from({ length: rowCount }, (_, i) => i);
 }
 
+/** Finding 3 (round 2) — P24 D10's own rule ("a column-scoped op walks only the visible rows"),
+ *  extended to a `range`-kind selection: its two corners (`anchorRow`/`row`) are page rows spanning
+ *  a CONTIGUOUS block, which every consumer used to walk assuming nothing in between was filtered
+ *  out — under an active "hide non-matching rows" filter that silently swept up hidden rows into
+ *  copy/delete, never intended by the user. Ascending, matching `displayRows`' own contract; `r0`/
+ *  `r1` may arrive in either order (a `SlickRange`-derived selection's anchor is always top-left,
+ *  but callers here pass raw corners, not a normalised range). */
+export function visibleRowsInSpan(
+  displayRows: readonly number[] | null,
+  r0: number,
+  r1: number,
+): number[] {
+  const lo = Math.min(r0, r1);
+  const hi = Math.max(r0, r1);
+  if (!displayRows) {
+    return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  }
+  return displayRows.filter((r) => r >= lo && r <= hi);
+}
+
+/** Finding 3 (round 2) — paste's own version of the same rule: a paste starting at `startRow`
+ *  writes `count` clipboard rows in order, but `startRow + ri` (the old, purely arithmetic target)
+ *  can land on a row the active filter is hiding. The ri-th clipboard row instead lands on the
+ *  ri-th *visible* page row at or after `startRow` — `displayRows` only ever holds real, loaded
+ *  page rows (never a pending-insert index), so once the walk runs past the last of them it
+ *  continues contiguously from `Math.max(startRow, rowCount)`, the pending-insert region, which is
+ *  never filtered (mirrors `isRowVisible`'s own pending-insert-is-always-visible rule). */
+export function pasteTargetRows(
+  displayRows: readonly number[] | null,
+  rowCount: number,
+  startRow: number,
+  count: number,
+): number[] {
+  if (count <= 0) return [];
+  if (!displayRows) return Array.from({ length: count }, (_, i) => startRow + i);
+  const out: number[] = [];
+  for (const r of displayRows) {
+    if (out.length >= count) break;
+    if (r >= startRow) out.push(r);
+  }
+  let next = Math.max(startRow, rowCount);
+  while (out.length < count) out.push(next++);
+  return out;
+}
+
 /** The loaded page's values only for one column (§8.5's own scope boundary) — the header menu's
  *  "Copy column values". */
 export function columnValuesFor(

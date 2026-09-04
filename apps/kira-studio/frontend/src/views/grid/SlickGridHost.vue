@@ -46,13 +46,7 @@ import { setSearchFiltering } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import {
-  columnsToTsv,
-  parseDelimited,
-  type RowSnapshot,
-  rangeToTsv,
-  rowsToTsv,
-} from './clipboardFormats';
+import { columnsToTsv, parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import { cellMenu, headerMenu, rowMenu } from './menu';
 import {
   addInsertRow,
@@ -78,11 +72,13 @@ import {
   type DisplayCellView,
   type NavColumns,
   navColumnsFor,
+  pasteTargetRows,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
   displayCell as rvDisplayCell,
   rowSnapshot as rvRowSnapshot,
   rowsForColumnOps as rvRowsForColumnOps,
+  visibleRowsInSpan,
 } from './slick/rowValues';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
@@ -1580,7 +1576,17 @@ function onCopy(): void {
   if (sel.kind === 'range') {
     // F14/§4.1 item 1: anchorRow/anchorCol is always the top-left corner now (SlickRange
     // normalises), so this needs no min/max sort the way the incumbent's own drag-anchor did.
-    void copyText(rangeToTsv(sel.anchorRow, sel.row, sel.anchorCol, sel.col, displayCell));
+    // Finding 3 (round 2): only the rows actually visible under the current filter within the
+    // span, same rule P24 D10 already applies to the column-selection branch below — a range
+    // used to copy every page row between its two corners even while the filter hid some of them.
+    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
+    void copyText(
+      columnsToTsv(
+        visibleRowsInSpan(currentDisplayRows(), sel.anchorRow, sel.row),
+        cols,
+        displayCell,
+      ),
+    );
     return;
   }
   if (sel.kind === 'row') {
@@ -1619,9 +1625,19 @@ async function onPaste(): Promise<void> {
   const insertIds = new Map<number, string>();
   const pending = pendingFor(props.tabId);
 
+  // Finding 3 (round 2) — a `range`-kind paste used to write to `startRow + ri`, a raw contiguous
+  // walk that ignores the active filter (a 'cell'-kind paste anchors on one already-visible row
+  // and only ever grows downward from it, so it's unaffected; 'row'-kind pastes the user's own
+  // explicit gutter-click rows, never a span). `pasteTargetRows` walks only the rows the filter
+  // still shows, continuing into the pending-insert region (never filtered) once it runs out.
+  const rangeTargetRows =
+    sel.kind === 'range'
+      ? pasteTargetRows(currentDisplayRows(), p.rowCount, startRow, parsed.length)
+      : null;
+
   for (let ri = 0; ri < parsed.length; ri++) {
-    const row = startRow + ri;
-    if (row < 0) continue;
+    const row = rangeTargetRows ? rangeTargetRows[ri] : startRow + ri;
+    if (row === undefined || row < 0) continue;
     const isNewRow = row >= p.rowCount;
     let insertId = insertIds.get(row);
     if (isNewRow && insertId === undefined) {
@@ -1725,12 +1741,12 @@ function onKeydown(e: SlickEventData): void {
   const deleteShortcut = shortcutFor(nativeLike, ['grid.deleteRows']);
   const cellOrRangeSel = runtimeEntry.selection;
   if (deleteShortcut && (cellOrRangeSel?.kind === 'cell' || cellOrRangeSel?.kind === 'range')) {
+    // Finding 3 (round 2) — only the rows actually visible under the current filter within the
+    // span, same rule the copy branch above now applies: a range used to stage every page row
+    // between its two corners for deletion, hidden ones included.
     const rows =
       cellOrRangeSel.kind === 'range'
-        ? Array.from(
-            { length: Math.abs(cellOrRangeSel.row - cellOrRangeSel.anchorRow) + 1 },
-            (_, i) => Math.min(cellOrRangeSel.row, cellOrRangeSel.anchorRow) + i,
-          )
+        ? visibleRowsInSpan(currentDisplayRows(), cellOrRangeSel.anchorRow, cellOrRangeSel.row)
         : [cellOrRangeSel.row];
     const ran = runMenuShortcut(
       rowMenu({

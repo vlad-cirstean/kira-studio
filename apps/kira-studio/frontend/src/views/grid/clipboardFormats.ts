@@ -18,26 +18,10 @@ interface CellText {
 // A cell/range/column-selection copy reads the same displayed values a row copy does (D6's
 // rationale, above) — `cellAt` is the grid's own `displayCell`, kept as a parameter rather than a
 // second RowSnapshot pass because a range/column selection is addressed by (row, display column)
-// pairs, not by whole rows.
-export function rangeToTsv(
-  r0: number,
-  r1: number,
-  c0: number,
-  c1: number,
-  cellAt: (row: number, col: number) => CellText,
-): string {
-  const lines: string[] = [];
-  for (let r = r0; r <= r1; r++) {
-    const cells: string[] = [];
-    for (let c = c0; c <= c1; c++) {
-      const dc = cellAt(r, c);
-      cells.push(dc.isNull ? '' : dc.text);
-    }
-    lines.push(cells.join('\t'));
-  }
-  return lines.join('\n');
-}
-
+// pairs, not by whole rows. `rows` is an explicit, possibly-non-contiguous list (never a `[r0,r1]`
+// bound walked internally) so a caller under an active filter can pass only the actually-visible
+// rows within a range — finding 3 (round 2): a `range`-kind selection's own copy used to walk
+// every page row between its two corners regardless of what the filter was hiding.
 export function columnsToTsv(
   rows: readonly number[],
   cols: readonly number[],

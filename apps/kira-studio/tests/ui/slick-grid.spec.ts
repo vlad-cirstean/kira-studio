@@ -1682,3 +1682,113 @@ test('P22 Pass B follow-up — the cell selection highlight tracks its row throu
   await expect(gridRow(page, 1)).toHaveClass(/pending-delete/);
   await expect(gridRow(page, 3)).not.toHaveClass(/pending-delete/);
 });
+
+// Finding 3 (round 2) — a `range`-kind selection stores only its two page-row corners, and every
+// consumer (copy, delete) used to walk the CONTIGUOUS page-row span between them, ignoring the
+// active filter entirely — `kind: 'row'`/`kind: 'column'` already applied P24 D10's "walk only the
+// visible rows" rule; only `range` didn't. Reproduced concretely: filter down to ids 1/2/3/90 (a
+// contiguous run plus one far outlier), shift-click id=1 to id=90 to select the range spanning
+// every hidden row in between, then Ctrl+C and Delete — pre-fix, copy pulled in all 90 page rows
+// and Delete staged all 90 for deletion; post-fix, both only touch the 4 rows actually on screen.
+test('P22 Pass B follow-up — a range selection under an active filter only copies/deletes the visible rows in its span (finding 3)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-range-filter-span';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Range Filter Span DB',
+    'grey',
+  );
+  const FIXTURE = bigRowsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Range Filter Span DB',
+        kind: 'postgres',
+        color: 'grey',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await page.addInitScript(CLIPBOARD_SHIM);
+  await page.reload();
+  await page.waitForSelector('[data-testid="status-bar"]');
+  const isMac = await page.evaluate(() => navigator.userAgent.includes('Mac'));
+  const DELETE_KEY = isMac ? 'Meta+Backspace' : 'Delete';
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Range Filter Span DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-grey"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const bigRowsRow = await findRow(page, BIG_ROWS_PATH);
+  await bigRowsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"] .slick-cell')).not.toHaveCount(0);
+
+  // --- filter to ids 1/2/3/90 (page rows 0,1,2,89) — a contiguous run plus one far outlier, so a
+  // shift-click across all four visible rows spans 86 hidden page rows in between ----------------
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await page.click('[data-testid="search-regex"]');
+  await page.fill('[data-testid="search-input"]', '^([1-3]|90)$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('of 4');
+  await page.click('[data-testid="search-filter-rows"]');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(4);
+
+  // --- shift-click id=1 (page row 0) to id=90 (page row 89): a `range`-kind selection spanning
+  // every filtered-out page row between them -----------------------------------------------------
+  await gridCell(page, 0, 'id').click();
+  await gridCell(page, 89, 'id').click({ modifiers: ['Shift'] });
+  await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+
+  // --- Ctrl+C only copies the 4 visible rows, not all 90 page rows the pre-fix range spanned -----
+  await page.evaluate(() =>
+    (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
+  );
+  await page.keyboard.press('Control+c');
+  const tsv = await page.evaluate(() => navigator.clipboard.readText());
+  expect(tsv.split('\n')).toEqual(['1', '2', '3', '90']);
+
+  // --- Delete only stages the 4 visible page rows, not the 86 hidden ones in between -------------
+  await page.keyboard.press(DELETE_KEY);
+  for (const row of [0, 1, 2, 89]) {
+    await expect(gridRow(page, row)).toHaveClass(/pending-delete/);
+  }
+  // The pending-row count itself confirms it: exactly the 4 visible rows, not the 86 hidden ones
+  // in between (which don't render while the filter is active, so their own class can't be
+  // asserted via a DOM lookup for an absent row) and not the pre-fix range's full 90-row span.
+  await expect(page.locator('.p-chip.warn')).toHaveText('4 rows pending');
+});
