@@ -9,8 +9,8 @@ and how to run things wherever a session happens to be.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job is spawning the right subagents in order, carrying context between
   them, and tracking progress; the actual writing always happens in a subagent.
-- Each phase (`docs/v1.1/SPEC.md`'s phasing table) gets an Opus-authored plan committed under
-  `docs/v1.1/plans/` before implementation starts — spawn an **Opus subagent** (`Agent` tool,
+- Each phase (`docs/v1.2/SPEC.md`'s phasing table) gets an Opus-authored plan committed under
+  `docs/v1.2/plans/` before implementation starts — spawn an **Opus subagent** (`Agent` tool,
   `model: "opus"`) whose only job is writing that plan. If a phase has no plan there, don't
   implement from the spec directly; get the plan written and committed first.
 - **Once the plan lands, spawn a Sonnet subagent** (`model: "sonnet"`) to implement it. Default to
@@ -30,7 +30,7 @@ and how to run things wherever a session happens to be.
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
 - **Multiple passes/iterations/rounds means repeat the whole loop that many times**, not run it once
   and treat extras as optional. Each pass plans against the *current* tree (on top of everything the
-  previous pass landed, never the pre-phase state) and gets its own file under `docs/v1.1/plans/`
+  previous pass landed, never the pre-phase state) and gets its own file under `docs/v1.2/plans/`
   (a phase's plan plus `-iter2`/`-iter3` suffixes), so what each round found stays legible. A
   planning pass should re-read the current source rather than trust the previous pass's summary
   prose, and say plainly when a pass finds nothing real rather than manufacture a finding.
@@ -95,7 +95,7 @@ and how to run things wherever a session happens to be.
   for breaking changes.
 - **Keep this file lean — prune as you go, don't just append.** An app fact belongs in
   `docs/ARCHITECTURE.md`; a phase or review round's discovery belongs in that phase's plan doc under
-  `docs/v1.1/plans/` (never a permanent "findings" section here — the plan doc and commit log are
+  `docs/v1.2/plans/` (never a permanent "findings" section here — the plan doc and commit log are
   the durable record, not this file). Before adding a bullet, ask whether it's a standing rule for
   how this team works, not a one-off result. When you touch this file, remove what's gone stale too
   — a fixed tool's workaround, a pointer to a deleted file/subsystem, a question a later phase
