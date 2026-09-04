@@ -1,8 +1,9 @@
 /**
- * D25 — "One schema in `core`, generating `contributes.configuration` for VS Code at build time
- * and driving the Electron settings UI from the same source. Defined at P3, before ~15 settings
- * accrete in two places." `SETTINGS` below is that one place; `scripts/gen-settings.ts` reads
- * `toVsCodeConfiguration()` to keep `packages/host-vscode/package.json` in step with it.
+ * D25 — "One schema in `core`, generating `contributes.configuration` for VS Code at build time.
+ * Defined at P3, before ~15 settings accrete in two places; a future host's own settings surface
+ * would generate from the same schema rather than inventing a second one." `SETTINGS` below is
+ * that one place; `scripts/gen-settings.ts` reads `toVsCodeConfiguration()` to keep
+ * `packages/host-vscode/package.json` in step with it.
  *
  * The keys this file defines are exactly the keys P3 consumes — each later phase adds its own
  * with its own consumer; the schema's value is being the one place, not being complete on day

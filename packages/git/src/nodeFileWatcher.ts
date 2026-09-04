@@ -1,8 +1,7 @@
 /**
  * The one real `FileWatcher` (packages/core/src/ports/fileWatcher.ts), `node:fs.watch` based,
- * shared by both hosts for the reason `nodeProcessRunner.ts` is shared: the extension host and
- * Electron main are the same runtime doing the same thing, and writing this twice at W10/W11 is
- * a copy-paste bug factory.
+ * written once for the same reason `nodeProcessRunner.ts` is: the extension host runs on Node,
+ * and any future Node-based host reuses this unchanged rather than reimplementing it.
  *
  * `fs.watch({ recursive: true })` on macOS is FSEvents-backed and coalesces events aggressively,
  * so a caller must re-read state rather than trust an event's `kind` to be precise — `watcher.ts`

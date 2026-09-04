@@ -1,8 +1,8 @@
 /**
- * The one real `ProcessRunner` (packages/core/src/ports/processRunner.ts). The extension host
- * and Electron main are both Node, so this is written once here rather than once per host —
- * `packages/host-*` wrap it with host-owned policy (which git path, which cwd, logging)
- * instead of reimplementing the spawn (§3.1, §3.3).
+ * The one real `ProcessRunner` (packages/core/src/ports/processRunner.ts). Written once here,
+ * not per host, because the extension host runs on Node — any future Node-based host reuses it
+ * unchanged; `packages/host-*` wraps it with host-owned policy (which git path, which cwd,
+ * logging) instead of reimplementing the spawn (§3.1, §3.3).
  */
 import { type ChildProcessWithoutNullStreams, spawn as nodeSpawn } from "node:child_process";
 import type { Readable } from "node:stream";
