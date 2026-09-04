@@ -466,6 +466,11 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
                                                        -- window_key ON DELETE CASCADE into windows
+http_collections(id, name, sort_order, origin_json, created_at, updated_at)  -- P4
+http_items(id, collection_id, parent_id, kind, name, sort_order, method, url,
+           request_json, origin_json, created_at, updated_at)
+                                                       -- the folder/request tree; parent_id and
+                                                       -- collection_id both ON DELETE CASCADE
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -474,6 +479,34 @@ no ORM; the Drizzle dependency went out with the Electron shell. Every row read 
 `settings`, `ui_layout` and `connections` is decoded through the model types in
 `apps/kira-studio/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
 instead of propagating zero values into the UI.
+
+**Collections are stored, not filed (P4).** A Postman collection lives in `kira.sqlite` as a
+normalized `http_collections`/`http_items` tree, not as a `.json` file on disk that the app edits
+in place. `item` is an *ordered array* in the format, so `sort_order` is data rather than
+presentation, and it is rewritten dense within a parent on any insert or delete — the same
+discipline `TabsRepo.Save` applies to `tabs."order"`. `http_items.parent_id` is a self-reference
+with `ON DELETE CASCADE`, which is genuinely enforced because `db.go`'s DSN sets `_foreign_keys=1`
+on every connection the pool opens: deleting a folder deletes its subtree at any depth in one
+statement, with no recursive delete in Go.
+
+**`origin_json` is what makes Postman fidelity real.** Each row also stores **the original Postman
+object verbatim**, minus only its recursive `item` array. This exists because fidelity here is a
+*retention* problem, not a parsing one: `encoding/json` drops every member a struct does not
+declare, so no typed model — library or hand-written — can round-trip the members this app does not
+model, and those members are most of a real collection once you get past the requests themselves
+(`auth` at three levels, `event[]` scripts, `variable[]` at four, saved `response[]` examples,
+`protocolProfileBehavior`, `request.proxy`/`certificate`, and the per-row `description` on headers,
+query params, urlencoded fields and form-data fields). Export therefore starts from `origin_json`
+and rewrites exactly three members — `url`, `header`, `body` — and only when re-running the
+importer over the origin's own member no longer yields what is stored; `method` is always written
+from `request_json`, and every other member is re-emitted byte-identically. `CollectionsRepo.SaveRequest`
+performs the same comparison and *sheds* each rewritten member from `origin_json`, so an edited
+request stops carrying a stale duplicate of its own body. The one thing not preserved is member
+order within a JSON object, since `map[string]json.RawMessage` re-marshals sorted — not semantic in
+JSON, and not something Postman's own exporter guarantees either. Scripts, auth and variables are
+preserved **inert**: never executed, never applied, never resolved. The honest consequence, which
+the import report states out loud, is that a request relying on collection-level Bearer auth will
+401 when sent from this app until the phase that builds an auth surface lands.
 
 **A known, deliberate orphan.** `settings` stores leaves by key, and an existing installation may
 carry an `advanced.engineMemoryCapMb` row from before P58f M10 removed the setting end to end
@@ -579,10 +612,26 @@ Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics fa
 (`theme/primitives/stickyBand.ts`), reveal-scroll with band inset — generic over any row shape
 with `depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
 behaviour (the connection-driven row model, the five openable-kind dispatch, context menus,
-keyboard shortcuts) unchanged; a future Http collections tree would mount `TreeHost` the same way,
-over its own row model, not a shared one — the two modes' tree *rows* have nothing in common
-(connect-before-expand, per-connection visibility, engine-dependent group folders), only how rows
-are virtualized and pinned.
+keyboard shortcuts) unchanged. **P4's `http/CollectionsTree.vue` is that primitive's second
+consumer**, and it landed with no change to `TreeHost.vue`, `VirtualList.vue` or `stickyBand.ts` at
+all — the props, the `#row` slot, `revealKey` and the background-contextmenu emit were exactly what
+a second tree needed, which is the check the factoring was meant to pass. It mounts `TreeHost` over
+its **own** row model, not a shared one: `CollectionRowVm` is four structural members plus seven of
+its own against `TreeRowVm`'s fourteen, because `connectionId`, `color`, `status`, `statusDetail`,
+`groupKind`, `badges`, `loading` and `error` mean nothing here. `http/CollectionRow.vue` is
+likewise its own row rather than a widened `project/TreeRow.vue` — partly because `http/**` may not
+import `project/**` at all, and partly because the differences are the point (no connection rail,
+no status dot, no `EngineIcon`; a leading method chip; an inline rename input). The two modes'
+tree *rows* have nothing in common, only how rows are virtualized and pinned.
+
+The stores differ for a reason worth stating: Studio's tree is lazy because its data is remote —
+expanding a node connects a connection and issues an IPC call, which is what its children cache,
+loading set, search debounce and "searching cached nodes only" caveat all exist for. A collections
+tree has none of that, because the whole tree is rows in a local SQLite table listable in one call,
+so its `visibleRows` is a pure `computed` over one array with no cache, no loading set and nothing
+to be incomplete about. While a search is active every ancestor of a match renders expanded
+**without mutating the expansion set**, so clearing the search restores exactly the shape the user
+had.
 
 **The tab strip and content area are registry-driven, not a per-kind dispatch chain.**
 `state/tabKinds.ts`'s `TAB_KINDS` (component-free) supplies each `TabKind`'s title/icon/rail
@@ -604,6 +653,21 @@ request has none — its state **is** the request — so its `path` is the liter
 and never reused for identity (a tab's identity is always its `id`, never its `path`, restated
 above). Duplicating an HTTP request tab therefore copies the source's own request state rather
 than starting fresh, the one kind where "same target, fresh default state" does not apply.
+
+**A saved collection request opens that same `'http-request'` kind — P4 added no tab kind (and no
+op kind).** Its state is sourced from an `http_items` row instead of `defaultHttpRequestTabState()`,
+and the binding lives in the state as `itemId`, *not* in `path`, which stays the literal constant
+above. That placement is forced rather than aesthetic: `duplicateTab` copies `path` verbatim while
+`duplicateState` clears `itemId`, so a `collection:<id>/request:<id>` path would leave a duplicated
+tab carrying the saved request's *path identity* alongside a state saying it is unsaved — and
+`openTab`'s reuse lookup, keyed on kind + connectionId + path, would then activate the **duplicate**
+when the user opened the original from the tree. Keeping identity in exactly one place and doing
+the reuse lookup explicitly (`openCollectionRequestTab`) is four lines with no such failure mode.
+A second state field, `name`, keeps `httpRequestTitle` pure: without it a request saved as
+"Create order" would render as `/v2/orders` in both the strip and the header. Deleting a row does
+**not** close tabs bound to it — a tab is an editing surface with its own persisted state, and
+closing one because a tree row went away would lose work; the tab simply reads as unsaved, and
+Save falls back to Save as…
 
 **A restored tab's state is normalized through its own kind's schema — merge-only, every kind,
 since P3.** `TabKindDef` (`state/tabKinds.ts`) carries a ninth member, `parseState(raw)`, a
@@ -631,14 +695,37 @@ decision dropped GraphQL entirely (not deprecated — deleted: no query/variable
 now plain text only, and JavaScript/JSON/HTML/XML became their own top-level `code` mode with its
 own `codeLanguage` field. **This means the mode vocabulary no longer maps 1:1 onto Postman's own
 `body.mode`** — Postman still has one `raw` mode with a `language` sub-field covering all five,
-this app now has two separate modes and no `graphql` mode at all. Whoever builds Postman collection
-import/export needs a real translation at that boundary (a Postman `raw` body with
-`language: 'json'` imports as this app's `code` mode with `codeLanguage: 'json'`, and the reverse
-on export; a Postman `graphql` body has nowhere to land and needs its own explicit decision) — see
-the breadcrumb comment on `HTTP_BODY_MODES` in `http.ts`. A Go/TS parity test
+this app now has two separate modes and no `graphql` mode at all. **P4 built that translation**, in
+`apps/kira-studio/internal/postman/body.go`, and it resolves as follows. On import: a Postman `raw`
+body whose `options.raw.language` is absent or `"text"` becomes `raw`; one of the four known
+languages becomes `code` with that `codeLanguage`; an *unrecognised* language degrades to plain
+`raw` rather than failing, since `options` is untyped in the published schema and the original
+language survives in `origin_json` for an unedited export to restore. On export the reverse, with
+`language: "text"` written explicitly for `raw` rather than omitted, so a Postman import shows the
+Text sub-selector instead of relying on a default this app does not control.
+
+**A Postman `graphql` body imports as `code`·`json`, carrying the GraphQL-over-HTTP envelope**
+(`{"query": …, "variables": …, "operationName": …}`) — byte-for-byte what this app's own serializer
+built before GraphQL was removed. Refusing the file, skipping the item and importing as `none` were
+all considered and declined: the point of importing a request is that it stays runnable, and the
+other three produce a request that silently does nothing. While the body is untouched the round
+trip is lossless (the export re-emits `mode: "graphql"` verbatim), and **the moment the user edits
+it, it stops being a GraphQL body** and exports as `raw` + `language: "json"` — an app with no
+GraphQL mode cannot honestly claim to have edited a GraphQL body. The import report says so.
+
+**Two lossiness boundaries, stated rather than hidden.** A collection this app created, and a
+collection imported from real Postman and re-exported *untouched*, both round-trip losslessly
+(modulo object member order). A collection imported from real Postman, **edited**, and re-exported
+does not, and cannot: the edited member is rebuilt in this app's canonical form, which drops what
+this app does not model *about that member* — a query param's `description` and its `disabled` flag
+when the URL changed, a header's `description` when the header list changed, a form-data row's
+`description` when the body changed, and a `graphql` body's identity as above. A Go/TS parity test
 (`tests/unit/go-ts-vocabulary-parity.spec.ts`, reading `internal/httpclient/body.go`'s
 `validBodyModes` as plain text) guards the two languages' mode and Content-Type vocabularies from
-drifting apart. The builder's own labels: `formdata` reads **form-data**, `urlencoded` reads
+drifting apart, and a third pair added by P4 does the same for `internal/postman/body.go`'s
+`postmanCodeLanguages` against `CODE_LANGUAGES` — without it, a fifth language added on the
+TypeScript side would make the importer silently treat that language's bodies as plain `raw` and
+the exporter silently stop emitting it, with nothing failing anywhere. The builder's own labels: `formdata` reads **form-data**, `urlencoded` reads
 **x-www-form-urlencoded**, `file` — "one local file, sent as the request's entire body" — reads
 **binary**, and `code` reads **Code**. `Content-Type` is a **default Go applies only when the
 request carries none of its own** (`text/plain` for raw, the `code` language's Content-Type,
