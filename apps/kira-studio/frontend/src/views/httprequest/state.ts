@@ -1,12 +1,20 @@
-import type { HttpBodyWire, HttpRequestTabState, HttpResponseWire } from '@shared/domain/http';
+import type {
+  HttpBodyWire,
+  HttpMethod,
+  HttpRequestTabState,
+  HttpResponseWire,
+} from '@shared/domain/http';
 import { control } from '../../bridge/control';
 import { loadDynamicGenerator } from '../../http/dynamic/catalog';
 import { itemRecord } from '../../http/state/collections';
 import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
+import { type ResolvedRequest, substituteBody } from '../../http/substituteRequest';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+
+export type { ResolvedRequest } from '../../http/substituteRequest';
 
 // The state's own five-mode fields, translated onto the wire union. Only the fields the active
 // mode's own serializer reads are populated — the rest stay at their zero value, since `Body.Mode`
@@ -54,45 +62,6 @@ function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
     case 'file':
       return { ...empty, mode: 'file', file: state.binaryFile?.path ?? '' };
   }
-}
-
-// P5 D7: every substitutable field, and only those — a form-data file row's `path` and the `file`
-// body's own path are deliberately excluded (D7: a local path is `os.Stat`-checked at send and was
-// never seen by any picker if it came from a substituted `{{var}}`, so its failure would name a
-// string the user never typed).
-function substituteBody(body: HttpBodyWire, sub: (text: string) => string): HttpBodyWire {
-  switch (body.mode) {
-    case 'raw':
-      return { ...body, raw: sub(body.raw) };
-    case 'code':
-      return { ...body, code: sub(body.code) };
-    case 'urlencoded':
-      return {
-        ...body,
-        urlEncoded: body.urlEncoded.map((f) => ({ name: sub(f.name), value: sub(f.value) })),
-      };
-    case 'formdata':
-      return {
-        ...body,
-        formData: body.formData.map((f) => ({
-          ...f,
-          name: sub(f.name),
-          contentType: sub(f.contentType),
-          value: f.kind === 'text' ? sub(f.value) : f.value,
-        })),
-      };
-    default:
-      return body;
-  }
-}
-
-export interface ResolvedRequest {
-  url: string;
-  headers: { name: string; value: string }[];
-  body: HttpBodyWire;
-  /** Every reference stage 1 found, across every D7 field — resolved, deferred (a secret, left
-   *  for Go), dynamic ($-prefixed, P6), or unknown. */
-  refs: Reference[];
 }
 
 /** D6 stage 1 / D7: resolves every non-secret {{name}} reference across the URL, enabled headers,
@@ -240,4 +209,38 @@ export async function send(tabId: string): Promise<void> {
 
 export function stop(tabId: string): void {
   stopOp(runtime[tabId]);
+}
+
+// P7 D10: the *Copy as curl* dialog's own frozen resolution — computed once on open, the same
+// shape send() already demonstrates (P6 D7's short-circuit: only a request that actually
+// references a dynamic value pays for loadDynamicGenerator()'s chunk). `http/state/curl.ts` cannot
+// import views/** (§0.3), so this lives here rather than there, and is called once rather than on
+// every render — re-running it on a later render would re-roll every {{$…}} the dialog is already
+// showing (D11's whole reason to exist).
+export interface ExportResolution {
+  method: HttpMethod;
+  resolved: ResolvedRequest;
+  /** Every distinct secret name stage 1 deferred, in first-encountered order — what the dialog's
+   *  reveal loop walks (D10). */
+  deferredNames: string[];
+}
+
+export async function resolveForExport(tabId: string): Promise<ExportResolution | null> {
+  const tab = findHttpRequestTab(tabId);
+  if (!tab) return null;
+
+  const collectionId = collectionIdFor(tab.state);
+  const environmentId = activeEnvironmentId.value;
+  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const first = resolveTabState(tab.state, values, secretNames);
+  const resolved = first.refs.some((r) => r.kind === 'dynamic')
+    ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+    : first;
+
+  const deferredNames: string[] = [];
+  for (const ref of resolved.refs) {
+    if (ref.kind === 'deferred' && !deferredNames.includes(ref.name)) deferredNames.push(ref.name);
+  }
+
+  return { method: tab.state.method, resolved, deferredNames };
 }
