@@ -38,6 +38,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
+| Outbound HTTP client (P2) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below) |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -592,8 +593,27 @@ above are unaffected) supplies the view component. `MainView.vue` is one
 when the mode has no active tab, replacing what used to be a nine-branch `v-if`/`v-else-if` chain;
 `TabStrip.vue` reads the same `TAB_KINDS` registry for its icon/title/rail/context-menu instead of
 branching on `tab.kind` itself, and no longer imports `project/state/tree` at all. Adding a tab
-kind (P2+) means adding one registry entry each in `state/tabKinds.ts` and
-`workbench/tabViews.ts`, not editing a dispatch chain in three files.
+kind means one registry entry each in `state/tabKinds.ts` and `workbench/tabViews.ts`, not editing
+a dispatch chain in three files — `'http-request'` (P2) is the first kind to actually exercise
+that promise, and the first Http-mode kind at all: `TAB_KIND_MODE['http-request']` is `'http'`,
+every other entry is `'studio'`. It costs a fourth vocabulary Go's `model.RenderableTabKinds` has
+to carry too (no compiler catches a miss there — `tests/unit/go-ts-vocabulary-parity.spec.ts`
+does). Every Studio kind's `path` addresses a real target the tab is a *view* onto; an HTTP
+request has none — its state **is** the request — so its `path` is the literal constant
+`'request'`: non-empty (`model.TabRecord.Validate` requires one), carrying no false uniqueness,
+and never reused for identity (a tab's identity is always its `id`, never its `path`, restated
+above). Duplicating an HTTP request tab therefore copies the source's own request state rather
+than starting fresh, the one kind where "same target, fresh default state" does not apply.
+
+**Response headers are shown alphabetised, not in received order — a known property of
+`net/http`, not a bug.** Go's `http.Response.Header` is a `map[string][]string` with
+`textproto.CanonicalMIMEHeaderKey` already applied by the transport; there is no stdlib access to
+the bytes as actually received, so `internal/httpclient` cannot recover either the original casing
+or the original order even if it wanted to. `Response.Headers` is instead a deterministic
+substitute — `[]Header{Name, Value}` sorted by name, one entry per value so a duplicate header
+(e.g. multiple `Set-Cookie`s) still survives — documented on the struct itself. A byte-level raw
+inspector, the phase that could recover the wire bytes directly (P7), is the one that can lift this
+if it ever matters.
 
 **Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
 are not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
@@ -698,6 +718,23 @@ editable leaves, disabled once the draft already equals that leaf's own default.
 `isAtDefault`/`resetLeaf` helpers drive all nine — the same discipline `diffSection` already
 applies to the Save-time patch — so a future leaf needs no dedicated handler. A reset still only
 stages the default into the draft; Save is what commits it, unchanged from P17.
+
+**The op log records one connectionless op kind: `'http'` (P2).** `Host.RunOp`'s `OpSpec.ConnectionID`
+was always `*string`, but P2 is the first phase to give it a real, every-day connectionless caller
+— `bridge/http.go`'s `HttpService.Send` calls `Host.RunOp(ctx, OpSpec{ConnectionID: nil, Kind:
+"http", OpID: args.OpID, TabID: &args.TabID}, fn)`. Nothing in `RunOp`/`CancelOp` needed to
+change: both connection-dependent branches already guarded on `ConnectionID != nil` (the throttle
+gate below, and `CancelOp`'s live-adapter kill), so an HTTP op mints an id, registers a cancellable
+context, emits `op:start`/`op:end` and hits the panic boundary exactly like a database op. The
+reason it joins the *existing* log rather than getting a second one of its own: the toolbar's
+progress ring and elapsed-time readout (`useRunState(tabId)`) and the Operations panel's own
+per-row Cancel button both read *only* this op log — a second one would mean either a dead ring on
+every HTTP tab or a second `useRunState`/ops store to keep in sync with the first, the exact
+"two implementations, two places for the same bug" this app's own registries elsewhere exist to
+avoid. A non-2xx HTTP response is still logged `status: 'ok'` — the op is the exchange, and testing
+a 404 endpoint is the point of an HTTP client; only a transport failure, a timeout or a cancel is
+`'error'`/`'cancelled'`. The outcome rides in `op.SetCommand`: the method and URL before the send,
+overwritten with `→ <status> <statusText>` once the response is known.
 
 **A per-connection command throttle paces the adapter dispatch funnel, not any one adapter.** P28
 added `connections.throttle_per_sec` (0 = unlimited, the default) alongside `auto_explain` as a
@@ -891,12 +928,13 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
-fourteen bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
+fifteen bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
 `LayoutService`, `TabsService`, `WindowsService` (P8: a page's own boot-time window registration,
 see Process model's multi-window subsection below), `ConnectionsService`, `TreeService`,
 `EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService`
 (P18: per-connection DDL document store, backing `connection_ddl` and the DDL-driven SQL language
-service described below), `LifecycleService`. `EngineService.Status()` has
+service described below), `HttpService` (P2: `Send`, the outbound HTTP path — see the op-log
+paragraph below and Stack, above), `LifecycleService`. `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
 no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
