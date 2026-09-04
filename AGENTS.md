@@ -104,7 +104,16 @@ and how to run things wherever a session happens to be.
 
 ## Known open items
 
-- None.
+- **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
+  install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
+  `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which does let
+  `shell.DefaultBounds` see a real work area for a window opened well after `Run()` (Dock-reopen
+  minting a fresh window, "New Window" when there's nothing to cascade from) — but every window
+  opened at startup is still built before `app.Run()` even runs (main.go's own top comment), and on
+  macOS the screen cache isn't populated until `ApplicationDidFinishLaunching` fires, strictly
+  after `Run()` is called. So a genuinely first-ever launch still gets the unclamped 1280×800
+  default until the window is resized once. Closing this needs deferring startup window creation
+  until after that event fires — a materially larger structural change than this fix.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 

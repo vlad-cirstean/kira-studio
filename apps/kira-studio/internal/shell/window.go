@@ -49,17 +49,18 @@ type WindowDeps struct {
 //
 // primaryWorkArea is the primary screen's work area for the no-stored-rectangle path (P22 D6(a));
 // nil is a legitimate input (falls back to the unclamped 1280×800 default) rather than a caller
-// error. In this app's own startup order — every window opened at boot is built and handed to
-// Wails before app.Run() (main.go's own top comment: "... -> the main window -> app.Run()"),
-// mirroring the pre-cutover Electron main.go's own ordering — Wails v3 beta.16 has not yet stood
-// up a live screen backend at that point (Run() is what sets *application.App's impl field, and
-// nothing before it can), so app.Screen.GetPrimary() reliably returns nil there today and this
-// clamp's fallback is what actually runs at first launch. Verified in this sandbox with
-// application.New(...).Screen.GetPrimary() pre-Run() — a property of Wails' Go control flow, not
-// of any platform-specific screen API, so it needs no real hardware to confirm. The clamp is
-// still implemented, tested and wired correctly, and takes effect the moment a caller can supply
-// a resolved work area — CascadeFrom already does exactly that for a second window, cascaded from
-// a first window that is by then live and running.
+// error. Every window opened at boot is built and handed to Wails before app.Run() (main.go's own
+// top comment: "... -> the main window -> app.Run()"), and on macOS (screen_darwin.go's own
+// `run()`) the screen cache app.Screen.GetPrimary() reads isn't populated until the native run
+// loop's ApplicationDidFinishLaunching fires — strictly after app.Run() is called, never before —
+// so it reliably returns nil for every window opened at startup, and this clamp's fallback is
+// what actually runs there. main.go resolves primaryWorkArea fresh on every openWindow call
+// (round-2 review finding 4) rather than once before Run(), which does let DefaultBounds run with
+// a real work area for a window opened well after Run() — "New Window", or Dock-reopen minting a
+// fresh window — though CascadeFrom (below) supplies its *own* already-resolved bounds directly to
+// Options' `w.Bounds != nil` branch for the common "New Window" case (an existing window to
+// cascade from), bypassing DefaultBounds entirely; DefaultBounds only runs there when CascadeFrom
+// has nothing to cascade from.
 func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *application.Rect) application.WebviewWindowOptions {
 	width, height := DefaultBounds(primaryWorkArea)
 	opts := application.WebviewWindowOptions{
