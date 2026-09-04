@@ -5,7 +5,7 @@ import { shortcutFor } from '../shortcuts/keys';
 import { confirmDialog } from '../state/confirmDialog';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
-import { openCollectionRequestTab } from '../state/tabs';
+import { openCollectionGrpcRequestTab, openCollectionRequestTab } from '../state/tabs';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -16,11 +16,13 @@ import {
   collapseRow,
   collectionsState,
   createCollection,
+  createGrpcItem,
   createItem,
   deleteRow,
   duplicateRow,
   expandRow,
   exportCollection,
+  fetchSavedGrpcRequest,
   fetchSavedRequest,
   importCollection,
   renameRow,
@@ -62,6 +64,13 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
     toggleRow(row);
     return;
   }
+  // P11 D12: a gRPC row opens the 'grpc-request' kind, never 'http-request' — the tree's own
+  // protocol column is what tells the two apart, since kind alone (D12's own reasoning) does not.
+  if (row.protocol === 'grpc') {
+    const saved = await fetchSavedGrpcRequest(row.id);
+    openCollectionGrpcRequestTab(row.id, row.name, saved);
+    return;
+  }
   const saved = await fetchSavedRequest(row.id);
   openCollectionRequestTab(row.id, row.name, saved);
 }
@@ -72,6 +81,7 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
 const actions: CollectionMenuActions = {
   open: (row) => void onOpen(row),
   newRequest: (row) => void createItem(row.collectionId, folderTarget(row), 'request'),
+  newGrpcRequest: (row) => void createGrpcItem(row.collectionId, folderTarget(row)),
   newFolder: (row) => void createItem(row.collectionId, folderTarget(row), 'folder'),
   newCollection: () => void createCollection(),
   rename: beginRename,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { grpcRequestTabStateSchema } from './grpc';
 import { httpRequestTabStateSchema } from './http';
 import type { AppMode } from './mode';
 import { sortSpecSchema } from './queries';
@@ -16,13 +17,16 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // RENDERABLE_TAB_KINDS/TAB_KIND_MODE below and Go's model.RenderableTabKinds (the one silent
   // failure mode of the four, D10).
   'http-request',
+  // P11 D2: the second kind inside the 'http' mode — a protocol AND a surface, following
+  // 'http-request''s own naming reasoning verbatim.
+  'grpc-request',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
 // 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
 // P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41, 'http-request' in
-// P2. The restore path drops rows of any other kind with a `warn` — a closed vocabulary decided
-// once, same discipline as P1's Caps/connectionKind.
+// P2, 'grpc-request' in P11. The restore path drops rows of any other kind with a `warn` — a
+// closed vocabulary decided once, same discipline as P1's Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
   'definition',
@@ -32,13 +36,16 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'stream',
   'browse',
   'http-request',
+  'grpc-request',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
 // in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
 // effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
 // per-kind registry (components, page stores, menu builders). All seven Studio kinds map to
-// 'studio'; 'http-request' (P2) is the first entry that maps to 'http'.
+// 'studio'; 'http-request' (P2) and 'grpc-request' (P11 D2) both map to 'http' — the SPEC's
+// "hosted through the same shell" is satisfied by a second kind inside the existing mode, not a
+// third mode.
 export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   data: 'studio',
   definition: 'studio',
@@ -48,6 +55,7 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   stream: 'studio',
   browse: 'studio',
   'http-request': 'http',
+  'grpc-request': 'http',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -217,6 +225,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('http-request'),
     state: httpRequestTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('grpc-request'),
+    state: grpcRequestTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -227,6 +240,7 @@ export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
 export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
 export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
 export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
+export type GrpcRequestTabRecord = Extract<TabRecord, { kind: 'grpc-request' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -254,6 +268,10 @@ export function asBrowseTab(tab: TabRecord | null | undefined): BrowseTabRecord 
 
 export function asHttpRequestTab(tab: TabRecord | null | undefined): HttpRequestTabRecord | null {
   return tab && tab.kind === 'http-request' ? tab : null;
+}
+
+export function asGrpcRequestTab(tab: TabRecord | null | undefined): GrpcRequestTabRecord | null {
+  return tab && tab.kind === 'grpc-request' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {

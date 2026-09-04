@@ -1,5 +1,11 @@
 import type { ConnectionColor } from '@shared/domain/connection';
 import {
+  defaultGrpcRequestTabState,
+  type GrpcRequestTabState,
+  grpcRequestTabStateSchema,
+  grpcRequestTitle,
+} from '@shared/domain/grpc';
+import {
   defaultHttpRequestTabState,
   type HttpRequestTabState,
   httpRequestTabStateSchema,
@@ -27,6 +33,7 @@ import {
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
+  type GrpcRequestTabRecord,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
@@ -237,5 +244,29 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: there is no project panel to reveal an HTTP request into.
     menuExtras: () => [],
     parseState: parseStateWith(httpRequestTabStateSchema),
+  },
+  'grpc-request': {
+    mode: TAB_KIND_MODE['grpc-request'],
+    title: (tab) => grpcRequestTitle((tab as GrpcRequestTabRecord).state),
+    // D2: distinct from 'globe' at a glance in a strip holding both kinds.
+    icon: () => 'symbol-interface',
+    // D2: no connection, so no rail.
+    railColor: () => undefined,
+    defaultState: () => defaultGrpcRequestTabState(),
+    // D2: a deliberate break with "same target, fresh default state" — a gRPC request's state
+    // *is* the request, mirroring 'http-request''s own identical reasoning.
+    duplicateState: (tab: GrpcRequestTabRecord): GrpcRequestTabState => ({
+      ...tab.state,
+      itemId: null,
+      name: '',
+      importPaths: [...tab.state.importPaths],
+      metadata: tab.state.metadata.map((m) => ({ ...m })),
+    }),
+    // D2: the runtime (and a still-running call) lives in views/grpcrequest/state.ts, freed —
+    // and cancelled — by registerTabRuntimeCleanup, not by this hook.
+    dropResources: noDrop,
+    // D2: there is no project panel to reveal a gRPC request into.
+    menuExtras: () => [],
+    parseState: parseStateWith(grpcRequestTabStateSchema),
   },
 };

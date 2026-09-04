@@ -1,14 +1,22 @@
 import {
   type CollectionItemKind,
+  type CollectionItemProtocol,
   type CollectionItemSummary,
   type CollectionSummary,
+  type HttpSavedGrpcRequest,
   type HttpSavedRequest,
+  httpSavedGrpcRequestSchema,
   httpSavedRequestSchema,
   type ImportReport,
 } from '@shared/domain/collections';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { patchHttpRequestTabState, renameHttpRequestTabs } from '../../state/tabs';
+import {
+  patchGrpcRequestTabState,
+  patchHttpRequestTabState,
+  renameGrpcRequestTabs,
+  renameHttpRequestTabs,
+} from '../../state/tabs';
 
 // P4 D13: Http's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
@@ -36,6 +44,9 @@ export interface CollectionRowVm {
   method: string;
   /** Requests only — searched, never shown. */
   url: string;
+  /** P11 D12: 'http' for every existing row (the column's own SQL default); meaningless for a
+   *  folder or a collection row. */
+  protocol: CollectionItemProtocol;
   matched: boolean;
 }
 
@@ -58,6 +69,8 @@ interface CollectionsState {
   /** Saved requests read on demand by GetRequest, keyed by item id — the dirty comparison's
    *  other half (D15) and the reason opening an already-open request costs no call. */
   requests: Record<string, HttpSavedRequest>;
+  /** P11 D12: GetGrpcRequest's own cache — grpcRequests' own sibling of `requests` above. */
+  grpcRequests: Record<string, HttpSavedGrpcRequest>;
   busy: boolean;
   report: ImportReport | null;
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
@@ -74,6 +87,7 @@ export const collectionsState = reactive<CollectionsState>({
   search: '',
   renamingKey: null,
   requests: {},
+  grpcRequests: {},
   busy: false,
   report: null,
   exportWarning: null,
@@ -110,6 +124,21 @@ export async function fetchSavedRequest(itemId: string): Promise<HttpSavedReques
 export function savedRequestFor(itemId: string | null): HttpSavedRequest | null {
   if (!itemId) return null;
   return collectionsState.requests[itemId] ?? null;
+}
+
+/** fetchSavedRequest's own gRPC sibling. */
+export async function fetchSavedGrpcRequest(itemId: string): Promise<HttpSavedGrpcRequest> {
+  const cached = collectionsState.grpcRequests[itemId];
+  if (cached) return cached;
+  const saved = httpSavedGrpcRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
+  collectionsState.grpcRequests[itemId] = saved;
+  return saved;
+}
+
+/** savedRequestFor's own gRPC sibling. */
+export function savedGrpcRequestFor(itemId: string | null): HttpSavedGrpcRequest | null {
+  if (!itemId) return null;
+  return collectionsState.grpcRequests[itemId] ?? null;
 }
 
 // ---- the row model ----
@@ -157,6 +186,7 @@ export const visibleRows = computed<CollectionRowVm[]>(() => {
         name: item.name,
         method: item.method,
         url: item.url,
+        protocol: item.protocol,
         matched: rowMatches(item.name, item.url, query),
       });
       if (item.kind === 'folder' && expanded) pushItems(collectionId, item.id, depth + 1);
@@ -180,6 +210,7 @@ export const visibleRows = computed<CollectionRowVm[]>(() => {
       name: collection.name,
       method: '',
       url: '',
+      protocol: 'http',
       matched: rowMatches(collection.name, '', query),
     });
     if (expanded) pushItems(collection.id, null, 1);
@@ -254,13 +285,28 @@ export async function createItem(
   collectionsState.renamingKey = key;
 }
 
+/** createItem's own gRPC sibling (P11 D12) — always a request, never a folder. */
+export async function createGrpcItem(collectionId: string, parentId: string | null): Promise<void> {
+  const item = await control.collectionsCreateGrpcItem({
+    collectionId,
+    parentId,
+    name: 'New gRPC request',
+  });
+  await loadCollections();
+  revealItem(collectionId, parentId);
+  const key = itemKey(item.id);
+  collectionsState.selected = key;
+  collectionsState.renamingKey = key;
+}
+
 export async function renameRow(row: CollectionRowVm, name: string): Promise<void> {
   collectionsState.renamingKey = null;
   const target = row.kind === 'collection' ? 'collection' : 'item';
   await control.collectionsRename(row.id, target, name);
   // Every tab bound to this row follows immediately, so the view header and the tab strip never
   // disagree with the tree (D14).
-  if (row.kind === 'request') renameHttpRequestTabs(row.id, name);
+  if (row.kind === 'request' && row.protocol === 'grpc') renameGrpcRequestTabs(row.id, name);
+  else if (row.kind === 'request') renameHttpRequestTabs(row.id, name);
   await loadCollections();
 }
 
@@ -271,6 +317,7 @@ export async function deleteRow(row: CollectionRowVm): Promise<void> {
   // surface with its own persisted state, and silently closing one because a tree row went away
   // would lose work. Its cached saved request goes, though, so the tab reads as unsaved.
   delete collectionsState.requests[row.id];
+  delete collectionsState.grpcRequests[row.id];
   if (collectionsState.selected === row.key) collectionsState.selected = null;
   await loadCollections();
 }
@@ -285,6 +332,14 @@ export async function duplicateRow(row: CollectionRowVm): Promise<void> {
       parentId: row.parentId,
       kind: 'folder',
       name,
+    });
+  } else if (row.protocol === 'grpc') {
+    const saved = await fetchSavedGrpcRequest(row.id);
+    await control.collectionsCreateGrpcItem({
+      collectionId: row.collectionId,
+      parentId: row.parentId,
+      name,
+      request: saved,
     });
   } else {
     const saved = await fetchSavedRequest(row.id);
@@ -310,19 +365,23 @@ export function cancelRename(): void {
 
 // ---- saving a request into a collection (D15) ----
 
+type SaveDialogPayload =
+  | { protocol: 'http'; request: HttpSavedRequest }
+  | { protocol: 'grpc'; request: HttpSavedGrpcRequest };
+
 interface SaveDialogState {
   open: boolean;
   /** The tab being saved. */
   tabId: string | null;
   suggestedName: string;
-  request: HttpSavedRequest | null;
+  payload: SaveDialogPayload | null;
 }
 
 export const saveDialogState = reactive<SaveDialogState>({
   open: false,
   tabId: null,
   suggestedName: '',
-  request: null,
+  payload: null,
 });
 
 /** Save as… — the request view opens this without importing the dialog component. */
@@ -333,13 +392,25 @@ export function openSaveDialog(
 ): void {
   saveDialogState.tabId = tabId;
   saveDialogState.suggestedName = suggestedName;
-  saveDialogState.request = request;
+  saveDialogState.payload = { protocol: 'http', request };
+  saveDialogState.open = true;
+}
+
+/** openSaveDialog's own gRPC sibling (P11 D12). */
+export function openSaveGrpcDialog(
+  tabId: string,
+  suggestedName: string,
+  request: HttpSavedGrpcRequest,
+): void {
+  saveDialogState.tabId = tabId;
+  saveDialogState.suggestedName = suggestedName;
+  saveDialogState.payload = { protocol: 'grpc', request };
   saveDialogState.open = true;
 }
 
 export function closeSaveDialog(): void {
   saveDialogState.open = false;
-  saveDialogState.request = null;
+  saveDialogState.payload = null;
   saveDialogState.tabId = null;
 }
 
@@ -349,16 +420,37 @@ export async function submitSaveDialog(
   parentId: string | null,
   name: string,
 ): Promise<void> {
-  const { tabId, request } = saveDialogState;
-  if (!tabId || !request) return;
+  const { tabId, payload } = saveDialogState;
+  if (!tabId || !payload) return;
+
+  if (payload.protocol === 'grpc') {
+    const item = await control.collectionsCreateGrpcItem({
+      collectionId,
+      parentId,
+      name,
+      request: payload.request,
+    });
+    collectionsState.grpcRequests[item.id] = payload.request;
+    try {
+      await control.grpcHistoryAdopt(tabId, item.id);
+    } catch (err) {
+      console.warn('adopting grpc call history into the saved request failed', err);
+    }
+    patchGrpcRequestTabState(tabId, { itemId: item.id, name });
+    await loadCollections();
+    revealItem(collectionId, parentId);
+    closeSaveDialog();
+    return;
+  }
+
   const item = await control.collectionsCreateItem({
     collectionId,
     parentId,
     kind: 'request',
     name,
-    request,
+    request: payload.request,
   });
-  collectionsState.requests[item.id] = request;
+  collectionsState.requests[item.id] = payload.request;
   // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
   // itemId is patched below. Best-effort, the same posture D2's own Go-side Record call takes —
   // Save as… itself must succeed regardless of whether adopting its history did.
@@ -388,6 +480,17 @@ export async function saveRequest(
   // The cache is the dirty comparison's saved side, so it must move in step with the write or the
   // mark would stay lit after a successful save.
   collectionsState.requests[itemId] = request;
+  await loadCollections();
+}
+
+/** saveRequest's own gRPC sibling. */
+export async function saveGrpcRequest(
+  itemId: string,
+  name: string,
+  request: HttpSavedGrpcRequest,
+): Promise<void> {
+  await control.collectionsSaveGrpcRequest(itemId, name, request);
+  collectionsState.grpcRequests[itemId] = request;
   await loadCollections();
 }
 

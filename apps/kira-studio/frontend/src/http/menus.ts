@@ -12,6 +12,9 @@ import type { CollectionRowVm } from './state/collections';
 export interface CollectionMenuActions {
   open(row: CollectionRowVm): void;
   newRequest(row: CollectionRowVm): void;
+  /** P11 D12: the row/background menu's own "New gRPC request" action — a sibling of newRequest,
+   *  never available on a folder-less background where newRequest already targets the root. */
+  newGrpcRequest(row: CollectionRowVm): void;
   newFolder(row: CollectionRowVm): void;
   newCollection(): void;
   rename(row: CollectionRowVm): void;
@@ -88,6 +91,13 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       label: 'New request',
       icon: 'add',
       run: () => actions.newRequest(row),
+    },
+    {
+      type: 'item',
+      id: 'new-grpc-request',
+      label: 'New gRPC request',
+      icon: 'symbol-interface',
+      run: () => actions.newGrpcRequest(row),
     },
     {
       type: 'item',

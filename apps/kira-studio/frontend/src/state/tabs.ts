@@ -1,4 +1,9 @@
-import type { HttpSavedRequest } from '@shared/domain/collections';
+import type { HttpSavedGrpcRequest, HttpSavedRequest } from '@shared/domain/collections';
+import {
+  defaultGrpcRequestTabState,
+  type GrpcRequestTabState,
+  grpcRequestTabStateSchema,
+} from '@shared/domain/grpc';
 import {
   defaultHttpRequestTabState,
   type HttpRequestTabState,
@@ -10,6 +15,7 @@ import {
   asConsoleTab,
   asDataTab,
   asDocumentTab,
+  asGrpcRequestTab,
   asHttpRequestTab,
   asKeyValueTab,
   asStreamTab,
@@ -29,6 +35,7 @@ import {
   defaultDocumentTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
+  type GrpcRequestTabRecord,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
@@ -41,6 +48,7 @@ import {
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
+import { fromSavedGrpcRequest } from '../views/grpcrequest/saved';
 import { fromSavedRequest } from '../views/httprequest/saved';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
@@ -447,6 +455,44 @@ export function renameHttpRequestTabs(itemId: string, name: string): void {
   }
 }
 
+// P11 D2: 'grpc-request''s own sibling of the four openHttpRequestTab-family functions above —
+// identical reasoning throughout (always fresh, no target to reuse by; a saved request opens the
+// existing kind with state sourced from the collection row instead of the default).
+export function openGrpcRequestTab(): string {
+  return openTab('grpc-request', null, 'request', () => defaultGrpcRequestTabState(), {
+    reuse: false,
+  }).id;
+}
+
+export function openCollectionGrpcRequestTab(
+  itemId: string,
+  name: string,
+  saved: HttpSavedGrpcRequest,
+): OpenTabResult {
+  const existing = tabsState.tabs.find(
+    (t) => t.kind === 'grpc-request' && (t as GrpcRequestTabRecord).state.itemId === itemId,
+  );
+  if (existing) {
+    activateTab(existing.id);
+    return { id: existing.id, reused: true };
+  }
+  const state = grpcRequestTabStateSchema.parse({
+    ...defaultGrpcRequestTabState(),
+    ...fromSavedGrpcRequest(saved),
+    itemId,
+    name,
+  });
+  return openTab('grpc-request', null, 'request', () => state, { reuse: false });
+}
+
+export function renameGrpcRequestTabs(itemId: string, name: string): void {
+  for (const tab of tabsState.tabs) {
+    if (tab.kind !== 'grpc-request') continue;
+    if ((tab as GrpcRequestTabRecord).state.itemId !== itemId) continue;
+    patchGrpcRequestTabState(tab.id, { name });
+  }
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 // P1 D4/F12: reads TAB_KINDS[source.kind].duplicateState instead of a seven-branch if/else — each
 // kind's own entry already knows what "fresh" means for it (data/document/keyvalue/stream keep the
@@ -678,6 +724,10 @@ export function patchHttpRequestTabState(id: string, patch: Partial<HttpRequestT
   patchTabState(id, 'http-request', patch, { skipUnchanged: false });
 }
 
+export function patchGrpcRequestTabState(id: string, patch: Partial<GrpcRequestTabState>): void {
+  patchTabState(id, 'grpc-request', patch, { skipUnchanged: false });
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -720,4 +770,8 @@ export function findBrowseTab(id: string): BrowseTabRecord | null {
 
 export function findHttpRequestTab(id: string): HttpRequestTabRecord | null {
   return asHttpRequestTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findGrpcRequestTab(id: string): GrpcRequestTabRecord | null {
+  return asGrpcRequestTab(tabsState.tabs.find((t) => t.id === id));
 }

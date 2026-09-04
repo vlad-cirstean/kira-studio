@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { openHttpRequestTab } from '../state/tabs';
+import { openGrpcRequestTab, openHttpRequestTab } from '../state/tabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { importCollection } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
@@ -32,6 +32,10 @@ function onImportCurl(): void {
         <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openHttpRequestTab">
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
           New request
+        </button>
+        <button type="button" class="p-dlgbtn" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
+          <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
+          New gRPC request
         </button>
         <button type="button" class="p-dlgbtn" data-testid="import-collection-start" @click="onImport">
           <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>

@@ -85,6 +85,7 @@
                       "../definition/**",
                       "../browse/**",
                       "../httprequest/**",
+                      "../grpcrequest/**",
                       "../../grid/**",
                       "../../documents/**",
                       "../../keyvalue/**",
@@ -92,7 +93,8 @@
                       "../../console/**",
                       "../../definition/**",
                       "../../browse/**",
-                      "../../httprequest/**"
+                      "../../httprequest/**",
+                      "../../grpcrequest/**"
                     ],
                     "message": "SPEC §11: views/<kind>/* must not import another views/<kind>/* — use views/shared/ instead."
                   }
