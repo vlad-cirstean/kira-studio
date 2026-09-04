@@ -37,6 +37,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
 
+// P2 D14/F8: `connection?.color ?? null` used to fold "no connection at all" (an HTTP request
+// tab) and "a connection with no colour assigned" into the same `null` — ViewHeader's own
+// `connColor !== undefined` guard then rendered a dot for both. `undefined` only for the former.
 const connection = computed(() => connectionRecord(props.tab.connectionId));
 
 const runState = useRunState(() => props.tab.id);
@@ -48,7 +51,7 @@ const runState = useRunState(() => props.tab.id);
     :icon-color="iconColor"
     :path="path"
     :name="name"
-    :conn-color="connection?.color ?? null"
+    :conn-color="connection ? (connection.color ?? null) : undefined"
     :conn-kind="connection?.kind"
     :target-testid="targetTestid"
     :name-testid="nameTestid"

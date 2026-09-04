@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
-import { tabTitle } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
@@ -9,6 +8,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu } from '../../state/contextMenu';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
+import { TAB_KINDS } from '../../state/tabKinds';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
@@ -69,9 +69,12 @@ async function onCancel(record: OpRecord): Promise<void> {
   await control.opsCancel(record.id);
 }
 
+// P2 D14/F7: TAB_KINDS[...].title — the registry P1 D4 made the per-kind source of truth —
+// instead of tabs.ts's own tabTitle, which falls back to the raw path (F4) and would print an
+// HTTP request tab's opaque constant 'request' path here.
 function tabTitleFor(record: OpRecord): string {
   const tab = record.tabId ? tabsState.tabs.find((t) => t.id === record.tabId) : undefined;
-  return tab ? tabTitle(tab) : '—';
+  return tab ? TAB_KINDS[tab.kind].title(tab) : '—';
 }
 
 // Reveal is right-click-only (the row's context menu) — a no-op when the tab has since been
@@ -243,7 +246,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
             <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
               <CodeMirrorHost
                 :doc="`command: ${item.record.command}`"
-                language="sql"
+                :language="item.record.kind === 'http' ? 'plain' : 'sql'"
                 :sql-dialect="opSqlDialect(item.record)"
                 :read-only="true"
               />
