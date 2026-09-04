@@ -167,6 +167,15 @@
 }
 
 .slick-grid-host .slick-column-name {
+  /* flex-grow (new — this rule previously had none) is what pushes the sort control to the
+     header cell's true right edge on anything wider than its own text: without it, the row's
+     leftover width just sat as trailing empty space after whichever element happened to be last
+     in DOM order, so the sort control (a DOM sibling SlickGrid places right after this one, before
+     onHeaderCellRendered's own badge/select-zone appends) sat immediately next to the column name
+     instead of at the cell's edge. flex-shrink is unaffected — a narrow column's own "shrink this,
+     not the badge/indicator" behavior (min-width: 0 + overflow/ellipsis below) is exactly as it
+     was. */
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -540,12 +549,24 @@
    that could shrink a column to one character) was the other half of: with every column now at
    least 64px, the header text and PK/FK badge have real room to spare, so the "space-starved
    narrow column" risk the earlier zero-width design was guarding against is far less live than it
-   was when this was written. `codicon-unfold` (a stacked ⌃⌄, not `arrow-both`'s ↔ — checked by
-   actually rendering both, the vertical pairing reads as "sortable" where the horizontal one
-   doesn't) is the neutral, muted-colour default; `-asc`/`-desc` still override both the glyph and
-   the colour once a sort is actually applied. */
+   was when this was written.
+   A further pass moved this to the header's true right edge (`order`, below — DOM order has this
+   div BEFORE `.header-key`/`.header-select-zone`, since SlickGrid builds it as part of its own
+   native header template and onHeaderCellRendered only APPENDS its own badge/zone after; `order`
+   reshuffles the visual sequence to name -> badge -> sort control without touching DOM order or
+   the click/z-index wiring above, which cares about paint stacking, not flex order) and gave the
+   at-rest glyph the same two arrows the sorted states use, stacked, rather than a differently-
+   shaped "unfold" icon — reads as "this is the same control, just showing both directions instead
+   of one" rather than two unrelated icons. Neutral muted colour throughout, not accent: this app's
+   convention (established for the title-bar panel toggles) is that state is shown by shape, not by
+   an unrelated brand colour. */
 .slick-grid-host .slick-sort-indicator {
   flex-shrink: 0;
+  /* Pushed after .slick-column-name's own flex-grow (slick-column-name's own rule, above) and
+     after .header-key — order: 2 is higher than both their default (0) and header-key's own
+     explicit 1, so this is always the last visual item in the row regardless of DOM position. */
+  order: 2;
+  margin-left: auto;
   width: 14px;
   height: 13px;
   /* Unchanged from the pre-existing at-rest geometry (0, not --kira-s-2) even though this state
@@ -556,7 +577,8 @@
      intercepting clicks meant for the zone underneath on the narrowest columns. The `-asc`/
      `-desc` states keep their own margin, unchanged — a real sort is rarer and already had this
      spacing before this pass. */
-  margin: 0;
+  margin-top: 0;
+  margin-bottom: 0;
   border: none;
   background: none;
   font-family: "codicon", monospace;
@@ -567,25 +589,49 @@
   line-height: 1;
   color: var(--kira-fg-muted);
   overflow: hidden;
+  /* The at-rest state stacks both arrows (::before up, ::after down) in a column, each shrunk to
+     fit the existing 14x13px box; a sorted state hides one of the two and grows the other back to
+     the original single-arrow size (below). */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
 }
 .slick-grid-host .slick-sort-indicator::before {
-  content: "\eb73";
+  content: "\eaa1"; /* codicon-arrow-up — the identical glyph the asc state uses */
+  font-size: 7px;
+  line-height: 1;
+}
+.slick-grid-host .slick-sort-indicator::after {
+  content: "\ea9a"; /* codicon-arrow-down — the identical glyph the desc state uses */
+  font-size: 7px;
+  line-height: 1;
 }
 .slick-grid-host .slick-sort-indicator:hover {
   color: var(--kira-fg);
 }
 .slick-grid-host .slick-sort-indicator-asc,
 .slick-grid-host .slick-sort-indicator-desc {
-  margin: 0 0 0 var(--kira-s-2);
-  color: var(--kira-accent);
+  margin-left: var(--kira-s-2);
+  /* Neutral, not var(--kira-accent) — this control signals its state by which single arrow shows,
+     the same way the panel-toggle buttons in the title bar settled on shape/brightness over an
+     unrelated brand colour. */
+  color: var(--kira-fg);
 }
-.slick-grid-host .slick-sort-indicator-asc::before {
-  content: "\eaa1";
+.slick-grid-host .slick-sort-indicator-asc::before,
+.slick-grid-host .slick-sort-indicator-desc::before {
+  font-size: 13px; /* back to the single-arrow size once only one of the two is showing */
+}
+.slick-grid-host .slick-sort-indicator-asc::after,
+.slick-grid-host .slick-sort-indicator-desc::after {
+  content: none; /* exactly one arrow once a direction is chosen, not the at-rest pair */
 }
 .slick-grid-host .slick-sort-indicator-desc::before {
   content: "\ea9a";
 }
 .slick-grid-host .slick-sort-indicator-numbered {
+  order: 3;
   flex-shrink: 0;
   margin: 0;
   width: 0;
