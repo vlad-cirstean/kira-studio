@@ -137,11 +137,19 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		// A fully-omitted pair does not get this treatment (§1.3/the matrix's own "neither set"
 		// case): nothing was offered there, so blaming a credential the caller never attempted
 		// would be wrong; here, one half of a pair was actually typed in.
+		//
+		// round-2 finding 5: ErrFirstReadEOF is constructed at three different call sites inside
+		// franz-go with no way to tell them apart from here, so it can't actually distinguish a
+		// SASL-requiring broker from a TLS misconfiguration or a connection severed for some other
+		// reason — the message below names multiple possibilities rather than asserting SASL
+		// specifically, even though SASL is the scenario this heuristic is scoped to detect.
 		if halfFilledCreds {
 			var firstReadEOF *kgo.ErrFirstReadEOF
 			if errors.As(err, &firstReadEOF) {
 				return nil, nil, nil, adapters.New(adapters.CodeAuth,
-					"kafka: SASL/PLAIN needs both a username and a password", nil)
+					"kafka: connection closed immediately after a half-filled username/password — "+
+						"the broker may require SASL/PLAIN authentication (needs both a username and "+
+						"a password), TLS, or the connection was otherwise refused", nil)
 			}
 		}
 		return nil, nil, nil, mapError(err)
