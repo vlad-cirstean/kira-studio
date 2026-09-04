@@ -94,9 +94,13 @@ function hideTooltip(): void {
   lastCloseAt = performance.now();
 }
 
-// P42 D19: JSON, and only ever written/read by this module — a malformed value here is this
-// module's own bug, not untrusted input, so a parse failure degrades to "no structure" rather
-// than throwing.
+// P42 D19: JSON. Finding 8 (round 2) — this comment used to claim PARTS_ATTR was "only ever
+// written/read by this module"; it's since also written directly by SlickGridHost.vue and
+// ConsoleSlickGrid.vue's own tooltipAttrs() (P42 D19/D20, no dynamic import of this module — the
+// value never leaves a data attribute either writer already controls). No security consequence
+// (still this app's own generated JSON, never external input) — a parse failure still degrades to
+// "no structure" rather than throwing, since a malformed value here would be a bug in one of those
+// three writers, not untrusted input.
 function readParts(el: HTMLElement): TooltipContent | null {
   const raw = el.getAttribute(PARTS_ATTR);
   if (!raw) return null;

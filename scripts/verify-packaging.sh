@@ -64,15 +64,27 @@ fi
 # Every window.__kira* assignment in main.ts must sit inside the `if (__KIRA_DEBUG_HOOKS__)` block
 # (P29 F1) — this is the static check that would have caught window.__kiraGridEngine shipping
 # unconditionally, and would catch the next hook added the same way.
+#
+# Finding 8 (round 2): the actual invariant is "nowhere in the file, full stop" — the awk pass
+# below used to only scan lines BEFORE the gate (`NR < gate`), so a hook added AFTER the block's
+# closing brace (arguably the more natural place to add one) passed silently, un-gated. Fixed by
+# locating the block's own closing brace (the next line that is *exactly* `}` — a lone top-level
+# brace, never `} from '...'`'s import-continuation shape or one of the block's own indented,
+# nested closes) and flagging a window.__kira* assignment anywhere outside [gate, close], not just
+# before it.
 MAIN_TS="apps/kira-studio/frontend/src/main.ts"
 if [ -f "$MAIN_TS" ]; then
   GATE_LINE="$(grep -n '^if (__KIRA_DEBUG_HOOKS__)' "$MAIN_TS" | head -1 | cut -d: -f1)"
   if [ -z "$GATE_LINE" ]; then
     fail "no debug-hook gate" "$MAIN_TS has no top-level 'if (__KIRA_DEBUG_HOOKS__)' block"
   else
-    UNGATED="$(awk -v gate="$GATE_LINE" 'NR < gate && /^[[:space:]]*window\.__kira/' "$MAIN_TS")"
+    UNGATED="$(awk -v gate="$GATE_LINE" '
+      NR == gate { in_block = 1; next }
+      in_block && $0 == "}" { in_block = 0; next }
+      !in_block && /^[[:space:]]*window\.__kira/ { print NR": "$0 }
+    ' "$MAIN_TS")"
     if [ -n "$UNGATED" ]; then
-      fail "un-gated debug global" "$MAIN_TS assigns window.__kira* before its __KIRA_DEBUG_HOOKS__ gate at line $GATE_LINE"
+      fail "un-gated debug global" "$MAIN_TS assigns window.__kira* outside its __KIRA_DEBUG_HOOKS__ gate (block starts at line $GATE_LINE): $UNGATED"
     fi
   fi
 else
