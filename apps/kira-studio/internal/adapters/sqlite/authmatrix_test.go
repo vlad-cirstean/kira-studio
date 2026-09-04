@@ -25,7 +25,9 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 		t.Fatalf("write garbage file: %v", err)
 	}
 	dir := filepath.Join(f.Dir, "p25-a-directory")
-	if err := os.Mkdir(dir, 0o755); err != nil {
+	// MkdirAll, not Mkdir: f.Dir is a memoized fixture directory, so a second `go test -count=2`
+	// run against the same directory would otherwise fail with "file exists".
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
