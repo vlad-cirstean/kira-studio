@@ -4,8 +4,7 @@ import type { HttpRequestTabState } from '@shared/domain/http';
 // form that can be edited and parsed back (a file part is bytes on disk, not text). The caller
 // (HttpRequestView.vue's toolbar button, http.editRaw's command) disables Edit as raw HTTP for the
 // other two rather than generating an elided body the parser would take literally.
-export const RAW_EDITABLE_BODY_MODES = ['none', 'raw', 'code', 'urlencoded'] as const;
-export type RawEditableBodyMode = (typeof RAW_EDITABLE_BODY_MODES)[number];
+const RAW_EDITABLE_BODY_MODES = ['none', 'raw', 'code', 'urlencoded'] as const;
 
 export function canEditAsRaw(bodyMode: HttpRequestTabState['bodyMode']): boolean {
   return (RAW_EDITABLE_BODY_MODES as readonly string[]).includes(bodyMode);

@@ -51,10 +51,10 @@ export interface CollectionRowVm {
 }
 
 /** TreeHost requires a unique string key per row, and the two id spaces are separate tables. */
-export function collectionKey(id: string): string {
+function collectionKey(id: string): string {
   return `c:${id}`;
 }
-export function itemKey(id: string): string {
+function itemKey(id: string): string {
   return `i:${id}`;
 }
 
@@ -97,7 +97,7 @@ export const collectionsState = reactive<CollectionsState>({
 /** Re-reads the whole tree. One call per panel mount (and after every mutation) — the tree is
  *  rows in a local table, so there is nothing to fetch lazily and nothing to be incomplete
  *  about. */
-export async function loadCollections(): Promise<void> {
+async function loadCollections(): Promise<void> {
   const { collections, items } = await control.collectionsList();
   collectionsState.collections = collections;
   collectionsState.items = items as CollectionItemSummary[];
@@ -240,7 +240,7 @@ export function collapseRow(row: CollectionRowVm): void {
 
 /** Every ancestor of an item, so a freshly created row is visible without the user expanding to
  *  it. Walks parent ids rather than the row model, which may not contain the row yet. */
-export function revealItem(collectionId: string, itemId: string | null): void {
+function revealItem(collectionId: string, itemId: string | null): void {
   collectionsState.expanded.add(collectionKey(collectionId));
   let cursor = itemId;
   while (cursor) {

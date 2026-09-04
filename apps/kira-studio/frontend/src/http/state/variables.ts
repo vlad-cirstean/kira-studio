@@ -25,7 +25,7 @@ export const variablesState = reactive<VariablesState>({
 });
 
 /** D3: the app-global selection, or null when none is active ("No environment"). */
-export const activeEnvironment = computed<HttpEnvironment | null>(
+const activeEnvironment = computed<HttpEnvironment | null>(
   () => variablesState.environments.find((e) => e.isActive) ?? null,
 );
 
@@ -33,7 +33,7 @@ export const activeEnvironment = computed<HttpEnvironment | null>(
  *  uses, and what control.httpSend's environmentId will carry at send time. */
 export const activeEnvironmentId = computed(() => activeEnvironment.value?.id ?? '');
 
-export async function loadEnvironments(): Promise<void> {
+async function loadEnvironments(): Promise<void> {
   variablesState.environments = await control.variablesListEnvironments();
   variablesState.loaded = true;
 }

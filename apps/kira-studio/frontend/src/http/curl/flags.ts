@@ -53,7 +53,7 @@ function warned(arity: CurlFlagArity): FlagSpec {
 
 // One record per spelling — long and short forms of the same flag are separate keys pointing at
 // equal specs, not aliases resolved at lookup time, so the table stays a plain object literal.
-export const FLAG_TABLE: Readonly<Record<string, FlagSpec>> = {
+const FLAG_TABLE: Readonly<Record<string, FlagSpec>> = {
   // ---- D5: method, URL, headers, credential sugar ----
   '-X': known('request', 1),
   '--request': known('request', 1),

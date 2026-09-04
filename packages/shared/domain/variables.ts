@@ -41,8 +41,7 @@ export interface HttpVariableHistoryEntry {
 // D8: the same four-outcome vocabulary v1.1 P14 already established for connections.RevealResult,
 // redeclared here rather than shared — importing internal/connections from internal/httpvars would
 // be exactly the Studio<->Http coupling this app's module-boundary rule exists to prevent.
-export const REVEAL_OUTCOMES = ['revealed', 'cancelled', 'confirmation-required', 'error'] as const;
-export type RevealOutcome = (typeof REVEAL_OUTCOMES)[number];
+export type RevealOutcome = 'revealed' | 'cancelled' | 'confirmation-required' | 'error';
 
 export interface RevealResult {
   value: string | null;

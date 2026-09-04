@@ -60,7 +60,7 @@ function urlSummary(url: string): string {
 }
 
 /** D12: the live one-line summary — "POST · api.example.com/v1/orders · 3 headers · JSON body". */
-export function summarizeParsed(state: ParsedCurl['state']): string {
+function summarizeParsed(state: ParsedCurl['state']): string {
   const parts = [state.method, urlSummary(state.url)];
   if (state.headers.length > 0) {
     parts.push(`${state.headers.length} header${state.headers.length === 1 ? '' : 's'}`);
