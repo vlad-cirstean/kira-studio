@@ -63,6 +63,14 @@ const response = computed(() => viewing.value?.snapshot.response ?? rt.value?.re
 const hasHistory = computed(() => (historyRt.value?.entries?.length ?? 0) > 0);
 const historyCount = computed(() => historyRt.value?.entries?.length ?? 0);
 
+// P10 D15/C5: a failed send has no response (§1.6, unchanged) but can carry a partial timeline
+// (ipcerr.Error.Details) — this is what lets the segmented control (and so the Timeline pane)
+// mount for it at all, the same way it already does for a response-less tab that merely has
+// history (hasHistory above).
+const hasFailureTimeline = computed(
+  () => rt.value?.status === 'error' && !!rt.value.error?.timeline,
+);
+
 const RESPONSE_PANE_OPTIONS = [
   { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
@@ -163,7 +171,7 @@ function onBackToLatest(): void {
       {{ rt.error.message }}
     </MessageStrip>
 
-    <template v-if="response || hasHistory">
+    <template v-if="response || hasHistory || hasFailureTimeline">
       <div class="response-status-row p-toolbar">
         <template v-if="response">
           <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">

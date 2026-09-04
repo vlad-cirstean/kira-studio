@@ -3,6 +3,7 @@ import type {
   HttpMethod,
   HttpRequestTabState,
   HttpResponseWire,
+  HttpTimeline,
 } from '@shared/domain/http';
 import { control } from '../../bridge/control';
 import { loadDynamicGenerator } from '../../http/dynamic/catalog';
@@ -132,7 +133,11 @@ export function collectionIdFor(state: HttpRequestTabState): string {
 export interface HttpRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
-  error: { code: string; message: string } | null;
+  // P10 D15/C5: timeline is the failed send's own partial timeline (ipcerr.Error.Details,
+  // mapHttpError) — undefined for every failure that isn't an HTTP send's own transport/body-read
+  // error (classifySendErr is the only producer), so TimelinePane.vue's failure branch has
+  // something to render beside the message this error strip has always shown.
+  error: { code: string; message: string; timeline?: HttpTimeline } | null;
   response: HttpResponseWire | null;
 }
 
@@ -210,7 +215,16 @@ export async function send(tabId: string): Promise<void> {
     // never actually 'disconnected' — but even if it were, applyLoadFailure/unmarkHydrated are
     // deliberately not called here: a Reconnect gate has nothing to gate on a connectionless tab.
     rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
+    // P10 D15: classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
+    // {kind, code, message} — widening it app-wide for one HTTP-only field would reach five other
+    // views that have no use for it. `err.details` is control.ts's own unwrap() addition, read
+    // directly here instead.
+    const details = (err as { details?: unknown } | undefined)?.details;
+    rt.error = {
+      code: failure.code,
+      message: failure.message,
+      timeline: details as HttpTimeline | undefined,
+    };
   }
 }
 

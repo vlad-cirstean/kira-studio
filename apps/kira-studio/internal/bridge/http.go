@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -91,16 +92,26 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				Body:    body,
 			})
 			if sendErr != nil {
+				// P10 D14/D15: a failed send's own Timeline (classifySendErr always attaches one,
+				// C2) carries the same resolved hop URLs a successful send's does, and mapHttpError
+				// — outside this closure, past where usedSecrets goes out of scope — is what turns
+				// it into ipcerr.Error.Details, a copyable surface. Masked here, the one place that
+				// still has usedSecrets, rather than never masked at all.
+				maskSendErrTimeline(sendErr, usedSecrets)
 				return nil, sendErr
 			}
 			op.SetCommand(fmt.Sprintf("%s %s → %d %s", args.Method, args.URL, resp.Status, resp.StatusText))
 
-			// P9 D6: the rendered exchange is built from the *resolved* request, so it carries every
-			// secret's plaintext — the exact situation P7 D10 already ruled on for a generated curl
-			// command (a copyable text surface). Masked here, at the point the values are already
-			// known, rather than inventing a second reveal gate (OQ-4): a secret's plaintext must
-			// never reach a copyable surface ungated (§0.3).
-			maskWireSecrets(resp.Wire, usedSecrets)
+			// P9 D6, widened by P10 D14/F16: the rendered exchange, the timeline's hop URLs and
+			// hop headers, and Redirects/FinalURL are all built from the *resolved* request or a
+			// resolved redirect chain, so every one of them carries a secret's plaintext — the
+			// exact situation P7 D10 already ruled on for a generated curl command (a copyable
+			// text surface), and F16 found that Redirects[].URL/FinalURL have been persisted to
+			// kira.sqlite unmasked since P8 landed. Masked here, at the point the values are
+			// already known, rather than inventing a second reveal gate (OQ-4): a secret's
+			// plaintext must never reach a copyable surface ungated, nor kira.sqlite outside
+			// http_variables.secret_value (§0.3).
+			maskSecrets(&resp, usedSecrets)
 
 			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a
 			// failed insert logs and the send still returns its response — a history feature
@@ -127,15 +138,13 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	return resp, nil
 }
 
-// maskWireSecrets is P9 D6: a no-op when there is no rendered exchange (a dump error, D2) or no
-// secret was actually substituted. Otherwise it replaces every secret's real value with {{name}}
-// inside resp.Wire.Request only — never ResponseHead, which never carried the request's secrets to
-// begin with. A strings.Replacer can only over-mask (a secret value that happens to occur elsewhere
-// in the request is masked too) and never under-mask, which is the safe direction (D6's own stated
-// property).
-func maskWireSecrets(wire *httpclient.WireExchange, usedSecrets map[string]string) {
-	if wire == nil || len(usedSecrets) == 0 {
-		return
+// secretReplacer builds P9 D6's own strings.Replacer over every non-empty secret value — nil when
+// there is nothing to mask (no secret was actually substituted). A strings.Replacer can only
+// over-mask (a secret value that happens to occur elsewhere is masked too) and never under-mask,
+// which is the safe direction (D6's own stated property).
+func secretReplacer(usedSecrets map[string]string) *strings.Replacer {
+	if len(usedSecrets) == 0 {
+		return nil
 	}
 	pairs := make([]string, 0, len(usedSecrets)*2)
 	for name, value := range usedSecrets {
@@ -145,20 +154,79 @@ func maskWireSecrets(wire *httpclient.WireExchange, usedSecrets map[string]strin
 		pairs = append(pairs, value, "{{"+name+"}}")
 	}
 	if len(pairs) == 0 {
+		return nil
+	}
+	return strings.NewReplacer(pairs...)
+}
+
+// maskSecrets is P9 D6, widened by P10 D14/F16 to four fields instead of one. F16 found that
+// resp.Redirects[].URL and resp.FinalURL — P2 fields, persisted by P8 since it landed — are
+// resolved URLs already reaching kira.sqlite unmasked today, and that this phase's own per-hop
+// URL/header list would widen the same gap rather than open a new one. All four are masked here,
+// at the point the values are already known, rather than inventing a second reveal gate (OQ-4).
+// A no-op when there is no rendered exchange (a dump error, D2) or no secret was actually
+// substituted.
+func maskSecrets(resp *httpclient.Response, usedSecrets map[string]string) {
+	replacer := secretReplacer(usedSecrets)
+	if replacer == nil {
 		return
 	}
-	wire.Request = strings.NewReplacer(pairs...).Replace(wire.Request)
-	wire.MaskedSecrets = len(usedSecrets)
+	if resp.Wire != nil {
+		resp.Wire.Request = replacer.Replace(resp.Wire.Request)
+		resp.Wire.MaskedSecrets = len(usedSecrets)
+	}
+	for i := range resp.Timeline.Hops {
+		resp.Timeline.Hops[i].URL = replacer.Replace(resp.Timeline.Hops[i].URL)
+		for j := range resp.Timeline.Hops[i].Headers {
+			// F16: a Location header is a URL too — the most likely place for a secret-bearing
+			// query string to reappear on a redirect.
+			resp.Timeline.Hops[i].Headers[j].Value = replacer.Replace(resp.Timeline.Hops[i].Headers[j].Value)
+		}
+	}
+	for i := range resp.Redirects {
+		resp.Redirects[i].URL = replacer.Replace(resp.Redirects[i].URL)
+	}
+	resp.FinalURL = replacer.Replace(resp.FinalURL)
+}
+
+// maskSendErrTimeline is D14's reach into D15's own new failure channel: a failed send's Timeline
+// (herr.Timeline, always attached by classifySendErr) carries the same resolved hop URLs a
+// successful send's Response.Timeline does, and mapHttpError below — called outside this
+// function's caller's closure, past where usedSecrets is in scope — is what turns it into
+// ipcerr.Error.Details, a copyable surface. A no-op when err is not an *httpclient.Error, carries
+// no Timeline, or no secret was actually substituted.
+func maskSendErrTimeline(err error, usedSecrets map[string]string) {
+	var herr *httpclient.Error
+	if !errors.As(err, &herr) || herr.Timeline == nil {
+		return
+	}
+	replacer := secretReplacer(usedSecrets)
+	if replacer == nil {
+		return
+	}
+	for i := range herr.Timeline.Hops {
+		herr.Timeline.Hops[i].URL = replacer.Replace(herr.Timeline.Hops[i].URL)
+	}
 }
 
 // mapHttpError joins httpclient's own four-code vocabulary into the ipcerr family (D8) — not
 // adapters.ErrorCode, whose CodeConnect/CodeEngineDown views/shared/viewOp.ts's
 // DISCONNECTED_CODES would misread as "the database connection is gone" and pop a Reconnect gate
-// over a tab that has no connection to reconnect.
+// over a tab that has no connection to reconnect. P10 D15: when the failure carries a Timeline —
+// already masked by maskSendErrTimeline above, before the error ever left the RunOp closure — it
+// is marshalled into Details for a renderer that knows how to read it (control.ts/state.ts, C5).
 func mapHttpError(err error) error {
 	var herr *httpclient.Error
 	if errors.As(err, &herr) {
-		return ipcerr.New(string(herr.Code), herr.Message)
+		e := ipcerr.New(string(herr.Code), herr.Message)
+		if herr.Timeline != nil {
+			if b, mErr := json.Marshal(herr.Timeline); mErr == nil {
+				e.Details = b
+			} else {
+				slog.Warn("marshalling failed-send timeline failed", "scope", "bridge/http", "err", mErr)
+			}
+		}
+		return e
 	}
 	return ipcerr.Internal(err.Error())
 }

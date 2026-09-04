@@ -12,6 +12,11 @@ import "encoding/json"
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// Details is P10 D15's own addition: optional structured context for one specific failure, for
+	// a renderer that knows how to read it (HttpService.Send's own failed-send timeline, so far the
+	// only producer). omitempty keeps Error()'s JSON byte-identical for every other bound method,
+	// which leaves this nil.
+	Details json.RawMessage `json:"details,omitempty"`
 }
 
 func (e *Error) Error() string {

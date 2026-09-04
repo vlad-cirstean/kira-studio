@@ -25,6 +25,24 @@ const response = computed(
 // a stored response" empty state distinct from "no timeline at all" the way Raw has one.
 const timeline = computed(() => response.value?.timeline ?? null);
 
+// P10 D15/C5: a failed send's own partial timeline — closes P9 OQ-7. A response, live or stored,
+// always takes precedence: this is only ever consulted when there is none.
+const failedTimeline = computed(() => {
+  if (response.value) return null;
+  if (rt.value?.status !== 'error') return null;
+  return rt.value.error?.timeline ?? null;
+});
+const activeTimeline = computed(() => timeline.value ?? failedTimeline.value);
+
+// D13: "The request failed during {phase}." — inferred from which of the send's own measured
+// phases the failed hop actually has, the same evidence the hop's own phase list already shows.
+function failurePhaseText(hop: HttpTimelineHop): string {
+  if (!hop.dns && !hop.connect) return 'connecting to the server';
+  if (hop.connect && !hop.tls && hop.url.startsWith('https:')) return 'the TLS handshake';
+  if (!hop.wait && !hop.download) return 'waiting for a response';
+  return 'the download';
+}
+
 // F18's one extension to RunState.vue's own ms/s convention: a sub-millisecond figure keeps two
 // decimals rather than rounding to "0 ms" — the reused-connection case this pane exists to explain
 // is exactly the sub-millisecond one (D4).
@@ -67,7 +85,7 @@ function pct(part: number, whole: number): number {
 
 /** D5: the hop's own bar, offset by its StartOffsetMs inside the send's full-width track. */
 function hopBarStyle(hop: HttpTimelineHop): { left: string; width: string } {
-  const total = timeline.value?.totalMs ?? 0;
+  const total = activeTimeline.value?.totalMs ?? 0;
   return {
     left: `${pct(hop.startOffsetMs, total)}%`,
     width: `${Math.max(pct(hop.totalMs, total), MIN_BAR_PCT)}%`,
@@ -146,16 +164,28 @@ function residueNote(hop: HttpTimelineHop): string {
 
 <template>
   <div class="timeline-pane" data-testid="http-timeline-pane">
-    <template v-if="timeline && timeline.hops.length > 0">
-      <MessageStrip v-if="viewingStored" tone="note" data-testid="http-timeline-stored-note">
+    <template v-if="activeTimeline && activeTimeline.hops.length > 0">
+      <!-- D15: a failed send's own partial timeline — the failure sentence names the phase the
+           request never got past, from the same measured phases the hop below already shows. -->
+      <MessageStrip
+        v-if="failedTimeline"
+        tone="err"
+        data-testid="http-timeline-failure-note"
+      >
+        The request failed during {{ failurePhaseText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}.
+        The steps below are what completed before it did.
+      </MessageStrip>
+      <MessageStrip v-else-if="viewingStored" tone="note" data-testid="http-timeline-stored-note">
         This timeline was recorded when the response was received.
       </MessageStrip>
 
-      <div class="p-xs dim timeline-summary" data-testid="http-timeline-summary">{{ summary }}</div>
+      <div v-if="!failedTimeline" class="p-xs dim timeline-summary" data-testid="http-timeline-summary">
+        {{ summary }}
+      </div>
 
       <div class="timeline-hops">
         <div
-          v-for="hop in timeline.hops"
+          v-for="hop in activeTimeline.hops"
           :key="hop.index"
           class="timeline-hop"
           data-testid="http-timeline-hop"
@@ -165,7 +195,12 @@ function residueNote(hop: HttpTimelineHop): string {
             <span>{{ hop.method }}</span>
             <span class="hop-url">{{ hop.url }}</span>
             <span>→</span>
-            <span class="p-chip" :class="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</span>
+            <span v-if="hop.status > 0" class="p-chip" :class="statusClass(hop.status)">
+              {{ hop.status }} {{ hop.statusText }}
+            </span>
+            <span v-else class="p-chip err" data-testid="http-timeline-hop-failed-chip">
+              {{ hop.error || 'failed' }}
+            </span>
           </div>
 
           <div class="hop-track">
@@ -216,7 +251,7 @@ function residueNote(hop: HttpTimelineHop): string {
             </div>
           </details>
           <details
-            v-else-if="hop.index === timeline.hops.length - 1 && response?.headers.length"
+            v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
             class="hop-headers"
           >
             <summary class="p-xs dim">Response headers</summary>
@@ -228,7 +263,7 @@ function residueNote(hop: HttpTimelineHop): string {
         </div>
       </div>
 
-      <div class="timeline-legend p-xs dim" data-testid="http-timeline-legend">
+      <div v-if="!failedTimeline" class="timeline-legend p-xs dim" data-testid="http-timeline-legend">
         <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="legend-item">
           <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
         </span>
@@ -239,6 +274,12 @@ function residueNote(hop: HttpTimelineHop): string {
     </template>
 
     <EmptyState v-else-if="response" icon="watch" label="This response has no timeline." data-testid="http-timeline-empty" />
+    <EmptyState
+      v-else-if="rt?.status === 'error'"
+      icon="warning"
+      label="This request failed before any timeline data was captured."
+      data-testid="http-timeline-empty"
+    />
     <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
   </div>
 </template>
