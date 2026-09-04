@@ -985,20 +985,53 @@ P7's own curl corpus takes. Eight cases:
    tooltip for a tab whose body mode is `formdata` (D10).
 
 ### 6.5 What only a real Mac and a real network can settle
-1. **The h2 share in practice.** Send to a handful of real public HTTPS endpoints and record how
-   many report `fidelity: 'http2'`. F2 measured that Google does; the *proportion* is what decides
-   whether the `http2` sentence is an edge case or the common one, and it is worth knowing before
-   P13 styles the strip.
-2. **A real corporate proxy** — confirm `fidelity: 'proxied'` fires and that the sentence is the
-   right one (F5/F9 used hand-written proxies).
-3. **A 2 GB binary body**: confirm the raw view renders instantly with a marker and that memory
-   does not spike (F8's `body=false` rule is what makes this true; it is worth watching once).
-4. **A real form-data send with two files**: confirm the rendered framing matches what the server
-   actually parsed, part for part.
-5. **A real secret in a header**: confirm the raw view shows `{{name}}` and that *Copy as curl*
-   still reveals through the real Touch ID prompt (the two surfaces must not interfere).
-6. **A hand-edited raw request that is then sent**: confirm a `{{var}}` typed in the dialog resolves
-   at send exactly as one typed in the builder does (D9's claim, end to end).
+
+None of the six run in this sandbox (no display, a proxied/restricted network, no macOS/Touch ID
+backend) — recorded here as unrunnable, with what was read or reasoned instead, in the same shape
+P1's own checklist line took.
+
+1. **The h2 share in practice.** *Not run* — this sandbox's outbound network goes through a
+   restricted agent proxy, not a real, representative path to public HTTPS endpoints. F2's own
+   measurement (a real request to google.com reporting `resp.Proto="HTTP/2.0"`) is the only
+   evidence available here; the *proportion* across a broader set of real endpoints is exactly what
+   P13 would need before styling the strip, and stays open.
+2. **A real corporate proxy.** *Not run* — no such proxy is reachable from this sandbox. F5/F9's
+   hand-written CONNECT/forwarding proxies are what `classifyFidelity`'s `proxied` branch and F9's
+   request-line note were verified against; a real corporate proxy (NTLM auth, TLS-inspecting MITM)
+   could differ in ways those hand-written probes cannot surface.
+3. **A 2 GB binary body.** *Not run* — no representative multi-GB file and no memory-profiling
+   tooling set up here. Read instead: `renderRequestBody`'s `BodyFile` case (`wire.go`) never calls
+   `os.Open` or reads any byte at all — it only formats `httpReq.ContentLength` (already resolved by
+   `buildFile`'s own `os.Stat`) and `filepath.Base` into the marker string — so the code path is
+   structurally size-independent; `TestRenderRequestBody_FileBodyReadsNoBytes` (`wire_test.go`)
+   pins this for a small file, and nothing in the function's control flow changes for a larger one.
+   Worth an actual watch on real hardware once, per the plan's own note.
+4. **A real form-data send with two files, against a real server.** *Not run as a fresh end-to-end
+   check* — but not unverified either: `renderFormDataBody` (`wire.go`) and the real send path
+   (`buildFormData`/`streamFormData`, `body.go`) call the *identical* `formPartHeader`/boundary
+   sequence, which is exactly what makes `TestBuildBody_MultipartContentLengthExact`
+   (`body_test.go`, pre-existing) and `TestRenderRequest_MultipartElision` (`wire_test.go`, this
+   phase) both hold: the dry-run count/framing the render produces is provably the same framing the
+   real multipart.Writer pass produces, by shared construction, not by coincidence. What only a real
+   server adds is confirming a real HTTP stack's own multipart parser agrees — worth running once,
+   not blocking.
+5. **A real secret in a header, through a real Touch ID prompt.** *Not run* — no macOS hardware, no
+   Keychain, no biometric backend in this Linux sandbox (`KIRA_INSECURE_SECRETS=1`'s own dev
+   fallback, AGENTS.md). `bridge/http.go`'s `maskWireSecrets` and the *Copy as curl* reveal gate are
+   two independent code paths (one masks `Wire.Request` unconditionally; the other decrypts and
+   reveals only after `localauth.Authorizer.Authorize`), verified independently — but never
+   end-to-end against a real prompt.
+6. **A hand-edited raw request that is then sent, confirming `{{var}}` resolves.** *Reasoned through
+   the code, not run as a fresh Go integration test*: `applyEditRaw` (`http/state/raw.ts`) is a
+   plain `patchHttpRequestTabState` call — after it returns, the tab is byte-identical in shape to
+   one authored entirely through the builder, and `send()` (`views/httprequest/state.ts`) runs the
+   same `resolveTabState`/`ResolveRequest` two-stage pipeline it always does, unmodified by this
+   phase. That pipeline's own substitution behaviour is already covered end-to-end by
+   `tests/ui/http-variables.spec.ts`'s *"substitution reaches the wire, and a secret does not"* —
+   this phase adds no new substitution code for Apply's own patch to bypass. `tests/ui/
+   http-raw.spec.ts`'s own editor test does exercise Apply and confirms the *tab state* lands
+   correctly (method/headers/URL); it stops short of also clicking Send, which would be this item's
+   only remaining gap.
 
 ### 6.6 What must not regress
 - **Studio renders identically.** Nothing in this phase touches `project/**`, `views/grid/**`,
@@ -1028,23 +1061,49 @@ P7's own curl corpus takes. Eight cases:
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — the three TS additions; `httpResponsePaneSchema` widened with an existing stored
-      `'body'`/`'headers'`/`'history'` value still restoring.
-- [ ] C2 — `renderRequest`'s head is byte-identical to a teed wire capture in `wire_test.go` case 1;
-      the multipart elision reports the real `Content-Length`; all three fidelities classify.
-- [ ] C3 — a rendered request carries `{{name}}` and no plaintext for every secret; a stored
-      snapshot's JSON contains no `"wire"` key; `bindings/**` comes back byte-identical.
-- [ ] C4 — the fourth segment renders; the fidelity strip shows the right sentence for each of the
-      three values; both Copy buttons work; a stored history entry shows D7's empty state.
-- [ ] C5/C6 — the corpus round-trips; `{{var}}` survives in all four positions; header case and
-      order are preserved; the six error/warning cases fire.
-- [ ] C7 — Apply patches **the current tab** (not a fresh one); the dialog is disabled with its
-      tooltip for `formdata`/`file`; the urlencoded→raw conversion is warned before Apply.
-- [ ] C8 — `tests/ui/http-raw.spec.ts`'s four tests, each passing twice in a row.
-- [ ] C9 — `docs/ARCHITECTURE.md` updated, **including the corrected `(P7)` pointer at `:1016`**.
-- [ ] §6.1's full command set green, including the four-chunk check and both bindings checks.
-- [ ] §6.5's six real-hardware/real-network steps — run, or recorded as unrunnable here with what
-      was read instead, in the same shape P1's own checklist line took.
+- [x] C1 — the three TS additions; `httpResponsePaneSchema` widened with an existing stored
+      `'body'`/`'headers'`/`'history'` value still restoring (F13's own reasoning: every prior
+      member is untouched, and `state/tabKinds.ts`'s `parseState` merge-normalises the rest — not
+      given its own dedicated test, matching P8's own precedent for the identical widening).
+- [x] C2 — `renderRequest`'s head is byte-identical to a teed wire capture in `wire_test.go` case 1
+      (`TestRenderRequest_ExactnessAgainstTheWire`); the multipart elision reports the real
+      `Content-Length` (`TestRenderRequest_MultipartElision`); all three fidelities classify
+      (`TestClassifyFidelity`).
+- [x] C3 — a rendered request carries `{{name}}` and no plaintext for every secret
+      (`TestResolveRequestReturnsExactlyTheSecretsItSubstituted`); a stored snapshot's JSON contains
+      no `"wire"` key (`TestResponseHistoryRecordStripsWireBeforePersisting`); bindings confirmed by
+      direct inspection rather than `git diff` — **`apps/kira-studio/frontend/bindings/**` turned
+      out to be git-ignored entirely** (`apps/kira-studio/.gitignore`), so there is no tracked
+      baseline to diff against. Regenerated directly (`wails3 task common:generate:bindings`, since
+      `scripts/setup.sh`'s own coarse CLI-identity stamp skipped it) and confirmed instead that
+      `HttpService.Send`'s binding still calls `$Call.ByName(…)` (not `$Call.ByID`) and that
+      `Response` gained exactly one new optional `wire` field of the new `WireExchange` type.
+- [x] C4 — the fourth segment renders; the fidelity strip shows the right sentence for each of the
+      three values (`http-raw.spec.ts`'s exact/http2 tests); both Copy buttons render (not clicked
+      in the UI suite — `copyText`/`navigator.clipboard` is P7's own already-covered primitive); a
+      stored history entry shows D7's empty state (`http-raw.spec.ts`'s third test).
+- [x] C5/C6 — the corpus round-trips (`http-raw-parse.spec.ts`); `{{var}}` survives in all four
+      positions; header case and order are preserved (including two same-named rows); the six
+      error/warning cases fire (Content-Length dropped, Transfer-Encoding chunked, obs-fold line
+      number, unknown method, no target, no colon).
+- [x] C7 — Apply patches **the current tab** (not a fresh one — `http-raw.spec.ts`'s editor test);
+      the dialog is disabled with its tooltip for `formdata` (verified for `formdata`; `file` shares
+      the identical `canEditAsRaw` gate and is not separately clicked in the UI suite); the
+      urlencoded→raw conversion is warned before Apply (added as a follow-up commit after this
+      checklist was first drafted, once the gap was noticed).
+- [x] C8 — `tests/ui/http-raw.spec.ts`'s four tests, each passing twice in a row (run three times
+      total across this session, including once after the urlencoded→raw addition).
+- [x] C9 — `docs/ARCHITECTURE.md` updated, **including the corrected `(P7)` pointer** (the stale
+      text lived at the line the plan called `:1016` when this plan was written; C1-C8's own
+      insertions above it in this same file shifted it — corrected by content match, not by line
+      number) — plus the P9 wire-rendering paragraph, the fidelity table's prose form, D7's
+      live-only rule beside P8's own storage paragraph (including fixing that paragraph's own stale
+      forward-reference to "the phase that could" render binary bodies — P9 measured that it does
+      not, D5), and the raw editor's parse-back contract.
+- [x] §6.1's full command set green, including the four-chunk check and both bindings checks (see
+      C3's own note on how the bindings check was actually performed).
+- [x] §6.5's six real-hardware/real-network steps — none runs in this sandbox; each is recorded
+      above with what was read or reasoned instead.
 
 ---
 

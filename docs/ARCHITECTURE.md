@@ -612,10 +612,12 @@ the request body and once to the response body) truncates a stored copy independ
 viewer render once?" vs. "how much is it worth keeping twenty copies of, forever?") get two
 different, independently-flagged truncation booleans, so an entry can report *both*, *either*, or
 neither. A **binary response body is not stored at all** — `bodyEncoding: "base64"` inflates the
-single largest payload class by a third, and the response viewer already refuses to render it (P9
-is the phase that could, and therefore the phase where storing the bytes would start to earn its
-keep) — the entry keeps every other field, including the true `bodyBytes`, so the list still reads
-"412 KB · binary". A **per-scope count cap** (20, the same shape `filter_history`'s/
+single largest payload class by a third, and the response viewer already refuses to render it. P9's
+raw inspector does not change this: its own rendering elides a binary body the identical way (a
+`[… N bytes of binary data …]` marker, never the bytes), so a binary body staying storable-as-a-
+marker-only is a settled property now, not a deferred question — the entry keeps every other field,
+including the true `bodyBytes`, so the list still reads "412 KB · binary". A **per-scope count cap**
+(20, the same shape `filter_history`'s/
 `http_variable_history`'s own insert-then-trim SQL already uses) bounds one request's own history.
 And a **global byte budget** (128 MiB, the same order of magnitude as the L2 row cache's own
 `cache.l2BudgetMb` budget, deliberately) bounds the table itself regardless of how many requests
@@ -1012,9 +1014,80 @@ no bound method and no bindings regeneration — `internal/httpvars/`, `internal
 the bytes as actually received, so `internal/httpclient` cannot recover either the original casing
 or the original order even if it wanted to. `Response.Headers` is instead a deterministic
 substitute — `[]Header{Name, Value}` sorted by name, one entry per value so a duplicate header
-(e.g. multiple `Set-Cookie`s) still survives — documented on the struct itself. A byte-level raw
-inspector, the phase that could recover the wire bytes directly (P7), is the one that can lift this
-if it ever matters.
+(e.g. multiple `Set-Cookie`s) still survives — documented on the struct itself. **P9 measured the
+lift and declined it, rather than merely deferring the question**: recovering the bytes as received
+needs a byte-level capture (below), and every mechanism that can do that changes the protocol the
+app negotiates or is unavailable outright for a proxied or HTTP/2 connection — the common case, not
+the edge one. So this property stands; P9's own raw view renders a *reconstruction* of the response
+half, labelled as one (below), rather than lifting this limitation.
+
+**P9's raw view renders from the real `*http.Request`/`*http.Response` — exact for the request
+half, an explicitly labelled reconstruction for the response half — because genuinely captured wire
+bytes are not available at an acceptable cost.** Four things were measured, not assumed:
+`sharedClient`'s transport already speaks HTTP/2 to most real HTTPS hosts (`onceSetNextProtoDefaults`
+bundles it automatically whenever `TLSClientConfig` is nil and no custom dialer is set, which is
+exactly the shape `client.go`'s transport already has) — so a large fraction of real sends have no
+HTTP/1.1 wire bytes at all, only HPACK frames on a multiplexed connection. Installing any dialer or
+connection tee capable of capturing real bytes forces `ForceAttemptHTTP2: false` or the negotiation
+silently downgrades to HTTP/1.1, changing the very thing being observed. Behind an HTTP proxy
+(`http.ProxyFromEnvironment`, already `sharedClient.Transport.Proxy`), the transport's own
+`connectMethod.scheme()` reports the *proxy's* scheme for a proxied HTTPS target, so a custom TLS
+dialer is never even consulted — a conn-level tee yields ciphertext, or nothing. And pooled
+connection reuse interleaves two exchanges on one tee, needing a third mechanism (`httptrace`
+installation, per-connection sink swapping) to de-interleave. None of this is a reason to give up on
+"raw" — it is the reason to render it instead of capture it: `httputil.DumpRequestOut(httpReq,
+false)`, called immediately before `sharedClient.Do` in `client.go`'s `Send`, was measured
+**byte-identical** to a real teed wire capture for a request carrying duplicate headers, a `Host:`
+header override, and the transport's own `Accept-Encoding: gzip` — because it is not an imitation,
+it runs the request through a real `http.Transport` writing to an in-memory pipe, the same
+`Request.write` a real send uses. The body is composed separately (`internal/httpclient/wire.go`),
+capped at 128 KiB and elided for a `file`/`formdata` payload the same two-pass dry-run trick
+`multipartLength` already uses for the real `Content-Length` — the header's own count is always the
+real one, never the elided text's length, so a truncation never lies about size. The response half
+has no equivalent stdlib exactness: `httputil.DumpResponse` reconstructs from the already-
+canonicalised `*http.Response`, alphabetised, and for an HTTP/2 exchange writes an honest status
+line over HTTP/1.1-style header lines that never existed on the wire. So every rendering carries a
+`fidelity` value — `exact` (HTTP/1.1, no proxy), `http2`, or `proxied` (a proxied plain-HTTP
+request's absolute-form request line is the one byte that differs from the dump, named rather than
+hidden) — computed from `resp.ProtoMajor` and the same `http.ProxyFromEnvironment` call the
+transport itself makes, so the label can never disagree with what actually happened. A tool that
+quietly showed HTTP/1.1 text for an HTTP/2 exchange would be worse than no tool at all.
+
+**The rendered exchange is live-only — stripped before it can reach `kira.sqlite`, never a fourth
+history cap.** `httpclient.Response.Wire *WireExchange` (`json:"wire,omitempty"`) rides back on the
+same object P8's `ResponseHistoryRepo.Record` already marshals into `snapshot_json` on every send —
+so `Record` sets `resp.Wire = nil` before marshalling, one line, and the omitted-when-nil tag means
+a stored snapshot's JSON carries no `"wire"` key at all, not a null one. The rendering is a resolved
+request in text form; even masked (below) it would double a snapshot's size for a pane that cannot
+be opened from a stored entry anyway — selecting a past response and switching to Raw shows an
+empty state naming exactly that lifetime, the same one P2 D6 already gave the live response object
+itself, applied here to a strictly larger payload. A rendered request's secrets are masked back to
+`{{name}}` before this even matters: `internal/httpvars.ResolveRequest` (above) already returns
+which secret names it substituted and their values in the same call; `bridge/http.go` builds a
+`strings.Replacer` from that pair set and applies it to `Wire.Request` only — never
+`Wire.ResponseHead`, which never carried a request secret to begin with. This is the same posture
+P7's *Copy as curl* dialog already applies to a generated command (a copyable text surface with
+every secret masked by construction), reused rather than a second reveal gate invented for a third
+surface — the raw pane's own masking note points at *Copy as curl* for anyone who needs the real
+values.
+
+**The raw *editor* is a third representation of tab state, parsed and generated entirely in
+renderer TypeScript exactly as P7's curl import/generate is, and it is pre-substitution by
+design.** `http/raw/generate.ts` builds a raw HTTP/1.1 text buffer from `HttpRequestTabState` —
+`{{base_url}}`, `{{token}}` and `{{$guid}}` all appear literally, because a post-substitution buffer
+could not be edited at all (applying it would write today's resolved values back into the tab and
+permanently destroy every variable reference). `http/raw/parse.ts` is the inverse, hand-written for
+the same reason P7 D1 declined every published curl parser: a raw-text parser has to accept
+`{{base_url}}/v2/orders` as a request-target and preserve header name case and row order verbatim,
+which is the opposite of what a conformant HTTP parser does. The dialog (`EditRawRequestDialog.vue`)
+parses the buffer once, on **Apply**, and patches the *current* tab — never a fresh one, the one
+deliberate difference from *Import from curl*, since this is the request already open being
+re-authored, not a new one being imported. Substitution still applies at send exactly as it does for
+a builder-authored request, because after Apply the tab is an ordinary tab and `send()` runs its
+usual two-stage resolution over whatever `{{name}}` references the hand-edited text carried — there
+is no second send path. A `formdata`/`file` body has no text form and is refused outright (disabled
+button, named tooltip) rather than generating an elided body the parser would take literally as
+bytes to send.
 
 **Past responses are browsed by swapping a source object, not by mounting a second viewer
 (P8).** `ResponsePane.vue`'s entire rendering — the status chip, elapsed/byte figures, redirect
