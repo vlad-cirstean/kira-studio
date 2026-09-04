@@ -1,0 +1,226 @@
+import type {
+  CollectionItemKind,
+  CollectionItemSummary,
+  CollectionSummary,
+  HttpSavedRequest,
+  ImportReport,
+} from '@shared/domain/collections';
+import { computed, reactive } from 'vue';
+import { control } from '../../bridge/control';
+
+// P4 D13: Http's own tree store. Studio's tree is lazy because its data is remote — expanding a
+// node connects a connection and issues an IPC call, which is what its children cache, loading
+// set, 150 ms search debounce and "searching cached nodes only" note all exist for (F15). A
+// collections tree has none of that: the whole tree is rows in a local SQLite table, listable in
+// one call, so `visibleRows` below is a **pure computed** over one array. That is a genuine
+// simplification rather than a shape to copy.
+
+/** The row TreeHost renders. Four structural members (key/depth/hasChildren/expanded — TreeHost's
+ *  own StickyRowLike contract) plus seven of its own, against TreeRowVm's fourteen: connectionId,
+ *  color, status, statusDetail, groupKind, badges, loading and error have no meaning here. The
+ *  mechanics generalize; the rows do not, which is exactly why P1 factored TreeHost out and left
+ *  TreeRow where it was. */
+export interface CollectionRowVm {
+  key: string;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  kind: 'collection' | 'folder' | 'request';
+  id: string;
+  collectionId: string;
+  parentId: string | null;
+  name: string;
+  /** Requests only — the row's leading chip. */
+  method: string;
+  /** Requests only — searched, never shown. */
+  url: string;
+  matched: boolean;
+}
+
+/** TreeHost requires a unique string key per row, and the two id spaces are separate tables. */
+export function collectionKey(id: string): string {
+  return `c:${id}`;
+}
+export function itemKey(id: string): string {
+  return `i:${id}`;
+}
+
+interface CollectionsState {
+  collections: CollectionSummary[];
+  items: CollectionItemSummary[];
+  expanded: Set<string>;
+  selected: string | null;
+  search: string;
+  /** The row key whose label is currently an inline rename input, if any. */
+  renamingKey: string | null;
+  /** Saved requests read on demand by GetRequest, keyed by item id — the dirty comparison's
+   *  other half (D15) and the reason opening an already-open request costs no call. */
+  requests: Record<string, HttpSavedRequest>;
+  busy: boolean;
+  report: ImportReport | null;
+  loaded: boolean;
+}
+
+export const collectionsState = reactive<CollectionsState>({
+  collections: [],
+  items: [],
+  expanded: new Set<string>(),
+  selected: null,
+  search: '',
+  renamingKey: null,
+  requests: {},
+  busy: false,
+  report: null,
+  loaded: false,
+});
+
+/** Re-reads the whole tree. One call per panel mount (and after every mutation) — the tree is
+ *  rows in a local table, so there is nothing to fetch lazily and nothing to be incomplete
+ *  about. */
+export async function loadCollections(): Promise<void> {
+  const { collections, items } = await control.collectionsList();
+  collectionsState.collections = collections;
+  collectionsState.items = items as CollectionItemSummary[];
+  collectionsState.loaded = true;
+}
+
+export function initCollections(): void {
+  if (collectionsState.loaded) return;
+  void loadCollections();
+}
+
+// ---- the row model ----
+
+function childrenOf(collectionId: string, parentId: string | null): CollectionItemSummary[] {
+  return collectionsState.items
+    .filter((item) => item.collectionId === collectionId && item.parentId === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/** Lower-cased once per render rather than per row. '' means "no search active". */
+export const activeSearchQuery = computed(() => collectionsState.search.trim().toLowerCase());
+
+function rowMatches(name: string, url: string, query: string): boolean {
+  if (!query) return false;
+  return name.toLowerCase().includes(query) || url.toLowerCase().includes(query);
+}
+
+/** True when this subtree contains a match, so an ancestor of a hit still renders. */
+function subtreeMatches(item: CollectionItemSummary, query: string): boolean {
+  if (rowMatches(item.name, item.url, query)) return true;
+  return childrenOf(item.collectionId, item.id).some((child) => subtreeMatches(child, query));
+}
+
+export const visibleRows = computed<CollectionRowVm[]>(() => {
+  const query = activeSearchQuery.value;
+  const rows: CollectionRowVm[] = [];
+
+  const pushItems = (collectionId: string, parentId: string | null, depth: number): void => {
+    for (const item of childrenOf(collectionId, parentId)) {
+      if (query && !subtreeMatches(item, query)) continue;
+      const children = childrenOf(collectionId, item.id);
+      // While a query is active every ancestor of a match renders expanded **without mutating
+      // `expanded`**, so clearing the search restores exactly the shape the user had.
+      const expanded = query ? true : collectionsState.expanded.has(itemKey(item.id));
+      rows.push({
+        key: itemKey(item.id),
+        depth,
+        hasChildren: item.kind === 'folder' && children.length > 0,
+        expanded,
+        kind: item.kind,
+        id: item.id,
+        collectionId,
+        parentId,
+        name: item.name,
+        method: item.method,
+        url: item.url,
+        matched: rowMatches(item.name, item.url, query),
+      });
+      if (item.kind === 'folder' && expanded) pushItems(collectionId, item.id, depth + 1);
+    }
+  };
+
+  for (const collection of collectionsState.collections) {
+    const children = childrenOf(collection.id, null);
+    const hasMatch = !query || children.some((child) => subtreeMatches(child, query));
+    if (query && !hasMatch && !rowMatches(collection.name, '', query)) continue;
+    const expanded = query ? true : collectionsState.expanded.has(collectionKey(collection.id));
+    rows.push({
+      key: collectionKey(collection.id),
+      depth: 0,
+      hasChildren: children.length > 0,
+      expanded,
+      kind: 'collection',
+      id: collection.id,
+      collectionId: collection.id,
+      parentId: null,
+      name: collection.name,
+      method: '',
+      url: '',
+      matched: rowMatches(collection.name, '', query),
+    });
+    if (expanded) pushItems(collection.id, null, 1);
+  }
+  return rows;
+});
+
+// ---- selection and expansion ----
+
+export function selectRow(key: string): void {
+  collectionsState.selected = key;
+}
+
+export function toggleRow(row: CollectionRowVm): void {
+  if (!row.hasChildren) return;
+  if (collectionsState.expanded.has(row.key)) collectionsState.expanded.delete(row.key);
+  else collectionsState.expanded.add(row.key);
+}
+
+export function expandRow(row: CollectionRowVm): void {
+  if (row.hasChildren) collectionsState.expanded.add(row.key);
+}
+
+export function collapseRow(row: CollectionRowVm): void {
+  collectionsState.expanded.delete(row.key);
+}
+
+/** Every ancestor of an item, so a freshly created row is visible without the user expanding to
+ *  it. Walks parent ids rather than the row model, which may not contain the row yet. */
+export function revealItem(collectionId: string, itemId: string | null): void {
+  collectionsState.expanded.add(collectionKey(collectionId));
+  let cursor = itemId;
+  while (cursor) {
+    const item = collectionsState.items.find((row) => row.id === cursor);
+    if (!item) return;
+    collectionsState.expanded.add(itemKey(item.id));
+    cursor = item.parentId;
+  }
+}
+
+// ---- lookups the panel, the menus and the request view all share ----
+
+export function itemRecord(itemId: string): CollectionItemSummary | undefined {
+  return collectionsState.items.find((item) => item.id === itemId);
+}
+
+export function collectionRecord(collectionId: string): CollectionSummary | undefined {
+  return collectionsState.collections.find((c) => c.id === collectionId);
+}
+
+/** Every folder in a collection, in tree order, as `Folder / Subfolder` labels — the target
+ *  picker's own list (D15). */
+export function folderPaths(collectionId: string): { id: string; label: string }[] {
+  const out: { id: string; label: string }[] = [];
+  const walk = (parentId: string | null, prefix: string): void => {
+    for (const item of childrenOf(collectionId, parentId)) {
+      if (item.kind !== 'folder') continue;
+      const label = prefix ? `${prefix} / ${item.name}` : item.name;
+      out.push({ id: item.id, label });
+      walk(item.id, label);
+    }
+  };
+  walk(null, '');
+  return out;
+}
+
+export type { CollectionItemKind };

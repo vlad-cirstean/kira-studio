@@ -1,18 +1,27 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { openHttpRequestTab } from '../state/tabs';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import LeftPanel from '../workbench/panels/LeftPanel.vue';
+import CollectionsTree from './CollectionsTree.vue';
+import { collectionsState } from './state/collections';
 
-// P1 C6: Http's own left-panel content, mounted through the same LeftPanel shell Studio's
-// ProjectPanel.vue uses (D3/D6) — proof the seam works, not a stub of a feature. `empty` is
-// always true: collections themselves don't land until P4, so there is genuinely no tree here
-// yet (AGENTS.md: "scope left out of a phase is left out entirely") — D13 gives the panel header
-// a New request action anyway, exactly where ProjectPanel.vue puts Add connection.
+// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
+// shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
+// collections yet", which is also what gates LeftPanel's own search box (F14).
+//
+// The `new-request` and `new-request-empty` testids are preserved exactly as P1 left them —
+// existing specs click them, and P4 has no reason to move Http's front door.
+const empty = computed(() => collectionsState.collections.length === 0);
+
+function onSearch(value: string): void {
+  collectionsState.search = value;
+}
 </script>
 
 <template>
-  <LeftPanel empty>
+  <LeftPanel :empty="empty" :search="collectionsState.search" @update:search="onSearch">
     <template #title>
       <span>Collections</span>
     </template>
@@ -25,8 +34,11 @@ import LeftPanel from '../workbench/panels/LeftPanel.vue';
         @click="openHttpRequestTab"
       />
     </template>
+    <template #body>
+      <CollectionsTree />
+    </template>
     <template #empty>
-      <EmptyState icon="globe" label="Collections arrive in a later phase">
+      <EmptyState icon="globe" label="No collections yet">
         <button type="button" class="p-dlgbtn primary" data-testid="new-request-empty" @click="openHttpRequestTab">
           New request
         </button>
